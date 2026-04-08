@@ -1,5 +1,4 @@
 import { consume } from "@lit/context";
-import { yaml } from "@codemirror/lang-yaml";
 import { StateEffect, StateField } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { Decoration, type DecorationSet } from "@codemirror/view";
@@ -8,6 +7,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import { basicSetup, EditorView } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import { darkModeContext } from "../context/index.js";
+import { esphomeYaml } from "../util/esphome-yaml-lang.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
@@ -79,7 +79,7 @@ export class ESPHomeYamlEditor extends LitElement {
         doc: this.value,
         extensions: [
           basicSetup,
-          yaml(),
+          esphomeYaml(),
           highlightField,
           EditorView.theme({
             "&": { height: "100%" },
