@@ -157,7 +157,7 @@ export class ESPHomePageDashboard extends LitElement {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
         gap: var(--wa-space-l);
-        padding: var(--wa-space-l);
+        padding: var(--wa-space-m);
       }
 
       /* ─── Search toolbar ─── */

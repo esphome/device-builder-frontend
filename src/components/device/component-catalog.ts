@@ -2,11 +2,12 @@ import { consume } from "@lit/context";
 import { mdiArrowCollapseAll, mdiArrowExpandAll, mdiMemory, mdiOpenInNew, mdiPlus } from "@mdi/js";
 import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import type { ComponentField, ComponentCatalogResponse } from "../../api/types.js";
+import type { ComponentCatalogEntry } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
@@ -21,37 +22,6 @@ registerMdiIcons({
   plus: mdiPlus,
 });
 
-/** A flattened component+platform item for display in the catalog. */
-export interface FlatComponent {
-  key: string;
-  componentId: string;
-  platformId: string;
-  name: string;
-  description: string;
-  category: string;
-  docsUrl: string;
-  fields: ComponentField[];
-}
-
-function flattenCatalog(catalog: ComponentCatalogResponse): FlatComponent[] {
-  const items: FlatComponent[] = [];
-  for (const comp of catalog.components) {
-    for (const plat of comp.platforms) {
-      items.push({
-        key: `${comp.id}_${plat.id}`,
-        componentId: comp.id,
-        platformId: plat.id,
-        name: comp.platforms.length > 1 ? `${comp.name} – ${plat.name}` : comp.name,
-        description: plat.description || comp.description,
-        category: comp.id,
-        docsUrl: comp.docs_url,
-        fields: plat.fields,
-      });
-    }
-  }
-  return items;
-}
-
 @customElement("esphome-component-catalog")
 export class ESPHomeComponentCatalog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -62,7 +32,10 @@ export class ESPHomeComponentCatalog extends LitElement {
   private _api!: ESPHomeAPI;
 
   @state()
-  private _components: FlatComponent[] = [];
+  private _components: ComponentCatalogEntry[] = [];
+
+  @state()
+  private _categories: Array<{ id: string; name: string; count: number }> = [];
 
   @state()
   private _loading = true;
@@ -76,15 +49,21 @@ export class ESPHomeComponentCatalog extends LitElement {
   @state()
   private _expandedId: string | null = null;
 
-  connectedCallback() {
-    super.connectedCallback();
-    this._loadCatalog();
+  private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
+
+  /** Trigger initial or refresh load of the catalog. */
+  public load() {
+    this._fetchComponents();
   }
 
-  private async _loadCatalog() {
+  private async _fetchComponents() {
+    this._loading = true;
     try {
-      const catalog = await this._api.getComponentCatalog();
-      this._components = flattenCatalog(catalog);
+      const query = this._search.trim() || undefined;
+      const category = this._category !== "all" ? this._category : undefined;
+      const response = await this._api.getComponents({ query, category, limit: 50 });
+      this._components = response.components;
+      this._categories = response.categories;
     } catch (e) {
       console.error("Failed to load component catalog:", e);
     } finally {
@@ -347,7 +326,6 @@ export class ESPHomeComponentCatalog extends LitElement {
     }
 
     const categories = this._buildCategories();
-    const filtered = this._filterComponents();
 
     return html`
       <div class="sidebar">
@@ -359,6 +337,7 @@ export class ESPHomeComponentCatalog extends LitElement {
               type="button"
               @click=${() => {
                 this._category = id;
+                this._fetchComponents();
               }}
             >
               <span class="category-btn-inner">
@@ -378,8 +357,8 @@ export class ESPHomeComponentCatalog extends LitElement {
         ></wa-input>
         <div class="grid-scroll">
           <div class="components-grid">
-            ${filtered.length
-              ? filtered.map((c) => this._renderCard(c, c.key === this._expandedId))
+            ${this._components.length
+              ? this._components.map((c) => this._renderCard(c, c.id === this._expandedId))
               : html`<p class="empty">${this._localize("device.no_components_found")}</p>`}
           </div>
         </div>
@@ -389,22 +368,18 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   private _buildCategories() {
     const allCount = this._components.length;
-    const byCat = new Map<string, number>();
-    for (const c of this._components) {
-      byCat.set(c.category, (byCat.get(c.category) ?? 0) + 1);
-    }
     const cats = [{ id: "all", label: this._localize("device.component_category_all"), count: allCount }];
-    for (const [id, count] of byCat) {
+    for (const cat of this._categories) {
       cats.push({
-        id,
-        label: this._localize(`device.component_category_${id}`),
-        count,
+        id: cat.id,
+        label: this._localize(`device.component_category_${cat.id}`),
+        count: cat.count,
       });
     }
     return cats;
   }
 
-  private _renderCard(component: FlatComponent, expanded: boolean) {
+  private _renderCard(component: ComponentCatalogEntry, expanded: boolean) {
     return html`
       <article class="component-card ${expanded ? "component-card--expanded" : ""}">
         <div class="component-card-header">
@@ -431,7 +406,7 @@ export class ESPHomeComponentCatalog extends LitElement {
           ${component.description}
         </p>
         <div class="card-footer">
-          <a class="more-info" href=${component.docsUrl} target="_blank" rel="noreferrer">
+          <a class="more-info" href=${component.docs_url} target="_blank" rel="noreferrer">
             ${this._localize("device.more_info")}
             <wa-icon library="mdi" name="open-in-new"></wa-icon>
           </a>
@@ -444,32 +419,16 @@ export class ESPHomeComponentCatalog extends LitElement {
     `;
   }
 
-  private _filterComponents(): FlatComponent[] {
-    let result = this._components;
-    if (this._category !== "all") {
-      result = result.filter((c) => c.category === this._category);
-    }
-    if (this._search.trim()) {
-      const q = this._search.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(q) ||
-          c.description.toLowerCase().includes(q) ||
-          c.category.toLowerCase().includes(q)
-      );
-    }
-    return result;
-  }
-
-  private _onToggleExpand(component: FlatComponent) {
-    this._expandedId = this._expandedId === component.key ? null : component.key;
+  private _onToggleExpand(component: ComponentCatalogEntry) {
+    this._expandedId = this._expandedId === component.id ? null : component.id;
   }
 
   private _onSearchInput(ev: Event) {
     this._search = (ev.target as HTMLInputElement).value;
+    this._debouncedSearch();
   }
 
-  private _onAdd(component: FlatComponent) {
+  private _onAdd(component: ComponentCatalogEntry) {
     this.dispatchEvent(
       new CustomEvent("add-component", {
         detail: { component },

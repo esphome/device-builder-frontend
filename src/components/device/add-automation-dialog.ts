@@ -2,7 +2,23 @@ import { consume } from "@lit/context";
 import { mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { AutomationTrigger, AutomationAction, ComponentField } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types.js";
+
+// Types for automation catalog — not yet available in the WebSocket backend
+interface AutomationTrigger {
+  id: string;
+  name: string;
+  description: string;
+  applicable_to: string[];
+  fields: ConfigEntry[];
+}
+
+interface AutomationAction {
+  id: string;
+  name: string;
+  description: string;
+  fields: ConfigEntry[];
+}
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
@@ -192,11 +208,10 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private async _loadCatalog() {
     this._loading = true;
     try {
-      const catalog = await this._api.getAutomationCatalog();
-      this._triggers = catalog.triggers;
-      this._actions = catalog.actions;
-      if (this._triggers.length > 0) this._triggerId = this._triggers[0].id;
-      if (this._actions.length > 0) this._actionId = this._actions[0].id;
+      // TODO: Automation catalog is not yet available in the WebSocket backend
+      console.warn("Automation catalog not yet supported by backend");
+      this._triggers = [];
+      this._actions = [];
     } catch (e) {
       console.error("Failed to load automation catalog:", e);
     } finally {
@@ -281,8 +296,8 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     `;
   }
 
-  private _renderActionField(field: ComponentField) {
-    const value = this._actionFields[field.key] ?? String(field.default ?? "");
+  private _renderActionField(field: ConfigEntry) {
+    const value = this._actionFields[field.key] ?? String(field.default_value ?? "");
     if (field.type === "select" && field.options) {
       return html`
         <div class="field">
@@ -291,7 +306,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             @change=${(e: Event) => this._setActionField(field.key, (e.target as HTMLSelectElement).value)}
           >
             ${field.options.map(
-              (opt) => html`<option value=${opt} ?selected=${opt === value}>${opt}</option>`
+              (opt) => html`<option value=${opt.value} ?selected=${opt.value === value}>${opt.label}</option>`
             )}
           </select>
         </div>
@@ -301,9 +316,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       <div class="field">
         <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
         <input
-          type=${field.type === "number" ? "number" : "text"}
+          type=${field.type === "integer" || field.type === "float" ? "number" : "text"}
           .value=${value}
-          placeholder=${String(field.default ?? "")}
+          placeholder=${String(field.default_value ?? "")}
           @input=${(e: Event) => this._setActionField(field.key, (e.target as HTMLInputElement).value)}
         />
       </div>
@@ -319,29 +334,8 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._submitting = true;
     this._error = "";
     try {
-      const selectedAction = this._actions.find((a) => a.id === this._actionId);
-      const actionFields: Record<string, unknown> = {};
-      if (selectedAction) {
-        for (const f of selectedAction.fields) {
-          const v = this._actionFields[f.key] ?? String(f.default ?? "");
-          actionFields[f.key] = f.type === "number" ? Number(v) : v;
-        }
-      }
-      const { yaml } = await this._api.addAutomation(this.configuration, {
-        target_component_name: this._targetName.trim(),
-        trigger: this._triggerId,
-        actions: this._actionId
-          ? [{ action: this._actionId, fields: actionFields }]
-          : [],
-      });
-      this._dialog.open = false;
-      this.dispatchEvent(
-        new CustomEvent("yaml-updated", {
-          detail: { yaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      // TODO: addAutomation is not yet available in the WebSocket backend
+      throw new Error("Automation support is not yet available");
     } catch (err) {
       this._error = err instanceof Error ? err.message : "Failed to add automation";
     } finally {

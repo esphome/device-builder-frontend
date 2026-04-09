@@ -240,7 +240,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
           <p class="board-description">${this.board.description}</p>
         </div>
         <div class="board-image">
-          <img src=${this._boardImageUrl(this.board.id)} alt="${this.board.name}" />
+          <img src=${this._boardImageUrl(this.board)} alt="${this.board.name}" />
         </div>
       </div>
 
@@ -312,8 +312,8 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     `;
   }
 
-  private _boardImageUrl(boardId: string): string {
-    if (boardId.startsWith("apollo")) return "/assets/board/apollo.svg";
+  private _boardImageUrl(board: BoardCatalogEntry): string {
+    if (board.images.length > 0) return board.images[0];
     return "/assets/board/default.svg";
   }
 }

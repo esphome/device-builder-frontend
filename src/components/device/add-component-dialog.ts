@@ -2,9 +2,9 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { ComponentField } from "../../api/types.js";
+import type { ComponentCatalogEntry, ConfigEntry } from "../../api/types.js";
+import { ConfigEntryType } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { FlatComponent } from "./component-catalog.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -13,6 +13,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./component-catalog.js";
+import type { ESPHomeComponentCatalog } from "./component-catalog.js";
 
 registerMdiIcons({ close: mdiClose, "arrow-left": mdiArrowLeft });
 
@@ -34,8 +35,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
+  @query("esphome-component-catalog")
+  private _catalog!: ESPHomeComponentCatalog;
+
   @state()
-  private _selected: FlatComponent | null = null;
+  private _selected: ComponentCatalogEntry | null = null;
 
   @state()
   private _fieldValues: Record<string, string> = {};
@@ -217,6 +221,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._fieldValues = {};
     this._error = "";
     this._dialog.open = true;
+    // Trigger catalog load when dialog opens (ensures WS is connected)
+    this.updateComplete.then(() => this._catalog?.load());
   }
 
   protected render() {
@@ -244,10 +250,19 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _renderForm() {
     const comp = this._selected!;
+    // Only show editable config entries (not labels, dividers, alerts, hidden)
+    const editableEntries = comp.config_entries.filter(
+      (e) =>
+        !e.hidden &&
+        e.type !== ConfigEntryType.LABEL &&
+        e.type !== ConfigEntryType.DIVIDER &&
+        e.type !== ConfigEntryType.ALERT
+    );
+
     return html`
       <div class="form">
         <p class="form-desc">${comp.description}</p>
-        ${comp.fields.map((f) => this._renderField(f))}
+        ${editableEntries.map((e) => this._renderField(e))}
         ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
         <div class="actions">
           <button class="btn btn-secondary" @click=${this._onBack}>
@@ -265,24 +280,25 @@ export class ESPHomeAddComponentDialog extends LitElement {
     `;
   }
 
-  private _renderField(field: ComponentField) {
-    const value = this._fieldValues[field.key] ?? String(field.default ?? "");
-    if (field.type === "select" && field.options) {
+  private _renderField(entry: ConfigEntry) {
+    const value = this._fieldValues[entry.key] ?? String(entry.default_value ?? "");
+
+    if (entry.type === ConfigEntryType.SELECT && entry.options) {
       return html`
         <div class="field">
-          <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
+          <label>${entry.label}${entry.required ? html`<span class="required">*</span>` : nothing}</label>
           <select
             .value=${value}
-            @change=${(e: Event) => this._setField(field.key, (e.target as HTMLSelectElement).value)}
+            @change=${(e: Event) => this._setField(entry.key, (e.target as HTMLSelectElement).value)}
           >
-            ${field.options.map(
-              (opt) => html`<option value=${opt} ?selected=${opt === value}>${opt}</option>`
+            ${entry.options.map(
+              (opt) => html`<option value=${opt.value} ?selected=${opt.value === value}>${opt.label}</option>`
             )}
           </select>
         </div>
       `;
     }
-    if (field.type === "boolean") {
+    if (entry.type === ConfigEntryType.BOOLEAN) {
       return html`
         <div class="field">
           <label>
@@ -290,21 +306,24 @@ export class ESPHomeAddComponentDialog extends LitElement {
               type="checkbox"
               ?checked=${value === "true"}
               @change=${(e: Event) =>
-                this._setField(field.key, String((e.target as HTMLInputElement).checked))}
+                this._setField(entry.key, String((e.target as HTMLInputElement).checked))}
             />
-            ${field.label}
+            ${entry.label}
           </label>
         </div>
       `;
     }
+    const inputType = entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT
+      ? "number"
+      : "text";
     return html`
       <div class="field">
-        <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
+        <label>${entry.label}${entry.required ? html`<span class="required">*</span>` : nothing}</label>
         <input
-          type=${field.type === "number" ? "number" : "text"}
+          type=${inputType}
           .value=${value}
-          placeholder=${String(field.default ?? "")}
-          @input=${(e: Event) => this._setField(field.key, (e.target as HTMLInputElement).value)}
+          placeholder=${String(entry.default_value ?? "")}
+          @input=${(e: Event) => this._setField(entry.key, (e.target as HTMLInputElement).value)}
         />
       </div>
     `;
@@ -316,21 +335,21 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _isFormValid(): boolean {
     if (!this._selected) return false;
-    return this._selected.fields
-      .filter((f) => f.required)
-      .every((f) => {
-        const v = this._fieldValues[f.key] ?? String(f.default ?? "");
+    return this._selected.config_entries
+      .filter((e) => e.required && !e.hidden)
+      .every((e) => {
+        const v = this._fieldValues[e.key] ?? String(e.default_value ?? "");
         return v.trim() !== "";
       });
   }
 
-  private _onComponentSelected(e: CustomEvent<{ component: FlatComponent }>) {
+  private _onComponentSelected(e: CustomEvent<{ component: ComponentCatalogEntry }>) {
     e.stopPropagation();
     const { component } = e.detail;
-    // Pre-fill defaults
+    // Pre-fill defaults from config entries
     const defaults: Record<string, string> = {};
-    for (const f of component.fields) {
-      if (f.default != null) defaults[f.key] = String(f.default);
+    for (const entry of component.config_entries) {
+      if (entry.default_value != null) defaults[entry.key] = String(entry.default_value);
     }
     this._fieldValues = defaults;
     this._selected = component;
@@ -348,13 +367,22 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._error = "";
     try {
       const fields: Record<string, unknown> = {};
-      for (const f of this._selected.fields) {
-        const v = this._fieldValues[f.key] ?? String(f.default ?? "");
-        fields[f.key] = f.type === "number" ? Number(v) : v;
+      for (const entry of this._selected.config_entries) {
+        if (entry.hidden) continue;
+        const v = this._fieldValues[entry.key] ?? String(entry.default_value ?? "");
+        if (!v && !entry.required) continue;
+        if (entry.type === ConfigEntryType.INTEGER) {
+          fields[entry.key] = Number(v);
+        } else if (entry.type === ConfigEntryType.FLOAT) {
+          fields[entry.key] = Number(v);
+        } else if (entry.type === ConfigEntryType.BOOLEAN) {
+          fields[entry.key] = v === "true";
+        } else {
+          fields[entry.key] = v;
+        }
       }
       const { yaml } = await this._api.addComponent(this.configuration, {
-        component: this._selected.componentId,
-        platform: this._selected.platformId,
+        component_id: this._selected.id,
         fields,
       });
       this._dialog.open = false;

@@ -216,8 +216,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
         ${board
           ? html`<img
               class="board-image"
-              src=${isStarterKit
-                ? "/assets/board/apollo.svg"
+              src=${board.images.length > 0
+                ? board.images[0]
                 : "/assets/board/default.svg"}
               alt=${board.name}
             />`

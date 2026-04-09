@@ -13,6 +13,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
@@ -48,15 +49,19 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @state()
   private _expandedBoardId: string | null = null;
 
+  private _debouncedSearch = debounce(() => this._fetchBoards(), 300);
+
   connectedCallback() {
     super.connectedCallback();
-    this._loadBoards();
+    this._fetchBoards();
   }
 
-  private async _loadBoards() {
+  private async _fetchBoards() {
+    this._loading = true;
     try {
-      const { boards } = await this._api.getBoardCatalog();
-      this._boards = boards;
+      const query = this._search.trim() || undefined;
+      const response = await this._api.getBoards({ query, limit: 50 });
+      this._boards = response.boards;
     } catch (e) {
       console.error("Failed to load board catalog:", e);
     } finally {
@@ -309,9 +314,8 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
 
-    const allBoards = this._filterBoards(this._search);
-    const featured = allBoards.find((b) => b.tags.includes("starter-kit"));
-    const regular = allBoards.filter((b) => !b.tags.includes("starter-kit"));
+    const featured = this._boards.find((b) => b.featured);
+    const regular = this._boards.filter((b) => !b.featured);
 
     return html`
       <wa-input
@@ -352,9 +356,10 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   private _renderFeatured(board: BoardCatalogEntry) {
+    const imageUrl = board.images.length > 0 ? board.images[0] : "/assets/board/apollo.svg";
     return html`
       <div class="featured-card">
-        <img class="featured-image" src="/assets/board/apollo.svg" alt=${board.name} />
+        <img class="featured-image" src=${imageUrl} alt=${board.name} />
         <div class="featured-body">
           <h3 class="featured-title">${board.name}</h3>
           <p class="featured-desc">${board.description}</p>
@@ -385,10 +390,11 @@ export class ESPHomeWizardStepBoard extends LitElement {
   }
 
   private _renderBoardCard(board: BoardCatalogEntry, expanded: boolean) {
+    const imageUrl = board.images.length > 0 ? board.images[0] : "/assets/board/default.svg";
     return html`
       <article class="board-card ${expanded ? "board-card--expanded" : ""}">
         <div class="board-card-header">
-          <img class="board-image" src="/assets/board/default.svg" alt=${board.name} />
+          <img class="board-image" src=${imageUrl} alt=${board.name} />
           <div class="board-card-header-text">
             <h3 class="board-title">${board.name}</h3>
           </div>
@@ -436,19 +442,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
     `;
   }
 
-  private _filterBoards(search: string): BoardCatalogEntry[] {
-    if (!search.trim()) return [...this._boards];
-    const q = search.toLowerCase();
-    return this._boards.filter(
-      (b) =>
-        b.name.toLowerCase().includes(q) ||
-        b.description.toLowerCase().includes(q) ||
-        b.tags.some((t) => t.toLowerCase().includes(q))
-    );
-  }
-
   private _onSearchInput(ev: Event) {
     this._search = (ev.target as HTMLInputElement).value;
+    this._debouncedSearch();
   }
 
   private _onToggleExpand(board: BoardCatalogEntry) {

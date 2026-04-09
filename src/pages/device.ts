@@ -51,7 +51,7 @@ export class ESPHomePageDevice extends LitElement {
     if (boardId) return this._boards.find((b) => b.id === boardId) ?? null;
     // Fallback: extract `board:` value from the YAML and match by hardware board ID
     const match = this._yaml.match(/^\s{2}board:\s*(\S+)/m);
-    if (match) return this._boards.find((b) => b.board === match[1]) ?? null;
+    if (match) return this._boards.find((b) => b.esphome.board === match[1]) ?? null;
     return null;
   }
 
@@ -95,8 +95,9 @@ export class ESPHomePageDevice extends LitElement {
 
   private async _loadBoardCatalog() {
     try {
-      const catalog = await this._api.getBoardCatalog();
-      this._boards = catalog.boards;
+      // Load a reasonable set of boards for matching the current device's board
+      const response = await this._api.getBoards({ limit: 200 });
+      this._boards = response.boards;
     } catch (e) {
       console.error("Failed to load board catalog:", e);
     }
@@ -104,7 +105,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private async _loadYaml() {
     try {
-      this._yaml = await this._api.getEdit(this.id);
+      this._yaml = await this._api.getConfig(this.id);
     } catch (e) {
       console.error("Failed to load YAML:", e);
     }
@@ -112,7 +113,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private async _saveYaml() {
     try {
-      await this._api.saveEdit(this.id, this._yaml);
+      await this._api.updateConfig(this.id, this._yaml);
       toast.success(this._localize("device.yaml_saved"), { richColors: true });
     } catch (e) {
       console.error("Failed to save YAML:", e);

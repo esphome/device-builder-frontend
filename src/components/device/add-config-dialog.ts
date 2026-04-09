@@ -2,7 +2,18 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { ConfigSection, ComponentField } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types.js";
+
+// Types for config section catalog — not yet available in the WebSocket backend
+interface ConfigSection {
+  id: string;
+  name: string;
+  description: string;
+  docs_url: string;
+  icon: string;
+  yaml_template: string;
+  fields: ConfigEntry[];
+}
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
@@ -250,8 +261,20 @@ export class ESPHomeAddConfigDialog extends LitElement {
   private async _loadCatalog() {
     this._loading = true;
     try {
-      const { sections } = await this._api.getConfigCatalog();
-      this._sections = sections;
+      // Fetch core infrastructure components from the component catalog
+      const response = await this._api.getComponents({
+        category: "core",
+        limit: 100,
+      });
+      this._sections = response.components.map((c) => ({
+        id: c.id,
+        name: c.name,
+        description: c.description,
+        docs_url: c.docs_url,
+        icon: "",
+        yaml_template: `${c.id}:\n`,
+        fields: c.config_entries,
+      }));
     } catch (e) {
       console.error("Failed to load config catalog:", e);
     } finally {
@@ -319,8 +342,8 @@ export class ESPHomeAddConfigDialog extends LitElement {
     `;
   }
 
-  private _renderField(field: ComponentField) {
-    const value = this._fieldValues[field.key] ?? String(field.default ?? "");
+  private _renderField(field: ConfigEntry) {
+    const value = this._fieldValues[field.key] ?? String(field.default_value ?? "");
     if (field.type === "select" && field.options) {
       return html`
         <div class="field">
@@ -329,7 +352,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
             @change=${(e: Event) => this._setField(field.key, (e.target as HTMLSelectElement).value)}
           >
             ${field.options.map(
-              (opt) => html`<option value=${opt} ?selected=${opt === value}>${opt}</option>`
+              (opt) => html`<option value=${opt.value} ?selected=${opt.value === value}>${opt.label}</option>`
             )}
           </select>
         </div>
@@ -339,9 +362,9 @@ export class ESPHomeAddConfigDialog extends LitElement {
       <div class="field">
         <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
         <input
-          type=${field.type === "number" ? "number" : "text"}
+          type=${field.type === "integer" || field.type === "float" ? "number" : "text"}
           .value=${value}
-          placeholder=${String(field.default ?? "")}
+          placeholder=${String(field.default_value ?? "")}
           @input=${(e: Event) => this._setField(field.key, (e.target as HTMLInputElement).value)}
         />
       </div>
@@ -357,7 +380,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
     return this._selected.fields
       .filter((f) => f.required)
       .every((f) => {
-        const v = this._fieldValues[f.key] ?? String(f.default ?? "");
+        const v = this._fieldValues[f.key] ?? String(f.default_value ?? "");
         return v.trim() !== "";
       });
   }
@@ -365,7 +388,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
   private _selectSection(section: ConfigSection) {
     const defaults: Record<string, string> = {};
     for (const f of section.fields) {
-      if (f.default != null) defaults[f.key] = String(f.default);
+      if (f.default_value != null) defaults[f.key] = String(f.default_value);
     }
     this._fieldValues = defaults;
     this._selected = section;
@@ -383,12 +406,20 @@ export class ESPHomeAddConfigDialog extends LitElement {
     this._error = "";
     try {
       const fields: Record<string, unknown> = {};
-      for (const f of this._selected.fields) {
-        const v = this._fieldValues[f.key] ?? String(f.default ?? "");
-        fields[f.key] = f.type === "number" ? Number(v) : v;
+      for (const field of this._selected.fields) {
+        if (field.hidden) continue;
+        const v = this._fieldValues[field.key] ?? String(field.default_value ?? "");
+        if (!v && !field.required) continue;
+        if (field.type === "integer" || field.type === "float") {
+          fields[field.key] = Number(v);
+        } else if (field.type === "boolean") {
+          fields[field.key] = v === "true";
+        } else {
+          fields[field.key] = v;
+        }
       }
-      const { yaml } = await this._api.addConfigSection(this.configuration, {
-        section: this._selected.id,
+      const { yaml } = await this._api.addComponent(this.configuration, {
+        component_id: this._selected.id,
         fields,
       });
       this._dialog.open = false;

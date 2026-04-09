@@ -4,8 +4,19 @@ import { css, html, LitElement, nothing } from "lit";
 import toast from "sonner-js";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { ConfigEntry, SectionConfigResponse } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
+
+// Local type — SectionConfigResponse is not yet available in the WebSocket backend
+interface SectionConfigResponse {
+  section_key: string;
+  section_type: "core" | "component" | "automation";
+  title: string;
+  description: string;
+  docs_url: string;
+  icon: string;
+  entries: ConfigEntry[];
+}
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -274,29 +285,87 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._error = "";
     this._dirty = false;
     try {
-      this._config = await this._api.getSectionConfig(
-        this.configuration,
-        this.sectionKey
-      );
-      // Initialize values from entries
-      const values: Record<string, unknown> = {};
-      for (const entry of this._config.entries) {
-        if (
-          entry.hidden ||
-          entry.type === ConfigEntryType.LABEL ||
-          entry.type === ConfigEntryType.DIVIDER ||
-          entry.type === ConfigEntryType.ALERT
-        ) {
-          continue;
-        }
-        values[entry.key] = entry.value ?? entry.default_value ?? "";
+      // Fetch the component schema from the catalog
+      const component = await this._api.getComponent(this.sectionKey);
+      if (!component) {
+        this._error = `Unknown section: ${this.sectionKey}`;
+        this._config = null;
+        this._loading = false;
+        return;
       }
-      this._values = values;
-    } catch (err) {
-      this._error = err instanceof Error ? err.message : "Failed to load section config";
+
+      // Parse current values from the device YAML
+      const yaml = await this._api.getConfig(this.configuration);
+      const currentValues = this._parseYamlSectionValues(yaml);
+
+      this._config = {
+        section_key: this.sectionKey,
+        section_type: "core",
+        title: component.name,
+        description: component.description,
+        docs_url: component.docs_url,
+        icon: "",
+        entries: component.config_entries,
+      };
+      this._values = currentValues;
+    } catch (e) {
+      this._error = e instanceof Error ? e.message : "Failed to load section config";
+      this._config = null;
     } finally {
       this._loading = false;
     }
+  }
+
+  /**
+   * Parse simple key: value pairs from the YAML section at the current fromLine.
+   * Only reads direct children (2-space indent) — skips nested blocks.
+   */
+  private _parseYamlSectionValues(yaml: string): Record<string, unknown> {
+    const lines = yaml.split("\n");
+    const values: Record<string, unknown> = {};
+
+    // Find the section start
+    let startIdx = -1;
+    if (this.fromLine !== undefined) {
+      startIdx = this.fromLine - 1; // 1-indexed to 0-indexed
+    } else {
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith(`${this.sectionKey}:`)) {
+          startIdx = i;
+          break;
+        }
+      }
+    }
+    if (startIdx < 0) return values;
+
+    // Extract direct children (exactly 2-space indent)
+    for (let i = startIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.trim() === "") continue;
+      // New top-level section — stop
+      if (/^[a-zA-Z]/.test(line)) break;
+
+      const match = line.match(/^  ([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
+      if (!match) continue;
+
+      const key = match[1];
+      let raw = match[2].trim();
+      // Skip if value is empty (nested block)
+      if (raw === "") continue;
+      // Strip quotes
+      if (
+        (raw.startsWith('"') && raw.endsWith('"')) ||
+        (raw.startsWith("'") && raw.endsWith("'"))
+      ) {
+        raw = raw.slice(1, -1);
+      }
+      // Store typed values
+      if (raw === "true") values[key] = true;
+      else if (raw === "false") values[key] = false;
+      else values[key] = raw;
+    }
+
+    return values;
   }
 
   protected render() {
@@ -488,73 +557,127 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       return;
     }
     try {
-      const { yaml } = await this._api.deleteSection(
-        this.configuration,
-        this.sectionKey,
-        this.fromLine
-      );
-      toast.success(this._localize("device.section_deleted", { name: this._config.title }), { richColors: true });
-      // Notify parent to update YAML and clear selection
+      const yaml = await this._api.getConfig(this.configuration);
+      const newYaml = this._removeSectionFromYaml(yaml);
+      await this._api.updateConfig(this.configuration, newYaml);
       this.dispatchEvent(
         new CustomEvent("yaml-updated", {
-          detail: { yaml },
+          detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
         })
       );
+      // Deselect this section
       this.dispatchEvent(
         new CustomEvent("section-select", {
-          detail: { sectionKey: null },
+          detail: { sectionKey: null, fromLine: undefined },
           bubbles: true,
           composed: true,
         })
       );
-    } catch (err) {
-      toast.error(this._localize("device.section_delete_error"), { richColors: true });
+      toast.success(`"${this._config.title}" removed`, { richColors: true });
+    } catch (e) {
+      toast.error("Failed to delete section", { richColors: true });
     }
   }
 
   private async _onSave() {
-    if (!this._config || this._saving) return;
+    if (!this._config) return;
     this._saving = true;
     this._error = "";
     try {
-      // Filter out empty optional values and internal keys
-      const valuesToSave: Record<string, unknown> = {};
-      for (const [key, val] of Object.entries(this._values)) {
-        if (key.startsWith("_")) continue;
-        const entry = this._config.entries.find((e) => e.key === key);
-        if (!entry) continue;
-        // Skip empty non-required fields
-        if (!entry.required && (val === "" || val === null || val === undefined))
-          continue;
-        valuesToSave[key] = val;
-      }
-
-      const { yaml } = await this._api.updateSectionConfig(this.configuration, {
-        section_key: this._config.section_key,
-        values: valuesToSave,
-      });
-
-      // Notify parent of YAML update
+      const yaml = await this._api.getConfig(this.configuration);
+      const newYaml = this._updateSectionInYaml(yaml);
+      await this._api.updateConfig(this.configuration, newYaml);
+      this._dirty = false;
       this.dispatchEvent(
         new CustomEvent("yaml-updated", {
-          detail: { yaml },
+          detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
         })
       );
-
-      toast.success(this._localize("device.section_saved"), { richColors: true });
-
-      // Reload form with fresh values from the saved YAML
-      await this._loadConfig();
-    } catch (err) {
-      this._error = err instanceof Error ? err.message : "Failed to save";
-      toast.error(this._localize("device.section_save_error"), { richColors: true });
+      toast.success(`"${this._config.title}" saved`, { richColors: true });
+    } catch (e) {
+      this._error = e instanceof Error ? e.message : "Failed to save";
     } finally {
       this._saving = false;
     }
+  }
+
+  /** Remove the entire section (from its top-level key to the next) from the YAML. */
+  private _removeSectionFromYaml(yaml: string): string {
+    const lines = yaml.split("\n");
+    const { start, end } = this._findSectionRange(lines);
+    if (start < 0) return yaml;
+    lines.splice(start, end - start);
+    return lines.join("\n");
+  }
+
+  /** Replace the section's direct child values in the YAML with the form values. */
+  private _updateSectionInYaml(yaml: string): string {
+    const lines = yaml.split("\n");
+    const { start, end } = this._findSectionRange(lines);
+    if (start < 0) return yaml;
+
+    // Build updated lines for the section
+    const sectionHeader = lines[start];
+    const newLines = [sectionHeader];
+
+    // Collect existing lines that are nested blocks (not simple key: value)
+    const existingNested: string[] = [];
+    const existingKeys = new Set<string>();
+    for (let i = start + 1; i < end; i++) {
+      const line = lines[i];
+      const match = line.match(/^  ([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
+      if (match && match[2].trim() !== "") {
+        existingKeys.add(match[1]);
+      } else if (line.trim() !== "") {
+        // Preserve nested blocks and comments as-is
+        existingNested.push(line);
+      }
+    }
+
+    // Write form values
+    for (const entry of this._config!.entries) {
+      if (entry.hidden) continue;
+      const val = this._values[entry.key];
+      if (val === undefined || val === "" || val === null) continue;
+      const strVal = typeof val === "boolean" ? String(val) : typeof val === "string" && val.includes(" ") ? `"${val}"` : String(val);
+      newLines.push(`  ${entry.key}: ${strVal}`);
+    }
+
+    // Re-add nested blocks that weren't simple values
+    newLines.push(...existingNested);
+
+    lines.splice(start, end - start, ...newLines);
+    return lines.join("\n");
+  }
+
+  /** Find the 0-indexed line range [start, end) for the current section. */
+  private _findSectionRange(lines: string[]): { start: number; end: number } {
+    let start = -1;
+    if (this.fromLine !== undefined) {
+      start = this.fromLine - 1;
+    } else {
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].startsWith(`${this.sectionKey}:`)) {
+          start = i;
+          break;
+        }
+      }
+    }
+    if (start < 0) return { start: -1, end: -1 };
+
+    // Find the end: next top-level key or EOF
+    let end = lines.length;
+    for (let i = start + 1; i < lines.length; i++) {
+      if (/^[a-zA-Z]/.test(lines[i])) {
+        end = i;
+        break;
+      }
+    }
+    return { start, end };
   }
 }
 

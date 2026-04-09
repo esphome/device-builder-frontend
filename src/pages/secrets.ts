@@ -43,7 +43,7 @@ export class ESPHomePageSecrets extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     try {
-      this._yaml = await this._api.getEdit(SECRETS_FILE);
+      this._yaml = await this._api.getConfig(SECRETS_FILE);
     } catch {
       this._yaml =
         '# ESPHome Secrets\n# Define sensitive values here and reference them with !secret <key>\n\nwifi_ssid: "your-ssid"\nwifi_password: "your-password"\napi_encryption_key: "your-key"\n';
@@ -161,7 +161,7 @@ export class ESPHomePageSecrets extends LitElement {
   private async _save() {
     this._saving = true;
     try {
-      await this._api.saveEdit(SECRETS_FILE, this._yaml);
+      await this._api.updateConfig(SECRETS_FILE, this._yaml);
       toast.success(this._localize("secrets.saved"), { richColors: true });
     } catch {
       toast.error(this._localize("secrets.save_error"), { richColors: true });

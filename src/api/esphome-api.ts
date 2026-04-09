@@ -1,442 +1,503 @@
 /**
- * ESPHome Dashboard API client.
+ * ESPHome Device Builder API client.
  *
- * Provides methods for all HTTP and WebSocket endpoints
- * exposed by the ESPHome dashboard backend.
+ * Single multiplexed WebSocket connection to /ws.
+ * All commands use the {command, message_id, args} → {result} protocol.
+ * Streaming commands (compile, upload, logs, validate, clean) receive
+ * EventMessages with "output" and "result" events.
  */
 import type {
-  DevicesResponse,
-  PingResponse,
-  VersionResponse,
-  SerialPort,
-  DownloadItem,
-  Board,
-  BoardCatalogResponse,
-  ComponentCatalogResponse,
-  AutomationCatalogResponse,
-  ConfigCatalogResponse,
   AddComponentResponse,
-  AddConfigSectionResponse,
-  AddAutomationResponse,
-  SectionConfigResponse,
-  UpdateSectionConfigResponse,
+  BoardCatalogEntry,
+  CommandMessage,
+  ComponentCatalogEntry,
+  DevicesResponse,
+  ErrorMessage,
+  EventMessage,
+  EventSubscriptionCallback,
+  PagedBoardsResponse,
+  PagedComponentsResponse,
+  ResultMessage,
+  SerialPort,
+  ServerInfoMessage,
+  StreamCallbacks,
+  UpdateDeviceResponse,
   UserPreferences,
-  WizardRequest,
   WizardResponse,
-  ImportRequest,
-  WsSpawnMessage,
-  WsEvent,
-  DashboardEvent,
 } from "./types.js";
 
+type PendingRequest = {
+  resolve: (result: unknown) => void;
+  reject: (error: Error) => void;
+};
+
+type StreamHandler = {
+  onOutput?: (line: string) => void;
+  onResult?: (data: { success: boolean; code: number }) => void;
+  onError?: (error: string) => void;
+};
+
 export class ESPHomeAPI {
-  private _baseUrl: string;
+  private _ws: WebSocket | null = null;
+  private _messageId = 0;
+  private _pendingRequests = new Map<string, PendingRequest>();
+  private _streamHandlers = new Map<string, StreamHandler>();
+  private _eventSubscriptions = new Map<string, EventSubscriptionCallback>();
+  private _serverInfo: ServerInfoMessage | null = null;
+  private _connected = false;
+  private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _connectPromise: {
+    resolve: (info: ServerInfoMessage) => void;
+    reject: (error: Error) => void;
+  } | null = null;
 
-  constructor(baseUrl: string = "") {
-    // Default to same origin (empty string) for proxied dev setup
-    this._baseUrl = baseUrl;
+  // Callbacks for connection state changes
+  onConnected?: (info: ServerInfoMessage) => void;
+  onDisconnected?: () => void;
+
+  get connected(): boolean {
+    return this._connected;
   }
 
-  // ─── HTTP Endpoints ────────────────────────────────────────
+  get serverInfo(): ServerInfoMessage | null {
+    return this._serverInfo;
+  }
 
-  private async _request<T>(
-    method: string,
-    path: string,
-    options?: {
-      params?: Record<string, string>;
-      body?: unknown;
+  // ─── Connection Management ────────────────────────────────
+
+  /**
+   * Connect to the WebSocket endpoint.
+   * Resolves with the ServerInfoMessage on successful connection.
+   */
+  connect(): Promise<ServerInfoMessage> {
+    if (this._connected && this._serverInfo) {
+      return Promise.resolve(this._serverInfo);
     }
+
+    return new Promise((resolve, reject) => {
+      this._connectPromise = { resolve, reject };
+
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+
+      this._ws = new WebSocket(wsUrl);
+
+      this._ws.addEventListener("message", (event) => {
+        this._onMessage(event);
+      });
+
+      this._ws.addEventListener("error", () => {
+        if (this._connectPromise) {
+          this._connectPromise.reject(new Error("WebSocket connection failed"));
+          this._connectPromise = null;
+        }
+      });
+
+      this._ws.addEventListener("close", () => {
+        this._onClose();
+      });
+    });
+  }
+
+  /** Disconnect and stop reconnecting. */
+  disconnect(): void {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
+    this._ws?.close();
+    this._ws = null;
+    this._connected = false;
+  }
+
+  private _onMessage(event: MessageEvent): void {
+    let data: Record<string, unknown>;
+    try {
+      data = JSON.parse(event.data);
+    } catch {
+      console.error("Invalid JSON from WebSocket");
+      return;
+    }
+
+    // ServerInfoMessage — sent on connect, has server_version
+    if ("server_version" in data) {
+      this._serverInfo = data as unknown as ServerInfoMessage;
+      this._connected = true;
+      if (this._connectPromise) {
+        this._connectPromise.resolve(this._serverInfo);
+        this._connectPromise = null;
+      }
+      this.onConnected?.(this._serverInfo);
+      return;
+    }
+
+    const messageId = data.message_id as string;
+    if (!messageId) return;
+
+    // ErrorMessage
+    if ("error_code" in data) {
+      const err = data as unknown as ErrorMessage;
+      const pending = this._pendingRequests.get(messageId);
+      if (pending) {
+        this._pendingRequests.delete(messageId);
+        pending.reject(new Error(`${err.error_code}: ${err.details || ""}`));
+      }
+      const stream = this._streamHandlers.get(messageId);
+      if (stream) {
+        this._streamHandlers.delete(messageId);
+        stream.onError?.(err.details || err.error_code);
+      }
+      return;
+    }
+
+    // EventMessage — push events or streaming output/result
+    if ("event" in data) {
+      const evt = data as unknown as EventMessage;
+
+      // Event subscription push events (subscribe_events)
+      const sub = this._eventSubscriptions.get(messageId);
+      if (sub) {
+        sub(evt.event, evt.data);
+        return;
+      }
+
+      // Streaming command output/result
+      const stream = this._streamHandlers.get(messageId);
+      if (stream) {
+        if (evt.event === "output") {
+          stream.onOutput?.(evt.data as string);
+        } else if (evt.event === "result") {
+          this._streamHandlers.delete(messageId);
+          stream.onResult?.(evt.data as { success: boolean; code: number });
+        }
+      }
+      return;
+    }
+
+    // ResultMessage — command response
+    if ("result" in data) {
+      const result = data as unknown as ResultMessage;
+      const pending = this._pendingRequests.get(messageId);
+      if (pending) {
+        this._pendingRequests.delete(messageId);
+        pending.resolve(result.result);
+      }
+      return;
+    }
+  }
+
+  private _onClose(): void {
+    const wasConnected = this._connected;
+    this._connected = false;
+    this._ws = null;
+
+    // Reject all pending requests
+    for (const [, pending] of this._pendingRequests) {
+      pending.reject(new Error("WebSocket connection closed"));
+    }
+    this._pendingRequests.clear();
+
+    // Notify stream handlers
+    for (const [, stream] of this._streamHandlers) {
+      stream.onError?.("WebSocket connection closed");
+    }
+    this._streamHandlers.clear();
+
+    // Clear event subscriptions (will re-subscribe on reconnect)
+    this._eventSubscriptions.clear();
+
+    if (wasConnected) {
+      this.onDisconnected?.();
+      // Auto-reconnect after delay
+      this._reconnectTimer = setTimeout(() => {
+        this._reconnectTimer = null;
+        this.connect().catch(() => {
+          // Will retry on next close
+        });
+      }, 5000);
+    }
+  }
+
+  // ─── Command Sending ──────────────────────────────────────
+
+  private _nextMessageId(): string {
+    return String(++this._messageId);
+  }
+
+  /**
+   * Send a command and wait for the result.
+   */
+  async sendCommand<T = unknown>(
+    command: string,
+    args?: Record<string, unknown>
   ): Promise<T> {
-    let url = `${this._baseUrl}/${path}`;
-
-    if (options?.params) {
-      const search = new URLSearchParams(options.params);
-      url += `?${search.toString()}`;
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
     }
 
-    const init: RequestInit = { method };
-
-    if (options?.body) {
-      init.headers = { "Content-Type": "application/json" };
-      init.body = JSON.stringify(options.body);
+    const messageId = this._nextMessageId();
+    const msg: CommandMessage = { command, message_id: messageId };
+    if (args && Object.keys(args).length > 0) {
+      msg.args = args;
     }
 
-    const resp = await fetch(url, init);
-
-    if (!resp.ok) {
-      throw new Error(`API request failed: ${resp.status} ${resp.statusText}`);
-    }
-
-    const contentType = resp.headers.get("content-type") ?? "";
-    if (!contentType.includes("json") && resp.status === 204) return undefined as T;
-    const text = await resp.text();
-    if (!text) return undefined as T;
-    return JSON.parse(text) as T;
-  }
-
-  /** Get all configured and importable devices. */
-  async getDevices(): Promise<DevicesResponse> {
-    return this._request("GET", "devices");
-  }
-
-  /** Get online/offline status for all devices. */
-  async getPing(): Promise<PingResponse> {
-    return this._request("GET", "ping");
-  }
-
-  /** Get ESPHome version. */
-  async getVersion(): Promise<VersionResponse> {
-    return this._request("GET", "version");
-  }
-
-  /** Get storage info for a device. */
-  async getInfo(configuration: string): Promise<unknown> {
-    return this._request("GET", "info", {
-      params: { configuration },
+    return new Promise<T>((resolve, reject) => {
+      this._pendingRequests.set(messageId, {
+        resolve: resolve as (result: unknown) => void,
+        reject,
+      });
+      this._ws!.send(JSON.stringify(msg));
     });
   }
 
-  /** Get fully resolved JSON config for a device. */
-  async getJsonConfig(configuration: string): Promise<unknown> {
-    return this._request("GET", "json-config", {
-      params: { configuration },
-    });
-  }
-
-  /** Get the YAML source for a device. */
-  async getEdit(configuration: string): Promise<string> {
-    const url = `${this._baseUrl}/edit?configuration=${encodeURIComponent(configuration)}`;
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      throw new Error(`Failed to load config: ${resp.status}`);
+  /**
+   * Send a streaming command (compile, upload, logs, etc.).
+   * Returns the message_id for cancellation.
+   */
+  sendStreamCommand(
+    command: string,
+    args: Record<string, unknown>,
+    callbacks: StreamCallbacks
+  ): string {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      callbacks.onError?.("WebSocket not connected");
+      return "";
     }
-    return resp.text();
+
+    const messageId = this._nextMessageId();
+    this._streamHandlers.set(messageId, callbacks);
+
+    const msg: CommandMessage = { command, message_id: messageId, args };
+    this._ws.send(JSON.stringify(msg));
+
+    return messageId;
   }
 
-  /** Save the YAML source for a device. */
-  async saveEdit(configuration: string, content: string): Promise<void> {
-    const url = `${this._baseUrl}/edit?configuration=${encodeURIComponent(configuration)}`;
-    const resp = await fetch(url, {
-      method: "POST",
-      body: content,
-    });
-    if (!resp.ok) {
-      throw new Error(`Failed to save config: ${resp.status}`);
+  // ─── Event Subscription ────────────────────────────────────
+
+  /**
+   * Subscribe to real-time push events from the backend.
+   * The callback receives events for the lifetime of the connection.
+   * Returns a promise that resolves once the subscription is confirmed.
+   */
+  async subscribeEvents(callback: EventSubscriptionCallback): Promise<void> {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
     }
-  }
 
-  /** Get available serial ports. */
-  async getSerialPorts(): Promise<SerialPort[]> {
-    return this._request("GET", "serial-ports");
-  }
+    const messageId = this._nextMessageId();
+    // Register event subscription before sending so we don't miss events
+    this._eventSubscriptions.set(messageId, callback);
 
-  /** Get available download files for a compiled configuration. */
-  async getDownloads(configuration: string): Promise<DownloadItem[]> {
-    return this._request("GET", "downloads", {
-      params: { configuration },
+    const msg: CommandMessage = { command: "subscribe_events", message_id: messageId };
+    this._ws.send(JSON.stringify(msg));
+
+    // Wait for the {subscribed: true} result confirmation
+    return new Promise<void>((resolve, reject) => {
+      this._pendingRequests.set(messageId, {
+        resolve: () => resolve(),
+        reject,
+      });
     });
   }
 
-  /** Get download URL for a firmware binary. */
-  getDownloadUrl(configuration: string, file: string): string {
-    return `${this._baseUrl}/download.bin?configuration=${encodeURIComponent(configuration)}&file=${encodeURIComponent(file)}`;
+  // ─── Device Commands ──────────────────────────────────────
+
+  /** List all configured and importable devices. */
+  async listDevices(): Promise<DevicesResponse> {
+    return this.sendCommand<DevicesResponse>("devices/list");
   }
 
-  /** Get boards for a platform. */
-  async getBoards(platform: string): Promise<Board[]> {
-    return this._request("GET", `boards/${platform}`);
+  /** Trigger device state polling. */
+  async getDeviceStates(): Promise<Record<string, never>> {
+    return this.sendCommand("devices/get_states");
   }
 
-  /** Get the full board catalog. */
-  async getBoardCatalog(): Promise<BoardCatalogResponse> {
-    return this._request("GET", "boards/catalog");
+  /** Create a new device configuration. */
+  async createDevice(args: {
+    name: string;
+    config_type?: string;
+    platform?: string;
+    board?: string;
+    ssid?: string;
+    psk?: string;
+    password?: string;
+    file_content?: string;
+    board_id?: string;
+  }): Promise<WizardResponse> {
+    return this.sendCommand<WizardResponse>("devices/create", args);
   }
 
-  /** Get the component catalog. */
-  async getComponentCatalog(): Promise<ComponentCatalogResponse> {
-    return this._request("GET", "components/catalog");
+  /** Update device metadata. */
+  async updateDevice(args: {
+    name: string;
+    friendly_name?: string;
+    comment?: string;
+    board_id?: string;
+  }): Promise<UpdateDeviceResponse> {
+    return this.sendCommand<UpdateDeviceResponse>("devices/update", args);
   }
 
-  /** Get the automation catalog. */
-  async getAutomationCatalog(): Promise<AutomationCatalogResponse> {
-    return this._request("GET", "automations/catalog");
+  /** Delete a device and all associated files. */
+  async deleteDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/delete", { configuration });
   }
 
-  /** Get the config section catalog. */
-  async getConfigCatalog(): Promise<ConfigCatalogResponse> {
-    return this._request("GET", "config/catalog");
+  /** Get device YAML config. */
+  async getConfig(configuration: string): Promise<string> {
+    return this.sendCommand<string>("devices/get_config", { configuration });
+  }
+
+  /** Save device YAML config. */
+  async updateConfig(configuration: string, content: string): Promise<void> {
+    await this.sendCommand("devices/update_config", { configuration, content });
   }
 
   /** Add a component to a device config. */
   async addComponent(
     configuration: string,
-    data: { component: string; platform: string; fields: Record<string, unknown> }
-  ): Promise<AddComponentResponse> {
-    return this._request("POST", `devices/${configuration}/components`, { body: data });
-  }
-
-  /** Add a config section to a device config. */
-  async addConfigSection(
-    configuration: string,
-    data: { section: string; fields: Record<string, unknown> }
-  ): Promise<AddConfigSectionResponse> {
-    return this._request("POST", `devices/${configuration}/config-sections`, { body: data });
-  }
-
-  /** Add an automation to a device config. */
-  async addAutomation(
-    configuration: string,
-    data: {
-      target_component_name: string;
-      trigger: string;
-      actions: Array<{ action: string; fields: Record<string, unknown> }>;
+    args: {
+      component_id: string;
+      fields?: Record<string, unknown>;
+      sub_entities?: Record<string, Record<string, unknown>>;
     }
-  ): Promise<AddAutomationResponse> {
-    return this._request("POST", `devices/${configuration}/automations`, { body: data });
-  }
-
-  /** Get config entries for a YAML section with current values. */
-  async getSectionConfig(
-    configuration: string,
-    sectionKey: string
-  ): Promise<SectionConfigResponse> {
-    return this._request("GET", `devices/${configuration}/section-config`, {
-      params: { key: sectionKey },
+  ): Promise<AddComponentResponse> {
+    return this.sendCommand<AddComponentResponse>("devices/add_component", {
+      configuration,
+      ...args,
     });
   }
 
-  /** Update config values for a YAML section. */
-  async updateSectionConfig(
-    configuration: string,
-    data: { section_key: string; values: Record<string, unknown> }
-  ): Promise<UpdateSectionConfigResponse> {
-    return this._request("POST", `devices/${configuration}/section-config`, { body: data });
-  }
-
-  /** Delete a YAML section. */
-  async deleteSection(
-    configuration: string,
-    sectionKey: string,
-    fromLine?: number
-  ): Promise<{ yaml: string }> {
-    const params: Record<string, string> = { key: sectionKey };
-    if (fromLine !== undefined) params.from_line = String(fromLine);
-    return this._request("DELETE", `devices/${configuration}/section-config`, { params });
-  }
-
-  /** Get user preferences. */
-  async getPreferences(): Promise<UserPreferences> {
-    return this._request("GET", "preferences");
-  }
-
-  /** Update user preferences (partial merge). */
-  async updatePreferences(prefs: UserPreferences): Promise<UserPreferences> {
-    return this._request("PUT", "preferences", { body: prefs });
-  }
-
-  /** Get secret key names. */
-  async getSecretKeys(): Promise<string[]> {
-    return this._request("GET", "secret_keys");
-  }
-
-  /** Create a new device via the wizard. */
-  async createWizard(data: WizardRequest): Promise<WizardResponse> {
-    return this._request("POST", "wizard", { body: data });
-  }
-
-  /** Import/adopt a device. */
-  async importDevice(data: ImportRequest): Promise<unknown> {
-    return this._request("POST", "import", { body: data });
-  }
-
-  /** Delete (archive) a device. */
-  async deleteDevice(configuration: string): Promise<unknown> {
-    return this._request("POST", "delete", {
-      params: { configuration },
-    });
-  }
-
-
-  /** Trigger OTA update for all online devices. */
-  async updateAll(): Promise<{ queued: number }> {
-    return this._request("POST", "update-all");
+  /** Import/adopt a discovered device. */
+  async importDevice(args: {
+    name: string;
+    project_name?: string;
+    package_import_url?: string;
+    friendly_name?: string;
+    encryption?: string;
+  }): Promise<{ configuration: string }> {
+    return this.sendCommand("devices/import", args);
   }
 
   /** Ignore/unignore a discovered device. */
-  async ignoreDevice(name: string, ignore: boolean): Promise<unknown> {
-    return this._request("POST", "ignore-device", {
-      body: { name, ignore },
-    });
+  async ignoreDevice(name: string, ignore: boolean): Promise<void> {
+    await this.sendCommand("devices/ignore", { name, ignore });
   }
 
-  // ─── WebSocket Command Streams ─────────────────────────────
-
-  /**
-   * Open a command WebSocket (compile, upload, logs, etc.)
-   * and stream output lines.
-   */
-  streamCommand(
-    path: string,
-    params: WsSpawnMessage,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = this._baseUrl
-      ? `${this._baseUrl.replace(/^http/, "ws")}/${path}`
-      : `${protocol}//${window.location.host}/${path}`;
-
-    const ws = new WebSocket(wsUrl);
-
-    ws.addEventListener("open", () => {
-      ws.send(JSON.stringify(params));
-    });
-
-    ws.addEventListener("message", (event) => {
-      const data: WsEvent = JSON.parse(event.data);
-      if (data.event === "line") {
-        callbacks.onLine?.(data.data);
-      } else if (data.event === "exit") {
-        callbacks.onExit?.(data.code);
-        ws.close();
-      }
-    });
-
-    ws.addEventListener("error", (event) => {
-      callbacks.onError?.(event);
-    });
-
-    return ws;
-  }
+  // ─── Streaming Commands ───────────────────────────────────
 
   /** Compile a device configuration. */
-  compile(
-    configuration: string,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    return this.streamCommand("compile", { type: "spawn", configuration }, callbacks);
+  compile(configuration: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand("devices/compile", { configuration }, callbacks);
   }
 
   /** Upload firmware to a device. */
-  upload(
-    configuration: string,
-    port: string,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    return this.streamCommand(
-      "upload",
-      { type: "spawn", configuration, port },
+  upload(configuration: string, port: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand(
+      "devices/upload",
+      { configuration, port },
       callbacks
     );
   }
 
   /** Stream logs from a device. */
-  logs(
-    configuration: string,
-    port: string,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    return this.streamCommand("logs", { type: "spawn", configuration, port }, callbacks);
-  }
-
-  /** Validate a device configuration. */
-  validate(
-    configuration: string,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    return this.streamCommand("validate", { type: "spawn", configuration }, callbacks);
-  }
-
-  /** Rename a device. */
-  rename(
-    configuration: string,
-    newName: string,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    return this.streamCommand(
-      "rename",
-      { type: "spawn", configuration, newName },
+  logs(configuration: string, port: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand(
+      "devices/logs",
+      { configuration, port },
       callbacks
     );
   }
 
-  /** Clean build files. */
-  clean(
-    configuration: string,
-    callbacks: {
-      onLine?: (line: string) => void;
-      onExit?: (code: number) => void;
-      onError?: (error: Event) => void;
-    }
-  ): WebSocket {
-    return this.streamCommand("clean", { type: "spawn", configuration }, callbacks);
+  /** Validate a device configuration. */
+  validate(configuration: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand("devices/validate", { configuration }, callbacks);
   }
 
-  // ─── Dashboard Events WebSocket ────────────────────────────
+  /** Clean build files for a device. */
+  clean(configuration: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand("devices/clean", { configuration }, callbacks);
+  }
 
-  /**
-   * Connect to the /events WebSocket for real-time dashboard updates.
-   * Returns the WebSocket so the caller can close it.
-   */
-  connectEvents(callbacks: {
-    onEvent: (event: DashboardEvent) => void;
-    onError?: (error: Event) => void;
-    onClose?: () => void;
-  }): WebSocket {
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = this._baseUrl
-      ? `${this._baseUrl.replace(/^http/, "ws")}/events`
-      : `${protocol}//${window.location.host}/events`;
+  // ─── Board Commands ───────────────────────────────────────
 
-    const ws = new WebSocket(wsUrl);
+  /** Get a single board by ID. */
+  async getBoard(boardId: string): Promise<BoardCatalogEntry | null> {
+    return this.sendCommand("boards/get_board", { board_id: boardId });
+  }
 
-    ws.addEventListener("message", (event) => {
-      const data: DashboardEvent = JSON.parse(event.data);
-      callbacks.onEvent(data);
+  /** Get boards with optional filtering, search, and pagination. */
+  async getBoards(args?: {
+    query?: string;
+    platform?: string;
+    variant?: string;
+    tag?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<PagedBoardsResponse> {
+    return this.sendCommand<PagedBoardsResponse>("boards/get_boards", args);
+  }
+
+  // ─── Component Commands ───────────────────────────────────
+
+  /** Get a single component by ID. */
+  async getComponent(componentId: string): Promise<ComponentCatalogEntry | null> {
+    return this.sendCommand("components/get_component", {
+      component_id: componentId,
     });
+  }
 
-    ws.addEventListener("error", (event) => {
-      callbacks.onError?.(event);
-    });
+  /** Get components with optional filtering, search, and pagination. */
+  async getComponents(args?: {
+    query?: string;
+    category?: string;
+    offset?: number;
+    limit?: number;
+  }): Promise<PagedComponentsResponse> {
+    return this.sendCommand<PagedComponentsResponse>(
+      "components/get_components",
+      args
+    );
+  }
 
-    ws.addEventListener("close", () => {
-      callbacks.onClose?.();
-    });
+  // ─── Config Commands ──────────────────────────────────────
 
-    // Send periodic pings to keep the connection alive
-    const pingInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "ping" }));
-      }
-    }, 30000);
+  /** Get ESPHome and server version. */
+  async getVersion(): Promise<{ server_version: string; esphome_version: string }> {
+    return this.sendCommand("config/version");
+  }
 
-    ws.addEventListener("close", () => {
-      clearInterval(pingInterval);
-    });
+  /** List available serial ports. */
+  async getSerialPorts(): Promise<SerialPort[]> {
+    return this.sendCommand<SerialPort[]>("config/serial_ports");
+  }
 
-    return ws;
+  /** Get user preferences. */
+  async getPreferences(): Promise<UserPreferences> {
+    return this.sendCommand<UserPreferences>("config/get_preferences");
+  }
+
+  /** Update user preferences. */
+  async updatePreferences(prefs: UserPreferences): Promise<UserPreferences> {
+    return this.sendCommand<UserPreferences>(
+      "config/set_preferences",
+      prefs as unknown as Record<string, unknown>
+    );
+  }
+
+  /** Get secret key names. */
+  async getSecretKeys(): Promise<string[]> {
+    return this.sendCommand<string[]>("config/get_secrets");
+  }
+
+  /** Get compiled device metadata. */
+  async getInfo(configuration: string): Promise<Record<string, unknown> | null> {
+    return this.sendCommand("config/get_info", { configuration });
+  }
+
+  /** Ping the server. */
+  async ping(): Promise<{ pong: boolean }> {
+    return this.sendCommand("ping");
   }
 }
+

@@ -1,329 +1,290 @@
 /**
- * Types for the ESPHome Dashboard API.
- * Based on https://github.com/esphome/dashboard-api
+ * Types for the ESPHome Device Builder API.
+ *
+ * Matches the WebSocket-only backend at /ws.
+ * All communication uses a single multiplexed WebSocket with
+ * command/message_id/args → result/error/event protocol.
  */
+
+// ─── WebSocket Protocol ──────────────────────────────────────
+
+/** Client → Server: a command request. */
+export interface CommandMessage {
+  command: string;
+  message_id: string;
+  args?: Record<string, unknown>;
+}
+
+/** Server → Client: successful command result. */
+export interface ResultMessage {
+  message_id: string;
+  result: unknown;
+}
+
+/** Server → Client: command error. */
+export interface ErrorMessage {
+  message_id: string;
+  error_code: ErrorCode;
+  details?: string;
+}
+
+/** Server → Client: streaming event (output lines, push events). */
+export interface EventMessage {
+  message_id: string;
+  event: string;
+  data: unknown;
+}
+
+/** Server → Client: sent immediately on connection. */
+export interface ServerInfoMessage {
+  server_version: string;
+  esphome_version: string;
+}
+
+export type ServerMessage = ResultMessage | ErrorMessage | EventMessage;
+
+export enum ErrorCode {
+  INVALID_MESSAGE = "invalid_message",
+  UNKNOWN_COMMAND = "unknown_command",
+  INVALID_ARGS = "invalid_args",
+  NOT_FOUND = "not_found",
+  INTERNAL_ERROR = "internal_error",
+}
+
+// ─── Paged Responses ─────────────────────────────────────────
+
+export interface PagedResponse {
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+// ─── Devices ─────────────────────────────────────────────────
 
 /** A configured ESPHome device. */
 export interface ConfiguredDevice {
   name: string;
-  friendly_name?: string;
+  friendly_name: string;
   configuration: string;
   path: string;
   comment: string | null;
   address: string;
-  web_port: string | null;
+  web_port: number | null;
   target_platform: string;
   current_version: string;
   deployed_version: string;
   loaded_integrations: string[];
-  board_id?: string;
+  board_id: string;
 }
 
 /** An adoptable/importable ESPHome device. */
 export interface AdoptableDevice {
   name: string;
-  friendly_name?: string;
-  network: string;
+  friendly_name: string;
   package_import_url: string;
   project_name: string;
   project_version: string;
+  network: string;
+  ignored: boolean;
 }
 
-/** Response from GET /devices */
+/** Response from devices/list. */
 export interface DevicesResponse {
   configured: ConfiguredDevice[];
   importable: AdoptableDevice[];
 }
 
-/** Response from GET /ping */
-export type PingResponse = Record<string, boolean>;
-
-/** Response from GET /version */
-export interface VersionResponse {
-  version: string;
+/** Response from devices/create. */
+export interface WizardResponse {
+  configuration: string;
 }
 
-/** Response from GET /serial-ports */
-export interface SerialPort {
-  port: string;
-  desc: string;
-}
-
-/** Response from GET /downloads */
-export interface DownloadItem {
-  title: string;
-  file: string;
-}
-
-/** Response from GET /boards/:platform */
-export interface Board {
+/** Response from devices/update. */
+export interface UpdateDeviceResponse {
   name: string;
-  board: string;
+  friendly_name: string;
+  comment: string | null;
+  board_id: string | null;
 }
 
-/** A board entry in the board catalog */
-export interface BoardCatalogEntry {
-  id: string;
-  name: string;
-  description: string;
-  platform: string;
-  board: string;
-  tags: string[];
-  docs_url: string;
-  image_url: string | null;
-  contents?: string[] | null;
-}
-
-/** Response from GET /boards/catalog */
-export interface BoardCatalogResponse {
-  boards: BoardCatalogEntry[];
-}
-
-/** A field definition for a component, config section, or automation */
-export interface ComponentField {
-  key: string;
-  label: string;
-  type: "string" | "number" | "boolean" | "select" | "pin";
-  required: boolean;
-  default?: string | number | boolean | null;
-  options?: string[] | null;
-}
-
-/** A platform variant of a component type */
-export interface ComponentPlatform {
-  id: string;
-  name: string;
-  description: string;
-  yaml_template: string;
-  fields: ComponentField[];
-}
-
-/** A component type in the component catalog */
-export interface ComponentType {
-  id: string;
-  name: string;
-  description: string;
-  docs_url: string;
-  icon: string;
-  platforms: ComponentPlatform[];
-}
-
-/** Response from GET /components/catalog */
-export interface ComponentCatalogResponse {
-  components: ComponentType[];
-}
-
-/** An automation trigger */
-export interface AutomationTrigger {
-  id: string;
-  name: string;
-  description: string;
-  applicable_to: string[];
-  fields: ComponentField[];
-}
-
-/** An automation action */
-export interface AutomationAction {
-  id: string;
-  name: string;
-  description: string;
-  fields: ComponentField[];
-}
-
-/** Response from GET /automations/catalog */
-export interface AutomationCatalogResponse {
-  triggers: AutomationTrigger[];
-  actions: AutomationAction[];
-}
-
-/** A config section template */
-export interface ConfigSection {
-  id: string;
-  name: string;
-  description: string;
-  docs_url: string;
-  icon: string;
-  yaml_template: string;
-  fields: ComponentField[];
-}
-
-/** Response from GET /config/catalog */
-export interface ConfigCatalogResponse {
-  sections: ConfigSection[];
-}
-
-/** Response from POST /devices/{config}/components */
+/** Response from devices/add_component. */
 export interface AddComponentResponse {
   yaml: string;
 }
 
-/** Response from POST /devices/{config}/config-sections */
-export interface AddConfigSectionResponse {
-  yaml: string;
+// ─── Boards ──────────────────────────────────────────────────
+
+export interface BoardEsphomeConfig {
+  platform: string;
+  board: string;
+  variant: string | null;
+  framework: string | null;
 }
 
-/** A value option for select-type config entries */
+export interface BoardHardware {
+  flash_size: string | null;
+  ram_size: number | null;
+  cpu_frequency: string | null;
+  connectivity: string[];
+}
+
+export interface BoardPin {
+  gpio: number;
+  label: string;
+  features: string[];
+  available: boolean | null;
+  occupied_by: string | null;
+  notes: string | null;
+}
+
+export interface BoardCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  manufacturer: string;
+  esphome: BoardEsphomeConfig;
+  hardware: BoardHardware;
+  images: string[];
+  tags: string[];
+  pins: BoardPin[];
+  docs_url: string;
+  product_url: string;
+  featured: boolean;
+  is_generic: boolean;
+}
+
+export interface PagedBoardsResponse extends PagedResponse {
+  boards: BoardCatalogEntry[];
+}
+
+// ─── Components ──────────────────────────────────────────────
+
+export interface ComponentSubEntity {
+  key: string;
+  platform_type: string;
+  config_entries: ConfigEntry[];
+}
+
+export interface ComponentCatalogEntry {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  docs_url: string;
+  image_url: string;
+  dependencies: string[];
+  auto_load: string[];
+  multi_conf: boolean;
+  config_entries: ConfigEntry[];
+  sub_entities: ComponentSubEntity[];
+}
+
+export interface PagedComponentsResponse extends PagedResponse {
+  components: ComponentCatalogEntry[];
+  categories: Array<{ id: string; name: string; count: number }>;
+}
+
+// ─── Config Entries ──────────────────────────────────────────
+
 export interface ConfigValueOption {
   label: string;
   value: string;
 }
 
-/** A rich configuration entry for visual editing of YAML sections */
 export interface ConfigEntry {
   key: string;
   type: ConfigEntryType;
   label: string;
   default_value: number | string | boolean | null;
   required: boolean;
-  options?: ConfigValueOption[] | null;
-  range?: number[] | null;
-  description?: string | null;
-  help_link?: string | null;
-  multi_value?: boolean;
-  hidden?: boolean;
-  value?: number | string | boolean | string[] | null;
+  description: string | null;
+  options: ConfigValueOption[] | null;
+  range: [number, number] | null;
+  help_link: string | null;
+  multi_value: boolean;
+  hidden: boolean;
+  advanced: boolean;
+  translation_key: string | null;
+  translation_params: string[] | null;
+  value: number | string | boolean | string[] | null;
 }
 
 export enum ConfigEntryType {
-  BOOLEAN = "boolean",
   STRING = "string",
   SECURE_STRING = "secure_string",
   INTEGER = "integer",
   FLOAT = "float",
+  BOOLEAN = "boolean",
+  SELECT = "select",
+  PIN = "pin",
+  TIME_PERIOD = "time_period",
+  ICON = "icon",
+  ID = "id",
+  TRIGGER = "trigger",
   LABEL = "label",
   DIVIDER = "divider",
-  SELECT = "select",
-  ICON = "icon",
   ALERT = "alert",
+  UNKNOWN = "unknown",
 }
 
-/** Response from GET /devices/{config}/section-config */
-export interface SectionConfigResponse {
-  section_key: string;
-  section_type: "core" | "component" | "automation";
-  title: string;
-  description: string;
-  docs_url: string;
-  icon: string;
-  entries: ConfigEntry[];
+// ─── Config / System ─────────────────────────────────────────
+
+export interface SerialPort {
+  port: string;
+  desc: string;
 }
 
-/** Response from POST /devices/{config}/section-config */
-export interface UpdateSectionConfigResponse {
-  yaml: string;
-}
-
-/** Response from POST /devices/{config}/automations */
-export interface AddAutomationResponse {
-  yaml: string;
-}
-
-/** Wizard request body for POST /wizard */
-export interface WizardRequest {
-  name: string;
-  platform: string;
-  board: string;
-  ssid: string;
-  psk: string;
-  password: string;
-  type: "basic" | "upload" | "empty";
-  file_content?: string;
-  board_id?: string;
-}
-
-/** Response from POST /wizard */
-export interface WizardResponse {
-  configuration: string;
-}
-
-/** Import request body for POST /import */
-export interface ImportRequest {
-  name: string;
-  project_name: string;
-  package_import_url: string;
-  friendly_name?: string;
-  encryption?: string;
-}
-
-/** User preferences (persisted on backend) */
 export interface UserPreferences {
   editor_layout?: "both" | "left" | "right";
 }
 
-/** WebSocket command message */
-export interface WsSpawnMessage {
-  type: "spawn";
-  configuration?: string;
-  port?: string;
-  only_generate?: boolean;
-  newName?: string;
-  clean_build_dir?: boolean;
+// ─── Event Subscription ─────────────────────────────────────
+
+/** Result from subscribe_events command. */
+export interface SubscribeEventsResult {
+  subscribed: boolean;
 }
 
-/** WebSocket stdin message */
-export interface WsStdinMessage {
-  type: "stdin";
-  data: string;
+/** Event types pushed by the backend after subscribe_events. */
+export enum DeviceEventType {
+  INITIAL_STATE = "initial_state",
+  DEVICE_ADDED = "device_added",
+  DEVICE_REMOVED = "device_removed",
+  DEVICE_UPDATED = "device_updated",
+  DEVICE_STATE_CHANGED = "device_state_changed",
+  IMPORTABLE_DEVICE_ADDED = "importable_device_added",
+  IMPORTABLE_DEVICE_REMOVED = "importable_device_removed",
 }
 
-/** WebSocket event message from server */
-export interface WsLineEvent {
-  event: "line";
-  data: string;
+/** Data payload for initial_state event. */
+export interface InitialStateEventData {
+  devices: ConfiguredDevice[];
 }
 
-export interface WsExitEvent {
-  event: "exit";
-  code: number;
+/** Data payload for device_added / device_updated / device_removed events. */
+export interface DeviceEventData {
+  device: ConfiguredDevice;
 }
 
-export type WsEvent = WsLineEvent | WsExitEvent;
-
-/** Dashboard event types from /events WebSocket */
-export type DashboardEventType =
-  | "initial_state"
-  | "entry_state_changed"
-  | "entry_added"
-  | "entry_removed"
-  | "entry_updated"
-  | "importable_device_added"
-  | "importable_device_removed"
-  | "pong";
-
-export interface DashboardInitialStateEvent {
-  event: "initial_state";
-  data: {
-    devices: ConfiguredDevice[];
-    ping: Record<string, boolean>;
-  };
+/** Data payload for device_state_changed event. */
+export interface DeviceStateChangedEventData {
+  configuration: string;
+  online: boolean;
 }
 
-export interface DashboardEntryStateChangedEvent {
-  event: "entry_state_changed";
-  data: {
-    filename: string;
-    name: string;
-    state: boolean;
-  };
+/** Data payload for importable_device_added / importable_device_removed events. */
+export interface ImportableDeviceEventData {
+  device: AdoptableDevice;
 }
 
-export interface DashboardEntryEvent {
-  event: "entry_added" | "entry_removed" | "entry_updated";
-  data: ConfiguredDevice;
-}
+/** Callback for event subscription push events. */
+export type EventSubscriptionCallback = (event: string, data: unknown) => void;
 
-export interface DashboardImportableEvent {
-  event: "importable_device_added" | "importable_device_removed";
-  data: AdoptableDevice;
-}
+// ─── Streaming Commands ──────────────────────────────────────
 
-export interface DashboardPongEvent {
-  event: "pong";
+/** Callbacks for streaming commands (compile, upload, logs, validate, clean). */
+export interface StreamCallbacks {
+  onOutput?: (line: string) => void;
+  onResult?: (data: { success: boolean; code: number }) => void;
+  onError?: (error: string) => void;
 }
-
-export type DashboardEvent =
-  | DashboardInitialStateEvent
-  | DashboardEntryStateChangedEvent
-  | DashboardEntryEvent
-  | DashboardImportableEvent
-  | DashboardPongEvent;

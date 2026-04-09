@@ -218,14 +218,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     this._submitting = true;
     try {
-      const { configuration } = await this._api.createWizard({
+      const { configuration } = await this._api.createDevice({
         name: slug,
-        platform: "",
-        board: "",
-        ssid: "",
-        psk: "",
-        password: "",
-        type: "empty",
+        config_type: "empty",
       });
       this.close();
       window.history.pushState({}, "", `/device/${configuration}`);
@@ -255,14 +250,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
     this._submitting = true;
     try {
-      const { configuration } = await this._api.createWizard({
+      const { configuration } = await this._api.createDevice({
         name: slug,
-        platform: "",
-        board: "",
-        ssid: "",
-        psk: "",
-        password: "",
-        type: "upload",
+        config_type: "upload",
         file_content: fileContent,
       });
       this.close();
@@ -291,14 +281,13 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     this._submitting = true;
     try {
-      const { configuration } = await this._api.createWizard({
+      const { configuration } = await this._api.createDevice({
         name: slug,
-        platform: board?.platform ?? "",
-        board: board?.board ?? "",
+        config_type: "basic",
+        platform: board?.esphome.platform ?? "",
+        board: board?.esphome.board ?? "",
         ssid: wifiSsid,
         psk: wifiPassword,
-        password: "",
-        type: "basic",
         board_id: board?.id,
       });
       this.close();

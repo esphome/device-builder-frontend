@@ -427,14 +427,9 @@ export class ESPHomeHeaderActions extends LitElement {
   private async _confirmUpdateAll() {
     this._updating = true;
     try {
-      const result = await this._api.updateAll();
+      // TODO: Update all is not yet supported by the WebSocket backend
       this._confirmUpdateOpen = false;
-      toast.success(
-        result.queued > 0
-          ? this._localize("layout.update_all_started", { count: result.queued })
-          : this._localize("layout.update_all_none"),
-        { richColors: true }
-      );
+      toast.info("Update all is not yet available", { richColors: true });
     } catch {
       toast.error(this._localize("layout.update_all_error"), { richColors: true });
     } finally {
