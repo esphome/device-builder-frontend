@@ -1,14 +1,15 @@
 import { consume } from "@lit/context";
 import {
   mdiClipboardTextSearchOutline,
+  mdiConsole,
   mdiDelete,
   mdiDotsVertical,
-  mdiFormatListBulleted,
   mdiMagnify,
   mdiPencil,
   mdiPlus,
   mdiPlusCircleOutline,
   mdiRefresh,
+  mdiUpload,
   mdiWeb,
   mdiWifi,
   mdiWifiOff,
@@ -36,15 +37,20 @@ import "@home-assistant/webawesome/dist/components/dropdown/dropdown.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
+import "../components/update-dialog.js";
+import type { ESPHomeUpdateDialog } from "../components/update-dialog.js";
+import "../components/logs-dialog.js";
+import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 
 registerMdiIcons({
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
+  console: mdiConsole,
   magnify: mdiMagnify,
   plus: mdiPlus,
   "plus-circle-outline": mdiPlusCircleOutline,
   refresh: mdiRefresh,
   pencil: mdiPencil,
-  "format-list-bulleted": mdiFormatListBulleted,
+  upload: mdiUpload,
   "dots-vertical": mdiDotsVertical,
   wifi: mdiWifi,
   "wifi-off": mdiWifiOff,
@@ -85,6 +91,12 @@ export class ESPHomePageDashboard extends LitElement {
 
   @query("esphome-create-config-dialog")
   private _createDialog!: ESPHomeCreateConfigDialog;
+
+  @query("esphome-update-dialog")
+  private _updateDialog!: ESPHomeUpdateDialog;
+
+  @query("esphome-logs-dialog")
+  private _logsDialog!: ESPHomeLogsDialog;
 
   static styles = [
     espHomeStyles,
@@ -155,7 +167,7 @@ export class ESPHomePageDashboard extends LitElement {
 
       .devices-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        grid-template-columns: repeat(auto-fill, 300px);
         gap: var(--wa-space-l);
         padding: var(--wa-space-m);
       }
@@ -417,14 +429,11 @@ export class ESPHomePageDashboard extends LitElement {
         overflow: visible;
         display: flex;
         flex-direction: column;
-        transition:
-          box-shadow 0.15s,
-          transform 0.15s;
+        transition: box-shadow 0.15s;
       }
 
       .device-card:hover {
         box-shadow: var(--wa-shadow-m);
-        transform: translateY(-2px);
       }
 
       .device-card-header {
@@ -494,7 +503,6 @@ export class ESPHomePageDashboard extends LitElement {
         align-items: center;
         gap: var(--wa-space-2xs);
         padding: var(--wa-space-s) var(--wa-space-m);
-        flex-wrap: wrap;
       }
 
       .device-actions .spacer {
@@ -516,6 +524,7 @@ export class ESPHomePageDashboard extends LitElement {
           background 0.12s,
           border-color 0.12s;
         white-space: nowrap;
+        min-width: 0;
       }
 
       .action-btn wa-icon {
@@ -531,6 +540,17 @@ export class ESPHomePageDashboard extends LitElement {
         background: color-mix(in srgb, var(--esphome-primary), black 10%);
       }
 
+      .action-btn--accent {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+        color: var(--esphome-primary);
+        border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+      }
+
+      .action-btn--accent:hover {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+        border-color: var(--esphome-primary);
+      }
+
       .action-btn--ghost {
         background: transparent;
         color: var(--wa-color-text-normal);
@@ -542,32 +562,9 @@ export class ESPHomePageDashboard extends LitElement {
         border-color: var(--wa-color-text-quiet);
       }
 
-      /* ─── Menu (three-dot) button ─── */
-
-      .menu-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 32px;
-        height: 32px;
-        border-radius: var(--wa-border-radius-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: transparent;
-        color: var(--wa-color-text-quiet);
-        cursor: pointer;
-        transition:
-          background 0.12s,
-          color 0.12s;
+      .action-btn--icon-only {
+        padding: 5px;
         flex-shrink: 0;
-      }
-
-      .menu-btn:hover {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-      }
-
-      .menu-btn wa-icon {
-        font-size: 18px;
       }
 
       /* ─── FAB ─── */
@@ -586,11 +583,7 @@ export class ESPHomePageDashboard extends LitElement {
         padding: 12px 22px;
         border-radius: 999px;
         border: none;
-        background: linear-gradient(
-          135deg,
-          var(--esphome-primary) 0%,
-          color-mix(in srgb, var(--esphome-primary), #7c3aed 40%) 100%
-        );
+        background: var(--esphome-primary);
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
@@ -601,19 +594,21 @@ export class ESPHomePageDashboard extends LitElement {
           0 2px 4px rgba(0, 0, 0, 0.12);
         transition:
           transform 0.15s,
-          box-shadow 0.15s;
+          box-shadow 0.15s,
+          background 0.15s;
         letter-spacing: 0.01em;
       }
 
       .fab-btn:hover {
-        transform: translateY(-2px) scale(1.02);
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        transform: translateY(-2px);
         box-shadow:
           0 8px 24px color-mix(in srgb, var(--esphome-primary), transparent 30%),
           0 4px 8px rgba(0, 0, 0, 0.14);
       }
 
       .fab-btn:active {
-        transform: translateY(0) scale(0.98);
+        transform: translateY(0);
       }
 
       .fab-btn wa-icon {
@@ -651,6 +646,8 @@ export class ESPHomePageDashboard extends LitElement {
       </div>
       ${this._renderFab()}
       <esphome-create-config-dialog></esphome-create-config-dialog>
+      <esphome-update-dialog></esphome-update-dialog>
+      <esphome-logs-dialog></esphome-logs-dialog>
     `;
   }
 
@@ -786,23 +783,33 @@ export class ESPHomePageDashboard extends LitElement {
             <wa-icon library="mdi" name="pencil"></wa-icon>
             ${this._localize("dashboard.edit")}
           </button>
-          <button class="action-btn action-btn--ghost">
-            <wa-icon library="mdi" name="refresh"></wa-icon>
+          <button
+            class="action-btn action-btn--accent"
+            @click=${() => this._openUpdate(device)}
+          >
+            <wa-icon library="mdi" name="upload"></wa-icon>
             ${this._localize("dashboard.update")}
           </button>
-          <button class="action-btn action-btn--ghost">
-            <wa-icon library="mdi" name="format-list-bulleted"></wa-icon>
+          <button
+            class="action-btn action-btn--ghost"
+            @click=${() => this._openLogs(device)}
+          >
+            <wa-icon library="mdi" name="console"></wa-icon>
             ${this._localize("dashboard.logs")}
           </button>
-          <div class="spacer"></div>
-          <wa-dropdown placement="bottom-end">
-            <button slot="trigger" class="menu-btn" aria-label="More options">
+          <wa-dropdown
+            placement="right-start"
+            distance="4"
+            @wa-select=${() => this._deleteDevice(device)}
+          >
+            <button
+              slot="trigger"
+              class="action-btn action-btn--ghost action-btn--icon-only"
+              aria-label="More options"
+            >
               <wa-icon library="mdi" name="dots-vertical"></wa-icon>
             </button>
-            <wa-dropdown-item
-              .variant=${"danger"}
-              @click=${() => this._deleteDevice(device)}
-            >
+            <wa-dropdown-item .variant=${"danger"}>
               <wa-icon slot="icon" library="mdi" name="delete"></wa-icon>
               ${this._localize("dashboard.delete")}
             </wa-dropdown-item>
@@ -828,14 +835,24 @@ export class ESPHomePageDashboard extends LitElement {
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
-  private async _deleteDevice(device: ConfiguredDevice) {
+  private _deleteDevice(device: ConfiguredDevice) {
     const name = device.friendly_name || device.name;
-    try {
-      await this._api.deleteDevice(device.configuration);
-      toast.success(`"${name}" deleted`, { richColors: true });
-    } catch {
+    this._api.deleteDevice(device.configuration).catch(() => {
       toast.error(`Failed to delete "${name}"`, { richColors: true });
-    }
+    });
+    toast.success(`"${name}" deleted`, { richColors: true });
+  }
+
+  private _openUpdate(device: ConfiguredDevice) {
+    this._updateDialog.configuration = device.configuration;
+    this._updateDialog.name = device.friendly_name || device.name;
+    this._updateDialog.open();
+  }
+
+  private _openLogs(device: ConfiguredDevice) {
+    this._logsDialog.configuration = device.configuration;
+    this._logsDialog.name = device.friendly_name || device.name;
+    this._logsDialog.open();
   }
 
   private _openCreateDialog() {

@@ -38,7 +38,13 @@ export class ESPHomeComponentCatalog extends LitElement {
   private _categories: Array<{ id: string; name: string; count: number }> = [];
 
   @state()
+  private _total = 0;
+
+  @state()
   private _loading = true;
+
+  @state()
+  private _initialLoad = true;
 
   @state()
   private _search = "";
@@ -64,10 +70,12 @@ export class ESPHomeComponentCatalog extends LitElement {
       const response = await this._api.getComponents({ query, category, limit: 50 });
       this._components = response.components;
       this._categories = response.categories;
+      this._total = response.total;
     } catch (e) {
       console.error("Failed to load component catalog:", e);
     } finally {
       this._loading = false;
+      this._initialLoad = false;
     }
   }
 
@@ -161,6 +169,8 @@ export class ESPHomeComponentCatalog extends LitElement {
         flex-direction: column;
         gap: var(--wa-space-m);
         padding-left: var(--wa-space-m);
+        padding-top: 3px;
+        padding-right: 3px;
         overflow: hidden;
       }
 
@@ -169,16 +179,24 @@ export class ESPHomeComponentCatalog extends LitElement {
         flex-shrink: 0;
       }
 
+      .result-count {
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        flex-shrink: 0;
+        margin-top: -6px;
+      }
+
       .grid-scroll {
         flex: 1;
         overflow-y: auto;
+        overflow-x: hidden;
         padding-right: var(--wa-space-2xs);
       }
 
       .components-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: var(--wa-space-s);
+        gap: 8px;
         align-content: start;
       }
 
@@ -186,11 +204,13 @@ export class ESPHomeComponentCatalog extends LitElement {
         border-radius: var(--wa-border-radius-l);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         background: var(--wa-color-surface-default);
-        padding: var(--wa-space-m);
+        padding: var(--wa-space-s) var(--wa-space-m);
         box-sizing: border-box;
+        min-width: 0;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-s);
+        gap: 6px;
         transition: border-color var(--wa-transition-normal) var(--wa-transition-easing);
       }
 
@@ -211,9 +231,8 @@ export class ESPHomeComponentCatalog extends LitElement {
         display: inline-flex;
         align-items: center;
         flex-shrink: 0;
-        margin-top: -2px;
         color: var(--esphome-primary);
-        font-size: 18px;
+        font-size: 15px;
       }
 
       .expand-button wa-icon {
@@ -222,13 +241,13 @@ export class ESPHomeComponentCatalog extends LitElement {
 
       .component-card-header {
         display: flex;
-        align-items: flex-start;
-        gap: var(--wa-space-s);
+        align-items: center;
+        gap: 8px;
       }
 
       .component-image--placeholder {
-        width: 48px;
-        height: 36px;
+        width: 32px;
+        height: 32px;
         display: flex;
         align-items: center;
         justify-content: center;
@@ -236,7 +255,7 @@ export class ESPHomeComponentCatalog extends LitElement {
         background: var(--wa-color-surface-subtle);
         flex-shrink: 0;
         color: var(--esphome-primary);
-        font-size: 24px;
+        font-size: 18px;
       }
 
       .component-card-header-text {
@@ -246,17 +265,20 @@ export class ESPHomeComponentCatalog extends LitElement {
 
       .component-title {
         margin: 0;
-        font-size: var(--wa-font-size-s);
+        font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
         line-height: 1.3;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .component-description {
         margin: 0;
-        font-size: var(--wa-font-size-xs);
+        font-size: var(--wa-font-size-2xs);
         color: var(--wa-color-text-quiet);
-        line-height: 1.5;
+        line-height: 1.4;
       }
 
       .component-description--clamp {
@@ -270,15 +292,15 @@ export class ESPHomeComponentCatalog extends LitElement {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: var(--wa-space-s);
+        gap: var(--wa-space-xs);
         margin-top: auto;
       }
 
       .more-info {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        font-size: var(--wa-font-size-xs);
+        gap: 2px;
+        font-size: var(--wa-font-size-2xs);
         color: var(--esphome-primary);
         text-decoration: none;
       }
@@ -288,14 +310,14 @@ export class ESPHomeComponentCatalog extends LitElement {
       }
 
       .more-info wa-icon {
-        font-size: 13px;
+        font-size: 11px;
       }
 
       .select-component {
         display: flex;
         align-items: center;
-        gap: 4px;
-        font-size: var(--wa-font-size-s);
+        gap: 3px;
+        font-size: var(--wa-font-size-2xs);
         font-weight: var(--wa-font-weight-bold);
         color: var(--esphome-primary);
         cursor: pointer;
@@ -321,7 +343,7 @@ export class ESPHomeComponentCatalog extends LitElement {
   ];
 
   protected render() {
-    if (this._loading) {
+    if (this._initialLoad && this._loading) {
       return html`<div class="loading">${this._localize("device.loading_components")}</div>`;
     }
 
@@ -355,11 +377,16 @@ export class ESPHomeComponentCatalog extends LitElement {
           @input=${this._onSearchInput}
           placeholder=${this._localize("device.search_components_placeholder")}
         ></wa-input>
+        ${!this._loading
+          ? html`<span class="result-count">${this._components.length} of ${this._total} components</span>`
+          : ""}
         <div class="grid-scroll">
           <div class="components-grid">
-            ${this._components.length
-              ? this._components.map((c) => this._renderCard(c, c.id === this._expandedId))
-              : html`<p class="empty">${this._localize("device.no_components_found")}</p>`}
+            ${this._loading
+              ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
+              : this._components.length
+                ? this._components.map((c) => this._renderCard(c, c.id === this._expandedId))
+                : html`<p class="empty">${this._localize("device.no_components_found")}</p>`}
           </div>
         </div>
       </div>
@@ -367,12 +394,13 @@ export class ESPHomeComponentCatalog extends LitElement {
   }
 
   private _buildCategories() {
-    const allCount = this._components.length;
-    const cats = [{ id: "all", label: this._localize("device.component_category_all"), count: allCount }];
+    const cats = [{ id: "all", label: this._localize("device.component_category_all"), count: this._total }];
     for (const cat of this._categories) {
+      const key = `device.component_category_${cat.id}`;
+      const translated = this._localize(key);
       cats.push({
         id: cat.id,
-        label: this._localize(`device.component_category_${cat.id}`),
+        label: translated !== key ? translated : cat.name,
         count: cat.count,
       });
     }

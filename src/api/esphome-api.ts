@@ -229,7 +229,8 @@ export class ESPHomeAPI {
    */
   async sendCommand<T = unknown>(
     command: string,
-    args?: Record<string, unknown>
+    args?: Record<string, unknown>,
+    timeout = 10000
   ): Promise<T> {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
@@ -242,9 +243,20 @@ export class ESPHomeAPI {
     }
 
     return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this._pendingRequests.delete(messageId);
+        reject(new Error(`Command "${command}" timed out after ${timeout}ms`));
+      }, timeout);
+
       this._pendingRequests.set(messageId, {
-        resolve: resolve as (result: unknown) => void,
-        reject,
+        resolve: (result: unknown) => {
+          clearTimeout(timer);
+          (resolve as (v: unknown) => void)(result);
+        },
+        reject: (error: unknown) => {
+          clearTimeout(timer);
+          reject(error);
+        },
       });
       this._ws!.send(JSON.stringify(msg));
     });

@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiContentSave, mdiDeleteOutline, mdiHelpCircleOutline, mdiOpenInNew } from "@mdi/js";
+import { mdiContentSave, mdiHelpCircleOutline, mdiOpenInNew } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import toast from "sonner-js";
 import { customElement, property, state } from "lit/decorators.js";
@@ -32,7 +32,6 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   "content-save": mdiContentSave,
-  "delete-outline": mdiDeleteOutline,
   "help-circle-outline": mdiHelpCircleOutline,
   "open-in-new": mdiOpenInNew,
 });
@@ -186,31 +185,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         gap: var(--wa-space-s);
         padding-top: var(--wa-space-s);
         border-top: 1px solid var(--wa-color-surface-border);
-      }
-
-      .delete-button {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        border: var(--wa-border-width-m) solid var(--wa-color-surface-border);
-        background: none;
-        color: var(--wa-color-text-quiet);
-        padding: var(--wa-space-s) var(--wa-space-l);
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        margin-right: auto;
-      }
-
-      .delete-button:hover {
-        color: var(--esphome-error);
-        border-color: var(--esphome-error);
-      }
-
-      .delete-button wa-icon {
-        font-size: 16px;
       }
 
       .save-button {
@@ -399,14 +373,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
       <div class="actions">
         <button
-          class="delete-button"
-          @click=${this._onDelete}
-          title=${this._localize("device.delete_section")}
-        >
-          <wa-icon library="mdi" name="delete-outline"></wa-icon>
-          ${this._localize("device.delete_section")}
-        </button>
-        <button
           class="save-button"
           ?disabled=${this._saving || !this._dirty}
           @click=${this._onSave}
@@ -551,36 +517,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._dirty = true;
   }
 
-  private async _onDelete() {
-    if (!this._config) return;
-    if (!confirm(this._localize("device.confirm_delete_section", { name: this._config.title }))) {
-      return;
-    }
-    try {
-      const yaml = await this._api.getConfig(this.configuration);
-      const newYaml = this._removeSectionFromYaml(yaml);
-      await this._api.updateConfig(this.configuration, newYaml);
-      this.dispatchEvent(
-        new CustomEvent("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      // Deselect this section
-      this.dispatchEvent(
-        new CustomEvent("section-select", {
-          detail: { sectionKey: null, fromLine: undefined },
-          bubbles: true,
-          composed: true,
-        })
-      );
-      toast.success(`"${this._config.title}" removed`, { richColors: true });
-    } catch (e) {
-      toast.error("Failed to delete section", { richColors: true });
-    }
-  }
-
   private async _onSave() {
     if (!this._config) return;
     this._saving = true;
@@ -588,7 +524,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     try {
       const yaml = await this._api.getConfig(this.configuration);
       const newYaml = this._updateSectionInYaml(yaml);
-      await this._api.updateConfig(this.configuration, newYaml);
+      const title = this._config.title;
+      this._api.updateConfig(this.configuration, newYaml).catch((e) => {
+        this._error = e instanceof Error ? e.message : "Failed to save";
+      });
       this._dirty = false;
       this.dispatchEvent(
         new CustomEvent("yaml-updated", {
@@ -597,7 +536,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           composed: true,
         })
       );
-      toast.success(`"${this._config.title}" saved`, { richColors: true });
+      toast.success(`"${title}" saved`, { richColors: true });
     } catch (e) {
       this._error = e instanceof Error ? e.message : "Failed to save";
     } finally {
@@ -606,14 +545,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   /** Remove the entire section (from its top-level key to the next) from the YAML. */
-  private _removeSectionFromYaml(yaml: string): string {
-    const lines = yaml.split("\n");
-    const { start, end } = this._findSectionRange(lines);
-    if (start < 0) return yaml;
-    lines.splice(start, end - start);
-    return lines.join("\n");
-  }
-
   /** Replace the section's direct child values in the YAML with the form values. */
   private _updateSectionInYaml(yaml: string): string {
     const lines = yaml.split("\n");

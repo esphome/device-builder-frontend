@@ -111,14 +111,12 @@ export class ESPHomePageDevice extends LitElement {
     }
   }
 
-  private async _saveYaml() {
-    try {
-      await this._api.updateConfig(this.id, this._yaml);
-      toast.success(this._localize("device.yaml_saved"), { richColors: true });
-    } catch (e) {
+  private _saveYaml() {
+    this._api.updateConfig(this.id, this._yaml).catch((e) => {
       console.error("Failed to save YAML:", e);
       toast.error(this._localize("device.yaml_save_error"), { richColors: true });
-    }
+    });
+    toast.success(this._localize("device.yaml_saved"), { richColors: true });
   }
 
   static styles = [

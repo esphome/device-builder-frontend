@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiClose } from "@mdi/js";
+import { mdiClose, mdiLightningBolt, mdiTargetVariant, mdiPlayCircleOutline } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfigEntry } from "../../api/types.js";
@@ -27,8 +27,14 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
-registerMdiIcons({ close: mdiClose });
+registerMdiIcons({
+  close: mdiClose,
+  "lightning-bolt": mdiLightningBolt,
+  "target-variant": mdiTargetVariant,
+  "play-circle-outline": mdiPlayCircleOutline,
+});
 
 @customElement("esphome-add-automation-dialog")
 export class ESPHomeAddAutomationDialog extends LitElement {
@@ -107,90 +113,197 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       }
 
       wa-dialog::part(body) {
-        padding: var(--wa-space-l) var(--wa-space-xl);
+        padding: var(--wa-space-l);
       }
 
       wa-dialog::part(footer) {
         display: none;
       }
 
+      /* ── Form ── */
+
       .form {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-m);
+        gap: var(--wa-space-s);
       }
 
-      .field {
+      /* ── Section blocks ── */
+
+      .section {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-xs);
+        gap: 8px;
+        padding: var(--wa-space-m);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-l);
+        background: var(--wa-color-surface-raised);
+      }
+
+      .section-header {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-s);
+        margin-bottom: 2px;
+      }
+
+      .section-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: var(--wa-border-radius-s);
+        flex-shrink: 0;
+      }
+
+      .section-icon wa-icon {
+        font-size: 16px;
+      }
+
+      .section-icon--target {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+        color: var(--esphome-primary);
+      }
+
+      .section-icon--trigger {
+        background: color-mix(in srgb, var(--esphome-warning), transparent 85%);
+        color: var(--esphome-warning);
+      }
+
+      .section-icon--action {
+        background: color-mix(in srgb, var(--esphome-success), transparent 85%);
+        color: var(--esphome-success);
       }
 
       .section-title {
-        margin: var(--wa-space-m) 0 0;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-subtle);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-
-      label {
-        font-size: var(--wa-font-size-s);
+        margin: 0;
+        font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      label .required { color: var(--esphome-error); margin-left: 2px; }
+      /* ── Fields ── */
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      label {
+        font-size: var(--wa-font-size-2xs);
+        font-weight: var(--wa-font-weight-semibold);
+        color: var(--wa-color-text-quiet);
+      }
+
+      label .required {
+        color: var(--esphome-error);
+        margin-left: 2px;
+      }
 
       input[type="text"],
       input[type="number"],
       select {
         width: 100%;
-        padding: var(--wa-space-s) var(--wa-space-m);
-        font-size: var(--wa-font-size-m);
+        padding: 9px 12px;
+        font-size: var(--wa-font-size-s);
         font-family: inherit;
         color: var(--wa-color-text-normal);
         background: var(--wa-color-surface-default);
-        border: var(--wa-border-width-m) solid var(--wa-color-surface-border);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-m);
         box-sizing: border-box;
         outline: none;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
       }
 
-      input:focus, select:focus { border-color: var(--esphome-primary); }
+      input:focus,
+      select:focus {
+        border-color: var(--esphome-primary);
+        box-shadow: 0 0 0 3px
+          color-mix(in srgb, var(--esphome-primary), transparent 80%);
+      }
+
+      input::placeholder {
+        color: var(--wa-color-text-quiet);
+      }
+
+      select {
+        appearance: auto;
+      }
+
+      /* ── Actions ── */
 
       .actions {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
-        margin-top: var(--wa-space-m);
+        padding-top: var(--wa-space-m);
+        border-top: 1px solid var(--wa-color-surface-border);
       }
 
-      .btn {
-        padding: var(--wa-space-s) var(--wa-space-l);
+      .dialog-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 18px;
+        border-radius: var(--wa-border-radius-m);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
-        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        border: var(--wa-border-width-m) solid transparent;
+        border: none;
+        transition:
+          background 0.12s,
+          opacity 0.12s;
       }
 
-      .btn-primary {
+      .dialog-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .dialog-btn--primary {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
       }
 
-      .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+      .dialog-btn--primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+      }
 
-      .error { color: var(--esphome-error); font-size: var(--wa-font-size-s); }
+      /* ── States ── */
+
+      .error {
+        color: var(--esphome-error);
+        font-size: var(--wa-font-size-xs);
+        background: color-mix(in srgb, var(--esphome-error), transparent 92%);
+        padding: var(--wa-space-s) var(--wa-space-m);
+        border-radius: var(--wa-border-radius-m);
+      }
 
       .loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--wa-space-m);
+        padding: var(--wa-space-xl);
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
-        text-align: center;
-        padding: var(--wa-space-xl);
+      }
+
+      .loading wa-spinner {
+        font-size: 24px;
+        --indicator-color: var(--esphome-primary);
+        --track-color: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 80%
+        );
       }
     `,
   ];
@@ -208,10 +321,29 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private async _loadCatalog() {
     this._loading = true;
     try {
-      // TODO: Automation catalog is not yet available in the WebSocket backend
-      console.warn("Automation catalog not yet supported by backend");
-      this._triggers = [];
-      this._actions = [];
+      // TODO: Replace with real API call when backend automation catalog is available
+      // For now, provide placeholder entries so the UI is functional
+      this._triggers = [
+        { id: "on_value", name: "On Value", description: "Triggered when the value changes", applicable_to: [], fields: [] },
+        { id: "on_press", name: "On Press", description: "Triggered when a button is pressed", applicable_to: [], fields: [] },
+        { id: "on_turn_on", name: "On Turn On", description: "Triggered when the component turns on", applicable_to: [], fields: [] },
+        { id: "on_turn_off", name: "On Turn Off", description: "Triggered when the component turns off", applicable_to: [], fields: [] },
+        { id: "on_boot", name: "On Boot", description: "Triggered when the device boots up", applicable_to: [], fields: [] },
+        { id: "on_time", name: "On Time", description: "Triggered at a specific time interval", applicable_to: [], fields: [] },
+      ];
+      this._actions = [
+        { id: "toggle", name: "Toggle", description: "Toggle the component state", fields: [] },
+        { id: "turn_on", name: "Turn On", description: "Turn the component on", fields: [] },
+        { id: "turn_off", name: "Turn Off", description: "Turn the component off", fields: [] },
+        { id: "logger.log", name: "Log Message", description: "Log a message to the console", fields: [
+          { key: "message", label: "Message", type: "string" as ConfigEntry["type"], required: true, default_value: "", hidden: false, description: "", options: null, range: null, help_link: null, multi_value: false, advanced: false, translation_key: null, translation_params: null, value: null },
+        ] },
+        { id: "delay", name: "Delay", description: "Wait for a specified duration", fields: [
+          { key: "delay", label: "Duration (ms)", type: "integer" as ConfigEntry["type"], required: true, default_value: "1000", hidden: false, description: "", options: null, range: null, help_link: null, multi_value: false, advanced: false, translation_key: null, translation_params: null, value: null },
+        ] },
+      ];
+      this._triggerId = this._triggers[0].id;
+      this._actionId = this._actions[0].id;
     } catch (e) {
       console.error("Failed to load automation catalog:", e);
     } finally {
@@ -223,10 +355,17 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     return html`
       <wa-dialog
         light-dismiss
-        label=${this._localize("device.add_automation_dialog_title", { name: this.boardName })}
+        label=${this.boardName
+          ? this._localize("device.add_automation_dialog_title", { name: this.boardName })
+          : this._localize("device.add_automation")}
       >
         ${this._loading
-          ? html`<p class="loading">${this._localize("device.loading_automation_catalog")}</p>`
+          ? html`
+              <div class="loading">
+                <wa-spinner></wa-spinner>
+                ${this._localize("device.loading_automation_catalog")}
+              </div>
+            `
           : this._renderForm()}
       </wa-dialog>
     `;
@@ -237,59 +376,88 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
     return html`
       <div class="form">
-        <p class="section-title">${this._localize("device.automation_target")}</p>
-        <div class="field">
-          <label>${this._localize("device.automation_target_name")}<span class="required">*</span></label>
-          <input
-            type="text"
-            .value=${this._targetName}
-            placeholder=${this._localize("device.automation_target_placeholder")}
-            @input=${(e: Event) => {
-              this._targetName = (e.target as HTMLInputElement).value;
-            }}
-          />
+        <!-- Target section -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon section-icon--target">
+              <wa-icon library="mdi" name="target-variant"></wa-icon>
+            </div>
+            <p class="section-title">${this._localize("device.automation_target")}</p>
+          </div>
+          <div class="field">
+            <label>
+              ${this._localize("device.automation_target_name")}<span class="required">*</span>
+            </label>
+            <input
+              type="text"
+              .value=${this._targetName}
+              placeholder=${this._localize("device.automation_target_placeholder")}
+              @input=${(e: Event) => {
+                this._targetName = (e.target as HTMLInputElement).value;
+              }}
+            />
+          </div>
         </div>
 
-        <p class="section-title">${this._localize("device.automation_trigger")}</p>
-        <div class="field">
-          <label>${this._localize("device.automation_trigger_label")}</label>
-          <select
-            @change=${(e: Event) => {
-              this._triggerId = (e.target as HTMLSelectElement).value;
-            }}
-          >
-            ${this._triggers.map(
-              (t) => html`<option value=${t.id} ?selected=${t.id === this._triggerId}>${t.name}</option>`
-            )}
-          </select>
+        <!-- Trigger section -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon section-icon--trigger">
+              <wa-icon library="mdi" name="lightning-bolt"></wa-icon>
+            </div>
+            <p class="section-title">${this._localize("device.automation_trigger")}</p>
+          </div>
+          <div class="field">
+            <label>${this._localize("device.automation_trigger_label")}</label>
+            <select
+              @change=${(e: Event) => {
+                this._triggerId = (e.target as HTMLSelectElement).value;
+              }}
+            >
+              ${this._triggers.length === 0
+                ? html`<option disabled selected>No triggers available</option>`
+                : this._triggers.map(
+                    (t) => html`<option value=${t.id} ?selected=${t.id === this._triggerId}>${t.name}</option>`
+                  )}
+            </select>
+          </div>
         </div>
 
-        <p class="section-title">${this._localize("device.automation_action")}</p>
-        <div class="field">
-          <label>${this._localize("device.automation_action_label")}</label>
-          <select
-            @change=${(e: Event) => {
-              this._actionId = (e.target as HTMLSelectElement).value;
-              this._actionFields = {};
-            }}
-          >
-            ${this._actions.map(
-              (a) => html`<option value=${a.id} ?selected=${a.id === this._actionId}>${a.name}</option>`
-            )}
-          </select>
+        <!-- Action section -->
+        <div class="section">
+          <div class="section-header">
+            <div class="section-icon section-icon--action">
+              <wa-icon library="mdi" name="play-circle-outline"></wa-icon>
+            </div>
+            <p class="section-title">${this._localize("device.automation_action")}</p>
+          </div>
+          <div class="field">
+            <label>${this._localize("device.automation_action_label")}</label>
+            <select
+              @change=${(e: Event) => {
+                this._actionId = (e.target as HTMLSelectElement).value;
+                this._actionFields = {};
+              }}
+            >
+              ${this._actions.length === 0
+                ? html`<option disabled selected>No actions available</option>`
+                : this._actions.map(
+                    (a) => html`<option value=${a.id} ?selected=${a.id === this._actionId}>${a.name}</option>`
+                  )}
+            </select>
+          </div>
+          ${selectedAction?.fields.map((f) => this._renderActionField(f)) ?? nothing}
         </div>
-
-        ${selectedAction?.fields.map((f) => this._renderActionField(f)) ?? nothing}
 
         ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
 
         <div class="actions">
           <button
-            class="btn btn-primary"
+            class="dialog-btn dialog-btn--primary"
             ?disabled=${this._submitting || !this._targetName.trim()}
             @click=${this._onSubmit}
           >
-            ${this._submitting ? "Adding…" : this._localize("device.add_automation")}
+            ${this._submitting ? "Adding\u2026" : this._localize("device.add_automation")}
           </button>
         </div>
       </div>

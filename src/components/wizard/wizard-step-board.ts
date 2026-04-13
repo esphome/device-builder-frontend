@@ -44,6 +44,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
   private _loading = true;
 
   @state()
+  private _initialLoad = true;
+
+  @state()
   private _search = "";
 
   @state()
@@ -66,6 +69,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       console.error("Failed to load board catalog:", e);
     } finally {
       this._loading = false;
+      this._initialLoad = false;
     }
   }
 
@@ -310,7 +314,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
   ];
 
   protected render() {
-    if (this._loading) {
+    if (this._initialLoad && this._loading) {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
 
@@ -334,24 +338,28 @@ export class ESPHomeWizardStepBoard extends LitElement {
         </button>
       </div>
 
-      ${featured
-        ? html`
-            <p class="section-label">${this._localize("wizard.starter_kit")}</p>
-            ${this._renderFeatured(featured)}
-          `
-        : nothing}
-      ${regular.length
-        ? html`
-            <p class="section-label">${this._localize("wizard.other_boards")}</p>
-            <div class="boards-scroll">
-              <div class="boards-grid">
-                ${regular.map((board) =>
-                  this._renderBoardCard(board, board.id === this._expandedBoardId)
-                )}
-              </div>
-            </div>
-          `
-        : nothing}
+      ${this._loading
+        ? html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`
+        : html`
+            ${featured
+              ? html`
+                  <p class="section-label">${this._localize("wizard.starter_kit")}</p>
+                  ${this._renderFeatured(featured)}
+                `
+              : nothing}
+            ${regular.length
+              ? html`
+                  <p class="section-label">${this._localize("wizard.other_boards")}</p>
+                  <div class="boards-scroll">
+                    <div class="boards-grid">
+                      ${regular.map((board) =>
+                        this._renderBoardCard(board, board.id === this._expandedBoardId)
+                      )}
+                    </div>
+                  </div>
+                `
+              : nothing}
+          `}
     `;
   }
 

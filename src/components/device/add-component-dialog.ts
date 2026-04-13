@@ -241,7 +241,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
             : nothing}
           ${isForm
             ? this._selected!.name
-            : this._localize("device.add_component_dialog_title", { name: this.boardName })}
+            : this.boardName
+              ? this._localize("device.add_component_dialog_title", { name: this.boardName })
+              : this._localize("device.add_component")}
         </span>
         ${isForm ? this._renderForm() : html`<esphome-component-catalog></esphome-component-catalog>`}
       </wa-dialog>

@@ -1,5 +1,10 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiClose } from "@mdi/js";
+import {
+  mdiArrowLeft,
+  mdiClose,
+  mdiCog,
+  mdiOpenInNew,
+} from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfigEntry } from "../../api/types.js";
@@ -22,8 +27,14 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
-registerMdiIcons({ close: mdiClose, "arrow-left": mdiArrowLeft });
+registerMdiIcons({
+  close: mdiClose,
+  "arrow-left": mdiArrowLeft,
+  cog: mdiCog,
+  "open-in-new": mdiOpenInNew,
+});
 
 @customElement("esphome-add-config-dialog")
 export class ESPHomeAddConfigDialog extends LitElement {
@@ -65,7 +76,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
     espHomeStyles,
     css`
       wa-dialog {
-        --width: 540px;
+        --width: 560px;
       }
 
       wa-dialog::part(header) {
@@ -93,7 +104,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
       }
 
       wa-dialog::part(body) {
-        padding: var(--wa-space-l) var(--wa-space-xl);
+        padding: var(--wa-space-l);
       }
 
       wa-dialog::part(footer) {
@@ -122,49 +133,72 @@ export class ESPHomeAddConfigDialog extends LitElement {
         opacity: 0.85;
       }
 
-      .back-button:hover { opacity: 1; }
+      .back-button:hover {
+        opacity: 1;
+      }
 
-      /* ── Section list ── */
+      /* ── Section grid ── */
 
       .section-list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
       }
 
       .section-card {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-2xs);
-        padding: var(--wa-space-m);
+        align-items: center;
+        gap: var(--wa-space-s);
+        padding: var(--wa-space-m) var(--wa-space-s);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-l);
         cursor: pointer;
-        background: none;
-        text-align: left;
+        background: var(--wa-color-surface-raised);
+        text-align: center;
         font-family: inherit;
-        transition: border-color 0.1s, background 0.1s;
+        transition:
+          border-color 0.12s,
+          background 0.12s,
+          box-shadow 0.12s;
       }
 
       .section-card:hover {
         border-color: var(--esphome-primary);
         background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 85%);
+      }
+
+      .section-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 40px;
+        height: 40px;
+        border-radius: var(--wa-border-radius-m);
+        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        color: var(--esphome-primary);
+        flex-shrink: 0;
+        transition: background 0.12s;
+      }
+
+      .section-icon wa-icon {
+        font-size: 20px;
+      }
+
+      .section-card:hover .section-icon {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 75%);
       }
 
       .section-card-name {
         margin: 0;
-        font-size: var(--wa-font-size-m);
+        font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
+        line-height: 1.3;
       }
 
-      .section-card-desc {
-        margin: 0;
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-      }
-
-      /* ── Field form ── */
+      /* ── Form view ── */
 
       .form {
         display: flex;
@@ -172,80 +206,183 @@ export class ESPHomeAddConfigDialog extends LitElement {
         gap: var(--wa-space-m);
       }
 
+      .form-header {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--wa-space-m);
+        padding-bottom: var(--wa-space-m);
+        border-bottom: 1px solid var(--wa-color-surface-border);
+      }
+
+      .form-header-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 44px;
+        height: 44px;
+        border-radius: var(--wa-border-radius-l);
+        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        color: var(--esphome-primary);
+        flex-shrink: 0;
+      }
+
+      .form-header-icon wa-icon {
+        font-size: 22px;
+      }
+
+      .form-header-text {
+        flex: 1;
+        min-width: 0;
+      }
+
       .form-desc {
-        margin: 0 0 var(--wa-space-s);
-        font-size: var(--wa-font-size-s);
+        margin: 0;
+        font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
+        line-height: 1.5;
+      }
+
+      .form-docs-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        font-size: var(--wa-font-size-2xs);
+        color: var(--esphome-primary);
+        text-decoration: none;
+        margin-top: 4px;
+      }
+
+      .form-docs-link:hover {
+        text-decoration: underline;
+      }
+
+      .form-docs-link wa-icon {
+        font-size: 12px;
       }
 
       .field {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-xs);
+        gap: 4px;
       }
 
       label {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
         color: var(--wa-color-text-normal);
       }
 
-      label .required { color: var(--esphome-error); margin-left: 2px; }
+      label .required {
+        color: var(--esphome-error);
+        margin-left: 2px;
+      }
 
       input[type="text"],
       input[type="number"],
       select {
         width: 100%;
-        padding: var(--wa-space-s) var(--wa-space-m);
-        font-size: var(--wa-font-size-m);
+        padding: 9px 12px;
+        font-size: var(--wa-font-size-s);
         font-family: inherit;
         color: var(--wa-color-text-normal);
-        background: var(--wa-color-surface-default);
-        border: var(--wa-border-width-m) solid var(--wa-color-surface-border);
+        background: var(--wa-color-surface-raised);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-m);
         box-sizing: border-box;
         outline: none;
+        transition:
+          border-color 0.15s,
+          box-shadow 0.15s;
       }
 
-      input:focus, select:focus { border-color: var(--esphome-primary); }
+      input:focus,
+      select:focus {
+        border-color: var(--esphome-primary);
+        box-shadow: 0 0 0 3px
+          color-mix(in srgb, var(--esphome-primary), transparent 80%);
+      }
+
+      input::placeholder {
+        color: var(--wa-color-text-quiet);
+      }
+
+      /* ── Actions ── */
 
       .actions {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
-        margin-top: var(--wa-space-m);
+        padding-top: var(--wa-space-m);
+        border-top: 1px solid var(--wa-color-surface-border);
       }
 
-      .btn {
-        padding: var(--wa-space-s) var(--wa-space-l);
+      .dialog-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 8px 18px;
+        border-radius: var(--wa-border-radius-m);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
-        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        border: var(--wa-border-width-m) solid transparent;
+        border: none;
+        transition:
+          background 0.12s,
+          opacity 0.12s;
       }
 
-      .btn-secondary {
-        background: none;
-        border-color: var(--wa-color-surface-border);
+      .dialog-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .dialog-btn--cancel {
+        background: var(--wa-color-surface-lowered);
         color: var(--wa-color-text-normal);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
 
-      .btn-primary {
+      .dialog-btn--cancel:hover:not(:disabled) {
+        background: var(--wa-color-surface-border);
+      }
+
+      .dialog-btn--primary {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
       }
 
-      .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+      .dialog-btn--primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+      }
 
-      .error { color: var(--esphome-error); font-size: var(--wa-font-size-s); }
+      .error {
+        color: var(--esphome-error);
+        font-size: var(--wa-font-size-xs);
+        background: color-mix(in srgb, var(--esphome-error), transparent 92%);
+        padding: var(--wa-space-s) var(--wa-space-m);
+        border-radius: var(--wa-border-radius-m);
+      }
 
       .loading {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--wa-space-m);
+        padding: var(--wa-space-xl);
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
-        text-align: center;
-        padding: var(--wa-space-xl);
+      }
+
+      .loading wa-spinner {
+        font-size: 24px;
+        --indicator-color: var(--esphome-primary);
+        --track-color: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 80%
+        );
       }
     `,
   ];
@@ -294,7 +431,9 @@ export class ESPHomeAddConfigDialog extends LitElement {
             : nothing}
           ${isForm
             ? this._selected!.name
-            : this._localize("device.add_config_dialog_title", { name: this.boardName })}
+            : this.boardName
+              ? this._localize("device.add_config_dialog_title", { name: this.boardName })
+              : this._localize("device.add_config")}
         </span>
         ${isForm ? this._renderForm() : this._renderSectionList()}
       </wa-dialog>
@@ -303,15 +442,22 @@ export class ESPHomeAddConfigDialog extends LitElement {
 
   private _renderSectionList() {
     if (this._loading) {
-      return html`<p class="loading">${this._localize("device.loading_config_catalog")}</p>`;
+      return html`
+        <div class="loading">
+          <wa-spinner></wa-spinner>
+          ${this._localize("device.loading_config_catalog")}
+        </div>
+      `;
     }
     return html`
       <div class="section-list">
         ${this._sections.map(
           (s) => html`
             <button class="section-card" @click=${() => this._selectSection(s)}>
+              <div class="section-icon">
+                <wa-icon library="mdi" name="cog"></wa-icon>
+              </div>
               <p class="section-card-name">${s.name}</p>
-              <p class="section-card-desc">${s.description}</p>
             </button>
           `
         )}
@@ -323,19 +469,37 @@ export class ESPHomeAddConfigDialog extends LitElement {
     const section = this._selected!;
     return html`
       <div class="form">
-        <p class="form-desc">${section.description}</p>
+        <div class="form-header">
+          <div class="form-header-icon">
+            <wa-icon library="mdi" name="cog"></wa-icon>
+          </div>
+          <div class="form-header-text">
+            <p class="form-desc">${section.description}</p>
+            ${section.docs_url
+              ? html`<a
+                  class="form-docs-link"
+                  href=${section.docs_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  ${this._localize("device.docs")}
+                  <wa-icon library="mdi" name="open-in-new"></wa-icon>
+                </a>`
+              : nothing}
+          </div>
+        </div>
         ${section.fields.map((f) => this._renderField(f))}
         ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
         <div class="actions">
-          <button class="btn btn-secondary" @click=${this._onBack}>
+          <button class="dialog-btn dialog-btn--cancel" @click=${this._onBack}>
             ${this._localize("wizard.back")}
           </button>
           <button
-            class="btn btn-primary"
+            class="dialog-btn dialog-btn--primary"
             ?disabled=${this._submitting || !this._isFormValid()}
             @click=${this._onSubmit}
           >
-            ${this._submitting ? "Adding…" : this._localize("device.add_config")}
+            ${this._submitting ? "Adding\u2026" : this._localize("device.add_config")}
           </button>
         </div>
       </div>
