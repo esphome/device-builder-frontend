@@ -1,31 +1,19 @@
 import { consume } from "@lit/context";
-import {
-  mdiCog,
-  mdiKeyVariant,
-  mdiPalette,
-  mdiSquareEditOutline,
-  mdiUpdate,
-} from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
-import toast from "sonner-js";
-import type { ESPHomeAPI } from "../api/index.js";
+import { mdiCog, mdiKeyVariant, mdiUpdate } from "@mdi/js";
+import { LitElement, css, html } from "lit";
+import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/switch/switch.js";
-import "@home-assistant/webawesome/dist/components/select/select.js";
-import "@home-assistant/webawesome/dist/components/option/option.js";
+import "./settings-dialog.js";
+import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
 registerMdiIcons({
   cog: mdiCog,
   "key-variant": mdiKeyVariant,
-  palette: mdiPalette,
-  "square-edit-outline": mdiSquareEditOutline,
   update: mdiUpdate,
 });
 
@@ -35,24 +23,14 @@ export class ESPHomeHeaderActions extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @consume({ context: darkModeContext, subscribe: true })
-  @state()
-  private _darkMode = false;
-
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
   @state()
   private _settingsOpen = false;
 
   @state()
-  private _settingsTab = "appearance";
-
-  @state()
-  private _editorLayout = "both";
-
-  @state()
   private _path = window.location.pathname;
+
+  @query("esphome-settings-dialog")
+  private _settingsDialog!: ESPHomeSettingsDialog;
 
   private _onPopState = () => {
     this._path = window.location.pathname;
@@ -96,9 +74,7 @@ export class ESPHomeHeaderActions extends LitElement {
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
         white-space: nowrap;
-        transition:
-          opacity 0.12s,
-          background 0.12s;
+        transition: opacity 0.12s, background 0.12s;
       }
 
       .hdr-btn:hover {
@@ -114,222 +90,12 @@ export class ESPHomeHeaderActions extends LitElement {
         padding: 6px;
       }
 
-      .header-actions-separator {
+      .separator {
         width: 1px;
         height: 20px;
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 70%);
         flex-shrink: 0;
         margin: 0 4px;
-      }
-
-      /* ─── Update all dialog ─── */
-
-      wa-dialog {
-        --width: 400px;
-      }
-
-      wa-dialog::part(header) {
-        background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
-        height: 40px;
-        box-sizing: border-box;
-      }
-
-      wa-dialog::part(title) {
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-
-      wa-dialog::part(body) {
-        padding: var(--wa-space-l) var(--wa-space-xl);
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
-      }
-
-      .dialog-body {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-l);
-      }
-
-      .dialog-body p {
-        margin: 0;
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.5;
-      }
-
-      .dialog-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-      }
-
-      .dialog-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        padding: 8px 18px;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition: background 0.12s, opacity 0.12s;
-      }
-
-      .dialog-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
-      .dialog-btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .dialog-btn--cancel:hover:not(:disabled) {
-        background: var(--wa-color-surface-border);
-      }
-
-      .dialog-btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .dialog-btn--primary:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-      }
-
-      .dialog-btn--danger {
-        background: var(--esphome-error);
-        color: var(--esphome-on-primary);
-      }
-
-      .dialog-btn--danger:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-error), black 10%);
-      }
-
-      /* ─── Settings dialog ─── */
-
-      wa-dialog.settings-dialog {
-        --width: 440px;
-      }
-
-      .settings-layout {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-      }
-
-      .settings-tabs {
-        display: flex;
-        gap: 0;
-        border-bottom: 1px solid var(--wa-color-surface-border);
-        margin-bottom: var(--wa-space-m);
-      }
-
-      .settings-tab {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-semibold);
-        font-family: inherit;
-        color: var(--wa-color-text-quiet);
-        position: relative;
-        transition: color 0.12s;
-      }
-
-      .settings-tab:hover {
-        color: var(--wa-color-text-normal);
-      }
-
-      .settings-tab--active {
-        color: var(--esphome-primary);
-      }
-
-      .settings-tab--active::after {
-        content: "";
-        position: absolute;
-        bottom: -1px;
-        left: var(--wa-space-s);
-        right: var(--wa-space-s);
-        height: 2px;
-        background: var(--esphome-primary);
-        border-radius: 2px 2px 0 0;
-      }
-
-      .settings-tab wa-icon {
-        font-size: 15px;
-      }
-
-      .settings-content {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-m);
-      }
-
-      .setting-group {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
-        background: var(--wa-color-surface-raised);
-      }
-
-      .setting-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--wa-space-m);
-      }
-
-      .setting-info {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        flex: 1;
-        min-width: 0;
-      }
-
-      .setting-label {
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .setting-desc {
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
-      }
-
-      .setting-row wa-select {
-        min-width: 140px;
       }
     `,
   ];
@@ -349,7 +115,7 @@ export class ESPHomeHeaderActions extends LitElement {
           ? html`
               <button
                 class="hdr-btn"
-                @click=${this._openConfirmUpdate}
+                @click=${() => window.dispatchEvent(new CustomEvent("esphome-enter-select-mode"))}
                 title=${this._localize("layout.update_all")}
               >
                 <wa-icon library="mdi" name="update"></wa-icon>
@@ -357,7 +123,7 @@ export class ESPHomeHeaderActions extends LitElement {
               </button>
             `
           : ""}
-        <div class="header-actions-separator"></div>
+        <div class="separator"></div>
         <button
           class="hdr-btn hdr-btn--icon-only"
           @click=${this._openSettings}
@@ -367,74 +133,11 @@ export class ESPHomeHeaderActions extends LitElement {
         </button>
       </div>
 
-      <wa-dialog
-        class="settings-dialog"
-        label=${this._localize("layout.settings")}
+      <esphome-settings-dialog
         ?open=${this._settingsOpen}
-        @wa-after-hide=${() => { this._settingsOpen = false; }}
-        light-dismiss
-      >
-        <div class="settings-layout">
-          <div class="settings-tabs">
-            <button
-              class="settings-tab ${this._settingsTab === "appearance" ? "settings-tab--active" : ""}"
-              @click=${() => { this._settingsTab = "appearance"; }}
-            >
-              <wa-icon library="mdi" name="palette"></wa-icon>
-              ${this._localize("settings.appearance")}
-            </button>
-            <button
-              class="settings-tab ${this._settingsTab === "editor" ? "settings-tab--active" : ""}"
-              @click=${() => { this._settingsTab = "editor"; }}
-            >
-              <wa-icon library="mdi" name="square-edit-outline"></wa-icon>
-              ${this._localize("settings.editor")}
-            </button>
-          </div>
-          <div class="settings-content">
-            ${this._settingsTab === "appearance" ? this._renderAppearanceSettings() : nothing}
-            ${this._settingsTab === "editor" ? this._renderEditorSettings() : nothing}
-          </div>
-        </div>
-      </wa-dialog>
-    `;
-  }
-
-  private _renderAppearanceSettings() {
-    return html`
-      <div class="setting-group">
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label">${this._localize("settings.dark_mode")}</span>
-            <span class="setting-desc">${this._localize("settings.dark_mode_desc")}</span>
-          </div>
-          <wa-switch
-            ?checked=${this._darkMode}
-            @change=${this._toggleDarkMode}
-          ></wa-switch>
-        </div>
-      </div>
-    `;
-  }
-
-  private _renderEditorSettings() {
-    return html`
-      <div class="setting-group">
-        <div class="setting-row">
-          <div class="setting-info">
-            <span class="setting-label">${this._localize("settings.editor_layout")}</span>
-            <span class="setting-desc">${this._localize("settings.editor_layout_desc")}</span>
-          </div>
-          <wa-select
-            .value=${this._editorLayout}
-            @change=${(e: Event) => this._setEditorLayout((e.target as HTMLSelectElement).value)}
-          >
-            <wa-option value="both">${this._localize("settings.layout_split")}</wa-option>
-            <wa-option value="left">${this._localize("settings.layout_visual")}</wa-option>
-            <wa-option value="right">${this._localize("settings.layout_yaml")}</wa-option>
-          </wa-select>
-        </div>
-      </div>
+        @close=${() => { this._settingsOpen = false; }}
+        @toggle-dark-mode=${this._forwardDarkModeToggle}
+      ></esphome-settings-dialog>
     `;
   }
 
@@ -443,29 +146,15 @@ export class ESPHomeHeaderActions extends LitElement {
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
-  private _openConfirmUpdate() {
-    window.dispatchEvent(new CustomEvent("esphome-enter-select-mode"));
-  }
-
   private async _openSettings() {
-    try {
-      const prefs = await this._api.getPreferences();
-      this._editorLayout = prefs.editor_layout ?? "both";
-    } catch {
-      // Use defaults
-    }
+    await this._settingsDialog.loadPreferences();
     this._settingsOpen = true;
   }
 
-  private _toggleDarkMode() {
+  private _forwardDarkModeToggle() {
     this.dispatchEvent(
-      new CustomEvent("toggle-dark-mode", { bubbles: true, composed: true })
+      new CustomEvent("toggle-dark-mode", { bubbles: true, composed: true }),
     );
-  }
-
-  private _setEditorLayout(layout: string) {
-    this._editorLayout = layout;
-    this._api.updatePreferences({ editor_layout: layout as "both" | "left" | "right" }).catch(() => {});
   }
 }
 
