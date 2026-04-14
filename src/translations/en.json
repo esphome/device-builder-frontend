@@ -52,7 +52,7 @@
     "deleted": "\"{name}\" deleted",
     "more_options": "More options",
     "logs_method_title": "How to get the logs for your device?",
-    "logs_method_wireless": "Wirelessly",
+    "logs_method_wireless": "On the network",
     "logs_method_wireless_desc": "Requires the device to be online",
     "logs_method_usb_local": "Plug into this computer",
     "logs_method_usb_local_desc": "For devices connected via USB to this computer",
@@ -203,8 +203,10 @@
     "update_all_error": "Failed to start updates",
     "updating": "Updating…",
     "cancel": "Cancel",
-    "light_mode": "Switch to light mode",
-    "dark_mode": "Switch to dark mode",
+    "theme": "Theme",
+    "theme_light": "Light",
+    "theme_dark": "Dark",
+    "theme_system": "System",
     "settings": "Settings",
     "back": "Back",
     "home_assistant": "Home Assistant"
@@ -226,6 +228,7 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Secrets saved",
-    "save_error": "Failed to save secrets"
+    "save_error": "Failed to save secrets",
+    "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
   }
 }

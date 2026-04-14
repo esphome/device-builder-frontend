@@ -1,9 +1,10 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 
 @customElement("esphome-wizard-step-setup")
@@ -12,11 +13,17 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
+
   @property({ attribute: false })
   public board: BoardCatalogEntry | null = null;
 
   @state()
   private _stage: "name" | "wifi" = "name";
+
+  private _secretWifiSsid = "";
+  private _secretWifiPassword = "";
 
   @state()
   private _deviceName = "";
@@ -26,6 +33,19 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   @state()
   private _wifiPassword = "";
+
+  async connectedCallback() {
+    super.connectedCallback();
+    try {
+      const yaml = await this._api.getConfig("secrets.yaml");
+      const ssid = yaml.match(/^wifi_ssid\s*:\s*["']?(.+?)["']?\s*$/m);
+      const pass = yaml.match(/^wifi_password\s*:\s*["']?(.+?)["']?\s*$/m);
+      if (ssid) this._secretWifiSsid = ssid[1];
+      if (pass) this._secretWifiPassword = pass[1];
+    } catch {
+      // No secrets file — leave defaults
+    }
+  }
 
   static styles = [
     espHomeStyles,
@@ -329,17 +349,34 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _onNext() {
     if (this._stage === "name") {
+      if (this._secretWifiSsid && !this._wifiSsid) {
+        this._wifiSsid = this._secretWifiSsid;
+      }
+      if (this._secretWifiPassword && !this._wifiPassword) {
+        this._wifiPassword = this._secretWifiPassword;
+      }
       this._stage = "wifi";
       return;
     }
+
+    // If the user kept the value from secrets, emit !secret references
+    // so the generated YAML uses secrets instead of hardcoded values.
+    const ssid =
+      this._wifiSsid === this._secretWifiSsid && this._secretWifiSsid
+        ? "!secret wifi_ssid"
+        : this._wifiSsid;
+    const password =
+      this._wifiPassword === this._secretWifiPassword && this._secretWifiPassword
+        ? "!secret wifi_password"
+        : this._wifiPassword;
 
     this.dispatchEvent(
       new CustomEvent("finish-setup", {
         detail: {
           board: this.board,
           name: this._deviceName,
-          wifiSsid: this._wifiSsid,
-          wifiPassword: this._wifiPassword,
+          wifiSsid: ssid,
+          wifiPassword: password,
         },
         bubbles: true,
         composed: true,

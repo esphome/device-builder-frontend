@@ -174,8 +174,10 @@
     "update_all_error": "Starten van updates mislukt",
     "updating": "Bijwerken…",
     "cancel": "Annuleren",
-    "light_mode": "Overschakelen naar lichte modus",
-    "dark_mode": "Overschakelen naar donkere modus",
+    "theme": "Thema",
+    "theme_light": "Licht",
+    "theme_dark": "Donker",
+    "theme_system": "Systeem",
     "settings": "Instellingen",
     "back": "Terug",
     "home_assistant": "Home Assistant"
@@ -186,6 +188,7 @@
     "save": "Opslaan",
     "saving": "Opslaan…",
     "saved": "Geheimen opgeslagen",
-    "save_error": "Opslaan van geheimen mislukt"
+    "save_error": "Opslaan van geheimen mislukt",
+    "file_header": "# Geheimen — sla gevoelige waarden hier op en verwijs ernaar\n# in uw apparaatconfiguraties met !secret <sleutel>\n#\n# Voorbeeld:\n#   wifi_ssid: \"uw-netwerknaam\"\n#   wifi_password: \"uw-wachtwoord\"\n"
   }
 }

@@ -174,8 +174,10 @@
     "update_all_error": "Échec du démarrage des mises à jour",
     "updating": "Mise à jour…",
     "cancel": "Annuler",
-    "light_mode": "Passer en mode clair",
-    "dark_mode": "Passer en mode sombre",
+    "theme": "Thème",
+    "theme_light": "Clair",
+    "theme_dark": "Sombre",
+    "theme_system": "Système",
     "settings": "Paramètres",
     "back": "Retour",
     "home_assistant": "Home Assistant"
@@ -186,6 +188,7 @@
     "save": "Enregistrer",
     "saving": "Enregistrement…",
     "saved": "Secrets enregistrés",
-    "save_error": "Échec de l'enregistrement des secrets"
+    "save_error": "Échec de l'enregistrement des secrets",
+    "file_header": "# Secrets — stockez vos valeurs sensibles ici et référencez-les\n# dans vos configurations d'appareils avec !secret <clé>\n#\n# Exemple :\n#   wifi_ssid: \"nom-de-votre-réseau\"\n#   wifi_password: \"votre-mot-de-passe\"\n"
   }
 }

@@ -129,13 +129,19 @@ export class ESPHomeApp extends LitElement {
   }
 
   private _initDarkMode() {
-    this._darkMode = false;
-    this._applyDarkMode();
+    const saved = localStorage.getItem("esphome-theme") ?? "system";
+    this._applyTheme(saved as "light" | "dark" | "system");
   }
 
-  private _applyDarkMode() {
-    document.documentElement.classList.toggle("wa-dark", this._darkMode);
-    document.documentElement.classList.toggle("wa-light", !this._darkMode);
+  private _applyTheme(theme: "light" | "dark" | "system") {
+    localStorage.setItem("esphome-theme", theme);
+    const prefersDark =
+      theme === "system"
+        ? window.matchMedia("(prefers-color-scheme: dark)").matches
+        : theme === "dark";
+    this._darkMode = prefersDark;
+    document.documentElement.classList.toggle("wa-dark", prefersDark);
+    document.documentElement.classList.toggle("wa-light", !prefersDark);
   }
 
   private async _init() {
@@ -241,15 +247,14 @@ export class ESPHomeApp extends LitElement {
 
   protected render() {
     return html`
-      <esphome-layout @toggle-dark-mode=${this._onToggleDarkMode}>
+      <esphome-layout @set-theme=${this._onSetTheme}>
         ${this._router.outlet()}
       </esphome-layout>
     `;
   }
 
-  private _onToggleDarkMode() {
-    this._darkMode = !this._darkMode;
-    this._applyDarkMode();
+  private _onSetTheme(e: CustomEvent<string>) {
+    this._applyTheme(e.detail as "light" | "dark" | "system");
   }
 }
 

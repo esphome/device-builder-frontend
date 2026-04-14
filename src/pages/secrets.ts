@@ -45,8 +45,7 @@ export class ESPHomePageSecrets extends LitElement {
     try {
       this._yaml = await this._api.getConfig(SECRETS_FILE);
     } catch {
-      this._yaml =
-        '# ESPHome Secrets\n# Define sensitive values here and reference them with !secret <key>\n\nwifi_ssid: "your-ssid"\nwifi_password: "your-password"\napi_encryption_key: "your-key"\n';
+      this._yaml = this._localize("secrets.file_header");
     }
     this._loaded = true;
   }
@@ -158,16 +157,14 @@ export class ESPHomePageSecrets extends LitElement {
     window.history.back();
   }
 
-  private async _save() {
-    this._saving = true;
-    try {
-      await this._api.updateConfig(SECRETS_FILE, this._yaml);
-      toast.success(this._localize("secrets.saved"), { richColors: true });
-    } catch {
-      toast.error(this._localize("secrets.save_error"), { richColors: true });
-    } finally {
-      this._saving = false;
-    }
+  private _save() {
+    toast.success(this._localize("secrets.saved"), { richColors: true });
+    this._api.updateConfig(SECRETS_FILE, this._yaml).catch((e) => {
+      const msg = e instanceof Error ? e.message : "";
+      if (!msg.includes("timed out")) {
+        toast.error(this._localize("secrets.save_error"), { richColors: true });
+      }
+    });
   }
 }
 

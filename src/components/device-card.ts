@@ -93,6 +93,10 @@ export class ESPHomeDeviceCard extends LitElement {
         gap: var(--wa-space-xs);
       }
 
+      .device-card-header:last-child {
+        border-bottom: none;
+      }
+
       .device-card-header-left {
         flex: 1;
         min-width: 0;
