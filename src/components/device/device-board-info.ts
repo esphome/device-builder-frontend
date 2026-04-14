@@ -103,6 +103,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         flex-direction: column;
         flex: 1;
         gap: var(--wa-space-s);
+        min-width: 0;
       }
 
       .board-name {
@@ -110,10 +111,22 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       }
 
       .board-image {
-        flex: 1;
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         justify-content: center;
+        width: 140px;
+        height: 100px;
+        padding: var(--wa-space-s);
+        background: var(--wa-color-surface-lowered);
+        border-radius: var(--wa-border-radius-l);
+        box-sizing: border-box;
+      }
+
+      .board-image img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
       }
 
       .board-tags {
@@ -137,15 +150,17 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
       }
 
       .board-description {
-        margin: var(--wa-space-xl) 0;
+        margin: 0;
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
+        line-height: 1.5;
       }
 
       .board-separator {
         height: 1px;
         background-color: var(--wa-color-surface-lowered);
         width: 100%;
+        margin-top: var(--wa-space-m);
       }
 
       /* ─── Step CTA ─── */
@@ -226,21 +241,22 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
           <h3 class="board-name">${this.board.name}</h3>
           <div class="board-tags">
             ${this.board.tags.map(
-              (tag) => html`<wa-badge variant="brand" pill>${tag}</wa-badge>`
+              (tag) => html`<wa-badge variant="brand" pill>${tag}</wa-badge>`,
             )}
             <a
               class="board-info-link"
               href=${this.board.docs_url}
               target="_blank"
               rel="noreferrer"
-              >${this._localize("device.more_info")}
-              <wa-icon library="mdi" name="open-in-new"></wa-icon
-            ></a>
+            >
+              ${this._localize("device.more_info")}
+              <wa-icon library="mdi" name="open-in-new"></wa-icon>
+            </a>
           </div>
           <p class="board-description">${this.board.description}</p>
         </div>
         <div class="board-image">
-          <img src=${this._boardImageUrl(this.board)} alt="${this.board.name}" />
+          <img src=${this._boardImageUrl(this.board)} alt=${this.board.name} />
         </div>
       </div>
 
