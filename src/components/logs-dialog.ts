@@ -4,7 +4,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { apiContext, localizeContext } from "../context/index.js";
+import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -53,6 +53,10 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  @consume({ context: darkModeContext, subscribe: true })
+  @state()
+  private _darkMode = true;
+
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
@@ -80,19 +84,41 @@ export class ESPHomeLogsDialog extends LitElement {
   static styles = [
     espHomeStyles,
     css`
+      :host {
+        --term-bg: #1e1e1e;
+        --term-bg-alt: #252526;
+        --term-fg: #d4d4d4;
+        --term-fg-muted: #808080;
+        --term-border: #3c3c3c;
+        --term-hover: #2a2d2e;
+        --term-accent: #4ec9b0;
+        --term-error: #f44747;
+      }
+
+      :host([light]) {
+        --term-bg: #f5f5f5;
+        --term-bg-alt: #e8e8e8;
+        --term-fg: #1e1e1e;
+        --term-fg-muted: #6e6e6e;
+        --term-border: #d0d0d0;
+        --term-hover: #dcdcdc;
+        --term-accent: #0d8a6f;
+        --term-error: #c02020;
+      }
+
       wa-dialog {
         --width: 720px;
       }
 
       wa-dialog::part(header) {
-        background: #1e1e1e;
+        background: var(--term-bg);
         padding: 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
 
       wa-dialog::part(title) {
-        color: #4ec9b0;
+        color: var(--term-accent);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
@@ -105,13 +131,13 @@ export class ESPHomeLogsDialog extends LitElement {
         padding: 0;
         min-width: unset;
         min-height: unset;
-        color: #808080;
+        color: var(--term-fg-muted);
         cursor: pointer;
       }
 
       wa-dialog::part(body) {
         padding: 0;
-        background: #1e1e1e;
+        background: var(--term-bg);
       }
 
       wa-dialog::part(footer) {
@@ -137,8 +163,8 @@ export class ESPHomeLogsDialog extends LitElement {
         align-items: center;
         gap: var(--wa-space-xs);
         padding: 6px var(--wa-space-m);
-        background: #252526;
-        border-top: 1px solid #3c3c3c;
+        background: var(--term-bg-alt);
+        border-top: 1px solid var(--term-border);
       }
 
       .terminal-toolbar .spacer {
@@ -156,7 +182,7 @@ export class ESPHomeLogsDialog extends LitElement {
         font-weight: 600;
         font-family: "SF Mono", "Fira Code", monospace;
         cursor: pointer;
-        border: 1px solid #3c3c3c;
+        border: 1px solid var(--term-border);
         transition: background 0.1s, border-color 0.1s;
       }
 
@@ -166,40 +192,40 @@ export class ESPHomeLogsDialog extends LitElement {
 
       .term-btn--ghost {
         background: transparent;
-        color: #808080;
+        color: var(--term-fg-muted);
       }
 
       .term-btn--ghost:hover {
-        background: #2a2d2e;
-        color: #d4d4d4;
-        border-color: #505050;
+        background: var(--term-hover);
+        color: var(--term-fg);
+        border-color: var(--term-fg-muted);
       }
 
       .term-btn--start {
-        background: color-mix(in srgb, #4ec9b0, transparent 85%);
-        color: #4ec9b0;
-        border-color: color-mix(in srgb, #4ec9b0, transparent 60%);
+        background: color-mix(in srgb, var(--term-accent), transparent 85%);
+        color: var(--term-accent);
+        border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
       }
 
       .term-btn--start:hover {
-        background: color-mix(in srgb, #4ec9b0, transparent 75%);
+        background: color-mix(in srgb, var(--term-accent), transparent 75%);
       }
 
       .term-btn--stop {
-        background: color-mix(in srgb, #f44747, transparent 85%);
-        color: #f44747;
-        border-color: color-mix(in srgb, #f44747, transparent 60%);
+        background: color-mix(in srgb, var(--term-error), transparent 85%);
+        color: var(--term-error);
+        border-color: color-mix(in srgb, var(--term-error), transparent 60%);
       }
 
       .term-btn--stop:hover {
-        background: color-mix(in srgb, #f44747, transparent 75%);
+        background: color-mix(in srgb, var(--term-error), transparent 75%);
       }
 
       .streaming-dot {
         width: 6px;
         height: 6px;
         border-radius: 50%;
-        background: #4ec9b0;
+        background: var(--term-accent);
         animation: pulse 1.5s infinite;
       }
 
@@ -209,6 +235,12 @@ export class ESPHomeLogsDialog extends LitElement {
       }
     `,
   ];
+
+  protected willUpdate(changedProperties: Map<string, unknown>) {
+    if (changedProperties.has("_darkMode")) {
+      this.toggleAttribute("light", !this._darkMode);
+    }
+  }
 
   public open() {
     this._lines = [];
@@ -237,6 +269,7 @@ export class ESPHomeLogsDialog extends LitElement {
           <esphome-ansi-log
             .lines=${this._lines}
             placeholder=${this._localize("dashboard.logs_placeholder")}
+            ?light=${!this._darkMode}
           ></esphome-ansi-log>
           <div class="terminal-toolbar">
             ${this._streaming

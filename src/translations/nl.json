@@ -30,7 +30,15 @@
     "update_device_failed": "Bijwerken van \"{name}\" mislukt",
     "delete_failed": "Verwijderen van \"{name}\" mislukt",
     "deleted": "\"{name}\" verwijderd",
-    "more_options": "Meer opties"
+    "more_options": "Meer opties",
+    "logs_method_title": "Hoe krijgt u de logboeken van uw apparaat?",
+    "logs_method_wireless": "Draadloos",
+    "logs_method_wireless_desc": "Vereist dat het apparaat online is",
+    "logs_method_usb_local": "Aansluiten op deze computer",
+    "logs_method_usb_local_desc": "Voor apparaten via USB verbonden met deze computer",
+    "logs_method_usb_server": "Aansluiten op computer met ESPHome Dashboard",
+    "logs_method_usb_server_desc": "Voor apparaten via USB verbonden met de server",
+    "logs_web_serial_unsupported": "Web Serial wordt niet ondersteund in deze browser"
   },
   "wizard": {
     "title_create": "Configuratie aanmaken",

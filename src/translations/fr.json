@@ -30,7 +30,15 @@
     "update_device_failed": "Échec de la mise à jour de \"{name}\"",
     "delete_failed": "Échec de la suppression de \"{name}\"",
     "deleted": "\"{name}\" supprimé",
-    "more_options": "Plus d'options"
+    "more_options": "Plus d'options",
+    "logs_method_title": "Comment obtenir les journaux de votre appareil ?",
+    "logs_method_wireless": "Sans fil",
+    "logs_method_wireless_desc": "Nécessite que l'appareil soit en ligne",
+    "logs_method_usb_local": "Brancher sur cet ordinateur",
+    "logs_method_usb_local_desc": "Pour les appareils connectés via USB à cet ordinateur",
+    "logs_method_usb_server": "Brancher sur l'ordinateur exécutant le tableau de bord ESPHome",
+    "logs_method_usb_server_desc": "Pour les appareils connectés via USB au serveur",
+    "logs_web_serial_unsupported": "Web Serial n'est pas pris en charge dans ce navigateur"
   },
   "wizard": {
     "title_create": "Créer une configuration",

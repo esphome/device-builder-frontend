@@ -50,7 +50,15 @@
     "update_device_failed": "\"{name}\" update failed",
     "delete_failed": "Failed to delete \"{name}\"",
     "deleted": "\"{name}\" deleted",
-    "more_options": "More options"
+    "more_options": "More options",
+    "logs_method_title": "How to get the logs for your device?",
+    "logs_method_wireless": "Wirelessly",
+    "logs_method_wireless_desc": "Requires the device to be online",
+    "logs_method_usb_local": "Plug into this computer",
+    "logs_method_usb_local_desc": "For devices connected via USB to this computer",
+    "logs_method_usb_server": "Plug into computer running ESPHome Dashboard",
+    "logs_method_usb_server_desc": "For devices connected via USB to the server",
+    "logs_web_serial_unsupported": "Web Serial is not supported in this browser"
   },
   "wizard": {
     "title_create": "Create configuration",

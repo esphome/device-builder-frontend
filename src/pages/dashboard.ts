@@ -11,8 +11,10 @@ import {
   mdiPlus,
   mdiPlusCircleOutline,
   mdiRefresh,
+  mdiSerialPort,
   mdiUpdate,
   mdiUpload,
+  mdiUsb,
   mdiWeb,
   mdiWifi,
   mdiWifiOff,
@@ -35,6 +37,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
+import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@home-assistant/webawesome/dist/components/dropdown/dropdown.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -55,8 +58,10 @@ registerMdiIcons({
   "plus-circle-outline": mdiPlusCircleOutline,
   refresh: mdiRefresh,
   pencil: mdiPencil,
+  "serial-port": mdiSerialPort,
   update: mdiUpdate,
   upload: mdiUpload,
+  usb: mdiUsb,
   "dots-vertical": mdiDotsVertical,
   wifi: mdiWifi,
   "wifi-off": mdiWifiOff,
@@ -96,6 +101,12 @@ export class ESPHomePageDashboard extends LitElement {
   private _search = "";
 
   @state()
+  private _logsMethodOpen = false;
+
+  @state()
+  private _logsMethodDevice: ConfiguredDevice | null = null;
+
+  @state()
   private _selectMode = false;
 
   @state()
@@ -108,18 +119,12 @@ export class ESPHomePageDashboard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    window.addEventListener(
-      "esphome-enter-select-mode",
-      this._onEnterSelectMode,
-    );
+    window.addEventListener("esphome-enter-select-mode", this._onEnterSelectMode);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener(
-      "esphome-enter-select-mode",
-      this._onEnterSelectMode,
-    );
+    window.removeEventListener("esphome-enter-select-mode", this._onEnterSelectMode);
   }
 
   @query("esphome-create-config-dialog")
@@ -774,6 +779,102 @@ export class ESPHomePageDashboard extends LitElement {
       .select-bar-btn wa-icon {
         font-size: 16px;
       }
+
+      /* ─── Logs method dialog ─── */
+
+      wa-dialog.logs-method-dialog {
+        --width: 460px;
+      }
+
+      wa-dialog.logs-method-dialog::part(header) {
+        background: var(--esphome-primary);
+        padding: 0 var(--wa-space-m);
+        height: 40px;
+        box-sizing: border-box;
+      }
+
+      wa-dialog.logs-method-dialog::part(title) {
+        color: var(--esphome-on-primary);
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-bold);
+      }
+
+      wa-dialog.logs-method-dialog::part(close-button__base) {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        min-width: unset;
+        min-height: unset;
+        color: var(--esphome-on-primary);
+        cursor: pointer;
+      }
+
+      wa-dialog.logs-method-dialog::part(body) {
+        padding: var(--wa-space-l);
+      }
+
+      wa-dialog.logs-method-dialog::part(footer) {
+        display: none;
+      }
+
+      .logs-method-list {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-s);
+      }
+
+      .logs-method-option {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-m);
+        padding: var(--wa-space-m);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-l);
+        cursor: pointer;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
+      }
+
+      .logs-method-option:hover:not(.logs-method-option--disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+        border-color: var(--esphome-primary);
+      }
+
+      .logs-method-option--disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .logs-method-option wa-icon {
+        font-size: 28px;
+        color: var(--esphome-primary);
+        flex-shrink: 0;
+      }
+
+      .logs-method-option--disabled wa-icon {
+        color: var(--wa-color-text-quiet);
+      }
+
+      .logs-method-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 0;
+      }
+
+      .logs-method-title {
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-normal);
+      }
+
+      .logs-method-desc {
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        line-height: 1.4;
+      }
     `,
   ];
 
@@ -808,6 +909,7 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-update-dialog></esphome-update-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
+      ${this._renderLogsMethodDialog()}
     `;
   }
 
@@ -924,7 +1026,10 @@ export class ESPHomePageDashboard extends LitElement {
 
     return html`
       <div
-        class="device-card ${this._selectMode ? "device-card--selectable" : ""} ${this._selectMode && selected ? "device-card--selected" : ""}"
+        class="device-card ${this._selectMode ? "device-card--selectable" : ""} ${this
+          ._selectMode && selected
+          ? "device-card--selected"
+          : ""}"
         @click=${this._selectMode
           ? () => this._toggleDevice(device.configuration)
           : nothing}
@@ -1060,9 +1165,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _selectAll() {
-    this._selectedDevices = new Set(
-      this._devices.map((d) => d.configuration),
-    );
+    this._selectedDevices = new Set(this._devices.map((d) => d.configuration));
   }
 
   private _deselectAll() {
@@ -1090,23 +1193,18 @@ export class ESPHomePageDashboard extends LitElement {
       this._localize("layout.update_all_started", {
         count: selected.length,
       }),
-      { richColors: true },
+      { richColors: true }
     );
 
     for (const configuration of selected) {
-      const device = this._devices.find(
-        (d) => d.configuration === configuration,
-      );
+      const device = this._devices.find((d) => d.configuration === configuration);
       if (!device) continue;
       const name = device.friendly_name || device.name;
       await this._compileAndUpload(configuration, name);
     }
   }
 
-  private _compileAndUpload(
-    configuration: string,
-    name: string,
-  ): Promise<void> {
+  private _compileAndUpload(configuration: string, name: string): Promise<void> {
     return new Promise((resolve) => {
       this._api.compile(configuration, {
         onOutput: () => {},
@@ -1120,37 +1218,34 @@ export class ESPHomePageDashboard extends LitElement {
                     this._localize("dashboard.update_device_success", {
                       name,
                     }),
-                    { richColors: true },
+                    { richColors: true }
                   );
                 } else {
                   toast.error(
                     this._localize("dashboard.update_device_failed", { name }),
-                    { richColors: true },
+                    { richColors: true }
                   );
                 }
                 resolve();
               },
               onError: () => {
-                toast.error(
-                  this._localize("dashboard.update_device_failed", { name }),
-                  { richColors: true },
-                );
+                toast.error(this._localize("dashboard.update_device_failed", { name }), {
+                  richColors: true,
+                });
                 resolve();
               },
             });
           } else {
-            toast.error(
-              this._localize("dashboard.update_device_failed", { name }),
-              { richColors: true },
-            );
+            toast.error(this._localize("dashboard.update_device_failed", { name }), {
+              richColors: true,
+            });
             resolve();
           }
         },
         onError: () => {
-          toast.error(
-            this._localize("dashboard.update_device_failed", { name }),
-            { richColors: true },
-          );
+          toast.error(this._localize("dashboard.update_device_failed", { name }), {
+            richColors: true,
+          });
           resolve();
         },
       });
@@ -1165,7 +1260,9 @@ export class ESPHomePageDashboard extends LitElement {
   private _deleteDevice(device: ConfiguredDevice) {
     const name = device.friendly_name || device.name;
     this._api.deleteDevice(device.configuration).catch(() => {
-      toast.error(this._localize("dashboard.delete_failed", { name }), { richColors: true });
+      toast.error(this._localize("dashboard.delete_failed", { name }), {
+        richColors: true,
+      });
     });
     toast.success(this._localize("dashboard.deleted", { name }), { richColors: true });
   }
@@ -1177,9 +1274,113 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _openLogs(device: ConfiguredDevice) {
-    this._logsDialog.configuration = device.configuration;
-    this._logsDialog.name = device.friendly_name || device.name;
-    this._logsDialog.open();
+    const online = this._deviceStates[device.configuration] ?? false;
+    if (online) {
+      this._logsDialog.configuration = device.configuration;
+      this._logsDialog.name = device.friendly_name || device.name;
+      this._logsDialog.open();
+    } else {
+      this._logsMethodDevice = device;
+      this._logsMethodOpen = true;
+    }
+  }
+
+  private _renderLogsMethodDialog() {
+    return html`
+      <wa-dialog
+        class="logs-method-dialog"
+        label=${this._localize("dashboard.logs_method_title")}
+        ?open=${this._logsMethodOpen}
+        @wa-after-hide=${() => {
+          this._logsMethodOpen = false;
+        }}
+        light-dismiss
+      >
+        <div class="logs-method-list">
+          <div class="logs-method-option logs-method-option--disabled">
+            <wa-icon library="mdi" name="wifi"></wa-icon>
+            <div class="logs-method-info">
+              <span class="logs-method-title"
+                >${this._localize("dashboard.logs_method_wireless")}</span
+              >
+              <span class="logs-method-desc"
+                >${this._localize("dashboard.logs_method_wireless_desc")}</span
+              >
+            </div>
+          </div>
+          <div class="logs-method-option" @click=${this._openLogsWebSerial}>
+            <wa-icon library="mdi" name="usb"></wa-icon>
+            <div class="logs-method-info">
+              <span class="logs-method-title"
+                >${this._localize("dashboard.logs_method_usb_local")}</span
+              >
+              <span class="logs-method-desc"
+                >${this._localize("dashboard.logs_method_usb_local_desc")}</span
+              >
+            </div>
+          </div>
+          <div class="logs-method-option logs-method-option--disabled">
+            <wa-icon library="mdi" name="serial-port"></wa-icon>
+            <div class="logs-method-info">
+              <span class="logs-method-title"
+                >${this._localize("dashboard.logs_method_usb_server")}</span
+              >
+              <span class="logs-method-desc"
+                >${this._localize("dashboard.logs_method_usb_server_desc")}</span
+              >
+            </div>
+          </div>
+        </div>
+      </wa-dialog>
+    `;
+  }
+
+  private async _openLogsWebSerial() {
+    if (!this._logsMethodDevice) return;
+    if (!("serial" in navigator)) {
+      toast.error(this._localize("dashboard.logs_web_serial_unsupported"), {
+        richColors: true,
+      });
+      return;
+    }
+    try {
+      const port = await (navigator as any).serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      this._logsMethodOpen = false;
+
+      const device = this._logsMethodDevice;
+      this._logsDialog.configuration = device.configuration;
+      this._logsDialog.name = device.friendly_name || device.name;
+      this._logsDialog.open();
+
+      // Read from the serial port and push lines to the logs dialog
+      const decoder = new TextDecoderStream();
+      port.readable.pipeTo(decoder.writable);
+      const reader = decoder.readable.getReader();
+      let buffer = "";
+      const readLoop = async () => {
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += value;
+            const lines = buffer.split("\n");
+            buffer = lines.pop() ?? "";
+            for (const line of lines) {
+              (this._logsDialog as any)._lines = [
+                ...(this._logsDialog as any)._lines,
+                line,
+              ];
+            }
+          }
+        } catch {
+          // Port closed or disconnected
+        }
+      };
+      readLoop();
+    } catch {
+      // User cancelled the port picker
+    }
   }
 
   private _openCreateDialog() {

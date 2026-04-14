@@ -127,6 +127,10 @@ function parseAnsiLine(line: string): AnsiSpan[] {
 
 @customElement("esphome-ansi-log")
 export class ESPHomeAnsiLog extends LitElement {
+  /** Use light theme instead of dark. */
+  @property({ type: Boolean, reflect: true })
+  light = false;
+
   /** The log lines to render. */
   @property({ attribute: false })
   lines: string[] = [];
@@ -148,11 +152,22 @@ export class ESPHomeAnsiLog extends LitElement {
   static styles = css`
     :host {
       display: block;
+      --log-bg: #1e1e1e;
+      --log-fg: #d4d4d4;
+      --log-hover: rgba(255, 255, 255, 0.04);
+      --log-placeholder: #666;
+    }
+
+    :host([light]) {
+      --log-bg: #f5f5f5;
+      --log-fg: #1e1e1e;
+      --log-hover: rgba(0, 0, 0, 0.04);
+      --log-placeholder: #999;
     }
 
     .log-container {
-      background: #1e1e1e;
-      color: #d4d4d4;
+      background: var(--log-bg);
+      color: var(--log-fg);
       font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       font-size: 0.8rem;
       padding: 16px;
@@ -171,11 +186,11 @@ export class ESPHomeAnsiLog extends LitElement {
     }
 
     .log-line:hover {
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--log-hover);
     }
 
     .placeholder {
-      color: #666;
+      color: var(--log-placeholder);
       font-style: italic;
     }
 
