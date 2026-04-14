@@ -70,6 +70,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property({ attribute: false })
   selectedKey: string | null = null;
 
+  @property({ attribute: false })
+  selectedFromLine?: number;
+
   @state()
   private _selectedLine: number | null = null;
 
@@ -257,9 +260,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
-    // Sync _selectedLine from selectedKey when set externally (e.g. URL restore)
+    // Sync _selectedLine from selectedKey/selectedFromLine when set externally (e.g. URL restore)
     if (
-      (changedProperties.has("selectedKey") || changedProperties.has("yaml")) &&
+      (changedProperties.has("selectedKey") || changedProperties.has("yaml") || changedProperties.has("selectedFromLine")) &&
       this.selectedKey &&
       this._selectedLine === null &&
       this.yaml
@@ -268,9 +271,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
         ...parseYamlTopLevelSections(this.yaml),
         ...parseYamlAutomations(this.yaml),
       ];
-      const match = allSections.find(
-        (s) => (s.platform || s.key) === this.selectedKey,
-      );
+      // Match by fromLine first (exact), fall back to key/platform match
+      const match = this.selectedFromLine !== undefined
+        ? allSections.find((s) => s.fromLine === this.selectedFromLine)
+        : allSections.find((s) => (s.platform || s.key) === this.selectedKey);
       if (match) {
         this._selectedLine = match.fromLine;
         this._selectedRange = { fromLine: match.fromLine, toLine: match.toLine };

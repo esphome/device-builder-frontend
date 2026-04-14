@@ -69,6 +69,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _dirty = false;
 
+  private _loadId = 0;
+
   @state()
   private _error = "";
 
@@ -239,7 +241,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   updated(changedProperties: Map<string, unknown>) {
     if (
-      (changedProperties.has("sectionKey") || changedProperties.has("configuration")) &&
+      (changedProperties.has("sectionKey") || changedProperties.has("configuration") || changedProperties.has("fromLine")) &&
       this.sectionKey &&
       this.configuration
     ) {
@@ -255,22 +257,27 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   private async _loadConfig() {
+    const id = ++this._loadId;
     this._loading = true;
     this._error = "";
+    this._config = null;
     this._dirty = false;
+
     try {
-      // Fetch the component schema from the catalog
       const component = await this._api.getComponent(this.sectionKey);
+
+      // Stale — user clicked another component while this was loading
+      if (id !== this._loadId) return;
+
       if (!component) {
         this._error = this._localize("device.unknown_section", { key: this.sectionKey });
-        this._config = null;
         this._loading = false;
         return;
       }
 
-      // Parse current values from the device YAML
       const yaml = await this._api.getConfig(this.configuration);
-      const currentValues = this._parseYamlSectionValues(yaml);
+
+      if (id !== this._loadId) return;
 
       this._config = {
         section_key: this.sectionKey,
@@ -281,12 +288,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         icon: "",
         entries: component.config_entries,
       };
-      this._values = currentValues;
+      this._values = this._parseYamlSectionValues(yaml);
     } catch (e) {
-      this._error = e instanceof Error ? e.message : this._localize("device.load_config_error");
-      this._config = null;
+      if (id !== this._loadId) return;
+      const msg = e instanceof Error ? e.message : "";
+      // Show a friendly message for timeouts instead of the raw error
+      this._error = msg.includes("timed out")
+        ? this._localize("device.load_config_error")
+        : msg || this._localize("device.load_config_error");
     } finally {
-      this._loading = false;
+      if (id === this._loadId) {
+        this._loading = false;
+      }
     }
   }
 
@@ -312,28 +325,58 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
     if (startIdx < 0) return values;
 
-    // Extract direct children (exactly 2-space indent)
+    // Detect if this is a list item (  - key: val) vs a top-level section (key:)
+    const isListItem = /^\s+-\s/.test(lines[startIdx]);
+    // For list items, the first line may have `  - platform: binary`
+    // and children are at 4-space indent. For top-level, children are at 2-space.
+    const childIndent = isListItem ? "    " : "  ";
+    const childRegex = new RegExp(
+      `^${childIndent}([a-zA-Z_][a-zA-Z0-9_]*):\\s*(.*)$`,
+    );
+
+    // Also parse the first line of a list item (  - key: value)
+    if (isListItem) {
+      const firstMatch = lines[startIdx].match(
+        /^\s+-\s+([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/,
+      );
+      if (firstMatch) {
+        const key = firstMatch[1];
+        let raw = firstMatch[2].trim();
+        if (raw !== "") {
+          if (
+            (raw.startsWith('"') && raw.endsWith('"')) ||
+            (raw.startsWith("'") && raw.endsWith("'"))
+          )
+            raw = raw.slice(1, -1);
+          if (raw === "true") values[key] = true;
+          else if (raw === "false") values[key] = false;
+          else values[key] = raw;
+        }
+      }
+    }
+
     for (let i = startIdx + 1; i < lines.length; i++) {
       const line = lines[i];
       if (line.trim() === "") continue;
-      // New top-level section — stop
-      if (/^[a-zA-Z]/.test(line)) break;
+      // Stop at a line with equal or less indentation (next item or top-level key)
+      if (isListItem) {
+        if (/^\s+-\s/.test(line) || /^[a-zA-Z]/.test(line)) break;
+      } else {
+        if (/^[a-zA-Z]/.test(line)) break;
+      }
 
-      const match = line.match(/^  ([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
+      const match = line.match(childRegex);
       if (!match) continue;
 
       const key = match[1];
       let raw = match[2].trim();
-      // Skip if value is empty (nested block)
       if (raw === "") continue;
-      // Strip quotes
       if (
         (raw.startsWith('"') && raw.endsWith('"')) ||
         (raw.startsWith("'") && raw.endsWith("'"))
       ) {
         raw = raw.slice(1, -1);
       }
-      // Store typed values
       if (raw === "true") values[key] = true;
       else if (raw === "false") values[key] = false;
       else values[key] = raw;
@@ -500,7 +543,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           ? html`<p class="field-description">${entry.description}</p>`
           : nothing}
         <wa-select
-          .value=${value}
+          value=${value}
           @change=${(e: Event) =>
             this._setValue(entry.key, (e.target as HTMLSelectElement).value)}
         >
@@ -551,34 +594,37 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const { start, end } = this._findSectionRange(lines);
     if (start < 0) return yaml;
 
+    const isListItem = /^\s+-\s/.test(lines[start]);
+    const childIndent = isListItem ? "    " : "  ";
+    const childRegex = new RegExp(
+      `^${childIndent}([a-zA-Z_][a-zA-Z0-9_]*):\\s*(.*)$`,
+    );
+
     // Build updated lines for the section
     const sectionHeader = lines[start];
     const newLines = [sectionHeader];
 
     // Collect existing lines that are nested blocks (not simple key: value)
     const existingNested: string[] = [];
-    const existingKeys = new Set<string>();
     for (let i = start + 1; i < end; i++) {
       const line = lines[i];
-      const match = line.match(/^  ([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/);
+      const match = line.match(childRegex);
       if (match && match[2].trim() !== "") {
-        existingKeys.add(match[1]);
+        // Simple key: value — will be replaced by form values
       } else if (line.trim() !== "") {
-        // Preserve nested blocks and comments as-is
         existingNested.push(line);
       }
     }
 
-    // Write form values
+    // Write form values at the correct indent
     for (const entry of this._config!.entries) {
       if (entry.hidden) continue;
       const val = this._values[entry.key];
       if (val === undefined || val === "" || val === null) continue;
       const strVal = typeof val === "boolean" ? String(val) : typeof val === "string" && val.includes(" ") ? `"${val}"` : String(val);
-      newLines.push(`  ${entry.key}: ${strVal}`);
+      newLines.push(`${childIndent}${entry.key}: ${strVal}`);
     }
 
-    // Re-add nested blocks that weren't simple values
     newLines.push(...existingNested);
 
     lines.splice(start, end - start, ...newLines);
@@ -600,12 +646,21 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
     if (start < 0) return { start: -1, end: -1 };
 
-    // Find the end: next top-level key or EOF
+    const isListItem = /^\s+-\s/.test(lines[start]);
+
     let end = lines.length;
     for (let i = start + 1; i < lines.length; i++) {
-      if (/^[a-zA-Z]/.test(lines[i])) {
-        end = i;
-        break;
+      // For list items, stop at the next list item or top-level key
+      if (isListItem) {
+        if (/^\s+-\s/.test(lines[i]) || /^[a-zA-Z]/.test(lines[i])) {
+          end = i;
+          break;
+        }
+      } else {
+        if (/^[a-zA-Z]/.test(lines[i])) {
+          end = i;
+          break;
+        }
       }
     }
     return { start, end };

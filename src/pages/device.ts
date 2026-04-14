@@ -65,7 +65,7 @@ export class ESPHomePageDevice extends LitElement {
   private _selectedSection: string | null = this._readUrlParam("section", null);
 
   @state()
-  private _selectedFromLine?: number;
+  private _selectedFromLine?: number = this._readUrlLine();
 
   @state()
   private _yaml = "";
@@ -175,6 +175,7 @@ export class ESPHomePageDevice extends LitElement {
             .boardName=${this._board?.name ?? ""}
             .configuration=${this.id}
             .selectedKey=${this._selectedSection}
+            .selectedFromLine=${this._selectedFromLine}
           ></esphome-device-navigator>
           <esphome-device-editor
             .yaml=${this._yaml}
@@ -237,6 +238,13 @@ export class ESPHomePageDevice extends LitElement {
     return params.get(key) ?? fallback;
   }
 
+  private _readUrlLine(): number | undefined {
+    const raw = new URLSearchParams(window.location.search).get("line");
+    if (!raw) return undefined;
+    const n = Number(raw);
+    return Number.isNaN(n) ? undefined : n;
+  }
+
   private _readUrlSections(): number[] {
     const raw = new URLSearchParams(window.location.search).get("open");
     if (!raw) return [];
@@ -246,11 +254,17 @@ export class ESPHomePageDevice extends LitElement {
   private _updateUrl() {
     const params = new URLSearchParams(window.location.search);
 
-    // Selected section
+    // Selected section + line
     if (this._selectedSection) {
       params.set("section", this._selectedSection);
+      if (this._selectedFromLine !== undefined) {
+        params.set("line", String(this._selectedFromLine));
+      } else {
+        params.delete("line");
+      }
     } else {
       params.delete("section");
+      params.delete("line");
     }
 
     // Open navigator sections
