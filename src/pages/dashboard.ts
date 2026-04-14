@@ -1259,12 +1259,15 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _deleteDevice(device: ConfiguredDevice) {
     const name = device.friendly_name || device.name;
-    this._api.deleteDevice(device.configuration).catch(() => {
-      toast.error(this._localize("dashboard.delete_failed", { name }), {
-        richColors: true,
-      });
-    });
     toast.success(this._localize("dashboard.deleted", { name }), { richColors: true });
+    this._api.deleteDevice(device.configuration).catch(() => {
+      // The real-time event subscription removes the device from the list
+      // immediately. Only show an error if the device is still present,
+      // meaning the delete truly failed (not just a command timeout).
+      if (this._devices.some((d) => d.configuration === device.configuration)) {
+        toast.error(this._localize("dashboard.delete_failed", { name }), { richColors: true });
+      }
+    });
   }
 
   private _openUpdate(device: ConfiguredDevice) {

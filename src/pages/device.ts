@@ -112,11 +112,16 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _saveYaml() {
-    this._api.updateConfig(this.id, this._yaml).catch((e) => {
-      console.error("Failed to save YAML:", e);
-      toast.error(this._localize("device.yaml_save_error"), { richColors: true });
-    });
     toast.success(this._localize("device.yaml_saved"), { richColors: true });
+    this._api.updateConfig(this.id, this._yaml).catch((e) => {
+      // Only surface real errors, not command timeouts — the backend
+      // writes the file but may not send a response before the timeout.
+      const msg = e instanceof Error ? e.message : "";
+      if (!msg.includes("timed out")) {
+        console.error("Failed to save YAML:", e);
+        toast.error(this._localize("device.yaml_save_error"), { richColors: true });
+      }
+    });
   }
 
   static styles = [
