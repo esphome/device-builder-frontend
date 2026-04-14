@@ -308,7 +308,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .selectedFromLine=${this.selectedFromLine}
               ></esphome-device-board-info>
             </div>
-            ${this.layout === "both" ? html`<div class="pane-divider"></div>` : nothing}
+            ${effectiveLayout === "both" ? html`<div class="pane-divider"></div>` : nothing}
             <div class="editor-pane editor-pane--right">
               <div class="editor-pane-body">
                 <esphome-yaml-editor
