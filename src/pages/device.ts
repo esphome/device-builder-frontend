@@ -1,6 +1,8 @@
 import { consume } from "@lit/context";
-import { css, html, LitElement } from "lit";
+import { mdiMenu } from "@mdi/js";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { registerMdiIcons } from "../util/register-icons.js";
 import type { BoardCatalogEntry, ConfiguredDevice } from "../api/types.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -10,8 +12,11 @@ import toast from "sonner-js";
 import { localizeContext, devicesContext, apiContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
+
+registerMdiIcons({ menu: mdiMenu });
 
 @customElement("esphome-page-device")
 export class ESPHomePageDevice extends LitElement {
@@ -66,6 +71,9 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _selectedFromLine?: number = this._readUrlLine();
+
+  @state()
+  private _drawerOpen = false;
 
   @state()
   private _yaml = "";
@@ -144,10 +152,85 @@ export class ESPHomePageDevice extends LitElement {
         height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
       }
 
+      /* ─── Desktop: hide drawer, show sidebar nav ─── */
+
+      .drawer,
+      .drawer-backdrop {
+        display: none;
+      }
+
+      .mobile-menu-btn {
+        display: none;
+      }
+
+      /* ─── Mobile ─── */
+
       @media (max-width: 900px) {
         .layout-grid {
           grid-template-columns: 1fr;
-          height: auto;
+          height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
+        }
+
+        /* Hide the desktop sidebar */
+        .desktop-nav {
+          display: none !important;
+        }
+
+        /* Show the mobile menu button */
+        .mobile-menu-btn {
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border: none;
+          background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
+          color: var(--esphome-on-primary);
+          cursor: pointer;
+          padding: 4px;
+          border-radius: var(--wa-border-radius-m);
+          margin-right: var(--wa-space-xs);
+        }
+
+        .mobile-menu-btn wa-icon { font-size: 18px; }
+        .mobile-menu-btn:hover { background: color-mix(in srgb, var(--esphome-on-primary), transparent 70%); }
+
+        /* Drawer backdrop */
+        .drawer-backdrop {
+          display: none;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          z-index: 99;
+        }
+
+        .drawer-backdrop--open {
+          display: block;
+        }
+
+        /* Drawer panel */
+        .drawer {
+          display: block;
+          position: fixed;
+          top: 0;
+          left: 0;
+          bottom: 0;
+          width: 300px;
+          max-width: 85vw;
+          z-index: 100;
+          background: var(--wa-color-surface-default);
+          box-shadow: var(--wa-shadow-l);
+          overflow-y: auto;
+          transform: translateX(-100%);
+          transition: transform 0.25s ease;
+        }
+
+        .drawer--open {
+          transform: translateX(0);
+        }
+
+        /* Remove card radius and border inside drawer */
+        .drawer {
+          --navigator-border-radius: 0;
+          --navigator-border: none;
         }
       }
     `,
@@ -158,6 +241,28 @@ export class ESPHomePageDevice extends LitElement {
       this._device?.friendly_name || this._device?.name || this.id || this._localize("dashboard.create_device");
 
     return html`
+      <!-- Mobile drawer -->
+      <div
+        class="drawer-backdrop ${this._drawerOpen ? "drawer-backdrop--open" : ""}"
+        @click=${() => { this._drawerOpen = false; }}
+      ></div>
+      <div
+        class="drawer ${this._drawerOpen ? "drawer--open" : ""}"
+        @section-toggle=${this._onSectionToggle}
+        @section-select=${this._onSectionSelect}
+        @yaml-highlight=${this._onYamlHighlight}
+      >
+        <esphome-device-navigator
+          class="drawer-nav"
+          .openSections=${this._openSections}
+          .yaml=${this._yaml}
+          .boardName=${this._board?.name ?? ""}
+          .configuration=${this.id}
+          .selectedKey=${this._selectedSection}
+          .selectedFromLine=${this._selectedFromLine}
+        ></esphome-device-navigator>
+      </div>
+
       <div class="page">
         <div
           class="layout-grid"
@@ -170,6 +275,7 @@ export class ESPHomePageDevice extends LitElement {
           @save-yaml=${this._saveYaml}
         >
           <esphome-device-navigator
+            class="desktop-nav"
             .openSections=${this._openSections}
             .yaml=${this._yaml}
             .boardName=${this._board?.name ?? ""}
@@ -188,7 +294,15 @@ export class ESPHomePageDevice extends LitElement {
             .configuration=${this.id}
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
-          ></esphome-device-editor>
+          >
+            <button
+              slot="mobile-menu"
+              class="mobile-menu-btn"
+              @click=${() => { this._drawerOpen = true; }}
+            >
+              <wa-icon library="mdi" name="menu"></wa-icon>
+            </button>
+          </esphome-device-editor>
         </div>
       </div>
     `;
@@ -226,6 +340,7 @@ export class ESPHomePageDevice extends LitElement {
   private _onSectionSelect(e: CustomEvent<{ sectionKey: string | null; fromLine?: number }>) {
     this._selectedSection = e.detail.sectionKey;
     this._selectedFromLine = e.detail.fromLine;
+    this._drawerOpen = false;
     this._updateUrl();
   }
 

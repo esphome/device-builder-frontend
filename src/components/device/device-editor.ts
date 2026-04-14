@@ -49,6 +49,26 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Boolean })
   justCreated = false;
 
+  @state()
+  private _isMobile = false;
+
+  private _mql = window.matchMedia("(max-width: 900px)");
+
+  private _onMqlChange = (e: MediaQueryListEvent) => {
+    this._isMobile = e.matches;
+  };
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._isMobile = this._mql.matches;
+    this._mql.addEventListener("change", this._onMqlChange);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this._mql.removeEventListener("change", this._onMqlChange);
+  }
+
   @property({ attribute: false })
   highlightRange: HighlightRange | null = null;
 
@@ -94,12 +114,17 @@ export class ESPHomeDeviceEditor extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 2px;
+        min-width: 0;
+        flex: 1;
       }
 
       .editor-header-title {
         margin: 0;
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .header-actions {
@@ -226,12 +251,22 @@ export class ESPHomeDeviceEditor extends LitElement {
       .editor-layout--right .editor-pane--left {
         display: none;
       }
+
+      @media (max-width: 900px) {
+        .layout-toggle .split-btn {
+          display: none;
+        }
+      }
     `,
   ];
 
   protected render() {
     const hasBoard = !!this.board;
-    const effectiveLayout = hasBoard ? this.layout : "right";
+    const effectiveLayout = !hasBoard
+      ? "right"
+      : this._isMobile && this.layout === "both"
+        ? "right"
+        : this.layout;
     const layoutClass =
       effectiveLayout === "both"
         ? "editor-layout--both"
@@ -253,6 +288,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     return html`
       <section class="card">
         <header class="card-header">
+          <slot name="mobile-menu"></slot>
           <div class="editor-header-main">
             <h2 class="editor-header-title">${title}</h2>
           </div>
@@ -278,6 +314,7 @@ export class ESPHomeDeviceEditor extends LitElement {
               <wa-icon library="mdi" name="layout-left"></wa-icon>
             </button>
             <button
+              class="split-btn"
               type="button"
               aria-pressed=${effectiveLayout === "both"}
               ?disabled=${!hasBoard}

@@ -91,8 +91,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
       .card {
         background: var(--wa-color-surface-default);
-        border-radius: var(--wa-border-radius-l);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--navigator-border-radius, var(--wa-border-radius-l));
+        border: var(--navigator-border, var(--wa-border-width-s) solid var(--wa-color-surface-border));
         box-shadow: var(--wa-elevation-02);
         display: flex;
         flex-direction: column;
