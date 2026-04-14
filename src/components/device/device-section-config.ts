@@ -262,7 +262,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       // Fetch the component schema from the catalog
       const component = await this._api.getComponent(this.sectionKey);
       if (!component) {
-        this._error = `Unknown section: ${this.sectionKey}`;
+        this._error = this._localize("device.unknown_section", { key: this.sectionKey });
         this._config = null;
         this._loading = false;
         return;
@@ -283,7 +283,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       };
       this._values = currentValues;
     } catch (e) {
-      this._error = e instanceof Error ? e.message : "Failed to load section config";
+      this._error = e instanceof Error ? e.message : this._localize("device.load_config_error");
       this._config = null;
     } finally {
       this._loading = false;
@@ -378,7 +378,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           @click=${this._onSave}
         >
           <wa-icon library="mdi" name="content-save"></wa-icon>
-          ${this._saving ? "Saving…" : this._localize("device.save")}
+          ${this._saving ? this._localize("device.saving") : this._localize("device.save")}
         </button>
       </div>
     `;
@@ -526,7 +526,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       const newYaml = this._updateSectionInYaml(yaml);
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {
-        this._error = e instanceof Error ? e.message : "Failed to save";
+        this._error = e instanceof Error ? e.message : this._localize("device.save_error");
       });
       this._dirty = false;
       this.dispatchEvent(
@@ -536,9 +536,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           composed: true,
         })
       );
-      toast.success(`"${title}" saved`, { richColors: true });
+      toast.success(this._localize("device.section_saved_toast", { title }), { richColors: true });
     } catch (e) {
-      this._error = e instanceof Error ? e.message : "Failed to save";
+      this._error = e instanceof Error ? e.message : this._localize("device.save_error");
     } finally {
       this._saving = false;
     }

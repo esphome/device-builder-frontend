@@ -120,7 +120,7 @@ export class ESPHomePageSecrets extends LitElement {
     return html`
       <div class="page">
         <div class="page-header">
-          <div class="back" @click=${this._goBack} title="Back">
+          <div class="back" @click=${this._goBack} title=${this._localize("layout.back")}>
             <wa-icon library="mdi" name="arrow-left"></wa-icon>
           </div>
           <div class="page-title">

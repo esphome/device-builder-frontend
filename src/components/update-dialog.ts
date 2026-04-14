@@ -339,7 +339,7 @@ export class ESPHomeUpdateDialog extends LitElement {
           this._startUpload();
         } else {
           this._state = "error";
-          this._lines = [...this._lines, "\x1b[31mCompilation failed.\x1b[0m"];
+          this._lines = [...this._lines, `\x1b[31m${this._localize("dashboard.update_compilation_failed")}\x1b[0m`];
         }
       },
       onError: (error: string) => {
@@ -351,7 +351,7 @@ export class ESPHomeUpdateDialog extends LitElement {
 
   private _startUpload() {
     this._state = "uploading";
-    this._lines = [...this._lines, "", "\x1b[36m── Uploading ──\x1b[0m", ""];
+    this._lines = [...this._lines, "", `\x1b[36m${this._localize("dashboard.update_uploading_header")}\x1b[0m`, ""];
 
     this._streamId = this._api.upload(this.configuration, "OTA", {
       onOutput: (line: string) => {
@@ -363,11 +363,11 @@ export class ESPHomeUpdateDialog extends LitElement {
           this._lines = [
             ...this._lines,
             "",
-            "\x1b[32mUpdate complete! Device is restarting.\x1b[0m",
+            `\x1b[32m${this._localize("dashboard.update_complete_msg")}\x1b[0m`,
           ];
         } else {
           this._state = "error";
-          this._lines = [...this._lines, "\x1b[31mUpload failed.\x1b[0m"];
+          this._lines = [...this._lines, `\x1b[31m${this._localize("dashboard.update_upload_failed")}\x1b[0m`];
         }
       },
       onError: (error: string) => {
@@ -382,7 +382,7 @@ export class ESPHomeUpdateDialog extends LitElement {
     // or a new command is issued. We just reset the UI state.
     if (this._state === "compiling" || this._state === "uploading") {
       this._state = "error";
-      this._lines = [...this._lines, "", "\x1b[33mStopped by user.\x1b[0m"];
+      this._lines = [...this._lines, "", `\x1b[33m${this._localize("dashboard.update_stopped")}\x1b[0m`];
     }
     this._streamId = "";
   }

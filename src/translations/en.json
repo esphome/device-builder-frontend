@@ -31,12 +31,26 @@
     "update_stop": "Stop",
     "update_close": "Close",
     "update_retry": "Retry",
+    "update_compilation_failed": "Compilation failed.",
+    "update_upload_failed": "Upload failed.",
+    "update_complete_msg": "Update complete! Device is restarting.",
+    "update_stopped": "Stopped by user.",
+    "update_uploading_header": "── Uploading ──",
     "logs_title": "Logs - {name}",
     "logs_placeholder": "Waiting for logs…",
     "logs_stop": "Stop",
     "logs_start": "Start",
     "logs_close": "Close",
-    "logs_clear": "Clear"
+    "logs_clear": "Clear",
+    "select_all": "Select all",
+    "deselect_all": "Deselect all",
+    "selected_count": "{count} selected",
+    "update_selected": "Update {count} device(s)",
+    "update_device_success": "\"{name}\" updated successfully",
+    "update_device_failed": "\"{name}\" update failed",
+    "delete_failed": "Failed to delete \"{name}\"",
+    "deleted": "\"{name}\" deleted",
+    "more_options": "More options"
   },
   "wizard": {
     "title_create": "Create configuration",
@@ -73,6 +87,9 @@
     "expand_board": "Expand details",
     "more_info": "More info",
     "add_board": "Select",
+    "import_read_error": "Failed to read the file.",
+    "import_duplicate_error": "A device named \"{name}\" already exists.",
+    "import_general_error": "Failed to import the config file. Please try again.",
     "tag": {
       "esp32-c6": "esp32-c6",
       "esp32-s3": "esp32-s3",
@@ -154,7 +171,18 @@
     "automation_trigger": "Trigger",
     "automation_trigger_label": "When",
     "automation_action": "Action",
-    "automation_action_label": "Then do"
+    "automation_action_label": "Then do",
+    "adding": "Adding…",
+    "saving": "Saving…",
+    "unknown_section": "Unknown section: {key}",
+    "load_config_error": "Failed to load section config",
+    "save_error": "Failed to save",
+    "section_saved_toast": "\"{title}\" saved",
+    "add_component_error": "Failed to add component",
+    "add_automation_error": "Failed to add automation",
+    "add_automation_unavailable": "Automation support is not yet available",
+    "add_config_error": "Failed to add config section",
+    "editor_layout_label": "Editor layout"
   },
   "layout": {
     "secrets": "Secrets",
@@ -169,7 +197,9 @@
     "cancel": "Cancel",
     "light_mode": "Switch to light mode",
     "dark_mode": "Switch to dark mode",
-    "settings": "Settings"
+    "settings": "Settings",
+    "back": "Back",
+    "home_assistant": "Home Assistant"
   },
   "settings": {
     "appearance": "Appearance",

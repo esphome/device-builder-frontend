@@ -108,7 +108,7 @@ export class ESPHomeLayout extends LitElement {
     return html`
       <div class="app-header">
         <div class="header-logos">
-          <wa-button class="ha-btn" variant="light" size="small" title="Home Assistant">
+          <wa-button class="ha-btn" variant="light" size="small" title=${this._localize("layout.home_assistant")}>
             <wa-icon library="mdi" name="arrow-collapse-right"></wa-icon>
             <img src="/assets/logo/ha.svg" alt="Home Assistant" />
           </wa-button>

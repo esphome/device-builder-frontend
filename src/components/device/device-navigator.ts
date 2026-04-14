@@ -15,6 +15,7 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
+  type YamlSection,
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
@@ -190,10 +191,25 @@ export class ESPHomeDeviceNavigator extends LitElement {
         border-color: var(--esphome-primary);
       }
 
-      .nav-item p {
-        margin: var(--wa-space-xs) 0;
+      .nav-item-content {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        padding: var(--wa-space-xs) 0;
+      }
+
+      .nav-item-content p {
+        margin: 0;
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
+      }
+
+      .nav-item-subtitle {
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        font-weight: normal;
+        margin: 0;
+        line-height: 1.2;
       }
 
       .nav-item wa-icon {
@@ -252,7 +268,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
         ...parseYamlTopLevelSections(this.yaml),
         ...parseYamlAutomations(this.yaml),
       ];
-      const match = allSections.find((s) => s.key === this.selectedKey);
+      const match = allSections.find(
+        (s) => (s.platform || s.key) === this.selectedKey,
+      );
       if (match) {
         this._selectedLine = match.fromLine;
         this._selectedRange = { fromLine: match.fromLine, toLine: match.toLine };
@@ -341,19 +359,26 @@ export class ESPHomeDeviceNavigator extends LitElement {
                       ? html`
                           <div class="nav-items">
                             ${items.map(
-                              ({ key, fromLine, toLine }) => html`
+                              (item) => html`
                                 <div
-                                  class="nav-item ${this._selectedLine === fromLine
+                                  class="nav-item ${this._selectedLine === item.fromLine
                                     ? "nav-item--selected"
-                                    : ""} ${this._hoveredLine === fromLine
+                                    : ""} ${this._hoveredLine === item.fromLine
                                     ? "nav-item--hovered"
                                     : ""}"
                                   @mouseenter=${() =>
-                                    this._onItemHover(fromLine, fromLine, toLine)}
+                                    this._onItemHover(item.fromLine, item.fromLine, item.toLine)}
                                   @mouseleave=${() => this._onItemLeave()}
-                                  @click=${() => this._onItemClick(key, fromLine, toLine)}
+                                  @click=${() => this._onItemClick(item)}
                                 >
-                                  <p>${key}</p>
+                                  <div class="nav-item-content">
+                                    <p>${item.name
+                                      ? `${item.name} - ${item.platform || item.key}`
+                                      : item.platform || item.key}</p>
+                                    ${item.parentKey && (item.name || item.platform)
+                                      ? html`<span class="nav-item-subtitle">${item.parentKey}</span>`
+                                      : nothing}
+                                  </div>
                                   <wa-icon library="mdi" name="chevron-right"></wa-icon>
                                 </div>
                               `
@@ -400,7 +425,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
     this._emitHighlight(this._selectedRange, false);
   }
 
-  private _onItemClick(key: string, fromLine: number, toLine: number) {
+  private _onItemClick(item: YamlSection) {
+    const { fromLine, toLine } = item;
+    const sectionKey = item.platform || item.key;
+
     if (this._selectedLine === fromLine) {
       this.selectedKey = null;
       this._selectedLine = null;
@@ -408,11 +436,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
       this._emitHighlight(this._hoveredLine === fromLine ? { fromLine, toLine } : null, false);
       this._emitSectionSelect(null, undefined);
     } else {
-      this.selectedKey = key;
+      this.selectedKey = sectionKey;
       this._selectedLine = fromLine;
       this._selectedRange = { fromLine, toLine };
       this._emitHighlight({ fromLine, toLine }, true);
-      this._emitSectionSelect(key, fromLine);
+      this._emitSectionSelect(sectionKey, fromLine);
     }
   }
 

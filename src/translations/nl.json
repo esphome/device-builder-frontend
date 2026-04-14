@@ -21,7 +21,16 @@
     "search_of": "van {total}",
     "no_results_title": "Geen apparaten gevonden",
     "no_results_desc": "Geen apparaten komen overeen met \"{query}\". Probeer een andere naam of configuratiebestand.",
-    "no_results_clear": "Zoekopdracht wissen"
+    "no_results_clear": "Zoekopdracht wissen",
+    "select_all": "Alles selecteren",
+    "deselect_all": "Alles deselecteren",
+    "selected_count": "{count} geselecteerd",
+    "update_selected": "{count} apparaat/apparaten bijwerken",
+    "update_device_success": "\"{name}\" succesvol bijgewerkt",
+    "update_device_failed": "Bijwerken van \"{name}\" mislukt",
+    "delete_failed": "Verwijderen van \"{name}\" mislukt",
+    "deleted": "\"{name}\" verwijderd",
+    "more_options": "Meer opties"
   },
   "wizard": {
     "title_create": "Configuratie aanmaken",
@@ -57,6 +66,9 @@
     "expand_board": "Details weergeven",
     "more_info": "Meer info",
     "add_board": "Selecteren",
+    "import_read_error": "Bestand lezen mislukt.",
+    "import_duplicate_error": "Een apparaat met de naam \"{name}\" bestaat al.",
+    "import_general_error": "Importeren van het configuratiebestand mislukt. Probeer het opnieuw.",
     "tag": {
       "esp32-c6": "esp32-c6",
       "esp32-s3": "esp32-s3",
@@ -127,6 +139,17 @@
     "automation_trigger_label": "Wanneer",
     "automation_action": "Actie",
     "automation_action_label": "Dan doen",
+    "adding": "Toevoegen…",
+    "saving": "Opslaan…",
+    "unknown_section": "Onbekende sectie: {key}",
+    "load_config_error": "Laden van sectieconfiguratie mislukt",
+    "save_error": "Opslaan mislukt",
+    "section_saved_toast": "\"{title}\" opgeslagen",
+    "add_component_error": "Toevoegen van component mislukt",
+    "add_automation_error": "Toevoegen van automatisering mislukt",
+    "add_automation_unavailable": "Ondersteuning voor automatiseringen is nog niet beschikbaar",
+    "add_config_error": "Toevoegen van configuratiesectie mislukt",
+    "editor_layout_label": "Editor-indeling",
     "editor_title_no_components": "Kies componenten voor uw {name}",
     "editor_title_no_automations": "Voeg automatiseringen toe voor uw {name}",
     "editor_title_ready": "{name} bewerken",
@@ -144,7 +167,10 @@
     "updating": "Bijwerken…",
     "cancel": "Annuleren",
     "light_mode": "Overschakelen naar lichte modus",
-    "dark_mode": "Overschakelen naar donkere modus"
+    "dark_mode": "Overschakelen naar donkere modus",
+    "settings": "Instellingen",
+    "back": "Terug",
+    "home_assistant": "Home Assistant"
   },
   "secrets": {
     "title": "Geheimen",

@@ -457,7 +457,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             ?disabled=${this._submitting || !this._targetName.trim()}
             @click=${this._onSubmit}
           >
-            ${this._submitting ? "Adding\u2026" : this._localize("device.add_automation")}
+            ${this._submitting ? this._localize("device.adding") : this._localize("device.add_automation")}
           </button>
         </div>
       </div>
@@ -503,9 +503,9 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._error = "";
     try {
       // TODO: addAutomation is not yet available in the WebSocket backend
-      throw new Error("Automation support is not yet available");
+      throw new Error(this._localize("device.add_automation_unavailable"));
     } catch (err) {
-      this._error = err instanceof Error ? err.message : "Failed to add automation";
+      this._error = err instanceof Error ? err.message : this._localize("device.add_automation_error");
     } finally {
       this._submitting = false;
     }

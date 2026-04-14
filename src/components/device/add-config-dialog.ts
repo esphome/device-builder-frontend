@@ -499,7 +499,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
             ?disabled=${this._submitting || !this._isFormValid()}
             @click=${this._onSubmit}
           >
-            ${this._submitting ? "Adding\u2026" : this._localize("device.add_config")}
+            ${this._submitting ? this._localize("device.adding") : this._localize("device.add_config")}
           </button>
         </div>
       </div>
@@ -596,7 +596,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
         })
       );
     } catch (err) {
-      this._error = err instanceof Error ? err.message : "Failed to add config section";
+      this._error = err instanceof Error ? err.message : this._localize("device.add_config_error");
     } finally {
       this._submitting = false;
     }

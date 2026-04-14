@@ -1,5 +1,7 @@
 import { consume } from "@lit/context";
 import {
+  mdiCheckboxBlankOutline,
+  mdiCheckboxMarked,
   mdiClipboardTextSearchOutline,
   mdiConsole,
   mdiDelete,
@@ -9,12 +11,13 @@ import {
   mdiPlus,
   mdiPlusCircleOutline,
   mdiRefresh,
+  mdiUpdate,
   mdiUpload,
   mdiWeb,
   mdiWifi,
   mdiWifiOff,
 } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -35,14 +38,16 @@ import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/dropdown-item/dropdown-item.js";
 import "@home-assistant/webawesome/dist/components/dropdown/dropdown.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "../components/wizard/create-config-dialog.js";
-import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
-import "../components/update-dialog.js";
-import type { ESPHomeUpdateDialog } from "../components/update-dialog.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import "../components/update-dialog.js";
+import type { ESPHomeUpdateDialog } from "../components/update-dialog.js";
+import "../components/wizard/create-config-dialog.js";
+import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 
 registerMdiIcons({
+  "checkbox-blank-outline": mdiCheckboxBlankOutline,
+  "checkbox-marked": mdiCheckboxMarked,
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
   console: mdiConsole,
   magnify: mdiMagnify,
@@ -50,6 +55,7 @@ registerMdiIcons({
   "plus-circle-outline": mdiPlusCircleOutline,
   refresh: mdiRefresh,
   pencil: mdiPencil,
+  update: mdiUpdate,
   upload: mdiUpload,
   "dots-vertical": mdiDotsVertical,
   wifi: mdiWifi,
@@ -88,6 +94,33 @@ export class ESPHomePageDashboard extends LitElement {
 
   @state()
   private _search = "";
+
+  @state()
+  private _selectMode = false;
+
+  @state()
+  private _selectedDevices = new Set<string>();
+
+  private _onEnterSelectMode = () => {
+    this._selectMode = true;
+    this._selectedDevices = new Set();
+  };
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener(
+      "esphome-enter-select-mode",
+      this._onEnterSelectMode,
+    );
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener(
+      "esphome-enter-select-mode",
+      this._onEnterSelectMode,
+    );
+  }
 
   @query("esphome-create-config-dialog")
   private _createDialog!: ESPHomeCreateConfigDialog;
@@ -169,7 +202,7 @@ export class ESPHomePageDashboard extends LitElement {
         display: grid;
         grid-template-columns: repeat(auto-fill, 300px);
         gap: var(--wa-space-l);
-        padding: var(--wa-space-m);
+        padding: var(--wa-space-l);
       }
 
       /* ─── Search toolbar ─── */
@@ -237,7 +270,6 @@ export class ESPHomePageDashboard extends LitElement {
       /* ─── Empty search state ─── */
 
       .empty-search {
-        grid-column: 1 / -1;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -614,6 +646,134 @@ export class ESPHomePageDashboard extends LitElement {
       .fab-btn wa-icon {
         font-size: 18px;
       }
+
+      /* ─── Select mode ─── */
+
+      .device-card--selectable {
+        cursor: pointer;
+      }
+
+      .device-card--selected {
+        border-color: var(--esphome-primary);
+        background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+      }
+
+      .device-checkbox {
+        font-size: 22px;
+        color: var(--wa-color-text-quiet);
+        flex-shrink: 0;
+        transition: color 0.12s;
+      }
+
+      .device-checkbox--checked {
+        color: var(--esphome-primary);
+      }
+
+      /* ─── Select bar ─── */
+
+      @keyframes select-bar-slide-in {
+        from {
+          transform: translateY(100%);
+        }
+        to {
+          transform: translateY(0);
+        }
+      }
+
+      .select-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: var(--wa-space-m) var(--wa-space-xl);
+        background: var(--wa-color-surface-raised);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+        z-index: 20;
+        animation: select-bar-slide-in 0.2s ease-out;
+      }
+
+      .select-bar-left {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-m);
+      }
+
+      .select-bar-count {
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-quiet);
+        font-weight: var(--wa-font-weight-semibold);
+      }
+
+      .select-bar-toggle {
+        border: none;
+        background: none;
+        color: var(--esphome-primary);
+        cursor: pointer;
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
+        padding: 6px 12px;
+        border-radius: var(--wa-border-radius-m);
+        transition: background 0.12s;
+      }
+
+      .select-bar-toggle:hover {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+      }
+
+      .select-bar-right {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-s);
+      }
+
+      .select-bar-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 18px;
+        border-radius: var(--wa-border-radius-m);
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
+        cursor: pointer;
+        border: none;
+        transition:
+          background 0.12s,
+          opacity 0.12s;
+      }
+
+      .select-bar-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .select-bar-btn--cancel {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
+      .select-bar-btn--cancel:hover {
+        background: var(--wa-color-surface-border);
+      }
+
+      .select-bar-btn--primary {
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+      }
+
+      .select-bar-btn--primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+      }
+
+      .select-bar-btn wa-icon {
+        font-size: 16px;
+      }
     `,
   ];
 
@@ -639,12 +799,12 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       ${this._importableDevices.length > 0 ? this._renderDiscoveredBanner() : ""}
       ${total > 0 ? this._renderToolbar(filtered.length, total) : ""}
+      ${filtered.length === 0 && q ? this._renderEmptySearch() : ""}
       <div class="devices-grid">
         ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
-        ${filtered.length === 0 && q ? this._renderEmptySearch() : ""}
         ${filtered.map((device) => this._renderDeviceCard(device))}
       </div>
-      ${this._renderFab()}
+      ${this._selectMode ? this._renderSelectBar() : this._renderFab()}
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-update-dialog></esphome-update-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
@@ -760,10 +920,25 @@ export class ESPHomePageDashboard extends LitElement {
   private _renderDeviceCard(device: ConfiguredDevice) {
     const online = this._deviceStates[device.configuration] ?? false;
     const displayName = device.friendly_name || device.name;
+    const selected = this._selectedDevices.has(device.configuration);
 
     return html`
-      <div class="device-card">
+      <div
+        class="device-card ${this._selectMode ? "device-card--selectable" : ""} ${this._selectMode && selected ? "device-card--selected" : ""}"
+        @click=${this._selectMode
+          ? () => this._toggleDevice(device.configuration)
+          : nothing}
+      >
         <div class="device-card-header">
+          ${this._selectMode
+            ? html`
+                <wa-icon
+                  class="device-checkbox ${selected ? "device-checkbox--checked" : ""}"
+                  library="mdi"
+                  name=${selected ? "checkbox-marked" : "checkbox-blank-outline"}
+                ></wa-icon>
+              `
+            : nothing}
           <div class="device-card-header-left">
             <h3 class="device-name">${displayName}</h3>
             <p class="device-config">${device.configuration}</p>
@@ -775,46 +950,50 @@ export class ESPHomePageDashboard extends LitElement {
               : this._localize("dashboard.offline")}
           </div>
         </div>
-        <div class="device-actions">
-          <button
-            class="action-btn action-btn--primary"
-            @click=${() => this._editDevice(device)}
-          >
-            <wa-icon library="mdi" name="pencil"></wa-icon>
-            ${this._localize("dashboard.edit")}
-          </button>
-          <button
-            class="action-btn action-btn--accent"
-            @click=${() => this._openUpdate(device)}
-          >
-            <wa-icon library="mdi" name="upload"></wa-icon>
-            ${this._localize("dashboard.update")}
-          </button>
-          <button
-            class="action-btn action-btn--ghost"
-            @click=${() => this._openLogs(device)}
-          >
-            <wa-icon library="mdi" name="console"></wa-icon>
-            ${this._localize("dashboard.logs")}
-          </button>
-          <wa-dropdown
-            placement="right-start"
-            distance="4"
-            @wa-select=${() => this._deleteDevice(device)}
-          >
-            <button
-              slot="trigger"
-              class="action-btn action-btn--ghost action-btn--icon-only"
-              aria-label="More options"
-            >
-              <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-            </button>
-            <wa-dropdown-item .variant=${"danger"}>
-              <wa-icon slot="icon" library="mdi" name="delete"></wa-icon>
-              ${this._localize("dashboard.delete")}
-            </wa-dropdown-item>
-          </wa-dropdown>
-        </div>
+        ${!this._selectMode
+          ? html`
+              <div class="device-actions">
+                <button
+                  class="action-btn action-btn--primary"
+                  @click=${() => this._editDevice(device)}
+                >
+                  <wa-icon library="mdi" name="pencil"></wa-icon>
+                  ${this._localize("dashboard.edit")}
+                </button>
+                <button
+                  class="action-btn action-btn--accent"
+                  @click=${() => this._openUpdate(device)}
+                >
+                  <wa-icon library="mdi" name="upload"></wa-icon>
+                  ${this._localize("dashboard.update")}
+                </button>
+                <button
+                  class="action-btn action-btn--ghost"
+                  @click=${() => this._openLogs(device)}
+                >
+                  <wa-icon library="mdi" name="console"></wa-icon>
+                  ${this._localize("dashboard.logs")}
+                </button>
+                <wa-dropdown
+                  placement="right-start"
+                  distance="4"
+                  @wa-select=${() => this._deleteDevice(device)}
+                >
+                  <button
+                    slot="trigger"
+                    class="action-btn action-btn--ghost action-btn--icon-only"
+                    aria-label=${this._localize("dashboard.more_options")}
+                  >
+                    <wa-icon library="mdi" name="dots-vertical"></wa-icon>
+                  </button>
+                  <wa-dropdown-item .variant=${"danger"}>
+                    <wa-icon slot="icon" library="mdi" name="delete"></wa-icon>
+                    ${this._localize("dashboard.delete")}
+                  </wa-dropdown-item>
+                </wa-dropdown>
+              </div>
+            `
+          : nothing}
       </div>
     `;
   }
@@ -830,6 +1009,154 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  private _renderSelectBar() {
+    const count = this._selectedDevices.size;
+    const total = this._devices.length;
+    const allSelected = count === total && total > 0;
+
+    return html`
+      <div class="select-bar">
+        <div class="select-bar-left">
+          <button
+            class="select-bar-toggle"
+            @click=${() => (allSelected ? this._deselectAll() : this._selectAll())}
+          >
+            ${allSelected
+              ? this._localize("dashboard.deselect_all")
+              : this._localize("dashboard.select_all")}
+          </button>
+          <span class="select-bar-count">
+            ${this._localize("dashboard.selected_count", { count })}
+          </span>
+        </div>
+        <div class="select-bar-right">
+          <button
+            class="select-bar-btn select-bar-btn--cancel"
+            @click=${this._cancelSelectMode}
+          >
+            ${this._localize("layout.cancel")}
+          </button>
+          <button
+            class="select-bar-btn select-bar-btn--primary"
+            ?disabled=${count === 0}
+            @click=${this._updateSelected}
+          >
+            <wa-icon library="mdi" name="update"></wa-icon>
+            ${this._localize("dashboard.update_selected", { count })}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private _toggleDevice(configuration: string) {
+    const next = new Set(this._selectedDevices);
+    if (next.has(configuration)) {
+      next.delete(configuration);
+    } else {
+      next.add(configuration);
+    }
+    this._selectedDevices = next;
+  }
+
+  private _selectAll() {
+    this._selectedDevices = new Set(
+      this._devices.map((d) => d.configuration),
+    );
+  }
+
+  private _deselectAll() {
+    this._selectedDevices = new Set();
+  }
+
+  private _cancelSelectMode() {
+    this._selectMode = false;
+    this._selectedDevices = new Set();
+  }
+
+  private async _updateSelected() {
+    const selected = [...this._selectedDevices];
+    this._selectMode = false;
+    this._selectedDevices = new Set();
+
+    if (selected.length === 0) {
+      toast.info(this._localize("layout.update_all_none"), {
+        richColors: true,
+      });
+      return;
+    }
+
+    toast.info(
+      this._localize("layout.update_all_started", {
+        count: selected.length,
+      }),
+      { richColors: true },
+    );
+
+    for (const configuration of selected) {
+      const device = this._devices.find(
+        (d) => d.configuration === configuration,
+      );
+      if (!device) continue;
+      const name = device.friendly_name || device.name;
+      await this._compileAndUpload(configuration, name);
+    }
+  }
+
+  private _compileAndUpload(
+    configuration: string,
+    name: string,
+  ): Promise<void> {
+    return new Promise((resolve) => {
+      this._api.compile(configuration, {
+        onOutput: () => {},
+        onResult: (data: { success: boolean; code: number }) => {
+          if (data.success) {
+            this._api.upload(configuration, "OTA", {
+              onOutput: () => {},
+              onResult: (uploadData: { success: boolean; code: number }) => {
+                if (uploadData.success) {
+                  toast.success(
+                    this._localize("dashboard.update_device_success", {
+                      name,
+                    }),
+                    { richColors: true },
+                  );
+                } else {
+                  toast.error(
+                    this._localize("dashboard.update_device_failed", { name }),
+                    { richColors: true },
+                  );
+                }
+                resolve();
+              },
+              onError: () => {
+                toast.error(
+                  this._localize("dashboard.update_device_failed", { name }),
+                  { richColors: true },
+                );
+                resolve();
+              },
+            });
+          } else {
+            toast.error(
+              this._localize("dashboard.update_device_failed", { name }),
+              { richColors: true },
+            );
+            resolve();
+          }
+        },
+        onError: () => {
+          toast.error(
+            this._localize("dashboard.update_device_failed", { name }),
+            { richColors: true },
+          );
+          resolve();
+        },
+      });
+    });
+  }
+
   private _editDevice(device: ConfiguredDevice) {
     window.history.pushState({}, "", `/device/${device.configuration}`);
     window.dispatchEvent(new PopStateEvent("popstate"));
@@ -838,9 +1165,9 @@ export class ESPHomePageDashboard extends LitElement {
   private _deleteDevice(device: ConfiguredDevice) {
     const name = device.friendly_name || device.name;
     this._api.deleteDevice(device.configuration).catch(() => {
-      toast.error(`Failed to delete "${name}"`, { richColors: true });
+      toast.error(this._localize("dashboard.delete_failed", { name }), { richColors: true });
     });
-    toast.success(`"${name}" deleted`, { richColors: true });
+    toast.success(this._localize("dashboard.deleted", { name }), { richColors: true });
   }
 
   private _openUpdate(device: ConfiguredDevice) {

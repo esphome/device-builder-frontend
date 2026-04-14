@@ -2,6 +2,9 @@ export interface YamlSection {
   key: string;
   fromLine: number; // 1-indexed (CodeMirror convention)
   toLine: number; // 1-indexed, inclusive
+  name?: string; // "name:" value from a YAML list item
+  platform?: string; // "platform:" value from a YAML list item
+  parentKey?: string; // top-level key when this is an expanded list item
 }
 
 export interface CategorizedSections {
@@ -47,20 +50,20 @@ export function categorizeSections(sections: YamlSection[]): CategorizedSections
 /**
  * Extracts top-level YAML keys and their line ranges.
  * Top-level keys have no leading whitespace (e.g. `esphome:`, `wifi:`).
+ * Sections containing YAML list items (e.g. `light:\n  - platform: binary`)
+ * are expanded so each list item becomes its own section with name/platform metadata.
  */
 export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
-  const sections: YamlSection[] = [];
+  const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
 
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i].match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
     if (match) {
-      if (sections.length > 0) {
-        // Close the previous section at the CM line just before this one.
-        // Array index i → CM line i+1, so the line before = CM line i.
-        sections[sections.length - 1].toLine = i;
+      if (rawSections.length > 0) {
+        rawSections[rawSections.length - 1].toLine = i;
       }
-      sections.push({
+      rawSections.push({
         key: match[1],
         fromLine: i + 1, // convert 0-indexed array to 1-indexed CM line
         toLine: lines.length,
@@ -69,11 +72,71 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
   }
 
   // Trim the trailing empty line (yaml strings often end with \n)
-  if (sections.length > 0 && lines[lines.length - 1] === "") {
-    sections[sections.length - 1].toLine = lines.length - 1;
+  if (rawSections.length > 0 && lines[lines.length - 1] === "") {
+    rawSections[rawSections.length - 1].toLine = lines.length - 1;
+  }
+
+  // Expand list items within each section
+  const sections: YamlSection[] = [];
+  for (const raw of rawSections) {
+    sections.push(..._expandListItems(lines, raw));
   }
 
   return sections;
+}
+
+/**
+ * If a top-level section contains YAML list items (`  - `), expand each into
+ * its own YamlSection with name, platform, and parentKey metadata.
+ * Otherwise return the section as-is.
+ */
+function _expandListItems(
+  lines: string[],
+  section: { key: string; fromLine: number; toLine: number },
+): YamlSection[] {
+  const keyIdx = section.fromLine - 1; // 0-indexed line of the top-level key
+  const endIdx = section.toLine - 1; // 0-indexed last line (inclusive)
+
+  // Find list item starts (`  - ` or `  -\n`)
+  const listStarts: number[] = [];
+  for (let i = keyIdx + 1; i <= endIdx; i++) {
+    if (/^  -\s/.test(lines[i]) || /^  -$/.test(lines[i])) {
+      listStarts.push(i);
+    }
+  }
+
+  if (listStarts.length === 0) {
+    return [{ key: section.key, fromLine: section.fromLine, toLine: section.toLine }];
+  }
+
+  const items: YamlSection[] = [];
+  for (let idx = 0; idx < listStarts.length; idx++) {
+    const itemStart = listStarts[idx];
+    const itemEnd =
+      idx + 1 < listStarts.length ? listStarts[idx + 1] - 1 : endIdx;
+
+    let name = "";
+    let platform = "";
+    for (let j = itemStart; j <= itemEnd; j++) {
+      const nameMatch = lines[j].match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
+      if (nameMatch) name = nameMatch[1];
+      const platformMatch = lines[j].match(
+        /^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*$/,
+      );
+      if (platformMatch) platform = platformMatch[1];
+    }
+
+    items.push({
+      key: section.key,
+      fromLine: itemStart + 1, // 1-indexed
+      toLine: itemEnd + 1, // 1-indexed
+      name: name || undefined,
+      platform: platform || undefined,
+      parentKey: section.key,
+    });
+  }
+
+  return items;
 }
 
 /**

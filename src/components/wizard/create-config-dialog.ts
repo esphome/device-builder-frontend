@@ -244,7 +244,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     try {
       fileContent = await file.text();
     } catch {
-      this._importError = "Failed to read the file.";
+      this._importError = this._localize("wizard.import_read_error");
       return;
     }
 
@@ -261,8 +261,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this._importError = msg.includes("409")
-        ? `A device named "${slug}" already exists.`
-        : "Failed to import the config file. Please try again.";
+        ? this._localize("wizard.import_duplicate_error", { name: slug })
+        : this._localize("wizard.import_general_error");
     } finally {
       this._submitting = false;
     }

@@ -154,6 +154,11 @@ export class ESPHomeDeviceEditor extends LitElement {
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
       }
 
+      .layout-toggle button:disabled {
+        opacity: 0.35;
+        cursor: not-allowed;
+      }
+
       .layout-toggle wa-icon {
         font-size: 18px;
       }
@@ -225,10 +230,12 @@ export class ESPHomeDeviceEditor extends LitElement {
   ];
 
   protected render() {
+    const hasBoard = !!this.board;
+    const effectiveLayout = hasBoard ? this.layout : "right";
     const layoutClass =
-      this.layout === "both"
+      effectiveLayout === "both"
         ? "editor-layout--both"
-        : this.layout === "left"
+        : effectiveLayout === "left"
           ? "editor-layout--left"
           : "editor-layout--right";
 
@@ -260,10 +267,11 @@ export class ESPHomeDeviceEditor extends LitElement {
               ${this._localize("device.save")}
             </button>
           </div>
-          <div class="layout-toggle" aria-label="Editor layout">
+          <div class="layout-toggle" aria-label=${this._localize("device.editor_layout_label")}>
             <button
               type="button"
-              aria-pressed=${this.layout === "left"}
+              aria-pressed=${effectiveLayout === "left"}
+              ?disabled=${!hasBoard}
               @click=${() => this._setLayout("left")}
               title=${this._localize("device.layout_components_only")}
             >
@@ -271,7 +279,8 @@ export class ESPHomeDeviceEditor extends LitElement {
             </button>
             <button
               type="button"
-              aria-pressed=${this.layout === "both"}
+              aria-pressed=${effectiveLayout === "both"}
+              ?disabled=${!hasBoard}
               @click=${() => this._setLayout("both")}
               title=${this._localize("device.layout_split")}
             >
@@ -279,7 +288,7 @@ export class ESPHomeDeviceEditor extends LitElement {
             </button>
             <button
               type="button"
-              aria-pressed=${this.layout === "right"}
+              aria-pressed=${effectiveLayout === "right"}
               @click=${() => this._setLayout("right")}
               title=${this._localize("device.layout_yaml_only")}
             >

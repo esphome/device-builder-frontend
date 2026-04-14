@@ -21,7 +21,16 @@
     "search_of": "sur {total}",
     "no_results_title": "Aucun appareil trouvé",
     "no_results_desc": "Aucun appareil ne correspond à \"{query}\". Essayez un autre nom ou fichier de configuration.",
-    "no_results_clear": "Effacer la recherche"
+    "no_results_clear": "Effacer la recherche",
+    "select_all": "Tout sélectionner",
+    "deselect_all": "Tout désélectionner",
+    "selected_count": "{count} sélectionné(s)",
+    "update_selected": "Mettre à jour {count} appareil(s)",
+    "update_device_success": "\"{name}\" mis à jour avec succès",
+    "update_device_failed": "Échec de la mise à jour de \"{name}\"",
+    "delete_failed": "Échec de la suppression de \"{name}\"",
+    "deleted": "\"{name}\" supprimé",
+    "more_options": "Plus d'options"
   },
   "wizard": {
     "title_create": "Créer une configuration",
@@ -57,6 +66,9 @@
     "expand_board": "Afficher les détails",
     "more_info": "Plus d'infos",
     "add_board": "Sélectionner",
+    "import_read_error": "Échec de la lecture du fichier.",
+    "import_duplicate_error": "Un appareil nommé \"{name}\" existe déjà.",
+    "import_general_error": "Échec de l'importation du fichier de configuration. Veuillez réessayer.",
     "tag": {
       "esp32-c6": "esp32-c6",
       "esp32-s3": "esp32-s3",
@@ -127,6 +139,17 @@
     "automation_trigger_label": "Quand",
     "automation_action": "Action",
     "automation_action_label": "Alors faire",
+    "adding": "Ajout…",
+    "saving": "Enregistrement…",
+    "unknown_section": "Section inconnue : {key}",
+    "load_config_error": "Échec du chargement de la configuration",
+    "save_error": "Échec de l'enregistrement",
+    "section_saved_toast": "\"{title}\" enregistré",
+    "add_component_error": "Échec de l'ajout du composant",
+    "add_automation_error": "Échec de l'ajout de l'automatisation",
+    "add_automation_unavailable": "Le support des automatisations n'est pas encore disponible",
+    "add_config_error": "Échec de l'ajout de la section de configuration",
+    "editor_layout_label": "Disposition de l'éditeur",
     "editor_title_no_components": "Choisissez des composants pour votre {name}",
     "editor_title_no_automations": "Ajoutez des automatisations pour votre {name}",
     "editor_title_ready": "Édition de {name}",
@@ -144,7 +167,10 @@
     "updating": "Mise à jour…",
     "cancel": "Annuler",
     "light_mode": "Passer en mode clair",
-    "dark_mode": "Passer en mode sombre"
+    "dark_mode": "Passer en mode sombre",
+    "settings": "Paramètres",
+    "back": "Retour",
+    "home_assistant": "Home Assistant"
   },
   "secrets": {
     "title": "Secrets",

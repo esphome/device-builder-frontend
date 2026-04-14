@@ -43,9 +43,6 @@ export class ESPHomeHeaderActions extends LitElement {
   private _api!: ESPHomeAPI;
 
   @state()
-  private _confirmUpdateOpen = false;
-
-  @state()
   private _settingsOpen = false;
 
   @state()
@@ -53,9 +50,6 @@ export class ESPHomeHeaderActions extends LitElement {
 
   @state()
   private _editorLayout = "both";
-
-  @state()
-  private _updating = false;
 
   @state()
   private _path = window.location.pathname;
@@ -374,39 +368,6 @@ export class ESPHomeHeaderActions extends LitElement {
       </div>
 
       <wa-dialog
-        label=${this._localize("layout.update_all_title")}
-        ?open=${this._confirmUpdateOpen}
-        @wa-after-hide=${() => {
-          this._confirmUpdateOpen = false;
-        }}
-        light-dismiss
-      >
-        <div class="dialog-body">
-          <p>${this._localize("layout.update_all_desc")}</p>
-          <div class="dialog-actions">
-            <button
-              class="dialog-btn dialog-btn--cancel"
-              @click=${() => {
-                this._confirmUpdateOpen = false;
-              }}
-            >
-              ${this._localize("layout.cancel")}
-            </button>
-            <button
-              class="dialog-btn dialog-btn--primary"
-              ?disabled=${this._updating}
-              @click=${this._confirmUpdateAll}
-            >
-              <wa-icon library="mdi" name="update"></wa-icon>
-              ${this._updating
-                ? this._localize("layout.updating")
-                : this._localize("layout.update_all_confirm")}
-            </button>
-          </div>
-        </div>
-      </wa-dialog>
-
-      <wa-dialog
         class="settings-dialog"
         label=${this._localize("layout.settings")}
         ?open=${this._settingsOpen}
@@ -483,20 +444,7 @@ export class ESPHomeHeaderActions extends LitElement {
   }
 
   private _openConfirmUpdate() {
-    this._confirmUpdateOpen = true;
-  }
-
-  private async _confirmUpdateAll() {
-    this._updating = true;
-    try {
-      // TODO: Update all is not yet supported by the WebSocket backend
-      this._confirmUpdateOpen = false;
-      toast.info("Update all is not yet available", { richColors: true });
-    } catch {
-      toast.error(this._localize("layout.update_all_error"), { richColors: true });
-    } finally {
-      this._updating = false;
-    }
+    window.dispatchEvent(new CustomEvent("esphome-enter-select-mode"));
   }
 
   private async _openSettings() {

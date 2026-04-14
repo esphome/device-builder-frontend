@@ -275,7 +275,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
             ?disabled=${this._submitting || !this._isFormValid()}
             @click=${this._onSubmit}
           >
-            ${this._submitting ? "Adding…" : this._localize("device.add_component_action")}
+            ${this._submitting ? this._localize("device.adding") : this._localize("device.add_component_action")}
           </button>
         </div>
       </div>
@@ -397,7 +397,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         })
       );
     } catch (err) {
-      this._error = err instanceof Error ? err.message : "Failed to add component";
+      this._error = err instanceof Error ? err.message : this._localize("device.add_component_error");
     } finally {
       this._submitting = false;
     }
