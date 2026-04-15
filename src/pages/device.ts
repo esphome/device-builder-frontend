@@ -78,6 +78,9 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _yaml = "";
 
+  @state()
+  private _savedYaml = "";
+
   async connectedCallback() {
     super.connectedCallback();
     this._loadBoardCatalog();
@@ -113,13 +116,16 @@ export class ESPHomePageDevice extends LitElement {
 
   private async _loadYaml() {
     try {
-      this._yaml = await this._api.getConfig(this.id);
+      const yaml = await this._api.getConfig(this.id);
+      this._yaml = yaml;
+      this._savedYaml = yaml;
     } catch (e) {
       console.error("Failed to load YAML:", e);
     }
   }
 
   private _saveYaml() {
+    this._savedYaml = this._yaml;
     toast.success(this._localize("device.yaml_saved"), { richColors: true });
     this._api.updateConfig(this.id, this._yaml).catch((e) => {
       // Only surface real errors, not command timeouts — the backend
@@ -285,6 +291,7 @@ export class ESPHomePageDevice extends LitElement {
           ></esphome-device-navigator>
           <esphome-device-editor
             .yaml=${this._yaml}
+            .savedYaml=${this._savedYaml}
             .layout=${this._layout}
             .deviceTitle=${deviceTitle}
             .board=${this._board}

@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiContentSave, mdiDockLeft, mdiDockRight, mdiViewSplitHorizontal } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { css, html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
@@ -84,6 +84,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Number })
   selectedFromLine?: number;
 
+  /** Yaml content at last save/load — compared against current yaml to detect changes. */
+  @property({ attribute: false })
+  savedYaml = "";
+
   static styles = [
     espHomeStyles,
     css`
@@ -127,30 +131,42 @@ export class ESPHomeDeviceEditor extends LitElement {
         text-overflow: ellipsis;
       }
 
-      .header-actions {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-        margin-right: var(--wa-space-s);
-      }
-
       .save-button {
+        position: absolute;
+        bottom: var(--wa-space-m);
+        right: var(--wa-space-m);
+        z-index: 10;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: 6px;
         border: none;
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
+        background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        padding: 4px 10px;
-        border-radius: 4px;
+        padding: 8px 16px;
+        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
         font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+        transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
       }
 
       .save-button:hover {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 70%);
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        transform: translateY(-1px);
+      }
+
+      .save-button:active {
+        transform: translateY(0);
+      }
+
+      .save-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
       }
 
       .save-button wa-icon {
@@ -189,6 +205,7 @@ export class ESPHomeDeviceEditor extends LitElement {
       }
 
       .card-body {
+        position: relative;
         flex: 1;
         min-height: 0;
         display: flex;
@@ -292,17 +309,6 @@ export class ESPHomeDeviceEditor extends LitElement {
           <div class="editor-header-main">
             <h2 class="editor-header-title">${title}</h2>
           </div>
-          <div class="header-actions">
-            <button
-              type="button"
-              class="save-button"
-              @click=${this._onSave}
-              title=${this._localize("device.save_yaml")}
-            >
-              <wa-icon library="mdi" name="content-save"></wa-icon>
-              ${this._localize("device.save")}
-            </button>
-          </div>
           <div class="layout-toggle" aria-label=${this._localize("device.editor_layout_label")}>
             <button
               type="button"
@@ -334,6 +340,16 @@ export class ESPHomeDeviceEditor extends LitElement {
           </div>
         </header>
         <div class="card-body">
+          <button
+            type="button"
+            class="save-button"
+            ?disabled=${this.yaml === this.savedYaml}
+            @click=${this._onSave}
+            title=${this._localize("device.save_yaml")}
+          >
+            <wa-icon library="mdi" name="content-save"></wa-icon>
+            ${this._localize("device.save")}
+          </button>
           <div class=${`editor-layout ${layoutClass}`}>
             <div class="editor-pane editor-pane--left">
               <esphome-device-board-info
