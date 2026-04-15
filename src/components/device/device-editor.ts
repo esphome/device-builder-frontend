@@ -1,18 +1,23 @@
 import { consume } from "@lit/context";
-import { mdiContentSave, mdiDockLeft, mdiDockRight, mdiViewSplitHorizontal } from "@mdi/js";
-import { css, html, LitElement, nothing, type PropertyValues } from "lit";
+import {
+  mdiContentSave,
+  mdiDockLeft,
+  mdiDockRight,
+  mdiViewSplitHorizontal,
+} from "@mdi/js";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
-import type { HighlightRange } from "../yaml-editor.js";
 import {
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
 } from "../../util/yaml-sections.js";
+import type { HighlightRange } from "../yaml-editor.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -149,7 +154,10 @@ export class ESPHomeDeviceEditor extends LitElement {
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
         box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
-        transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
+        transition:
+          background 0.12s,
+          box-shadow 0.12s,
+          transform 0.12s;
       }
 
       .save-button:hover {
@@ -309,7 +317,10 @@ export class ESPHomeDeviceEditor extends LitElement {
           <div class="editor-header-main">
             <h2 class="editor-header-title">${title}</h2>
           </div>
-          <div class="layout-toggle" aria-label=${this._localize("device.editor_layout_label")}>
+          <div
+            class="layout-toggle"
+            aria-label=${this._localize("device.editor_layout_label")}
+          >
             <button
               type="button"
               aria-pressed=${effectiveLayout === "left"}
@@ -361,7 +372,9 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .selectedFromLine=${this.selectedFromLine}
               ></esphome-device-board-info>
             </div>
-            ${effectiveLayout === "both" ? html`<div class="pane-divider"></div>` : nothing}
+            ${effectiveLayout === "both"
+              ? html`<div class="pane-divider"></div>`
+              : nothing}
             <div class="editor-pane editor-pane--right">
               <div class="editor-pane-body">
                 <esphome-yaml-editor

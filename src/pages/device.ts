@@ -1,22 +1,25 @@
 import { consume } from "@lit/context";
-import { mdiMenu } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { mdiArrowCollapseLeft, mdiArrowCollapseRight } from "@mdi/js";
+import { css, html, LitElement } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { registerMdiIcons } from "../util/register-icons.js";
-import type { BoardCatalogEntry, ConfiguredDevice } from "../api/types.js";
+import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
+import type { BoardCatalogEntry, ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
-import toast from "sonner-js";
-import { localizeContext, devicesContext, apiContext } from "../context/index.js";
+import { apiContext, devicesContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
 
-registerMdiIcons({ menu: mdiMenu });
+registerMdiIcons({
+  "arrow-collapse-left": mdiArrowCollapseLeft,
+  "arrow-collapse-right": mdiArrowCollapseRight,
+});
 
 @customElement("esphome-page-device")
 export class ESPHomePageDevice extends LitElement {
@@ -74,6 +77,9 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _drawerOpen = false;
+
+  @state()
+  private _navCollapsed = false;
 
   @state()
   private _yaml = "";
@@ -156,6 +162,15 @@ export class ESPHomePageDevice extends LitElement {
         grid-template-columns: minmax(230px, 1fr) minmax(0, 5fr);
         gap: var(--wa-space-l);
         height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
+        transition: grid-template-columns 0.25s ease;
+      }
+
+      .layout-grid.nav-collapsed {
+        grid-template-columns: minmax(0, 5fr);
+      }
+
+      .layout-grid.nav-collapsed .desktop-nav {
+        display: none;
       }
 
       /* ─── Desktop: hide drawer, show sidebar nav ─── */
@@ -165,8 +180,24 @@ export class ESPHomePageDevice extends LitElement {
         display: none;
       }
 
-      .mobile-menu-btn {
-        display: none;
+      .nav-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
+        color: var(--esphome-on-primary);
+        cursor: pointer;
+        padding: 4px;
+        border-radius: var(--wa-border-radius-m);
+        margin-right: var(--wa-space-xs);
+      }
+
+      .nav-toggle-btn wa-icon {
+        font-size: 14px;
+      }
+      .nav-toggle-btn:hover {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 70%);
       }
 
       /* ─── Mobile ─── */
@@ -181,23 +212,6 @@ export class ESPHomePageDevice extends LitElement {
         .desktop-nav {
           display: none !important;
         }
-
-        /* Show the mobile menu button */
-        .mobile-menu-btn {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-          border: none;
-          background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
-          color: var(--esphome-on-primary);
-          cursor: pointer;
-          padding: 4px;
-          border-radius: var(--wa-border-radius-m);
-          margin-right: var(--wa-space-xs);
-        }
-
-        .mobile-menu-btn wa-icon { font-size: 18px; }
-        .mobile-menu-btn:hover { background: color-mix(in srgb, var(--esphome-on-primary), transparent 70%); }
 
         /* Drawer backdrop */
         .drawer-backdrop {
@@ -244,13 +258,18 @@ export class ESPHomePageDevice extends LitElement {
 
   protected render() {
     const deviceTitle =
-      this._device?.friendly_name || this._device?.name || this.id || this._localize("dashboard.create_device");
+      this._device?.friendly_name ||
+      this._device?.name ||
+      this.id ||
+      this._localize("dashboard.create_device");
 
     return html`
       <!-- Mobile drawer -->
       <div
         class="drawer-backdrop ${this._drawerOpen ? "drawer-backdrop--open" : ""}"
-        @click=${() => { this._drawerOpen = false; }}
+        @click=${() => {
+          this._drawerOpen = false;
+        }}
       ></div>
       <div
         class="drawer ${this._drawerOpen ? "drawer--open" : ""}"
@@ -271,7 +290,7 @@ export class ESPHomePageDevice extends LitElement {
 
       <div class="page">
         <div
-          class="layout-grid"
+          class="layout-grid ${this._navCollapsed ? "nav-collapsed" : ""}"
           @section-toggle=${this._onSectionToggle}
           @layout-change=${this._onLayoutChange}
           @yaml-change=${this._onYamlChange}
@@ -302,17 +321,32 @@ export class ESPHomePageDevice extends LitElement {
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
           >
-            <button
-              slot="mobile-menu"
-              class="mobile-menu-btn"
-              @click=${() => { this._drawerOpen = true; }}
-            >
-              <wa-icon library="mdi" name="menu"></wa-icon>
+            <button slot="mobile-menu" class="nav-toggle-btn" @click=${this._onNavToggle}>
+              <wa-icon library="mdi" name=${this._navToggleIcon}></wa-icon>
             </button>
           </esphome-device-editor>
         </div>
       </div>
     `;
+  }
+
+  private get _isMobile(): boolean {
+    return window.matchMedia("(max-width: 900px)").matches;
+  }
+
+  private get _navToggleIcon(): string {
+    if (this._isMobile) {
+      return "arrow-collapse-right";
+    }
+    return this._navCollapsed ? "arrow-collapse-right" : "arrow-collapse-left";
+  }
+
+  private _onNavToggle() {
+    if (this._isMobile) {
+      this._drawerOpen = !this._drawerOpen;
+    } else {
+      this._navCollapsed = !this._navCollapsed;
+    }
   }
 
   private _onSectionToggle(e: CustomEvent<{ index: number }>) {
@@ -335,7 +369,9 @@ export class ESPHomePageDevice extends LitElement {
     this._yaml = e.detail.value;
   }
 
-  private _onYamlHighlight(e: CustomEvent<{ range: HighlightRange | null; scroll: boolean }>) {
+  private _onYamlHighlight(
+    e: CustomEvent<{ range: HighlightRange | null; scroll: boolean }>
+  ) {
     this._highlightRange = e.detail.range;
     this._scrollToHighlight = e.detail.scroll;
   }
@@ -344,7 +380,9 @@ export class ESPHomePageDevice extends LitElement {
     this._yaml = e.detail.yaml;
   }
 
-  private _onSectionSelect(e: CustomEvent<{ sectionKey: string | null; fromLine?: number }>) {
+  private _onSectionSelect(
+    e: CustomEvent<{ sectionKey: string | null; fromLine?: number }>
+  ) {
     this._selectedSection = e.detail.sectionKey;
     this._selectedFromLine = e.detail.fromLine;
     this._drawerOpen = false;
@@ -370,7 +408,10 @@ export class ESPHomePageDevice extends LitElement {
   private _readUrlSections(): number[] {
     const raw = new URLSearchParams(window.location.search).get("open");
     if (!raw) return [];
-    return raw.split(",").map(Number).filter((n) => !Number.isNaN(n));
+    return raw
+      .split(",")
+      .map(Number)
+      .filter((n) => !Number.isNaN(n));
   }
 
   private _updateUrl() {
