@@ -413,14 +413,14 @@ export class ESPHomePageDashboard extends LitElement {
             <button
               class="view-toggle-btn ${this._view === "cards" ? "active" : ""}"
               @click=${() => this._setView("cards")}
-              title="Card view"
+              title=${this._localize("dashboard.card_view")}
             >
               <wa-icon library="mdi" name="view-grid"></wa-icon>
             </button>
             <button
               class="view-toggle-btn ${this._view === "table" ? "active" : ""}"
               @click=${() => this._setView("table")}
-              title="Table view"
+              title=${this._localize("dashboard.table_view")}
             >
               <wa-icon library="mdi" name="table"></wa-icon>
             </button>
