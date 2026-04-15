@@ -2,7 +2,6 @@ import {
   mdiFileDocumentOutline,
   mdiInformationOutline,
   mdiIpNetworkOutline,
-  mdiLan,
   mdiMemory,
   mdiTagMultiple,
   mdiTextShort,
@@ -20,7 +19,6 @@ registerMdiIcons({
   "file-document-outline": mdiFileDocumentOutline,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
-  lan: mdiLan,
   memory: mdiMemory,
   "tag-multiple": mdiTagMultiple,
   "text-short": mdiTextShort,
@@ -146,7 +144,6 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._row("information-outline", "Name", d.friendly_name || d.name)}
         ${this._row("ip-network-outline", "IP Address", d.address, true)}
         ${this._row("memory", "Platform", d.target_platform)}
-        ${this._row("lan", "Board", d.board_id, true)}
       </div>
 
       <div class="section">

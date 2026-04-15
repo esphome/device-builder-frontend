@@ -35,6 +35,9 @@ export class ESPHomePageSecrets extends LitElement {
   private _yaml = "";
 
   @state()
+  private _savedYaml = "";
+
+  @state()
   private _saving = false;
 
   @state()
@@ -43,9 +46,13 @@ export class ESPHomePageSecrets extends LitElement {
   async connectedCallback() {
     super.connectedCallback();
     try {
-      this._yaml = await this._api.getConfig(SECRETS_FILE);
+      const yaml = await this._api.getConfig(SECRETS_FILE);
+      this._yaml = yaml;
+      this._savedYaml = yaml;
     } catch {
-      this._yaml = this._localize("secrets.file_header");
+      const yaml = this._localize("secrets.file_header");
+      this._yaml = yaml;
+      this._savedYaml = yaml;
     }
     this._loaded = true;
   }
@@ -95,6 +102,7 @@ export class ESPHomePageSecrets extends LitElement {
 
       .editor-card {
         flex: 1;
+        position: relative;
         background: var(--wa-color-surface-default);
         border-radius: var(--wa-border-radius-l);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
@@ -102,6 +110,47 @@ export class ESPHomePageSecrets extends LitElement {
         display: flex;
         flex-direction: column;
         overflow: hidden;
+      }
+
+      .save-button {
+        position: absolute;
+        bottom: var(--wa-space-m);
+        right: var(--wa-space-m);
+        z-index: 10;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: none;
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+        padding: 8px 16px;
+        border-radius: var(--wa-border-radius-m);
+        cursor: pointer;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+        transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
+      }
+
+      .save-button:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        transform: translateY(-1px);
+      }
+
+      .save-button:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      .save-button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+
+      .save-button wa-icon {
+        font-size: 16px;
       }
 
       .back {
@@ -126,22 +175,20 @@ export class ESPHomePageSecrets extends LitElement {
             <h1>${this._localize("secrets.title")}</h1>
             <p>${this._localize("secrets.desc")}</p>
           </div>
-          <wa-button
-            size="small"
-            variant="brand"
-            ?disabled=${this._saving || !this._loaded}
-            @click=${this._save}
-          >
-            ${this._saving
-              ? html`<wa-spinner slot="prefix"></wa-spinner>`
-              : html`<wa-icon slot="prefix" library="mdi" name="content-save"></wa-icon>`}
-            ${this._saving
-              ? this._localize("secrets.saving")
-              : this._localize("secrets.save")}
-          </wa-button>
         </div>
         <wa-divider></wa-divider>
         <div class="editor-card">
+          <button
+            type="button"
+            class="save-button"
+            ?disabled=${this._saving || !this._loaded || this._yaml === this._savedYaml}
+            @click=${this._save}
+          >
+            <wa-icon library="mdi" name="content-save"></wa-icon>
+            ${this._saving
+              ? this._localize("secrets.saving")
+              : this._localize("secrets.save")}
+          </button>
           <esphome-yaml-editor
             .value=${this._yaml}
             @yaml-change=${(e: CustomEvent) => {
@@ -158,6 +205,7 @@ export class ESPHomePageSecrets extends LitElement {
   }
 
   private _save() {
+    this._savedYaml = this._yaml;
     toast.success(this._localize("secrets.saved"), { richColors: true });
     this._api.updateConfig(SECRETS_FILE, this._yaml).catch((e) => {
       const msg = e instanceof Error ? e.message : "";
