@@ -167,15 +167,18 @@ export class ESPHomeTableColumnToggle extends LitElement {
               <div class="menu-divider"></div>
               ${this.columns.map(
                 (col) => html`
-                  <div
+                  <button
+                    type="button"
                     class="menu-item"
+                    role="menuitemcheckbox"
+                    aria-checked=${col.visible}
                     @click=${() => this._onToggle(col.id, !col.visible)}
                   >
                     <span class="checkbox ${col.visible ? "checked" : ""}">
                       <wa-icon library="mdi" name="check"></wa-icon>
                     </span>
                     ${col.header}
-                  </div>
+                  </button>
                 `
               )}
             </div>
