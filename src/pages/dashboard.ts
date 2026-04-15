@@ -3,6 +3,8 @@ import {
   mdiClipboardTextSearchOutline,
   mdiMagnify,
   mdiPlus,
+  mdiViewGrid,
+  mdiTable,
   mdiWeb,
 } from "@mdi/js";
 import { LitElement, css, html } from "lit";
@@ -24,6 +26,8 @@ import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/device-card.js";
+import "../components/dashboard/device-table.js";
+import "../components/dashboard/device-drawer.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/logs-method-dialog.js";
@@ -33,10 +37,14 @@ import type { ESPHomeUpdateDialog } from "../components/update-dialog.js";
 import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 
+type DashboardView = "cards" | "table";
+
 registerMdiIcons({
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
   magnify: mdiMagnify,
   plus: mdiPlus,
+  "view-grid": mdiViewGrid,
+  table: mdiTable,
   web: mdiWeb,
 });
 
@@ -82,6 +90,16 @@ export class ESPHomePageDashboard extends LitElement {
 
   @state()
   private _selectedDevices = new Set<string>();
+
+  @state()
+  private _view: DashboardView =
+    (localStorage.getItem("esphome-dashboard-view") as DashboardView) || "cards";
+
+  @state()
+  private _drawerOpen = false;
+
+  @state()
+  private _drawerDevice: ConfiguredDevice | null = null;
 
   private _onEnterSelectMode = () => {
     this._selectMode = true;
@@ -158,14 +176,61 @@ export class ESPHomePageDashboard extends LitElement {
       /* ─── Search toolbar ─── */
 
       .toolbar { display: flex; flex-direction: column; gap: 6px; padding: var(--wa-space-l) var(--wa-space-l) 0; }
+      .toolbar-row { display: flex; align-items: center; gap: var(--wa-space-s); }
 
-      .search-wrap { position: relative; max-width: 380px; }
+      .search-wrap { position: relative; max-width: 380px; flex: 1; }
       .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 18px; color: var(--wa-color-text-quiet); pointer-events: none; display: flex; align-items: center; }
       .search-input { width: 100%; box-sizing: border-box; padding: 9px 14px 9px 38px; font-size: var(--wa-font-size-s); font-family: inherit; color: var(--wa-color-text-normal); background: var(--wa-color-surface-raised); border: var(--wa-border-width-s) solid var(--wa-color-surface-border); border-radius: var(--wa-border-radius-l); outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
       .search-input::placeholder { color: var(--wa-color-text-quiet); }
       .search-input:focus { border-color: var(--esphome-primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%); }
       .device-count { font-size: var(--wa-font-size-xs); color: var(--wa-color-text-quiet); padding-left: 2px; }
       .device-count strong { color: var(--wa-color-text-normal); font-weight: var(--wa-font-weight-bold); }
+
+      /* ─── View Toggle ─── */
+
+      .view-toggle {
+        display: inline-flex;
+        border-radius: var(--wa-border-radius-m);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        overflow: hidden;
+        flex-shrink: 0;
+      }
+
+      .view-toggle-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border: none;
+        background: var(--wa-color-surface-raised);
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        transition: background 0.12s, color 0.12s;
+        padding: 0;
+      }
+
+      .view-toggle-btn + .view-toggle-btn {
+        border-left: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
+      .view-toggle-btn:hover {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
+      }
+
+      .view-toggle-btn.active {
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+      }
+
+      .view-toggle-btn.active:hover {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+      }
+
+      .view-toggle-btn wa-icon {
+        font-size: 18px;
+      }
 
       /* ─── Empty search state ─── */
 
@@ -261,26 +326,48 @@ export class ESPHomePageDashboard extends LitElement {
             </div>
           `
         : ""}
-      <div class="devices-grid">
-        ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
-        ${filtered.map((device) => {
-          const online = this._deviceStates[device.configuration] ?? false;
-          return html`
-            <esphome-device-card
-              .name=${device.friendly_name || device.name}
-              .configuration=${device.configuration}
-              ?online=${online}
-              ?select-mode=${this._selectMode}
-              ?selected=${this._selectedDevices.has(device.configuration)}
-              @edit-device=${() => this._editDevice(device)}
-              @update-device=${() => this._openUpdate(device)}
-              @open-logs=${() => this._openLogs(device)}
-              @delete-device=${() => this._deleteDevice(device)}
-              @toggle-select=${() => this._toggleDevice(device.configuration)}
-            ></esphome-device-card>
-          `;
-        })}
-      </div>
+      ${this._view === "cards"
+        ? html`
+            <div class="devices-grid">
+              ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
+              ${filtered.map((device) => {
+                const online = this._deviceStates[device.configuration] ?? false;
+                return html`
+                  <esphome-device-card
+                    .name=${device.friendly_name || device.name}
+                    .configuration=${device.configuration}
+                    ?online=${online}
+                    ?select-mode=${this._selectMode}
+                    ?selected=${this._selectedDevices.has(device.configuration)}
+                    @edit-device=${() => this._editDevice(device)}
+                    @update-device=${() => this._openUpdate(device)}
+                    @open-logs=${() => this._openLogs(device)}
+                    @delete-device=${() => this._deleteDevice(device)}
+                    @toggle-select=${() => this._toggleDevice(device.configuration)}
+                  ></esphome-device-card>
+                `;
+              })}
+            </div>
+          `
+        : html`
+            <esphome-device-table
+              .devices=${this._devices}
+              .deviceStates=${this._deviceStates}
+              .search=${this._search}
+              @row-click=${(e: CustomEvent<ConfiguredDevice>) => {
+                this._drawerDevice = e.detail;
+                this._drawerOpen = true;
+              }}
+            ></esphome-device-table>
+          `}
+      <esphome-device-drawer
+        ?open=${this._drawerOpen}
+        .device=${this._drawerDevice}
+        @drawer-close=${() => { this._drawerOpen = false; }}
+        @edit-device=${(e: CustomEvent) => { this._drawerOpen = false; this._editDevice(e.detail); }}
+        @update-device=${(e: CustomEvent) => { this._drawerOpen = false; this._openUpdate(e.detail); }}
+        @open-logs=${(e: CustomEvent) => { this._drawerOpen = false; this._openLogs(e.detail); }}
+      ></esphome-device-drawer>
       ${this._selectMode
         ? html`
             <esphome-select-bar
@@ -317,13 +404,36 @@ export class ESPHomePageDashboard extends LitElement {
     const suffix = q ? " " + this._localize("dashboard.search_of", { total }) : "";
     return html`
       <div class="toolbar">
-        <div class="search-wrap">
-          <span class="search-icon"><wa-icon library="mdi" name="magnify"></wa-icon></span>
-          <input class="search-input" type="search" placeholder=${this._localize("dashboard.search_placeholder")} .value=${this._search} @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }} />
+        <div class="toolbar-row">
+          <div class="search-wrap">
+            <span class="search-icon"><wa-icon library="mdi" name="magnify"></wa-icon></span>
+            <input class="search-input" type="search" placeholder=${this._localize("dashboard.search_placeholder")} .value=${this._search} @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }} />
+          </div>
+          <div class="view-toggle">
+            <button
+              class="view-toggle-btn ${this._view === "cards" ? "active" : ""}"
+              @click=${() => this._setView("cards")}
+              title="Card view"
+            >
+              <wa-icon library="mdi" name="view-grid"></wa-icon>
+            </button>
+            <button
+              class="view-toggle-btn ${this._view === "table" ? "active" : ""}"
+              @click=${() => this._setView("table")}
+              title="Table view"
+            >
+              <wa-icon library="mdi" name="table"></wa-icon>
+            </button>
+          </div>
         </div>
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
       </div>
     `;
+  }
+
+  private _setView(view: DashboardView) {
+    this._view = view;
+    localStorage.setItem("esphome-dashboard-view", view);
   }
 
   private _renderAddDeviceCard() {
