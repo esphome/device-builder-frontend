@@ -52,49 +52,9 @@ export async function deleteBulkDevices(
   }
 }
 
-export function validateDevice(
-  device: ConfiguredDevice,
-  api: ESPHomeAPI,
-  localize: LocalizeFunc
-) {
-  const name = device.friendly_name || device.name;
-  api.validate(device.configuration, {
-    onResult: (result) => {
-      if (result.success) {
-        toast.success(localize("dashboard.action_validate_success", { name }), {
-          richColors: true,
-        });
-      } else {
-        toast.error(localize("dashboard.action_validate_failed", { name }), {
-          richColors: true,
-        });
-      }
-    },
-    onError: () => {
-      toast.error(localize("dashboard.action_validate_failed", { name }), {
-        richColors: true,
-      });
-    },
-  });
-}
-
-export function installDevice(device: ConfiguredDevice, localize: LocalizeFunc) {
-  const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_install_success", { name }), {
-    richColors: true,
-  });
-}
-
-export function cleanBuild(device: ConfiguredDevice, localize: LocalizeFunc) {
-  const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_clean_success", { name }), {
-    richColors: true,
-  });
-}
-
 export function downloadElf(device: ConfiguredDevice, localize: LocalizeFunc) {
   const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_download_elf_success", { name }), {
+  toast.info(localize("dashboard.action_download_elf_unavailable", { name }), {
     richColors: true,
   });
 }

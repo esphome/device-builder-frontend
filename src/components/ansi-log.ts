@@ -172,8 +172,7 @@ export class ESPHomeAnsiLog extends LitElement {
       font-size: 0.8rem;
       padding: 16px;
       border-radius: 8px;
-      min-height: 200px;
-      max-height: 500px;
+      height: var(--log-height, 400px);
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;

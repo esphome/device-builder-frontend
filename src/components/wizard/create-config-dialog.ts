@@ -183,6 +183,13 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   }
 
   private _renderStep() {
+    // Show loading message while import creation is in progress
+    if (this._submitting && this._creationMethod === "import") {
+      return html`<p style="text-align:center;color:var(--wa-color-text-quiet);padding:var(--wa-space-xl) 0">
+        ${this._localize("wizard.importing_device")}
+      </p>`;
+    }
+
     switch (this._step) {
       case "method":
         return html`<esphome-wizard-step-method></esphome-wizard-step-method>`;
