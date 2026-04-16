@@ -611,7 +611,7 @@ export class ESPHomeDeviceTable extends LitElement {
         @open-logs=${(e: CustomEvent) => this._forwardEvent("open-logs", e.detail)}
         @delete-device=${(e: CustomEvent) =>
           this._forwardEvent("delete-device", e.detail)}
-        @enter-select=${this._enterSelectMode}
+        @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._enterSelectMode(e.detail)}
       ></esphome-table-row-menu>
     `;
   }
@@ -677,9 +677,13 @@ export class ESPHomeDeviceTable extends LitElement {
     this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
   }
 
-  private _enterSelectMode() {
+  private _enterSelectMode(device: ConfiguredDevice) {
     this.dispatchEvent(
-      new CustomEvent("enter-select-mode", { bubbles: true, composed: true })
+      new CustomEvent("enter-select-mode", {
+        detail: device.configuration,
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 

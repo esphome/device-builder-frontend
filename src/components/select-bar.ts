@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiUpdate } from "@mdi/js";
+import { mdiDelete, mdiUpdate } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -9,7 +9,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-registerMdiIcons({ update: mdiUpdate });
+registerMdiIcons({ delete: mdiDelete, update: mdiUpdate });
 
 @customElement("esphome-select-bar")
 export class ESPHomeSelectBar extends LitElement {
@@ -22,6 +22,7 @@ export class ESPHomeSelectBar extends LitElement {
 
   @property({ type: Number, attribute: "total-count" })
   totalCount = 0;
+
 
   static styles = [
     espHomeStyles,
@@ -126,6 +127,16 @@ export class ESPHomeSelectBar extends LitElement {
         background: color-mix(in srgb, var(--esphome-primary), black 10%);
       }
 
+      .btn--danger {
+        background: transparent;
+        color: var(--esphome-error);
+        border: var(--wa-border-width-s) solid var(--esphome-error);
+      }
+
+      .btn--danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-error), transparent 90%);
+      }
+
       .btn wa-icon {
         font-size: 16px;
       }
@@ -157,6 +168,16 @@ export class ESPHomeSelectBar extends LitElement {
         <div class="right">
           <button class="btn btn--cancel" @click=${() => this._emit("cancel")}>
             ${this._localize("layout.cancel")}
+          </button>
+          <button
+            class="btn btn--danger"
+            ?disabled=${this.selectedCount === 0}
+            @click=${() => this._emit("delete-selected")}
+          >
+            <wa-icon library="mdi" name="delete"></wa-icon>
+            ${this._localize("dashboard.delete_selected", {
+              count: this.selectedCount,
+            })}
           </button>
           <button
             class="btn btn--primary"

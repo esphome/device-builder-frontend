@@ -25,6 +25,8 @@ import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../components/confirm-dialog.js";
+import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/device-card.js";
@@ -101,10 +103,12 @@ export class ESPHomePageDashboard extends LitElement {
   @state()
   private _drawerDevice: ConfiguredDevice | null = null;
 
-  private _onEnterSelectMode = () => {
+  private _onEnterSelectMode = (configuration?: string) => {
     this._selectMode = true;
-    this._selectedDevices = new Set();
+    this._selectedDevices = configuration ? new Set([configuration]) : new Set();
   };
+
+  private _onGlobalEnterSelectMode = () => this._onEnterSelectMode();
 
   protected willUpdate(changed: PropertyValues) {
     if (changed.has("_view")) {
@@ -115,13 +119,16 @@ export class ESPHomePageDashboard extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
-    window.addEventListener("esphome-enter-select-mode", this._onEnterSelectMode);
+    window.addEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    window.removeEventListener("esphome-enter-select-mode", this._onEnterSelectMode);
+    window.removeEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
   }
+
+  @query("esphome-confirm-dialog")
+  private _confirmDialog!: ESPHomeConfirmDialog;
 
   @query("esphome-create-config-dialog")
   private _createDialog!: ESPHomeCreateConfigDialog;
@@ -741,7 +748,7 @@ export class ESPHomePageDashboard extends LitElement {
               @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
               @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
                 this._deleteDevice(e.detail)}
-              @enter-select-mode=${this._onEnterSelectMode}
+              @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
             >
               <div slot="toolbar" class="toolbar-row">
                 <div class="search-wrap">
@@ -807,6 +814,7 @@ export class ESPHomePageDashboard extends LitElement {
                 this._selectedDevices = new Set();
               }}
               @update-selected=${this._updateSelected}
+              @delete-selected=${this._deleteSelected}
             ></esphome-select-bar>
           `
         : this._view === "cards"
@@ -819,6 +827,13 @@ export class ESPHomePageDashboard extends LitElement {
               </div>
             `
           : ""}
+      <esphome-confirm-dialog
+        heading=${this._localize("dashboard.delete_selected_title")}
+        message=${this._localize("dashboard.delete_selected_desc", { count: this._selectedDevices.size })}
+        confirm-label=${this._localize("dashboard.delete_selected_confirm")}
+        destructive
+        @confirm=${this._executeDeleteSelected}
+      ></esphome-confirm-dialog>
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-update-dialog></esphome-update-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
@@ -1053,6 +1068,26 @@ export class ESPHomePageDashboard extends LitElement {
       if (!device) continue;
       const name = device.friendly_name || device.name;
       await this._compileAndUpload(configuration, name);
+    }
+  }
+
+  private _deleteSelected() {
+    if (this._selectedDevices.size === 0) {
+      toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
+      return;
+    }
+    this._confirmDialog.open();
+  }
+
+  private _executeDeleteSelected() {
+    const selected = [...this._selectedDevices];
+    this._selectMode = false;
+    this._selectedDevices = new Set();
+
+    for (const configuration of selected) {
+      const device = this._devices.find((d) => d.configuration === configuration);
+      if (!device) continue;
+      this._deleteDevice(device);
     }
   }
 
