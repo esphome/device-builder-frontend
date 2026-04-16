@@ -416,6 +416,11 @@ export class ESPHomeAPI {
     return this.sendStreamCommand("devices/logs", { configuration, port }, callbacks);
   }
 
+  /** Follow a job's output: historical lines + live stream until completion. */
+  firmwareFollowJob(jobId: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand("firmware/follow_job", { job_id: jobId }, callbacks);
+  }
+
   // ─── Firmware Commands (job queue) ────────────────────────
 
   /** Queue a compile job. */

@@ -3,8 +3,8 @@ import { mdiClose, mdiRefresh, mdiStop } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { DeviceEventType, JobStatus } from "../api/types.js";
-import type { FirmwareJob, JobEventData, JobOutputEventData } from "../api/types.js";
+import { JobStatus } from "../api/types.js";
+import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -42,12 +42,10 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() private _state: CommandState | null = null;
   @state() private _lines: string[] = [];
 
-  /** Active job ID for firmware/* commands (not used for validate). */
+  /** Active job ID (for cancel). Not used for validate. */
   private _jobId = "";
-  /** Stream message ID for validate (streaming command). */
+  /** Stream message ID (for both validate streaming and follow_job streaming). */
   private _streamId = "";
-
-  private _boundJobHandler = this._onJobEvent.bind(this);
 
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
@@ -103,7 +101,6 @@ export class ESPHomeCommandDialog extends LitElement {
       .content {
         display: flex;
         flex-direction: column;
-        /* Fill available dialog height */
         height: 60vh;
         min-height: 300px;
         max-height: 70vh;
@@ -188,18 +185,8 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   public close() {
-    this._cleanup();
+    this._streamId = "";
     this._dialog.open = false;
-  }
-
-  connectedCallback() {
-    super.connectedCallback();
-    window.addEventListener("esphome-job-event", this._boundJobHandler as EventListener);
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback();
-    window.removeEventListener("esphome-job-event", this._boundJobHandler as EventListener);
   }
 
   private get _title(): string {
@@ -255,7 +242,8 @@ export class ESPHomeCommandDialog extends LitElement {
   // ─── Command execution ─────────────────────────────────────
 
   private async _start() {
-    this._cleanup();
+    this._streamId = "";
+    this._jobId = "";
     this._state = "running";
     this._lines = [];
 
@@ -266,7 +254,7 @@ export class ESPHomeCommandDialog extends LitElement {
     await this._startFirmwareJob();
   }
 
-  /** Validate uses the per-connection streaming command. */
+  /** Validate uses the per-connection streaming command (not a queued job). */
   private _startValidateStream() {
     this._streamId = this._api.validate(this.configuration, {
       onOutput: (line) => { this._lines = [...this._lines, line]; },
@@ -274,7 +262,7 @@ export class ESPHomeCommandDialog extends LitElement {
         this._streamId = "";
         this._state = data.success ? "success" : "error";
         const key = data.success ? "command.validate_success" : "command.validate_failed";
-        this._lines = [...this._lines, "", `\x1b[${data.success ? "32" : "31"}m${this._localize(key)}\x1b[0m`];
+        this._lines = [...this._lines, `\x1b[${data.success ? "32" : "31"}m${this._localize(key)}\x1b[0m`];
       },
       onError: (error) => {
         this._streamId = "";
@@ -284,10 +272,14 @@ export class ESPHomeCommandDialog extends LitElement {
     });
   }
 
-  /** Compile/install/clean use the firmware job queue. */
+  /**
+   * Queue a firmware job, then follow its output via follow_job.
+   * follow_job sends historical output first, then streams live lines,
+   * and finally sends a result event when the job finishes.
+   */
   private async _startFirmwareJob() {
+    let job: FirmwareJob;
     try {
-      let job: FirmwareJob;
       switch (this._commandType) {
         case "install":
           job = await this._api.firmwareInstall(this.configuration);
@@ -301,57 +293,44 @@ export class ESPHomeCommandDialog extends LitElement {
         default:
           return;
       }
-      this._jobId = job.job_id;
-      // If the job already has output (re-connected to running job), show it
-      if (job.output.length > 0) {
-        this._lines = [...job.output];
-      }
     } catch (err) {
       this._state = "error";
       const msg = err instanceof Error ? err.message : String(err);
       this._lines = [`\x1b[31mError: ${msg}\x1b[0m`];
-    }
-  }
-
-  // ─── Job event handling ────────────────────────────────────
-
-  private _onJobEvent(e: CustomEvent<{ event: string; data: unknown }>) {
-    const { event, data } = e.detail;
-    if (!this._jobId) return;
-
-    if (event === DeviceEventType.JOB_OUTPUT) {
-      const { job_id, line } = data as JobOutputEventData;
-      if (job_id === this._jobId) {
-        this._lines = [...this._lines, line];
-      }
       return;
     }
 
-    // Lifecycle events carry the full job
-    const jobData = data as JobEventData;
-    if (jobData.job?.job_id !== this._jobId) return;
-
-    switch (event) {
-      case DeviceEventType.JOB_COMPLETED:
-        this._state = "success";
-        this._lines = [
-          ...this._lines, "",
-          `\x1b[32m${this._localize(`command.${this._commandType}_success`)}\x1b[0m`,
-        ];
-        this._jobId = "";
-        break;
-      case DeviceEventType.JOB_FAILED:
-        this._state = "error";
-        this._lines = [
-          ...this._lines, "",
-          `\x1b[31m${this._localize(`command.${this._commandType}_failed`)}\x1b[0m`,
-        ];
-        this._jobId = "";
-        break;
-    }
+    this._jobId = job.job_id;
+    this._followJob(job.job_id);
   }
 
-  // ─── Cleanup ───────────────────────────────────────────────
+  /** Attach to a job's output stream. Works for queued, running, or finished jobs. */
+  private _followJob(jobId: string) {
+    this._streamId = this._api.firmwareFollowJob(jobId, {
+      onOutput: (line) => {
+        this._lines = [...this._lines, line];
+      },
+      onResult: (data) => {
+        this._streamId = "";
+        const result = data as unknown as { status: string; exit_code: number | null };
+        const success = result.status === JobStatus.COMPLETED;
+        this._state = success ? "success" : "error";
+        const key = success
+          ? `command.${this._commandType}_success`
+          : `command.${this._commandType}_failed`;
+        this._lines = [...this._lines, `\x1b[${success ? "32" : "31"}m${this._localize(key)}\x1b[0m`];
+        this._jobId = "";
+      },
+      onError: (error) => {
+        this._streamId = "";
+        this._state = "error";
+        this._lines = [...this._lines, `\x1b[31mError: ${error}\x1b[0m`];
+        this._jobId = "";
+      },
+    });
+  }
+
+  // ─── Stop / cleanup ────────────────────────────────────────
 
   private _stop() {
     if (this._state !== "running") return;
@@ -359,17 +338,13 @@ export class ESPHomeCommandDialog extends LitElement {
       this._api.firmwareCancel(this._jobId).catch(() => {});
     }
     this._state = "error";
-    this._lines = [...this._lines, "", `\x1b[33m${this._localize("command.stopped")}\x1b[0m`];
-    this._cleanup();
-  }
-
-  private _cleanup() {
-    this._jobId = "";
+    this._lines = [...this._lines, `\x1b[33m${this._localize("command.stopped")}\x1b[0m`];
     this._streamId = "";
+    this._jobId = "";
   }
 
   private _onDialogHide() {
-    this._cleanup();
+    this._streamId = "";
   }
 }
 

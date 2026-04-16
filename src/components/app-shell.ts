@@ -253,16 +253,6 @@ export class ESPHomeApp extends LitElement {
         );
         break;
       }
-      // Firmware job events — re-dispatch as window events for command-dialog
-      case DeviceEventType.JOB_QUEUED:
-      case DeviceEventType.JOB_STARTED:
-      case DeviceEventType.JOB_OUTPUT:
-      case DeviceEventType.JOB_COMPLETED:
-      case DeviceEventType.JOB_FAILED:
-        window.dispatchEvent(
-          new CustomEvent("esphome-job-event", { detail: { event, data } }),
-        );
-        break;
     }
   }
 
