@@ -21,16 +21,19 @@
     "@mdi/js": "7.4.47",
     "@tanstack/lit-table": "^8.21.3",
     "codemirror": "^6.0.2",
+    "esptool-js": "^0.6.0",
     "lit": "3.3.2",
     "lit-html": "3.3.2",
     "sonner-js": "^1.1.3",
     "urlpattern-polyfill": "10.1.0"
   },
   "devDependencies": {
+    "@anthropic-ai/sdk": "^0.90.0",
     "@rspack/core": "1.7.6",
     "@rspack/dev-server": "1.2.1",
     "@swc/helpers": "0.5.19",
     "@types/node": "22.15.0",
+    "@types/w3c-web-serial": "^1.0.8",
     "prettier": "3.8.1",
     "typescript": "5.9.3"
   },

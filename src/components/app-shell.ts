@@ -113,14 +113,33 @@ export class ESPHomeApp extends LitElement {
 
   // ─── Lifecycle ───────────────────────────────────────────
 
+  private _onSerialConnect = () => {
+    toast.info(this._localize("layout.usb_device_connected"), {
+      richColors: true,
+      duration: 8000,
+      action: {
+        label: this._localize("layout.usb_device_setup"),
+        onClick: () => {
+          window.dispatchEvent(new CustomEvent("esphome-serial-setup"));
+        },
+      },
+    });
+  };
+
   connectedCallback() {
     super.connectedCallback();
     this._init();
+    if ("serial" in navigator) {
+      navigator.serial.addEventListener("connect", this._onSerialConnect);
+    }
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._api.disconnect();
+    if ("serial" in navigator) {
+      navigator.serial.removeEventListener("connect", this._onSerialConnect);
+    }
   }
 
   private _initDarkMode() {

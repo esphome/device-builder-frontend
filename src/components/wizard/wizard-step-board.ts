@@ -15,6 +15,7 @@ import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { detectChip, disconnect, isWebSerialSupported } from "../../util/web-serial.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -169,7 +170,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       }
 
       .boards-scroll {
-        max-height: 320px;
+        height: 320px;
         overflow-y: auto;
         padding-right: var(--wa-space-2xs);
       }
@@ -333,33 +334,35 @@ export class ESPHomeWizardStepBoard extends LitElement {
         <button class="helper-link" type="button">
           ${this._localize("wizard.dont_know_board")}
         </button>
-        <button class="helper-link helper-link--bold" type="button">
+        <button class="helper-link helper-link--bold" type="button" @click=${this._connectBoard}>
           ${this._localize("wizard.connect_your_board")}
         </button>
       </div>
 
-      ${this._loading
-        ? html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`
-        : html`
-            ${featured
-              ? html`
-                  <p class="section-label">${this._localize("wizard.starter_kit")}</p>
-                  ${this._renderFeatured(featured)}
-                `
-              : nothing}
-            ${regular.length
-              ? html`
-                  <p class="section-label">${this._localize("wizard.other_boards")}</p>
-                  <div class="boards-scroll">
+      <div class="boards-scroll">
+        ${this._loading
+          ? html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`
+          : this._boards.length === 0
+            ? html`<p class="loading">${this._localize("wizard.no_boards_found")}</p>`
+            : html`
+              ${featured
+                ? html`
+                    <p class="section-label">${this._localize("wizard.starter_kit")}</p>
+                    ${this._renderFeatured(featured)}
+                  `
+                : nothing}
+              ${regular.length
+                ? html`
+                    <p class="section-label">${this._localize("wizard.other_boards")}</p>
                     <div class="boards-grid">
                       ${regular.map((board) =>
                         this._renderBoardCard(board, board.id === this._expandedBoardId)
                       )}
                     </div>
-                  </div>
-                `
-              : nothing}
-          `}
+                  `
+                : nothing}
+            `}
+      </div>
     `;
   }
 
@@ -467,6 +470,45 @@ export class ESPHomeWizardStepBoard extends LitElement {
         composed: true,
       })
     );
+  }
+
+  private async _connectBoard() {
+    if (!isWebSerialSupported()) return;
+
+    try {
+      const detected = await detectChip();
+      // e.g. "ESP32-S3 (QFN56) (revision v0.2)"
+      const chipName = detected.chipName;
+      await disconnect(detected.transport);
+
+      // Extract chip family: "ESP32-S3 (QFN56) ..." → "esp32s3"
+      const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
+
+      // Try fetching the generic board directly by expected ID
+      const genericId = `generic-${family}`;
+      const board = await this._api.getBoard(genericId);
+      if (board) {
+        this._onAdd(board);
+        return;
+      }
+
+      // Fallback: search by variant to find any matching board
+      const response = await this._api.getBoards({ query: family, limit: 20 });
+      const match = response.boards.find((b) => {
+        const variant = b.esphome.variant ?? b.esphome.platform;
+        return variant === family;
+      });
+
+      if (match) {
+        this._onAdd(match);
+      } else {
+        // Show filtered results so the user can pick manually
+        this._search = chipName.split("(")[0].trim();
+        this._fetchBoards();
+      }
+    } catch {
+      // User cancelled the port picker or detection failed
+    }
   }
 }
 

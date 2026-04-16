@@ -26,5 +26,19 @@ function applyWaTheme(): void {
   document.head.appendChild(style);
 }
 
+// Style sonner toast action buttons to use the brand color
+function applySonnerOverrides(): void {
+  const style = document.createElement("style");
+  style.id = "sonner-overrides";
+  style.textContent = `
+    [data-sonner-toast] [data-button] {
+      color: var(--esphome-primary, #0d8a6f) !important;
+      font-weight: 600 !important;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 // Execute immediately on import
 applyWaTheme();
+applySonnerOverrides();

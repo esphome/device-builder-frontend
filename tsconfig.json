@@ -17,6 +17,7 @@
     "strict": true,
     "noImplicitAny": false,
     "skipLibCheck": true,
+    "types": ["@types/w3c-web-serial"],
     "esModuleInterop": true,
     "isolatedModules": true,
     "paths": {

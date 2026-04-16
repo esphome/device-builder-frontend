@@ -32,6 +32,7 @@ import {
   extractApiKey,
   streamSerialToDialog,
 } from "./dashboard-actions.js";
+import { detectChip, disconnect } from "../util/web-serial.js";
 import { cardSkeletonTemplate, tableSkeletonTemplate } from "./dashboard-skeletons.js";
 import { dashboardStyles } from "./dashboard-styles.js";
 
@@ -122,10 +123,13 @@ export class ESPHomePageDashboard extends LitElement {
     }
   }
 
+  private _onSerialSetup = () => this._detectAndOpenWizard();
+
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
     window.addEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
+    window.addEventListener("esphome-serial-setup", this._onSerialSetup);
   }
 
   private async _loadPreferences() {
@@ -151,6 +155,7 @@ export class ESPHomePageDashboard extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
+    window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
   }
 
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
@@ -480,12 +485,6 @@ export class ESPHomePageDashboard extends LitElement {
     this._apiKeyDialog.open(key);
   }
 
-  private _openCommand(device: ConfiguredDevice, type: CommandType) {
-    this._commandDialog.configuration = device.configuration;
-    this._commandDialog.name = device.friendly_name || device.name;
-    this._commandDialog.open(type);
-  }
-
   private async _downloadFirmware(device: ConfiguredDevice) {
     const name = device.friendly_name || device.name;
     try {
@@ -494,7 +493,6 @@ export class ESPHomePageDashboard extends LitElement {
         toast.error(this._localize("dashboard.download_no_binaries", { name }), { richColors: true });
         return;
       }
-      // Download the first available binary
       const binary = binaries[0];
       const result = await this._api.firmwareDownload(device.configuration, binary.file);
       const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
@@ -509,6 +507,33 @@ export class ESPHomePageDashboard extends LitElement {
       toast.error(this._localize("dashboard.download_firmware_failed", { name }), { richColors: true });
     }
   }
+
+  private async _detectAndOpenWizard() {
+    try {
+      const detected = await detectChip();
+      const chipName = detected.chipName;
+      await disconnect(detected.transport);
+
+      const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
+      const board = await this._api.getBoard(`generic-${family}`);
+
+      if (board) {
+        this._createDialog.openWithBoard(board);
+      } else {
+        this._createDialog.open("board");
+      }
+    } catch {
+      // Detection failed or user cancelled — open wizard at board step as fallback
+      this._createDialog.open("board");
+    }
+  }
+
+  private _openCommand(device: ConfiguredDevice, type: CommandType) {
+    this._commandDialog.configuration = device.configuration;
+    this._commandDialog.name = device.friendly_name || device.name;
+    this._commandDialog.open(type);
+  }
+
 
   private _openLogs(device: ConfiguredDevice) {
     if (device.state === DeviceState.ONLINE) {

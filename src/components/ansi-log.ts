@@ -152,6 +152,7 @@ export class ESPHomeAnsiLog extends LitElement {
   static styles = css`
     :host {
       display: block;
+      height: var(--log-height, 400px);
       --log-bg: #1e1e1e;
       --log-fg: #d4d4d4;
       --log-hover: rgba(255, 255, 255, 0.04);
@@ -172,6 +173,7 @@ export class ESPHomeAnsiLog extends LitElement {
       font-size: 0.8rem;
       padding: 8px 16px;
       border-radius: 8px;
+      height: 100%;
       overflow-y: auto;
       white-space: pre-wrap;
       overflow-wrap: anywhere;

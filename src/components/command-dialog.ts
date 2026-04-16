@@ -95,7 +95,7 @@ export class ESPHomeCommandDialog extends LitElement {
         padding: 0; min-width: unset; min-height: unset;
         color: var(--term-fg-muted); cursor: pointer;
       }
-      wa-dialog::part(body) { padding: 0; background: var(--term-bg); }
+      wa-dialog::part(body) { padding: 0; background: var(--term-bg); overflow: hidden; }
       wa-dialog::part(footer) { display: none; }
 
       .content {
@@ -104,6 +104,7 @@ export class ESPHomeCommandDialog extends LitElement {
         height: 60vh;
         min-height: 300px;
         max-height: 70vh;
+        overflow: hidden;
       }
       esphome-ansi-log {
         flex: 1;
@@ -113,6 +114,7 @@ export class ESPHomeCommandDialog extends LitElement {
       esphome-ansi-log::part(container) { border-radius: 0; }
 
       .terminal-toolbar {
+        flex-shrink: 0;
         display: flex; align-items: center; gap: var(--wa-space-xs);
         padding: 6px var(--wa-space-m);
         background: var(--term-bg-alt);

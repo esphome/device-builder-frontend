@@ -138,6 +138,7 @@ export class ESPHomeLogsDialog extends LitElement {
       wa-dialog::part(body) {
         padding: 0;
         background: var(--term-bg);
+        overflow: hidden;
       }
 
       wa-dialog::part(footer) {
@@ -150,6 +151,7 @@ export class ESPHomeLogsDialog extends LitElement {
         height: 60vh;
         min-height: 300px;
         max-height: 70vh;
+        overflow: hidden;
       }
 
       esphome-ansi-log {
@@ -164,6 +166,7 @@ export class ESPHomeLogsDialog extends LitElement {
       }
 
       .terminal-toolbar {
+        flex-shrink: 0;
         display: flex;
         align-items: center;
         gap: var(--wa-space-xs);

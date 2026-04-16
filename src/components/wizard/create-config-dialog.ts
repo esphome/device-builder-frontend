@@ -131,9 +131,21 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     `,
   ];
 
-  public open() {
-    this._step = "method";
+  public open(startStep?: WizardStep) {
+    this._step = startStep ?? "method";
     this._creationMethod = "basic";
+    this._selectedBoard = null;
+    this._importFile = null;
+    this._submitting = false;
+    this._importError = "";
+    this._dialog.open = true;
+  }
+
+  /** Open directly at the setup step with a pre-selected board. */
+  public openWithBoard(board: BoardCatalogEntry) {
+    this._step = "setup";
+    this._creationMethod = "basic";
+    this._selectedBoard = board;
     this._importFile = null;
     this._submitting = false;
     this._importError = "";
