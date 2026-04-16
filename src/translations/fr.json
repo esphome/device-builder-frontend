@@ -75,7 +75,8 @@
     "drawer_configuration": "Configuration",
     "drawer_config_file": "Fichier de config",
     "drawer_comment": "Commentaire",
-    "drawer_loaded_integrations": "Intégrations chargées"
+    "drawer_loaded_integrations": "Intégrations chargées",
+    "context_select": "Sélectionner"
   },
   "wizard": {
     "title_create": "Créer une configuration",

@@ -75,7 +75,8 @@
     "drawer_configuration": "Configuratie",
     "drawer_config_file": "Configuratiebestand",
     "drawer_comment": "Opmerking",
-    "drawer_loaded_integrations": "Geladen integraties"
+    "drawer_loaded_integrations": "Geladen integraties",
+    "context_select": "Selecteren"
   },
   "wizard": {
     "title_create": "Configuratie aanmaken",

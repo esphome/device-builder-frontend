@@ -95,7 +95,8 @@
     "drawer_configuration": "Configuration",
     "drawer_config_file": "Config File",
     "drawer_comment": "Comment",
-    "drawer_loaded_integrations": "Loaded Integrations"
+    "drawer_loaded_integrations": "Loaded Integrations",
+    "context_select": "Select"
   },
   "wizard": {
     "title_create": "Create configuration",

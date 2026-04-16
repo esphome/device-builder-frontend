@@ -50,6 +50,7 @@ export class ESPHomeTablePagination extends LitElement {
     css`
       :host {
         display: block;
+        flex-shrink: 0;
       }
 
       .pagination {
@@ -59,6 +60,8 @@ export class ESPHomeTablePagination extends LitElement {
         padding: var(--wa-space-m) var(--wa-space-l);
         flex-wrap: wrap;
         gap: var(--wa-space-s);
+        border-top: var(--wa-border-width-s) solid
+          var(--wa-color-surface-border);
       }
 
       .info {

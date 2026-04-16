@@ -41,7 +41,9 @@ export class ESPHomeTableColumnToggle extends LitElement {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 6px 14px;
+        padding: 0 14px;
+        height: 36px;
+        box-sizing: border-box;
         border-radius: var(--wa-border-radius-m);
         font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
@@ -170,12 +172,13 @@ export class ESPHomeTableColumnToggle extends LitElement {
         ? html`
             <div class="backdrop" @click=${this._close}></div>
             <div class="menu">
-              <div class="menu-label">${this._localize("dashboard.table_toggle_columns")}</div>
+              <div class="menu-label">
+                ${this._localize("dashboard.table_toggle_columns")}
+              </div>
               <div class="menu-divider"></div>
               ${this.columns.map(
                 (col) => html`
-                  <button
-                    type="button"
+                  <div
                     class="menu-item"
                     role="menuitemcheckbox"
                     aria-checked=${col.visible}
@@ -185,7 +188,7 @@ export class ESPHomeTableColumnToggle extends LitElement {
                       <wa-icon library="mdi" name="check"></wa-icon>
                     </span>
                     ${col.header}
-                  </button>
+                  </div>
                 `
               )}
             </div>

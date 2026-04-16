@@ -1,8 +1,12 @@
 import { consume } from "@lit/context";
-import { mdiChevronDown, mdiChevronUp, mdiUnfoldMoreHorizontal } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import type { PropertyValues } from "lit";
+import {
+  mdiCheckboxBlankOutline,
+  mdiCheckboxMarked,
+  mdiChevronDown,
+  mdiChevronUp,
+  mdiDotsVertical,
+  mdiUnfoldMoreHorizontal,
+} from "@mdi/js";
 import {
   TableController,
   flexRender,
@@ -14,21 +18,29 @@ import {
   type SortingState,
   type VisibilityState,
 } from "@tanstack/lit-table";
-import type { LocalizeFunc } from "../../common/localize.js";
+import type { PropertyValues } from "lit";
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfiguredDevice } from "../../api/types.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
+import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
+import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./table-column-toggle.js";
 import "./table-pagination.js";
+import "./table-row-menu.js";
 
 registerMdiIcons({
+  "checkbox-blank-outline": mdiCheckboxBlankOutline,
+  "checkbox-marked": mdiCheckboxMarked,
   "chevron-up": mdiChevronUp,
   "chevron-down": mdiChevronDown,
+  "dots-vertical": mdiDotsVertical,
   "unfold-more-horizontal": mdiUnfoldMoreHorizontal,
 });
 
@@ -54,11 +66,29 @@ export class ESPHomeDeviceTable extends LitElement {
   @property({ attribute: false })
   search = "";
 
+  @property({ type: Boolean, attribute: "select-mode" })
+  selectMode = false;
+
+  @property({ attribute: false })
+  selectedDevices = new Set<string>();
+
   @state()
   private _sorting: SortingState = [];
 
   @state()
   private _columnVisibility: VisibilityState = {};
+
+  @state()
+  private _contextMenuDevice: ConfiguredDevice | null = null;
+
+  @state()
+  private _contextMenuPos: { x: number; y: number } | null = null;
+
+  @state()
+  private _contextMenuAnchorRight = false;
+
+  @query(".table-scroll")
+  private _scrollContainer!: HTMLDivElement;
 
   private _tableController = new TableController<DeviceRow>(this);
 
@@ -71,15 +101,24 @@ export class ESPHomeDeviceTable extends LitElement {
 
   // ─── Stable callbacks (no inline arrows in render) ───
 
-  private _handleSortingChange = (updater: SortingState | ((old: SortingState) => SortingState)) => {
+  private _handleSortingChange = (
+    updater: SortingState | ((old: SortingState) => SortingState)
+  ) => {
     this._sorting = typeof updater === "function" ? updater(this._sorting) : updater;
   };
 
-  private _handleVisibilityChange = (updater: VisibilityState | ((old: VisibilityState) => VisibilityState)) => {
-    this._columnVisibility = typeof updater === "function" ? updater(this._columnVisibility) : updater;
+  private _handleVisibilityChange = (
+    updater: VisibilityState | ((old: VisibilityState) => VisibilityState)
+  ) => {
+    this._columnVisibility =
+      typeof updater === "function" ? updater(this._columnVisibility) : updater;
   };
 
-  private _globalFilterFn = (row: any, _columnId: string, filterValue: unknown): boolean => {
+  private _globalFilterFn = (
+    row: any,
+    _columnId: string,
+    filterValue: unknown
+  ): boolean => {
     const q = (filterValue as string).trim().toLowerCase();
     if (!q) return true;
     const d: DeviceRow = row.original;
@@ -118,31 +157,71 @@ export class ESPHomeDeviceTable extends LitElement {
 
   static styles = [
     espHomeStyles,
+    tableCellStyles,
     css`
       :host {
-        display: block;
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
       }
 
       .controls {
         display: flex;
         align-items: center;
-        justify-content: flex-end;
-        padding: 0 var(--wa-space-l);
-        margin-bottom: var(--wa-space-s);
+        gap: var(--wa-space-s);
+        padding: var(--wa-space-l) var(--wa-space-l) 0;
+        margin-bottom: var(--wa-space-l);
+        flex-shrink: 0;
+      }
+
+      .controls ::slotted([slot="toolbar"]) {
+        flex: 1;
+        min-width: 0;
+      }
+
+      .controls-right {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-s);
+        flex-shrink: 0;
       }
 
       /* ─── Table ─── */
 
       .table-wrap {
-        margin: 0 var(--wa-space-l);
+        margin: 0 var(--wa-space-l) var(--wa-space-l);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-l);
         overflow: hidden;
         background: var(--wa-color-surface-raised);
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-height: 0;
       }
 
       .table-scroll {
-        overflow-x: auto;
+        overflow: auto;
+        flex: 1;
+        min-height: 0;
+        /* Horizontal scroll shadows — appear only when content overflows */
+        background:
+          linear-gradient(to right, var(--wa-color-surface-raised) 30%, transparent) left
+            center,
+          linear-gradient(to left, var(--wa-color-surface-raised) 30%, transparent) right
+            center,
+          radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.12), transparent) left
+            center,
+          radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.12), transparent)
+            right center;
+        background-repeat: no-repeat;
+        background-size:
+          40px 100%,
+          40px 100%,
+          14px 100%,
+          14px 100%;
+        background-attachment: local, local, scroll, scroll;
       }
 
       table {
@@ -154,6 +233,9 @@ export class ESPHomeDeviceTable extends LitElement {
       /* ─── Header ─── */
 
       thead {
+        position: sticky;
+        top: 0;
+        z-index: 1;
         background: var(--wa-color-surface-lowered);
       }
 
@@ -166,8 +248,7 @@ export class ESPHomeDeviceTable extends LitElement {
         text-transform: uppercase;
         letter-spacing: 0.04em;
         white-space: nowrap;
-        border-bottom: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         user-select: none;
       }
 
@@ -203,8 +284,7 @@ export class ESPHomeDeviceTable extends LitElement {
       /* ─── Body ─── */
 
       tbody tr {
-        border-bottom: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         transition: background 0.1s;
         cursor: pointer;
       }
@@ -212,11 +292,11 @@ export class ESPHomeDeviceTable extends LitElement {
         border-bottom: none;
       }
       tbody tr:hover {
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 95%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+      }
+      tbody tr:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: -2px;
       }
 
       td {
@@ -228,82 +308,83 @@ export class ESPHomeDeviceTable extends LitElement {
         max-width: 250px;
       }
 
-      /* ─── Cell helpers (used by column defs) ─── */
+      /* ─── Select / Checkbox ─── */
 
-      .status-dot {
-        display: inline-block;
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
+      .select-col {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        padding: 0;
+        text-align: center;
         vertical-align: middle;
-      }
-      .status-dot.online {
-        background: var(--esphome-success);
-        box-shadow: 0 0 6px
-          color-mix(in srgb, var(--esphome-success), transparent 50%);
-      }
-      .status-dot.offline {
-        background: var(--esphome-error);
-        box-shadow: 0 0 6px
-          color-mix(in srgb, var(--esphome-error), transparent 60%);
+        overflow: visible;
       }
 
-      .cell-name {
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      .cell-mono {
-        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-          monospace;
-        font-size: var(--wa-font-size-2xs);
+      .row-checkbox {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        cursor: pointer;
         color: var(--wa-color-text-quiet);
+        transition: color 0.12s;
       }
 
-      .cell-badge {
-        display: inline-flex;
-        padding: 2px 10px;
-        border-radius: 999px;
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-bold);
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 88%
-        );
+      .row-checkbox:hover {
         color: var(--esphome-primary);
-        letter-spacing: 0.02em;
       }
 
-      .cell-muted {
+      .row-checkbox wa-icon {
+        font-size: 20px;
+      }
+
+      tbody tr.selected {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+      }
+
+      tbody tr.selected .row-checkbox {
+        color: var(--esphome-primary);
+      }
+
+      thead .row-checkbox {
         color: var(--wa-color-text-quiet);
-        font-style: italic;
       }
 
-      .cell-comment {
-        color: var(--wa-color-text-quiet);
-        max-width: 200px;
-        overflow: hidden;
-        text-overflow: ellipsis;
+      /* ─── Actions column ─── */
+
+      .actions-col {
+        width: 40px;
+        min-width: 40px;
+        max-width: 40px;
+        padding: 0;
+        text-align: center;
+        vertical-align: middle;
+        overflow: visible;
       }
 
-      .cell-tags {
+      .actions-btn {
         display: inline-flex;
-        gap: 4px;
-      }
-
-      .tag {
-        display: inline-flex;
-        padding: 1px 8px;
+        align-items: center;
+        justify-content: center;
+        width: 30px;
+        height: 30px;
+        border: none;
         border-radius: var(--wa-border-radius-m);
-        font-size: 10px;
-        font-weight: var(--wa-font-weight-bold);
-        background: var(--wa-color-surface-lowered);
+        background: transparent;
         color: var(--wa-color-text-quiet);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        cursor: pointer;
+        padding: 0;
+        transition: background 0.12s, color 0.12s;
       }
 
-      .cell-config {
-        color: var(--wa-color-text-quiet);
+      .actions-btn:hover {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
+      }
+
+      .actions-btn wa-icon {
+        font-size: 18px;
       }
 
       .no-results {
@@ -354,34 +435,63 @@ export class ESPHomeDeviceTable extends LitElement {
 
     return html`
       <div class="controls">
-        <esphome-table-column-toggle
-          .columns=${toggleCols}
-          @column-visibility-change=${(e: CustomEvent<{ id: string; visible: boolean }>) => {
-            table.getColumn(e.detail.id)?.toggleVisibility(e.detail.visible);
-          }}
-        ></esphome-table-column-toggle>
+        <slot name="toolbar"></slot>
+        <div class="controls-right">
+          <esphome-table-column-toggle
+            .columns=${toggleCols}
+            @column-visibility-change=${(
+              e: CustomEvent<{ id: string; visible: boolean }>
+            ) => {
+              table.getColumn(e.detail.id)?.toggleVisibility(e.detail.visible);
+            }}
+          ></esphome-table-column-toggle>
+          <slot name="actions"></slot>
+        </div>
       </div>
 
       <div class="table-wrap">
         <div class="table-scroll">
-          <table>
+          <table role="grid">
             <thead>
               ${headerGroups.map(
                 (hg) => html`
-                  <tr>
+                  <tr role="row">
+                    ${this.selectMode
+                      ? html`<th class="select-col" style="width:40px">
+                          <span class="row-checkbox" @click=${this._onToggleAll}>
+                            <wa-icon
+                              library="mdi"
+                              name=${this._allSelected
+                                ? "checkbox-marked"
+                                : "checkbox-blank-outline"}
+                            ></wa-icon>
+                          </span>
+                        </th>`
+                      : nothing}
                     ${hg.headers.map((header) => {
                       const sorted = header.column.getIsSorted();
                       const canSort = header.column.getCanSort();
                       return html`
                         <th
+                          role="columnheader"
+                          aria-sort=${sorted === "asc"
+                            ? "ascending"
+                            : sorted === "desc"
+                              ? "descending"
+                              : "none"}
                           class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""}"
                           style="width:${header.getSize()}px"
-                          @click=${canSort ? () => header.column.toggleSorting() : nothing}
+                          @click=${canSort
+                            ? () => header.column.toggleSorting()
+                            : nothing}
                         >
                           <span class="th-content">
                             ${header.isPlaceholder
                               ? null
-                              : flexRender(header.column.columnDef.header, header.getContext())}
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
                             ${canSort
                               ? html`<wa-icon
                                   class="sort-icon"
@@ -397,28 +507,73 @@ export class ESPHomeDeviceTable extends LitElement {
                         </th>
                       `;
                     })}
+                    <th class="actions-col"></th>
                   </tr>
-                `,
+                `
               )}
             </thead>
             <tbody>
               ${rows.length > 0
                 ? rows.map(
                     (row) => html`
-                      <tr @click=${() => this._onRowClick(row.original._device)}>
-                        ${row.getVisibleCells().map(
-                          (cell) => html`
-                            <td>
-                              ${flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </td>
-                          `,
-                        )}
+                      <tr
+                        role="row"
+                        tabindex="0"
+                        class="${this.selectMode &&
+                        this.selectedDevices.has(row.original.config)
+                          ? "selected"
+                          : ""}"
+                        @click=${() =>
+                          this.selectMode
+                            ? this._onToggleSelect(row.original.config)
+                            : this._onRowClick(row.original._device)}
+                        @contextmenu=${(e: MouseEvent) =>
+                          this._onRowContextMenu(e, row.original._device)}
+                        @keydown=${(e: KeyboardEvent) =>
+                          this._onRowKeydown(e, row.original._device)}
+                      >
+                        ${this.selectMode
+                          ? html`<td role="gridcell" class="select-col">
+                              <span class="row-checkbox">
+                                <wa-icon
+                                  library="mdi"
+                                  name=${this.selectedDevices.has(row.original.config)
+                                    ? "checkbox-marked"
+                                    : "checkbox-blank-outline"}
+                                ></wa-icon>
+                              </span>
+                            </td>`
+                          : nothing}
+                        ${row
+                          .getVisibleCells()
+                          .map(
+                            (cell) => html`
+                              <td role="gridcell">
+                                ${flexRender(
+                                  cell.column.columnDef.cell,
+                                  cell.getContext()
+                                )}
+                              </td>
+                            `
+                          )}
+                        <td role="gridcell" class="actions-col">
+                          <button
+                            class="actions-btn"
+                            @click=${(e: MouseEvent) => { e.stopPropagation(); this._openActionsMenu(e, row.original._device); }}
+                          >
+                            <wa-icon library="mdi" name="dots-vertical"></wa-icon>
+                          </button>
+                        </td>
                       </tr>
-                    `,
+                    `
                   )
                 : html`
                     <tr>
-                      <td colspan=${table.getVisibleLeafColumns().length} class="no-results">
+                      <td
+                        colspan=${table.getVisibleLeafColumns().length +
+                        (this.selectMode ? 1 : 0) + 1}
+                        class="no-results"
+                      >
                         ${this._localize("dashboard.table_no_results")}
                       </td>
                     </tr>
@@ -434,11 +589,102 @@ export class ESPHomeDeviceTable extends LitElement {
           total-rows=${table.getFilteredRowModel().rows.length}
           ?can-previous-page=${table.getCanPreviousPage()}
           ?can-next-page=${table.getCanNextPage()}
-          @page-change=${(e: CustomEvent<number>) => table.setPageIndex(e.detail)}
-          @page-size-change=${(e: CustomEvent<number>) => table.setPageSize(e.detail)}
+          @page-change=${(e: CustomEvent<number>) => {
+            table.setPageIndex(e.detail);
+            this._scrollToTop();
+          }}
+          @page-size-change=${(e: CustomEvent<number>) => {
+            table.setPageSize(e.detail);
+            this._scrollToTop();
+          }}
         ></esphome-table-pagination>
       </div>
+
+      <esphome-table-row-menu
+        .device=${this._contextMenuDevice}
+        .position=${this._contextMenuPos}
+        ?anchor-right=${this._contextMenuAnchorRight}
+        @menu-close=${this._closeContextMenu}
+        @edit-device=${(e: CustomEvent) => this._forwardEvent("edit-device", e.detail)}
+        @update-device=${(e: CustomEvent) =>
+          this._forwardEvent("update-device", e.detail)}
+        @open-logs=${(e: CustomEvent) => this._forwardEvent("open-logs", e.detail)}
+        @delete-device=${(e: CustomEvent) =>
+          this._forwardEvent("delete-device", e.detail)}
+        @enter-select=${this._enterSelectMode}
+      ></esphome-table-row-menu>
     `;
+  }
+
+  private get _allSelected(): boolean {
+    return (
+      this._rows.length > 0 && this._rows.every((r) => this.selectedDevices.has(r.config))
+    );
+  }
+
+  private _onToggleSelect(config: string) {
+    this.dispatchEvent(
+      new CustomEvent("toggle-select", {
+        detail: config,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onToggleAll() {
+    this.dispatchEvent(
+      new CustomEvent(this._allSelected ? "deselect-all" : "select-all", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (this.selectMode) {
+        this._onToggleSelect(device.configuration);
+      } else {
+        this._onRowClick(device);
+      }
+    }
+  }
+
+  private _openActionsMenu(e: MouseEvent, device: ConfiguredDevice) {
+    const btn = e.currentTarget as HTMLElement;
+    const rect = btn.getBoundingClientRect();
+    this._contextMenuDevice = device;
+    this._contextMenuPos = { x: rect.right, y: rect.bottom + 4 };
+    this._contextMenuAnchorRight = true;
+  }
+
+  private _onRowContextMenu(e: MouseEvent, device: ConfiguredDevice) {
+    e.preventDefault();
+    this._contextMenuDevice = device;
+    this._contextMenuPos = { x: e.clientX, y: e.clientY };
+    this._contextMenuAnchorRight = false;
+  }
+
+  private _closeContextMenu() {
+    this._contextMenuDevice = null;
+    this._contextMenuPos = null;
+    this._contextMenuAnchorRight = false;
+  }
+
+  private _forwardEvent(name: string, detail: unknown) {
+    this.dispatchEvent(new CustomEvent(name, { detail, bubbles: true, composed: true }));
+  }
+
+  private _enterSelectMode() {
+    this.dispatchEvent(
+      new CustomEvent("enter-select-mode", { bubbles: true, composed: true })
+    );
+  }
+
+  private _scrollToTop() {
+    this._scrollContainer?.scrollTo({ top: 0 });
   }
 
   private _onRowClick(device: ConfiguredDevice) {
@@ -447,7 +693,7 @@ export class ESPHomeDeviceTable extends LitElement {
         detail: device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }
