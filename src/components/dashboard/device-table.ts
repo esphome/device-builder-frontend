@@ -118,7 +118,7 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Stable callbacks ───
 
   private _handleSortingChange = (
-    updater: SortingState | ((old: SortingState) => SortingState),
+    updater: SortingState | ((old: SortingState) => SortingState)
   ) => {
     this._sorting = typeof updater === "function" ? updater(this._sorting) : updater;
     this.dispatchEvent(
@@ -126,12 +126,12 @@ export class ESPHomeDeviceTable extends LitElement {
         detail: this._sorting,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
   private _handleVisibilityChange = (
-    updater: VisibilityState | ((old: VisibilityState) => VisibilityState),
+    updater: VisibilityState | ((old: VisibilityState) => VisibilityState)
   ) => {
     this._columnVisibility =
       typeof updater === "function" ? updater(this._columnVisibility) : updater;
@@ -140,12 +140,12 @@ export class ESPHomeDeviceTable extends LitElement {
         detail: this._columnVisibility,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
   private _handlePaginationChange = (
-    updater: PaginationState | ((old: PaginationState) => PaginationState),
+    updater: PaginationState | ((old: PaginationState) => PaginationState)
   ) => {
     const current = { pageSize: this._pageSize, pageIndex: this._pageIndex };
     const next = typeof updater === "function" ? updater(current) : updater;
@@ -158,12 +158,16 @@ export class ESPHomeDeviceTable extends LitElement {
           detail: this._pageSize,
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     }
   };
 
-  private _globalFilterFn = (row: any, _columnId: string, filterValue: unknown): boolean => {
+  private _globalFilterFn = (
+    row: any,
+    _columnId: string,
+    filterValue: unknown
+  ): boolean => {
     const q = (filterValue as string).trim().toLowerCase();
     if (!q) return true;
     const d: DeviceRow = row.original;
@@ -239,15 +243,18 @@ export class ESPHomeDeviceTable extends LitElement {
     const toggleCols: ToggleableColumn[] = table
       .getAllColumns()
       .filter((c) => c.getCanHide())
-      .map((c) => ({ id: c.id, header: c.columnDef.header as string, visible: c.getIsVisible() }));
+      .map((c) => ({
+        id: c.id,
+        header: c.columnDef.header as string,
+        visible: c.getIsVisible(),
+      }));
 
     return html`
       ${this._renderControls(table, toggleCols)}
       <div class="table-wrap">
         <div class="table-scroll">
           <table role="grid">
-            ${this._renderThead(table)}
-            ${this._renderTbody(table, rows)}
+            ${this._renderThead(table)} ${this._renderTbody(table, rows)}
           </table>
         </div>
         <esphome-table-pagination
@@ -257,8 +264,14 @@ export class ESPHomeDeviceTable extends LitElement {
           total-rows=${table.getFilteredRowModel().rows.length}
           ?can-previous-page=${table.getCanPreviousPage()}
           ?can-next-page=${table.getCanNextPage()}
-          @page-change=${(e: CustomEvent<number>) => { table.setPageIndex(e.detail); this._scrollToTop(); }}
-          @page-size-change=${(e: CustomEvent<number>) => { table.setPageSize(e.detail); this._scrollToTop(); }}
+          @page-change=${(e: CustomEvent<number>) => {
+            table.setPageIndex(e.detail);
+            this._scrollToTop();
+          }}
+          @page-size-change=${(e: CustomEvent<number>) => {
+            table.setPageSize(e.detail);
+            this._scrollToTop();
+          }}
         ></esphome-table-pagination>
       </div>
       <esphome-table-row-menu
@@ -266,18 +279,54 @@ export class ESPHomeDeviceTable extends LitElement {
         .position=${this._contextMenuPos}
         ?anchor-right=${this._contextMenuAnchorRight}
         @menu-close=${this._closeContextMenu}
-        @edit-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("edit-device", e.detail); }}
-        @update-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("update-device", e.detail); }}
-        @open-logs=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("open-logs", e.detail); }}
-        @delete-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("delete-device", e.detail); }}
-        @validate-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("validate-device", e.detail); }}
-        @install-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("install-device", e.detail); }}
-        @show-api-key=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("show-api-key", e.detail); }}
-        @download-yaml=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("download-yaml", e.detail); }}
-        @rename-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("rename-device", e.detail); }}
-        @clean-build=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("clean-build", e.detail); }}
-        @download-elf=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("download-elf", e.detail); }}
-        @enter-select=${(e: CustomEvent<ConfiguredDevice>) => { e.stopPropagation(); this._enterSelectMode(e.detail); }}
+        @edit-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("edit-device", e.detail);
+        }}
+        @update-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("update-device", e.detail);
+        }}
+        @open-logs=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("open-logs", e.detail);
+        }}
+        @delete-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("delete-device", e.detail);
+        }}
+        @validate-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("validate-device", e.detail);
+        }}
+        @install-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("install-device", e.detail);
+        }}
+        @show-api-key=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("show-api-key", e.detail);
+        }}
+        @download-yaml=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("download-yaml", e.detail);
+        }}
+        @rename-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("rename-device", e.detail);
+        }}
+        @clean-build=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("clean-build", e.detail);
+        }}
+        @download-elf=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("download-elf", e.detail);
+        }}
+        @enter-select=${(e: CustomEvent<ConfiguredDevice>) => {
+          e.stopPropagation();
+          this._enterSelectMode(e.detail);
+        }}
       ></esphome-table-row-menu>
     `;
   }
@@ -289,7 +338,9 @@ export class ESPHomeDeviceTable extends LitElement {
         <div class="controls-right">
           <esphome-table-column-toggle
             .columns=${toggleCols}
-            @column-visibility-change=${(e: CustomEvent<{ id: string; visible: boolean }>) => {
+            @column-visibility-change=${(
+              e: CustomEvent<{ id: string; visible: boolean }>
+            ) => {
               table.getColumn(e.detail.id)?.toggleVisibility(e.detail.visible);
             }}
           ></esphome-table-column-toggle>
@@ -308,7 +359,12 @@ export class ESPHomeDeviceTable extends LitElement {
               ${this.selectMode
                 ? html`<th class="select-col" style="width:40px">
                     <span class="row-checkbox" @click=${this._onToggleAll}>
-                      <wa-icon library="mdi" name=${this._allSelected ? "checkbox-marked" : "checkbox-blank-outline"}></wa-icon>
+                      <wa-icon
+                        library="mdi"
+                        name=${this._allSelected
+                          ? "checkbox-marked"
+                          : "checkbox-blank-outline"}
+                      ></wa-icon>
                     </span>
                   </th>`
                 : nothing}
@@ -318,16 +374,28 @@ export class ESPHomeDeviceTable extends LitElement {
                 return html`
                   <th
                     role="columnheader"
-                    aria-sort=${sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"}
+                    aria-sort=${sorted === "asc"
+                      ? "ascending"
+                      : sorted === "desc"
+                        ? "descending"
+                        : "none"}
                     class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""}"
                     style="width:${header.getSize()}px"
                     @click=${canSort ? () => header.column.toggleSorting() : nothing}
                   >
                     <span class="th-content">
-                      ${header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
+                      ${header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
                       ${canSort
-                        ? html`<wa-icon class="sort-icon" library="mdi"
-                            name=${sorted === "asc" ? "chevron-up" : sorted === "desc" ? "chevron-down" : "unfold-more-horizontal"}
+                        ? html`<wa-icon
+                            class="sort-icon"
+                            library="mdi"
+                            name=${sorted === "asc"
+                              ? "chevron-up"
+                              : sorted === "desc"
+                                ? "chevron-down"
+                                : "unfold-more-horizontal"}
                           ></wa-icon>`
                         : nothing}
                     </span>
@@ -336,7 +404,7 @@ export class ESPHomeDeviceTable extends LitElement {
               })}
               <th class="actions-col"></th>
             </tr>
-          `,
+          `
         )}
       </thead>
     `;
@@ -351,32 +419,62 @@ export class ESPHomeDeviceTable extends LitElement {
                 <tr
                   role="row"
                   tabindex="0"
-                  class="${this.selectMode && this.selectedDevices.has(row.original.config) ? "selected" : ""}"
-                  @click=${() => this.selectMode ? this._onToggleSelect(row.original.config) : this._onRowClick(row.original._device)}
-                  @contextmenu=${(e: MouseEvent) => this._onRowContextMenu(e, row.original._device)}
-                  @keydown=${(e: KeyboardEvent) => this._onRowKeydown(e, row.original._device)}
+                  class="${this.selectMode &&
+                  this.selectedDevices.has(row.original.config)
+                    ? "selected"
+                    : ""}"
+                  @click=${() =>
+                    this.selectMode
+                      ? this._onToggleSelect(row.original.config)
+                      : this._onRowClick(row.original._device)}
+                  @contextmenu=${(e: MouseEvent) =>
+                    this._onRowContextMenu(e, row.original._device)}
+                  @keydown=${(e: KeyboardEvent) =>
+                    this._onRowKeydown(e, row.original._device)}
                 >
                   ${this.selectMode
                     ? html`<td role="gridcell" class="select-col">
                         <span class="row-checkbox">
-                          <wa-icon library="mdi" name=${this.selectedDevices.has(row.original.config) ? "checkbox-marked" : "checkbox-blank-outline"}></wa-icon>
+                          <wa-icon
+                            library="mdi"
+                            name=${this.selectedDevices.has(row.original.config)
+                              ? "checkbox-marked"
+                              : "checkbox-blank-outline"}
+                          ></wa-icon>
                         </span>
                       </td>`
                     : nothing}
-                  ${row.getVisibleCells().map(
-                    (cell: any) => html`<td role="gridcell">${flexRender(cell.column.columnDef.cell, cell.getContext())}</td>`,
-                  )}
+                  ${row
+                    .getVisibleCells()
+                    .map(
+                      (cell: any) =>
+                        html`<td role="gridcell">
+                          ${flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>`
+                    )}
                   <td role="gridcell" class="actions-col">
-                    <button class="actions-btn" @click=${(e: MouseEvent) => { e.stopPropagation(); this._openActionsMenu(e, row.original._device); }}>
+                    <button
+                      class="actions-btn"
+                      aria-label=${this._localize("dashboard.more_options")}
+                      @click=${(e: MouseEvent) => {
+                        e.stopPropagation();
+                        this._openActionsMenu(e, row.original._device);
+                      }}
+                    >
                       <wa-icon library="mdi" name="dots-vertical"></wa-icon>
                     </button>
                   </td>
                 </tr>
-              `,
+              `
             )
           : html`
               <tr>
-                <td colspan=${table.getVisibleLeafColumns().length + (this.selectMode ? 1 : 0) + 1} class="no-results">
+                <td
+                  colspan=${table.getVisibleLeafColumns().length +
+                  (this.selectMode ? 1 : 0) +
+                  1}
+                  class="no-results"
+                >
                   ${this._localize("dashboard.table_no_results")}
                 </td>
               </tr>
@@ -388,21 +486,32 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Event handlers ───
 
   private get _allSelected(): boolean {
-    return this._rows.length > 0 && this._rows.every((r) => this.selectedDevices.has(r.config));
+    return (
+      this._rows.length > 0 && this._rows.every((r) => this.selectedDevices.has(r.config))
+    );
   }
 
   private _onToggleSelect(config: string) {
-    this.dispatchEvent(new CustomEvent("toggle-select", { detail: config, bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent("toggle-select", { detail: config, bubbles: true, composed: true })
+    );
   }
 
   private _onToggleAll() {
-    this.dispatchEvent(new CustomEvent(this._allSelected ? "deselect-all" : "select-all", { bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent(this._allSelected ? "deselect-all" : "select-all", {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      this.selectMode ? this._onToggleSelect(device.configuration) : this._onRowClick(device);
+      this.selectMode
+        ? this._onToggleSelect(device.configuration)
+        : this._onRowClick(device);
     }
   }
 
@@ -431,7 +540,13 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _enterSelectMode(device: ConfiguredDevice) {
-    this.dispatchEvent(new CustomEvent("enter-select-mode", { detail: device.configuration, bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent("enter-select-mode", {
+        detail: device.configuration,
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private _scrollToTop() {
@@ -439,7 +554,9 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _onRowClick(device: ConfiguredDevice) {
-    this.dispatchEvent(new CustomEvent("row-click", { detail: device, bubbles: true, composed: true }));
+    this.dispatchEvent(
+      new CustomEvent("row-click", { detail: device, bubbles: true, composed: true })
+    );
   }
 }
 

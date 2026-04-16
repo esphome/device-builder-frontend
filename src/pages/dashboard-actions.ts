@@ -12,7 +12,7 @@ export function deleteDevice(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
   devices: ConfiguredDevice[],
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
   const name = device.friendly_name || device.name;
   toast.success(localize("dashboard.deleted", { name }), { richColors: true });
@@ -27,7 +27,7 @@ export async function deleteBulkDevices(
   configurations: string[],
   devices: ConfiguredDevice[],
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
   let results: BulkDeleteResult[];
   try {
@@ -52,44 +52,91 @@ export async function deleteBulkDevices(
   }
 }
 
-export function validateDevice(device: ConfiguredDevice, localize: LocalizeFunc) {
+export function validateDevice(
+  device: ConfiguredDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc
+) {
   const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_validate_success", { name }), { richColors: true });
+  api.validate(device.configuration, {
+    onResult: (result) => {
+      if (result.success) {
+        toast.success(localize("dashboard.action_validate_success", { name }), {
+          richColors: true,
+        });
+      } else {
+        toast.error(localize("dashboard.action_validate_failed", { name }), {
+          richColors: true,
+        });
+      }
+    },
+    onError: () => {
+      toast.error(localize("dashboard.action_validate_failed", { name }), {
+        richColors: true,
+      });
+    },
+  });
 }
 
 export function installDevice(device: ConfiguredDevice, localize: LocalizeFunc) {
   const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_install_success", { name }), { richColors: true });
+  toast.success(localize("dashboard.action_install_success", { name }), {
+    richColors: true,
+  });
 }
 
 export function cleanBuild(device: ConfiguredDevice, localize: LocalizeFunc) {
   const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_clean_success", { name }), { richColors: true });
+  toast.success(localize("dashboard.action_clean_success", { name }), {
+    richColors: true,
+  });
 }
 
 export function downloadElf(device: ConfiguredDevice, localize: LocalizeFunc) {
   const name = device.friendly_name || device.name;
-  toast.success(localize("dashboard.action_download_elf_success", { name }), { richColors: true });
+  toast.success(localize("dashboard.action_download_elf_success", { name }), {
+    richColors: true,
+  });
 }
 
-export async function downloadYaml(device: ConfiguredDevice, api: ESPHomeAPI) {
-  const yaml = await api.getConfig(device.configuration);
-  const blob = new Blob([yaml], { type: "text/yaml" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = device.configuration.endsWith(".yaml")
-    ? device.configuration
-    : `${device.configuration}.yaml`;
-  a.click();
-  URL.revokeObjectURL(url);
+export async function downloadYaml(
+  device: ConfiguredDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc
+) {
+  const name = device.friendly_name || device.name;
+  let url: string | undefined;
+  try {
+    const yaml = await api.getConfig(device.configuration);
+    const blob = new Blob([yaml], { type: "text/yaml" });
+    url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = device.configuration.endsWith(".yaml")
+      ? device.configuration
+      : `${device.configuration}.yaml`;
+    a.click();
+  } catch {
+    toast.error(localize("dashboard.action_download_yaml_failed", { name }), {
+      richColors: true,
+    });
+  } finally {
+    if (url) {
+      URL.revokeObjectURL(url);
+    }
+  }
 }
 
-export async function extractApiKey(device: ConfiguredDevice, api: ESPHomeAPI): Promise<string> {
+export async function extractApiKey(
+  device: ConfiguredDevice,
+  api: ESPHomeAPI
+): Promise<string> {
   try {
     const yaml = await api.getConfig(device.configuration);
     // Look for api: encryption: key: "..."
-    const match = yaml.match(/api:\s[\s\S]*?encryption:\s[\s\S]*?key:\s*["']([^"']+)["']/);
+    const match = yaml.match(
+      /api:\s[\s\S]*?encryption:\s[\s\S]*?key:\s*["']([^"']+)["']/
+    );
     return match?.[1] ?? "";
   } catch {
     return "";
@@ -113,7 +160,9 @@ export function streamSerialToDialog(port: any, dialog: any) {
           dialog._lines = [...dialog._lines, line];
         }
       }
-    } catch { /* Port closed */ }
+    } catch {
+      /* Port closed */
+    }
   };
   readLoop();
 }
@@ -122,7 +171,7 @@ export function compileAndUpload(
   configuration: string,
   name: string,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<void> {
   return new Promise((resolve) => {
     api.compile(configuration, {
@@ -134,25 +183,33 @@ export function compileAndUpload(
             onResult: (d: { success: boolean; code: number }) => {
               toast[d.success ? "success" : "error"](
                 localize(
-                  d.success ? "dashboard.update_device_success" : "dashboard.update_device_failed",
-                  { name },
+                  d.success
+                    ? "dashboard.update_device_success"
+                    : "dashboard.update_device_failed",
+                  { name }
                 ),
-                { richColors: true },
+                { richColors: true }
               );
               resolve();
             },
             onError: () => {
-              toast.error(localize("dashboard.update_device_failed", { name }), { richColors: true });
+              toast.error(localize("dashboard.update_device_failed", { name }), {
+                richColors: true,
+              });
               resolve();
             },
           });
         } else {
-          toast.error(localize("dashboard.update_device_failed", { name }), { richColors: true });
+          toast.error(localize("dashboard.update_device_failed", { name }), {
+            richColors: true,
+          });
           resolve();
         }
       },
       onError: () => {
-        toast.error(localize("dashboard.update_device_failed", { name }), { richColors: true });
+        toast.error(localize("dashboard.update_device_failed", { name }), {
+          richColors: true,
+        });
         resolve();
       },
     });

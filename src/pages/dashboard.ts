@@ -279,10 +279,10 @@ export class ESPHomePageDashboard extends LitElement {
               @edit-device=${() => editDevice(device)}
               @update-device=${() => this._openUpdate(device)}
               @open-logs=${() => this._openLogs(device)}
-              @validate-device=${() => validateDevice(device, this._localize)}
+              @validate-device=${() => validateDevice(device, this._api, this._localize)}
               @install-device=${() => installDevice(device, this._localize)}
               @show-api-key=${() => this._showApiKey(device)}
-              @download-yaml=${() => downloadYaml(device, this._api)}
+              @download-yaml=${() => downloadYaml(device, this._api, this._localize)}
               @rename-device=${() => this._openRename(device)}
               @clean-build=${() => cleanBuild(device, this._localize)}
               @download-elf=${() => downloadElf(device, this._localize)}
@@ -316,10 +316,10 @@ export class ESPHomePageDashboard extends LitElement {
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
         @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openUpdate(e.detail)}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
-        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => validateDevice(e.detail, this._localize)}
+        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => validateDevice(e.detail, this._api, this._localize)}
         @install-device=${(e: CustomEvent<ConfiguredDevice>) => installDevice(e.detail, this._localize)}
         @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => this._showApiKey(e.detail)}
-        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api)}
+        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => cleanBuild(e.detail, this._localize)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => downloadElf(e.detail, this._localize)}
