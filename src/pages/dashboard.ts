@@ -7,7 +7,7 @@ import {
   mdiViewGrid,
   mdiWeb,
 } from "@mdi/js";
-import { LitElement, css, html, type PropertyValues } from "lit";
+import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -23,6 +23,12 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import {
+  compileAndUpload,
+  deleteDevice,
+  editDevice,
+} from "./dashboard-actions.js";
+import { dashboardStyles } from "./dashboard-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/confirm-dialog.js";
@@ -75,33 +81,18 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
-  @state()
-  private _showDiscovered = false;
-
-  @state()
-  private _search = "";
-
-  @state()
-  private _logsMethodOpen = false;
-
-  @state()
-  private _logsMethodDevice: ConfiguredDevice | null = null;
-
-  @state()
-  private _selectMode = false;
-
-  @state()
-  private _selectedDevices = new Set<string>();
+  @state() private _showDiscovered = false;
+  @state() private _search = "";
+  @state() private _logsMethodOpen = false;
+  @state() private _logsMethodDevice: ConfiguredDevice | null = null;
+  @state() private _selectMode = false;
+  @state() private _selectedDevices = new Set<string>();
+  @state() private _drawerOpen = false;
+  @state() private _drawerDevice: ConfiguredDevice | null = null;
 
   @state()
   private _view: DashboardView =
     (localStorage.getItem("esphome-dashboard-view") as DashboardView) || "cards";
-
-  @state()
-  private _drawerOpen = false;
-
-  @state()
-  private _drawerDevice: ConfiguredDevice | null = null;
 
   private _onEnterSelectMode = (configuration?: string) => {
     this._selectMode = true;
@@ -127,706 +118,209 @@ export class ESPHomePageDashboard extends LitElement {
     window.removeEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
   }
 
-  @query("esphome-confirm-dialog")
-  private _confirmDialog!: ESPHomeConfirmDialog;
+  @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
+  @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
+  @query("esphome-update-dialog") private _updateDialog!: ESPHomeUpdateDialog;
+  @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
 
-  @query("esphome-create-config-dialog")
-  private _createDialog!: ESPHomeCreateConfigDialog;
-
-  @query("esphome-update-dialog")
-  private _updateDialog!: ESPHomeUpdateDialog;
-
-  @query("esphome-logs-dialog")
-  private _logsDialog!: ESPHomeLogsDialog;
-
-  static styles = [
-    espHomeStyles,
-    css`
-      :host {
-        display: flex;
-        flex-direction: column;
-        height: calc(100vh - var(--esphome-header-height));
-        overflow: hidden;
-      }
-
-      :host([view="cards"]) {
-        height: auto;
-        overflow: visible;
-      }
-
-      /* ─── Discovered Banner ─── */
-
-      @keyframes banner-slide-in {
-        from {
-          transform: translateY(-100%);
-        }
-        to {
-          transform: translateY(0);
-        }
-      }
-
-      .discovered-banner-wrap {
-        display: flex;
-        justify-content: center;
-        overflow: hidden;
-        flex-shrink: 0;
-      }
-
-      .discovered-banner {
-        display: inline-flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: var(--wa-space-xs);
-        padding: var(--wa-space-xs) var(--wa-space-l) var(--wa-space-s);
-        background: var(--esphome-secondary);
-        border-radius: 0 0 var(--wa-border-radius-l) var(--wa-border-radius-l);
-        font-size: var(--wa-font-size-s);
-        color: var(--esphome-on-primary);
-        animation: banner-slide-in 1s cubic-bezier(0.4, 0, 0.2, 1) both;
-      }
-
-      .discovered-banner wa-icon {
-        font-size: var(--wa-font-size-m);
-        color: var(--esphome-on-primary);
-        margin-right: 10px;
-      }
-      .discovered-banner a {
-        color: var(--esphome-primary-light);
-        cursor: pointer;
-        text-decoration: underline;
-        font-weight: var(--wa-font-weight-bold);
-        font-size: var(--wa-font-size-2xs);
-        margin-left: var(--wa-space-4xl);
-        opacity: 0.85;
-      }
-      .discovered-banner a:hover {
-        opacity: 1;
-      }
-      .discovered-banner span {
-        font-weight: var(--wa-font-weight-bold);
-        font-size: var(--wa-font-size-xs);
-      }
-      .discovered-banner-empty {
-        margin-right: var(--wa-space-4xl);
-      }
-
-      /* ─── Card Grid ─── */
-
-      .devices-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, 300px);
-        gap: var(--wa-space-l);
-        padding: var(--wa-space-l);
-      }
-
-      /* ─── Search toolbar ─── */
-
-      .toolbar {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        padding: var(--wa-space-l) var(--wa-space-l) 0;
-        flex-shrink: 0;
-      }
-      .toolbar-row {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-s);
-      }
-
-      .search-wrap {
-        position: relative;
-        max-width: 380px;
-        flex: 1;
-      }
-      .search-icon {
-        position: absolute;
-        left: 12px;
-        top: 50%;
-        transform: translateY(-50%);
-        font-size: 18px;
-        color: var(--wa-color-text-quiet);
-        pointer-events: none;
-        display: flex;
-        align-items: center;
-      }
-      .search-input {
-        width: 100%;
-        box-sizing: border-box;
-        padding: 9px 14px 9px 38px;
-        font-size: var(--wa-font-size-s);
-        font-family: inherit;
-        color: var(--wa-color-text-normal);
-        background: var(--wa-color-surface-raised);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
-        outline: none;
-        transition:
-          border-color 0.15s,
-          box-shadow 0.15s;
-      }
-      .search-input::placeholder {
-        color: var(--wa-color-text-quiet);
-      }
-      .search-input:focus {
-        border-color: var(--esphome-primary);
-        box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
-      }
-      .device-count {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        padding-left: 2px;
-      }
-      .device-count strong {
-        color: var(--wa-color-text-normal);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      /* ─── View Toggle ─── */
-
-      .view-toggle {
-        display: inline-flex;
-        border-radius: var(--wa-border-radius-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        overflow: hidden;
-        flex-shrink: 0;
-      }
-
-      .view-toggle-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 36px;
-        height: 36px;
-        border: none;
-        background: var(--wa-color-surface-raised);
-        color: var(--wa-color-text-quiet);
-        cursor: pointer;
-        transition:
-          background 0.12s,
-          color 0.12s;
-        padding: 0;
-      }
-
-      .view-toggle-btn + .view-toggle-btn {
-        border-left: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .view-toggle-btn:hover {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-      }
-
-      .view-toggle-btn.active {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .view-toggle-btn.active:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-      }
-
-      .view-toggle-btn wa-icon {
-        font-size: 18px;
-      }
-
-      /* ─── Empty search state ─── */
-
-      .empty-search {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-4xl) var(--wa-space-l);
-        text-align: center;
-      }
-      .empty-search-icon {
-        font-size: 48px;
-        color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
-        line-height: 1;
-      }
-      .empty-search-title {
-        margin: 0;
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-      .empty-search-desc {
-        margin: 0;
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        max-width: 320px;
-      }
-      .empty-search-clear {
-        margin-top: var(--wa-space-xs);
-        background: none;
-        border: var(--wa-border-width-s) solid var(--esphome-primary);
-        color: var(--esphome-primary);
-        padding: 6px 16px;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-family: inherit;
-        font-weight: var(--wa-font-weight-bold);
-        cursor: pointer;
-        transition: background 0.12s;
-      }
-      .empty-search-clear:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
-      }
-
-      /* ─── Skeleton ─── */
-
-      @keyframes skeleton-shimmer {
-        from {
-          background-position: -400px 0;
-        }
-        to {
-          background-position: 400px 0;
-        }
-      }
-      .skeleton-card {
-        border-radius: var(--wa-border-radius-l);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-raised);
-        overflow: hidden;
-        min-height: 130px;
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m);
-      }
-      .skeleton-line {
-        border-radius: var(--wa-border-radius-m);
-        background: linear-gradient(
-          90deg,
-          var(--wa-color-surface-border) 25%,
-          color-mix(
-              in srgb,
-              var(--wa-color-surface-border),
-              var(--wa-color-surface-raised) 60%
-            )
-            50%,
-          var(--wa-color-surface-border) 75%
-        );
-        background-size: 800px 100%;
-        animation: skeleton-shimmer 1.4s infinite linear;
-      }
-      .skeleton-line--title {
-        height: 18px;
-        width: 55%;
-      }
-      .skeleton-line--subtitle {
-        height: 13px;
-        width: 35%;
-      }
-      .skeleton-line--actions {
-        height: 30px;
-        width: 100%;
-        margin-top: auto;
-      }
-
-      /* ─── Table Skeleton ─── */
-
-      .skeleton-table {
-        margin: var(--wa-space-l);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
-        overflow: hidden;
-        background: var(--wa-color-surface-raised);
-        flex: 1;
-        min-height: 0;
-      }
-
-      .skeleton-table-header {
-        display: flex;
-        gap: var(--wa-space-l);
-        padding: 14px var(--wa-space-l);
-        background: var(--wa-color-surface-lowered);
-        border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .skeleton-table-row {
-        display: flex;
-        gap: var(--wa-space-l);
-        padding: 14px var(--wa-space-l);
-        border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .skeleton-table-row:last-child {
-        border-bottom: none;
-      }
-
-      .skeleton-line--header {
-        height: 12px;
-        width: 100px;
-      }
-
-      .skeleton-line--cell {
-        height: 14px;
-        flex: 1;
-      }
-
-      .skeleton-line--cell:first-child {
-        max-width: 16px;
-        border-radius: 50%;
-        height: 16px;
-        flex: none;
-      }
-
-      /* ─── Add New Device Card ─── */
-
-      .add-device-card {
-        border: 2px dashed color-mix(in srgb, var(--esphome-primary), transparent 50%);
-        border-radius: var(--wa-border-radius-l);
-        padding: var(--wa-space-xl) var(--wa-space-l);
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: var(--wa-space-m);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
-        min-height: 200px;
-        cursor: pointer;
-        transition:
-          border-color 0.15s,
-          background 0.15s,
-          transform 0.15s;
-      }
-      .add-device-card:hover {
-        border-color: var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
-        transform: translateY(-2px);
-      }
-      .add-device-icon-wrap {
-        width: 52px;
-        height: 52px;
-        border-radius: 50%;
-        background: var(--esphome-primary);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 50%);
-        transition:
-          box-shadow 0.15s,
-          transform 0.15s;
-      }
-      .add-device-card:hover .add-device-icon-wrap {
-        box-shadow: 0 6px 20px color-mix(in srgb, var(--esphome-primary), transparent 35%);
-        transform: scale(1.06);
-      }
-      .add-device-icon-wrap wa-icon {
-        font-size: 26px;
-        color: var(--esphome-on-primary);
-      }
-      .add-device-label {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--esphome-primary);
-      }
-      .add-device-hint {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        text-align: center;
-      }
-      .esphome-web-link {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-2xs);
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        text-decoration: none;
-        margin-top: var(--wa-space-2xs);
-      }
-      .esphome-web-link wa-icon {
-        font-size: 14px;
-      }
-      .esphome-web-link:hover {
-        color: var(--esphome-primary);
-      }
-
-      /* ─── Table Create Button ─── */
-
-      .table-create-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 0 14px;
-        height: 36px;
-        box-sizing: border-box;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-        transition: background 0.12s;
-      }
-
-      .table-create-btn:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-      }
-
-      .table-create-btn wa-icon {
-        font-size: 15px;
-      }
-
-      /* ─── FAB ─── */
-
-      .fab-container {
-        position: fixed;
-        bottom: var(--wa-space-l);
-        right: var(--wa-space-xl);
-        z-index: 10;
-      }
-      .fab-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-        padding: 12px 22px;
-        border-radius: 999px;
-        border: none;
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        box-shadow:
-          0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 40%),
-          0 2px 4px rgba(0, 0, 0, 0.12);
-        transition:
-          transform 0.15s,
-          box-shadow 0.15s,
-          background 0.15s;
-        letter-spacing: 0.01em;
-      }
-      .fab-btn:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-        transform: translateY(-2px);
-        box-shadow:
-          0 8px 24px color-mix(in srgb, var(--esphome-primary), transparent 30%),
-          0 4px 8px rgba(0, 0, 0, 0.14);
-      }
-      .fab-btn:active {
-        transform: translateY(0);
-      }
-      .fab-btn wa-icon {
-        font-size: 18px;
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, dashboardStyles];
 
   protected render() {
+    if (!this._devicesLoaded) {
+      return this._view === "table" ? this._renderTableSkeleton() : this._renderCardSkeleton();
+    }
+
     const q = this._search.trim().toLowerCase();
     const filtered = q
       ? this._devices.filter(
           (d) =>
             (d.friendly_name || d.name).toLowerCase().includes(q) ||
-            d.configuration.toLowerCase().includes(q)
+            d.configuration.toLowerCase().includes(q),
         )
       : this._devices;
-    const total = this._devices.length;
-
-    if (!this._devicesLoaded) {
-      return this._view === "table"
-        ? this._renderTableSkeleton()
-        : html`
-            <div class="devices-grid">
-              ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(
-                () => html`
-                  <div class="skeleton-card" aria-hidden="true">
-                    <div class="skeleton-line skeleton-line--title"></div>
-                    <div class="skeleton-line skeleton-line--subtitle"></div>
-                    <div class="skeleton-line skeleton-line--actions"></div>
-                  </div>
-                `
-              )}
-            </div>
-          `;
-    }
 
     return html`
-      ${this._importableDevices.length > 0
-        ? html`
-            <div class="discovered-banner-wrap">
-              <div class="discovered-banner">
-                <div class="discovered-banner-empty"></div>
-                <div style="justify-content: center; display: flex; align-items: center">
-                  <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
-                  <span
-                    >${this._localize("dashboard.discovered_count", {
-                      count: this._importableDevices.length,
-                    })}</span
-                  >
-                </div>
-                <a
-                  @click=${() => {
-                    this._showDiscovered = !this._showDiscovered;
-                  }}
-                  >${this._localize("dashboard.show")}</a
-                >
-              </div>
-            </div>
-          `
+      ${this._renderBanner()}
+      ${this._devices.length > 0 && this._view === "cards"
+        ? this._renderToolbar(filtered.length, this._devices.length)
         : ""}
-      ${total > 0 && this._view === "cards"
-        ? this._renderToolbar(filtered.length, total)
-        : ""}
-      ${filtered.length === 0 && q && this._view === "cards"
-        ? html`
-            <div class="empty-search">
-              <wa-icon class="empty-search-icon" library="mdi" name="magnify"></wa-icon>
-              <h3 class="empty-search-title">
-                ${this._localize("dashboard.no_results_title")}
-              </h3>
-              <p class="empty-search-desc">
-                ${this._localize("dashboard.no_results_desc", {
-                  query: this._search.trim(),
-                })}
-              </p>
-              <button
-                class="empty-search-clear"
-                @click=${() => {
-                  this._search = "";
-                }}
-              >
-                ${this._localize("dashboard.no_results_clear")}
-              </button>
-            </div>
-          `
-        : ""}
-      ${this._view === "cards"
-        ? html`
-            <div class="devices-grid">
-              ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
-              ${filtered.map((device) => {
-                const online = this._deviceStates[device.configuration] ?? false;
-                return html`
-                  <esphome-device-card
-                    .name=${device.friendly_name || device.name}
-                    .configuration=${device.configuration}
-                    ?online=${online}
-                    ?select-mode=${this._selectMode}
-                    ?selected=${this._selectedDevices.has(device.configuration)}
-                    @edit-device=${() => this._editDevice(device)}
-                    @update-device=${() => this._openUpdate(device)}
-                    @open-logs=${() => this._openLogs(device)}
-                    @delete-device=${() => this._deleteDevice(device)}
-                    @toggle-select=${() => this._toggleDevice(device.configuration)}
-                  ></esphome-device-card>
-                `;
-              })}
-            </div>
-          `
-        : html`
-            <esphome-device-table
-              .devices=${this._devices}
-              .deviceStates=${this._deviceStates}
-              .search=${this._search}
+      ${filtered.length === 0 && q && this._view === "cards" ? this._renderEmptySearch() : ""}
+      ${this._view === "cards" ? this._renderCardGrid(filtered) : this._renderTable()}
+      ${this._renderDrawer()}
+      ${this._renderSelectBarOrFab()}
+      ${this._renderDialogs()}
+    `;
+  }
+
+  // ─── Render helpers ───
+
+  private _renderBanner() {
+    if (this._importableDevices.length === 0) return "";
+    return html`
+      <div class="discovered-banner-wrap">
+        <div class="discovered-banner">
+          <div class="discovered-banner-empty"></div>
+          <div style="justify-content: center; display: flex; align-items: center">
+            <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
+            <span>${this._localize("dashboard.discovered_count", { count: this._importableDevices.length })}</span>
+          </div>
+          <a @click=${() => { this._showDiscovered = !this._showDiscovered; }}>${this._localize("dashboard.show")}</a>
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderViewToggle() {
+    const view = this._view;
+    return html`
+      <div class="view-toggle">
+        <button class="view-toggle-btn ${view === "cards" ? "active" : ""}" @click=${() => this._setView("cards")}>
+          <wa-icon library="mdi" name="view-grid"></wa-icon>
+        </button>
+        <button class="view-toggle-btn ${view === "table" ? "active" : ""}" @click=${() => this._setView("table")}>
+          <wa-icon library="mdi" name="table"></wa-icon>
+        </button>
+      </div>
+    `;
+  }
+
+  private _renderToolbar(matchCount: number, total: number) {
+    const q = this._search.trim();
+    const unit = matchCount === 1 ? this._localize("dashboard.device_singular") : this._localize("dashboard.device_plural");
+    const suffix = q ? " " + this._localize("dashboard.search_of", { total }) : "";
+    return html`
+      <div class="toolbar">
+        <div class="toolbar-row">
+          <div class="search-wrap">
+            <span class="search-icon"><wa-icon library="mdi" name="magnify"></wa-icon></span>
+            <input class="search-input" type="search"
+              placeholder=${this._localize("dashboard.search_placeholder")}
+              .value=${this._search}
+              @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }}
+            />
+          </div>
+          ${this._renderViewToggle()}
+        </div>
+        <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+      </div>
+    `;
+  }
+
+  private _renderEmptySearch() {
+    return html`
+      <div class="empty-search">
+        <wa-icon class="empty-search-icon" library="mdi" name="magnify"></wa-icon>
+        <h3 class="empty-search-title">${this._localize("dashboard.no_results_title")}</h3>
+        <p class="empty-search-desc">${this._localize("dashboard.no_results_desc", { query: this._search.trim() })}</p>
+        <button class="empty-search-clear" @click=${() => { this._search = ""; }}>${this._localize("dashboard.no_results_clear")}</button>
+      </div>
+    `;
+  }
+
+  private _renderCardGrid(filtered: ConfiguredDevice[]) {
+    return html`
+      <div class="devices-grid">
+        ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
+        ${filtered.map((device) => {
+          const online = this._deviceStates[device.configuration] ?? false;
+          return html`
+            <esphome-device-card
+              .name=${device.friendly_name || device.name}
+              .configuration=${device.configuration}
+              ?online=${online}
               ?select-mode=${this._selectMode}
-              .selectedDevices=${this._selectedDevices}
-              @row-click=${(e: CustomEvent<ConfiguredDevice>) => {
-                this._drawerDevice = e.detail;
-                this._drawerOpen = true;
-              }}
-              @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
-              @select-all=${() => {
-                this._selectedDevices = new Set(
-                  this._devices.map((d) => d.configuration)
-                );
-              }}
-              @deselect-all=${() => {
-                this._selectedDevices = new Set();
-              }}
-              @edit-device=${(e: CustomEvent<ConfiguredDevice>) =>
-                this._editDevice(e.detail)}
-              @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
-                this._openUpdate(e.detail)}
-              @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
-              @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
-                this._deleteDevice(e.detail)}
-              @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
-            >
-              <div slot="toolbar" class="toolbar-row">
-                <div class="search-wrap">
-                  <span class="search-icon"
-                    ><wa-icon library="mdi" name="magnify"></wa-icon
-                  ></span>
-                  <input
-                    class="search-input"
-                    type="search"
-                    placeholder=${this._localize("dashboard.search_placeholder")}
-                    .value=${this._search}
-                    @input=${(e: Event) => {
-                      this._search = (e.target as HTMLInputElement).value;
-                    }}
-                  />
-                </div>
-                ${this._renderViewToggle()}
-              </div>
-              <button
-                slot="actions"
-                class="table-create-btn"
-                @click=${() => this._createDialog.open()}
-              >
-                <wa-icon library="mdi" name="plus"></wa-icon>
-                ${this._localize("dashboard.create_device")}
-              </button>
-            </esphome-device-table>
-          `}
+              ?selected=${this._selectedDevices.has(device.configuration)}
+              @edit-device=${() => editDevice(device)}
+              @update-device=${() => this._openUpdate(device)}
+              @open-logs=${() => this._openLogs(device)}
+              @delete-device=${() => deleteDevice(device, this._api, this._devices, this._localize)}
+              @toggle-select=${() => this._toggleDevice(device.configuration)}
+            ></esphome-device-card>
+          `;
+        })}
+      </div>
+    `;
+  }
+
+  private _renderTable() {
+    return html`
+      <esphome-device-table
+        .devices=${this._devices}
+        .deviceStates=${this._deviceStates}
+        .search=${this._search}
+        ?select-mode=${this._selectMode}
+        .selectedDevices=${this._selectedDevices}
+        @row-click=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerDevice = e.detail; this._drawerOpen = true; }}
+        @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
+        @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
+        @deselect-all=${() => { this._selectedDevices = new Set(); }}
+        @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openUpdate(e.detail)}
+        @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
+        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => deleteDevice(e.detail, this._api, this._devices, this._localize)}
+        @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
+      >
+        <div slot="toolbar" class="toolbar-row">
+          <div class="search-wrap">
+            <span class="search-icon"><wa-icon library="mdi" name="magnify"></wa-icon></span>
+            <input class="search-input" type="search"
+              placeholder=${this._localize("dashboard.search_placeholder")}
+              .value=${this._search}
+              @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }}
+            />
+          </div>
+          ${this._renderViewToggle()}
+        </div>
+        <button slot="actions" class="table-create-btn" @click=${() => this._createDialog.open()}>
+          <wa-icon library="mdi" name="plus"></wa-icon>
+          ${this._localize("dashboard.create_device")}
+        </button>
+      </esphome-device-table>
+    `;
+  }
+
+  private _renderDrawer() {
+    return html`
       <esphome-device-drawer
         ?open=${this._drawerOpen}
         .device=${this._drawerDevice}
-        @drawer-close=${() => {
-          this._drawerOpen = false;
-        }}
-        @edit-device=${(e: CustomEvent) => {
-          this._drawerOpen = false;
-          this._editDevice(e.detail);
-        }}
-        @update-device=${(e: CustomEvent) => {
-          this._drawerOpen = false;
-          this._openUpdate(e.detail);
-        }}
-        @open-logs=${(e: CustomEvent) => {
-          this._drawerOpen = false;
-          this._openLogs(e.detail);
-        }}
+        @drawer-close=${() => { this._drawerOpen = false; }}
+        @edit-device=${(e: CustomEvent) => { this._drawerOpen = false; editDevice(e.detail); }}
+        @update-device=${(e: CustomEvent) => { this._drawerOpen = false; this._openUpdate(e.detail); }}
+        @open-logs=${(e: CustomEvent) => { this._drawerOpen = false; this._openLogs(e.detail); }}
       ></esphome-device-drawer>
-      ${this._selectMode
-        ? html`
-            <esphome-select-bar
-              selected-count=${this._selectedDevices.size}
-              total-count=${this._devices.length}
-              @select-all=${() => {
-                this._selectedDevices = new Set(
-                  this._devices.map((d) => d.configuration)
-                );
-              }}
-              @deselect-all=${() => {
-                this._selectedDevices = new Set();
-              }}
-              @cancel=${() => {
-                this._selectMode = false;
-                this._selectedDevices = new Set();
-              }}
-              @update-selected=${this._updateSelected}
-              @delete-selected=${this._deleteSelected}
-            ></esphome-select-bar>
-          `
-        : this._view === "cards"
-          ? html`
-              <div class="fab-container">
-                <button class="fab-btn" @click=${() => this._createDialog.open()}>
-                  <wa-icon library="mdi" name="plus"></wa-icon>
-                  ${this._localize("dashboard.create_device")}
-                </button>
-              </div>
-            `
-          : ""}
+    `;
+  }
+
+  private _renderSelectBarOrFab() {
+    if (this._selectMode) {
+      return html`
+        <esphome-select-bar
+          selected-count=${this._selectedDevices.size}
+          total-count=${this._devices.length}
+          @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
+          @deselect-all=${() => { this._selectedDevices = new Set(); }}
+          @cancel=${() => { this._selectMode = false; this._selectedDevices = new Set(); }}
+          @update-selected=${this._updateSelected}
+          @delete-selected=${this._deleteSelected}
+        ></esphome-select-bar>
+      `;
+    }
+    if (this._view === "cards") {
+      return html`
+        <div class="fab-container">
+          <button class="fab-btn" @click=${() => this._createDialog.open()}>
+            <wa-icon library="mdi" name="plus"></wa-icon>
+            ${this._localize("dashboard.create_device")}
+          </button>
+        </div>
+      `;
+    }
+    return "";
+  }
+
+  private _renderDialogs() {
+    return html`
       <esphome-confirm-dialog
         heading=${this._localize("dashboard.delete_selected_title")}
         message=${this._localize("dashboard.delete_selected_desc", { count: this._selectedDevices.size })}
@@ -839,92 +333,37 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-logs-method-dialog
         ?open=${this._logsMethodOpen}
-        @close=${() => {
-          this._logsMethodOpen = false;
-        }}
+        @close=${() => { this._logsMethodOpen = false; }}
         @web-serial=${this._openLogsWebSerial}
       ></esphome-logs-method-dialog>
     `;
   }
 
-  private _renderViewToggle() {
-    const view = this._view;
+  private _renderCardSkeleton() {
     return html`
-      <div class="view-toggle">
-        <button
-          class="view-toggle-btn ${view === "cards" ? "active" : ""}"
-          @click=${() => this._setView("cards")}
-        >
-          <wa-icon library="mdi" name="view-grid"></wa-icon>
-        </button>
-        <button
-          class="view-toggle-btn ${view === "table" ? "active" : ""}"
-          @click=${() => this._setView("table")}
-        >
-          <wa-icon library="mdi" name="table"></wa-icon>
-        </button>
-      </div>
-    `;
-  }
-
-  private _renderToolbar(matchCount: number, total: number) {
-    const q = this._search.trim();
-    const unit =
-      matchCount === 1
-        ? this._localize("dashboard.device_singular")
-        : this._localize("dashboard.device_plural");
-    const suffix = q ? " " + this._localize("dashboard.search_of", { total }) : "";
-    return html`
-      <div class="toolbar">
-        <div class="toolbar-row">
-          <div class="search-wrap">
-            <span class="search-icon"
-              ><wa-icon library="mdi" name="magnify"></wa-icon
-            ></span>
-            <input
-              class="search-input"
-              type="search"
-              placeholder=${this._localize("dashboard.search_placeholder")}
-              .value=${this._search}
-              @input=${(e: Event) => {
-                this._search = (e.target as HTMLInputElement).value;
-              }}
-            />
+      <div class="devices-grid">
+        ${Array.from({ length: 10 }, () => html`
+          <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton-line skeleton-line--title"></div>
+            <div class="skeleton-line skeleton-line--subtitle"></div>
+            <div class="skeleton-line skeleton-line--actions"></div>
           </div>
-          ${this._renderViewToggle()}
-        </div>
-        <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+        `)}
       </div>
     `;
-  }
-
-  private _setView(view: DashboardView) {
-    this._view = view;
-    localStorage.setItem("esphome-dashboard-view", view);
   }
 
   private _renderTableSkeleton() {
-    const cols = 5;
-    const rows = 8;
     return html`
       <div class="skeleton-table" aria-hidden="true">
         <div class="skeleton-table-header">
-          ${Array.from(
-            { length: cols },
-            () => html`<div class="skeleton-line skeleton-line--header"></div>`
-          )}
+          ${Array.from({ length: 5 }, () => html`<div class="skeleton-line skeleton-line--header"></div>`)}
         </div>
-        ${Array.from(
-          { length: rows },
-          () => html`
-            <div class="skeleton-table-row">
-              ${Array.from(
-                { length: cols },
-                () => html`<div class="skeleton-line skeleton-line--cell"></div>`
-              )}
-            </div>
-          `
-        )}
+        ${Array.from({ length: 8 }, () => html`
+          <div class="skeleton-table-row">
+            ${Array.from({ length: 5 }, () => html`<div class="skeleton-line skeleton-line--cell"></div>`)}
+          </div>
+        `)}
       </div>
     `;
   }
@@ -932,47 +371,21 @@ export class ESPHomePageDashboard extends LitElement {
   private _renderAddDeviceCard() {
     return html`
       <div class="add-device-card" @click=${() => this._createDialog.open()}>
-        <div class="add-device-icon-wrap">
-          <wa-icon library="mdi" name="plus"></wa-icon>
-        </div>
-        <span class="add-device-label"
-          >${this._localize("dashboard.add_new_device")}</span
-        >
-        <span class="add-device-hint"
-          >${this._localize("dashboard.add_new_device_hint")}</span
-        >
-        <a
-          class="esphome-web-link"
-          href="https://web.esphome.io"
-          target="_blank"
-          rel="noopener"
-          @click=${(e: Event) => e.stopPropagation()}
-        >
-          <wa-icon library="mdi" name="web"></wa-icon> ${this._localize(
-            "dashboard.esphome_web"
-          )}
+        <div class="add-device-icon-wrap"><wa-icon library="mdi" name="plus"></wa-icon></div>
+        <span class="add-device-label">${this._localize("dashboard.add_new_device")}</span>
+        <span class="add-device-hint">${this._localize("dashboard.add_new_device_hint")}</span>
+        <a class="esphome-web-link" href="https://web.esphome.io" target="_blank" rel="noopener" @click=${(e: Event) => e.stopPropagation()}>
+          <wa-icon library="mdi" name="web"></wa-icon> ${this._localize("dashboard.esphome_web")}
         </a>
       </div>
     `;
   }
 
-  // ─── Device Actions ────────────────────────────────────────
+  // ─── Actions ───
 
-  private _editDevice(device: ConfiguredDevice) {
-    window.history.pushState({}, "", `/device/${device.configuration}`);
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }
-
-  private _deleteDevice(device: ConfiguredDevice) {
-    const name = device.friendly_name || device.name;
-    toast.success(this._localize("dashboard.deleted", { name }), { richColors: true });
-    this._api.deleteDevice(device.configuration).catch(() => {
-      if (this._devices.some((d) => d.configuration === device.configuration)) {
-        toast.error(this._localize("dashboard.delete_failed", { name }), {
-          richColors: true,
-        });
-      }
-    });
+  private _setView(view: DashboardView) {
+    this._view = view;
+    localStorage.setItem("esphome-dashboard-view", view);
   }
 
   private _openUpdate(device: ConfiguredDevice) {
@@ -996,9 +409,7 @@ export class ESPHomePageDashboard extends LitElement {
   private async _openLogsWebSerial() {
     if (!this._logsMethodDevice) return;
     if (!("serial" in navigator)) {
-      toast.error(this._localize("dashboard.logs_web_serial_unsupported"), {
-        richColors: true,
-      });
+      toast.error(this._localize("dashboard.logs_web_serial_unsupported"), { richColors: true });
       return;
     }
     try {
@@ -1024,23 +435,14 @@ export class ESPHomePageDashboard extends LitElement {
             const lines = buffer.split("\n");
             buffer = lines.pop() ?? "";
             for (const line of lines) {
-              (this._logsDialog as any)._lines = [
-                ...(this._logsDialog as any)._lines,
-                line,
-              ];
+              (this._logsDialog as any)._lines = [...(this._logsDialog as any)._lines, line];
             }
           }
-        } catch {
-          // Port closed or disconnected
-        }
+        } catch { /* Port closed */ }
       };
       readLoop();
-    } catch {
-      // User cancelled the port picker
-    }
+    } catch { /* User cancelled */ }
   }
-
-  // ─── Select Mode / Update All ──────────────────────────────
 
   private _toggleDevice(configuration: string) {
     const next = new Set(this._selectedDevices);
@@ -1053,21 +455,15 @@ export class ESPHomePageDashboard extends LitElement {
     const selected = [...this._selectedDevices];
     this._selectMode = false;
     this._selectedDevices = new Set();
-
     if (selected.length === 0) {
       toast.info(this._localize("layout.update_all_none"), { richColors: true });
       return;
     }
-
-    toast.info(this._localize("layout.update_all_started", { count: selected.length }), {
-      richColors: true,
-    });
-
+    toast.info(this._localize("layout.update_all_started", { count: selected.length }), { richColors: true });
     for (const configuration of selected) {
       const device = this._devices.find((d) => d.configuration === configuration);
       if (!device) continue;
-      const name = device.friendly_name || device.name;
-      await this._compileAndUpload(configuration, name);
+      await compileAndUpload(configuration, device.friendly_name || device.name, this._api, this._localize);
     }
   }
 
@@ -1083,56 +479,11 @@ export class ESPHomePageDashboard extends LitElement {
     const selected = [...this._selectedDevices];
     this._selectMode = false;
     this._selectedDevices = new Set();
-
     for (const configuration of selected) {
       const device = this._devices.find((d) => d.configuration === configuration);
       if (!device) continue;
-      this._deleteDevice(device);
+      deleteDevice(device, this._api, this._devices, this._localize);
     }
-  }
-
-  private _compileAndUpload(configuration: string, name: string): Promise<void> {
-    return new Promise((resolve) => {
-      this._api.compile(configuration, {
-        onOutput: () => {},
-        onResult: (data: { success: boolean; code: number }) => {
-          if (data.success) {
-            this._api.upload(configuration, "OTA", {
-              onOutput: () => {},
-              onResult: (d: { success: boolean; code: number }) => {
-                toast[d.success ? "success" : "error"](
-                  this._localize(
-                    d.success
-                      ? "dashboard.update_device_success"
-                      : "dashboard.update_device_failed",
-                    { name }
-                  ),
-                  { richColors: true }
-                );
-                resolve();
-              },
-              onError: () => {
-                toast.error(this._localize("dashboard.update_device_failed", { name }), {
-                  richColors: true,
-                });
-                resolve();
-              },
-            });
-          } else {
-            toast.error(this._localize("dashboard.update_device_failed", { name }), {
-              richColors: true,
-            });
-            resolve();
-          }
-        },
-        onError: () => {
-          toast.error(this._localize("dashboard.update_device_failed", { name }), {
-            richColors: true,
-          });
-          resolve();
-        },
-      });
-    });
   }
 }
 
