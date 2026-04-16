@@ -201,11 +201,18 @@ export class ESPHomeDeviceTable extends LitElement {
         .position=${this._contextMenuPos}
         ?anchor-right=${this._contextMenuAnchorRight}
         @menu-close=${this._closeContextMenu}
-        @edit-device=${(e: CustomEvent) => this._forwardEvent("edit-device", e.detail)}
-        @update-device=${(e: CustomEvent) => this._forwardEvent("update-device", e.detail)}
-        @open-logs=${(e: CustomEvent) => this._forwardEvent("open-logs", e.detail)}
-        @delete-device=${(e: CustomEvent) => this._forwardEvent("delete-device", e.detail)}
-        @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._enterSelectMode(e.detail)}
+        @edit-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("edit-device", e.detail); }}
+        @update-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("update-device", e.detail); }}
+        @open-logs=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("open-logs", e.detail); }}
+        @delete-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("delete-device", e.detail); }}
+        @validate-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("validate-device", e.detail); }}
+        @install-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("install-device", e.detail); }}
+        @show-api-key=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("show-api-key", e.detail); }}
+        @download-yaml=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("download-yaml", e.detail); }}
+        @rename-device=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("rename-device", e.detail); }}
+        @clean-build=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("clean-build", e.detail); }}
+        @download-elf=${(e: CustomEvent) => { e.stopPropagation(); this._forwardEvent("download-elf", e.detail); }}
+        @enter-select=${(e: CustomEvent<ConfiguredDevice>) => { e.stopPropagation(); this._enterSelectMode(e.detail); }}
       ></esphome-table-row-menu>
     `;
   }

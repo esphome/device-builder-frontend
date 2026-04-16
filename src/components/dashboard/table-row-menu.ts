@@ -1,9 +1,15 @@
 import { consume } from "@lit/context";
 import {
+  mdiBroom,
   mdiCheckboxMultipleBlankOutline,
+  mdiCheckDecagram,
   mdiConsole,
   mdiDelete,
+  mdiDownload,
+  mdiFileDownloadOutline,
+  mdiKeyVariant,
   mdiPencil,
+  mdiRenameOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
@@ -17,10 +23,16 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  broom: mdiBroom,
   "checkbox-multiple-blank-outline": mdiCheckboxMultipleBlankOutline,
+  "check-decagram": mdiCheckDecagram,
   console: mdiConsole,
   delete: mdiDelete,
+  download: mdiDownload,
+  "file-download-outline": mdiFileDownloadOutline,
+  "key-variant": mdiKeyVariant,
   pencil: mdiPencil,
+  "rename-outline": mdiRenameOutline,
   upload: mdiUpload,
 });
 
@@ -142,13 +154,38 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="pencil"></wa-icon>
           ${this._localize("dashboard.drawer_edit")}
         </div>
-        <div class="menu-item" @click=${() => this._emit("update-device")}>
+        <div class="menu-item" @click=${() => this._emit("validate-device")}>
+          <wa-icon library="mdi" name="check-decagram"></wa-icon>
+          ${this._localize("dashboard.action_validate")}
+        </div>
+        <div class="menu-item" @click=${() => this._emit("install-device")}>
           <wa-icon library="mdi" name="upload"></wa-icon>
-          ${this._localize("dashboard.drawer_update")}
+          ${this._localize("dashboard.action_install")}
         </div>
         <div class="menu-item" @click=${() => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" @click=${() => this._emit("show-api-key")}>
+          <wa-icon library="mdi" name="key-variant"></wa-icon>
+          ${this._localize("dashboard.action_show_api_key")}
+        </div>
+        <div class="menu-item" @click=${() => this._emit("download-yaml")}>
+          <wa-icon library="mdi" name="download"></wa-icon>
+          ${this._localize("dashboard.action_download_yaml")}
+        </div>
+        <div class="menu-item" @click=${() => this._emit("rename-device")}>
+          <wa-icon library="mdi" name="rename-outline"></wa-icon>
+          ${this._localize("dashboard.action_rename")}
+        </div>
+        <div class="menu-item" @click=${() => this._emit("clean-build")}>
+          <wa-icon library="mdi" name="broom"></wa-icon>
+          ${this._localize("dashboard.action_clean_build")}
+        </div>
+        <div class="menu-item" @click=${() => this._emit("download-elf")}>
+          <wa-icon library="mdi" name="file-download-outline"></wa-icon>
+          ${this._localize("dashboard.action_download_elf")}
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item" @click=${() => this._emit("enter-select")}>

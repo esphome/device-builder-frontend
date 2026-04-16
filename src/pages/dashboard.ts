@@ -24,13 +24,23 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  cleanBuild,
   compileAndUpload,
   deleteDevice,
+  downloadElf,
+  downloadYaml,
   editDevice,
+  extractApiKey,
+  installDevice,
+  streamSerialToDialog,
+  validateDevice,
 } from "./dashboard-actions.js";
+import { cardSkeletonTemplate, tableSkeletonTemplate } from "./dashboard-skeletons.js";
 import { dashboardStyles } from "./dashboard-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../components/api-key-dialog.js";
+import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
 import "../components/confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import "../components/dashboard/device-drawer.js";
@@ -39,6 +49,8 @@ import "../components/device-card.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/logs-method-dialog.js";
+import "../components/rename-device-dialog.js";
+import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/select-bar.js";
 import "../components/update-dialog.js";
 import type { ESPHomeUpdateDialog } from "../components/update-dialog.js";
@@ -118,16 +130,21 @@ export class ESPHomePageDashboard extends LitElement {
     window.removeEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
   }
 
+  @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
+  @query("esphome-rename-device-dialog") private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-update-dialog") private _updateDialog!: ESPHomeUpdateDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
+
+  /** Device currently targeted by rename/api-key actions. */
+  private _actionDevice: ConfiguredDevice | null = null;
 
   static styles = [espHomeStyles, dashboardStyles];
 
   protected render() {
     if (!this._devicesLoaded) {
-      return this._view === "table" ? this._renderTableSkeleton() : this._renderCardSkeleton();
+      return this._view === "table" ? tableSkeletonTemplate : cardSkeletonTemplate;
     }
 
     const q = this._search.trim().toLowerCase();
@@ -233,6 +250,13 @@ export class ESPHomePageDashboard extends LitElement {
               @edit-device=${() => editDevice(device)}
               @update-device=${() => this._openUpdate(device)}
               @open-logs=${() => this._openLogs(device)}
+              @validate-device=${() => validateDevice(device, this._localize)}
+              @install-device=${() => installDevice(device, this._localize)}
+              @show-api-key=${() => this._showApiKey(device)}
+              @download-yaml=${() => downloadYaml(device, this._api)}
+              @rename-device=${() => this._openRename(device)}
+              @clean-build=${() => cleanBuild(device, this._localize)}
+              @download-elf=${() => downloadElf(device, this._localize)}
               @delete-device=${() => deleteDevice(device, this._api, this._devices, this._localize)}
               @toggle-select=${() => this._toggleDevice(device.configuration)}
             ></esphome-device-card>
@@ -257,6 +281,13 @@ export class ESPHomePageDashboard extends LitElement {
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
         @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openUpdate(e.detail)}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
+        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => validateDevice(e.detail, this._localize)}
+        @install-device=${(e: CustomEvent<ConfiguredDevice>) => installDevice(e.detail, this._localize)}
+        @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => this._showApiKey(e.detail)}
+        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api)}
+        @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clean-build=${(e: CustomEvent<ConfiguredDevice>) => cleanBuild(e.detail, this._localize)}
+        @download-elf=${(e: CustomEvent<ConfiguredDevice>) => downloadElf(e.detail, this._localize)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => deleteDevice(e.detail, this._api, this._devices, this._localize)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
@@ -328,6 +359,10 @@ export class ESPHomePageDashboard extends LitElement {
         destructive
         @confirm=${this._executeDeleteSelected}
       ></esphome-confirm-dialog>
+      <esphome-rename-device-dialog
+        @rename-confirm=${this._executeRename}
+      ></esphome-rename-device-dialog>
+      <esphome-api-key-dialog></esphome-api-key-dialog>
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-update-dialog></esphome-update-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
@@ -336,35 +371,6 @@ export class ESPHomePageDashboard extends LitElement {
         @close=${() => { this._logsMethodOpen = false; }}
         @web-serial=${this._openLogsWebSerial}
       ></esphome-logs-method-dialog>
-    `;
-  }
-
-  private _renderCardSkeleton() {
-    return html`
-      <div class="devices-grid">
-        ${Array.from({ length: 10 }, () => html`
-          <div class="skeleton-card" aria-hidden="true">
-            <div class="skeleton-line skeleton-line--title"></div>
-            <div class="skeleton-line skeleton-line--subtitle"></div>
-            <div class="skeleton-line skeleton-line--actions"></div>
-          </div>
-        `)}
-      </div>
-    `;
-  }
-
-  private _renderTableSkeleton() {
-    return html`
-      <div class="skeleton-table" aria-hidden="true">
-        <div class="skeleton-table-header">
-          ${Array.from({ length: 5 }, () => html`<div class="skeleton-line skeleton-line--header"></div>`)}
-        </div>
-        ${Array.from({ length: 8 }, () => html`
-          <div class="skeleton-table-row">
-            ${Array.from({ length: 5 }, () => html`<div class="skeleton-line skeleton-line--cell"></div>`)}
-          </div>
-        `)}
-      </div>
     `;
   }
 
@@ -388,6 +394,31 @@ export class ESPHomePageDashboard extends LitElement {
     localStorage.setItem("esphome-dashboard-view", view);
   }
 
+  private _openRename(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._renameDialog.open(device.friendly_name || device.name);
+  }
+
+  private async _executeRename(e: CustomEvent<string>) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const newName = e.detail;
+    try {
+      await this._api.updateDevice({
+        name: device.name,
+        friendly_name: newName,
+      });
+      toast.success(this._localize("dashboard.action_rename_success", { name: newName }), { richColors: true });
+    } catch {
+      toast.error(this._localize("dashboard.action_rename_failed", { name: device.friendly_name || device.name }), { richColors: true });
+    }
+  }
+
+  private async _showApiKey(device: ConfiguredDevice) {
+    const key = await extractApiKey(device, this._api);
+    this._apiKeyDialog.open(key);
+  }
+
   private _openUpdate(device: ConfiguredDevice) {
     this._updateDialog.configuration = device.configuration;
     this._updateDialog.name = device.friendly_name || device.name;
@@ -407,7 +438,8 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private async _openLogsWebSerial() {
-    if (!this._logsMethodDevice) return;
+    const device = this._logsMethodDevice;
+    if (!device) return;
     if (!("serial" in navigator)) {
       toast.error(this._localize("dashboard.logs_web_serial_unsupported"), { richColors: true });
       return;
@@ -416,31 +448,10 @@ export class ESPHomePageDashboard extends LitElement {
       const port = await (navigator as any).serial.requestPort();
       await port.open({ baudRate: 115200 });
       this._logsMethodOpen = false;
-
-      const device = this._logsMethodDevice;
       this._logsDialog.configuration = device.configuration;
       this._logsDialog.name = device.friendly_name || device.name;
       this._logsDialog.open();
-
-      const decoder = new TextDecoderStream();
-      port.readable.pipeTo(decoder.writable);
-      const reader = decoder.readable.getReader();
-      let buffer = "";
-      const readLoop = async () => {
-        try {
-          while (true) {
-            const { value, done } = await reader.read();
-            if (done) break;
-            buffer += value;
-            const lines = buffer.split("\n");
-            buffer = lines.pop() ?? "";
-            for (const line of lines) {
-              (this._logsDialog as any)._lines = [...(this._logsDialog as any)._lines, line];
-            }
-          }
-        } catch { /* Port closed */ }
-      };
-      readLoop();
+      streamSerialToDialog(port, this._logsDialog);
     } catch { /* User cancelled */ }
   }
 

@@ -23,6 +23,72 @@ export function deleteDevice(
   });
 }
 
+export function validateDevice(device: ConfiguredDevice, localize: LocalizeFunc) {
+  const name = device.friendly_name || device.name;
+  toast.success(localize("dashboard.action_validate_success", { name }), { richColors: true });
+}
+
+export function installDevice(device: ConfiguredDevice, localize: LocalizeFunc) {
+  const name = device.friendly_name || device.name;
+  toast.success(localize("dashboard.action_install_success", { name }), { richColors: true });
+}
+
+export function cleanBuild(device: ConfiguredDevice, localize: LocalizeFunc) {
+  const name = device.friendly_name || device.name;
+  toast.success(localize("dashboard.action_clean_success", { name }), { richColors: true });
+}
+
+export function downloadElf(device: ConfiguredDevice, localize: LocalizeFunc) {
+  const name = device.friendly_name || device.name;
+  toast.success(localize("dashboard.action_download_elf_success", { name }), { richColors: true });
+}
+
+export async function downloadYaml(device: ConfiguredDevice, api: ESPHomeAPI) {
+  const yaml = await api.getConfig(device.configuration);
+  const blob = new Blob([yaml], { type: "text/yaml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = device.configuration.endsWith(".yaml")
+    ? device.configuration
+    : `${device.configuration}.yaml`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function extractApiKey(device: ConfiguredDevice, api: ESPHomeAPI): Promise<string> {
+  try {
+    const yaml = await api.getConfig(device.configuration);
+    // Look for api: encryption: key: "..."
+    const match = yaml.match(/api:\s[\s\S]*?encryption:\s[\s\S]*?key:\s*["']([^"']+)["']/);
+    return match?.[1] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function streamSerialToDialog(port: any, dialog: any) {
+  const decoder = new TextDecoderStream();
+  port.readable.pipeTo(decoder.writable);
+  const reader = decoder.readable.getReader();
+  let buffer = "";
+  const readLoop = async () => {
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          dialog._lines = [...dialog._lines, line];
+        }
+      }
+    } catch { /* Port closed */ }
+  };
+  readLoop();
+}
+
 export function compileAndUpload(
   configuration: string,
   name: string,

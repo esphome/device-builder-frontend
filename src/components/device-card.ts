@@ -1,11 +1,17 @@
 import { consume } from "@lit/context";
 import {
+  mdiBroom,
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
+  mdiCheckDecagram,
   mdiConsole,
   mdiDelete,
   mdiDotsVertical,
+  mdiDownload,
+  mdiFileDownloadOutline,
+  mdiKeyVariant,
   mdiPencil,
+  mdiRenameOutline,
   mdiUpload,
   mdiWifi,
   mdiWifiOff,
@@ -22,15 +28,21 @@ import "@home-assistant/webawesome/dist/components/dropdown/dropdown.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  broom: mdiBroom,
   "checkbox-blank-outline": mdiCheckboxBlankOutline,
   "checkbox-marked": mdiCheckboxMarked,
+  "check-decagram": mdiCheckDecagram,
   console: mdiConsole,
-  pencil: mdiPencil,
-  upload: mdiUpload,
+  delete: mdiDelete,
   "dots-vertical": mdiDotsVertical,
+  download: mdiDownload,
+  "file-download-outline": mdiFileDownloadOutline,
+  "key-variant": mdiKeyVariant,
+  pencil: mdiPencil,
+  "rename-outline": mdiRenameOutline,
+  upload: mdiUpload,
   wifi: mdiWifi,
   "wifi-off": mdiWifiOff,
-  delete: mdiDelete,
 });
 
 @customElement("esphome-device-card")
@@ -282,7 +294,7 @@ export class ESPHomeDeviceCard extends LitElement {
                 <wa-dropdown
                   placement="right-start"
                   distance="4"
-                  @wa-select=${() => this._emit("delete-device")}
+                  @wa-select=${this._onDropdownSelect}
                 >
                   <button
                     slot="trigger"
@@ -291,7 +303,35 @@ export class ESPHomeDeviceCard extends LitElement {
                   >
                     <wa-icon library="mdi" name="dots-vertical"></wa-icon>
                   </button>
-                  <wa-dropdown-item .variant=${"danger"}>
+                  <wa-dropdown-item value="validate-device">
+                    <wa-icon slot="icon" library="mdi" name="check-decagram"></wa-icon>
+                    ${this._localize("dashboard.action_validate")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="install-device">
+                    <wa-icon slot="icon" library="mdi" name="upload"></wa-icon>
+                    ${this._localize("dashboard.action_install")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="show-api-key">
+                    <wa-icon slot="icon" library="mdi" name="key-variant"></wa-icon>
+                    ${this._localize("dashboard.action_show_api_key")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="download-yaml">
+                    <wa-icon slot="icon" library="mdi" name="download"></wa-icon>
+                    ${this._localize("dashboard.action_download_yaml")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="rename-device">
+                    <wa-icon slot="icon" library="mdi" name="rename-outline"></wa-icon>
+                    ${this._localize("dashboard.action_rename")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="clean-build">
+                    <wa-icon slot="icon" library="mdi" name="broom"></wa-icon>
+                    ${this._localize("dashboard.action_clean_build")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="download-elf">
+                    <wa-icon slot="icon" library="mdi" name="file-download-outline"></wa-icon>
+                    ${this._localize("dashboard.action_download_elf")}
+                  </wa-dropdown-item>
+                  <wa-dropdown-item value="delete-device" .variant=${"danger"}>
                     <wa-icon slot="icon" library="mdi" name="delete"></wa-icon>
                     ${this._localize("dashboard.delete")}
                   </wa-dropdown-item>
@@ -301,6 +341,12 @@ export class ESPHomeDeviceCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  private _onDropdownSelect(e: CustomEvent) {
+    const item = e.detail?.item;
+    const value = item?.value;
+    if (value) this._emit(value);
   }
 
   private _emit(name: string) {
