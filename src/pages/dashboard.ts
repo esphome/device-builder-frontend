@@ -26,10 +26,8 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
-  compileAndUpload,
   deleteBulkDevices,
   deleteDevice,
-  downloadElf,
   downloadYaml,
   editDevice,
   extractApiKey,
@@ -275,7 +273,7 @@ export class ESPHomePageDashboard extends LitElement {
               ?select-mode=${this._selectMode}
               ?selected=${this._selectedDevices.has(device.configuration)}
               @edit-device=${() => editDevice(device)}
-              @update-device=${() => this._openCommand(device, "update")}
+              @update-device=${() => this._openCommand(device, "install")}
               @open-logs=${() => this._openLogs(device)}
               @validate-device=${() => this._openCommand(device, "validate")}
               @install-device=${() => this._openCommand(device, "install")}
@@ -283,7 +281,7 @@ export class ESPHomePageDashboard extends LitElement {
               @download-yaml=${() => downloadYaml(device, this._api, this._localize)}
               @rename-device=${() => this._openRename(device)}
               @clean-build=${() => this._openCommand(device, "clean")}
-              @download-elf=${() => downloadElf(device, this._localize)}
+              @download-elf=${() => this._downloadFirmware(device)}
               @delete-device=${() => deleteDevice(device, this._api, this._devices, this._localize)}
               @toggle-select=${() => this._toggleDevice(device.configuration)}
             ></esphome-device-card>
@@ -312,7 +310,7 @@ export class ESPHomePageDashboard extends LitElement {
         @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
         @deselect-all=${() => { this._selectedDevices = new Set(); }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
-        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "update")}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "install")}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
         @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "validate")}
         @install-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "install")}
@@ -320,7 +318,7 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
-        @download-elf=${(e: CustomEvent<ConfiguredDevice>) => downloadElf(e.detail, this._localize)}
+        @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => deleteDevice(e.detail, this._api, this._devices, this._localize)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
@@ -350,7 +348,7 @@ export class ESPHomePageDashboard extends LitElement {
         .device=${this._drawerDevice}
         @drawer-close=${() => { this._drawerOpen = false; }}
         @edit-device=${(e: CustomEvent) => { this._drawerOpen = false; editDevice(e.detail); }}
-        @update-device=${(e: CustomEvent) => { this._drawerOpen = false; this._openCommand(e.detail, "update"); }}
+        @update-device=${(e: CustomEvent) => { this._drawerOpen = false; this._openCommand(e.detail, "install"); }}
         @open-logs=${(e: CustomEvent) => { this._drawerOpen = false; this._openLogs(e.detail); }}
       ></esphome-device-drawer>
     `;
@@ -474,6 +472,30 @@ export class ESPHomePageDashboard extends LitElement {
     this._commandDialog.open(type);
   }
 
+  private async _downloadFirmware(device: ConfiguredDevice) {
+    const name = device.friendly_name || device.name;
+    try {
+      const binaries = await this._api.firmwareGetBinaries(device.configuration);
+      if (binaries.length === 0) {
+        toast.error(this._localize("dashboard.download_no_binaries", { name }), { richColors: true });
+        return;
+      }
+      // Download the first available binary
+      const binary = binaries[0];
+      const result = await this._api.firmwareDownload(device.configuration, binary.file);
+      const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error(this._localize("dashboard.download_firmware_failed", { name }), { richColors: true });
+    }
+  }
+
   private _openLogs(device: ConfiguredDevice) {
     const online = this._deviceStates[device.configuration] ?? false;
     if (online) {
@@ -520,10 +542,10 @@ export class ESPHomePageDashboard extends LitElement {
       return;
     }
     toast.info(this._localize("layout.update_all_started", { count: selected.length }), { richColors: true });
-    for (const configuration of selected) {
-      const device = this._devices.find((d) => d.configuration === configuration);
-      if (!device) continue;
-      await compileAndUpload(configuration, device.friendly_name || device.name, this._api, this._localize);
+    try {
+      await this._api.firmwareInstallBulk(selected);
+    } catch {
+      toast.error(this._localize("layout.update_all_error"), { richColors: true });
     }
   }
 

@@ -52,13 +52,6 @@ export async function deleteBulkDevices(
   }
 }
 
-export function downloadElf(device: ConfiguredDevice, localize: LocalizeFunc) {
-  const name = device.friendly_name || device.name;
-  toast.info(localize("dashboard.action_download_elf_unavailable", { name }), {
-    richColors: true,
-  });
-}
-
 export async function downloadYaml(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
@@ -127,51 +120,3 @@ export function streamSerialToDialog(port: any, dialog: any) {
   readLoop();
 }
 
-export function compileAndUpload(
-  configuration: string,
-  name: string,
-  api: ESPHomeAPI,
-  localize: LocalizeFunc
-): Promise<void> {
-  return new Promise((resolve) => {
-    api.compile(configuration, {
-      onOutput: () => {},
-      onResult: (data: { success: boolean; code: number }) => {
-        if (data.success) {
-          api.upload(configuration, "OTA", {
-            onOutput: () => {},
-            onResult: (d: { success: boolean; code: number }) => {
-              toast[d.success ? "success" : "error"](
-                localize(
-                  d.success
-                    ? "dashboard.update_device_success"
-                    : "dashboard.update_device_failed",
-                  { name }
-                ),
-                { richColors: true }
-              );
-              resolve();
-            },
-            onError: () => {
-              toast.error(localize("dashboard.update_device_failed", { name }), {
-                richColors: true,
-              });
-              resolve();
-            },
-          });
-        } else {
-          toast.error(localize("dashboard.update_device_failed", { name }), {
-            richColors: true,
-          });
-          resolve();
-        }
-      },
-      onError: () => {
-        toast.error(localize("dashboard.update_device_failed", { name }), {
-          richColors: true,
-        });
-        resolve();
-      },
-    });
-  });
-}

@@ -75,6 +75,8 @@ export interface ConfiguredDevice {
   deployed_version: string;
   loaded_integrations: string[];
   board_id: string;
+  /** null = never compiled, true = YAML newer than binary, false = up to date */
+  has_pending_changes: boolean | null;
 }
 
 /** An adoptable/importable ESPHome device. */
@@ -266,6 +268,49 @@ export interface BulkDeleteResult {
   error?: string;
 }
 
+// ─── Firmware Jobs ──────────────────────────────────────────
+
+export enum JobStatus {
+  QUEUED = "queued",
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  CANCELLED = "cancelled",
+}
+
+export enum JobType {
+  COMPILE = "compile",
+  UPLOAD = "upload",
+  INSTALL = "install",
+  CLEAN = "clean",
+}
+
+export interface FirmwareJob {
+  job_id: string;
+  configuration: string;
+  job_type: JobType;
+  status: JobStatus;
+  created_at: string;
+  started_at: string | null;
+  completed_at: string | null;
+  exit_code: number | null;
+  output: string[];
+  error: string | null;
+  port: string;
+}
+
+export interface FirmwareBinary {
+  title: string;
+  file: string;
+}
+
+export interface FirmwareDownload {
+  filename: string;
+  data: string;
+  size: number;
+  compressed: boolean;
+}
+
 // ─── Event Subscription ─────────────────────────────────────
 
 /** Result from subscribe_events command. */
@@ -282,6 +327,22 @@ export enum DeviceEventType {
   DEVICE_STATE_CHANGED = "device_state_changed",
   IMPORTABLE_DEVICE_ADDED = "importable_device_added",
   IMPORTABLE_DEVICE_REMOVED = "importable_device_removed",
+  JOB_QUEUED = "job_queued",
+  JOB_STARTED = "job_started",
+  JOB_OUTPUT = "job_output",
+  JOB_COMPLETED = "job_completed",
+  JOB_FAILED = "job_failed",
+}
+
+/** Data payload for job lifecycle events (queued, started, completed, failed). */
+export interface JobEventData {
+  job: FirmwareJob;
+}
+
+/** Data payload for job_output event. */
+export interface JobOutputEventData {
+  job_id: string;
+  line: string;
 }
 
 /** Data payload for initial_state event. */
@@ -310,7 +371,7 @@ export type EventSubscriptionCallback = (event: string, data: unknown) => void;
 
 // ─── Streaming Commands ──────────────────────────────────────
 
-/** Callbacks for streaming commands (compile, upload, logs, validate, clean). */
+/** Callbacks for streaming commands (validate, logs). */
 export interface StreamCallbacks {
   onOutput?: (line: string) => void;
   onResult?: (data: { success: boolean; code: number }) => void;

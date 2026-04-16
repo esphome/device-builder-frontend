@@ -16,6 +16,9 @@ import type {
   ErrorMessage,
   EventMessage,
   EventSubscriptionCallback,
+  FirmwareBinary,
+  FirmwareDownload,
+  FirmwareJob,
   PagedBoardsResponse,
   PagedComponentsResponse,
   ResultMessage,
@@ -401,31 +404,89 @@ export class ESPHomeAPI {
     await this.sendCommand("devices/ignore", { name, ignore });
   }
 
-  // ─── Streaming Commands ───────────────────────────────────
+  // ─── Streaming Commands (per-connection) ───────────────────
 
-  /** Compile a device configuration. */
-  compile(configuration: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/compile", { configuration }, callbacks);
-  }
-
-  /** Upload firmware to a device. */
-  upload(configuration: string, port: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/upload", { configuration, port }, callbacks);
-  }
-
-  /** Stream logs from a device. */
-  logs(configuration: string, port: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/logs", { configuration, port }, callbacks);
-  }
-
-  /** Validate a device configuration. */
+  /** Validate a device configuration (streaming, not queued). */
   validate(configuration: string, callbacks: StreamCallbacks): string {
     return this.sendStreamCommand("devices/validate", { configuration }, callbacks);
   }
 
-  /** Clean build files for a device. */
-  clean(configuration: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/clean", { configuration }, callbacks);
+  /** Stream logs from a device (streaming, not queued). */
+  logs(configuration: string, port: string, callbacks: StreamCallbacks): string {
+    return this.sendStreamCommand("devices/logs", { configuration, port }, callbacks);
+  }
+
+  // ─── Firmware Commands (job queue) ────────────────────────
+
+  /** Queue a compile job. */
+  async firmwareCompile(configuration: string): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/compile", { configuration });
+  }
+
+  /** Queue an upload job. */
+  async firmwareUpload(configuration: string, port = ""): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/upload", { configuration, port });
+  }
+
+  /** Queue a compile+upload job (defaults to OTA). */
+  async firmwareInstall(configuration: string, port = "OTA"): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/install", { configuration, port });
+  }
+
+  /** Queue a clean job. */
+  async firmwareClean(configuration: string): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/clean", { configuration });
+  }
+
+  /** Queue compile for multiple devices. */
+  async firmwareCompileBulk(configurations: string[]): Promise<FirmwareJob[]> {
+    return this.sendCommand<FirmwareJob[]>("firmware/compile_bulk", { configurations });
+  }
+
+  /** Queue install for multiple devices. */
+  async firmwareInstallBulk(configurations: string[], port = "OTA"): Promise<FirmwareJob[]> {
+    return this.sendCommand<FirmwareJob[]>("firmware/install_bulk", { configurations, port });
+  }
+
+  /** List jobs, optionally filtered. */
+  async firmwareGetJobs(args?: {
+    status?: string;
+    configuration?: string;
+  }): Promise<FirmwareJob[]> {
+    return this.sendCommand<FirmwareJob[]>("firmware/get_jobs", args);
+  }
+
+  /** Get a single job with full output. */
+  async firmwareGetJob(jobId: string): Promise<FirmwareJob | null> {
+    return this.sendCommand<FirmwareJob | null>("firmware/get_job", { job_id: jobId });
+  }
+
+  /** Cancel a queued job. */
+  async firmwareCancel(jobId: string): Promise<void> {
+    await this.sendCommand("firmware/cancel", { job_id: jobId });
+  }
+
+  /** Remove finished jobs. */
+  async firmwareClear(status?: string): Promise<void> {
+    await this.sendCommand("firmware/clear", status ? { status } : undefined);
+  }
+
+  /** List available firmware binaries after compile. */
+  async firmwareGetBinaries(configuration: string): Promise<FirmwareBinary[]> {
+    return this.sendCommand<FirmwareBinary[]>("firmware/get_binaries", { configuration });
+  }
+
+  /** Download a compiled firmware binary as base64. */
+  async firmwareDownload(
+    configuration: string,
+    file: string,
+    compressed = false,
+  ): Promise<FirmwareDownload> {
+    return this.sendCommand<FirmwareDownload>("firmware/download", {
+      configuration,
+      file,
+      compressed,
+    });
   }
 
   // ─── Board Commands ───────────────────────────────────────
