@@ -160,13 +160,13 @@ export class ESPHomeDeviceEditor extends LitElement {
           transform 0.12s;
       }
 
-      .save-button:hover {
+      .save-button:hover:not(:disabled) {
         background: color-mix(in srgb, var(--esphome-primary), black 10%);
         box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
         transform: translateY(-1px);
       }
 
-      .save-button:active {
+      .save-button:active:not(:disabled) {
         transform: translateY(0);
       }
 

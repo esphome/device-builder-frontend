@@ -2,8 +2,9 @@ import { consume } from "@lit/context";
 import { mdiClose, mdiConsole, mdiPencil, mdiUpload, mdiWifi, mdiWifiOff } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import type { ConfiguredDevice } from "../../api/types.js";
-import { deviceStatesContext } from "../../context/index.js";
+import { deviceStatesContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -21,6 +22,10 @@ registerMdiIcons({
 
 @customElement("esphome-device-drawer")
 export class ESPHomeDeviceDrawer extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
   @consume({ context: deviceStatesContext, subscribe: true })
   @state()
   private _deviceStates: Record<string, boolean> = {};
@@ -291,7 +296,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
             <h2 class="title">${device.friendly_name || device.name}</h2>
             <p class="subtitle">${device.configuration}</p>
           </div>
-          <button class="close-btn" @click=${this._close} aria-label="Close">
+          <button class="close-btn" @click=${this._close} aria-label=${this._localize("dashboard.drawer_close")}>
             <wa-icon library="mdi" name="close"></wa-icon>
           </button>
         </div>
@@ -302,7 +307,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
             library="mdi"
             name=${online ? "wifi" : "wifi-off"}
           ></wa-icon>
-          ${online ? "Device Online" : "Device Offline"}
+          ${online ? this._localize("dashboard.drawer_device_online") : this._localize("dashboard.drawer_device_offline")}
         </div>
 
         <div class="body">
@@ -317,21 +322,21 @@ export class ESPHomeDeviceDrawer extends LitElement {
             @click=${() => this._emitAction("edit-device")}
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>
-            Edit
+            ${this._localize("dashboard.drawer_edit")}
           </button>
           <button
             class="action action--accent"
             @click=${() => this._emitAction("update-device")}
           >
             <wa-icon library="mdi" name="upload"></wa-icon>
-            Update
+            ${this._localize("dashboard.drawer_update")}
           </button>
           <button
             class="action action--ghost"
             @click=${() => this._emitAction("open-logs")}
           >
             <wa-icon library="mdi" name="console"></wa-icon>
-            Logs
+            ${this._localize("dashboard.drawer_logs")}
           </button>
         </div>
       </div>

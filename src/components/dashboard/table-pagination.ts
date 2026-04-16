@@ -1,3 +1,4 @@
+import { consume } from "@lit/context";
 import {
   mdiChevronLeft,
   mdiChevronRight,
@@ -5,7 +6,9 @@ import {
   mdiPageLast,
 } from "@mdi/js";
 import { LitElement, css, html } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
+import type { LocalizeFunc } from "../../common/localize.js";
+import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -20,6 +23,10 @@ registerMdiIcons({
 
 @customElement("esphome-table-pagination")
 export class ESPHomeTablePagination extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
   @property({ type: Number, attribute: "page-index" })
   pageIndex = 0;
 
@@ -132,10 +139,10 @@ export class ESPHomeTablePagination extends LitElement {
   protected render() {
     return html`
       <div class="pagination">
-        <span class="info">${this.totalRows} row(s) total</span>
+        <span class="info">${this._localize("dashboard.pagination_total", { count: this.totalRows })}</span>
         <div class="controls">
           <div class="page-size">
-            <span>Rows per page</span>
+            <span>${this._localize("dashboard.pagination_rows_per_page")}</span>
             <select @change=${this._onPageSizeChange}>
               ${[10, 20, 25, 50, 100].map(
                 (size) =>
@@ -146,14 +153,14 @@ export class ESPHomeTablePagination extends LitElement {
             </select>
           </div>
           <span class="page-info">
-            Page ${this.pageIndex + 1} of ${this.pageCount || 1}
+            ${this._localize("dashboard.pagination_page_of", { current: this.pageIndex + 1, total: this.pageCount || 1 })}
           </span>
           <div class="buttons">
             <button
               class="page-btn"
               ?disabled=${!this.canPreviousPage}
               @click=${() => this._emitPageChange(0)}
-              title="First page"
+              title=${this._localize("dashboard.pagination_first_page")}
             >
               <wa-icon library="mdi" name="page-first"></wa-icon>
             </button>
@@ -161,7 +168,7 @@ export class ESPHomeTablePagination extends LitElement {
               class="page-btn"
               ?disabled=${!this.canPreviousPage}
               @click=${() => this._emitPageChange(this.pageIndex - 1)}
-              title="Previous page"
+              title=${this._localize("dashboard.pagination_previous_page")}
             >
               <wa-icon library="mdi" name="chevron-left"></wa-icon>
             </button>
@@ -169,7 +176,7 @@ export class ESPHomeTablePagination extends LitElement {
               class="page-btn"
               ?disabled=${!this.canNextPage}
               @click=${() => this._emitPageChange(this.pageIndex + 1)}
-              title="Next page"
+              title=${this._localize("dashboard.pagination_next_page")}
             >
               <wa-icon library="mdi" name="chevron-right"></wa-icon>
             </button>
@@ -177,7 +184,7 @@ export class ESPHomeTablePagination extends LitElement {
               class="page-btn"
               ?disabled=${!this.canNextPage}
               @click=${() => this._emitPageChange(this.pageCount - 1)}
-              title="Last page"
+              title=${this._localize("dashboard.pagination_last_page")}
             >
               <wa-icon library="mdi" name="page-last"></wa-icon>
             </button>

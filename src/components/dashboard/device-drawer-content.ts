@@ -1,3 +1,4 @@
+import { consume } from "@lit/context";
 import {
   mdiFileDocumentOutline,
   mdiInformationOutline,
@@ -8,8 +9,10 @@ import {
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import type { ConfiguredDevice } from "../../api/types.js";
+import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -27,6 +30,10 @@ registerMdiIcons({
 
 @customElement("esphome-device-drawer-content")
 export class ESPHomeDeviceDrawerContent extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
   @property({ attribute: false })
   device!: ConfiguredDevice;
 
@@ -140,28 +147,28 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
     return html`
       <div class="section">
-        <h4 class="section-title">Device Information</h4>
-        ${this._row("information-outline", "Name", d.friendly_name || d.name)}
-        ${this._row("ip-network-outline", "IP Address", d.address, true)}
-        ${this._row("memory", "Platform", d.target_platform)}
+        <h4 class="section-title">${this._localize("dashboard.drawer_device_info")}</h4>
+        ${this._row("information-outline", this._localize("dashboard.drawer_name"), d.friendly_name || d.name)}
+        ${this._row("ip-network-outline", this._localize("dashboard.drawer_ip_address"), d.address, true)}
+        ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
 
       <div class="section">
-        <h4 class="section-title">Version</h4>
-        ${this._row("tag-multiple", "Current Version", d.current_version, true)}
-        ${this._row("upload", "Deployed Version", d.deployed_version, true)}
+        <h4 class="section-title">${this._localize("dashboard.drawer_version")}</h4>
+        ${this._row("tag-multiple", this._localize("dashboard.drawer_current_version"), d.current_version, true)}
+        ${this._row("upload", this._localize("dashboard.drawer_deployed_version"), d.deployed_version, true)}
       </div>
 
       <div class="section">
-        <h4 class="section-title">Configuration</h4>
-        ${this._row("file-document-outline", "Config File", d.configuration, true)}
-        ${this._row("text-short", "Comment", d.comment)}
+        <h4 class="section-title">${this._localize("dashboard.drawer_configuration")}</h4>
+        ${this._row("file-document-outline", this._localize("dashboard.drawer_config_file"), d.configuration, true)}
+        ${this._row("text-short", this._localize("dashboard.drawer_comment"), d.comment)}
       </div>
 
       ${d.loaded_integrations && d.loaded_integrations.length > 0
         ? html`
             <div class="section">
-              <h4 class="section-title">Loaded Integrations</h4>
+              <h4 class="section-title">${this._localize("dashboard.drawer_loaded_integrations")}</h4>
               <div class="tags-wrap">
                 ${d.loaded_integrations.map(
                   (i) => html`<span class="tag">${i}</span>`,

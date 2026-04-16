@@ -204,7 +204,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         font-family: inherit;
       }
 
-      .save-button:hover {
+      .save-button:hover:not(:disabled) {
         opacity: 0.9;
       }
 

@@ -1,3 +1,4 @@
+import { consume } from "@lit/context";
 import { mdiChevronDown, mdiChevronUp, mdiUnfoldMoreHorizontal } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -9,13 +10,16 @@ import {
   getFilteredRowModel,
   getPaginationRowModel,
   getSortedRowModel,
+  type ColumnDef,
   type SortingState,
   type VisibilityState,
 } from "@tanstack/lit-table";
+import type { LocalizeFunc } from "../../common/localize.js";
 import type { ConfiguredDevice } from "../../api/types.js";
+import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { deviceColumns, type DeviceRow } from "./table-columns.js";
+import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -37,6 +41,10 @@ const paginatedRowModel = getPaginationRowModel<DeviceRow>();
 
 @customElement("esphome-device-table")
 export class ESPHomeDeviceTable extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
   @property({ attribute: false })
   devices: ConfiguredDevice[] = [];
 
@@ -56,6 +64,10 @@ export class ESPHomeDeviceTable extends LitElement {
 
   /** Stable data array — only rebuilt when inputs change. */
   private _rows: DeviceRow[] = [];
+
+  /** Columns — rebuilt when localise function changes. */
+  private _columns: ColumnDef<DeviceRow>[] = [];
+  private _prevLocalize: LocalizeFunc | null = null;
 
   // ─── Stable callbacks (no inline arrows in render) ───
 
@@ -82,6 +94,10 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Lifecycle ───
 
   protected willUpdate(changed: PropertyValues) {
+    if (this._localize !== this._prevLocalize) {
+      this._prevLocalize = this._localize;
+      this._columns = createDeviceColumns(this._localize);
+    }
     if (changed.has("devices") || changed.has("deviceStates")) {
       this._rows = this.devices.map((d) => ({
         status: this.deviceStates[d.configuration] ?? false,
@@ -304,7 +320,7 @@ export class ESPHomeDeviceTable extends LitElement {
   protected render() {
     const table = this._tableController.table({
       data: this._rows,
-      columns: deviceColumns,
+      columns: this._columns,
       state: {
         sorting: this._sorting,
         columnVisibility: this._columnVisibility,
@@ -403,7 +419,7 @@ export class ESPHomeDeviceTable extends LitElement {
                 : html`
                     <tr>
                       <td colspan=${table.getVisibleLeafColumns().length} class="no-results">
-                        No results found.
+                        ${this._localize("dashboard.table_no_results")}
                       </td>
                     </tr>
                   `}

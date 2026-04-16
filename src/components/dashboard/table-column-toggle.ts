@@ -1,6 +1,9 @@
+import { consume } from "@lit/context";
 import { mdiCheck, mdiCogOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { LocalizeFunc } from "../../common/localize.js";
+import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -16,6 +19,10 @@ export interface ToggleableColumn {
 
 @customElement("esphome-table-column-toggle")
 export class ESPHomeTableColumnToggle extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
   @property({ attribute: false })
   columns: ToggleableColumn[] = [];
 
@@ -157,13 +164,13 @@ export class ESPHomeTableColumnToggle extends LitElement {
     return html`
       <button class="toggle-btn" @click=${this._toggle}>
         <wa-icon library="mdi" name="cog-outline"></wa-icon>
-        Columns
+        ${this._localize("dashboard.table_columns")}
       </button>
       ${this._open
         ? html`
             <div class="backdrop" @click=${this._close}></div>
             <div class="menu">
-              <div class="menu-label">Toggle columns</div>
+              <div class="menu-label">${this._localize("dashboard.table_toggle_columns")}</div>
               <div class="menu-divider"></div>
               ${this.columns.map(
                 (col) => html`
