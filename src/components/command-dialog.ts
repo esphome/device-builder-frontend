@@ -100,7 +100,19 @@ export class ESPHomeCommandDialog extends LitElement {
       wa-dialog::part(body) { padding: 0; background: var(--term-bg); }
       wa-dialog::part(footer) { display: none; }
 
-      .content { display: flex; flex-direction: column; }
+      .content {
+        display: flex;
+        flex-direction: column;
+        /* Fill available dialog height */
+        height: 60vh;
+        min-height: 300px;
+        max-height: 70vh;
+      }
+      esphome-ansi-log {
+        flex: 1;
+        min-height: 0;
+        --log-height: 100%;
+      }
       esphome-ansi-log::part(container) { border-radius: 0; }
 
       .terminal-toolbar {

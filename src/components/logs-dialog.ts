@@ -147,10 +147,15 @@ export class ESPHomeLogsDialog extends LitElement {
       .logs-content {
         display: flex;
         flex-direction: column;
+        height: 60vh;
+        min-height: 300px;
+        max-height: 70vh;
       }
 
       esphome-ansi-log {
         flex: 1;
+        min-height: 0;
+        --log-height: 100%;
       }
 
       /* Override ansi-log border-radius inside the dialog */

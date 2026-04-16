@@ -4,8 +4,8 @@
  * Renders log lines with ANSI color codes converted to styled HTML spans.
  * Supports auto-scrolling to the bottom as new lines arrive.
  */
-import { LitElement, html, css, nothing } from "lit";
-import { customElement, property, state, query } from "lit/decorators.js";
+import { LitElement, css, html, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 /** ANSI 4-bit color palette (standard 8 + bright 8). */
 const ANSI_COLORS: Record<number, string> = {
@@ -170,18 +170,21 @@ export class ESPHomeAnsiLog extends LitElement {
       color: var(--log-fg);
       font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       font-size: 0.8rem;
-      padding: 16px;
+      padding: 8px 16px;
       border-radius: 8px;
-      height: var(--log-height, 400px);
       overflow-y: auto;
       white-space: pre-wrap;
-      word-break: break-all;
-      line-height: 1.5;
+      overflow-wrap: anywhere;
+      line-height: 1.2;
+      box-sizing: border-box;
+      tab-size: 4;
     }
 
     .log-line {
       margin: 0;
-      min-height: 1.5em;
+      padding: 0;
+      border-radius: 3px;
+      min-height: 1em;
     }
 
     .log-line:hover {
@@ -209,29 +212,47 @@ export class ESPHomeAnsiLog extends LitElement {
   }
 
   protected render() {
-    if (this.lines.length === 0) {
-      return html`
-        <div class="log-container">
-          ${this.placeholder
-            ? html`<div class="log-line placeholder">${this.placeholder}</div>`
-            : nothing}
-        </div>
-      `;
+    // Flatten: a single "line" from upstream may contain embedded newlines,
+    // so split into visual lines, trim leading whitespace (so every line
+    // starts at the same left offset), and drop empty ones.
+    const visual: string[] = [];
+    for (const raw of this.lines) {
+      const normalized = raw.replace(/\r\n?/g, "\n");
+      for (const part of normalized.split("\n")) {
+        const trimmed = this._stripLeadingWhitespace(part);
+        if (trimmed.replace(/\u001b\[[0-9;]*m/g, "").trim().length > 0) {
+          visual.push(trimmed);
+        }
+      }
     }
 
     return html`
       <div class="log-container" @scroll=${this._handleScroll}>
-        ${this.lines.map((line) => this._renderLine(line))}
+        ${visual.length === 0 && this.placeholder
+          ? html`<div class="log-line placeholder">${this.placeholder}</div>`
+          : visual.map((line) => this._renderLine(line))}
       </div>
     `;
   }
 
+  /**
+   * Remove leading whitespace while preserving any ANSI escape sequences
+   * that appear before the first visible character. This ensures every
+   * rendered line starts flush with the container's left padding.
+   */
+  private _stripLeadingWhitespace(line: string): string {
+    // Match: any number of (ANSI escape | space | tab) at the start.
+    // We keep the ANSI escapes and drop the spaces/tabs.
+    const re = /^((?:\u001b\[[0-9;]*m|[ \t])*)/;
+    const match = line.match(re);
+    if (!match) return line;
+    const prefix = match[0];
+    const ansiOnly = prefix.replace(/[ \t]+/g, "");
+    return ansiOnly + line.slice(prefix.length);
+  }
+
   private _renderLine(line: string) {
     const spans = parseAnsiLine(line);
-
-    if (spans.length === 0) {
-      return html`<div class="log-line">&nbsp;</div>`;
-    }
 
     return html`<div class="log-line">
       ${spans.map((span) => {
@@ -256,16 +277,22 @@ export class ESPHomeAnsiLog extends LitElement {
     </div>`;
   }
 
+  private _ignoreNextScroll = false;
+
   private _handleScroll() {
     if (!this._container) return;
+    if (this._ignoreNextScroll) {
+      this._ignoreNextScroll = false;
+      return;
+    }
     const { scrollTop, scrollHeight, clientHeight } = this._container;
-    // User has scrolled up if not near the bottom
     this._isUserScrolled = scrollHeight - scrollTop - clientHeight > 40;
   }
 
   private _scrollToBottom() {
     requestAnimationFrame(() => {
       if (this._container) {
+        this._ignoreNextScroll = true;
         this._container.scrollTop = this._container.scrollHeight;
       }
     });
