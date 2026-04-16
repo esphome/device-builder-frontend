@@ -11,7 +11,9 @@ import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
+import { DashboardView, SortDirection } from "../api/types.js";
 import type { AdoptableDevice, ConfiguredDevice } from "../api/types.js";
+import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
@@ -26,6 +28,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import {
   cleanBuild,
   compileAndUpload,
+  deleteBulkDevices,
   deleteDevice,
   downloadElf,
   downloadYaml,
@@ -56,8 +59,6 @@ import "../components/update-dialog.js";
 import type { ESPHomeUpdateDialog } from "../components/update-dialog.js";
 import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
-
-type DashboardView = "cards" | "table";
 
 registerMdiIcons({
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
@@ -103,8 +104,12 @@ export class ESPHomePageDashboard extends LitElement {
   @state() private _drawerDevice: ConfiguredDevice | null = null;
 
   @state()
-  private _view: DashboardView =
-    (localStorage.getItem("esphome-dashboard-view") as DashboardView) || "cards";
+  private _view: DashboardView = DashboardView.CARDS;
+
+  // Table preferences — synced to/from backend
+  @state() private _tablePageSize = 25;
+  @state() private _tableSorting: SortingState | null = null;
+  @state() private _tableColumnVisibility: VisibilityState | null = null;
 
   private _onEnterSelectMode = (configuration?: string) => {
     this._selectMode = true;
@@ -117,12 +122,36 @@ export class ESPHomePageDashboard extends LitElement {
     if (changed.has("_view")) {
       this.setAttribute("view", this._view);
     }
+    // Load preferences once WS is connected (devices loaded means events are flowing)
+    if (changed.has("_devicesLoaded") && this._devicesLoaded) {
+      this._loadPreferences();
+    }
   }
 
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
     window.addEventListener("esphome-enter-select-mode", this._onGlobalEnterSelectMode);
+  }
+
+  private async _loadPreferences() {
+    try {
+      const prefs = await this._api.getPreferences();
+      this._view = prefs.dashboard_view;
+      this._tablePageSize = prefs.table_page_size;
+      this._tableColumnVisibility = prefs.table_column_visibility;
+
+      // Convert backend sort (column + direction) to TanStack SortingState
+      if (prefs.table_sort_column) {
+        this._tableSorting = [
+          { id: prefs.table_sort_column, desc: prefs.table_sort_direction === SortDirection.DESC },
+        ];
+      } else {
+        this._tableSorting = [];
+      }
+    } catch {
+      // Preferences not critical — use default
+    }
   }
 
   disconnectedCallback() {
@@ -144,7 +173,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected render() {
     if (!this._devicesLoaded) {
-      return this._view === "table" ? tableSkeletonTemplate : cardSkeletonTemplate;
+      return this._view === DashboardView.TABLE ? tableSkeletonTemplate : cardSkeletonTemplate;
     }
 
     const q = this._search.trim().toLowerCase();
@@ -158,11 +187,11 @@ export class ESPHomePageDashboard extends LitElement {
 
     return html`
       ${this._renderBanner()}
-      ${this._devices.length > 0 && this._view === "cards"
+      ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? this._renderToolbar(filtered.length, this._devices.length)
         : ""}
-      ${filtered.length === 0 && q && this._view === "cards" ? this._renderEmptySearch() : ""}
-      ${this._view === "cards" ? this._renderCardGrid(filtered) : this._renderTable()}
+      ${filtered.length === 0 && q && this._view === DashboardView.CARDS ? this._renderEmptySearch() : ""}
+      ${this._view === DashboardView.CARDS ? this._renderCardGrid(filtered) : this._renderTable()}
       ${this._renderDrawer()}
       ${this._renderSelectBarOrFab()}
       ${this._renderDialogs()}
@@ -191,10 +220,10 @@ export class ESPHomePageDashboard extends LitElement {
     const view = this._view;
     return html`
       <div class="view-toggle">
-        <button class="view-toggle-btn ${view === "cards" ? "active" : ""}" @click=${() => this._setView("cards")}>
+        <button class="view-toggle-btn ${view === DashboardView.CARDS ? "active" : ""}" @click=${() => this._setView(DashboardView.CARDS)}>
           <wa-icon library="mdi" name="view-grid"></wa-icon>
         </button>
-        <button class="view-toggle-btn ${view === "table" ? "active" : ""}" @click=${() => this._setView("table")}>
+        <button class="view-toggle-btn ${view === DashboardView.TABLE ? "active" : ""}" @click=${() => this._setView(DashboardView.TABLE)}>
           <wa-icon library="mdi" name="table"></wa-icon>
         </button>
       </div>
@@ -272,8 +301,14 @@ export class ESPHomePageDashboard extends LitElement {
         .devices=${this._devices}
         .deviceStates=${this._deviceStates}
         .search=${this._search}
+        .initialPageSize=${this._tablePageSize}
+        .initialSorting=${this._tableSorting}
+        .initialColumnVisibility=${this._tableColumnVisibility}
         ?select-mode=${this._selectMode}
         .selectedDevices=${this._selectedDevices}
+        @table-sort-change=${this._onTableSortChange}
+        @table-visibility-change=${this._onTableVisibilityChange}
+        @table-page-size-change=${this._onTablePageSizeChange}
         @row-click=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerDevice = e.detail; this._drawerOpen = true; }}
         @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
         @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
@@ -337,7 +372,7 @@ export class ESPHomePageDashboard extends LitElement {
         ></esphome-select-bar>
       `;
     }
-    if (this._view === "cards") {
+    if (this._view === DashboardView.CARDS) {
       return html`
         <div class="fab-container">
           <button class="fab-btn" @click=${() => this._createDialog.open()}>
@@ -391,7 +426,30 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _setView(view: DashboardView) {
     this._view = view;
-    localStorage.setItem("esphome-dashboard-view", view);
+    this._api.updatePreferences({ dashboard_view: view }).catch(() => {});
+  }
+
+  private _onTableSortChange(e: CustomEvent<SortingState>) {
+    const sorting = e.detail;
+    const first = sorting[0] ?? null;
+    this._api
+      .updatePreferences({
+        table_sort_column: first?.id ?? null,
+        table_sort_direction: first ? (first.desc ? SortDirection.DESC : SortDirection.ASC) : null,
+      })
+      .catch(() => {});
+  }
+
+  private _onTableVisibilityChange(e: CustomEvent<VisibilityState>) {
+    this._api
+      .updatePreferences({ table_column_visibility: e.detail })
+      .catch(() => {});
+  }
+
+  private _onTablePageSizeChange(e: CustomEvent<number>) {
+    this._api
+      .updatePreferences({ table_page_size: e.detail })
+      .catch(() => {});
   }
 
   private _openRename(device: ConfiguredDevice) {
@@ -490,11 +548,7 @@ export class ESPHomePageDashboard extends LitElement {
     const selected = [...this._selectedDevices];
     this._selectMode = false;
     this._selectedDevices = new Set();
-    for (const configuration of selected) {
-      const device = this._devices.find((d) => d.configuration === configuration);
-      if (!device) continue;
-      deleteDevice(device, this._api, this._devices, this._localize);
-    }
+    deleteBulkDevices(selected, this._devices, this._api, this._localize);
   }
 }
 

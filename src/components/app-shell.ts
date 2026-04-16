@@ -13,7 +13,7 @@ import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import { DeviceEventType } from "../api/types.js";
+import { DeviceEventType, Theme } from "../api/types.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -129,16 +129,27 @@ export class ESPHomeApp extends LitElement {
   }
 
   private _initDarkMode() {
-    const saved = localStorage.getItem("esphome-theme") ?? "system";
-    this._applyTheme(saved as "light" | "dark" | "system");
+    // Use localStorage as fast initial value, then sync from backend
+    const saved = (localStorage.getItem("esphome-theme") as Theme) ?? Theme.SYSTEM;
+    this._applyTheme(saved);
   }
 
-  private _applyTheme(theme: "light" | "dark" | "system") {
+  private async _loadThemePreference() {
+    try {
+      const prefs = await this._api.getPreferences();
+      this._applyTheme(prefs.theme);
+    } catch {
+      // Preferences not critical — keep localStorage value
+    }
+  }
+
+  private _applyTheme(theme: Theme) {
+    // Cache in localStorage for fast initial paint and header-actions sync reads
     localStorage.setItem("esphome-theme", theme);
     const prefersDark =
-      theme === "system"
+      theme === Theme.SYSTEM
         ? window.matchMedia("(prefers-color-scheme: dark)").matches
-        : theme === "dark";
+        : theme === Theme.DARK;
     this._darkMode = prefersDark;
     document.documentElement.classList.toggle("wa-dark", prefersDark);
     document.documentElement.classList.toggle("wa-light", !prefersDark);
@@ -170,6 +181,8 @@ export class ESPHomeApp extends LitElement {
     try {
       const info = await this._api.connect();
       this._version = info.esphome_version;
+      // Sync theme from backend once connected
+      this._loadThemePreference();
     } catch (err) {
       console.error("Failed to connect to WebSocket:", err);
     }
@@ -254,7 +267,9 @@ export class ESPHomeApp extends LitElement {
   }
 
   private _onSetTheme(e: CustomEvent<string>) {
-    this._applyTheme(e.detail as "light" | "dark" | "system");
+    const theme = e.detail as Theme;
+    this._applyTheme(theme);
+    this._api.updatePreferences({ theme }).catch(() => {});
   }
 }
 

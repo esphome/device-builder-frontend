@@ -19,7 +19,10 @@ import "./wizard-step-setup.js";
 registerMdiIcons({ close: mdiClose, "arrow-left": mdiArrowLeft });
 
 type WizardStep = "method" | "board" | "setup" | "empty-config";
-type WizardStepDetail = WizardStep | { step: WizardStep; board?: BoardCatalogEntry | null };
+type CreationMethod = "basic" | "empty" | "import";
+type WizardStepDetail =
+  | WizardStep
+  | { step: WizardStep; board?: BoardCatalogEntry | null; method?: CreationMethod; file?: File };
 
 @customElement("esphome-create-config-dialog")
 export class ESPHomeCreateConfigDialog extends LitElement {
@@ -35,6 +38,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
+
+  @state()
+  private _creationMethod: CreationMethod = "basic";
+
+  /** Stored file for import flow (selected before board step). */
+  private _importFile: File | null = null;
 
   @state()
   private _submitting = false;
@@ -124,6 +133,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   public open() {
     this._step = "method";
+    this._creationMethod = "basic";
+    this._importFile = null;
     this._submitting = false;
     this._importError = "";
     this._dialog.open = true;
@@ -154,7 +165,6 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         @next-step=${this._onNextStep}
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
-        @import-config=${this._onImportConfig}
       >
         <span slot="label" class="dialog-label">
           ${this._step !== "method"
@@ -192,10 +202,31 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       return;
     }
 
-    this._step = detail.step;
+    // Track creation method and import file when coming from method step
+    if (detail.method) {
+      this._creationMethod = detail.method;
+    }
+    if (detail.file) {
+      this._importFile = detail.file;
+    }
+
     if (detail.board !== undefined) {
       this._selectedBoard = detail.board;
     }
+
+    // After board selection, route based on creation method
+    if (detail.step === "setup" && detail.board) {
+      if (this._creationMethod === "empty") {
+        this._step = "empty-config";
+        return;
+      }
+      if (this._creationMethod === "import") {
+        this._createImportedDevice();
+        return;
+      }
+    }
+
+    this._step = detail.step;
   }
 
   private _onBack() {
@@ -207,19 +238,21 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         this._step = "board";
         break;
       case "empty-config":
-        this._step = "method";
+        this._step = "board";
         break;
     }
   }
 
   private async _onCreateEmptyConfig(e: CustomEvent<{ name: string }>) {
     if (this._submitting) return;
+    if (!this._selectedBoard) return;
     const { name } = e.detail;
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
         name: slug,
+        board_id: this._selectedBoard.id,
         config_type: "empty",
       });
       this.close();
@@ -232,26 +265,28 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     }
   }
 
-  private async _onImportConfig(e: CustomEvent<{ file: File }>) {
+  private async _createImportedDevice() {
     if (this._submitting) return;
-    const { file } = e.detail;
-    const name = file.name.replace(/\.(yaml|yml)$/i, "");
-    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    if (!this._importFile || !this._selectedBoard) return;
 
     this._importError = "";
 
     let fileContent: string;
     try {
-      fileContent = await file.text();
+      fileContent = await this._importFile.text();
     } catch {
       this._importError = this._localize("wizard.import_read_error");
       return;
     }
 
+    const name = this._importFile.name.replace(/\.(yaml|yml)$/i, "");
+    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
         name: slug,
+        board_id: this._selectedBoard.id,
         config_type: "upload",
         file_content: fileContent,
       });
@@ -278,17 +313,16 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   ) {
     if (this._submitting) return;
     const { board, name, wifiSsid, wifiPassword } = e.detail;
+    if (!board) return;
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
         name: slug,
+        board_id: board.id,
         config_type: "basic",
-        platform: board?.esphome.platform ?? "",
-        board: board?.esphome.board ?? "",
         ssid: wifiSsid,
         psk: wifiPassword,
-        board_id: board?.id,
       });
       this.close();
       window.history.pushState({}, "", `/device/${configuration}`);

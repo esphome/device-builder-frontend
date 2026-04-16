@@ -1,6 +1,6 @@
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types.js";
+import type { BulkDeleteResult, ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 export function editDevice(device: ConfiguredDevice) {
@@ -21,6 +21,35 @@ export function deleteDevice(
       toast.error(localize("dashboard.delete_failed", { name }), { richColors: true });
     }
   });
+}
+
+export async function deleteBulkDevices(
+  configurations: string[],
+  devices: ConfiguredDevice[],
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+) {
+  let results: BulkDeleteResult[];
+  try {
+    results = await api.deleteBulkDevices(configurations);
+  } catch {
+    toast.error(localize("dashboard.delete_bulk_failed"), { richColors: true });
+    return;
+  }
+
+  const succeeded = results.filter((r) => r.success).length;
+  const failed = results.filter((r) => !r.success);
+
+  if (succeeded > 0) {
+    toast.success(localize("dashboard.delete_bulk_success", { count: succeeded }), {
+      richColors: true,
+    });
+  }
+  for (const result of failed) {
+    const device = devices.find((d) => d.configuration === result.configuration);
+    const name = device ? device.friendly_name || device.name : result.configuration;
+    toast.error(localize("dashboard.delete_failed", { name }), { richColors: true });
+  }
 }
 
 export function validateDevice(device: ConfiguredDevice, localize: LocalizeFunc) {

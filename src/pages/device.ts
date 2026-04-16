@@ -100,13 +100,17 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private async _loadPreferences() {
+    // Editor layout stored locally (not in backend preferences)
+    const savedLayout = localStorage.getItem("esphome-editor-layout");
+    if (savedLayout === "both" || savedLayout === "left" || savedLayout === "right") {
+      this._layout = savedLayout;
+    }
+
     try {
       const prefs = await this._api.getPreferences();
-      if (prefs.editor_layout) {
-        this._layout = prefs.editor_layout;
-      }
-    } catch (e) {
-      // Preferences not critical — use default
+      this._navCollapsed = !prefs.navigator_visible;
+    } catch {
+      // Preferences not critical — use defaults
     }
   }
 
@@ -346,6 +350,7 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = !this._drawerOpen;
     } else {
       this._navCollapsed = !this._navCollapsed;
+      this._api.updatePreferences({ navigator_visible: !this._navCollapsed }).catch(() => {});
     }
   }
 
@@ -362,7 +367,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onLayoutChange(e: CustomEvent<DeviceLayoutMode>) {
     this._layout = e.detail;
-    this._api.updatePreferences({ editor_layout: e.detail }).catch(() => {});
+    localStorage.setItem("esphome-editor-layout", e.detail);
   }
 
   private _onYamlChange(e: CustomEvent<{ value: string }>) {

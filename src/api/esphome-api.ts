@@ -9,6 +9,7 @@
 import type {
   AddComponentResponse,
   BoardCatalogEntry,
+  BulkDeleteResult,
   CommandMessage,
   ComponentCatalogEntry,
   DevicesResponse,
@@ -330,14 +331,11 @@ export class ESPHomeAPI {
   /** Create a new device configuration. */
   async createDevice(args: {
     name: string;
+    board_id: string;
     config_type?: string;
-    platform?: string;
-    board?: string;
     ssid?: string;
     psk?: string;
-    password?: string;
     file_content?: string;
-    board_id?: string;
   }): Promise<WizardResponse> {
     return this.sendCommand<WizardResponse>("devices/create", args);
   }
@@ -355,6 +353,11 @@ export class ESPHomeAPI {
   /** Delete a device and all associated files. */
   async deleteDevice(configuration: string): Promise<void> {
     await this.sendCommand("devices/delete", { configuration });
+  }
+
+  /** Delete multiple devices at once. Returns per-device results. */
+  async deleteBulkDevices(configurations: string[]): Promise<BulkDeleteResult[]> {
+    return this.sendCommand<BulkDeleteResult[]>("devices/delete_bulk", { configurations });
   }
 
   /** Get device YAML config. */
@@ -480,11 +483,11 @@ export class ESPHomeAPI {
     return this.sendCommand<UserPreferences>("config/get_preferences");
   }
 
-  /** Update user preferences. */
-  async updatePreferences(prefs: UserPreferences): Promise<UserPreferences> {
+  /** Update user preferences (partial — only provided fields are changed). */
+  async updatePreferences(prefs: Partial<UserPreferences>): Promise<UserPreferences> {
     return this.sendCommand<UserPreferences>(
       "config/set_preferences",
-      prefs as unknown as Record<string, unknown>
+      prefs as Record<string, unknown>
     );
   }
 

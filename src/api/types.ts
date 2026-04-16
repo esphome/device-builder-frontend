@@ -234,8 +234,36 @@ export interface SerialPort {
   desc: string;
 }
 
+export enum DashboardView {
+  CARDS = "cards",
+  TABLE = "table",
+}
+
+export enum Theme {
+  LIGHT = "light",
+  DARK = "dark",
+  SYSTEM = "system",
+}
+
+export enum SortDirection {
+  ASC = "asc",
+  DESC = "desc",
+}
+
 export interface UserPreferences {
-  editor_layout?: "both" | "left" | "right";
+  dashboard_view: DashboardView;
+  theme: Theme;
+  navigator_visible: boolean;
+  table_page_size: number;
+  table_column_visibility: Record<string, boolean>;
+  table_sort_column: string | null;
+  table_sort_direction: SortDirection | null;
+}
+
+export interface BulkDeleteResult {
+  configuration: string;
+  success: boolean;
+  error?: string;
 }
 
 // ─── Event Subscription ─────────────────────────────────────

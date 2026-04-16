@@ -15,6 +15,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   type ColumnDef,
+  type PaginationState,
   type SortingState,
   type VisibilityState,
 } from "@tanstack/lit-table";
@@ -73,11 +74,29 @@ export class ESPHomeDeviceTable extends LitElement {
   @property({ attribute: false })
   selectedDevices = new Set<string>();
 
+  /** Initial sorting from preferences — applied once when first set. */
+  @property({ attribute: false })
+  initialSorting: SortingState | null = null;
+
+  /** Initial column visibility from preferences — applied once when first set. */
+  @property({ attribute: false })
+  initialColumnVisibility: VisibilityState | null = null;
+
+  /** Initial page size from preferences — applied once when first set. */
+  @property({ type: Number, attribute: "initial-page-size" })
+  initialPageSize = 25;
+
   @state()
   private _sorting: SortingState = [];
 
   @state()
   private _columnVisibility: VisibilityState = {};
+
+  @state()
+  private _pageSize = 25;
+
+  @state()
+  private _pageIndex = 0;
 
   @state()
   private _contextMenuDevice: ConfiguredDevice | null = null;
@@ -102,6 +121,13 @@ export class ESPHomeDeviceTable extends LitElement {
     updater: SortingState | ((old: SortingState) => SortingState),
   ) => {
     this._sorting = typeof updater === "function" ? updater(this._sorting) : updater;
+    this.dispatchEvent(
+      new CustomEvent("table-sort-change", {
+        detail: this._sorting,
+        bubbles: true,
+        composed: true,
+      }),
+    );
   };
 
   private _handleVisibilityChange = (
@@ -109,6 +135,32 @@ export class ESPHomeDeviceTable extends LitElement {
   ) => {
     this._columnVisibility =
       typeof updater === "function" ? updater(this._columnVisibility) : updater;
+    this.dispatchEvent(
+      new CustomEvent("table-visibility-change", {
+        detail: this._columnVisibility,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
+  private _handlePaginationChange = (
+    updater: PaginationState | ((old: PaginationState) => PaginationState),
+  ) => {
+    const current = { pageSize: this._pageSize, pageIndex: this._pageIndex };
+    const next = typeof updater === "function" ? updater(current) : updater;
+    const pageSizeChanged = next.pageSize !== this._pageSize;
+    this._pageSize = next.pageSize;
+    this._pageIndex = next.pageIndex;
+    if (pageSizeChanged) {
+      this.dispatchEvent(
+        new CustomEvent("table-page-size-change", {
+          detail: this._pageSize,
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    }
   };
 
   private _globalFilterFn = (row: any, _columnId: string, filterValue: unknown): boolean => {
@@ -126,6 +178,18 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Lifecycle ───
 
   protected willUpdate(changed: PropertyValues) {
+    // Apply initial values from preferences when they arrive
+    if (changed.has("initialSorting") && this.initialSorting !== null) {
+      this._sorting = this.initialSorting;
+    }
+    if (changed.has("initialColumnVisibility") && this.initialColumnVisibility !== null) {
+      this._columnVisibility = this.initialColumnVisibility;
+    }
+    if (changed.has("initialPageSize")) {
+      this._pageSize = this.initialPageSize;
+      this._pageIndex = 0;
+    }
+
     if (this._localize !== this._prevLocalize) {
       this._prevLocalize = this._localize;
       this._columns = createDeviceColumns(this._localize);
@@ -158,15 +222,16 @@ export class ESPHomeDeviceTable extends LitElement {
         sorting: this._sorting,
         columnVisibility: this._columnVisibility,
         globalFilter: this.search,
+        pagination: { pageSize: this._pageSize, pageIndex: this._pageIndex },
       },
       onSortingChange: this._handleSortingChange as any,
       onColumnVisibilityChange: this._handleVisibilityChange as any,
+      onPaginationChange: this._handlePaginationChange as any,
       getCoreRowModel: coreRowModel,
       getSortedRowModel: sortedRowModel,
       getFilteredRowModel: filteredRowModel,
       getPaginationRowModel: paginatedRowModel,
       globalFilterFn: this._globalFilterFn,
-      initialState: { pagination: { pageSize: 25 } },
     });
 
     const rows = table.getRowModel().rows;

@@ -228,21 +228,26 @@ export class ESPHomeWizardStepMethod extends LitElement {
     const file = this._fileInput.files?.[0];
     if (!file) return;
 
-    // TODO: read file contents and create a dashboard card from the imported config
-    // e.g. await importConfigFromFile(file);
-    console.log("[wizard] import config from file:", file.name);
-
     // Reset so the same file can be re-selected if needed
     this._fileInput.value = "";
 
+    // Store file and route through board selection
     this.dispatchEvent(
-      new CustomEvent("import-config", { detail: { file }, bubbles: true, composed: true })
+      new CustomEvent("next-step", {
+        detail: { step: "board", method: "import", file },
+        bubbles: true,
+        composed: true,
+      })
     );
   }
 
   private _emptyConfig() {
     this.dispatchEvent(
-      new CustomEvent("next-step", { detail: "empty-config", bubbles: true, composed: true })
+      new CustomEvent("next-step", {
+        detail: { step: "board", method: "empty" },
+        bubbles: true,
+        composed: true,
+      })
     );
   }
 }
