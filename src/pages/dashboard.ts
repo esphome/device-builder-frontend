@@ -288,7 +288,7 @@ export class ESPHomePageDashboard extends LitElement {
               ?selected=${this._selectedDevices.has(device.configuration)}
               @edit-device=${() => editDevice(device)}
               @install-device=${() => this._openInstallMethod(device)}
-              @update-device=${() => this._firmwareDialog.installOta(device)}
+              @update-device=${() => this._openCommand(device, "install")}
               @show-progress=${() => this._showJobProgress(device)}
               @card-click=${() => { this._drawerDevice = device; this._drawerOpen = true; }}
               @card-context-menu=${(e: CustomEvent) => { this._cardContextDevice = device; this._cardContextPosition = e.detail; }}
@@ -320,9 +320,9 @@ export class ESPHomePageDashboard extends LitElement {
         @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
         @deselect-all=${() => { this._selectedDevices = new Set(); }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
-        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._firmwareDialog.installOta(e.detail)}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "install")}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
-        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._firmwareDialog.validate(e.detail)}
+        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "validate")}
         @install-device=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallMethod(e.detail)}
         @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => this._showApiKey(e.detail)}
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
@@ -359,7 +359,7 @@ export class ESPHomePageDashboard extends LitElement {
         ?busy=${this._drawerDevice ? this._activeJobs.has(this._drawerDevice.configuration) : false}
         @drawer-close=${() => { this._drawerOpen = false; }}
         @edit-device=${(e: CustomEvent) => { this._drawerOpen = false; editDevice(e.detail); }}
-        @update-device=${(e: CustomEvent) => { this._drawerOpen = false; this._firmwareDialog.installOta(e.detail); }}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerOpen = false; this._openCommand(e.detail, "install"); }}
         @open-logs=${(e: CustomEvent) => { this._drawerOpen = false; this._openLogs(e.detail); }}
       ></esphome-device-drawer>
     `;
@@ -373,9 +373,9 @@ export class ESPHomePageDashboard extends LitElement {
         ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
         @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
-        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._firmwareDialog.installOta(e.detail)}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "install")}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
-        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._firmwareDialog.validate(e.detail)}
+        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "validate")}
         @install-device=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallMethod(e.detail)}
         @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => this._showApiKey(e.detail)}
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
@@ -543,16 +543,16 @@ export class ESPHomePageDashboard extends LitElement {
     }
   }
 
-  private _openCommand(device: ConfiguredDevice, type: CommandType) {
+  private _openCommand(device: ConfiguredDevice, type: CommandType, port?: string) {
     this._commandDialog.configuration = device.configuration;
     this._commandDialog.name = device.friendly_name || device.name;
-    this._commandDialog.open(type);
+    this._commandDialog.open(type, port ? { port } : undefined);
   }
 
   private _showJobProgress(device: ConfiguredDevice) {
     const job = this._activeJobs.get(device.configuration);
     if (job) {
-      this._firmwareDialog.followJob(device, job);
+      this._commandDialog.followJob(device, job);
     }
   }
 
@@ -572,9 +572,9 @@ export class ESPHomePageDashboard extends LitElement {
       this._openLogsWithMethod(device, method, port);
     } else {
       if (method === "ota") {
-        this._firmwareDialog.installOta(device);
+        this._openCommand(device, "install", "OTA");
       } else if (method === "server-serial") {
-        this._firmwareDialog.installServerSerial(device, port!);
+        this._openCommand(device, "install", port!);
       } else if (method === "web-serial") {
         this._firmwareDialog.installWebSerial(device);
       }

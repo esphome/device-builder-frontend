@@ -12,7 +12,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { JobStatus } from "../api/types.js";
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -80,83 +80,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   // ─── Public API ────────────────────────────────────────
 
-  installOta(device: ConfiguredDevice) {
-    this._init(device);
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
-    this._dialog.open = true;
-    this._startServerInstall("OTA");
-  }
-
-  installServerSerial(device: ConfiguredDevice, port: string) {
-    this._init(device);
-    this._step = "queued";
-    this._statusMessage = this._localize("firmware.status_queued");
-    this._dialog.open = true;
-    this._startServerInstall(port);
-  }
-
+  /**
+   * Install firmware via Web Serial. The only install path that lives in this
+   * dialog — it needs chip detection + client-side flash progress, which the
+   * generic terminal command dialog cannot represent. OTA, server-serial
+   * installs, validate, compile, clean all run through `command-dialog.ts`.
+   */
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
     this._step = "connecting";
     this._statusMessage = this._localize("firmware.status_connecting");
     this._dialog.open = true;
     this._startWebSerialInstall();
-  }
-
-  /** Validate a device configuration. */
-  validate(device: ConfiguredDevice) {
-    this._init(device);
-    this._title = this._localize("firmware.validate_title", { name: device.friendly_name || device.name });
-    this._step = "installing";
-    this._statusMessage = this._localize("firmware.status_validating");
-    this._dialog.open = true;
-    this._streamId = this._api.validate(device.configuration, {
-      onOutput: (line) => { this._logLines = [...this._logLines, line]; },
-      onResult: (data) => {
-        this._streamId = "";
-        if (data.success) {
-          this._step = "done";
-          this._statusMessage = this._localize("firmware.validate_success");
-        } else {
-          this._fail(this._localize("firmware.validate_failed"));
-        }
-      },
-      onError: (error) => {
-        this._streamId = "";
-        this._fail(error);
-      },
-    });
-  }
-
-  /** Attach to an already-running job and show its progress. */
-  followJob(device: ConfiguredDevice, job: FirmwareJob) {
-    this._init(device);
-    this._step = "installing";
-    this._statusMessage = this._localize("firmware.status_installing");
-    this._dialog.open = true;
-    this._jobId = job.job_id;
-    this._streamId = this._api.firmwareFollowJob(job.job_id, {
-      onOutput: (line) => {
-        this._logLines = [...this._logLines, line];
-      },
-      onResult: (data) => {
-        this._streamId = "";
-        this._jobId = "";
-        const result = data as unknown as { status: string };
-        if (result.status === JobStatus.COMPLETED) {
-          this._statusMessage = this._localize("firmware.status_done");
-          this._step = "done";
-        } else {
-          this._fail(this._localize("firmware.install_failed"));
-        }
-      },
-      onError: (error) => {
-        this._streamId = "";
-        this._jobId = "";
-        this._fail(error);
-      },
-    });
   }
 
   private _init(device: ConfiguredDevice) {
@@ -445,45 +380,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           : html`<button class="btn btn--primary" @click=${this._close}>${this._localize("command.close")}</button>`}
       </div>
     `;
-  }
-
-  // ─── Server-side Install (OTA / Server Serial) ─────────
-
-  private async _startServerInstall(port: string) {
-    const device = this._device;
-    if (!device) return;
-
-    try {
-      const job = await this._api.firmwareInstall(device.configuration, port);
-      this._jobId = job.job_id;
-      this._streamId = this._api.firmwareFollowJob(job.job_id, {
-        onOutput: (line) => {
-          if (this._step === "queued") {
-            this._step = "installing";
-            this._statusMessage = this._localize("firmware.status_installing");
-          }
-          this._logLines = [...this._logLines, line];
-        },
-        onResult: (data) => {
-          this._streamId = "";
-          this._jobId = "";
-          const result = data as unknown as { status: string };
-          if (result.status === JobStatus.COMPLETED) {
-            this._statusMessage = this._localize("firmware.status_done");
-            this._step = "done";
-          } else {
-            this._fail(this._localize("firmware.install_failed"));
-          }
-        },
-        onError: (error) => {
-          this._streamId = "";
-          this._jobId = "";
-          this._fail(error);
-        },
-      });
-    } catch (err) {
-      this._fail(err instanceof Error ? err.message : String(err));
-    }
   }
 
   // ─── Web Serial Install ────────────────────────────────

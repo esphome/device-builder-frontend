@@ -1,10 +1,16 @@
 import { consume } from "@lit/context";
-import { mdiClose, mdiRefresh, mdiStop } from "@mdi/js";
+import {
+  mdiAlertCircle,
+  mdiCheckCircle,
+  mdiClose,
+  mdiRefresh,
+  mdiStop,
+} from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { JobStatus } from "../api/types.js";
-import type { FirmwareJob } from "../api/types.js";
+import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -14,7 +20,13 @@ import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./ansi-log.js";
 
-registerMdiIcons({ close: mdiClose, stop: mdiStop, refresh: mdiRefresh });
+registerMdiIcons({
+  close: mdiClose,
+  stop: mdiStop,
+  refresh: mdiRefresh,
+  "check-circle": mdiCheckCircle,
+  "alert-circle": mdiAlertCircle,
+});
 
 export type CommandType = "install" | "compile" | "validate" | "clean";
 type CommandState = "running" | "success" | "error";
@@ -41,11 +53,14 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() private _commandType: CommandType = "validate";
   @state() private _state: CommandState | null = null;
   @state() private _lines: string[] = [];
+  @state() private _statusMessage = "";
 
   /** Active job ID (for cancel). Not used for validate. */
   private _jobId = "";
   /** Stream message ID (for both validate streaming and follow_job streaming). */
   private _streamId = "";
+  /** Install target port — "OTA" for network, an actual port for server-serial. */
+  private _port = "OTA";
 
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
@@ -113,6 +128,29 @@ export class ESPHomeCommandDialog extends LitElement {
       }
       esphome-ansi-log::part(container) { border-radius: 0; }
 
+      .status-banner {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 20px;
+        border-top: 1px solid var(--term-border);
+        font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .status-banner wa-icon {
+        font-size: 28px;
+        flex-shrink: 0;
+      }
+      .status-banner--success {
+        background: color-mix(in srgb, var(--term-success), transparent 85%);
+        color: var(--term-success);
+      }
+      .status-banner--error {
+        background: color-mix(in srgb, var(--term-error), transparent 85%);
+        color: var(--term-error);
+      }
+
       .terminal-toolbar {
         flex-shrink: 0;
         display: flex; align-items: center; gap: var(--wa-space-xs);
@@ -121,14 +159,6 @@ export class ESPHomeCommandDialog extends LitElement {
         border-top: 1px solid var(--term-border);
       }
       .terminal-toolbar .spacer { flex: 1; }
-
-      .status-label {
-        font-size: 12px; font-weight: 600;
-        font-family: "SF Mono", "Fira Code", monospace;
-        color: var(--term-fg-muted);
-      }
-      .status-label--success { color: var(--term-success); }
-      .status-label--error { color: var(--term-error); }
 
       .streaming-dot {
         width: 6px; height: 6px; border-radius: 50%;
@@ -176,14 +206,37 @@ export class ESPHomeCommandDialog extends LitElement {
     }
   }
 
-  public open(type: CommandType) {
+  public open(type: CommandType, options?: { port?: string }) {
     this._commandType = type;
+    this._port = options?.port ?? "OTA";
     this._state = null;
     this._lines = [];
+    this._statusMessage = "";
     this._jobId = "";
     this._streamId = "";
     this._dialog.open = true;
     this._start();
+  }
+
+  /** Attach to an already-running job (from the device card "in progress" state). */
+  public followJob(device: ConfiguredDevice, job: FirmwareJob) {
+    this.configuration = device.configuration;
+    this.name = device.friendly_name || device.name;
+    const typeMap: Record<string, CommandType> = {
+      compile: "compile",
+      install: "install",
+      clean: "clean",
+      upload: "install",
+    };
+    this._commandType = typeMap[job.job_type] ?? "install";
+    this._port = job.port || "OTA";
+    this._state = "running";
+    this._lines = [];
+    this._statusMessage = "";
+    this._jobId = job.job_id;
+    this._streamId = "";
+    this._dialog.open = true;
+    this._followJob(job.job_id);
   }
 
   public close() {
@@ -200,9 +253,23 @@ export class ESPHomeCommandDialog extends LitElement {
       <wa-dialog label=${this._title} light-dismiss @wa-after-hide=${this._onDialogHide}>
         <div class="content">
           <esphome-ansi-log .lines=${this._lines} ?light=${!this._darkMode}></esphome-ansi-log>
+          ${this._renderBanner()}
           ${this._renderToolbar()}
         </div>
       </wa-dialog>
+    `;
+  }
+
+  private _renderBanner() {
+    if (this._state !== "success" && this._state !== "error") return nothing;
+    const isSuccess = this._state === "success";
+    const icon = isSuccess ? "check-circle" : "alert-circle";
+    const modifier = isSuccess ? "success" : "error";
+    return html`
+      <div class="status-banner status-banner--${modifier}">
+        <wa-icon library="mdi" name=${icon}></wa-icon>
+        <span>${this._statusMessage}</span>
+      </div>
     `;
   }
 
@@ -215,12 +282,8 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   private _renderStatus() {
-    switch (this._state) {
-      case "running": return html`<span class="streaming-dot"></span>`;
-      case "success": return html`<span class="status-label status-label--success">${this._localize("command.done")}</span>`;
-      case "error": return html`<span class="status-label status-label--error">${this._localize("command.failed")}</span>`;
-      default: return nothing;
-    }
+    if (this._state === "running") return html`<span class="streaming-dot"></span>`;
+    return nothing;
   }
 
   private _renderActions() {
@@ -248,6 +311,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = "";
     this._state = "running";
     this._lines = [];
+    this._statusMessage = "";
 
     if (this._commandType === "validate") {
       this._startValidateStream();
@@ -263,13 +327,14 @@ export class ESPHomeCommandDialog extends LitElement {
       onResult: (data) => {
         this._streamId = "";
         this._state = data.success ? "success" : "error";
-        const key = data.success ? "command.validate_success" : "command.validate_failed";
-        this._lines = [...this._lines, `\x1b[${data.success ? "32" : "31"}m${this._localize(key)}\x1b[0m`];
+        this._statusMessage = this._localize(
+          data.success ? "command.validate_success" : "command.validate_failed",
+        );
       },
       onError: (error) => {
         this._streamId = "";
         this._state = "error";
-        this._lines = [...this._lines, `\x1b[31mError: ${error}\x1b[0m`];
+        this._statusMessage = error;
       },
     });
   }
@@ -284,7 +349,7 @@ export class ESPHomeCommandDialog extends LitElement {
     try {
       switch (this._commandType) {
         case "install":
-          job = await this._api.firmwareInstall(this.configuration);
+          job = await this._api.firmwareInstall(this.configuration, this._port);
           break;
         case "compile":
           job = await this._api.firmwareCompile(this.configuration);
@@ -298,7 +363,7 @@ export class ESPHomeCommandDialog extends LitElement {
     } catch (err) {
       this._state = "error";
       const msg = err instanceof Error ? err.message : String(err);
-      this._lines = [`\x1b[31mError: ${msg}\x1b[0m`];
+      this._statusMessage = msg;
       return;
     }
 
@@ -317,16 +382,17 @@ export class ESPHomeCommandDialog extends LitElement {
         const result = data as unknown as { status: string; exit_code: number | null };
         const success = result.status === JobStatus.COMPLETED;
         this._state = success ? "success" : "error";
-        const key = success
-          ? `command.${this._commandType}_success`
-          : `command.${this._commandType}_failed`;
-        this._lines = [...this._lines, `\x1b[${success ? "32" : "31"}m${this._localize(key)}\x1b[0m`];
+        this._statusMessage = this._localize(
+          success
+            ? `command.${this._commandType}_success`
+            : `command.${this._commandType}_failed`,
+        );
         this._jobId = "";
       },
       onError: (error) => {
         this._streamId = "";
         this._state = "error";
-        this._lines = [...this._lines, `\x1b[31mError: ${error}\x1b[0m`];
+        this._statusMessage = error;
         this._jobId = "";
       },
     });
@@ -340,7 +406,7 @@ export class ESPHomeCommandDialog extends LitElement {
       this._api.firmwareCancel(this._jobId).catch(() => {});
     }
     this._state = "error";
-    this._lines = [...this._lines, `\x1b[33m${this._localize("command.stopped")}\x1b[0m`];
+    this._statusMessage = this._localize("command.stopped");
     this._streamId = "";
     this._jobId = "";
   }
