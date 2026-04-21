@@ -367,7 +367,20 @@
     "add_automation_error": "Failed to add automation",
     "add_automation_unavailable": "Automation support is not yet available",
     "add_config_error": "Failed to add config section",
-    "editor_layout_label": "Editor layout"
+    "editor_layout_label": "Editor layout",
+    "yaml_preview": "YAML preview",
+    "yaml_preview_toggle": "Show YAML"
+  },
+  "validation": {
+    "required": "This field is required",
+    "min": "Must be at least {min}",
+    "max": "Must be at most {max}",
+    "min_length": "Must be at least {min} characters",
+    "max_length": "Must be at most {max} characters",
+    "not_a_number": "Must be a number",
+    "not_an_integer": "Must be a whole number",
+    "invalid_option": "Not a valid option",
+    "invalid_device_name": "Only lowercase letters, digits and hyphens; must start/end with letter or digit"
   },
   "layout": {
     "secrets": "Secrets",

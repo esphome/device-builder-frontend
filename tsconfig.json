@@ -36,6 +36,6 @@
       "lit/directives/keyed": ["./node_modules/lit/directives/keyed.js"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules"]
 }

@@ -1,9 +1,10 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { validateDeviceName } from "../util/config-validation.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
@@ -124,6 +125,16 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
         opacity: 0.5;
         cursor: not-allowed;
       }
+
+      input.invalid {
+        border-color: var(--esphome-error);
+      }
+
+      .field-error {
+        color: var(--esphome-error);
+        font-size: var(--wa-font-size-xs);
+        margin-top: var(--wa-space-2xs);
+      }
     `,
   ];
 
@@ -138,7 +149,10 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
   }
 
   protected render() {
-    const unchanged = this._value.trim() === this.deviceName || !this._value.trim();
+    const trimmed = this._value.trim();
+    const unchanged = trimmed === this.deviceName || !trimmed;
+    const err = trimmed && trimmed !== this.deviceName ? validateDeviceName(trimmed) : null;
+    const canSubmit = !unchanged && !err;
 
     return html`
       <wa-dialog label=${this._localize("dashboard.action_rename_title")} light-dismiss>
@@ -146,16 +160,20 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
           <label>${this._localize("dashboard.action_rename_label")}</label>
           <input
             type="text"
+            class=${err ? "invalid" : ""}
             .value=${this._value}
             @input=${(e: Event) => { this._value = (e.target as HTMLInputElement).value; }}
-            @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" && !unchanged) this._confirm(); }}
+            @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" && canSubmit) this._confirm(); }}
           />
+          ${err
+            ? html`<span class="field-error">${this._localize(err.code, err.params)}</span>`
+            : nothing}
         </div>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
-          <button class="btn btn--primary" ?disabled=${unchanged} @click=${this._confirm}>
+          <button class="btn btn--primary" ?disabled=${!canSubmit} @click=${this._confirm}>
             ${this._localize("dashboard.action_rename_confirm")}
           </button>
         </div>
@@ -166,6 +184,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
   private _confirm() {
     const newName = this._value.trim();
     if (!newName || newName === this.deviceName) return;
+    if (validateDeviceName(newName)) return;
     this.close();
     this.dispatchEvent(
       new CustomEvent("rename-confirm", {

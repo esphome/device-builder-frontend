@@ -21,6 +21,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { validateEntries, type ValidationError } from "../../util/config-validation.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -73,6 +74,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   @state()
   private _error = "";
+
+  @state()
+  private _fieldErrors: Map<string, ValidationError> = new Map();
 
   static styles = [
     espHomeStyles,
@@ -145,6 +149,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
       .field-label .required {
         color: var(--esphome-error);
+      }
+
+      .field-error {
+        color: var(--esphome-error);
+        font-size: var(--wa-font-size-2xs);
+        margin-top: var(--wa-space-2xs);
+      }
+
+      wa-input.invalid::part(base),
+      wa-select.invalid::part(combobox) {
+        border-color: var(--esphome-error);
       }
 
       .field-description {
@@ -464,6 +479,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private _renderStringField(entry: ConfigEntry, inputType: string) {
     const value = String(this._values[entry.key] ?? "");
+    const invalid = this._errorFor(entry.key) !== null;
     return html`
       <div class="field">
         <label class="field-label">
@@ -475,17 +491,23 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           : nothing}
         <wa-input
           type=${inputType}
+          class=${invalid ? "invalid" : ""}
           .value=${value}
+          ?disabled=${this._saving}
           placeholder=${String(entry.default_value ?? "")}
           @input=${(e: Event) =>
             this._setValue(entry.key, (e.target as HTMLInputElement).value)}
         ></wa-input>
+        ${this._fieldError(entry.key)}
       </div>
     `;
   }
 
   private _renderNumberField(entry: ConfigEntry) {
     const value = String(this._values[entry.key] ?? "");
+    const invalid = this._errorFor(entry.key) !== null;
+    const min = entry.range ? String(entry.range[0]) : undefined;
+    const max = entry.range ? String(entry.range[1]) : undefined;
     return html`
       <div class="field">
         <label class="field-label">
@@ -497,13 +519,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           : nothing}
         <wa-input
           type="number"
+          class=${invalid ? "invalid" : ""}
           .value=${value}
+          ?disabled=${this._saving}
+          min=${min ?? ""}
+          max=${max ?? ""}
           placeholder=${String(entry.default_value ?? "")}
           @input=${(e: Event) => {
             const raw = (e.target as HTMLInputElement).value;
             this._setValue(entry.key, raw === "" ? "" : Number(raw));
           }}
         ></wa-input>
+        ${this._fieldError(entry.key)}
       </div>
     `;
   }
@@ -521,6 +548,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         </div>
         <wa-switch
           ?checked=${checked}
+          ?disabled=${this._saving}
           @change=${(e: Event) =>
             this._setValue(
               entry.key,
@@ -533,6 +561,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private _renderSelectField(entry: ConfigEntry) {
     const value = String(this._values[entry.key] ?? "");
+    const invalid = this._errorFor(entry.key) !== null;
     return html`
       <div class="field">
         <label class="field-label">
@@ -543,7 +572,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           ? html`<p class="field-description">${entry.description}</p>`
           : nothing}
         <wa-select
+          class=${invalid ? "invalid" : ""}
           value=${value}
+          ?disabled=${this._saving}
           @change=${(e: Event) =>
             this._setValue(entry.key, (e.target as HTMLSelectElement).value)}
         >
@@ -551,6 +582,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             (opt) => html`<wa-option value=${opt.value}>${opt.label}</wa-option>`
           )}
         </wa-select>
+        ${this._fieldError(entry.key)}
       </div>
     `;
   }
@@ -558,10 +590,31 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _setValue(key: string, value: unknown) {
     this._values = { ...this._values, [key]: value };
     this._dirty = true;
+    if (this._fieldErrors.has(key)) {
+      const next = new Map(this._fieldErrors);
+      next.delete(key);
+      this._fieldErrors = next;
+    }
+  }
+
+  private _errorFor(key: string): ValidationError | null {
+    return this._fieldErrors.get(key) ?? null;
+  }
+
+  private _fieldError(key: string) {
+    const err = this._errorFor(key);
+    if (!err) return nothing;
+    return html`<span class="field-error">${this._localize(err.code, err.params)}</span>`;
   }
 
   private async _onSave() {
     if (!this._config) return;
+    const errors = validateEntries(this._config.entries, this._values);
+    if (errors.size > 0) {
+      this._fieldErrors = errors;
+      return;
+    }
+    this._fieldErrors = new Map();
     this._saving = true;
     this._error = "";
     try {

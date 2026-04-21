@@ -8,7 +8,10 @@
     "dev": "node build-scripts/dev-server.cjs",
     "build": "node build-scripts/build.cjs",
     "lint": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\"",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepare": "husky"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",
@@ -33,8 +36,10 @@
     "@swc/helpers": "0.5.19",
     "@types/node": "22.15.0",
     "@types/w3c-web-serial": "^1.0.8",
+    "husky": "^9.1.7",
     "prettier": "3.8.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitest": "^2.1.9"
   },
   "browserslist": {
     "modern": [

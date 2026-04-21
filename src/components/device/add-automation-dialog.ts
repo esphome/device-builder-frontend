@@ -373,6 +373,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   private _renderForm() {
     const selectedAction = this._actions.find((a) => a.id === this._actionId);
+    const disabled = this._submitting;
 
     return html`
       <div class="form">
@@ -390,6 +391,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             </label>
             <input
               type="text"
+              ?disabled=${disabled}
               .value=${this._targetName}
               placeholder=${this._localize("device.automation_target_placeholder")}
               @input=${(e: Event) => {
@@ -410,6 +412,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           <div class="field">
             <label>${this._localize("device.automation_trigger_label")}</label>
             <select
+              ?disabled=${disabled}
               @change=${(e: Event) => {
                 this._triggerId = (e.target as HTMLSelectElement).value;
               }}
@@ -434,6 +437,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           <div class="field">
             <label>${this._localize("device.automation_action_label")}</label>
             <select
+              ?disabled=${disabled}
               @change=${(e: Event) => {
                 this._actionId = (e.target as HTMLSelectElement).value;
                 this._actionFields = {};
@@ -446,7 +450,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
                   )}
             </select>
           </div>
-          ${selectedAction?.fields.map((f) => this._renderActionField(f)) ?? nothing}
+          ${selectedAction?.fields.map((f) => this._renderActionField(f, disabled)) ?? nothing}
         </div>
 
         ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
@@ -454,7 +458,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         <div class="actions">
           <button
             class="dialog-btn dialog-btn--primary"
-            ?disabled=${this._submitting || !this._targetName.trim()}
+            ?disabled=${disabled || !this._targetName.trim()}
             @click=${this._onSubmit}
           >
             ${this._submitting ? this._localize("device.adding") : this._localize("device.add_automation")}
@@ -464,13 +468,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     `;
   }
 
-  private _renderActionField(field: ConfigEntry) {
+  private _renderActionField(field: ConfigEntry, disabled: boolean) {
     const value = this._actionFields[field.key] ?? String(field.default_value ?? "");
     if (field.type === "select" && field.options) {
       return html`
         <div class="field">
           <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
           <select
+            ?disabled=${disabled}
             @change=${(e: Event) => this._setActionField(field.key, (e.target as HTMLSelectElement).value)}
           >
             ${field.options.map(
@@ -485,6 +490,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
         <input
           type=${field.type === "integer" || field.type === "float" ? "number" : "text"}
+          ?disabled=${disabled}
           .value=${value}
           placeholder=${String(field.default_value ?? "")}
           @input=${(e: Event) => this._setActionField(field.key, (e.target as HTMLInputElement).value)}

@@ -131,10 +131,6 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   }
 
   private _next() {
-    // TODO: call BE to create an empty configuration
-    // e.g. await createEmptyConfig({ name: this._name });
-    console.log("[wizard] create empty config:", this._name);
-
     this.dispatchEvent(
       new CustomEvent("create-empty-config", {
         detail: { name: this._name },
