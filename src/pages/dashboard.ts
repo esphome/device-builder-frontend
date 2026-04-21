@@ -479,21 +479,19 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _openRename(device: ConfiguredDevice) {
     this._actionDevice = device;
-    this._renameDialog.open(device.friendly_name || device.name);
+    this._renameDialog.open(device.name);
   }
 
   private async _executeRename(e: CustomEvent<string>) {
     const device = this._actionDevice;
     if (!device) return;
     const newName = e.detail;
+    if (newName === device.name) return;
     try {
-      await this._api.updateDevice({
-        name: device.name,
-        friendly_name: newName,
-      });
+      await this._api.renameDevice(device.configuration, newName);
       toast.success(this._localize("dashboard.action_rename_success", { name: newName }), { richColors: true });
     } catch {
-      toast.error(this._localize("dashboard.action_rename_failed", { name: device.friendly_name || device.name }), { richColors: true });
+      toast.error(this._localize("dashboard.action_rename_failed", { name: device.name }), { richColors: true });
     }
   }
 

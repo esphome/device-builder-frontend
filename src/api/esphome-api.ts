@@ -364,6 +364,15 @@ export class ESPHomeAPI {
     return this.sendCommand<UpdateDeviceResponse>("devices/update", args);
   }
 
+  /** Rename a device via the ESPHome CLI (renames YAML file + hostname). */
+  async renameDevice(configuration: string, newName: string): Promise<void> {
+    await this.sendCommand(
+      "devices/rename",
+      { configuration, new_name: newName },
+      60000,
+    );
+  }
+
   /** Delete a device and all associated files. */
   async deleteDevice(configuration: string): Promise<void> {
     await this.sendCommand("devices/delete", { configuration });
