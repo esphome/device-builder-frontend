@@ -22,8 +22,15 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _stage: "name" | "wifi" = "name";
 
+  @state()
   private _secretWifiSsid = "";
+
+  @state()
   private _secretWifiPassword = "";
+
+  private get _hasSecretWifi(): boolean {
+    return Boolean(this._secretWifiSsid && this._secretWifiPassword);
+  }
 
   @state()
   private _deviceName = "";
@@ -261,7 +268,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
               : !this._wifiSsid.trim()}
             @click=${this._onNext}
           >
-            ${this._stage === "name"
+            ${this._stage === "name" && !this._hasSecretWifi
               ? this._localize("wizard.next")
               : this._localize("wizard.finish_setup")}
           </button>
@@ -349,6 +356,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   private _onNext() {
     if (this._stage === "name") {
+      if (this._hasSecretWifi) {
+        this._finish("!secret wifi_ssid", "!secret wifi_password");
+        return;
+      }
       if (this._secretWifiSsid && !this._wifiSsid) {
         this._wifiSsid = this._secretWifiSsid;
       }
@@ -370,13 +381,17 @@ export class ESPHomeWizardStepSetup extends LitElement {
         ? "!secret wifi_password"
         : this._wifiPassword;
 
+    this._finish(ssid, password);
+  }
+
+  private _finish(wifiSsid: string, wifiPassword: string) {
     this.dispatchEvent(
       new CustomEvent("finish-setup", {
         detail: {
           board: this.board,
           name: this._deviceName,
-          wifiSsid: ssid,
-          wifiPassword: password,
+          wifiSsid,
+          wifiPassword,
         },
         bubbles: true,
         composed: true,
