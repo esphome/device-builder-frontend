@@ -4,20 +4,35 @@ import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { BoardCatalogEntry, ConfiguredDevice } from "../api/types.js";
+import type {
+  BoardCatalogEntry,
+  ConfiguredDevice,
+  FirmwareJob,
+} from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
+import { DeviceInstallController } from "../components/device/device-install-controller.js";
+import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
-import { apiContext, devicesContext, localizeContext } from "../context/index.js";
+import {
+  activeJobsContext,
+  apiContext,
+  devicesContext,
+  localizeContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../components/command-dialog.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
+import "../components/firmware-install-dialog.js";
+import "../components/install-method-dialog.js";
 import "../components/unsaved-changes-dialog.js";
 
 registerMdiIcons({
@@ -37,6 +52,10 @@ export class ESPHomePageDevice extends LitElement {
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
+
+  @consume({ context: activeJobsContext, subscribe: true })
+  @state()
+  private _activeJobs: Map<string, FirmwareJob> = new Map();
 
   @property()
   id = "";
@@ -93,6 +112,35 @@ export class ESPHomePageDevice extends LitElement {
 
   @query("esphome-unsaved-changes-dialog")
   private _leaveDialog!: ESPHomeUnsavedChangesDialog;
+
+  @query("esphome-command-dialog")
+  private _commandDialog!: ESPHomeCommandDialog;
+
+  @query("esphome-firmware-install-dialog")
+  private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+
+  private _installCtrl = this._createInstallController();
+
+  private _createInstallController(): DeviceInstallController {
+    const page = this;
+    return new DeviceInstallController({
+      addController: (c) => page.addController(c),
+      removeController: (c) => page.removeController(c),
+      requestUpdate: () => page.requestUpdate(),
+      get updateComplete() {
+        return page.updateComplete;
+      },
+      get device() {
+        return page._device;
+      },
+      get commandDialog() {
+        return page._commandDialog ?? null;
+      },
+      get firmwareDialog() {
+        return page._firmwareDialog ?? null;
+      },
+    });
+  }
 
   private _pendingLeaveResolve: ((value: boolean) => void) | null = null;
 
@@ -266,6 +314,8 @@ export class ESPHomePageDevice extends LitElement {
           @yaml-updated=${this._onYamlUpdated}
           @section-select=${this._onSectionSelect}
           @save-yaml=${this._saveYaml}
+          @install-device=${this._installCtrl.onInstall}
+          @update-device=${this._installCtrl.onUpdate}
         >
           <esphome-device-navigator
             class="desktop-nav"
@@ -288,6 +338,9 @@ export class ESPHomePageDevice extends LitElement {
             .configuration=${this.id}
             .selectedSection=${this._selectedSection}
             .selectedFromLine=${this._selectedFromLine}
+            ?hasPendingChanges=${this._device?.has_pending_changes === true}
+            ?hasUpdateAvailable=${this._device?.update_available === true}
+            ?busy=${this._activeJobs.has(this.id)}
           >
             <button slot="mobile-menu" class="nav-toggle-btn" @click=${this._onNavToggle}>
               <wa-icon library="mdi" name=${this._navToggleIcon}></wa-icon>
@@ -300,6 +353,14 @@ export class ESPHomePageDevice extends LitElement {
         @save=${this._onLeaveSave}
         @cancel=${this._onLeaveCancel}
       ></esphome-unsaved-changes-dialog>
+      <esphome-command-dialog></esphome-command-dialog>
+      <esphome-firmware-install-dialog></esphome-firmware-install-dialog>
+      <esphome-install-method-dialog
+        ?open=${this._installCtrl.installMethodOpen}
+        .deviceState=${this._installCtrl.deviceState}
+        @close=${this._installCtrl.onInstallMethodClose}
+        @select-method=${this._installCtrl.onInstallMethodSelect}
+      ></esphome-install-method-dialog>
     `;
   }
 

@@ -3,6 +3,7 @@ import {
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
+  mdiUpload,
   mdiVectorDifference,
   mdiViewSplitHorizontal,
 } from "@mdi/js";
@@ -32,6 +33,7 @@ registerMdiIcons({
   "layout-left": mdiDockLeft,
   "layout-right": mdiDockRight,
   "layout-split": mdiViewSplitHorizontal,
+  upload: mdiUpload,
   "vector-difference": mdiVectorDifference,
 });
 
@@ -97,6 +99,15 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ attribute: false })
   savedYaml = "";
 
+  @property({ type: Boolean })
+  hasPendingChanges = false;
+
+  @property({ type: Boolean })
+  hasUpdateAvailable = false;
+
+  @property({ type: Boolean })
+  busy = false;
+
   @consume({ context: yamlDiffButtonContext, subscribe: true })
   @state()
   private _showDiffButton = false;
@@ -139,6 +150,27 @@ export class ESPHomeDeviceEditor extends LitElement {
             <h2 class="editor-header-title">${title}</h2>
           </div>
           <div class="header-actions">
+            ${this.hasPendingChanges
+              ? html`<button
+                  type="button"
+                  class="install-button"
+                  ?disabled=${this.busy}
+                  @click=${this._onInstall}
+                  title=${this._localize("dashboard.install")}
+                >
+                  <wa-icon library="mdi" name="upload"></wa-icon>
+                </button>`
+              : this.hasUpdateAvailable
+                ? html`<button
+                    type="button"
+                    class="install-button"
+                    ?disabled=${this.busy}
+                    @click=${this._onUpdate}
+                    title=${this._localize("dashboard.update")}
+                  >
+                    <wa-icon library="mdi" name="upload"></wa-icon>
+                  </button>`
+                : nothing}
             ${this._showDiffButton
               ? html`<button
                   type="button"
@@ -244,6 +276,24 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   private _toggleDiff() {
     this._showDiff = !this._showDiff;
+  }
+
+  private _onInstall() {
+    this.dispatchEvent(
+      new CustomEvent("install-device", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onUpdate() {
+    this.dispatchEvent(
+      new CustomEvent("update-device", {
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   updated(changed: Map<string, unknown>) {

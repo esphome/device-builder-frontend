@@ -92,7 +92,8 @@ export const deviceEditorStyles = css`
     gap: var(--wa-space-s);
   }
 
-  .diff-toggle {
+  .diff-toggle,
+  .install-button {
     border: none;
     background: transparent;
     color: var(--esphome-on-primary);
@@ -108,13 +109,19 @@ export const deviceEditorStyles = css`
     background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
   }
 
-  .diff-toggle:disabled {
+  .diff-toggle:disabled,
+  .install-button:disabled {
     opacity: 0.35;
     cursor: not-allowed;
   }
 
-  .diff-toggle wa-icon {
+  .diff-toggle wa-icon,
+  .install-button wa-icon {
     font-size: 18px;
+  }
+
+  .install-button:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
   }
 
   .layout-toggle {
