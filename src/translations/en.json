@@ -413,6 +413,18 @@
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button"
   },
+  "command": {
+    "placeholder": "Type a command or search…",
+    "no_results": "No results found",
+    "group_navigation": "Navigation",
+    "group_devices": "Devices",
+    "go_dashboard": "Go to dashboard",
+    "enable_diff_button": "Enable YAML diff button",
+    "disable_diff_button": "Disable YAML diff button",
+    "navigate_hint": "to navigate",
+    "select_hint": "to select",
+    "close_hint": "to close"
+  },
   "settings": {
     "appearance": "Appearance",
     "editor": "Editor",

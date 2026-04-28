@@ -42,6 +42,7 @@ import { espHomeStyles } from "../styles/shared.js";
 
 // Import child components
 import "../pages/dashboard.js";
+import "./command-palette.js";
 import "./esphome-layout.js";
 
 @customElement("esphome-app")
@@ -334,6 +335,7 @@ export class ESPHomeApp extends LitElement {
       >
         ${this._router.outlet()}
       </esphome-layout>
+      <esphome-command-palette></esphome-command-palette>
     `;
   }
 
