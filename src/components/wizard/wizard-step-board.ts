@@ -5,6 +5,7 @@ import {
   mdiChevronDown,
   mdiOpenInNew,
   mdiPlus,
+  mdiUsbPort,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -27,6 +28,7 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "open-in-new": mdiOpenInNew,
   plus: mdiPlus,
+  "usb-port": mdiUsbPort,
 });
 
 @customElement("esphome-wizard-step-board")
@@ -80,7 +82,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
     this._loading = true;
     try {
       const query = this._search.trim() || undefined;
-      const filter = ESPHomeWizardStepBoard.PLATFORMS.find((p) => p.label === this._selectedFilter);
+      const filter = ESPHomeWizardStepBoard.PLATFORMS.find(
+        (p) => p.label === this._selectedFilter
+      );
       const platform = filter?.platform || undefined;
       const variant = filter?.variant || undefined;
       const response = await this._api.getBoards({ query, platform, variant, limit: 50 });
@@ -109,9 +113,10 @@ export class ESPHomeWizardStepBoard extends LitElement {
       .helper-row {
         display: flex;
         flex-wrap: wrap;
-        gap: var(--wa-space-m);
+        align-items: center;
+        gap: var(--wa-space-s);
         font-size: var(--wa-font-size-xs);
-        margin-top: calc(-1 * var(--wa-space-xs));
+        margin-top: calc(-1 * var(--wa-space-2xs));
       }
 
       .helper-link {
@@ -128,8 +133,33 @@ export class ESPHomeWizardStepBoard extends LitElement {
         text-decoration: none;
       }
 
-      .helper-link--bold {
+      .connect-board-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+        padding: var(--wa-space-xs) var(--wa-space-m);
+        font-family: inherit;
+        font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
+        color: var(--esphome-primary);
+        background: var(--esphome-primary-light);
+        border: none;
+        border-radius: var(--wa-border-radius-m);
+        cursor: pointer;
+        transition: background 0.12s;
+      }
+
+      .connect-board-btn:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary-light), black 5%);
+      }
+
+      .connect-board-btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .connect-board-btn wa-icon {
+        font-size: 16px;
       }
 
       .featured-card {
@@ -385,23 +415,25 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
       <div class="platform-filters">
         ${ESPHomeWizardStepBoard.PLATFORMS.map(
-          (p) => html`<button
-            class="platform-chip ${this._selectedFilter === p.label ? "platform-chip--active" : ""}"
-            @click=${() => this._onPlatformFilter(p.label)}
-          >${p.label}</button>`
+          (p) =>
+            html`<button
+              class="platform-chip ${this._selectedFilter === p.label
+                ? "platform-chip--active"
+                : ""}"
+              @click=${() => this._onPlatformFilter(p.label)}
+            >
+              ${p.label}
+            </button>`
         )}
       </div>
 
       <div class="helper-row">
+        <button class="connect-board-btn" type="button" @click=${this._connectBoard}>
+          <wa-icon library="mdi" name="usb-port"></wa-icon>
+          ${this._localize("wizard.connect_your_board")}
+        </button>
         <button class="helper-link" type="button">
           ${this._localize("wizard.dont_know_board")}
-        </button>
-        <button
-          class="helper-link helper-link--bold"
-          type="button"
-          @click=${this._connectBoard}
-        >
-          ${this._localize("wizard.connect_your_board")}
         </button>
       </div>
 
@@ -445,7 +477,10 @@ export class ESPHomeWizardStepBoard extends LitElement {
           <p class="featured-desc">${board.description}</p>
           <div class="tags">
             <wa-badge variant="neutral" pill style="font-size: var(--wa-font-size-s);"
-              >${this._localizeTag(board.esphome.variant || board.esphome.platform)}</wa-badge>
+              >${this._localizeTag(
+                board.esphome.variant || board.esphome.platform
+              )}</wa-badge
+            >
             ${board.tags.map(
               (tag) =>
                 html`<wa-badge
@@ -500,11 +535,11 @@ export class ESPHomeWizardStepBoard extends LitElement {
         </p>
 
         <div class="tags">
-          <wa-badge
-            style="font-size: var(--wa-font-size-xs);"
-            variant="neutral"
-            pill
-          >${this._localizeTag(board.esphome.variant || board.esphome.platform)}</wa-badge>
+          <wa-badge style="font-size: var(--wa-font-size-xs);" variant="neutral" pill
+            >${this._localizeTag(
+              board.esphome.variant || board.esphome.platform
+            )}</wa-badge
+          >
           ${board.tags.map(
             (tag) =>
               html`<wa-badge
