@@ -1,7 +1,9 @@
 import { consume } from "@lit/context";
+import { indentWithTab } from "@codemirror/commands";
+import { indentUnit } from "@codemirror/language";
 import { StateEffect, StateField } from "@codemirror/state";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { Decoration, type DecorationSet } from "@codemirror/view";
+import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
 import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { basicSetup, EditorView } from "codemirror";
@@ -80,6 +82,8 @@ export class ESPHomeYamlEditor extends LitElement {
         extensions: [
           basicSetup,
           esphomeYaml(),
+          indentUnit.of("  "),
+          keymap.of([indentWithTab]),
           highlightField,
           EditorView.theme({
             "&": { height: "100%" },
