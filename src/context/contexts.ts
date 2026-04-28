@@ -47,3 +47,8 @@ export const isHaIngressContext = createContext<boolean>(
 export const activeJobsContext = createContext<Map<string, FirmwareJob>>(
   Symbol("esphome-active-jobs")
 );
+
+/** Context for whether the YAML diff button is enabled in the editor. */
+export const yamlDiffButtonContext = createContext<boolean>(
+  Symbol("esphome-yaml-diff-button")
+);

@@ -36,6 +36,7 @@ import {
   isHaIngressContext,
   localizeContext,
   versionContext,
+  yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 
@@ -81,6 +82,10 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: localizeContext })
   @state()
   private _localize: LocalizeFunc = defaultLocalize;
+
+  @provide({ context: yamlDiffButtonContext })
+  @state()
+  private _yamlDiffButton = false;
 
   // ─── Router ──────────────────────────────────────────────
 
@@ -164,6 +169,7 @@ export class ESPHomeApp extends LitElement {
     try {
       const prefs = await this._api.getPreferences();
       this._applyTheme(prefs.theme);
+      this._yamlDiffButton = prefs.yaml_diff_button;
     } catch {
       // Preferences not critical — keep localStorage value
     }
@@ -322,7 +328,10 @@ export class ESPHomeApp extends LitElement {
 
   protected render() {
     return html`
-      <esphome-layout @set-theme=${this._onSetTheme}>
+      <esphome-layout
+        @set-theme=${this._onSetTheme}
+        @set-yaml-diff-button=${this._onSetYamlDiffButton}
+      >
         ${this._router.outlet()}
       </esphome-layout>
     `;
@@ -332,6 +341,12 @@ export class ESPHomeApp extends LitElement {
     const theme = e.detail as Theme;
     this._applyTheme(theme);
     this._api.updatePreferences({ theme }).catch(() => {});
+  }
+
+  private _onSetYamlDiffButton(e: CustomEvent<boolean>) {
+    const enabled = e.detail;
+    this._yamlDiffButton = enabled;
+    this._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
   }
 }
 

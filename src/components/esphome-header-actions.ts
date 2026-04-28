@@ -1,9 +1,10 @@
 import { consume } from "@lit/context";
 import {
-  mdiCog,
+  mdiCheck,
   mdiDotsVertical,
   mdiKeyVariant,
   mdiUpdate,
+  mdiVectorDifference,
   mdiWeatherNight,
   mdiWeatherSunny,
   mdiThemeLightDark,
@@ -11,17 +12,22 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { darkModeContext, localizeContext } from "../context/index.js";
+import {
+  darkModeContext,
+  localizeContext,
+  yamlDiffButtonContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
-  cog: mdiCog,
+  check: mdiCheck,
   "dots-vertical": mdiDotsVertical,
   "key-variant": mdiKeyVariant,
   update: mdiUpdate,
+  "vector-difference": mdiVectorDifference,
   "weather-night": mdiWeatherNight,
   "weather-sunny": mdiWeatherSunny,
   "theme-light-dark": mdiThemeLightDark,
@@ -42,6 +48,10 @@ export class ESPHomeHeaderActions extends LitElement {
 
   @state()
   private _open = false;
+
+  @consume({ context: yamlDiffButtonContext, subscribe: true })
+  @state()
+  private _yamlDiffButton = false;
 
   private get _currentTheme(): string {
     return localStorage.getItem("esphome-theme") ?? "system";
@@ -142,6 +152,15 @@ export class ESPHomeHeaderActions extends LitElement {
         color: var(--esphome-primary);
       }
 
+      .menu-item-label {
+        flex: 1;
+      }
+
+      .menu-item .check {
+        font-size: 14px;
+        color: var(--esphome-primary);
+      }
+
       .menu-divider {
         height: 1px;
         background: var(--wa-color-surface-border);
@@ -182,9 +201,17 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 ${this._localize("layout.secrets")}
               </div>
-              <div class="menu-item" @click=${this._openSettings}>
-                <wa-icon library="mdi" name="cog"></wa-icon>
-                ${this._localize("layout.settings")}
+              <div class="menu-divider"></div>
+              <span class="menu-label">${this._localize("layout.editor")}</span>
+              <div
+                class="menu-item ${this._yamlDiffButton ? "menu-item--active" : ""}"
+                @click=${this._toggleYamlDiffButton}
+              >
+                <wa-icon library="mdi" name="vector-difference"></wa-icon>
+                <span class="menu-item-label">${this._localize("layout.yaml_diff_button")}</span>
+                ${this._yamlDiffButton
+                  ? html`<wa-icon class="check" library="mdi" name="check"></wa-icon>`
+                  : nothing}
               </div>
               <div class="menu-divider"></div>
               <span class="menu-label">${this._localize("layout.theme")}</span>
@@ -220,12 +247,6 @@ export class ESPHomeHeaderActions extends LitElement {
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
 
-  private _openSettings() {
-    this._close();
-    window.history.pushState({}, "", "/settings");
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }
-
   private _openUpdateAll() {
     this._close();
     window.dispatchEvent(new CustomEvent("esphome-enter-select-mode"));
@@ -236,6 +257,17 @@ export class ESPHomeHeaderActions extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-theme", {
         detail: theme,
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _toggleYamlDiffButton() {
+    const next = !this._yamlDiffButton;
+    this.dispatchEvent(
+      new CustomEvent("set-yaml-diff-button", {
+        detail: next,
         bubbles: true,
         composed: true,
       }),

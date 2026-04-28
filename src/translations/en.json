@@ -369,7 +369,10 @@
     "add_config_error": "Failed to add config section",
     "editor_layout_label": "Editor layout",
     "yaml_preview": "YAML preview",
-    "yaml_preview_toggle": "Show YAML"
+    "yaml_preview_toggle": "Show YAML",
+    "diff_view_diff": "Show diff against saved",
+    "diff_view_editor": "Back to editor",
+    "diff_no_changes": "No unsaved changes"
   },
   "validation": {
     "required": "This field is required",
@@ -401,7 +404,9 @@
     "theme_system": "System",
     "settings": "Settings",
     "back": "Back",
-    "home_assistant": "Home Assistant"
+    "home_assistant": "Home Assistant",
+    "editor": "Editor",
+    "yaml_diff_button": "YAML diff button"
   },
   "settings": {
     "appearance": "Appearance",

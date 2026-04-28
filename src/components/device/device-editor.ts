@@ -3,15 +3,17 @@ import {
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
+  mdiVectorDifference,
   mdiViewSplitHorizontal,
 } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { deviceEditorStyles } from "./device-editor.styles.js";
 import {
   categorizeSections,
   parseYamlAutomations,
@@ -22,6 +24,7 @@ import type { HighlightRange } from "../yaml-editor.js";
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../yaml-editor.js";
+import "../yaml-diff.js";
 import "./device-board-info.js";
 
 registerMdiIcons({
@@ -29,6 +32,7 @@ registerMdiIcons({
   "layout-left": mdiDockLeft,
   "layout-right": mdiDockRight,
   "layout-split": mdiViewSplitHorizontal,
+  "vector-difference": mdiVectorDifference,
 });
 
 export type DeviceLayoutMode = "both" | "left" | "right";
@@ -93,197 +97,14 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ attribute: false })
   savedYaml = "";
 
-  static styles = [
-    espHomeStyles,
-    css`
-      :host {
-        display: contents;
-      }
+  @consume({ context: yamlDiffButtonContext, subscribe: true })
+  @state()
+  private _showDiffButton = false;
 
-      .card {
-        background: var(--wa-color-surface-default);
-        border-radius: var(--wa-border-radius-l);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        box-shadow: var(--wa-elevation-02);
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
+  @state()
+  private _showDiff = false;
 
-      .card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: var(--wa-space-s) var(--wa-space-m);
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .editor-header-main {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-        flex: 1;
-      }
-
-      .editor-header-title {
-        margin: 0;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .save-button {
-        position: absolute;
-        bottom: var(--wa-space-m);
-        right: var(--wa-space-m);
-        z-index: 10;
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        border: none;
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-        padding: 8px 16px;
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
-        transition:
-          background 0.12s,
-          box-shadow 0.12s,
-          transform 0.12s;
-      }
-
-      .save-button:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
-        transform: translateY(-1px);
-      }
-
-      .save-button:active:not(:disabled) {
-        transform: translateY(0);
-      }
-
-      .save-button:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-        box-shadow: none;
-        transform: none;
-      }
-
-      .save-button wa-icon {
-        font-size: 16px;
-      }
-
-      .layout-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-      }
-
-      .layout-toggle button {
-        border: none;
-        background: transparent;
-        color: var(--esphome-on-primary);
-        padding: 2px 4px;
-        border-radius: 4px;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .layout-toggle button[aria-pressed="true"] {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-      }
-
-      .layout-toggle button:disabled {
-        opacity: 0.35;
-        cursor: not-allowed;
-      }
-
-      .layout-toggle wa-icon {
-        font-size: 18px;
-      }
-
-      .card-body {
-        position: relative;
-        flex: 1;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-      }
-
-      .editor-layout {
-        flex: 1;
-        min-height: 0;
-        display: grid;
-        gap: 0;
-      }
-
-      .editor-layout--both {
-        grid-template-columns: 1fr 1px 1fr;
-      }
-
-      .editor-layout--left {
-        grid-template-columns: 1fr;
-      }
-
-      .editor-layout--right {
-        grid-template-columns: 1fr;
-      }
-
-      .editor-pane {
-        padding: var(--wa-space-m);
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-        min-height: 0;
-        overflow: hidden;
-      }
-
-      .editor-pane--left {
-        overflow-y: auto;
-      }
-
-      .editor-pane-title {
-        margin: 0;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      .editor-pane-body {
-        flex: 1;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .pane-divider {
-        background: var(--wa-color-surface-border);
-        width: 1px;
-        align-self: stretch;
-      }
-
-      .editor-layout--left .editor-pane--right,
-      .editor-layout--right .editor-pane--left {
-        display: none;
-      }
-
-      @media (max-width: 900px) {
-        .layout-toggle .split-btn {
-          display: none;
-        }
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, deviceEditorStyles];
 
   protected render() {
     const hasBoard = !!this.board;
@@ -317,37 +138,53 @@ export class ESPHomeDeviceEditor extends LitElement {
           <div class="editor-header-main">
             <h2 class="editor-header-title">${title}</h2>
           </div>
-          <div
-            class="layout-toggle"
-            aria-label=${this._localize("device.editor_layout_label")}
-          >
-            <button
-              type="button"
-              aria-pressed=${effectiveLayout === "left"}
-              ?disabled=${!hasBoard}
-              @click=${() => this._setLayout("left")}
-              title=${this._localize("device.layout_components_only")}
+          <div class="header-actions">
+            ${this._showDiffButton
+              ? html`<button
+                  type="button"
+                  class="diff-toggle"
+                  aria-pressed=${this._showDiff}
+                  ?disabled=${this.yaml === this.savedYaml && !this._showDiff}
+                  @click=${this._toggleDiff}
+                  title=${this._showDiff
+                    ? this._localize("device.diff_view_editor")
+                    : this._localize("device.diff_view_diff")}
+                >
+                  <wa-icon library="mdi" name="vector-difference"></wa-icon>
+                </button>`
+              : nothing}
+            <div
+              class="layout-toggle"
+              aria-label=${this._localize("device.editor_layout_label")}
             >
-              <wa-icon library="mdi" name="layout-left"></wa-icon>
-            </button>
-            <button
-              class="split-btn"
-              type="button"
-              aria-pressed=${effectiveLayout === "both"}
-              ?disabled=${!hasBoard}
-              @click=${() => this._setLayout("both")}
-              title=${this._localize("device.layout_split")}
-            >
-              <wa-icon library="mdi" name="layout-split"></wa-icon>
-            </button>
-            <button
-              type="button"
-              aria-pressed=${effectiveLayout === "right"}
-              @click=${() => this._setLayout("right")}
-              title=${this._localize("device.layout_yaml_only")}
-            >
-              <wa-icon library="mdi" name="layout-right"></wa-icon>
-            </button>
+              <button
+                type="button"
+                aria-pressed=${effectiveLayout === "left"}
+                ?disabled=${!hasBoard}
+                @click=${() => this._setLayout("left")}
+                title=${this._localize("device.layout_components_only")}
+              >
+                <wa-icon library="mdi" name="layout-left"></wa-icon>
+              </button>
+              <button
+                class="split-btn"
+                type="button"
+                aria-pressed=${effectiveLayout === "both"}
+                ?disabled=${!hasBoard}
+                @click=${() => this._setLayout("both")}
+                title=${this._localize("device.layout_split")}
+              >
+                <wa-icon library="mdi" name="layout-split"></wa-icon>
+              </button>
+              <button
+                type="button"
+                aria-pressed=${effectiveLayout === "right"}
+                @click=${() => this._setLayout("right")}
+                title=${this._localize("device.layout_yaml_only")}
+              >
+                <wa-icon library="mdi" name="layout-right"></wa-icon>
+              </button>
+            </div>
           </div>
         </header>
         <div class="card-body">
@@ -377,12 +214,17 @@ export class ESPHomeDeviceEditor extends LitElement {
               : nothing}
             <div class="editor-pane editor-pane--right">
               <div class="editor-pane-body">
-                <esphome-yaml-editor
-                  .value=${this.yaml}
-                  .highlightRange=${this.highlightRange}
-                  .scrollToHighlight=${this.scrollToHighlight}
-                  @yaml-change=${this._onYamlChange}
-                ></esphome-yaml-editor>
+                ${this._showDiff
+                  ? html`<esphome-yaml-diff
+                      .oldValue=${this.savedYaml}
+                      .newValue=${this.yaml}
+                    ></esphome-yaml-diff>`
+                  : html`<esphome-yaml-editor
+                      .value=${this.yaml}
+                      .highlightRange=${this.highlightRange}
+                      .scrollToHighlight=${this.scrollToHighlight}
+                      @yaml-change=${this._onYamlChange}
+                    ></esphome-yaml-editor>`}
               </div>
             </div>
           </div>
@@ -398,6 +240,24 @@ export class ESPHomeDeviceEditor extends LitElement {
         composed: true,
       })
     );
+  }
+
+  private _toggleDiff() {
+    this._showDiff = !this._showDiff;
+  }
+
+  updated(changed: Map<string, unknown>) {
+    if (this._showDiff && changed.has("_showDiffButton") && !this._showDiffButton) {
+      this._showDiff = false;
+      return;
+    }
+    if (
+      this._showDiff &&
+      changed.has("savedYaml") &&
+      this.yaml === this.savedYaml
+    ) {
+      this._showDiff = false;
+    }
   }
 
   private _setLayout(layout: DeviceLayoutMode) {
