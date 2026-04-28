@@ -38,6 +38,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @property()
   deviceState: DeviceState = DeviceState.UNKNOWN;
 
+  @property()
+  mode: "install" | "logs" = "install";
+
   @state() private _view: DialogView = "method";
   @state() private _ports: SerialPort[] = [];
   @state() private _loadingPorts = false;
@@ -191,9 +194,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   ];
 
   protected render() {
+    const methodTitleKey =
+      this.mode === "logs"
+        ? "dashboard.logs_method_title"
+        : "dashboard.install_method_title";
     const label =
       this._view === "method"
-        ? this._localize("dashboard.install_method_title")
+        ? this._localize(methodTitleKey)
         : this._localize("dashboard.install_method_select_port");
 
     return html`

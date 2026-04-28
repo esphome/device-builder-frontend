@@ -435,6 +435,7 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-install-method-dialog
         ?open=${this._installMethodOpen}
         .deviceState=${this._installMethodDevice?.state ?? DeviceState.UNKNOWN}
+        .mode=${this._installMethodMode}
         @close=${() => { this._installMethodOpen = false; }}
         @select-method=${this._onInstallMethodSelect}
       ></esphome-install-method-dialog>
