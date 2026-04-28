@@ -112,15 +112,15 @@ export class ESPHomeCommandPalette extends LitElement {
     const nav: CommandAction[] = [
       {
         id: "nav.home",
-        group: t("command.group_navigation"),
-        label: t("command.go_dashboard"),
+        group: t("command_palette.group_navigation"),
+        label: t("command_palette.go_dashboard"),
         icon: "home",
         keywords: ["dashboard", "devices"],
         run: () => navigate("/"),
       },
       {
         id: "nav.secrets",
-        group: t("command.group_navigation"),
+        group: t("command_palette.group_navigation"),
         label: t("layout.secrets"),
         icon: "key-variant",
         keywords: ["password", "wifi"],
@@ -128,7 +128,7 @@ export class ESPHomeCommandPalette extends LitElement {
       },
     ];
 
-    const deviceGroup = t("command.group_devices");
+    const deviceGroup = t("command_palette.group_devices");
     const devices: CommandAction[] = this._devices.map((d) => ({
       id: `device.${d.configuration}`,
       group: deviceGroup,
@@ -171,8 +171,8 @@ export class ESPHomeCommandPalette extends LitElement {
         id: "editor.diff_button",
         group: t("layout.editor"),
         label: this._yamlDiffEnabled
-          ? t("command.disable_diff_button")
-          : t("command.enable_diff_button"),
+          ? t("command_palette.disable_diff_button")
+          : t("command_palette.enable_diff_button"),
         icon: "vector-difference",
         keywords: ["diff", "yaml", "compare"],
         run: () => this._toggleDiffButton(),
@@ -226,7 +226,7 @@ export class ESPHomeCommandPalette extends LitElement {
             class="search-input"
             type="text"
             .value=${this._query}
-            placeholder=${this._localize("command.placeholder")}
+            placeholder=${this._localize("command_palette.placeholder")}
             @input=${this._onQueryInput}
             @keydown=${this._onInputKeyDown}
             autocomplete="off"
@@ -235,7 +235,7 @@ export class ESPHomeCommandPalette extends LitElement {
         </div>
         <div class="list" role="listbox">
           ${items.length === 0
-            ? html`<div class="empty">${this._localize("command.no_results")}</div>`
+            ? html`<div class="empty">${this._localize("command_palette.no_results")}</div>`
             : groups.map(
                 (g) => html`
                   <div class="group">
@@ -246,9 +246,9 @@ export class ESPHomeCommandPalette extends LitElement {
               )}
         </div>
         <div class="footer">
-          <span><kbd>↑</kbd><kbd>↓</kbd> ${this._localize("command.navigate_hint")}</span>
-          <span><kbd>↵</kbd> ${this._localize("command.select_hint")}</span>
-          <span><kbd>esc</kbd> ${this._localize("command.close_hint")}</span>
+          <span><kbd>↑</kbd><kbd>↓</kbd> ${this._localize("command_palette.navigate_hint")}</span>
+          <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
+          <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
         </div>
       </div>
     `;

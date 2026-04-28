@@ -413,7 +413,7 @@
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button"
   },
-  "command": {
+  "command_palette": {
     "placeholder": "Type a command or search…",
     "no_results": "No results found",
     "group_navigation": "Navigation",
