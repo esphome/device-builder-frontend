@@ -1,20 +1,24 @@
 import { consume } from "@lit/context";
 import { mdiArrowCollapseLeft, mdiArrowCollapseRight } from "@mdi/js";
-import { css, html, LitElement } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { html, LitElement } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { BoardCatalogEntry, ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { DeviceLayoutMode } from "../components/device/device-editor.js";
+import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
 import { apiContext, devicesContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
+import "../components/unsaved-changes-dialog.js";
 
 registerMdiIcons({
   "arrow-collapse-left": mdiArrowCollapseLeft,
@@ -87,10 +91,80 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _savedYaml = "";
 
+  @query("esphome-unsaved-changes-dialog")
+  private _leaveDialog!: ESPHomeUnsavedChangesDialog;
+
+  private _pendingLeaveResolve: ((value: boolean) => void) | null = null;
+
+  /** When true, the next popstate is allowed to fall through to the router. */
+  private _allowingLeave = false;
+
+  private get _isDirty(): boolean {
+    return this._yaml !== this._savedYaml;
+  }
+
+  private _confirmLeave = (): Promise<boolean> => {
+    if (!this._isDirty) return Promise.resolve(true);
+    if (this._pendingLeaveResolve) return Promise.resolve(false);
+    return new Promise<boolean>((resolve) => {
+      this._pendingLeaveResolve = resolve;
+      this._leaveDialog?.open();
+    });
+  };
+
+  private _resolvePendingLeave(value: boolean) {
+    const r = this._pendingLeaveResolve;
+    this._pendingLeaveResolve = null;
+    r?.(value);
+  }
+
+  private _onLeaveDiscard = () => this._resolvePendingLeave(true);
+
+  private _onLeaveSave = () => {
+    this._saveYaml();
+    this._resolvePendingLeave(true);
+  };
+
+  private _onLeaveCancel = () => this._resolvePendingLeave(false);
+
+  private _onBeforeUnload = (e: BeforeUnloadEvent) => {
+    if (this._isDirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
+  };
+
+  private _onPopState = (e: PopStateEvent) => {
+    if (this._allowingLeave) {
+      this._allowingLeave = false;
+      return;
+    }
+    if (!this._isDirty) return;
+    e.stopImmediatePropagation();
+    window.history.pushState({}, "", `/device/${this.id}`);
+    this._confirmLeave().then((canLeave) => {
+      if (canLeave) {
+        this._allowingLeave = true;
+        window.history.back();
+      }
+    });
+  };
+
   async connectedCallback() {
     super.connectedCallback();
     this._loadBoardCatalog();
     this._loadPreferences();
+    setLeaveGuard(this._confirmLeave);
+    window.addEventListener("beforeunload", this._onBeforeUnload);
+    window.addEventListener("popstate", this._onPopState, { capture: true });
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    setLeaveGuard(null);
+    window.removeEventListener("beforeunload", this._onBeforeUnload);
+    window.removeEventListener("popstate", this._onPopState, { capture: true });
+    this._resolvePendingLeave(false);
   }
 
   updated(changedProperties: Map<string, unknown>) {
@@ -148,117 +222,7 @@ export class ESPHomePageDevice extends LitElement {
     });
   }
 
-  static styles = [
-    espHomeStyles,
-    css`
-      :host {
-        display: block;
-      }
-
-      .page {
-        box-sizing: border-box;
-        padding: var(--wa-space-l);
-        min-height: calc(100vh - var(--esphome-header-height));
-      }
-
-      .layout-grid {
-        display: grid;
-        grid-template-columns: minmax(230px, 1fr) minmax(0, 5fr);
-        gap: var(--wa-space-l);
-        height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
-        transition: grid-template-columns 0.25s ease;
-      }
-
-      .layout-grid.nav-collapsed {
-        grid-template-columns: minmax(0, 5fr);
-      }
-
-      .layout-grid.nav-collapsed .desktop-nav {
-        display: none;
-      }
-
-      /* ─── Desktop: hide drawer, show sidebar nav ─── */
-
-      .drawer,
-      .drawer-backdrop {
-        display: none;
-      }
-
-      .nav-toggle-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: none;
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-        padding: 4px;
-        border-radius: var(--wa-border-radius-m);
-        margin-right: var(--wa-space-xs);
-      }
-
-      .nav-toggle-btn wa-icon {
-        font-size: 14px;
-      }
-      .nav-toggle-btn:hover {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 70%);
-      }
-
-      /* ─── Mobile ─── */
-
-      @media (max-width: 900px) {
-        .layout-grid {
-          grid-template-columns: 1fr;
-          height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
-        }
-
-        /* Hide the desktop sidebar */
-        .desktop-nav {
-          display: none !important;
-        }
-
-        /* Drawer backdrop */
-        .drawer-backdrop {
-          display: none;
-          position: fixed;
-          inset: 0;
-          background: rgba(0, 0, 0, 0.4);
-          z-index: 99;
-        }
-
-        .drawer-backdrop--open {
-          display: block;
-        }
-
-        /* Drawer panel */
-        .drawer {
-          display: block;
-          position: fixed;
-          top: 0;
-          left: 0;
-          bottom: 0;
-          width: 300px;
-          max-width: 85vw;
-          z-index: 100;
-          background: var(--wa-color-surface-default);
-          box-shadow: var(--wa-shadow-l);
-          overflow-y: auto;
-          transform: translateX(-100%);
-          transition: transform 0.25s ease;
-        }
-
-        .drawer--open {
-          transform: translateX(0);
-        }
-
-        /* Remove card radius and border inside drawer */
-        .drawer {
-          --navigator-border-radius: 0;
-          --navigator-border: none;
-        }
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, devicePageStyles];
 
   protected render() {
     const deviceTitle =
@@ -331,6 +295,11 @@ export class ESPHomePageDevice extends LitElement {
           </esphome-device-editor>
         </div>
       </div>
+      <esphome-unsaved-changes-dialog
+        @discard=${this._onLeaveDiscard}
+        @save=${this._onLeaveSave}
+        @cancel=${this._onLeaveCancel}
+      ></esphome-unsaved-changes-dialog>
     `;
   }
 

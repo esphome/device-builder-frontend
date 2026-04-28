@@ -18,6 +18,7 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -243,8 +244,7 @@ export class ESPHomeHeaderActions extends LitElement {
 
   private _openSecrets() {
     this._close();
-    window.history.pushState({}, "", "/secrets");
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    navigate("/secrets");
   }
 
   private _openUpdateAll() {

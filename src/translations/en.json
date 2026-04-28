@@ -372,7 +372,12 @@
     "yaml_preview_toggle": "Show YAML",
     "diff_view_diff": "Show diff against saved",
     "diff_view_editor": "Back to editor",
-    "diff_no_changes": "No unsaved changes"
+    "diff_no_changes": "No unsaved changes",
+    "unsaved_title": "Unsaved changes",
+    "unsaved_message": "You have unsaved changes in this device. If you leave without saving, they will be lost.",
+    "leave_anyway": "Leave anyway",
+    "discard_changes": "Discard",
+    "save_and_leave": "Save"
   },
   "validation": {
     "required": "This field is required",

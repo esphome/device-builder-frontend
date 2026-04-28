@@ -5,6 +5,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { isHaIngressContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
@@ -104,8 +105,7 @@ export class ESPHomeLayout extends LitElement {
   ];
 
   private _goHome() {
-    window.history.pushState({}, "", "/");
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    navigate("/");
   }
 
   protected render() {

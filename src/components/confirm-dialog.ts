@@ -152,7 +152,10 @@ export class ESPHomeConfirmDialog extends LitElement {
     `,
   ];
 
+  private _confirmed = false;
+
   open() {
+    this._confirmed = false;
     this._dialog.open = true;
   }
 
@@ -162,7 +165,11 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog label=${this.heading} light-dismiss>
+      <wa-dialog
+        label=${this.heading}
+        light-dismiss
+        @wa-after-hide=${this._onAfterHide}
+      >
         <div class="body">
           ${this.destructive
             ? html`<div class="icon-wrap destructive">
@@ -187,10 +194,19 @@ export class ESPHomeConfirmDialog extends LitElement {
   }
 
   private _confirm() {
+    this._confirmed = true;
     this.close();
     this.dispatchEvent(
       new CustomEvent("confirm", { bubbles: true, composed: true }),
     );
+  }
+
+  private _onAfterHide() {
+    if (!this._confirmed) {
+      this.dispatchEvent(
+        new CustomEvent("cancel", { bubbles: true, composed: true }),
+      );
+    }
   }
 }
 
