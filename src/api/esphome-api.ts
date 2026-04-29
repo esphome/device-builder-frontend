@@ -13,6 +13,7 @@ import type {
   CommandMessage,
   ComponentCatalogEntry,
   DevicesResponse,
+  EditorValidateResponse,
   ErrorMessage,
   EventMessage,
   EventSubscriptionCallback,
@@ -607,5 +608,23 @@ export class ESPHomeAPI {
   /** Ping the server. */
   async ping(): Promise<{ pong: boolean }> {
     return this.sendCommand("ping");
+  }
+
+  // ─── Editor (live YAML validation) ────────────────────────
+
+  /**
+   * Validate YAML for the editor. Backend pipes the content through the
+   * upstream `esphome vscode --ace` subprocess and returns the same
+   * `{yaml_errors, validation_errors}` shape upstream renders inline.
+   */
+  async validateYaml(
+    configuration: string,
+    content: string,
+  ): Promise<EditorValidateResponse> {
+    return this.sendCommand<EditorValidateResponse>(
+      "editor/validate_yaml",
+      { configuration, content },
+      30000,
+    );
   }
 }
