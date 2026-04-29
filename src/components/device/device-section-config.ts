@@ -40,7 +40,6 @@ interface SectionConfigResponse {
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
-import "@home-assistant/webawesome/dist/components/popover/popover.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
@@ -100,8 +99,25 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _fieldErrors: Map<string, ValidationError> = new Map();
 
+  /** Section keys whose Advanced section is currently expanded. Tracking this
+   *  per-section means switching between configs (esphome → wifi → logger)
+   *  doesn't bleed one section's state into another. */
   @state()
-  private _advancedOpen = false;
+  private _advancedOpenSections = new Set<string>();
+
+  private get _advancedOpen(): boolean {
+    return this._advancedOpenSections.has(this.sectionKey);
+  }
+
+  private _setAdvancedOpen(open: boolean) {
+    const next = new Set(this._advancedOpenSections);
+    if (open) {
+      next.add(this.sectionKey);
+    } else {
+      next.delete(this.sectionKey);
+    }
+    this._advancedOpenSections = next;
+  }
 
   /**
    * Top-level component keys present in the device's YAML (e.g. `wifi`,
@@ -259,34 +275,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
       .help-button:hover {
         color: var(--esphome-primary);
-      }
-
-      .help-popover {
-        max-width: 320px;
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-normal);
-        line-height: 1.5;
-      }
-
-      .help-popover p {
-        margin: 0 0 var(--wa-space-s);
-      }
-
-      .help-popover p:last-child {
-        margin-bottom: 0;
-      }
-
-      .help-popover a {
-        display: inline-flex;
-        align-items: center;
-        gap: var(--wa-space-2xs);
-        color: var(--esphome-primary);
-        text-decoration: none;
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      .help-popover a:hover {
-        text-decoration: underline;
       }
 
       .advanced-section {
@@ -740,7 +728,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         <button
           class="advanced-toggle"
           @click=${() => {
-            this._advancedOpen = !this._advancedOpen;
+            this._setAdvancedOpen(!this._advancedOpen);
           }}
         >
           <wa-icon
@@ -824,13 +812,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const invalid = this._errorFor(entry.key) !== null;
     return html`
       <div class="field" data-field-key=${entry.key}>
-        <label class="field-label">
-          ${entry.label}
-          ${entry.required ? html`<span class="required">*</span>` : nothing}
-        </label>
-        ${entry.description
-          ? html`<p class="field-description">${entry.description}</p>`
-          : nothing}
+        ${this._renderLabel(entry)}
         <input
           type=${inputType}
           class=${invalid ? "invalid" : ""}
@@ -852,13 +834,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const max = entry.range ? String(entry.range[1]) : undefined;
     return html`
       <div class="field" data-field-key=${entry.key}>
-        <label class="field-label">
-          ${entry.label}
-          ${entry.required ? html`<span class="required">*</span>` : nothing}
-        </label>
-        ${entry.description
-          ? html`<p class="field-description">${entry.description}</p>`
-          : nothing}
+        ${this._renderLabel(entry)}
         <input
           type="number"
           class=${invalid ? "invalid" : ""}
@@ -1102,13 +1078,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    *  - both             → popover with description and a "Learn more" link
    */
   private _renderLabel(entry: ConfigEntry) {
-    const hasHelp = !!(entry.description || entry.help_link);
     return html`
       <label class="field-label">
         ${this._labelFor(entry)}
         ${entry.required ? html`<span class="required">*</span>` : nothing}
-        ${hasHelp ? this._renderHelp(entry) : nothing}
+        ${entry.help_link ? this._renderHelpLink(entry) : nothing}
       </label>
+      ${entry.description
+        ? html`<p class="field-description">${entry.description}</p>`
+        : nothing}
     `;
   }
 
@@ -1134,39 +1112,20 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       .join(" ");
   }
 
-  private _renderHelp(entry: ConfigEntry) {
-    const helpId = `help-${entry.key}`;
-    // No description but has a link → render as a plain link button.
-    if (!entry.description && entry.help_link) {
-      return html`<a
-        class="help-button"
-        href=${entry.help_link}
-        target="_blank"
-        rel="noreferrer"
-        title=${this._localize("device.docs")}
-      >
-        <wa-icon library="mdi" name="help-circle-outline"></wa-icon>
-      </a>`;
-    }
-    // Description (with or without link) → popover.
-    return html`
-      <button class="help-button" id=${helpId} type="button">
-        <wa-icon library="mdi" name="help-circle-outline"></wa-icon>
-      </button>
-      <wa-popover for=${helpId} placement="top">
-        <div class="help-popover">
-          ${entry.description ? html`<p>${entry.description}</p>` : nothing}
-          ${entry.help_link
-            ? html`<p>
-                <a href=${entry.help_link} target="_blank" rel="noreferrer">
-                  ${this._localize("device.docs")}
-                  <wa-icon library="mdi" name="open-in-new"></wa-icon>
-                </a>
-              </p>`
-            : nothing}
-        </div>
-      </wa-popover>
-    `;
+  /** Inline docs-link icon shown next to the label when an entry has a
+   *  `help_link`. Description text is rendered below the label as a regular
+   *  paragraph (see `_renderLabel`) — no popover. */
+  private _renderHelpLink(entry: ConfigEntry) {
+    if (!entry.help_link) return nothing;
+    return html`<a
+      class="help-button"
+      href=${entry.help_link}
+      target="_blank"
+      rel="noreferrer"
+      title=${this._localize("device.docs")}
+    >
+      <wa-icon library="mdi" name="open-in-new"></wa-icon>
+    </a>`;
   }
 
   private _setValue(key: string, value: unknown) {
@@ -1189,7 +1148,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // If the failing field lives in the collapsed Advanced section it isn't
     // in the DOM yet — open it and wait for the re-render before searching.
     if (firstEntry.advanced && !this._advancedOpen) {
-      this._advancedOpen = true;
+      this._setAdvancedOpen(true);
       await this.updateComplete;
     }
 
