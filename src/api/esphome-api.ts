@@ -345,7 +345,7 @@ export class ESPHomeAPI {
   /** Create a new device configuration. */
   async createDevice(args: {
     name: string;
-    board_id: string;
+    board_id?: string;
     config_type?: string;
     ssid?: string;
     psk?: string;

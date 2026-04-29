@@ -177,6 +177,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         @next-step=${this._onNextStep}
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
+        @import-file=${this._onImportFile}
       >
         <span slot="label" class="dialog-label">
           ${this._step !== "method"
@@ -221,31 +222,22 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       return;
     }
 
-    // Track creation method and import file when coming from method step
+    // Track creation method when coming from method step.
     if (detail.method) {
       this._creationMethod = detail.method;
-    }
-    if (detail.file) {
-      this._importFile = detail.file;
     }
 
     if (detail.board !== undefined) {
       this._selectedBoard = detail.board;
     }
 
-    // After board selection, route based on creation method
-    if (detail.step === "setup" && detail.board) {
-      if (this._creationMethod === "empty") {
-        this._step = "empty-config";
-        return;
-      }
-      if (this._creationMethod === "import") {
-        this._createImportedDevice();
-        return;
-      }
-    }
-
     this._step = detail.step;
+  }
+
+  private _onImportFile(e: CustomEvent<{ file: File }>) {
+    this._creationMethod = "import";
+    this._importFile = e.detail.file;
+    this._createImportedDevice();
   }
 
   private _onBack() {
@@ -257,21 +249,20 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         this._step = "board";
         break;
       case "empty-config":
-        this._step = "board";
+        this._step = "method";
         break;
     }
   }
 
   private async _onCreateEmptyConfig(e: CustomEvent<{ name: string }>) {
     if (this._submitting) return;
-    if (!this._selectedBoard) return;
     const { name } = e.detail;
     const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
         name: slug,
-        board_id: this._selectedBoard.id,
+        board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       });
       this.close();
@@ -286,7 +277,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   private async _createImportedDevice() {
     if (this._submitting) return;
-    if (!this._importFile || !this._selectedBoard) return;
+    if (!this._importFile) return;
 
     this._importError = "";
 
@@ -305,7 +296,6 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     try {
       const { configuration } = await this._api.createDevice({
         name: slug,
-        board_id: this._selectedBoard.id,
         config_type: "upload",
         file_content: fileContent,
       });

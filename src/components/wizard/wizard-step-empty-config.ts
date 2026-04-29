@@ -118,7 +118,7 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
           ${this._localize("wizard.cancel")}
         </button>
         <button class="btn btn-next" ?disabled=${!this._name.trim()} @click=${this._next}>
-          ${this._localize("wizard.next")}
+          ${this._localize("wizard.finish_setup")}
         </button>
       </div>
     `;

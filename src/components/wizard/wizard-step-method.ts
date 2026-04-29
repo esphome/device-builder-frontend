@@ -231,10 +231,11 @@ export class ESPHomeWizardStepMethod extends LitElement {
     // Reset so the same file can be re-selected if needed
     this._fileInput.value = "";
 
-    // Store file and route through board selection
+    // Imports don't ask for a board — the YAML already declares its platform.
+    // The dialog reads the file and creates the device immediately.
     this.dispatchEvent(
-      new CustomEvent("next-step", {
-        detail: { step: "board", method: "import", file },
+      new CustomEvent("import-file", {
+        detail: { file },
         bubbles: true,
         composed: true,
       })
@@ -244,7 +245,7 @@ export class ESPHomeWizardStepMethod extends LitElement {
   private _emptyConfig() {
     this.dispatchEvent(
       new CustomEvent("next-step", {
-        detail: { step: "board", method: "empty" },
+        detail: { step: "empty-config", method: "empty" },
         bubbles: true,
         composed: true,
       })
