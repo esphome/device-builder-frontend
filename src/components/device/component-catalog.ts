@@ -57,6 +57,17 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Re-fetch on (re)connect — the parent dialog drops this element when
+    // it swaps in the configure-form view, so the next time we come back
+    // we need to refill the list. Without this we'd sit in `_loading=true`
+    // forever and render the placeholder string.
+    if (this._initialLoad) {
+      this._fetchComponents();
+    }
+  }
+
   /** Trigger initial or refresh load of the catalog. */
   public load() {
     this._fetchComponents();
@@ -87,6 +98,10 @@ export class ESPHomeComponentCatalog extends LitElement {
         display: flex;
         height: 480px;
         gap: 0;
+      }
+
+      :host([hidden]) {
+        display: none;
       }
 
       .sidebar {

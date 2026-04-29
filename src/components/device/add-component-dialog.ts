@@ -129,6 +129,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   protected render() {
     const isForm = this._selected !== null;
+    // Keep the catalog mounted permanently so its state (search query, scroll
+    // position, expanded card) survives the round trip into the form view —
+    // hide it with `hidden` rather than swapping it out of the DOM. The form
+    // is fine to mount/unmount on demand since each selection starts fresh.
     return html`
       <wa-dialog
         class=${isForm ? "form-view" : ""}
@@ -149,13 +153,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
               ? this._localize("device.add_component_dialog_title", { name: this.boardName })
               : this._localize("device.add_component")}
         </span>
+        <esphome-component-catalog ?hidden=${isForm}></esphome-component-catalog>
         ${isForm
           ? html`<esphome-add-component-form
               .component=${this._selected!}
               .submitting=${this._submitting}
               .submitError=${this._submitError}
             ></esphome-add-component-form>`
-          : html`<esphome-component-catalog></esphome-component-catalog>`}
+          : nothing}
       </wa-dialog>
     `;
   }

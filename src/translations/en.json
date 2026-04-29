@@ -355,6 +355,7 @@
     "save_yaml": "Save YAML",
     "loading_config_catalog": "Loading configuration catalog…",
     "loading_automation_catalog": "Loading automation catalog…",
+    "loading_components": "Loading components…",
     "automation_target": "Target",
     "automation_target_name": "Target component name",
     "automation_target_placeholder": "e.g. my_sensor",

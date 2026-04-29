@@ -27,6 +27,7 @@ function makeEntry(overrides: Partial<ConfigEntry>): ConfigEntry {
     depends_on: null,
     depends_on_value: null,
     depends_on_value_not: null,
+    depends_on_component: null,
     pin_features: [],
     pin_mode: null,
     ...overrides,

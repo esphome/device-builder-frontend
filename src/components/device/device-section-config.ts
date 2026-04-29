@@ -229,14 +229,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         margin-top: var(--wa-space-2xs);
       }
 
-      wa-select.invalid::part(combobox) {
-        border-color: var(--esphome-error);
-      }
-
       .field-description {
         font-size: var(--wa-font-size-2xs);
         color: var(--wa-color-text-quiet);
         margin: 0;
+      }
+
+      /* Push the input/select away from a description sitting right above it
+         so the two pieces of text don't collide. */
+      .field-description + input,
+      .field-description + textarea,
+      .field-description + wa-select {
+        margin-top: 8px;
       }
 
       .help-button {
@@ -287,8 +291,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
       .advanced-section {
         margin-top: var(--wa-space-l);
-        border-top: 1px solid var(--wa-color-surface-lowered);
-        padding-top: var(--wa-space-m);
       }
 
       .advanced-toggle {
@@ -454,6 +456,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         padding: var(--wa-space-xl);
       }
 
+      /* Sizing only — chrome (border / radius / focus ring) comes from the
+         shared inputStyles so wa-select matches every other input field. */
       wa-select {
         width: 100%;
       }
@@ -791,7 +795,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const value = String(this._values[entry.key] ?? "");
     const invalid = this._errorFor(entry.key) !== null;
     return html`
-      <div class="field">
+      <div class="field" data-field-key=${entry.key}>
         <label class="field-label">
           ${entry.label}
           ${entry.required ? html`<span class="required">*</span>` : nothing}
@@ -819,7 +823,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const min = entry.range ? String(entry.range[0]) : undefined;
     const max = entry.range ? String(entry.range[1]) : undefined;
     return html`
-      <div class="field">
+      <div class="field" data-field-key=${entry.key}>
         <label class="field-label">
           ${entry.label}
           ${entry.required ? html`<span class="required">*</span>` : nothing}
@@ -849,7 +853,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const checked =
       this._values[entry.key] === true || this._values[entry.key] === "true";
     return html`
-      <div class="switch-field">
+      <div class="switch-field" data-field-key=${entry.key}>
         <div class="field-info">${this._renderLabel(entry)}</div>
         <wa-switch
           ?checked=${checked}
@@ -868,7 +872,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const value = String(this._values[entry.key] ?? "");
     const invalid = this._errorFor(entry.key) !== null;
     return html`
-      <div class="field">
+      <div class="field" data-field-key=${entry.key}>
         ${this._renderLabel(entry)}
         <wa-select
           class=${invalid ? "invalid" : ""}
@@ -897,7 +901,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const items: string[] = Array.isArray(raw) ? raw.map((v) => String(v)) : [];
     const invalid = this._errorFor(entry.key) !== null;
     return html`
-      <div class="field">
+      <div class="field" data-field-key=${entry.key}>
         ${this._renderLabel(entry)}
         ${items.length === 0
           ? html`<p class="field-description">
@@ -969,7 +973,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const visible = this.board.pins.filter(matchesFeatures);
 
     return html`
-      <div class="field">
+      <div class="field" data-field-key=${entry.key}>
         ${this._renderLabel(entry)}
         <wa-select
           class=${invalid ? "invalid" : ""}
@@ -1005,7 +1009,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const value = String(this._values[entry.key] ?? "");
     const invalid = this._errorFor(entry.key) !== null;
     return html`
-      <div class="field">
+      <div class="field" data-field-key=${entry.key}>
         ${this._renderLabel(entry)}
         <textarea
           class="textarea-field ${invalid ? "invalid" : ""}"
@@ -1135,6 +1139,36 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   }
 
+  private async _scrollFirstErrorIntoView(errors: Map<string, ValidationError>) {
+    if (!this._config) return;
+    // Find the first entry (in render order) that has an error so we land on
+    // the topmost issue rather than whatever Map iteration happens to surface.
+    const firstEntry = this._config.entries.find((e) => errors.has(e.key));
+    if (!firstEntry) return;
+
+    // If the failing field lives in the collapsed Advanced section it isn't
+    // in the DOM yet — open it and wait for the re-render before searching.
+    if (firstEntry.advanced && !this._advancedOpen) {
+      this._advancedOpen = true;
+      await this.updateComplete;
+    }
+
+    const root = this.shadowRoot;
+    if (!root) return;
+    const container = root.querySelector(
+      `[data-field-key="${CSS.escape(firstEntry.key)}"]`
+    ) as HTMLElement | null;
+    if (!container) return;
+
+    container.scrollIntoView({ behavior: "smooth", block: "center" });
+    // Focus the first focusable control so the user can fix it immediately
+    // without an extra click. `preventScroll` keeps our smooth scroll intact.
+    const focusable = container.querySelector<HTMLElement>(
+      "input, select, textarea, wa-select, wa-switch, [tabindex]"
+    );
+    focusable?.focus({ preventScroll: true });
+  }
+
   private _errorFor(key: string): ValidationError | null {
     return this._fieldErrors.get(key) ?? null;
   }
@@ -1154,6 +1188,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
     if (errors.size > 0) {
       this._fieldErrors = errors;
+      // Wait for the DOM to reflect the new error markers, then scroll the
+      // first invalid field into view (no-op if it's already visible).
+      await this.updateComplete;
+      this._scrollFirstErrorIntoView(errors);
       return;
     }
     this._fieldErrors = new Map();

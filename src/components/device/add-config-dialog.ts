@@ -1,13 +1,13 @@
 import { consume } from "@lit/context";
-import {
-  mdiArrowLeft,
-  mdiClose,
-  mdiCog,
-  mdiOpenInNew,
-} from "@mdi/js";
+import { mdiArrowLeft, mdiClose, mdiCog, mdiOpenInNew } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfigEntry } from "../../api/types.js";
+import type { LocalizeFunc } from "../../common/localize.js";
+import { apiContext, localizeContext } from "../../context/index.js";
+import { espHomeStyles } from "../../styles/shared.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 
 // Types for config section catalog — not yet available in the WebSocket backend
 interface ConfigSection {
@@ -19,16 +19,11 @@ interface ConfigSection {
   yaml_template: string;
   fields: ConfigEntry[];
 }
-import type { ESPHomeAPI } from "../../api/index.js";
-import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext, apiContext } from "../../context/index.js";
-import { inputStyles } from "../../styles/inputs.js";
-import { espHomeStyles } from "../../styles/shared.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import { inputStyles } from "../../styles/inputs.js";
 
 registerMdiIcons({
   close: mdiClose,
@@ -297,8 +292,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
 
       select:focus {
         border-color: var(--esphome-primary);
-        box-shadow: 0 0 0 3px
-          color-mix(in srgb, var(--esphome-primary), transparent 80%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
       }
 
       /* ── Actions ── */
@@ -308,7 +302,6 @@ export class ESPHomeAddConfigDialog extends LitElement {
         justify-content: flex-end;
         gap: var(--wa-space-s);
         padding-top: var(--wa-space-m);
-        border-top: 1px solid var(--wa-color-surface-border);
       }
 
       .dialog-btn {
@@ -373,11 +366,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
       .loading wa-spinner {
         font-size: 24px;
         --indicator-color: var(--esphome-primary);
-        --track-color: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 80%
-        );
+        --track-color: color-mix(in srgb, var(--esphome-primary), transparent 80%);
       }
     `,
   ];
@@ -494,7 +483,9 @@ export class ESPHomeAddConfigDialog extends LitElement {
             ?disabled=${this._submitting || !this._isFormValid()}
             @click=${this._onSubmit}
           >
-            ${this._submitting ? this._localize("device.adding") : this._localize("device.add_config")}
+            ${this._submitting
+              ? this._localize("device.adding")
+              : this._localize("device.add_config")}
           </button>
         </div>
       </div>
@@ -506,12 +497,20 @@ export class ESPHomeAddConfigDialog extends LitElement {
     if (field.type === "select" && field.options) {
       return html`
         <div class="field">
-          <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
+          <label
+            >${field.label}${field.required
+              ? html`<span class="required">*</span>`
+              : nothing}</label
+          >
           <select
-            @change=${(e: Event) => this._setField(field.key, (e.target as HTMLSelectElement).value)}
+            @change=${(e: Event) =>
+              this._setField(field.key, (e.target as HTMLSelectElement).value)}
           >
             ${field.options.map(
-              (opt) => html`<option value=${opt.value} ?selected=${opt.value === value}>${opt.label}</option>`
+              (opt) =>
+                html`<option value=${opt.value} ?selected=${opt.value === value}>
+                  ${opt.label}
+                </option>`
             )}
           </select>
         </div>
@@ -519,12 +518,17 @@ export class ESPHomeAddConfigDialog extends LitElement {
     }
     return html`
       <div class="field">
-        <label>${field.label}${field.required ? html`<span class="required">*</span>` : nothing}</label>
+        <label
+          >${field.label}${field.required
+            ? html`<span class="required">*</span>`
+            : nothing}</label
+        >
         <input
           type=${field.type === "integer" || field.type === "float" ? "number" : "text"}
           .value=${value}
           placeholder=${String(field.default_value ?? "")}
-          @input=${(e: Event) => this._setField(field.key, (e.target as HTMLInputElement).value)}
+          @input=${(e: Event) =>
+            this._setField(field.key, (e.target as HTMLInputElement).value)}
         />
       </div>
     `;
@@ -591,7 +595,8 @@ export class ESPHomeAddConfigDialog extends LitElement {
         })
       );
     } catch (err) {
-      this._error = err instanceof Error ? err.message : this._localize("device.add_config_error");
+      this._error =
+        err instanceof Error ? err.message : this._localize("device.add_config_error");
     } finally {
       this._submitting = false;
     }

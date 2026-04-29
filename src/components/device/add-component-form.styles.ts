@@ -126,23 +126,39 @@ export const addComponentFormStyles = css`
     display: flex;
     justify-content: flex-end;
     gap: var(--wa-space-s);
-    margin-top: var(--wa-space-m);
+    padding-top: var(--wa-space-m);
   }
 
   .btn {
-    padding: var(--wa-space-s) var(--wa-space-l);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 18px;
+    border-radius: var(--wa-border-radius-m);
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
     font-family: inherit;
-    border-radius: var(--wa-border-radius-m);
     cursor: pointer;
-    border: var(--wa-border-width-m) solid transparent;
+    border: none;
+    transition:
+      background 0.12s,
+      opacity 0.12s;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 
   .btn-secondary {
-    background: none;
-    border-color: var(--wa-color-surface-border);
+    background: var(--wa-color-surface-lowered);
     color: var(--wa-color-text-normal);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--wa-color-surface-border);
   }
 
   .btn-primary {
@@ -150,10 +166,8 @@ export const addComponentFormStyles = css`
     color: var(--esphome-on-primary);
   }
 
-  .btn-primary:disabled,
-  .btn-secondary:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .btn-primary:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--esphome-primary), black 10%);
   }
 
   .error {
