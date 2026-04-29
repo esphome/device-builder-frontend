@@ -412,7 +412,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         justify-content: flex-end;
         gap: var(--wa-space-s);
         padding-top: var(--wa-space-s);
-        border-top: 1px solid var(--wa-color-surface-border);
       }
 
       .save-button {
@@ -422,7 +421,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         border: none;
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        padding: var(--wa-space-s) var(--wa-space-l);
+        padding: var(--wa-space-xs) var(--wa-space-m);
         border-radius: var(--wa-border-radius-m);
         cursor: pointer;
         font-size: var(--wa-font-size-s);

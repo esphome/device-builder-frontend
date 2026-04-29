@@ -4,7 +4,7 @@ import { defaultLocalize } from "../../src/common/localize.js";
 describe("defaultLocalize", () => {
   it("resolves a top-level string key", () => {
     expect(defaultLocalize("dashboard.title")).toBe(
-      "ESPHome - create and edit",
+      "ESPHome - Device Builder",
     );
   });
 
