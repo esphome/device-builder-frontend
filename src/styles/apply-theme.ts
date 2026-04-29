@@ -26,17 +26,40 @@ function applyWaTheme(): void {
   document.head.appendChild(style);
 }
 
-// Style sonner toast action buttons to use the brand color
+/** sonner-js renders toasts inside a shadow root attached to a
+ *  `<div data-sonner-toasters>` it lazily appends to <body>. Document-level
+ *  styles can't reach in there, so we inject our overrides directly into the
+ *  shadow tree as soon as it exists. */
 function applySonnerOverrides(): void {
-  const style = document.createElement("style");
-  style.id = "sonner-overrides";
-  style.textContent = `
+  const css = `
     [data-sonner-toast] [data-button] {
-      color: var(--esphome-primary, #0d8a6f) !important;
+      background: #009fee !important;
+      color: #ffffff !important;
+      border: none !important;
       font-weight: 600 !important;
     }
+    [data-sonner-toast] [data-button]:hover {
+      background: color-mix(in srgb, #009fee, black 10%) !important;
+    }
   `;
-  document.head.appendChild(style);
+
+  const inject = (): boolean => {
+    const host = document.querySelector("[data-sonner-toasters]") as HTMLElement | null;
+    if (!host?.shadowRoot) return false;
+    if (host.shadowRoot.querySelector("style[data-esphome-overrides]")) return true;
+    const style = document.createElement("style");
+    style.setAttribute("data-esphome-overrides", "");
+    style.textContent = css;
+    host.shadowRoot.appendChild(style);
+    return true;
+  };
+
+  if (inject()) return;
+
+  const observer = new MutationObserver(() => {
+    if (inject()) observer.disconnect();
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 // Execute immediately on import

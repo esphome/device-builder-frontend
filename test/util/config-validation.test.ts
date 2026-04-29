@@ -23,6 +23,12 @@ function makeEntry(overrides: Partial<ConfigEntry>): ConfigEntry {
     translation_key: null,
     translation_params: null,
     value: null,
+    templatable: false,
+    depends_on: null,
+    depends_on_value: null,
+    depends_on_value_not: null,
+    pin_features: [],
+    pin_mode: null,
     ...overrides,
   };
 }
@@ -38,21 +44,13 @@ describe("validateDeviceName", () => {
   });
 
   it("rejects uppercase and underscores", () => {
-    expect(validateDeviceName("MyDevice")?.code).toBe(
-      "validation.invalid_device_name",
-    );
-    expect(validateDeviceName("my_device")?.code).toBe(
-      "validation.invalid_device_name",
-    );
+    expect(validateDeviceName("MyDevice")?.code).toBe("validation.invalid_device_name");
+    expect(validateDeviceName("my_device")?.code).toBe("validation.invalid_device_name");
   });
 
   it("rejects leading/trailing hyphen", () => {
-    expect(validateDeviceName("-foo")?.code).toBe(
-      "validation.invalid_device_name",
-    );
-    expect(validateDeviceName("foo-")?.code).toBe(
-      "validation.invalid_device_name",
-    );
+    expect(validateDeviceName("-foo")?.code).toBe("validation.invalid_device_name");
+    expect(validateDeviceName("foo-")?.code).toBe("validation.invalid_device_name");
   });
 
   it("rejects names over 63 chars", () => {

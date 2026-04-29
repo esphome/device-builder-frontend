@@ -73,7 +73,7 @@ export const dashboardStyles = css`
 
   .devices-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 300px);
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
     gap: var(--wa-space-l);
     padding: var(--wa-space-l);
   }
@@ -260,7 +260,12 @@ export const dashboardStyles = css`
     background: linear-gradient(
       90deg,
       var(--wa-color-surface-border) 25%,
-      color-mix(in srgb, var(--wa-color-surface-border), var(--wa-color-surface-raised) 60%) 50%,
+      color-mix(
+          in srgb,
+          var(--wa-color-surface-border),
+          var(--wa-color-surface-raised) 60%
+        )
+        50%,
       var(--wa-color-surface-border) 75%
     );
     background-size: 800px 100%;
