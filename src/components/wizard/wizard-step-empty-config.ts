@@ -3,6 +3,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 
 @customElement("esphome-wizard-step-empty-config")
@@ -16,6 +17,7 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
 
   static styles = [
     espHomeStyles,
+    inputStyles,
     css`
       :host {
         display: block;
@@ -34,24 +36,6 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
         color: var(--wa-color-text-normal);
       }
 
-      input {
-        width: 100%;
-        padding: var(--wa-space-s) var(--wa-space-m);
-        font-size: var(--wa-font-size-m);
-        font-family: inherit;
-        color: var(--wa-color-text-normal);
-        background: var(--wa-color-surface-default);
-        border: var(--wa-border-width-m) solid var(--esphome-primary-light);
-        border-radius: var(--wa-border-radius-m);
-        box-sizing: border-box;
-        outline: none;
-        transition: border-color var(--wa-transition-normal) var(--wa-transition-easing);
-      }
-
-      input:focus {
-        border-color: var(--esphome-primary);
-      }
-
       .actions {
         display: flex;
         justify-content: flex-end;
@@ -59,27 +43,32 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
       }
 
       .btn {
-        padding: var(--wa-space-s) var(--wa-space-l);
-        font-size: var(--wa-font-size-s);
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 0 14px;
+        height: 36px;
+        box-sizing: border-box;
+        font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
         border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        border: var(--wa-border-width-m) solid transparent;
+        border: var(--wa-border-width-s) solid transparent;
         transition:
-          background var(--wa-transition-normal) var(--wa-transition-easing),
-          border-color var(--wa-transition-normal) var(--wa-transition-easing);
+          background 0.12s,
+          border-color 0.12s;
       }
 
       .btn-cancel {
-        background: none;
-        border-color: var(--esphome-primary-light);
+        background: var(--wa-color-surface-raised);
+        border-color: var(--wa-color-surface-border);
         color: var(--wa-color-text-normal);
       }
 
       .btn-cancel:hover {
-        border-color: var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+        background: var(--wa-color-surface-lowered);
+        border-color: var(--wa-color-text-quiet);
       }
 
       .btn-next {

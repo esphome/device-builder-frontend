@@ -16,14 +16,39 @@ export type LocalizeFunc = (
   values?: Record<string, string | number>
 ) => string;
 
-const SUPPORTED_LOCALES = ["en", "fr", "nl"] as const;
-type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
+export const SUPPORTED_LOCALES = ["en", "fr", "nl"] as const;
+export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
+
+const LOCALE_STORAGE_KEY = "esphome-locale";
 
 function detectLocale(): SupportedLocale {
   const lang = navigator.language.split("-")[0];
   return (SUPPORTED_LOCALES as readonly string[]).includes(lang)
     ? (lang as SupportedLocale)
     : "en";
+}
+
+/** Read the user's explicit locale choice from localStorage, if any. */
+export function readStoredLocale(): SupportedLocale | null {
+  const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
+  if (stored && (SUPPORTED_LOCALES as readonly string[]).includes(stored)) {
+    return stored as SupportedLocale;
+  }
+  return null;
+}
+
+export function writeStoredLocale(locale: SupportedLocale): void {
+  localStorage.setItem(LOCALE_STORAGE_KEY, locale);
+}
+
+/** Drop the explicit override so subsequent loads follow the browser. */
+export function clearStoredLocale(): void {
+  localStorage.removeItem(LOCALE_STORAGE_KEY);
+}
+
+/** The active locale: stored override, else browser detection. */
+export function activeLocale(): SupportedLocale {
+  return readStoredLocale() ?? detectLocale();
 }
 
 async function loadLocaleMessages(
@@ -93,11 +118,16 @@ export const defaultLocalize: LocalizeFunc = buildLocalize(
 );
 
 /**
- * Loads the browser locale (with per-key English fallback) asynchronously.
+ * Loads the requested locale (with per-key English fallback) asynchronously.
  * Replace the context value with the result once resolved.
+ *
+ * If `force` is omitted, picks the stored locale (from a previous user
+ * selection) or falls back to the browser locale.
  */
-export async function loadLocalize(): Promise<LocalizeFunc> {
-  const locale = detectLocale();
+export async function loadLocalize(
+  force?: SupportedLocale
+): Promise<LocalizeFunc> {
+  const locale = force ?? activeLocale();
   if (locale === "en") return defaultLocalize;
 
   const localeMessages = await loadLocaleMessages(locale);

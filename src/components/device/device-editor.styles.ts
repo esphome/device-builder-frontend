@@ -41,28 +41,41 @@ export const deviceEditorStyles = css`
     text-overflow: ellipsis;
   }
 
-  .save-button {
+  .editor-floating-actions {
     position: absolute;
     bottom: var(--wa-space-m);
     right: var(--wa-space-m);
     z-index: 10;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    border: none;
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
-    padding: 8px 16px;
+    gap: var(--wa-space-s);
+  }
+
+  .save-button,
+  .install-fab {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    gap: 3px;
+    padding: 7px 14px;
+    border: var(--wa-border-width-s) solid transparent;
     border-radius: var(--wa-border-radius-m);
     cursor: pointer;
     font-size: var(--wa-font-size-xs);
     font-weight: var(--wa-font-weight-bold);
     font-family: inherit;
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    line-height: 1;
     transition:
       background 0.12s,
+      border-color 0.12s,
       box-shadow 0.12s,
       transform 0.12s;
+  }
+
+  .save-button {
+    background: var(--esphome-primary);
+    color: var(--esphome-on-primary);
+    box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
   }
 
   .save-button:hover:not(:disabled) {
@@ -82,7 +95,24 @@ export const deviceEditorStyles = css`
     transform: none;
   }
 
-  .save-button wa-icon {
+  .install-fab {
+    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    color: var(--esphome-primary);
+    border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+  }
+
+  .install-fab:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+    border-color: var(--esphome-primary);
+  }
+
+  .install-fab:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .save-button wa-icon,
+  .install-fab wa-icon {
     font-size: 16px;
   }
 
@@ -92,8 +122,7 @@ export const deviceEditorStyles = css`
     gap: var(--wa-space-s);
   }
 
-  .diff-toggle,
-  .install-button {
+  .diff-toggle {
     border: none;
     background: transparent;
     color: var(--esphome-on-primary);
@@ -109,19 +138,13 @@ export const deviceEditorStyles = css`
     background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
   }
 
-  .diff-toggle:disabled,
-  .install-button:disabled {
+  .diff-toggle:disabled {
     opacity: 0.35;
     cursor: not-allowed;
   }
 
-  .diff-toggle wa-icon,
-  .install-button wa-icon {
+  .diff-toggle wa-icon {
     font-size: 18px;
-  }
-
-  .install-button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
   }
 
   .layout-toggle {

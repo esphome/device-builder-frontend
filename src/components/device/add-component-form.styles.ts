@@ -34,34 +34,34 @@ export const addComponentFormStyles = css`
     margin-left: 2px;
   }
 
-  input[type="text"],
-  input[type="number"],
   select {
     width: 100%;
-    padding: var(--wa-space-s) var(--wa-space-m);
-    font-size: var(--wa-font-size-m);
+    padding: 9px 14px;
+    font-size: var(--wa-font-size-s);
     font-family: inherit;
     color: var(--wa-color-text-normal);
-    background: var(--wa-color-surface-default);
-    border: var(--wa-border-width-m) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-raised);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-l);
     box-sizing: border-box;
     outline: none;
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
   }
 
-  input:focus,
   select:focus {
     border-color: var(--esphome-primary);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--esphome-primary), transparent 80%);
   }
 
-  input.invalid,
   select.invalid {
     border-color: var(--esphome-error);
   }
 
-  input:disabled,
   select:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 

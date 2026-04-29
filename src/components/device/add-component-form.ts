@@ -5,6 +5,7 @@ import type { ComponentCatalogEntry, ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
   validateEntries,
@@ -42,7 +43,7 @@ export class ESPHomeAddComponentForm extends LitElement {
   @state()
   private _showYaml = false;
 
-  static styles = [espHomeStyles, addComponentFormStyles];
+  static styles = [espHomeStyles, inputStyles, addComponentFormStyles];
 
   connectedCallback(): void {
     super.connectedCallback();

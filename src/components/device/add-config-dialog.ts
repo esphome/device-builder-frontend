@@ -22,6 +22,7 @@ interface ConfigSection {
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -74,6 +75,7 @@ export class ESPHomeAddConfigDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    inputStyles,
     css`
       wa-dialog {
         --width: 560px;
@@ -277,17 +279,15 @@ export class ESPHomeAddConfigDialog extends LitElement {
         margin-left: 2px;
       }
 
-      input[type="text"],
-      input[type="number"],
       select {
         width: 100%;
-        padding: 9px 12px;
+        padding: 9px 14px;
         font-size: var(--wa-font-size-s);
         font-family: inherit;
         color: var(--wa-color-text-normal);
         background: var(--wa-color-surface-raised);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-m);
+        border-radius: var(--wa-border-radius-l);
         box-sizing: border-box;
         outline: none;
         transition:
@@ -295,15 +295,10 @@ export class ESPHomeAddConfigDialog extends LitElement {
           box-shadow 0.15s;
       }
 
-      input:focus,
       select:focus {
         border-color: var(--esphome-primary);
         box-shadow: 0 0 0 3px
           color-mix(in srgb, var(--esphome-primary), transparent 80%);
-      }
-
-      input::placeholder {
-        color: var(--wa-color-text-quiet);
       }
 
       /* ── Actions ── */

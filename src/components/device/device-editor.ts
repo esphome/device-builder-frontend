@@ -69,15 +69,29 @@ export class ESPHomeDeviceEditor extends LitElement {
     this._isMobile = e.matches;
   };
 
+  /** Cmd/Ctrl+S → save the YAML if there are unsaved changes. Listens at
+   *  the document level so the shortcut works regardless of which child
+   *  (CodeMirror, navigator, etc.) currently has focus. */
+  private _onGlobalKeyDown = (e: KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
+      e.preventDefault();
+      if (this.yaml !== this.savedYaml) {
+        this._onSave();
+      }
+    }
+  };
+
   connectedCallback() {
     super.connectedCallback();
     this._isMobile = this._mql.matches;
     this._mql.addEventListener("change", this._onMqlChange);
+    window.addEventListener("keydown", this._onGlobalKeyDown);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     this._mql.removeEventListener("change", this._onMqlChange);
+    window.removeEventListener("keydown", this._onGlobalKeyDown);
   }
 
   @property({ attribute: false })
@@ -150,27 +164,6 @@ export class ESPHomeDeviceEditor extends LitElement {
             <h2 class="editor-header-title">${title}</h2>
           </div>
           <div class="header-actions">
-            ${this.hasPendingChanges
-              ? html`<button
-                  type="button"
-                  class="install-button"
-                  ?disabled=${this.busy}
-                  @click=${this._onInstall}
-                  title=${this._localize("dashboard.install")}
-                >
-                  <wa-icon library="mdi" name="upload"></wa-icon>
-                </button>`
-              : this.hasUpdateAvailable
-                ? html`<button
-                    type="button"
-                    class="install-button"
-                    ?disabled=${this.busy}
-                    @click=${this._onUpdate}
-                    title=${this._localize("dashboard.update")}
-                  >
-                    <wa-icon library="mdi" name="upload"></wa-icon>
-                  </button>`
-                : nothing}
             ${this._showDiffButton
               ? html`<button
                   type="button"
@@ -220,16 +213,41 @@ export class ESPHomeDeviceEditor extends LitElement {
           </div>
         </header>
         <div class="card-body">
-          <button
-            type="button"
-            class="save-button"
-            ?disabled=${this.yaml === this.savedYaml}
-            @click=${this._onSave}
-            title=${this._localize("device.save_yaml")}
-          >
-            <wa-icon library="mdi" name="content-save"></wa-icon>
-            ${this._localize("device.save")}
-          </button>
+          <div class="editor-floating-actions">
+            ${this.hasPendingChanges
+              ? html`<button
+                  type="button"
+                  class="install-fab"
+                  ?disabled=${this.busy}
+                  @click=${this._onInstall}
+                  title=${this._localize("dashboard.install")}
+                >
+                  <wa-icon library="mdi" name="upload"></wa-icon>
+                  ${this._localize("dashboard.install")}
+                </button>`
+              : this.hasUpdateAvailable
+                ? html`<button
+                    type="button"
+                    class="install-fab"
+                    ?disabled=${this.busy}
+                    @click=${this._onUpdate}
+                    title=${this._localize("dashboard.update")}
+                  >
+                    <wa-icon library="mdi" name="upload"></wa-icon>
+                    ${this._localize("dashboard.update")}
+                  </button>`
+                : nothing}
+            <button
+              type="button"
+              class="save-button"
+              ?disabled=${this.yaml === this.savedYaml}
+              @click=${this._onSave}
+              title=${this._localize("device.save_yaml")}
+            >
+              <wa-icon library="mdi" name="content-save"></wa-icon>
+              ${this._localize("device.save")}
+            </button>
+          </div>
           <div class=${`editor-layout ${layoutClass}`}>
             <div class="editor-pane editor-pane--left">
               <esphome-device-board-info

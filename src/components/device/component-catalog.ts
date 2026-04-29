@@ -6,13 +6,13 @@ import type { ComponentCatalogEntry } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/input/input.js";
 
 registerMdiIcons({
   "arrow-collapse-all": mdiArrowCollapseAll,
@@ -81,6 +81,7 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    inputStyles,
     css`
       :host {
         display: flex;
@@ -174,8 +175,7 @@ export class ESPHomeComponentCatalog extends LitElement {
         overflow: hidden;
       }
 
-      wa-input {
-        width: 100%;
+      input[type="search"] {
         flex-shrink: 0;
       }
 
@@ -371,12 +371,12 @@ export class ESPHomeComponentCatalog extends LitElement {
         )}
       </div>
       <div class="main">
-        <wa-input
+        <input
           type="search"
           .value=${this._search}
           @input=${this._onSearchInput}
           placeholder=${this._localize("device.search_components_placeholder")}
-        ></wa-input>
+        />
         ${!this._loading
           ? html`<span class="result-count">${this._components.length} of ${this._total} components</span>`
           : ""}

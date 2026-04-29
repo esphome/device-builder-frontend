@@ -118,7 +118,9 @@ export class ESPHomeLayout extends LitElement {
         opacity: 0.85;
         cursor: pointer;
         flex-shrink: 0;
-        transition: opacity 0.12s, background 0.12s;
+        transition:
+          opacity 0.12s,
+          background 0.12s;
       }
 
       .header-back:hover {
@@ -160,7 +162,12 @@ export class ESPHomeLayout extends LitElement {
         <div class="header-logos">
           ${this._isHaIngress
             ? html`
-                <wa-button class="ha-btn" variant="light" size="small" title=${this._localize("layout.home_assistant")}>
+                <wa-button
+                  class="ha-btn"
+                  variant="light"
+                  size="small"
+                  title=${this._localize("layout.home_assistant")}
+                >
                   <wa-icon library="mdi" name="arrow-collapse-right"></wa-icon>
                   <img src="/assets/logo/ha.svg" alt="Home Assistant" />
                 </wa-button>

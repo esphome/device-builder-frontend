@@ -10,7 +10,7 @@
 import { Router } from "@lit-labs/router";
 import { provide } from "@lit/context";
 import { css, html, LitElement } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
 import { DeviceEventType, DeviceState, JobStatus, Theme } from "../api/types.js";
@@ -25,7 +25,14 @@ import type {
   JobEventData,
   ServerInfoMessage,
 } from "../api/types.js";
-import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
+import {
+  clearStoredLocale,
+  defaultLocalize,
+  loadLocalize,
+  type LocalizeFunc,
+  type SupportedLocale,
+  writeStoredLocale,
+} from "../common/localize.js";
 import {
   apiContext,
   darkModeContext,
@@ -44,6 +51,8 @@ import { espHomeStyles } from "../styles/shared.js";
 import "../pages/dashboard.js";
 import "./command-palette.js";
 import "./esphome-layout.js";
+import "./settings-dialog.js";
+import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
 @customElement("esphome-app")
 export class ESPHomeApp extends LitElement {
@@ -327,15 +336,25 @@ export class ESPHomeApp extends LitElement {
 
   // ─── Render ──────────────────────────────────────────────
 
+  @query("esphome-settings-dialog")
+  private _settingsDialog!: ESPHomeSettingsDialog;
+
   protected render() {
     return html`
       <esphome-layout
         @set-theme=${this._onSetTheme}
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
+        @set-language=${this._onSetLanguage}
+        @open-settings=${this._onOpenSettings}
       >
         ${this._router.outlet()}
       </esphome-layout>
       <esphome-command-palette></esphome-command-palette>
+      <esphome-settings-dialog
+        @set-theme=${this._onSetTheme}
+        @set-yaml-diff-button=${this._onSetYamlDiffButton}
+        @set-language=${this._onSetLanguage}
+      ></esphome-settings-dialog>
     `;
   }
 
@@ -349,6 +368,29 @@ export class ESPHomeApp extends LitElement {
     const enabled = e.detail;
     this._yamlDiffButton = enabled;
     this._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
+  }
+
+  private async _onSetLanguage(
+    e: CustomEvent<SupportedLocale | "system">
+  ) {
+    const choice = e.detail;
+    if (choice === "system") {
+      clearStoredLocale();
+    } else {
+      writeStoredLocale(choice);
+    }
+    try {
+      // Pass undefined when "system" so loadLocalize falls back to browser detection.
+      this._localize = await loadLocalize(
+        choice === "system" ? undefined : choice
+      );
+    } catch (err) {
+      console.error("Failed to load locale", choice, err);
+    }
+  }
+
+  private _onOpenSettings() {
+    this._settingsDialog?.open();
   }
 }
 

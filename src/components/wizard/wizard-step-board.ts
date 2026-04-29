@@ -18,9 +18,10 @@ import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { detectChip, disconnect, isWebSerialSupported } from "../../util/web-serial.js";
 
+import { inputStyles } from "../../styles/inputs.js";
+
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/input/input.js";
 
 registerMdiIcons({
   "arrow-collapse-all": mdiArrowCollapseAll,
@@ -99,15 +100,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   static styles = [
     espHomeStyles,
+    inputStyles,
     css`
       :host {
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-m);
-      }
-
-      wa-input {
-        width: 100%;
       }
 
       .helper-row {
@@ -406,12 +404,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
     const regular = this._boards.filter((b) => !b.featured);
 
     return html`
-      <wa-input
+      <input
         type="search"
         .value=${this._search}
         @input=${this._onSearchInput}
         placeholder=${this._localize("wizard.search_boards_placeholder")}
-      ></wa-input>
+      />
 
       <div class="platform-filters">
         ${ESPHomeWizardStepBoard.PLATFORMS.map(

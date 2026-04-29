@@ -118,7 +118,7 @@ export const dashboardStyles = css`
     color: var(--wa-color-text-normal);
     background: var(--wa-color-surface-raised);
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-l);
+    border-radius: var(--wa-border-radius-m);
     outline: none;
     transition:
       border-color 0.15s,
