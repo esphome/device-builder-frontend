@@ -33,6 +33,7 @@ import { createDeviceColumns, type DeviceRow } from "./table-columns.js";
 import { tableLayoutStyles } from "./table-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./table-column-toggle.js";
 import "./table-pagination.js";
 import "./table-row-menu.js";
@@ -52,6 +53,12 @@ const coreRowModel = getCoreRowModel<DeviceRow>();
 const sortedRowModel = getSortedRowModel<DeviceRow>();
 const filteredRowModel = getFilteredRowModel<DeviceRow>();
 const paginatedRowModel = getPaginationRowModel<DeviceRow>();
+
+// Columns hidden by default unless the user explicitly enables them via preferences.
+const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
+  comment: false,
+  version: false,
+};
 
 @customElement("esphome-device-table")
 export class ESPHomeDeviceTable extends LitElement {
@@ -90,7 +97,7 @@ export class ESPHomeDeviceTable extends LitElement {
   private _sorting: SortingState = [];
 
   @state()
-  private _columnVisibility: VisibilityState = {};
+  private _columnVisibility: VisibilityState = { ...DEFAULT_HIDDEN_COLUMNS };
 
   @state()
   private _pageSize = 25;
@@ -187,7 +194,8 @@ export class ESPHomeDeviceTable extends LitElement {
       this._sorting = this.initialSorting;
     }
     if (changed.has("initialColumnVisibility") && this.initialColumnVisibility !== null) {
-      this._columnVisibility = this.initialColumnVisibility;
+      // Merge defaults so columns the user hasn't explicitly toggled stay hidden.
+      this._columnVisibility = { ...DEFAULT_HIDDEN_COLUMNS, ...this.initialColumnVisibility };
     }
     if (changed.has("initialPageSize")) {
       this._pageSize = this.initialPageSize;
@@ -203,11 +211,10 @@ export class ESPHomeDeviceTable extends LitElement {
         status: d.state,
         name: d.name,
         friendly_name: d.friendly_name,
-        ip: d.address || "",
+        ip: d.ip || d.address || "",
         platform: d.target_platform || "",
         version: d.current_version || "",
         comment: d.comment || "",
-        tags: d.loaded_integrations?.slice(0, 3) || [],
         config: d.configuration,
         hasPendingChanges: d.has_pending_changes === true,
         hasUpdateAvailable: d.update_available,

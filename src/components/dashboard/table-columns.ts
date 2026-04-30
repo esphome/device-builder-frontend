@@ -12,13 +12,19 @@ export interface DeviceRow {
   platform: string;
   version: string;
   comment: string;
-  tags: string[];
   config: string;
   hasPendingChanges: boolean;
   hasUpdateAvailable: boolean;
   busy: boolean;
   _device: ConfiguredDevice;
 }
+
+const dispatchRowEvent = (e: Event, name: string, device: ConfiguredDevice) => {
+  e.stopPropagation();
+  (e.currentTarget as HTMLElement).dispatchEvent(
+    new CustomEvent(name, { detail: device, bubbles: true, composed: true }),
+  );
+};
 
 export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow>[] {
   return [
@@ -28,7 +34,19 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) => {
         const row = info.row.original;
         if (row.busy) {
-          return html`<wa-spinner class="status-spinner" style="font-size:12px;--indicator-color:var(--esphome-primary);--track-color:transparent;"></wa-spinner>`;
+          return html`<span
+            class="cell-status-center cell-status-busy"
+            role="button"
+            tabindex="0"
+            title=${localize("dashboard.table_action_view_progress")}
+            @click=${(e: Event) => dispatchRowEvent(e, "show-progress", row._device)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                dispatchRowEvent(e, "show-progress", row._device);
+              }
+            }}
+          ><wa-spinner class="status-spinner" style="font-size:12px;--indicator-color:var(--esphome-primary);--track-color:transparent;"></wa-spinner></span>`;
         }
         const state = info.getValue() as DeviceState;
         const dotClass = state === DeviceState.ONLINE ? "online" : state === DeviceState.OFFLINE ? "offline" : "unknown";
@@ -37,10 +55,10 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           : state === DeviceState.OFFLINE
             ? localize("dashboard.table_status_offline")
             : localize("dashboard.table_status_unknown");
-        return html`<span
+        return html`<span class="cell-status-center"><span
           class="status-dot ${dotClass}"
           title="${title}"
-        ></span>`;
+        ></span></span>`;
       },
       size: 80,
       enableHiding: true,
@@ -67,7 +85,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       accessorKey: "ip",
       header: localize("dashboard.table_col_ip"),
       cell: (info) =>
-        html`<span class="cell-mono">${info.getValue() || "\u2014"}</span>`,
+        html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
       size: 140,
       enableHiding: true,
     },
@@ -78,7 +96,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const val = info.getValue() as string;
         return val
           ? html`<span class="cell-badge">${val}</span>`
-          : html`<span class="cell-muted">\u2014</span>`;
+          : html`<span class="cell-muted">—</span>`;
       },
       size: 120,
       enableHiding: true,
@@ -87,7 +105,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       accessorKey: "version",
       header: localize("dashboard.table_col_version"),
       cell: (info) =>
-        html`<span class="cell-mono">${info.getValue() || "\u2014"}</span>`,
+        html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
       size: 150,
       enableHiding: true,
     },
@@ -95,22 +113,8 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       accessorKey: "comment",
       header: localize("dashboard.table_col_comment"),
       cell: (info) =>
-        html`<span class="cell-comment">${info.getValue() || "\u2014"}</span>`,
+        html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
       size: 180,
-      enableHiding: true,
-    },
-    {
-      accessorKey: "tags",
-      header: localize("dashboard.table_col_tags"),
-      cell: (info) => {
-        const tags = info.getValue() as string[];
-        if (!tags || tags.length === 0)
-          return html`<span class="cell-muted">\u2014</span>`;
-        return html`<span class="cell-tags"
-          >${tags.map((t) => html`<span class="tag">${t}</span>`)}</span
-        >`;
-      },
-      size: 160,
       enableHiding: true,
     },
     {
@@ -120,6 +124,51 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         html`<span class="cell-mono cell-config">${info.getValue()}</span>`,
       size: 180,
       enableHiding: true,
+    },
+    {
+      id: "actions",
+      header: localize("dashboard.table_col_actions"),
+      cell: (info) => {
+        const row = info.row.original;
+        const device = row._device;
+        const showInstall = row.hasPendingChanges;
+        const showUpdate = !row.hasPendingChanges && row.hasUpdateAvailable;
+        return html`<span class="cell-actions">
+          <button
+            class="cell-action-btn"
+            aria-label=${localize("dashboard.table_action_logs")}
+            title=${localize("dashboard.table_action_logs")}
+            @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
+          >
+            <wa-icon library="mdi" name="console"></wa-icon>
+          </button>
+          ${showInstall
+            ? html`<button
+                class="cell-action-btn cell-action-btn--accent"
+                aria-label=${localize("dashboard.table_action_install")}
+                title=${localize("dashboard.table_action_install")}
+                ?disabled=${row.busy}
+                @click=${(e: Event) => dispatchRowEvent(e, "install-device", device)}
+              >
+                <wa-icon library="mdi" name="upload"></wa-icon>
+              </button>`
+            : nothing}
+          ${showUpdate
+            ? html`<button
+                class="cell-action-btn cell-action-btn--accent"
+                aria-label=${localize("dashboard.table_action_update")}
+                title=${localize("dashboard.table_action_update")}
+                ?disabled=${row.busy}
+                @click=${(e: Event) => dispatchRowEvent(e, "update-device", device)}
+              >
+                <wa-icon library="mdi" name="upload"></wa-icon>
+              </button>`
+            : nothing}
+        </span>`;
+      },
+      size: 120,
+      enableSorting: false,
+      enableHiding: false,
     },
   ];
 }

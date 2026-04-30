@@ -316,6 +316,7 @@ export class ESPHomePageDashboard extends LitElement {
         @table-visibility-change=${this._saveTablePreference}
         @table-page-size-change=${this._saveTablePreference}
         @row-click=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerDevice = e.detail; this._drawerOpen = true; }}
+        @show-progress=${(e: CustomEvent<ConfiguredDevice>) => this._showJobProgress(e.detail)}
         @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
         @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
         @deselect-all=${() => { this._selectedDevices = new Set(); }}

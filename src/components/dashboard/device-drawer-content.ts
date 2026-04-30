@@ -204,7 +204,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       <div class="section">
         <h4 class="section-title">${this._localize("dashboard.drawer_device_info")}</h4>
         ${this._row("information-outline", this._localize("dashboard.drawer_name"), d.friendly_name || d.name)}
-        ${this._row("ip-network-outline", this._localize("dashboard.drawer_ip_address"), d.address, true)}
+        ${this._row("ip-network-outline", this._localize("dashboard.drawer_ip_address"), d.ip || d.address, true)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
 

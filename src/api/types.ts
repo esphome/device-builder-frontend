@@ -78,7 +78,10 @@ export interface ConfiguredDevice {
   comment: string | null;
   board_id: string;
   target_platform: string;
+  /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */
   address: string;
+  /** Resolved IPv4 address from mDNS — empty until the device is seen online. */
+  ip: string;
   web_port: number | null;
   current_version: string;
   deployed_version: string;
