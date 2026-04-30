@@ -527,6 +527,10 @@ export interface FirmwareJob {
   output: string[];
   error: string | null;
   port: string;
+  /** 0–100 progress, monotonically non-decreasing while the job runs.
+   *  `null` until the underlying tooling (PlatformIO/esptool) emits a
+   *  percentage we can latch onto. */
+  progress: number | null;
 }
 
 export interface FirmwareBinary {

@@ -3,12 +3,14 @@ import {
   mdiCog,
   mdiDotsVertical,
   mdiKeyVariant,
+  mdiPlaylistCheck,
   mdiUpdate,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { localizeContext } from "../context/index.js";
+import { firmwareJobsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -19,6 +21,7 @@ registerMdiIcons({
   cog: mdiCog,
   "dots-vertical": mdiDotsVertical,
   "key-variant": mdiKeyVariant,
+  "playlist-check": mdiPlaylistCheck,
   update: mdiUpdate,
 });
 
@@ -27,6 +30,10 @@ export class ESPHomeHeaderActions extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: firmwareJobsContext, subscribe: true })
+  @state()
+  private _jobs: Map<string, FirmwareJob> = new Map();
 
   @state()
   private _path = window.location.pathname;
@@ -56,6 +63,7 @@ export class ESPHomeHeaderActions extends LitElement {
       }
 
       .menu-btn {
+        position: relative;
         display: inline-flex;
         align-items: center;
         border: none;
@@ -77,6 +85,17 @@ export class ESPHomeHeaderActions extends LitElement {
         font-size: 20px;
       }
 
+      .menu-btn-badge {
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--esphome-warning, #f59e0b);
+        box-shadow: 0 0 0 2px var(--esphome-primary);
+      }
+
       .backdrop {
         position: fixed;
         inset: 0;
@@ -86,7 +105,7 @@ export class ESPHomeHeaderActions extends LitElement {
       .menu {
         position: fixed;
         z-index: 101;
-        min-width: 190px;
+        min-width: 220px;
         background: var(--wa-color-surface-raised);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-l);
@@ -138,6 +157,18 @@ export class ESPHomeHeaderActions extends LitElement {
         color: var(--esphome-primary);
       }
 
+      .menu-item-count {
+        margin-left: auto;
+        font-size: var(--wa-font-size-2xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--esphome-on-primary);
+        background: var(--esphome-primary);
+        border-radius: 999px;
+        padding: 1px 8px;
+        min-width: 18px;
+        text-align: center;
+      }
+
       .menu-divider {
         height: 1px;
         background: var(--wa-color-surface-border);
@@ -156,9 +187,13 @@ export class ESPHomeHeaderActions extends LitElement {
   ];
 
   protected render() {
+    const jobCount = this._jobs.size;
     return html`
       <button class="menu-btn" @click=${this._toggle}>
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
+        ${jobCount > 0
+          ? html`<span class="menu-btn-badge" aria-label=${this._localize("firmware_jobs.badge_label", { count: jobCount })}></span>`
+          : nothing}
       </button>
       ${this._open
         ? html`
@@ -172,6 +207,13 @@ export class ESPHomeHeaderActions extends LitElement {
                     </div>
                   `
                 : nothing}
+              <div class="menu-item" @click=${this._openFirmwareJobs}>
+                <wa-icon library="mdi" name="playlist-check"></wa-icon>
+                <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
+                ${jobCount > 0
+                  ? html`<span class="menu-item-count">${jobCount}</span>`
+                  : nothing}
+              </div>
               <div class="menu-item" @click=${this._openSecrets}>
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 ${this._localize("layout.secrets")}
@@ -203,6 +245,16 @@ export class ESPHomeHeaderActions extends LitElement {
   private _openUpdateAll() {
     this._close();
     window.dispatchEvent(new CustomEvent("esphome-enter-select-mode"));
+  }
+
+  private _openFirmwareJobs() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-firmware-jobs", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private _openSettings() {

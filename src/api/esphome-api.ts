@@ -444,6 +444,36 @@ export class ESPHomeAPI {
     return this.sendStreamCommand("firmware/follow_job", { job_id: jobId }, callbacks);
   }
 
+  /**
+   * Subscribe to lifecycle, output, and progress events for every job.
+   *
+   * Stays open for the connection's lifetime — there's no per-subscription
+   * cancel on the backend. Events delivered to `callback`:
+   *  - `snapshot` (FirmwareJob) — replayed on subscribe for each
+   *    non-terminal job, when `snapshot` arg is `true` (default).
+   *  - `job_queued` / `job_started` / `job_completed` / `job_failed`
+   *    / `job_cancelled` — payload is the full FirmwareJob.
+   *  - `job_output` — `{ job_id, line }`.
+   *  - `job_progress` — `{ job_id, progress }`.
+   */
+  firmwareFollowJobs(
+    callback: EventSubscriptionCallback,
+    snapshot = true
+  ): string {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
+    }
+    const messageId = this._nextMessageId();
+    this._eventSubscriptions.set(messageId, callback);
+    const msg: CommandMessage = {
+      command: "firmware/follow_jobs",
+      message_id: messageId,
+      args: { snapshot },
+    };
+    this._ws.send(JSON.stringify(msg));
+    return messageId;
+  }
+
   // ─── Firmware Commands (job queue) ────────────────────────
 
   /** Queue a compile job. */

@@ -13,7 +13,7 @@ import { css, html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import { DeviceEventType, DeviceState, JobStatus, Theme } from "../api/types.js";
+import { DeviceEventType, DeviceState, Theme } from "../api/types.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -22,7 +22,6 @@ import type {
   FirmwareJob,
   ImportableDeviceEventData,
   InitialStateEventData,
-  JobEventData,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -39,6 +38,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   activeJobsContext,
+  firmwareJobsContext,
   importableDevicesContext,
   isHaIngressContext,
   localizeContext,
@@ -51,6 +51,8 @@ import { espHomeStyles } from "../styles/shared.js";
 import "../pages/dashboard.js";
 import "./command-palette.js";
 import "./esphome-layout.js";
+import "./firmware-jobs-dialog.js";
+import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
@@ -88,6 +90,10 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: activeJobsContext })
   @state()
   private _activeJobs: Map<string, FirmwareJob> = new Map();
+
+  @provide({ context: firmwareJobsContext })
+  @state()
+  private _firmwareJobs: Map<string, FirmwareJob> = new Map();
 
   @provide({ context: localizeContext })
   @state()
@@ -214,6 +220,7 @@ export class ESPHomeApp extends LitElement {
       this._version = info.esphome_version;
       this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
       this._subscribeToEvents();
+      this._subscribeToFollowJobs();
     };
 
     this._api.onDisconnected = () => {
@@ -234,22 +241,6 @@ export class ESPHomeApp extends LitElement {
 
   // ─── Event Subscription ──────────────────────────────────
 
-  private async _loadActiveJobs() {
-    try {
-      const [queued, running] = await Promise.all([
-        this._api.firmwareGetJobs({ status: JobStatus.QUEUED }),
-        this._api.firmwareGetJobs({ status: JobStatus.RUNNING }),
-      ]);
-      const map = new Map<string, FirmwareJob>();
-      for (const job of [...queued, ...running]) {
-        map.set(job.configuration, job);
-      }
-      this._activeJobs = map;
-    } catch {
-      // Not critical
-    }
-  }
-
   private async _subscribeToEvents() {
     try {
       await this._api.subscribeEvents((event, data) =>
@@ -260,13 +251,87 @@ export class ESPHomeApp extends LitElement {
     }
   }
 
+  /**
+   * Subscribe to `firmware/follow_jobs` for the canonical view of every
+   * job. Replaces an earlier flow that combined `firmware/get_jobs` with
+   * partial events from `subscribe_events` — that path missed
+   * `job_progress` and `job_cancelled`. We reset both job maps on
+   * (re)connect so the snapshot is the source of truth.
+   */
+  private _subscribeToFollowJobs() {
+    this._activeJobs = new Map();
+    this._firmwareJobs = new Map();
+    try {
+      this._api.firmwareFollowJobs((event, data) =>
+        this._handleJobEvent(event, data)
+      );
+    } catch (err) {
+      console.error("Failed to follow firmware jobs:", err);
+    }
+  }
+
+  private _handleJobEvent(event: string, data: unknown): void {
+    switch (event) {
+      case "snapshot":
+      case "job_queued":
+      case "job_started": {
+        this._upsertJob(data as FirmwareJob);
+        break;
+      }
+      case "job_completed":
+      case "job_failed":
+      case "job_cancelled": {
+        this._removeJob(data as FirmwareJob);
+        break;
+      }
+      case "job_progress": {
+        const { job_id, progress } = data as { job_id: string; progress: number };
+        const existing = this._firmwareJobs.get(job_id);
+        if (!existing) return;
+        const updated = { ...existing, progress };
+        const next = new Map(this._firmwareJobs);
+        next.set(job_id, updated);
+        this._firmwareJobs = next;
+        if (this._activeJobs.get(updated.configuration)?.job_id === job_id) {
+          const active = new Map(this._activeJobs);
+          active.set(updated.configuration, updated);
+          this._activeJobs = active;
+        }
+        break;
+      }
+      // job_output is handled per-job via firmware/follow_job in the
+      // command-dialog — no app-level use for the line stream.
+    }
+  }
+
+  private _upsertJob(job: FirmwareJob): void {
+    const next = new Map(this._firmwareJobs);
+    next.set(job.job_id, job);
+    this._firmwareJobs = next;
+    const active = new Map(this._activeJobs);
+    active.set(job.configuration, job);
+    this._activeJobs = active;
+  }
+
+  private _removeJob(job: FirmwareJob): void {
+    const next = new Map(this._firmwareJobs);
+    next.delete(job.job_id);
+    this._firmwareJobs = next;
+    // Only clear the per-device active slot if it points at *this* job —
+    // a freshly-queued follow-up for the same device must stay visible.
+    if (this._activeJobs.get(job.configuration)?.job_id === job.job_id) {
+      const active = new Map(this._activeJobs);
+      active.delete(job.configuration);
+      this._activeJobs = active;
+    }
+  }
+
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
         const { devices } = data as InitialStateEventData;
         this._devices = devices;
         this._devicesLoaded = true;
-        this._loadActiveJobs();
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {
@@ -315,22 +380,6 @@ export class ESPHomeApp extends LitElement {
         );
         break;
       }
-      case DeviceEventType.JOB_QUEUED:
-      case DeviceEventType.JOB_STARTED: {
-        const { job } = data as JobEventData;
-        const next = new Map(this._activeJobs);
-        next.set(job.configuration, job);
-        this._activeJobs = next;
-        break;
-      }
-      case DeviceEventType.JOB_COMPLETED:
-      case DeviceEventType.JOB_FAILED: {
-        const { job } = data as JobEventData;
-        const next = new Map(this._activeJobs);
-        next.delete(job.configuration);
-        this._activeJobs = next;
-        break;
-      }
     }
   }
 
@@ -339,6 +388,9 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-settings-dialog")
   private _settingsDialog!: ESPHomeSettingsDialog;
 
+  @query("esphome-firmware-jobs-dialog")
+  private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
+
   protected render() {
     return html`
       <esphome-layout
@@ -346,6 +398,7 @@ export class ESPHomeApp extends LitElement {
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
         @set-language=${this._onSetLanguage}
         @open-settings=${this._onOpenSettings}
+        @open-firmware-jobs=${this._onOpenFirmwareJobs}
       >
         ${this._router.outlet()}
       </esphome-layout>
@@ -359,6 +412,7 @@ export class ESPHomeApp extends LitElement {
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
         @set-language=${this._onSetLanguage}
       ></esphome-settings-dialog>
+      <esphome-firmware-jobs-dialog></esphome-firmware-jobs-dialog>
     `;
   }
 
@@ -395,6 +449,10 @@ export class ESPHomeApp extends LitElement {
 
   private _onOpenSettings() {
     this._settingsDialog?.open();
+  }
+
+  private _onOpenFirmwareJobs() {
+    this._firmwareJobsDialog?.open();
   }
 }
 

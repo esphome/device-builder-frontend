@@ -487,5 +487,19 @@
     "saved": "Secrets saved",
     "save_error": "Failed to save secrets",
     "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
+  },
+  "firmware_jobs": {
+    "menu_item": "Firmware tasks",
+    "title": "Firmware tasks",
+    "badge_label": "{count} active firmware task(s)",
+    "empty_title": "No firmware tasks running",
+    "empty_desc": "Compile, install, or clean jobs you start will show up here.",
+    "status_queued": "Queued",
+    "status_running": "Running…",
+    "cancel": "Cancel",
+    "type_compile": "Compile",
+    "type_upload": "Upload",
+    "type_install": "Install",
+    "type_clean": "Clean"
   }
 }

@@ -43,9 +43,20 @@ export const isHaIngressContext = createContext<boolean>(
   Symbol("esphome-is-ha-ingress")
 );
 
-/** Context for active firmware jobs, keyed by device configuration. */
+/** Context for active firmware jobs, keyed by device configuration.
+ *  Tracks the latest non-terminal job per device (used for the busy
+ *  spinner on cards/tables). For the full multi-job view, see
+ *  `firmwareJobsContext`. */
 export const activeJobsContext = createContext<Map<string, FirmwareJob>>(
   Symbol("esphome-active-jobs")
+);
+
+/** Context for every non-terminal firmware job, keyed by `job_id`.
+ *  Powers the firmware-tasks dialog — a device can have several jobs
+ *  in flight (e.g. compile + clean queued back-to-back), so we key by
+ *  job_id to keep them all distinct. */
+export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
+  Symbol("esphome-firmware-jobs")
 );
 
 /** Context for whether the YAML diff button is enabled in the editor. */
