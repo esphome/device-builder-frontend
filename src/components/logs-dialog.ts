@@ -104,11 +104,13 @@ export class ESPHomeLogsDialog extends LitElement {
         }
 
         wa-dialog[open]::part(dialog) {
-          max-width: 100vw;
-          max-height: 100dvh;
-          height: 100dvh;
-          margin: 0;
-          border-radius: 0;
+          max-width: 100vw !important;
+          max-height: 100vh !important;
+          max-height: 100dvh !important;
+          height: 100vh !important;
+          height: 100dvh !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
         }
 
         .logs-content {
