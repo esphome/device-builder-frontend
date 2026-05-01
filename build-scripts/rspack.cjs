@@ -93,6 +93,11 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
     new rspack.CopyRspackPlugin({
       patterns: [
         {
+          from: path.resolve(PUBLIC_DIR, "assets"),
+          to: path.resolve(OUTPUT_DIR, "assets"),
+          noErrorOnMissing: true,
+        },
+        {
           from: path.resolve(PUBLIC_DIR, "static"),
           to: path.resolve(OUTPUT_DIR, "static"),
           noErrorOnMissing: true,
