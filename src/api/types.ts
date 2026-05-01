@@ -604,6 +604,11 @@ export interface JobOutputEventData {
 /** Data payload for initial_state event. */
 export interface InitialStateEventData {
   devices: ConfiguredDevice[];
+  /** Discovered factory-firmware devices the dashboard knew about
+   *  before this client subscribed. The backend follows up with
+   *  ``IMPORTABLE_DEVICE_ADDED`` / ``_REMOVED`` events for changes
+   *  after subscription. */
+  importable: AdoptableDevice[];
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
