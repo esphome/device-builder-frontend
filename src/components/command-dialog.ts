@@ -9,8 +9,8 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobStatus } from "../api/types.js";
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import { JobStatus, JobType } from "../api/types.js";
+import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -28,8 +28,16 @@ registerMdiIcons({
   "alert-circle": mdiAlertCircle,
 });
 
-export type CommandType = "install" | "compile" | "validate" | "clean";
+export type CommandType = "install" | "compile" | "validate" | "clean" | "reset";
 type CommandState = "running" | "success" | "error";
+
+const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
+  [JobType.COMPILE]: "compile",
+  [JobType.INSTALL]: "install",
+  [JobType.UPLOAD]: "install",
+  [JobType.CLEAN]: "clean",
+  [JobType.RESET_BUILD_ENV]: "reset",
+};
 
 @customElement("esphome-command-dialog")
 export class ESPHomeCommandDialog extends LitElement {
@@ -218,17 +226,17 @@ export class ESPHomeCommandDialog extends LitElement {
     this._start();
   }
 
-  /** Attach to an already-running job (from the device card "in progress" state). */
-  public followJob(device: ConfiguredDevice, job: FirmwareJob) {
-    this.configuration = device.configuration;
-    this.name = device.friendly_name || device.name;
-    const typeMap: Record<string, CommandType> = {
-      compile: "compile",
-      install: "install",
-      clean: "clean",
-      upload: "install",
-    };
-    this._commandType = typeMap[job.job_type] ?? "install";
+  /**
+   * Attach to a firmware job's output stream. Handles any state —
+   * terminal jobs replay buffered output and resolve to the final
+   * success/error banner. `displayName` shows in the title; pass the
+   * device's friendly name, or a synthetic label for jobs with an
+   * empty `configuration` (e.g. `reset_build_env`).
+   */
+  public followJob(job: FirmwareJob, displayName: string) {
+    this.configuration = job.configuration;
+    this.name = displayName;
+    this._commandType = JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
     this._port = job.port || "OTA";
     this._state = "running";
     this._lines = [];

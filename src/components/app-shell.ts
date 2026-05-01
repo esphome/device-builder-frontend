@@ -13,7 +13,13 @@ import { css, html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import { DeviceEventType, DeviceState, Theme } from "../api/types.js";
+import {
+  DeviceEventType,
+  DeviceState,
+  JobStatus,
+  JobType,
+  Theme,
+} from "../api/types.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -46,6 +52,20 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+
+// Mirrors the backend's `_PRIMARY_JOB_TYPES` retention pool — these
+// are the job types deduplicated to one terminal entry per device.
+const PRIMARY_JOB_TYPES: ReadonlySet<JobType> = new Set([
+  JobType.COMPILE,
+  JobType.UPLOAD,
+  JobType.INSTALL,
+]);
+
+const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
+  JobStatus.COMPLETED,
+  JobStatus.FAILED,
+  JobStatus.CANCELLED,
+]);
 
 // Import child components
 import "../pages/dashboard.js";
@@ -281,7 +301,7 @@ export class ESPHomeApp extends LitElement {
       case "job_completed":
       case "job_failed":
       case "job_cancelled": {
-        this._removeJob(data as FirmwareJob);
+        this._terminateJob(data as FirmwareJob);
         break;
       }
       case "job_progress": {
@@ -313,9 +333,44 @@ export class ESPHomeApp extends LitElement {
     this._activeJobs = active;
   }
 
-  private _removeJob(job: FirmwareJob): void {
+  /** Job reached a terminal state — keep it in `_firmwareJobs` for
+   *  the manage-tasks panel's retained history, drop any older
+   *  terminal entry for the same device so a re-compile replaces
+   *  rather than stacks, then clear the per-device "active" slot.
+   *  Cancellations that already have a live successor for the same
+   *  device are treated as a backend supersede and dropped silently
+   *  (no "Recent" entry) — the backend fires JOB_QUEUED for the new
+   *  job before cancelling the old one specifically so we can spot
+   *  this case here. */
+  private _terminateJob(job: FirmwareJob): void {
+    if (job.status === JobStatus.CANCELLED && job.configuration) {
+      const supersededByActive = [...this._firmwareJobs.values()].some(
+        (j) =>
+          j.job_id !== job.job_id &&
+          j.configuration === job.configuration &&
+          !TERMINAL_STATUSES.has(j.status),
+      );
+      if (supersededByActive) {
+        const next = new Map(this._firmwareJobs);
+        next.delete(job.job_id);
+        this._firmwareJobs = next;
+        return;
+      }
+    }
     const next = new Map(this._firmwareJobs);
-    next.delete(job.job_id);
+    next.set(job.job_id, job);
+    if (PRIMARY_JOB_TYPES.has(job.job_type) && job.configuration) {
+      for (const [id, existing] of next) {
+        if (id === job.job_id) continue;
+        if (
+          PRIMARY_JOB_TYPES.has(existing.job_type) &&
+          existing.configuration === job.configuration &&
+          TERMINAL_STATUSES.has(existing.status)
+        ) {
+          next.delete(id);
+        }
+      }
+    }
     this._firmwareJobs = next;
     // Only clear the per-device active slot if it points at *this* job —
     // a freshly-queued follow-up for the same device must stay visible.
@@ -412,7 +467,9 @@ export class ESPHomeApp extends LitElement {
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
         @set-language=${this._onSetLanguage}
       ></esphome-settings-dialog>
-      <esphome-firmware-jobs-dialog></esphome-firmware-jobs-dialog>
+      <esphome-firmware-jobs-dialog
+        @firmware-history-cleared=${this._onFirmwareHistoryCleared}
+      ></esphome-firmware-jobs-dialog>
     `;
   }
 
@@ -453,6 +510,18 @@ export class ESPHomeApp extends LitElement {
 
   private _onOpenFirmwareJobs() {
     this._firmwareJobsDialog?.open();
+  }
+
+  /** Prune retained terminal jobs locally after the user clears
+   *  history — `firmware/clear` doesn't broadcast an event. */
+  private _onFirmwareHistoryCleared() {
+    const next = new Map<string, FirmwareJob>();
+    for (const [id, job] of this._firmwareJobs) {
+      if (!TERMINAL_STATUSES.has(job.status)) {
+        next.set(id, job);
+      }
+    }
+    this._firmwareJobs = next;
   }
 }
 

@@ -8,6 +8,7 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
+import { JobStatus } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { firmwareJobsContext, localizeContext } from "../context/index.js";
@@ -187,12 +188,17 @@ export class ESPHomeHeaderActions extends LitElement {
   ];
 
   protected render() {
-    const jobCount = this._jobs.size;
+    let activeCount = 0;
+    for (const job of this._jobs.values()) {
+      if (job.status === JobStatus.QUEUED || job.status === JobStatus.RUNNING) {
+        activeCount++;
+      }
+    }
     return html`
       <button class="menu-btn" @click=${this._toggle}>
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-        ${jobCount > 0
-          ? html`<span class="menu-btn-badge" aria-label=${this._localize("firmware_jobs.badge_label", { count: jobCount })}></span>`
+        ${activeCount > 0
+          ? html`<span class="menu-btn-badge" aria-label=${this._localize("firmware_jobs.badge_label", { count: activeCount })}></span>`
           : nothing}
       </button>
       ${this._open
@@ -210,8 +216,8 @@ export class ESPHomeHeaderActions extends LitElement {
               <div class="menu-item" @click=${this._openFirmwareJobs}>
                 <wa-icon library="mdi" name="playlist-check"></wa-icon>
                 <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
-                ${jobCount > 0
-                  ? html`<span class="menu-item-count">${jobCount}</span>`
+                ${activeCount > 0
+                  ? html`<span class="menu-item-count">${activeCount}</span>`
                   : nothing}
               </div>
               <div class="menu-item" @click=${this._openSecrets}>

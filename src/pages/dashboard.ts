@@ -554,7 +554,7 @@ export class ESPHomePageDashboard extends LitElement {
   private _showJobProgress(device: ConfiguredDevice) {
     const job = this._activeJobs.get(device.configuration);
     if (job) {
-      this._commandDialog.followJob(device, job);
+      this._commandDialog.followJob(job, device.friendly_name || device.name);
     }
   }
 

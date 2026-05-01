@@ -51,10 +51,11 @@ export const activeJobsContext = createContext<Map<string, FirmwareJob>>(
   Symbol("esphome-active-jobs")
 );
 
-/** Context for every non-terminal firmware job, keyed by `job_id`.
+/** Context for every firmware job the backend currently exposes
+ *  (active and the trimmed terminal history), keyed by `job_id`.
  *  Powers the firmware-tasks dialog — a device can have several jobs
- *  in flight (e.g. compile + clean queued back-to-back), so we key by
- *  job_id to keep them all distinct. */
+ *  in flight (e.g. compile + clean queued back-to-back), so we key
+ *  by job_id to keep them all distinct. */
 export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
   Symbol("esphome-firmware-jobs")
 );

@@ -496,6 +496,11 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareJob>("firmware/clean", { configuration });
   }
 
+  /** Queue a reset-build-environment job (wipes the toolchain cache). */
+  async firmwareResetBuildEnv(): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/reset_build_env");
+  }
+
   /** Queue compile for multiple devices. */
   async firmwareCompileBulk(configurations: string[]): Promise<FirmwareJob[]> {
     return this.sendCommand<FirmwareJob[]>("firmware/compile_bulk", { configurations });

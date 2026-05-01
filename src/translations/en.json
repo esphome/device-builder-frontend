@@ -159,6 +159,7 @@
     "compile_title": "Compile — {name}",
     "validate_title": "Validate — {name}",
     "clean_title": "Clean — {name}",
+    "reset_title": "Reset build environment",
     "stop": "Stop",
     "retry": "Retry",
     "close": "Close",
@@ -172,7 +173,9 @@
     "validate_success": "Configuration is valid!",
     "validate_failed": "Validation failed.",
     "clean_success": "Build files cleaned.",
-    "clean_failed": "Clean failed."
+    "clean_failed": "Clean failed.",
+    "reset_success": "Build environment reset. The next compile will redownload the toolchain.",
+    "reset_failed": "Failed to reset the build environment."
   },
   "firmware": {
     "install_title": "Install — {name}",
@@ -496,14 +499,29 @@
     "menu_item": "Firmware tasks",
     "title": "Firmware tasks",
     "badge_label": "{count} active firmware task(s)",
-    "empty_title": "No firmware tasks running",
+    "empty_title": "No firmware tasks yet",
     "empty_desc": "Compile, install, or clean jobs you start will show up here.",
+    "group_active": "Active",
+    "group_history": "Recent",
     "status_queued": "Queued",
     "status_running": "Running…",
+    "status_completed": "Completed",
+    "status_failed": "Failed",
+    "status_cancelled": "Cancelled",
     "cancel": "Cancel",
+    "clear_history": "Clear history",
+    "build_env_label": "(build environment)",
+    "reset_build_env": "Reset build environment",
+    "reset_confirm_title": "Reset build environment?",
+    "reset_confirm_message": "This wipes the toolchain cache and platform/library installs. The next compile will be slow because everything has to re-download. Continue?",
+    "reset_confirm_button": "Reset",
     "type_compile": "Compile",
     "type_upload": "Upload",
     "type_install": "Install",
-    "type_clean": "Clean"
+    "type_clean": "Clean",
+    "type_reset_build_env": "Reset",
+    "time_queued": "queued {time}",
+    "time_started": "started {time}",
+    "time_finished": "finished {time}"
   }
 }

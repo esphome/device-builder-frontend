@@ -516,6 +516,7 @@ export enum JobType {
   UPLOAD = "upload",
   INSTALL = "install",
   CLEAN = "clean",
+  RESET_BUILD_ENV = "reset_build_env",
 }
 
 export interface FirmwareJob {
