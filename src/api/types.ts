@@ -91,6 +91,13 @@ export interface ConfiguredDevice {
   has_pending_changes: boolean;
   /** True if compiled with older ESPHome version */
   update_available: boolean;
+  /**
+   * True when the YAML (after !include / packages / !secret resolution)
+   * declares an ``api: encryption:`` block. Drives the lock-icon
+   * indicator next to the status dot. The actual key value is fetched
+   * on demand via ``devices/get_api_key``.
+   */
+  api_encrypted: boolean;
 }
 
 /** An adoptable/importable ESPHome device. */

@@ -393,6 +393,23 @@ export class ESPHomeAPI {
   }
 
   /**
+   * Resolve the Native API encryption key for a device.
+   *
+   * Backend reads the YAML through ESPHome's loader so ``!secret`` /
+   * ``!include`` / packages all resolve like a real compile. Empty
+   * string when the device has no ``api: encryption:`` block, the
+   * resolution failed, or the key isn't a string. Callers use the
+   * empty value as the "open the editor and check" signal.
+   */
+  async getApiKey(configuration: string): Promise<string> {
+    const result = await this.sendCommand<{ key: string }>(
+      "devices/get_api_key",
+      { configuration },
+    );
+    return result.key ?? "";
+  }
+
+  /**
    * Add a component to a device config.
    *
    * Nested values mirror the YAML structure: pass them as nested dicts

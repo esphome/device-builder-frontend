@@ -15,6 +15,7 @@ export interface DeviceRow {
   config: string;
   hasPendingChanges: boolean;
   hasUpdateAvailable: boolean;
+  api_encrypted: boolean;
   busy: boolean;
   recentJob: FirmwareJob | null;
   _device: ConfiguredDevice;
@@ -103,6 +104,11 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       header: localize("dashboard.table_col_name"),
       cell: (info) => {
         const row = info.row.original;
+        const encryptionIcon = row.api_encrypted ? "lock" : "lock-open-variant";
+        const encryptionTitle = row.api_encrypted
+          ? localize("dashboard.table_status_encrypted")
+          : localize("dashboard.table_status_unencrypted");
+        const encryptionClass = row.api_encrypted ? "secure" : "insecure";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
@@ -111,6 +117,12 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           ${row.hasUpdateAvailable
             ? html`<span class="cell-indicator cell-indicator--update" title=${localize("dashboard.status_update_available")}></span>`
             : nothing}
+          <wa-icon
+            class="cell-encryption ${encryptionClass}"
+            library="mdi"
+            name=${encryptionIcon}
+            title=${encryptionTitle}
+          ></wa-icon>
         </span>`;
       },
       size: 200,

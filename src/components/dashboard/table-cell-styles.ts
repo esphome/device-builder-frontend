@@ -52,6 +52,27 @@ export const tableCellStyles = css`
     opacity: 0.5;
   }
 
+  /* Encryption indicator — small lock / lock-off icon next to the
+     device name. The 'secure' variant keys off --esphome-success so it
+     reads as "this is fine"; the 'insecure' variant shares the warning
+     palette so the eye picks insecure devices up at a glance without
+     looking alarming for what's a soft warning. Lives next to the
+     name, not the status dot, because the status column is small and
+     also conveys job-state icons. */
+  .cell-encryption {
+    font-size: 14px;
+    flex-shrink: 0;
+    vertical-align: middle;
+  }
+  .cell-encryption.secure {
+    color: var(--esphome-success);
+    opacity: 0.85;
+  }
+  .cell-encryption.insecure {
+    color: var(--esphome-warning, #d99a4f);
+    opacity: 0.9;
+  }
+
   .status-recent wa-icon {
     font-size: 16px;
   }

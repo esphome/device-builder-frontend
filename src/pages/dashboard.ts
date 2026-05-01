@@ -311,6 +311,7 @@ export class ESPHomePageDashboard extends LitElement {
               .state=${device.state}
               ?has-pending-changes=${device.has_pending_changes === true}
               ?has-update-available=${device.update_available}
+              ?api-encrypted=${device.api_encrypted === true}
               ?busy=${this._activeJobs.has(device.configuration)}
               .recentJob=${this._recentJobs.get(device.configuration) ?? null}
               ?select-mode=${this._selectMode}

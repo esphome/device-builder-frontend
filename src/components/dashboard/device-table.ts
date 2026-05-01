@@ -8,6 +8,8 @@ import {
   mdiChevronUp,
   mdiCloseCircle,
   mdiDotsVertical,
+  mdiLock,
+  mdiLockOpenVariant,
   mdiPencil,
   mdiUnfoldMoreHorizontal,
 } from "@mdi/js";
@@ -51,6 +53,8 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "close-circle": mdiCloseCircle,
   "dots-vertical": mdiDotsVertical,
+  lock: mdiLock,
+  "lock-open-variant": mdiLockOpenVariant,
   pencil: mdiPencil,
   "unfold-more-horizontal": mdiUnfoldMoreHorizontal,
 });
@@ -233,6 +237,7 @@ export class ESPHomeDeviceTable extends LitElement {
         config: d.configuration,
         hasPendingChanges: d.has_pending_changes === true,
         hasUpdateAvailable: d.update_available,
+        api_encrypted: d.api_encrypted === true,
         busy: this.activeJobs.has(d.configuration),
         recentJob: this.recentJobs.get(d.configuration) ?? null,
         _device: d,

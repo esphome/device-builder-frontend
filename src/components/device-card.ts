@@ -6,6 +6,8 @@ import {
   mdiCheckboxMarked,
   mdiCloseCircle,
   mdiDotsVertical,
+  mdiLock,
+  mdiLockOpenVariant,
   mdiPencil,
   mdiUpload,
   mdiWifi,
@@ -30,6 +32,8 @@ registerMdiIcons({
   "checkbox-marked": mdiCheckboxMarked,
   "close-circle": mdiCloseCircle,
   "dots-vertical": mdiDotsVertical,
+  lock: mdiLock,
+  "lock-open-variant": mdiLockOpenVariant,
   pencil: mdiPencil,
   upload: mdiUpload,
   wifi: mdiWifi,
@@ -80,6 +84,9 @@ export class ESPHomeDeviceCard extends LitElement {
 
   @property({ type: Boolean, attribute: "has-update-available" })
   hasUpdateAvailable = false;
+
+  @property({ type: Boolean, attribute: "api-encrypted" })
+  apiEncrypted = false;
 
   @property({ type: Boolean })
   busy = false;
@@ -178,6 +185,21 @@ export class ESPHomeDeviceCard extends LitElement {
       .indicator-dot--update {
         background: var(--esphome-primary);
         box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+      }
+
+      /* API-encryption indicator. Filled lock for encrypted (the
+         expected case) reads as 'this is fine'; the open lock shares
+         the warning palette so insecure devices catch the eye. */
+      .encryption-icon {
+        font-size: 14px;
+        flex-shrink: 0;
+      }
+      .encryption-icon.secure {
+        color: var(--esphome-success);
+        opacity: 0.85;
+      }
+      .encryption-icon.insecure {
+        color: var(--esphome-warning, #f59e0b);
       }
 
       .device-config {
@@ -361,6 +383,16 @@ export class ESPHomeDeviceCard extends LitElement {
               ${this.hasUpdateAvailable
                 ? html`<span class="indicator-dot indicator-dot--update" title=${this._localize("dashboard.status_update_available")}></span>`
                 : nothing}
+              <wa-icon
+                class="encryption-icon ${this.apiEncrypted ? "secure" : "insecure"}"
+                library="mdi"
+                name=${this.apiEncrypted ? "lock" : "lock-open-variant"}
+                title=${this._localize(
+                  this.apiEncrypted
+                    ? "dashboard.table_status_encrypted"
+                    : "dashboard.table_status_unencrypted",
+                )}
+              ></wa-icon>
             </div>
             <p class="device-config">${this.configuration}</p>
           </div>
