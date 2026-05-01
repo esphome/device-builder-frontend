@@ -94,42 +94,14 @@ export const dashboardStyles = css`
   }
 
   .search-wrap {
-    position: relative;
     max-width: 380px;
     flex: 1;
   }
-  .search-icon {
-    position: absolute;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 18px;
-    color: var(--wa-color-text-quiet);
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-  }
   .search-input {
     width: 100%;
-    box-sizing: border-box;
-    padding: 9px 14px 9px 38px;
-    font-size: var(--wa-font-size-s);
-    font-family: inherit;
-    color: var(--wa-color-text-normal);
-    background: var(--wa-color-surface-raised);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    border-radius: var(--wa-border-radius-m);
-    outline: none;
-    transition:
-      border-color 0.15s,
-      box-shadow 0.15s;
-  }
-  .search-input::placeholder {
-    color: var(--wa-color-text-quiet);
-  }
-  .search-input:focus {
-    border-color: var(--esphome-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    /* wa-input owns its own border / radius / focus ring; we only
+       set the font size so it tracks the rest of the toolbar. */
+    --font-size-medium: var(--wa-font-size-s);
   }
   .device-count {
     font-size: var(--wa-font-size-xs);

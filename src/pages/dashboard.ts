@@ -40,6 +40,7 @@ import { cardSkeletonTemplate, tableSkeletonTemplate } from "./dashboard-skeleto
 import { dashboardStyles } from "./dashboard-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/input/input.js";
 import "../components/api-key-dialog.js";
 import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
 import "../components/confirm-dialog.js";
@@ -265,6 +266,24 @@ export class ESPHomePageDashboard extends LitElement {
     }
   };
 
+  private _renderSearchInput() {
+    // ``wa-input`` carries a built-in cross-browser clear button via
+    // ``with-clear`` — no need to hand-roll one or work around
+    // Firefox not rendering ``::-webkit-search-cancel-button``.
+    return html`<div class="search-wrap">
+      <wa-input
+        class="search-input"
+        type="search"
+        with-clear
+        placeholder=${this._localize("dashboard.search_placeholder")}
+        .value=${this._search}
+        @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }}
+      >
+        <wa-icon slot="start" library="mdi" name="magnify"></wa-icon>
+      </wa-input>
+    </div>`;
+  }
+
   private _renderToolbar(matchCount: number, total: number) {
     const q = this._search.trim();
     const unit = matchCount === 1 ? this._localize("dashboard.device_singular") : this._localize("dashboard.device_plural");
@@ -272,14 +291,7 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       <div class="toolbar">
         <div class="toolbar-row">
-          <div class="search-wrap">
-            <span class="search-icon"><wa-icon library="mdi" name="magnify"></wa-icon></span>
-            <input class="search-input" type="search"
-              placeholder=${this._localize("dashboard.search_placeholder")}
-              .value=${this._search}
-              @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }}
-            />
-          </div>
+          ${this._renderSearchInput()}
           ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
         </div>
@@ -366,14 +378,7 @@ export class ESPHomePageDashboard extends LitElement {
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
         <div slot="toolbar" class="toolbar-row">
-          <div class="search-wrap">
-            <span class="search-icon"><wa-icon library="mdi" name="magnify"></wa-icon></span>
-            <input class="search-input" type="search"
-              placeholder=${this._localize("dashboard.search_placeholder")}
-              .value=${this._search}
-              @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }}
-            />
-          </div>
+          ${this._renderSearchInput()}
           ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
         </div>
