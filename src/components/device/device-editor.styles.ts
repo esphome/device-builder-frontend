@@ -24,6 +24,23 @@ export const deviceEditorStyles = css`
     color: var(--esphome-on-primary);
   }
 
+  /* Navigator hidden + YAML-only layout = the title bar is the only
+     non-editor chrome left on screen. Squeeze it so it gives the
+     YAML editor back the vertical space the user already implicitly
+     asked for by collapsing both panels. */
+  .card-header--compact {
+    padding: var(--wa-space-2xs) var(--wa-space-m);
+  }
+
+  .card-header--compact .editor-header-title {
+    font-size: var(--wa-font-size-2xs);
+  }
+
+  .card-header--compact .layout-toggle wa-icon,
+  .card-header--compact .diff-toggle wa-icon {
+    font-size: 16px;
+  }
+
   .editor-header-main {
     display: flex;
     flex-direction: column;

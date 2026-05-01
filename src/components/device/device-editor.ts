@@ -46,6 +46,13 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property()
   layout: DeviceLayoutMode = "both";
 
+  /** Forwarded from the page so the editor can shrink its own header
+   *  chrome when both side panels are out of view (navigator hidden +
+   *  YAML-only layout). With nothing else on screen the title bar
+   *  ate vertical space the user couldn't reclaim. */
+  @property({ type: Boolean })
+  navCollapsed = false;
+
   @property()
   deviceTitle = "";
 
@@ -142,6 +149,14 @@ export class ESPHomeDeviceEditor extends LitElement {
         : effectiveLayout === "left"
           ? "editor-layout--left"
           : "editor-layout--right";
+    /* When the user has hidden the navigator AND chosen YAML-only,
+       the only thing on screen is the YAML editor — the bulky title
+       bar is just chrome at that point. Compact it (less padding,
+       smaller title) so the editor reclaims the vertical space.
+       Mobile already has its own header treatment so we leave that
+       alone. */
+    const compactHeader =
+      !this._isMobile && this.navCollapsed && effectiveLayout === "right";
 
     // Single, calm title — guidance for empty / partially-filled
     // devices belongs in the content pane (the cards / step prompts),
@@ -152,7 +167,7 @@ export class ESPHomeDeviceEditor extends LitElement {
 
     return html`
       <section class="card">
-        <header class="card-header">
+        <header class="card-header ${compactHeader ? "card-header--compact" : ""}">
           <slot name="mobile-menu"></slot>
           <div class="editor-header-main">
             <h2 class="editor-header-title">${title}</h2>

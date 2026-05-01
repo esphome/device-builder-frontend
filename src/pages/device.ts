@@ -374,6 +374,7 @@ export class ESPHomePageDevice extends LitElement {
             .yaml=${this._yaml}
             .savedYaml=${this._savedYaml}
             .layout=${this._layout}
+            ?navCollapsed=${this._navCollapsed}
             .deviceTitle=${deviceTitle}
             .board=${this._board}
             .highlightRange=${this._highlightRange}
