@@ -30,6 +30,13 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
     css`
       :host {
         display: block;
+        /* Grid stretches each row's items to the row height; without
+           a 100% chain through the host and card, a card with a
+           shorter title sits at its intrinsic height while a sibling
+           with a wrapping title is taller, leaving the action row
+           floating mid-card. Stretch the chain so the action row
+           always lands at the bottom of every card in the row. */
+        height: 100%;
       }
 
       .card {
@@ -39,6 +46,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
         background: var(--wa-color-surface-raised);
         display: flex;
         flex-direction: column;
+        height: 100%;
         transition: box-shadow 0.15s;
       }
 
@@ -75,6 +83,11 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
       .header {
         padding: var(--wa-space-m) var(--wa-space-m) var(--wa-space-s);
         border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        /* Take all the spare height so the action row pins to the
+           bottom of every card and siblings in the same grid row line
+           up regardless of how many lines the title / subtitle wrap
+           into. */
+        flex: 1;
       }
 
       .title {
