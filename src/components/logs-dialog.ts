@@ -23,15 +23,6 @@ registerMdiIcons({
   pulse: mdiPulse,
 });
 
-/* Match component state-publish lines so the user can mute the
-   high-volume sensor / binary_sensor / switch / cover / climate
-   noise and still see the lower-frequency lifecycle messages. The
-   anchors (`: ` or ` - `) keep the test from triggering on
-   incidental occurrences of the phrase inside a free-form log
-   message. */
-const STATE_LINE_RE =
-  /(?:: |\s-\s)(?:Sending state|Publishing:|Got state|Received state)\b/i;
-
 @customElement("esphome-logs-dialog")
 export class ESPHomeLogsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -347,9 +338,6 @@ export class ESPHomeLogsDialog extends LitElement {
 
   protected render() {
     const title = this._localize("dashboard.logs_title", { name: this.name });
-    const visibleLines = this._hideStates
-      ? this._lines.filter((line) => !STATE_LINE_RE.test(line))
-      : this._lines;
     const toggleLabel = this._localize(
       this._hideStates ? "dashboard.logs_show_states" : "dashboard.logs_hide_states",
     );
@@ -362,7 +350,7 @@ export class ESPHomeLogsDialog extends LitElement {
       >
         <div class="logs-content">
           <esphome-ansi-log
-            .lines=${visibleLines}
+            .lines=${this._lines}
             placeholder=${this._localize("dashboard.logs_placeholder")}
             ?light=${!this._darkMode}
           ></esphome-ansi-log>
@@ -378,7 +366,6 @@ export class ESPHomeLogsDialog extends LitElement {
               aria-pressed=${this._hideStates ? "true" : "false"}
             >
               <wa-icon library="mdi" name="pulse"></wa-icon>
-              ${toggleLabel}
             </button>
             <button
               class="term-btn term-btn--ghost expand-btn"
@@ -424,19 +411,24 @@ export class ESPHomeLogsDialog extends LitElement {
     this._streaming = true;
     this._lines = [];
 
-    this._streamId = this._api.logs(this.configuration, this._port, {
-      onOutput: (line: string) => {
-        this._lines = [...this._lines, line];
+    this._streamId = this._api.logs(
+      this.configuration,
+      this._port,
+      {
+        onOutput: (line: string) => {
+          this._lines = [...this._lines, line];
+        },
+        onResult: () => {
+          this._streaming = false;
+          this._streamId = "";
+        },
+        onError: () => {
+          this._streaming = false;
+          this._streamId = "";
+        },
       },
-      onResult: () => {
-        this._streaming = false;
-        this._streamId = "";
-      },
-      onError: () => {
-        this._streaming = false;
-        this._streamId = "";
-      },
-    });
+      { noStates: this._hideStates },
+    );
   }
 
   private _stopStreaming() {
@@ -470,6 +462,15 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _toggleHideStates() {
     this._hideStates = !this._hideStates;
+    /* The --no-states flag is set on the esphome subprocess at spawn
+       time, so flipping the toggle has to tear down the current
+       stream and start a fresh one. Only restart if we were actively
+       streaming — if the user already hit Stop, leave the buffer
+       alone and let them hit Start themselves. */
+    if (this._streamId) {
+      this._stopStreaming();
+      this._startStreaming();
+    }
   }
 
   private _clearLogs() {

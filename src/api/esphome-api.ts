@@ -457,8 +457,17 @@ export class ESPHomeAPI {
   }
 
   /** Stream logs from a device (streaming, not queued). */
-  logs(configuration: string, port: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/logs", { configuration, port }, callbacks);
+  logs(
+    configuration: string,
+    port: string,
+    callbacks: StreamCallbacks,
+    options: { noStates?: boolean } = {},
+  ): string {
+    const payload: Record<string, unknown> = { configuration, port };
+    if (options.noStates) {
+      payload.no_states = true;
+    }
+    return this.sendStreamCommand("devices/logs", payload, callbacks);
   }
 
   /**
