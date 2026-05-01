@@ -75,7 +75,7 @@ const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
 // "Clean build files says completed for too long"); failures and
 // cancellations linger longer because the user actually wants to
 // notice those, and they don't move on without acknowledgement.
-const RECENT_JOB_TTL_MS_COMPLETED = 4_000;
+const RECENT_JOB_TTL_MS_COMPLETED = 10_000;
 const RECENT_JOB_TTL_MS_FAILED = 30_000;
 
 // Import child components
