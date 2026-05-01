@@ -192,6 +192,10 @@ export const tableCellStyles = css`
     color: var(--wa-color-text-quiet);
     cursor: pointer;
     padding: 0;
+    /* Reset anchor presentation so the Visit Web UI link (rendered
+       as <a> for rel=noopener security) matches the surrounding
+       <button> action controls — no underline, no visited tint. */
+    text-decoration: none;
     transition:
       background 0.12s,
       color 0.12s,
@@ -221,5 +225,36 @@ export const tableCellStyles = css`
     background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
     color: var(--esphome-primary);
     border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+  }
+
+  /* Progressive overflow into the row-end kebab: as the viewport
+     narrows we drop inline action buttons in priority order so the
+     table keeps as many one-click actions visible as it can.
+     Priority order (highest → lowest, last to drop):
+       Edit          (always visible)
+       Install /
+       Update        (mutually exclusive — only one renders)
+       Logs
+       Visit Web UI
+     The kebab in actions-col stays visible at every width and
+     mirrors every action the buttons expose, so nothing becomes
+     unreachable. Mobile users get the card view by default, so we
+     deliberately don't tear the actions column off entirely at any
+     viewport — Edit + kebab is a fine fallback if someone forces
+     table view on a phone. */
+  @media (max-width: 1024px) {
+    .cell-action-btn--visit-web {
+      display: none;
+    }
+  }
+  @media (max-width: 920px) {
+    .cell-action-btn--logs {
+      display: none;
+    }
+  }
+  @media (max-width: 820px) {
+    .cell-action-btn--install {
+      display: none;
+    }
   }
 `;

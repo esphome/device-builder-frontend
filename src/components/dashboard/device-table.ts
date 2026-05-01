@@ -7,11 +7,14 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiCloseCircle,
+  mdiConsole,
   mdiDotsVertical,
   mdiLock,
   mdiLockOpenVariant,
+  mdiOpenInNew,
   mdiPencil,
   mdiUnfoldMoreHorizontal,
+  mdiUpload,
 } from "@mdi/js";
 import {
   TableController,
@@ -52,11 +55,14 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-down": mdiChevronDown,
   "close-circle": mdiCloseCircle,
+  console: mdiConsole,
   "dots-vertical": mdiDotsVertical,
   lock: mdiLock,
   "lock-open-variant": mdiLockOpenVariant,
+  "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
   "unfold-more-horizontal": mdiUnfoldMoreHorizontal,
+  upload: mdiUpload,
 });
 
 // ─── Cached row-model factories (created once, reused forever) ───
@@ -310,6 +316,7 @@ export class ESPHomeDeviceTable extends LitElement {
         .device=${this._contextMenuDevice}
         .position=${this._contextMenuPos}
         ?anchor-right=${this._contextMenuAnchorRight}
+        ?has-pending=${this._contextMenuDevice?.has_pending_changes === true}
         ?busy=${this._contextMenuDevice ? this.activeJobs.has(this._contextMenuDevice.configuration) : false}
         @menu-close=${this._closeContextMenu}
         @edit-device=${(e: CustomEvent) => {
@@ -412,7 +419,7 @@ export class ESPHomeDeviceTable extends LitElement {
                       : sorted === "desc"
                         ? "descending"
                         : "none"}
-                    class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""}"
+                    class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""} col-${header.column.id}"
                     style="width:${header.getSize()}px"
                     @click=${canSort ? () => header.column.toggleSorting() : nothing}
                   >
@@ -481,7 +488,7 @@ export class ESPHomeDeviceTable extends LitElement {
                     .getVisibleCells()
                     .map(
                       (cell: any) =>
-                        html`<td role="gridcell">
+                        html`<td role="gridcell" class="col-${cell.column.id}">
                           ${flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>`
                     )}
@@ -540,12 +547,18 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      this.selectMode
-        ? this._onToggleSelect(device.configuration)
-        : this._onRowClick(device);
-    }
+    if (e.key !== "Enter" && e.key !== " ") return;
+    /* Don't double-fire when the user is keyboard-activating an
+       inline action control (Edit / Logs / Install / Update / Visit
+       Web / kebab). The native button/anchor handles its own activation
+       and the event bubbles up to the row — without this guard,
+       pressing Enter on a focused action also opens the row drawer
+       behind it. */
+    if ((e.target as Element)?.closest("button, a")) return;
+    e.preventDefault();
+    this.selectMode
+      ? this._onToggleSelect(device.configuration)
+      : this._onRowClick(device);
   }
 
   private _openActionsMenu(e: MouseEvent, device: ConfiguredDevice) {

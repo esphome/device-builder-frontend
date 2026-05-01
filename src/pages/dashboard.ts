@@ -35,6 +35,7 @@ import {
   fetchApiKey,
   streamSerialToDialog,
 } from "./dashboard-actions.js";
+import { buildWebUiUrl } from "../util/web-ui-url.js";
 import { detectChip, disconnect } from "../util/web-serial.js";
 import { cardSkeletonTemplate, tableSkeletonTemplate } from "./dashboard-skeletons.js";
 import { dashboardStyles } from "./dashboard-styles.js";
@@ -352,6 +353,7 @@ export class ESPHomePageDashboard extends LitElement {
       <div class="devices-grid">
         ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
         ${filtered.map((device) => {
+          const webUrl = buildWebUiUrl(device);
           return html`
             <esphome-device-card
               .name=${device.friendly_name || device.name}
@@ -363,11 +365,13 @@ export class ESPHomePageDashboard extends LitElement {
               ?api-encrypted=${device.api_encrypted === true}
               ?busy=${this._activeJobs.has(device.configuration)}
               .recentJob=${this._recentJobs.get(device.configuration) ?? null}
+              .webUrl=${webUrl}
               ?select-mode=${this._selectMode}
               ?selected=${this._selectedDevices.has(device.configuration)}
               @edit-device=${() => editDevice(device)}
               @install-device=${() => this._openInstallMethod(device)}
               @update-device=${() => this._openCommand(device, "install")}
+              @open-logs=${() => this._openLogs(device)}
               @show-progress=${() => this._showJobProgress(device)}
               @card-click=${() => { this._drawerDevice = device; this._drawerOpen = true; }}
               @card-context-menu=${(e: CustomEvent) => { this._cardContextDevice = device; this._cardContextPosition = e.detail; }}
@@ -445,6 +449,8 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-table-row-menu
         .device=${this._cardContextDevice}
         .position=${this._cardContextPosition}
+        card-mode
+        ?has-pending=${this._cardContextDevice?.has_pending_changes === true}
         ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
         @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}

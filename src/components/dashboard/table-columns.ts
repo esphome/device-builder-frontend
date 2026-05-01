@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
   status: DeviceState;
@@ -187,26 +188,26 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const device = row._device;
         const showInstall = row.hasPendingChanges;
         const showUpdate = !row.hasPendingChanges && row.hasUpdateAvailable;
+        const visitUrl = buildWebUiUrl(device);
+        const showVisit = visitUrl !== "";
+        // Priority order (highest → lowest, last to drop on narrow
+        // viewports): edit > install/update > logs > visit web. Each
+        // button carries a per-action class (cell-action-btn--edit,
+        // --install, --logs, --visit-web) so the media queries in
+        // table-cell-styles can hide them progressively as room runs
+        // out; the row-end kebab keeps every action reachable.
         return html`<span class="cell-actions">
           <button
-            class="cell-action-btn"
+            class="cell-action-btn cell-action-btn--edit"
             aria-label=${localize("dashboard.table_action_edit")}
             title=${localize("dashboard.table_action_edit")}
             @click=${(e: Event) => dispatchRowEvent(e, "edit-device", device)}
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>
           </button>
-          <button
-            class="cell-action-btn"
-            aria-label=${localize("dashboard.table_action_logs")}
-            title=${localize("dashboard.table_action_logs")}
-            @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
-          >
-            <wa-icon library="mdi" name="console"></wa-icon>
-          </button>
           ${showInstall
             ? html`<button
-                class="cell-action-btn cell-action-btn--accent"
+                class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
                 aria-label=${localize("dashboard.table_action_install")}
                 title=${localize("dashboard.table_action_install")}
                 ?disabled=${row.busy}
@@ -217,7 +218,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : nothing}
           ${showUpdate
             ? html`<button
-                class="cell-action-btn cell-action-btn--accent"
+                class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
                 aria-label=${localize("dashboard.table_action_update")}
                 title=${localize("dashboard.table_action_update")}
                 ?disabled=${row.busy}
@@ -226,9 +227,30 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                 <wa-icon library="mdi" name="upload"></wa-icon>
               </button>`
             : nothing}
+          <button
+            class="cell-action-btn cell-action-btn--logs"
+            aria-label=${localize("dashboard.table_action_logs")}
+            title=${localize("dashboard.table_action_logs")}
+            @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
+          >
+            <wa-icon library="mdi" name="console"></wa-icon>
+          </button>
+          ${showVisit
+            ? html`<a
+                class="cell-action-btn cell-action-btn--visit-web"
+                href=${visitUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label=${localize("dashboard.action_visit_web_ui")}
+                title=${localize("dashboard.action_visit_web_ui")}
+                @click=${(e: Event) => e.stopPropagation()}
+              >
+                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              </a>`
+            : nothing}
         </span>`;
       },
-      size: 120,
+      size: 160,
       enableSorting: false,
       enableHiding: false,
     },

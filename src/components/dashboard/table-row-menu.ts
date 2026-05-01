@@ -20,6 +20,7 @@ import type { ConfiguredDevice } from "../../api/types.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -60,6 +61,21 @@ export class ESPHomeTableRowMenu extends LitElement {
 
   @property({ type: Boolean, attribute: "anchor-right" })
   anchorRight = false;
+
+  /** When true, the menu is being shown for a card view where every
+   *  inline action button is always rendered. The duplicate menu items
+   *  (Logs, Visit Web UI, Install when pending) are hidden via CSS
+   *  so the kebab only carries what isn't already on the card. The
+   *  host attribute drives the CSS selector — keep it in sync. */
+  @property({ type: Boolean, attribute: "card-mode", reflect: true })
+  cardMode = false;
+
+  /** Mirrors ``ConfiguredDevice.has_pending_changes`` for the open
+   *  device. The inline Install button only renders when this is true,
+   *  so the kebab Install entry hides at the same widths to avoid the
+   *  duplicate. Reflected so CSS can target it via host attribute. */
+  @property({ type: Boolean, attribute: "has-pending", reflect: true })
+  hasPending = false;
 
   @query(".menu")
   private _menuEl!: HTMLDivElement;
@@ -157,6 +173,39 @@ export class ESPHomeTableRowMenu extends LitElement {
       .menu-item--danger:hover wa-icon {
         color: var(--esphome-error);
       }
+
+      /* Dedupe with the inline action buttons. The card always shows
+         every inline action when applicable, so card-mode hides the
+         duplicate kebab entries unconditionally. The table only shows
+         the inline buttons above each priority breakpoint, so for the
+         table the kebab entries hide only above those same widths.
+         Class names match the inline cell-action-btn modifiers so the
+         pairing is obvious at a glance; breakpoints are off-by-one
+         from the inline rules so the transition pixel never has both
+         copies hidden:
+           menu-item--install  (only when has-pending)  inline > 820px
+           menu-item--logs                              inline > 920px
+           menu-item--visit-web                         inline > 1024px */
+      :host([card-mode]) .menu-item--logs,
+      :host([card-mode]) .menu-item--visit-web,
+      :host([card-mode][has-pending]) .menu-item--install {
+        display: none;
+      }
+      @media (min-width: 821px) {
+        :host(:not([card-mode])[has-pending]) .menu-item--install {
+          display: none;
+        }
+      }
+      @media (min-width: 921px) {
+        :host(:not([card-mode])) .menu-item--logs {
+          display: none;
+        }
+      }
+      @media (min-width: 1025px) {
+        :host(:not([card-mode])) .menu-item--visit-web {
+          display: none;
+        }
+      }
     `,
   ];
 
@@ -169,19 +218,15 @@ export class ESPHomeTableRowMenu extends LitElement {
         class="menu"
         style=${this._initialStyle()}
       >
-        <div class="menu-item" @click=${() => this._emit("edit-device")}>
-          <wa-icon library="mdi" name="pencil"></wa-icon>
-          ${this._localize("dashboard.drawer_edit")}
-        </div>
         <div class="menu-item" @click=${() => this._emit("validate-device")}>
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
         </div>
-        <div class="menu-item ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("install-device")}>
+        <div class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("install-device")}>
           <wa-icon library="mdi" name="upload"></wa-icon>
           ${this._localize("dashboard.action_install")}
         </div>
-        <div class="menu-item ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("open-logs")}>
+        <div class="menu-item menu-item--logs ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
         </div>
@@ -291,16 +336,13 @@ export class ESPHomeTableRowMenu extends LitElement {
   }
 
   private _renderVisitWebUi() {
-    // Render only when we actually have somewhere to send the user:
-    // a port from the YAML's ``web_server:`` block AND a resolvable
-    // host. ``ip`` stays empty until the device has been seen online,
-    // and ``address`` should always be populated from StorageJSON,
-    // but the guard means the menu item never appears as a no-op.
-    if (this.device == null || this.device.web_port == null) return nothing;
-    const host = this.device.address || this.device.ip;
-    if (!host) return nothing;
-    const port = this.device.web_port;
-    const url = `http://${host}${port === 80 ? "" : `:${port}`}`;
+    // Render only when we actually have somewhere to send the user.
+    // ``buildWebUiUrl`` is the single source of truth for the
+    // host/port/protocol logic; it returns "" when the YAML didn't
+    // expose web_server or we don't have a host yet.
+    if (this.device == null) return nothing;
+    const url = buildWebUiUrl(this.device);
+    if (!url) return nothing;
     // Anchor element with ``rel="noopener noreferrer"`` is the
     // codebase's standard external-link pattern; the browser enforces
     // the security defaults instead of relying on
@@ -308,7 +350,7 @@ export class ESPHomeTableRowMenu extends LitElement {
     // Referer header and isn't honoured uniformly across browsers.
     return html`
       <a
-        class="menu-item menu-item--link"
+        class="menu-item menu-item--link menu-item--visit-web"
         href=${url}
         target="_blank"
         rel="noopener noreferrer"
