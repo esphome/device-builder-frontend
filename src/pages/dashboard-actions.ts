@@ -80,14 +80,14 @@ export async function downloadYaml(
   }
 }
 
-export async function extractApiKey(
+export async function fetchApiKey(
   device: ConfiguredDevice,
   api: ESPHomeAPI
 ): Promise<string> {
   // Server-side resolution — uses ESPHome's YAML loader so !secret /
   // !include / packages all resolve the same way as a real compile.
-  // The previous regex on raw YAML missed every config that pulled
-  // the key from secrets.yaml or hid it behind a $substitution.
+  // (Previously named ``extractApiKey`` when this was a regex on the
+  // raw YAML; the new name reflects that the work is on the backend.)
   try {
     return await api.getApiKey(device.configuration);
   } catch {

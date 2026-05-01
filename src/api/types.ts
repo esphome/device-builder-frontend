@@ -105,7 +105,7 @@ export interface ConfiguredDevice {
    * True when the YAML (after !include / packages / !secret
    * resolution) declares an ``api: encryption:`` block. Flips the
    * indicator variant (filled lock vs open lock) when ``api_enabled``
-   * is True. The actual key value is fetched on demand via
+   * is set. The actual key value is fetched on demand via
    * ``devices/get_api_key``.
    */
   api_encrypted: boolean;

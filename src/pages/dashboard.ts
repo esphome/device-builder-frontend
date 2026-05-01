@@ -32,7 +32,7 @@ import {
   deleteDevice,
   downloadYaml,
   editDevice,
-  extractApiKey,
+  fetchApiKey,
   streamSerialToDialog,
 } from "./dashboard-actions.js";
 import { detectChip, disconnect } from "../util/web-serial.js";
@@ -531,7 +531,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private async _showApiKey(device: ConfiguredDevice) {
-    const key = await extractApiKey(device, this._api);
+    const key = await fetchApiKey(device, this._api);
     this._apiKeyDialog.open(key);
   }
 

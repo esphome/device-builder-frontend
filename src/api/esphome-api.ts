@@ -402,11 +402,16 @@ export class ESPHomeAPI {
    * empty value as the "open the editor and check" signal.
    */
   async getApiKey(configuration: string): Promise<string> {
-    const result = await this.sendCommand<{ key: string }>(
+    // ``sendCommand`` resolves ``unknown`` — guard the shape so a
+    // malformed payload (number / object / nullish) can't sneak past
+    // the dialog's string-only assumptions and surface as a runtime
+    // crash. The empty string is the same "no key here" signal the
+    // backend already produces for unencrypted / unparseable configs.
+    const result = await this.sendCommand<{ key: unknown }>(
       "devices/get_api_key",
       { configuration },
     );
-    return result.key ?? "";
+    return typeof result?.key === "string" ? result.key : "";
   }
 
   /**
