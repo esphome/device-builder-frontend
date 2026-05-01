@@ -69,6 +69,7 @@
     "action_rename": "Rename hostname",
     "action_clean_build": "Clean build files",
     "action_download_elf": "Download ELF file",
+    "action_visit_web_ui": "Visit web UI",
     "action_validate_success": "\"{name}\" configuration is valid",
     "action_validate_failed": "Validation failed for \"{name}\"",
     "action_install_started": "Installing \"{name}\"…",

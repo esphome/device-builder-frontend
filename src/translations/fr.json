@@ -45,6 +45,7 @@
     "action_rename": "Renommer l'hôte",
     "action_clean_build": "Nettoyer les fichiers de compilation",
     "action_download_elf": "Télécharger le fichier ELF",
+    "action_visit_web_ui": "Ouvrir l'interface web",
     "action_validate_success": "La configuration de \"{name}\" est valide",
     "action_validate_failed": "Échec de la validation pour \"{name}\"",
     "action_install_started": "Installation de \"{name}\"…",

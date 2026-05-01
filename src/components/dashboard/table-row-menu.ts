@@ -8,6 +8,7 @@ import {
   mdiDownload,
   mdiFileDownloadOutline,
   mdiKeyVariant,
+  mdiOpenInNew,
   mdiPencil,
   mdiRenameOutline,
   mdiUpload,
@@ -31,6 +32,7 @@ registerMdiIcons({
   download: mdiDownload,
   "file-download-outline": mdiFileDownloadOutline,
   "key-variant": mdiKeyVariant,
+  "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
   "rename-outline": mdiRenameOutline,
   upload: mdiUpload,
@@ -174,6 +176,12 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
         </div>
+        ${this.device?.web_port != null
+          ? html`<div class="menu-item" @click=${this._openWebUi}>
+              <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              ${this._localize("dashboard.action_visit_web_ui")}
+            </div>`
+          : nothing}
         <div class="menu-divider"></div>
         ${this.device?.api_encrypted
           ? html`<div class="menu-item" @click=${() => this._emit("show-api-key")}>
@@ -277,6 +285,18 @@ export class ESPHomeTableRowMenu extends LitElement {
     );
     this._close();
   }
+
+  private _openWebUi = () => {
+    // Pure navigation — no app state to update, so we don't bounce
+    // through the parent like the other menu items do.
+    if (!this.device || this.device.web_port == null) return;
+    const port = this.device.web_port;
+    const host = this.device.address || this.device.ip;
+    if (!host) return;
+    const url = `http://${host}${port === 80 ? "" : `:${port}`}`;
+    window.open(url, "_blank", "noopener");
+    this._close();
+  };
 }
 
 declare global {

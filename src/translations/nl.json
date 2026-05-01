@@ -45,6 +45,7 @@
     "action_rename": "Hostnaam hernoemen",
     "action_clean_build": "Bouwbestanden opschonen",
     "action_download_elf": "ELF-bestand downloaden",
+    "action_visit_web_ui": "Webinterface openen",
     "action_validate_success": "Configuratie van \"{name}\" is geldig",
     "action_validate_failed": "Validatie mislukt voor \"{name}\"",
     "action_install_started": "\"{name}\" installeren…",
