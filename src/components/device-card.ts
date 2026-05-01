@@ -393,8 +393,8 @@ export class ESPHomeDeviceCard extends LitElement {
                     name=${this.apiEncrypted ? "lock" : "lock-open-variant"}
                     title=${this._localize(
                       this.apiEncrypted
-                        ? "dashboard.table_status_encrypted"
-                        : "dashboard.table_status_unencrypted",
+                        ? "dashboard.table_status_encrypted_tooltip"
+                        : "dashboard.table_status_unencrypted_tooltip",
                     )}
                   ></wa-icon>`
                 : nothing}

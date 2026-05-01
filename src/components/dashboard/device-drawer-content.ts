@@ -225,6 +225,11 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
                   class="status-badge ${apiEncrypted
                     ? "status-badge--encrypted"
                     : "status-badge--unencrypted"}"
+                  title=${this._localize(
+                    apiEncrypted
+                      ? "dashboard.table_status_encrypted_tooltip"
+                      : "dashboard.table_status_unencrypted_tooltip",
+                  )}
                 >
                   <wa-icon
                     library="mdi"

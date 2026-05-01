@@ -108,9 +108,11 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         // No lock at all when the device doesn't expose the Native API.
         // "Insecure" only makes sense for a surface that's actually on.
         const encryptionIcon = row.api_encrypted ? "lock" : "lock-open-variant";
+        // Icon-only indicator → use the longer descriptive tooltip;
+        // there's no visible label competing for space.
         const encryptionTitle = row.api_encrypted
-          ? localize("dashboard.table_status_encrypted")
-          : localize("dashboard.table_status_unencrypted");
+          ? localize("dashboard.table_status_encrypted_tooltip")
+          : localize("dashboard.table_status_unencrypted_tooltip");
         const encryptionClass = row.api_encrypted ? "secure" : "insecure";
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
