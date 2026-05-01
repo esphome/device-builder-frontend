@@ -247,7 +247,12 @@ export class ESPHomePageDashboard extends LitElement {
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
             <span>${this._localize("dashboard.discovered_count", { count: this._importableDevices.length })}</span>
           </div>
-          <a @click=${() => { this._showDiscovered = !this._showDiscovered; }}>${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}</a>
+          <button
+            class="discovered-banner-toggle"
+            type="button"
+            aria-pressed=${this._showDiscovered}
+            @click=${() => { this._showDiscovered = !this._showDiscovered; }}
+          >${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}</button>
         </div>
       </div>
     `;
