@@ -445,8 +445,15 @@ export class ESPHomeAPI {
    * The backend kills the underlying subprocess and the streaming task
    * ends in CANCELLED state — no further `output`/`result` events are
    * sent for that stream. Returns once the backend confirms.
+   *
+   * The local handler for `streamId` is dropped synchronously so any
+   * already-in-flight `output` events (or a misbehaving backend that
+   * keeps sending) won't reach the caller after the stop, and the
+   * `_streamHandlers` entry doesn't leak when the cancelled task
+   * never emits a terminal `result` event.
    */
   async stopStream(streamId: string): Promise<{ cancelled: boolean }> {
+    this._streamHandlers.delete(streamId);
     return this.sendCommand<{ cancelled: boolean }>("devices/stop_stream", {
       stream_id: streamId,
     });

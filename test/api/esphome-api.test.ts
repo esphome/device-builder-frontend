@@ -284,6 +284,37 @@ describe("ESPHomeAPI — streaming commands", () => {
     await expect(pending).resolves.toEqual({ cancelled: true });
   });
 
+  it("stopStream drops the local handler so further output events are ignored", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const onOutput = vi.fn();
+    const onResult = vi.fn();
+
+    const streamId = api.sendStreamCommand(
+      "devices/logs",
+      { configuration: "foo.yaml", port: "" },
+      { onOutput, onResult },
+    );
+
+    // Pre-stop: events flow normally.
+    ws.receive({ message_id: streamId, event: "output", data: "before-stop" });
+    expect(onOutput).toHaveBeenCalledWith("before-stop");
+
+    api.stopStream(streamId);
+
+    // Anything that arrives after stop — whether genuinely racing or a
+    // misbehaving backend that keeps sending — must not reach the caller.
+    ws.receive({ message_id: streamId, event: "output", data: "after-stop" });
+    ws.receive({
+      message_id: streamId,
+      event: "result",
+      data: { success: false, code: -1 },
+    });
+
+    expect(onOutput).toHaveBeenCalledTimes(1);
+    expect(onResult).not.toHaveBeenCalled();
+  });
+
   it("signals an error via onError if send is attempted while disconnected", () => {
     const api = new ESPHomeAPI();
     const onError = vi.fn();
