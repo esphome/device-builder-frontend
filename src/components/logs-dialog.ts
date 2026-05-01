@@ -52,6 +52,9 @@ export class ESPHomeLogsDialog extends LitElement {
   private _showStates = true;
 
   @state()
+  private _passive = false;
+
+  @state()
   _lines: string[] = [];
 
   private _streamId = "";
@@ -317,6 +320,12 @@ export class ESPHomeLogsDialog extends LitElement {
     this._lines = [];
     this._streaming = false;
     this._expanded = false;
+    /* Reset to the default each open. Persisting "hide states" across
+       a close/reopen would surprise the user — the dialog is supposed
+       to behave the same way every time it pops up unless the user
+       explicitly flips the toggle this session. */
+    this._showStates = true;
+    this._passive = false;
     this._streamId = "";
     this._dialog.open = true;
     this._startStreaming();
@@ -328,6 +337,12 @@ export class ESPHomeLogsDialog extends LitElement {
     this._lines = [];
     this._streaming = true;
     this._expanded = false;
+    this._showStates = true;
+    /* Web Serial drives output directly into ``_lines`` via
+       ``streamSerialToDialog`` — there's no backend ``esphome logs``
+       subprocess to pass ``--no-states`` to, so the toggle is hidden
+       in passive mode to avoid implying state filtering is available. */
+    this._passive = true;
     this._streamId = "";
     this._dialog.open = true;
   }
@@ -360,15 +375,19 @@ export class ESPHomeLogsDialog extends LitElement {
               ? html`<span class="streaming-dot"></span>`
               : ""}
             <span class="spacer"></span>
-            <button
-              class="term-btn term-btn--ghost ${this._showStates ? "is-active" : ""}"
-              @click=${this._toggleShowStates}
-              title=${toggleLabel}
-              aria-pressed=${this._showStates ? "true" : "false"}
-            >
-              <wa-icon library="mdi" name="pulse"></wa-icon>
-              ${this._localize("dashboard.logs_states")}
-            </button>
+            ${this._passive
+              ? ""
+              : html`
+                  <button
+                    class="term-btn term-btn--ghost ${this._showStates ? "is-active" : ""}"
+                    @click=${this._toggleShowStates}
+                    title=${toggleLabel}
+                    aria-pressed=${this._showStates ? "true" : "false"}
+                  >
+                    <wa-icon library="mdi" name="pulse"></wa-icon>
+                    ${this._localize("dashboard.logs_states")}
+                  </button>
+                `}
             <button
               class="term-btn term-btn--ghost expand-btn"
               @click=${this._toggleExpanded}
