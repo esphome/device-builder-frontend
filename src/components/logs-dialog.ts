@@ -234,6 +234,13 @@ export class ESPHomeLogsDialog extends LitElement {
         :host wa-dialog::part(dialog) {
           position: fixed;
           inset: 0;
+          /* width/height are explicit because wa-dialog's
+             width: var(--width) and the UA's
+             max-height: calc(100% - ...) would otherwise keep the
+             dialog at its desktop size. dvh handles iOS Safari's
+             collapsing URL bar. */
+          width: 100vw;
+          height: 100dvh;
           max-width: none;
           max-height: none;
           margin: 0;
