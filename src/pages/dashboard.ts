@@ -277,7 +277,13 @@ export class ESPHomePageDashboard extends LitElement {
         with-clear
         placeholder=${this._localize("dashboard.search_placeholder")}
         .value=${this._search}
-        @input=${(e: Event) => { this._search = (e.target as HTMLInputElement).value; }}
+        @input=${(e: Event) => {
+          // ``e.target`` is the ``<wa-input>`` custom-element host,
+          // not the inner native input — read from ``currentTarget``
+          // typed as the ``{ value }`` shape we actually rely on
+          // rather than casting to HTMLInputElement (which it isn't).
+          this._search = (e.currentTarget as unknown as { value: string }).value;
+        }}
       >
         <wa-icon slot="start" library="mdi" name="magnify"></wa-icon>
       </wa-input>
