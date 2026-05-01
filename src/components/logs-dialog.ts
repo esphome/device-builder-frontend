@@ -81,16 +81,26 @@ export class ESPHomeLogsDialog extends LitElement {
       }
 
       wa-dialog {
-        --width: min(900px, 90vw);
+        /* 900px clipped roughly the last ~100px off a typical ESPHome
+           log line on a laptop display once the timestamp + level +
+           module prefix was included. Bump to 1100px so the common
+           case fits without wrap; the expand button is still useful
+           for the wider tails (long config-dump lines, stack traces)
+           by stretching to nearly full viewport. */
+        --width: min(1100px, 90vw);
       }
 
-      :host([expanded]) wa-dialog {
-        --width: 95vw;
-      }
-
+      /* Expanded → "just give me logs": full viewport, the body fills
+         the space between the slim title bar and the streaming/stop
+         toolbar. height: 100% (with min-height: 0 so flex children
+         can shrink) lets the dialog's intrinsic header/body/footer
+         flex layout do the math, which avoids the calc(100dvh - X)
+         guesswork that left ~200px of empty space under the toolbar.
+         Same shape the mobile rule below already uses. */
       :host([expanded]) .logs-content {
-        height: 80vh;
-        max-height: 85vh;
+        height: 100%;
+        max-height: none;
+        min-height: 0;
       }
 
       wa-dialog::part(header) {
@@ -225,11 +235,25 @@ export class ESPHomeLogsDialog extends LitElement {
         50% { opacity: 0.3; }
       }
 
-      /* Mobile overrides — placed last so same-specificity rules
-         in this file win source-order against the desktop defaults.
-         :host wa-dialog::part(dialog) lands at (0,1,2), beating both
-         wa-dialog's internal .dialog (0,1,0) and the user-agent's
-         dialog:modal (0,1,1) without needing !important. */
+      /* Full-viewport rules — the same shape applies when the user
+         hits expand on desktop AND on any mobile width. Placed last
+         so same-specificity rules in this file win source-order
+         against the desktop defaults. The :host wa-dialog::part(dialog)
+         selector lands at (0,1,2), beating both wa-dialog's internal
+         .dialog (0,1,0) and the user-agent's dialog:modal (0,1,1)
+         without needing !important. */
+      :host([expanded]) wa-dialog::part(dialog) {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-width: none;
+        max-height: none;
+        margin: 0;
+        border-radius: 0;
+      }
+
       @media (max-width: 700px) {
         :host wa-dialog::part(dialog) {
           position: fixed;
