@@ -279,6 +279,14 @@ export class ESPHomeDeviceCard extends LitElement {
         }
       }
 
+      /* Honour prefers-reduced-motion: reduce — keep the badge
+         solid and let the colour alone signal completion. */
+      @media (prefers-reduced-motion: reduce) {
+        .device-status.completed {
+          animation: none;
+        }
+      }
+
       .device-status.failed {
         background: color-mix(in srgb, var(--esphome-error), transparent 85%);
         color: var(--esphome-error);

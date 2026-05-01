@@ -72,11 +72,12 @@ const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
 // can flash a status indicator after the spinner clears. Successful
 // completions revert quickly so the device's real online/offline
 // state isn't masked for a third of a minute (the user complaint
-// "Clean build files says completed for too long"); failures and
-// cancellations linger longer because the user actually wants to
-// notice those, and they don't move on without acknowledgement.
+// "Clean build files says completed for too long"); failed /
+// cancelled jobs linger longer so the user has time to notice them
+// before the indicator times out.
 const RECENT_JOB_TTL_MS_COMPLETED = 10_000;
-const RECENT_JOB_TTL_MS_FAILED = 30_000;
+// Used for every non-COMPLETED terminal status (FAILED, CANCELLED).
+const RECENT_JOB_TTL_MS_ATTENTION = 30_000;
 
 // Import child components
 import "../pages/dashboard.js";
@@ -430,7 +431,7 @@ export class ESPHomeApp extends LitElement {
     const ttl =
       job.status === JobStatus.COMPLETED
         ? RECENT_JOB_TTL_MS_COMPLETED
-        : RECENT_JOB_TTL_MS_FAILED;
+        : RECENT_JOB_TTL_MS_ATTENTION;
     const timer = setTimeout(() => {
       this._recentJobTimers.delete(job.configuration);
       // Only drop if this job is still the latest recent entry; a

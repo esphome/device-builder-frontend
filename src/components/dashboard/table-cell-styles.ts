@@ -100,6 +100,13 @@ export const tableCellStyles = css`
       opacity: 0.55;
     }
   }
+  /* Honour reduced-motion preferences — keep the icon solid and let
+     the success colour alone signal completion. */
+  @media (prefers-reduced-motion: reduce) {
+    .status-recent--success {
+      animation: none;
+    }
+  }
 
   .cell-name-wrap {
     display: inline-flex;
