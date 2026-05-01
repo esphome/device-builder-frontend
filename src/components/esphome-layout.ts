@@ -132,11 +132,19 @@ export class ESPHomeLayout extends LitElement {
         font-size: 20px;
       }
 
+      .header-text {
+        min-width: 0;
+        overflow: hidden;
+      }
+
       .header-text h1 {
         margin: 0;
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--esphome-on-primary);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .header-text p {
@@ -144,10 +152,21 @@ export class ESPHomeLayout extends LitElement {
         font-size: var(--wa-font-size-xs);
         color: var(--esphome-on-primary);
         opacity: 0.75;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .header-spacer {
         flex: 1;
+      }
+
+      /* Mobile: drop the subtitle so the title isn't squashed against
+         the top of the viewport, and keep header height compact. */
+      @media (max-width: 700px) {
+        .header-text p {
+          display: none;
+        }
       }
     `,
   ];
