@@ -263,6 +263,20 @@ export class ESPHomeDeviceCard extends LitElement {
       .device-status.completed {
         background: color-mix(in srgb, var(--esphome-success), transparent 85%);
         color: var(--esphome-success);
+        animation: completed-pulse 1s ease-in-out infinite;
+      }
+
+      /* Pulse the success badge so it reads as transient — the
+         dashboard's RECENT_JOB_TTL_MS_COMPLETED window is short and
+         the throb signals "this is going away momentarily" instead of
+         "this is the device's permanent state". */
+      @keyframes completed-pulse {
+        0%, 100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.55;
+        }
       }
 
       .device-status.failed {

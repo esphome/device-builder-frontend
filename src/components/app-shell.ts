@@ -69,8 +69,14 @@ const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
 ]);
 
 // How long a terminated job stays in `_recentJobs` so the dashboard
-// can flash a success/failure indicator after the spinner clears.
-const RECENT_JOB_TTL_MS = 30_000;
+// can flash a status indicator after the spinner clears. Successful
+// completions revert quickly so the device's real online/offline
+// state isn't masked for a third of a minute (the user complaint
+// "Clean build files says completed for too long"); failures and
+// cancellations linger longer because the user actually wants to
+// notice those, and they don't move on without acknowledgement.
+const RECENT_JOB_TTL_MS_COMPLETED = 4_000;
+const RECENT_JOB_TTL_MS_FAILED = 30_000;
 
 // Import child components
 import "../pages/dashboard.js";
@@ -421,6 +427,10 @@ export class ESPHomeApp extends LitElement {
     const prevTimer = this._recentJobTimers.get(job.configuration);
     if (prevTimer !== undefined) clearTimeout(prevTimer);
 
+    const ttl =
+      job.status === JobStatus.COMPLETED
+        ? RECENT_JOB_TTL_MS_COMPLETED
+        : RECENT_JOB_TTL_MS_FAILED;
     const timer = setTimeout(() => {
       this._recentJobTimers.delete(job.configuration);
       // Only drop if this job is still the latest recent entry; a
@@ -431,7 +441,7 @@ export class ESPHomeApp extends LitElement {
       const next = new Map(this._recentJobs);
       next.delete(job.configuration);
       this._recentJobs = next;
-    }, RECENT_JOB_TTL_MS);
+    }, ttl);
     this._recentJobTimers.set(job.configuration, timer);
   }
 
