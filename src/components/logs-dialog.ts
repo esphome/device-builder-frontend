@@ -93,46 +93,6 @@ export class ESPHomeLogsDialog extends LitElement {
         max-height: 85vh;
       }
 
-      /* Mobile: dialog takes the whole viewport. dvh accounts for
-         mobile browser chrome (URL bar) so the toolbar cannot scroll
-         out from under the user. The selector uses [open] so the
-         specificity beats wa-dialog's internal .dialog rule (single
-         class, otherwise wins against a bare ::part(dialog)). */
-      @media (max-width: 700px) {
-        wa-dialog {
-          --width: 100vw;
-        }
-
-        /* :host bumps specificity above dialog:modal (0,1,1).
-           Force position + inset so the dialog fills the viewport
-           whether wa-dialog is using modal or non-modal show(). */
-        :host wa-dialog::part(dialog) {
-          position: fixed !important;
-          inset: 0 !important;
-          width: 100vw !important;
-          height: 100dvh !important;
-          max-width: none !important;
-          max-height: none !important;
-          margin: 0 !important;
-          border-radius: 0 !important;
-        }
-
-        .logs-content {
-          height: 100%;
-          max-height: none;
-          min-height: 0;
-        }
-
-        /* Expand is desktop-only — the dialog is already full-screen
-           on mobile so there's nothing to expand. .term-btn declares
-           display: inline-flex later in the stylesheet with the same
-           single-class specificity, so we double-up the selector to
-           win on specificity. */
-        .term-btn.expand-btn {
-          display: none;
-        }
-      }
-
       wa-dialog::part(header) {
         background: var(--term-bg);
         padding: 0 var(--wa-space-m);
@@ -263,6 +223,42 @@ export class ESPHomeLogsDialog extends LitElement {
       @keyframes pulse {
         0%, 100% { opacity: 1; }
         50% { opacity: 0.3; }
+      }
+
+      /* Mobile overrides — placed last so source-order wins against
+         desktop sizing for same-specificity selectors. dvh accounts
+         for iOS Safari's collapsing URL bar so the toolbar can't be
+         pushed off-screen. */
+      @media (max-width: 700px) {
+        wa-dialog {
+          --width: 100vw;
+        }
+
+        /* :host bumps specificity above dialog:modal (0,1,1). Force
+           position + inset so the dialog fills the viewport whether
+           wa-dialog opens modal or non-modal. */
+        :host wa-dialog::part(dialog) {
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100dvh !important;
+          max-width: none !important;
+          max-height: none !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+        }
+
+        .logs-content {
+          height: 100%;
+          max-height: none;
+          min-height: 0;
+        }
+
+        /* Expand is desktop-only — dialog is already full-screen on
+           mobile. Doubled selector beats .term-btn's display: inline-flex. */
+        .term-btn.expand-btn {
+          display: none;
+        }
       }
     `,
   ];
