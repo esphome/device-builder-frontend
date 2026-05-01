@@ -54,9 +54,19 @@ export const devicePageStyles = css`
   }
 
   @media (max-width: 900px) {
+    /* Drop the page padding on mobile so the editor goes edge-to-edge.
+       The card itself is already small at this width — wasting ~16px
+       on each side to a frame just makes it harder to read; logs go
+       full-screen the same way for the same reason. */
+    .page {
+      padding: 0;
+      min-height: calc(100dvh - var(--esphome-header-height));
+    }
+
     .layout-grid {
       grid-template-columns: 1fr;
-      height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
+      gap: 0;
+      height: calc(100dvh - var(--esphome-header-height));
     }
 
     .desktop-nav {

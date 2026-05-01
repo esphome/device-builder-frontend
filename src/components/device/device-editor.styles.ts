@@ -247,5 +247,15 @@ export const deviceEditorStyles = css`
     .layout-toggle .split-btn {
       display: none;
     }
+
+    /* Drop the card frame on mobile — the page wrapper already
+       removes its padding so the editor occupies the full viewport.
+       Border / border-radius / shadow at small widths just shave
+       pixels off the editing area without adding any meaning. */
+    .card {
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+    }
   }
 `;
