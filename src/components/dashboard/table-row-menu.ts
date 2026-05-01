@@ -175,10 +175,12 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.drawer_logs")}
         </div>
         <div class="menu-divider"></div>
-        <div class="menu-item" @click=${() => this._emit("show-api-key")}>
-          <wa-icon library="mdi" name="key-variant"></wa-icon>
-          ${this._localize("dashboard.action_show_api_key")}
-        </div>
+        ${this.device?.api_encrypted
+          ? html`<div class="menu-item" @click=${() => this._emit("show-api-key")}>
+              <wa-icon library="mdi" name="key-variant"></wa-icon>
+              ${this._localize("dashboard.action_show_api_key")}
+            </div>`
+          : nothing}
         <div class="menu-item" @click=${() => this._emit("download-yaml")}>
           <wa-icon library="mdi" name="download"></wa-icon>
           ${this._localize("dashboard.action_download_yaml")}
