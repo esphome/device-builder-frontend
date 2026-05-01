@@ -225,34 +225,30 @@ export const tableCellStyles = css`
 
   /* Progressive overflow into the row-end kebab: as the viewport
      narrows we drop inline action buttons in priority order so the
-     table keeps as many one-click actions visible as it can. The
-     priority order matches the user model:
-       prio-1 Edit            (kept until the column itself drops)
+     table keeps as many one-click actions visible as it can.
+     Priority order matches the user model:
+       prio-1 Edit            (always visible)
        prio-2 Install/Update  (only one of these is rendered at a time)
        prio-3 Logs
        prio-4 Visit Web UI
-     The kebab in actions-col remains visible at every width and
+     The kebab in actions-col stays visible at every width and
      mirrors every action the buttons expose, so nothing becomes
-     unreachable. Below the mobile breakpoint the entire actions
-     column drops out — phone-width tables have no room for inline
-     icons at all and the kebab is right there. */
-  @media (max-width: 1100px) {
+     unreachable. Mobile users get the card view by default, so we
+     deliberately don't tear the actions column off entirely at any
+     viewport — Edit + kebab is a fine fallback if someone forces
+     table view on a phone. */
+  @media (max-width: 1024px) {
     .cell-action-btn--prio-4 {
       display: none;
     }
   }
-  @media (max-width: 980px) {
+  @media (max-width: 920px) {
     .cell-action-btn--prio-3 {
       display: none;
     }
   }
-  @media (max-width: 860px) {
+  @media (max-width: 820px) {
     .cell-action-btn--prio-2 {
-      display: none;
-    }
-  }
-  @media (max-width: 768px) {
-    .col-actions {
       display: none;
     }
   }
