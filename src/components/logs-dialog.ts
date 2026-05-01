@@ -225,27 +225,19 @@ export class ESPHomeLogsDialog extends LitElement {
         50% { opacity: 0.3; }
       }
 
-      /* Mobile overrides — placed last so source-order wins against
-         desktop sizing for same-specificity selectors. dvh accounts
-         for iOS Safari's collapsing URL bar so the toolbar can't be
-         pushed off-screen. */
+      /* Mobile overrides — placed last so same-specificity rules
+         in this file win source-order against the desktop defaults.
+         :host wa-dialog::part(dialog) lands at (0,1,2), beating both
+         wa-dialog's internal .dialog (0,1,0) and the user-agent's
+         dialog:modal (0,1,1) without needing !important. */
       @media (max-width: 700px) {
-        wa-dialog {
-          --width: 100vw;
-        }
-
-        /* :host bumps specificity above dialog:modal (0,1,1). Force
-           position + inset so the dialog fills the viewport whether
-           wa-dialog opens modal or non-modal. */
         :host wa-dialog::part(dialog) {
-          position: fixed !important;
-          inset: 0 !important;
-          width: 100vw !important;
-          height: 100dvh !important;
-          max-width: none !important;
-          max-height: none !important;
-          margin: 0 !important;
-          border-radius: 0 !important;
+          position: fixed;
+          inset: 0;
+          max-width: none;
+          max-height: none;
+          margin: 0;
+          border-radius: 0;
         }
 
         .logs-content {
@@ -254,8 +246,6 @@ export class ESPHomeLogsDialog extends LitElement {
           min-height: 0;
         }
 
-        /* Expand is desktop-only — dialog is already full-screen on
-           mobile. Doubled selector beats .term-btn's display: inline-flex. */
         .term-btn.expand-btn {
           display: none;
         }
