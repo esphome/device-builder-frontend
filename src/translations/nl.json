@@ -133,6 +133,8 @@
     "logs_start": "Starten",
     "logs_close": "Sluiten",
     "logs_clear": "Wissen",
+    "logs_hide_states": "Statussen verbergen",
+    "logs_show_states": "Statussen tonen",
     "install_method_title": "Hoe wilt u de firmware installeren?",
     "install_method_network": "Via het netwerk",
     "install_method_network_desc": "Vereist dat het apparaat online is",

@@ -133,6 +133,8 @@
     "logs_start": "Démarrer",
     "logs_close": "Fermer",
     "logs_clear": "Effacer",
+    "logs_hide_states": "Masquer les états",
+    "logs_show_states": "Afficher les états",
     "install_method_title": "Comment voulez-vous installer le firmware ?",
     "install_method_network": "Sur le réseau",
     "install_method_network_desc": "Nécessite que l'appareil soit en ligne",

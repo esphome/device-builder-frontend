@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowCollapse, mdiArrowExpand, mdiClose, mdiDeleteSweep, mdiDownload, mdiPlay, mdiStop } from "@mdi/js";
+import { mdiArrowCollapse, mdiArrowExpand, mdiClose, mdiDeleteSweep, mdiDownload, mdiPlay, mdiPulse, mdiStop } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -20,7 +20,17 @@ registerMdiIcons({
   play: mdiPlay,
   stop: mdiStop,
   "delete-sweep": mdiDeleteSweep,
+  pulse: mdiPulse,
 });
+
+/* Match component state-publish lines so the user can mute the
+   high-volume sensor / binary_sensor / switch / cover / climate
+   noise and still see the lower-frequency lifecycle messages. The
+   anchors (`: ` or ` - `) keep the test from triggering on
+   incidental occurrences of the phrase inside a free-form log
+   message. */
+const STATE_LINE_RE =
+  /(?:: |\s-\s)(?:Sending state|Publishing:|Got state|Received state)\b/i;
 
 @customElement("esphome-logs-dialog")
 export class ESPHomeLogsDialog extends LitElement {
@@ -46,6 +56,9 @@ export class ESPHomeLogsDialog extends LitElement {
 
   @state()
   private _expanded = false;
+
+  @state()
+  private _hideStates = false;
 
   @state()
   _lines: string[] = [];
@@ -202,6 +215,15 @@ export class ESPHomeLogsDialog extends LitElement {
         border-color: var(--term-fg-muted);
       }
 
+      /* Highlight the states toggle when filtering is on so the user
+         sees at a glance that some lines are being suppressed. Same
+         palette as --start; the icon flip alone is too subtle. */
+      .term-btn--ghost.is-active {
+        background: color-mix(in srgb, var(--term-accent), transparent 85%);
+        color: var(--term-accent);
+        border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
+      }
+
       .term-btn--start {
         background: color-mix(in srgb, var(--term-accent), transparent 85%);
         color: var(--term-accent);
@@ -325,6 +347,12 @@ export class ESPHomeLogsDialog extends LitElement {
 
   protected render() {
     const title = this._localize("dashboard.logs_title", { name: this.name });
+    const visibleLines = this._hideStates
+      ? this._lines.filter((line) => !STATE_LINE_RE.test(line))
+      : this._lines;
+    const toggleLabel = this._localize(
+      this._hideStates ? "dashboard.logs_show_states" : "dashboard.logs_hide_states",
+    );
 
     return html`
       <wa-dialog
@@ -334,7 +362,7 @@ export class ESPHomeLogsDialog extends LitElement {
       >
         <div class="logs-content">
           <esphome-ansi-log
-            .lines=${this._lines}
+            .lines=${visibleLines}
             placeholder=${this._localize("dashboard.logs_placeholder")}
             ?light=${!this._darkMode}
           ></esphome-ansi-log>
@@ -343,6 +371,15 @@ export class ESPHomeLogsDialog extends LitElement {
               ? html`<span class="streaming-dot"></span>`
               : ""}
             <span class="spacer"></span>
+            <button
+              class="term-btn term-btn--ghost ${this._hideStates ? "is-active" : ""}"
+              @click=${this._toggleHideStates}
+              title=${toggleLabel}
+              aria-pressed=${this._hideStates ? "true" : "false"}
+            >
+              <wa-icon library="mdi" name="pulse"></wa-icon>
+              ${toggleLabel}
+            </button>
             <button
               class="term-btn term-btn--ghost expand-btn"
               @click=${this._toggleExpanded}
@@ -429,6 +466,10 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _toggleExpanded() {
     this._expanded = !this._expanded;
+  }
+
+  private _toggleHideStates() {
+    this._hideStates = !this._hideStates;
   }
 
   private _clearLogs() {
