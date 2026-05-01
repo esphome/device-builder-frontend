@@ -93,6 +93,37 @@ export class ESPHomeLogsDialog extends LitElement {
         max-height: 85vh;
       }
 
+      /* Mobile: dialog takes the whole viewport. dvh accounts for
+         mobile browser chrome (URL bar) so the toolbar cannot scroll
+         out from under the user. The selector uses [open] so the
+         specificity beats wa-dialog's internal .dialog rule (single
+         class, otherwise wins against a bare ::part(dialog)). */
+      @media (max-width: 700px) {
+        wa-dialog {
+          --width: 100vw;
+        }
+
+        wa-dialog[open]::part(dialog) {
+          max-width: 100vw;
+          max-height: 100dvh;
+          height: 100dvh;
+          margin: 0;
+          border-radius: 0;
+        }
+
+        .logs-content {
+          height: 100%;
+          max-height: none;
+          min-height: 0;
+        }
+
+        /* Expand is desktop-only — the dialog is already full-screen
+           on mobile so there's nothing to expand. */
+        .expand-btn {
+          display: none;
+        }
+      }
+
       wa-dialog::part(header) {
         background: var(--term-bg);
         padding: 0 var(--wa-space-m);
@@ -284,7 +315,7 @@ export class ESPHomeLogsDialog extends LitElement {
               : ""}
             <span class="spacer"></span>
             <button
-              class="term-btn term-btn--ghost"
+              class="term-btn term-btn--ghost expand-btn"
               @click=${this._toggleExpanded}
             >
               <wa-icon library="mdi" name=${this._expanded ? "arrow-collapse" : "arrow-expand"}></wa-icon>
