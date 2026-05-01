@@ -133,6 +133,7 @@
     "logs_start": "Starten",
     "logs_close": "Sluiten",
     "logs_clear": "Wissen",
+    "logs_states": "Statussen",
     "logs_hide_states": "Statussen verbergen",
     "logs_show_states": "Statussen tonen",
     "install_method_title": "Hoe wilt u de firmware installeren?",

@@ -366,6 +366,7 @@ export class ESPHomeLogsDialog extends LitElement {
               aria-pressed=${this._hideStates ? "true" : "false"}
             >
               <wa-icon library="mdi" name="pulse"></wa-icon>
+              ${this._localize("dashboard.logs_states")}
             </button>
             <button
               class="term-btn term-btn--ghost expand-btn"

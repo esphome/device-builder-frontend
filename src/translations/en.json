@@ -43,6 +43,7 @@
     "logs_start": "Start",
     "logs_close": "Close",
     "logs_clear": "Clear",
+    "logs_states": "States",
     "logs_hide_states": "Hide states",
     "logs_show_states": "Show states",
     "select_all": "Select all",
