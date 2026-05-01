@@ -86,9 +86,9 @@ function detectLogLevelColor(line: string): string | undefined {
  *   - Two-char escapes: `ESC` + a single control char. Also discarded.
  * Final-byte / intermediate / parameter ranges follow ECMA-48.
  *
- * The introducer alternation matches BOTH the real `` byte AND
+ * The introducer alternation matches BOTH the real `\x1b` byte AND
  * the four-character literal `\033` text that ESPHome's `--dashboard`
- * log formatter emits. ESPHome rewrites `` to literal `\033` so
+ * log formatter emits. ESPHome rewrites `\x1b` to literal `\033` so
  * `colorama` can't strip the codes when stdout is piped to us — without
  * matching the literal form here, the colours would render as plain
  * `\033[32m` text. The original ESPHome dashboard's frontend matches
@@ -351,7 +351,7 @@ export class ESPHomeAnsiLog extends LitElement {
   private _cleanLine(line: string): string {
     return line
       .replace(
-        /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[@-ln-~]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
+        /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
         "",
       )
       .replace(/\s+$/, "");
