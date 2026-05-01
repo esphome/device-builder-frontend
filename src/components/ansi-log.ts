@@ -221,17 +221,21 @@ export class ESPHomeAnsiLog extends LitElement {
       height: 100%;
       overflow-y: auto;
       overflow-x: auto;
-      white-space: pre;
       line-height: 18px;
       box-sizing: border-box;
       tab-size: 4;
     }
 
+    /* white-space: pre lives on the line, not the container. On the
+       container Lit's html-template inter-element text nodes
+       (whitespace between <div> and the interpolated children) render
+       as visible blank lines above the first real log line. */
     .log-line {
       margin: 0;
       padding: 0;
       border-radius: 2px;
       line-height: 18px;
+      white-space: pre;
     }
 
     .log-line:hover {
