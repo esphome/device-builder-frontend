@@ -3,6 +3,7 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
   status: DeviceState;
@@ -187,21 +188,17 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const device = row._device;
         const showInstall = row.hasPendingChanges;
         const showUpdate = !row.hasPendingChanges && row.hasUpdateAvailable;
-        // Visit Web UI only when the YAML exposes a web_server port AND
-        // we have a host to point at. Mirrors the kebab menu's guard.
-        const webHost = device.address || device.ip;
-        const showVisit = device.web_port != null && !!webHost;
-        const visitUrl = showVisit
-          ? `http://${webHost}${device.web_port === 80 ? "" : `:${device.web_port}`}`
-          : "";
+        const visitUrl = buildWebUiUrl(device);
+        const showVisit = visitUrl !== "";
         // Priority order (highest → lowest, last to drop on narrow
         // viewports): edit > install/update > logs > visit web. Each
-        // button carries a ``--prio-N`` class so the CSS in
-        // ``table-cell-styles`` can hide them progressively as room
-        // runs out; the row-end kebab keeps every action reachable.
+        // button carries a per-action class (cell-action-btn--edit,
+        // --install, --logs, --visit-web) so the media queries in
+        // table-cell-styles can hide them progressively as room runs
+        // out; the row-end kebab keeps every action reachable.
         return html`<span class="cell-actions">
           <button
-            class="cell-action-btn cell-action-btn--prio-1"
+            class="cell-action-btn cell-action-btn--edit"
             aria-label=${localize("dashboard.table_action_edit")}
             title=${localize("dashboard.table_action_edit")}
             @click=${(e: Event) => dispatchRowEvent(e, "edit-device", device)}
@@ -210,7 +207,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           </button>
           ${showInstall
             ? html`<button
-                class="cell-action-btn cell-action-btn--accent cell-action-btn--prio-2"
+                class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
                 aria-label=${localize("dashboard.table_action_install")}
                 title=${localize("dashboard.table_action_install")}
                 ?disabled=${row.busy}
@@ -221,7 +218,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : nothing}
           ${showUpdate
             ? html`<button
-                class="cell-action-btn cell-action-btn--accent cell-action-btn--prio-2"
+                class="cell-action-btn cell-action-btn--accent cell-action-btn--install"
                 aria-label=${localize("dashboard.table_action_update")}
                 title=${localize("dashboard.table_action_update")}
                 ?disabled=${row.busy}
@@ -231,7 +228,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
               </button>`
             : nothing}
           <button
-            class="cell-action-btn cell-action-btn--prio-3"
+            class="cell-action-btn cell-action-btn--logs"
             aria-label=${localize("dashboard.table_action_logs")}
             title=${localize("dashboard.table_action_logs")}
             @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
@@ -240,7 +237,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           </button>
           ${showVisit
             ? html`<a
-                class="cell-action-btn cell-action-btn--prio-4"
+                class="cell-action-btn cell-action-btn--visit-web"
                 href=${visitUrl}
                 target="_blank"
                 rel="noopener noreferrer"

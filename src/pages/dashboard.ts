@@ -35,6 +35,7 @@ import {
   fetchApiKey,
   streamSerialToDialog,
 } from "./dashboard-actions.js";
+import { buildWebUiUrl } from "../util/web-ui-url.js";
 import { detectChip, disconnect } from "../util/web-serial.js";
 import { cardSkeletonTemplate, tableSkeletonTemplate } from "./dashboard-skeletons.js";
 import { dashboardStyles } from "./dashboard-styles.js";
@@ -322,15 +323,7 @@ export class ESPHomePageDashboard extends LitElement {
       <div class="devices-grid">
         ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
         ${filtered.map((device) => {
-          // Pre-build the Visit Web UI URL when the YAML exposes a
-          // web_server port AND we have a host. Mirrors the kebab menu
-          // / table guard so the inline icon only appears when the
-          // link would actually go somewhere.
-          const webHost = device.address || device.ip;
-          const webUrl =
-            device.web_port != null && webHost
-              ? `http://${webHost}${device.web_port === 80 ? "" : `:${device.web_port}`}`
-              : "";
+          const webUrl = buildWebUiUrl(device);
           return html`
             <esphome-device-card
               .name=${device.friendly_name || device.name}
@@ -427,6 +420,7 @@ export class ESPHomePageDashboard extends LitElement {
         .device=${this._cardContextDevice}
         .position=${this._cardContextPosition}
         card-mode
+        ?has-pending=${this._cardContextDevice?.has_pending_changes === true}
         ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
         @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}

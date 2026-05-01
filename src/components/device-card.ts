@@ -109,10 +109,11 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ type: Boolean })
   selected = false;
 
-  /** Pre-built http(s) URL to the device's web UI when its YAML
-   *  exposes ``web_server`` and we have a host. Empty string hides
-   *  the inline Visit Web button. Pre-built so the card doesn't have
-   *  to know about ``ConfiguredDevice`` shape. */
+  /** Pre-built http URL to the device's web UI when its YAML exposes
+   *  ``web_server`` and we have a host. Empty string hides the inline
+   *  Visit Web button. Pre-built so the card doesn't have to know
+   *  about ``ConfiguredDevice`` shape; ``buildWebUiUrl`` is the
+   *  shared source of truth for protocol/port logic. */
   @property()
   webUrl = "";
 
@@ -399,9 +400,10 @@ export class ESPHomeDeviceCard extends LitElement {
       }
 
       /* Compact icon-only button that sits inline with the labelled
-         buttons (Edit / Install) — same visual size as the kebab but
-         without the auto left-margin that pushes the kebab to the
-         right edge. Used for Logs and Visit Web UI. */
+         buttons — same visual size as the kebab but without the auto
+         left-margin that pushes the kebab to the right edge. Used by
+         the Visit Web UI control (icon-only since the open-in-new
+         icon is self-explanatory). */
       .action-btn--tile {
         padding: 5px;
         flex-shrink: 0;
