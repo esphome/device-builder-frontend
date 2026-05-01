@@ -103,14 +103,22 @@ export class ESPHomeLogsDialog extends LitElement {
           --width: 100vw;
         }
 
-        wa-dialog[open]::part(dialog) {
+        wa-dialog::part(dialog) {
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
           max-width: 100vw !important;
-          max-height: 100vh !important;
-          max-height: 100dvh !important;
           height: 100vh !important;
           height: 100dvh !important;
+          max-height: 100vh !important;
+          max-height: 100dvh !important;
           margin: 0 !important;
           border-radius: 0 !important;
+        }
+
+        wa-dialog::part(body) {
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
         }
 
         .logs-content {
@@ -120,8 +128,11 @@ export class ESPHomeLogsDialog extends LitElement {
         }
 
         /* Expand is desktop-only — the dialog is already full-screen
-           on mobile so there's nothing to expand. */
-        .expand-btn {
+           on mobile so there's nothing to expand. .term-btn declares
+           display: inline-flex later in the stylesheet with the same
+           single-class specificity, so we double-up the selector to
+           win on specificity. */
+        .term-btn.expand-btn {
           display: none;
         }
       }
