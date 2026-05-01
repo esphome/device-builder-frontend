@@ -49,7 +49,7 @@ export class ESPHomeLogsDialog extends LitElement {
   private _expanded = false;
 
   @state()
-  private _hideStates = true;
+  private _showStates = true;
 
   @state()
   _lines: string[] = [];
@@ -339,7 +339,7 @@ export class ESPHomeLogsDialog extends LitElement {
   protected render() {
     const title = this._localize("dashboard.logs_title", { name: this.name });
     const toggleLabel = this._localize(
-      this._hideStates ? "dashboard.logs_show_states" : "dashboard.logs_hide_states",
+      this._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states",
     );
 
     return html`
@@ -360,10 +360,10 @@ export class ESPHomeLogsDialog extends LitElement {
               : ""}
             <span class="spacer"></span>
             <button
-              class="term-btn term-btn--ghost ${this._hideStates ? "is-active" : ""}"
-              @click=${this._toggleHideStates}
+              class="term-btn term-btn--ghost ${this._showStates ? "is-active" : ""}"
+              @click=${this._toggleShowStates}
               title=${toggleLabel}
-              aria-pressed=${this._hideStates ? "true" : "false"}
+              aria-pressed=${this._showStates ? "true" : "false"}
             >
               <wa-icon library="mdi" name="pulse"></wa-icon>
               ${this._localize("dashboard.logs_states")}
@@ -428,7 +428,7 @@ export class ESPHomeLogsDialog extends LitElement {
           this._streamId = "";
         },
       },
-      { noStates: this._hideStates },
+      { noStates: !this._showStates },
     );
   }
 
@@ -461,8 +461,8 @@ export class ESPHomeLogsDialog extends LitElement {
     this._expanded = !this._expanded;
   }
 
-  private _toggleHideStates() {
-    this._hideStates = !this._hideStates;
+  private _toggleShowStates() {
+    this._showStates = !this._showStates;
     /* The --no-states flag is set on the esphome subprocess at spawn
        time, so flipping the toggle has to tear down the current
        stream and start a fresh one. Only restart if we were actively
