@@ -222,4 +222,17 @@ export const tableCellStyles = css`
     color: var(--esphome-primary);
     border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
+
+  /* Below the mobile breakpoint the table is cramped — every visible
+     column is competing for horizontal space and the row-end kebab
+     already exposes every action. Drop the entire actions column
+     (header + body cells) so the row stops fighting for width; the
+     row-end actions-col kebab stays visible and opens the row menu
+     with the same Edit / Logs / Install / Update entries plus
+     everything else. */
+  @media (max-width: 768px) {
+    .col-actions {
+      display: none;
+    }
+  }
 `;

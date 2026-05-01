@@ -412,7 +412,7 @@ export class ESPHomeDeviceTable extends LitElement {
                       : sorted === "desc"
                         ? "descending"
                         : "none"}
-                    class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""}"
+                    class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""} col-${header.column.id}"
                     style="width:${header.getSize()}px"
                     @click=${canSort ? () => header.column.toggleSorting() : nothing}
                   >
@@ -481,7 +481,7 @@ export class ESPHomeDeviceTable extends LitElement {
                     .getVisibleCells()
                     .map(
                       (cell: any) =>
-                        html`<td role="gridcell">
+                        html`<td role="gridcell" class="col-${cell.column.id}">
                           ${flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>`
                     )}
