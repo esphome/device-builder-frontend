@@ -439,6 +439,19 @@ export class ESPHomeAPI {
     return this.sendStreamCommand("devices/logs", { configuration, port }, callbacks);
   }
 
+  /**
+   * Cancel a previously-issued streaming command (validate or logs).
+   *
+   * The backend kills the underlying subprocess and the streaming task
+   * ends in CANCELLED state — no further `output`/`result` events are
+   * sent for that stream. Returns once the backend confirms.
+   */
+  async stopStream(streamId: string): Promise<{ cancelled: boolean }> {
+    return this.sendCommand<{ cancelled: boolean }>("devices/stop_stream", {
+      stream_id: streamId,
+    });
+  }
+
   /** Follow a job's output: historical lines + live stream until completion. */
   firmwareFollowJob(jobId: string, callbacks: StreamCallbacks): string {
     return this.sendStreamCommand("firmware/follow_job", { job_id: jobId }, callbacks);

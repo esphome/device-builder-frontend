@@ -343,8 +343,15 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _stopStreaming() {
+    const streamId = this._streamId;
     this._streaming = false;
     this._streamId = "";
+    if (streamId) {
+      // Tell the backend to kill the subprocess. If the WS isn't open
+      // anymore there's nothing to cancel server-side anyway, so swallow
+      // any error from the call.
+      this._api.stopStream(streamId).catch(() => {});
+    }
   }
 
   private _downloadLogs() {

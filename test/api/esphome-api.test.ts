@@ -260,6 +260,30 @@ describe("ESPHomeAPI — streaming commands", () => {
     expect(onError).toHaveBeenCalledWith("WebSocket connection closed");
   });
 
+  it("stopStream sends devices/stop_stream with the stream id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    // Start a streaming command so we have a message_id worth cancelling.
+    const streamId = api.sendStreamCommand(
+      "devices/logs",
+      { configuration: "foo.yaml", port: "" },
+      { onOutput: vi.fn(), onResult: vi.fn() },
+    );
+
+    const pending = api.stopStream(streamId);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: { stream_id: string };
+    }>(1);
+    expect(sent.command).toBe("devices/stop_stream");
+    expect(sent.args).toEqual({ stream_id: streamId });
+
+    ws.receive({ message_id: sent.message_id, result: { cancelled: true } });
+    await expect(pending).resolves.toEqual({ cancelled: true });
+  });
+
   it("signals an error via onError if send is attempted while disconnected", () => {
     const api = new ESPHomeAPI();
     const onError = vi.fn();
