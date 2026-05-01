@@ -486,12 +486,11 @@ export class ESPHomeDeviceCard extends LitElement {
                       `
                     : nothing}
                 <button
-                  class="action-btn action-btn--ghost action-btn--tile"
-                  aria-label=${this._localize("dashboard.drawer_logs")}
-                  title=${this._localize("dashboard.drawer_logs")}
+                  class="action-btn action-btn--ghost"
                   @click=${() => this._emit("open-logs")}
                 >
                   <wa-icon library="mdi" name="console"></wa-icon>
+                  ${this._localize("dashboard.drawer_logs")}
                 </button>
                 ${this.webUrl
                   ? html`<a
