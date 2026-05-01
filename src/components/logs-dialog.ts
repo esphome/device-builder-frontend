@@ -206,9 +206,10 @@ export class ESPHomeLogsDialog extends LitElement {
         border-color: var(--term-fg-muted);
       }
 
-      /* Highlight the states toggle when filtering is on so the user
-         sees at a glance that some lines are being suppressed. Same
-         palette as --start; the icon flip alone is too subtle. */
+      /* Tint the states toggle with the accent palette while the
+         "show states" mode is on so the user can tell at a glance
+         whether component state lines are flowing. Same palette as
+         --start so it visually reads as "this is active". */
       .term-btn--ghost.is-active {
         background: color-mix(in srgb, var(--term-accent), transparent 85%);
         color: var(--term-accent);
@@ -431,16 +432,17 @@ export class ESPHomeLogsDialog extends LitElement {
     );
   }
 
-  private _stopStreaming() {
+  private _stopStreaming(): Promise<void> {
     const streamId = this._streamId;
     this._streaming = false;
     this._streamId = "";
-    if (streamId) {
-      // Tell the backend to kill the subprocess. If the WS isn't open
-      // anymore there's nothing to cancel server-side anyway, so swallow
-      // any error from the call.
-      this._api.stopStream(streamId).catch(() => {});
-    }
+    if (!streamId) return Promise.resolve();
+    // Tell the backend to kill the subprocess. If the WS isn't open
+    // anymore there's nothing to cancel server-side anyway, so swallow
+    // any error from the call. Returns a promise so callers that need
+    // to wait for the cancel to land (e.g. the states toggle, which
+    // immediately spawns a fresh stream) can await it.
+    return this._api.stopStream(streamId).catch(() => undefined).then(() => undefined);
   }
 
   private _downloadLogs() {
@@ -460,17 +462,19 @@ export class ESPHomeLogsDialog extends LitElement {
     this._expanded = !this._expanded;
   }
 
-  private _toggleShowStates() {
+  private async _toggleShowStates() {
     this._showStates = !this._showStates;
     /* The --no-states flag is set on the esphome subprocess at spawn
        time, so flipping the toggle has to tear down the current
-       stream and start a fresh one. Only restart if we were actively
-       streaming — if the user already hit Stop, leave the buffer
-       alone and let them hit Start themselves. */
-    if (this._streamId) {
-      this._stopStreaming();
-      this._startStreaming();
-    }
+       stream and start a fresh one. Await the cancel so the backend
+       has actually killed the old subprocess before we spawn the new
+       one — otherwise a fast double-toggle could leave two log
+       readers attached to the device API at once. Only restart if we
+       were actively streaming — if the user already hit Stop, leave
+       the buffer alone and let them hit Start themselves. */
+    if (!this._streamId) return;
+    await this._stopStreaming();
+    this._startStreaming();
   }
 
   private _clearLogs() {

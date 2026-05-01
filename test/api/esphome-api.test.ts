@@ -410,6 +410,36 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.args).toEqual({ configuration: "foo.yaml" });
   });
 
+  it("logs sends devices/logs without no_states by default", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const id = api.logs("foo.yaml", "OTA", { onOutput: () => {} });
+    expect(id).toBeTruthy();
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+    expect(sent.command).toBe("devices/logs");
+    expect(sent.args).toEqual({ configuration: "foo.yaml", port: "OTA" });
+  });
+
+  it("logs forwards no_states=true when noStates is set", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    api.logs("foo.yaml", "OTA", { onOutput: () => {} }, { noStates: true });
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({
+      configuration: "foo.yaml",
+      port: "OTA",
+      no_states: true,
+    });
+  });
+
+  it("logs omits no_states when noStates is false", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    api.logs("foo.yaml", "OTA", { onOutput: () => {} }, { noStates: false });
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({ configuration: "foo.yaml", port: "OTA" });
+  });
+
   it("updatePreferences passes the partial prefs as args", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
