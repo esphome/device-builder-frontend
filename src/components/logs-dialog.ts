@@ -237,8 +237,10 @@ export class ESPHomeLogsDialog extends LitElement {
           /* width/height are explicit because wa-dialog's
              width: var(--width) and the UA's
              max-height: calc(100% - ...) would otherwise keep the
-             dialog at its desktop size. dvh handles iOS Safari's
-             collapsing URL bar. */
+             dialog at its desktop size. The vh declaration is the
+             fallback for pre-2022 Safari / Chrome / Firefox that
+             don't recognise dvh; modern browsers pick the dvh line
+             which adjusts as iOS Safari's URL bar collapses. */
           width: 100vw;
           height: 100vh;
           height: 100dvh;
