@@ -480,9 +480,10 @@ export class ESPHomeDeviceCard extends LitElement {
     }
     // Transport-agnostic network icons — wifi/wifi-off implied a
     // wireless link, but plenty of devices on the network are on
-    // ethernet. The ``check-network`` / ``network-off`` /
-    // ``help-network`` trio reads as "online", "offline", and
-    // "unknown" without baking in a guess about the link type.
+    // ethernet. The ``check-network-outline`` /
+    // ``network-off-outline`` / ``help-network-outline`` trio reads
+    // as "online", "offline", and "unknown" without baking in a
+    // guess about the link type.
     const stateIcon =
       this.state === DeviceState.ONLINE
         ? "check-network-outline"
