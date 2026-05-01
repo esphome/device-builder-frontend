@@ -322,6 +322,15 @@ export class ESPHomePageDashboard extends LitElement {
       <div class="devices-grid">
         ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
         ${filtered.map((device) => {
+          // Pre-build the Visit Web UI URL when the YAML exposes a
+          // web_server port AND we have a host. Mirrors the kebab menu
+          // / table guard so the inline icon only appears when the
+          // link would actually go somewhere.
+          const webHost = device.address || device.ip;
+          const webUrl =
+            device.web_port != null && webHost
+              ? `http://${webHost}${device.web_port === 80 ? "" : `:${device.web_port}`}`
+              : "";
           return html`
             <esphome-device-card
               .name=${device.friendly_name || device.name}
@@ -333,11 +342,13 @@ export class ESPHomePageDashboard extends LitElement {
               ?api-encrypted=${device.api_encrypted === true}
               ?busy=${this._activeJobs.has(device.configuration)}
               .recentJob=${this._recentJobs.get(device.configuration) ?? null}
+              .webUrl=${webUrl}
               ?select-mode=${this._selectMode}
               ?selected=${this._selectedDevices.has(device.configuration)}
               @edit-device=${() => editDevice(device)}
               @install-device=${() => this._openInstallMethod(device)}
               @update-device=${() => this._openCommand(device, "install")}
+              @open-logs=${() => this._openLogs(device)}
               @show-progress=${() => this._showJobProgress(device)}
               @card-click=${() => { this._drawerDevice = device; this._drawerOpen = true; }}
               @card-context-menu=${(e: CustomEvent) => { this._cardContextDevice = device; this._cardContextPosition = e.detail; }}

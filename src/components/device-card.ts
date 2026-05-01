@@ -6,11 +6,13 @@ import {
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
   mdiCloseCircle,
+  mdiConsole,
   mdiDotsVertical,
   mdiHelpNetworkOutline,
   mdiLock,
   mdiLockOpenVariant,
   mdiNetworkOffOutline,
+  mdiOpenInNew,
   mdiPencil,
   mdiUpload,
 } from "@mdi/js";
@@ -32,12 +34,14 @@ registerMdiIcons({
   "checkbox-blank-outline": mdiCheckboxBlankOutline,
   "checkbox-marked": mdiCheckboxMarked,
   "close-circle": mdiCloseCircle,
+  console: mdiConsole,
   "dots-vertical": mdiDotsVertical,
   "check-network-outline": mdiCheckNetworkOutline,
   "help-network-outline": mdiHelpNetworkOutline,
   lock: mdiLock,
   "lock-open-variant": mdiLockOpenVariant,
   "network-off-outline": mdiNetworkOffOutline,
+  "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
   upload: mdiUpload,
 });
@@ -104,6 +108,13 @@ export class ESPHomeDeviceCard extends LitElement {
 
   @property({ type: Boolean })
   selected = false;
+
+  /** Pre-built http(s) URL to the device's web UI when its YAML
+   *  exposes ``web_server`` and we have a host. Empty string hides
+   *  the inline Visit Web button. Pre-built so the card doesn't have
+   *  to know about ``ConfiguredDevice`` shape. */
+  @property()
+  webUrl = "";
 
   static styles = [
     espHomeStyles,
@@ -381,6 +392,15 @@ export class ESPHomeDeviceCard extends LitElement {
         flex-shrink: 0;
         margin-left: auto;
       }
+
+      /* Compact icon-only button that sits inline with the labelled
+         buttons (Edit / Install) — same visual size as the kebab but
+         without the auto left-margin that pushes the kebab to the
+         right edge. Used for Logs and Visit Web UI. */
+      .action-btn--tile {
+        padding: 5px;
+        flex-shrink: 0;
+      }
     `,
   ];
 
@@ -460,6 +480,27 @@ export class ESPHomeDeviceCard extends LitElement {
                         </button>
                       `
                     : nothing}
+                <button
+                  class="action-btn action-btn--ghost action-btn--tile"
+                  aria-label=${this._localize("dashboard.drawer_logs")}
+                  title=${this._localize("dashboard.drawer_logs")}
+                  @click=${() => this._emit("open-logs")}
+                >
+                  <wa-icon library="mdi" name="console"></wa-icon>
+                </button>
+                ${this.webUrl
+                  ? html`<a
+                      class="action-btn action-btn--ghost action-btn--tile"
+                      href=${this.webUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label=${this._localize("dashboard.action_visit_web_ui")}
+                      title=${this._localize("dashboard.action_visit_web_ui")}
+                      @click=${(e: Event) => e.stopPropagation()}
+                    >
+                      <wa-icon library="mdi" name="open-in-new"></wa-icon>
+                    </a>`
+                  : nothing}
                 <button
                   class="action-btn action-btn--ghost action-btn--icon-only"
                   aria-label=${this._localize("dashboard.more_options")}
