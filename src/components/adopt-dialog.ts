@@ -38,12 +38,12 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state() private _device: AdoptableDevice | null = null;
   @state() private _name = "";
   @state() private _friendlyName = "";
-  // Default off: opting in writes ``api: encryption: key: <psk>`` to
-  // the device's YAML, which silently breaks any existing API client
-  // (Home Assistant, automations, esphome cli) that doesn't already
-  // know the key. Make the user say yes — they should know they're
-  // doing it.
-  @state() private _encryption = false;
+  // Default on — the legacy dashboard added an encryption key to
+  // every adopted device unconditionally and the lack of a way to
+  // opt out was the actual annoyance. Keep the secure-by-default
+  // behaviour, just expose a checkbox so users who don't want it
+  // (e.g. they're staying with plain MQTT) can untick it.
+  @state() private _encryption = true;
   @state() private _busy = false;
   @state() private _error: string | null = null;
 
@@ -192,7 +192,7 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._device = device;
     this._name = stripMacSuffix(device.name);
     this._friendlyName = device.friendly_name || "";
-    this._encryption = false;
+    this._encryption = true;
     this._busy = false;
     this._error = null;
     this._dialog.open = true;
