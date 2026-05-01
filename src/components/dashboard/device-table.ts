@@ -7,11 +7,14 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiCloseCircle,
+  mdiConsole,
   mdiDotsVertical,
   mdiLock,
   mdiLockOpenVariant,
+  mdiOpenInNew,
   mdiPencil,
   mdiUnfoldMoreHorizontal,
+  mdiUpload,
 } from "@mdi/js";
 import {
   TableController,
@@ -52,11 +55,14 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-down": mdiChevronDown,
   "close-circle": mdiCloseCircle,
+  console: mdiConsole,
   "dots-vertical": mdiDotsVertical,
   lock: mdiLock,
   "lock-open-variant": mdiLockOpenVariant,
+  "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
   "unfold-more-horizontal": mdiUnfoldMoreHorizontal,
+  upload: mdiUpload,
 });
 
 // ─── Cached row-model factories (created once, reused forever) ───

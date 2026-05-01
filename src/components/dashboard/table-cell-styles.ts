@@ -223,13 +223,34 @@ export const tableCellStyles = css`
     border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
 
-  /* Below the mobile breakpoint the table is cramped — every visible
-     column is competing for horizontal space and the row-end kebab
-     already exposes every action. Drop the entire actions column
-     (header + body cells) so the row stops fighting for width; the
-     row-end actions-col kebab stays visible and opens the row menu
-     with the same Edit / Logs / Install / Update entries plus
-     everything else. */
+  /* Progressive overflow into the row-end kebab: as the viewport
+     narrows we drop inline action buttons in priority order so the
+     table keeps as many one-click actions visible as it can. The
+     priority order matches the user model:
+       prio-1 Edit            (kept until the column itself drops)
+       prio-2 Install/Update  (only one of these is rendered at a time)
+       prio-3 Logs
+       prio-4 Visit Web UI
+     The kebab in actions-col remains visible at every width and
+     mirrors every action the buttons expose, so nothing becomes
+     unreachable. Below the mobile breakpoint the entire actions
+     column drops out — phone-width tables have no room for inline
+     icons at all and the kebab is right there. */
+  @media (max-width: 1100px) {
+    .cell-action-btn--prio-4 {
+      display: none;
+    }
+  }
+  @media (max-width: 980px) {
+    .cell-action-btn--prio-3 {
+      display: none;
+    }
+  }
+  @media (max-width: 860px) {
+    .cell-action-btn--prio-2 {
+      display: none;
+    }
+  }
   @media (max-width: 768px) {
     .col-actions {
       display: none;

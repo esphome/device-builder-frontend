@@ -187,26 +187,30 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const device = row._device;
         const showInstall = row.hasPendingChanges;
         const showUpdate = !row.hasPendingChanges && row.hasUpdateAvailable;
+        // Visit Web UI only when the YAML exposes a web_server port AND
+        // we have a host to point at. Mirrors the kebab menu's guard.
+        const webHost = device.address || device.ip;
+        const showVisit = device.web_port != null && !!webHost;
+        const visitUrl = showVisit
+          ? `http://${webHost}${device.web_port === 80 ? "" : `:${device.web_port}`}`
+          : "";
+        // Priority order (highest → lowest, last to drop on narrow
+        // viewports): edit > install/update > logs > visit web. Each
+        // button carries a ``--prio-N`` class so the CSS in
+        // ``table-cell-styles`` can hide them progressively as room
+        // runs out; the row-end kebab keeps every action reachable.
         return html`<span class="cell-actions">
           <button
-            class="cell-action-btn"
+            class="cell-action-btn cell-action-btn--prio-1"
             aria-label=${localize("dashboard.table_action_edit")}
             title=${localize("dashboard.table_action_edit")}
             @click=${(e: Event) => dispatchRowEvent(e, "edit-device", device)}
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>
           </button>
-          <button
-            class="cell-action-btn"
-            aria-label=${localize("dashboard.table_action_logs")}
-            title=${localize("dashboard.table_action_logs")}
-            @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
-          >
-            <wa-icon library="mdi" name="console"></wa-icon>
-          </button>
           ${showInstall
             ? html`<button
-                class="cell-action-btn cell-action-btn--accent"
+                class="cell-action-btn cell-action-btn--accent cell-action-btn--prio-2"
                 aria-label=${localize("dashboard.table_action_install")}
                 title=${localize("dashboard.table_action_install")}
                 ?disabled=${row.busy}
@@ -217,7 +221,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : nothing}
           ${showUpdate
             ? html`<button
-                class="cell-action-btn cell-action-btn--accent"
+                class="cell-action-btn cell-action-btn--accent cell-action-btn--prio-2"
                 aria-label=${localize("dashboard.table_action_update")}
                 title=${localize("dashboard.table_action_update")}
                 ?disabled=${row.busy}
@@ -226,9 +230,30 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                 <wa-icon library="mdi" name="upload"></wa-icon>
               </button>`
             : nothing}
+          <button
+            class="cell-action-btn cell-action-btn--prio-3"
+            aria-label=${localize("dashboard.table_action_logs")}
+            title=${localize("dashboard.table_action_logs")}
+            @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
+          >
+            <wa-icon library="mdi" name="console"></wa-icon>
+          </button>
+          ${showVisit
+            ? html`<a
+                class="cell-action-btn cell-action-btn--prio-4"
+                href=${visitUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label=${localize("dashboard.action_visit_web_ui")}
+                title=${localize("dashboard.action_visit_web_ui")}
+                @click=${(e: Event) => e.stopPropagation()}
+              >
+                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              </a>`
+            : nothing}
         </span>`;
       },
-      size: 120,
+      size: 160,
       enableSorting: false,
       enableHiding: false,
     },
