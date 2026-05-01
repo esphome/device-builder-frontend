@@ -348,6 +348,8 @@
     "add_automation_unavailable": "Le support des automatisations n'est pas encore disponible",
     "add_config_error": "Échec de l'ajout de la section de configuration",
     "editor_layout_label": "Disposition de l'éditeur",
+    "editor_expand": "Agrandir l'éditeur",
+    "editor_collapse": "Réduire l'éditeur",
     "editor_title_ready": "Édition de {name}",
     "delete_section": "Supprimer la section",
     "confirm_delete_section": "Êtes-vous sûr de vouloir supprimer la section « {name} » ?",

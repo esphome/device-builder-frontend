@@ -1,5 +1,7 @@
 import { consume } from "@lit/context";
 import {
+  mdiArrowCollapse,
+  mdiArrowExpand,
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
@@ -24,6 +26,8 @@ import "../yaml-diff.js";
 import "./device-board-info.js";
 
 registerMdiIcons({
+  "arrow-collapse": mdiArrowCollapse,
+  "arrow-expand": mdiArrowExpand,
   "content-save": mdiContentSave,
   "layout-left": mdiDockLeft,
   "layout-right": mdiDockRight,
@@ -67,21 +71,31 @@ export class ESPHomeDeviceEditor extends LitElement {
   @state()
   private _isMobile = false;
 
+  @state()
+  private _fullscreen = false;
+
   private _mql = window.matchMedia("(max-width: 900px)");
 
   private _onMqlChange = (e: MediaQueryListEvent) => {
     this._isMobile = e.matches;
   };
 
-  /** Cmd/Ctrl+S → save the YAML if there are unsaved changes. Listens at
-   *  the document level so the shortcut works regardless of which child
-   *  (CodeMirror, navigator, etc.) currently has focus. */
+  /** Cmd/Ctrl+S → save the YAML if there are unsaved changes. Also
+   *  ESC to exit fullscreen so the editor matches the logs dialog
+   *  pattern. Listens at the document level so the shortcut works
+   *  regardless of which child (CodeMirror, navigator, etc.) currently
+   *  has focus. */
   private _onGlobalKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (this.yaml !== this.savedYaml) {
         this._onSave();
       }
+      return;
+    }
+    if (e.key === "Escape" && this._fullscreen) {
+      e.preventDefault();
+      this._fullscreen = false;
     }
   };
 
@@ -217,6 +231,24 @@ export class ESPHomeDeviceEditor extends LitElement {
                 <wa-icon library="mdi" name="layout-right"></wa-icon>
               </button>
             </div>
+            ${this._isMobile
+              ? nothing
+              : html`<button
+                  type="button"
+                  class="fullscreen-toggle"
+                  aria-pressed=${this._fullscreen}
+                  @click=${this._toggleFullscreen}
+                  title=${this._localize(
+                    this._fullscreen
+                      ? "device.editor_collapse"
+                      : "device.editor_expand",
+                  )}
+                >
+                  <wa-icon
+                    library="mdi"
+                    name=${this._fullscreen ? "arrow-collapse" : "arrow-expand"}
+                  ></wa-icon>
+                </button>`}
           </div>
         </header>
         <div class="card-body">
@@ -346,6 +378,16 @@ export class ESPHomeDeviceEditor extends LitElement {
         composed: true,
       })
     );
+  }
+
+  private _toggleFullscreen() {
+    this._fullscreen = !this._fullscreen;
+  }
+
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has("_fullscreen")) {
+      this.toggleAttribute("fullscreen", this._fullscreen);
+    }
   }
 
   /**

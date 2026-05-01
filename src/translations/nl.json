@@ -348,6 +348,8 @@
     "add_automation_unavailable": "Ondersteuning voor automatiseringen is nog niet beschikbaar",
     "add_config_error": "Toevoegen van configuratiesectie mislukt",
     "editor_layout_label": "Editor-indeling",
+    "editor_expand": "Editor uitvouwen",
+    "editor_collapse": "Editor inklappen",
     "editor_title_ready": "{name} bewerken",
     "delete_section": "Sectie verwijderen",
     "confirm_delete_section": "Weet u zeker dat u de sectie '{name}' wilt verwijderen?",

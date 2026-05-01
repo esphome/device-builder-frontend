@@ -416,6 +416,8 @@
     "add_automation_unavailable": "Automation support is not yet available",
     "add_config_error": "Failed to add config section",
     "editor_layout_label": "Editor layout",
+    "editor_expand": "Expand editor",
+    "editor_collapse": "Collapse editor",
     "yaml_preview": "YAML preview",
     "yaml_preview_toggle": "Show YAML",
     "diff_view_diff": "Show diff against saved",
