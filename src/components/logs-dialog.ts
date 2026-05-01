@@ -240,6 +240,7 @@ export class ESPHomeLogsDialog extends LitElement {
              dialog at its desktop size. dvh handles iOS Safari's
              collapsing URL bar. */
           width: 100vw;
+          height: 100vh;
           height: 100dvh;
           max-width: none;
           max-height: none;
