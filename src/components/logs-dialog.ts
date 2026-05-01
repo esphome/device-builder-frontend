@@ -49,7 +49,7 @@ export class ESPHomeLogsDialog extends LitElement {
   private _expanded = false;
 
   @state()
-  private _hideStates = false;
+  private _hideStates = true;
 
   @state()
   _lines: string[] = [];
