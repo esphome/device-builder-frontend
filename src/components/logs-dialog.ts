@@ -410,7 +410,6 @@ export class ESPHomeLogsDialog extends LitElement {
   private _startStreaming() {
     if (this._streaming) return;
     this._streaming = true;
-    this._lines = [];
 
     this._streamId = this._api.logs(
       this.configuration,
