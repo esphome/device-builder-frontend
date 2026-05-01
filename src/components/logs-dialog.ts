@@ -110,15 +110,20 @@ export class ESPHomeLogsDialog extends LitElement {
         min-height: 0;
       }
 
+      /* Match the device-editor's title bar (--esphome-primary
+         on white) so the dialog reads as part of the dashboard
+         chrome. The body stays terminal-themed — header colour was
+         the only thing that looked unintentional against the
+         dashboard's blue header bar. */
       wa-dialog::part(header) {
-        background: var(--term-bg);
+        background: var(--esphome-primary);
         padding: 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
 
       wa-dialog::part(title) {
-        color: var(--term-accent);
+        color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
@@ -131,8 +136,12 @@ export class ESPHomeLogsDialog extends LitElement {
         padding: 0;
         min-width: unset;
         min-height: unset;
-        color: var(--term-fg-muted);
+        color: var(--esphome-on-primary);
         cursor: pointer;
+      }
+
+      wa-dialog::part(close-button__base):hover {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
       }
 
       wa-dialog::part(body) {
