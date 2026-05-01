@@ -85,9 +85,17 @@ function detectLogLevelColor(line: string): string | undefined {
  *     etc. Always discarded.
  *   - Two-char escapes: `ESC` + a single control char. Also discarded.
  * Final-byte / intermediate / parameter ranges follow ECMA-48.
+ *
+ * The introducer alternation matches BOTH the real `` byte AND
+ * the four-character literal `\033` text that ESPHome's `--dashboard`
+ * log formatter emits. ESPHome rewrites `` to literal `\033` so
+ * `colorama` can't strip the codes when stdout is piped to us — without
+ * matching the literal form here, the colours would render as plain
+ * `\033[32m` text. The original ESPHome dashboard's frontend matches
+ * both forms for the same reason.
  */
 const ANSI_ESCAPE_RE =
-  /\u001b\[[\x30-\x3f]*[\x20-\x2f]*([\x40-\x7e])|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[NOPVWX^_=>]/g;
+  /(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*([\x40-\x7e])|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>]/g;
 
 /** Parse a single log line with ANSI codes into styled spans. */
 function parseAnsiLine(line: string): AnsiSpan[] {
@@ -118,9 +126,11 @@ function parseAnsiLine(line: string): AnsiSpan[] {
     // consumed — the bytes between this match and the next one are
     // dropped from the output.
     if (match[1] === "m") {
-      // Pull params from inside `ESC [ ... m`. `match[0].slice(2, -1)`
-      // is the substring between `ESC[` and `m`.
-      const params = match[0].slice(2, -1);
+      // Pull params from inside `<introducer> [ ... m`. The introducer
+      // is either the 1-char real `` byte or the 4-char literal
+      // `\033` text — slice from after the `[` (not a fixed offset)
+      // to the byte before the trailing `m`.
+      const params = match[0].slice(match[0].indexOf("[") + 1, -1);
       const codes = params
         .split(";")
         .map((p) => (p === "" ? 0 : Number(p)));
