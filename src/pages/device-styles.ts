@@ -57,15 +57,22 @@ export const devicePageStyles = css`
     /* Drop the page padding on mobile so the editor goes edge-to-edge.
        The card itself is already small at this width — wasting ~16px
        on each side to a frame just makes it harder to read; logs go
-       full-screen the same way for the same reason. */
+       full-screen the same way for the same reason.
+       Each dvh line is paired with a vh fallback above it so
+       pre-2022 browsers that don't recognise dvh still pick up the
+       mobile sizing instead of dropping the declaration and falling
+       through to the desktop rule (which had an extra
+       2 * var(--wa-space-l) subtracted and would leave a gap). */
     .page {
       padding: 0;
+      min-height: calc(100vh - var(--esphome-header-height));
       min-height: calc(100dvh - var(--esphome-header-height));
     }
 
     .layout-grid {
       grid-template-columns: 1fr;
       gap: 0;
+      height: calc(100vh - var(--esphome-header-height));
       height: calc(100dvh - var(--esphome-header-height));
     }
 
