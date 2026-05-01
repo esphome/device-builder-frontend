@@ -103,22 +103,16 @@ export class ESPHomeLogsDialog extends LitElement {
           --width: 100vw;
         }
 
-        wa-dialog::part(dialog) {
-          position: fixed !important;
+        /* :host bumps specificity above dialog:modal (0,1,1) — the
+           user-agent rule that sets position/inset/max-* on a modal
+           <dialog>. Drop wa-dialog's max-* constraints and let the
+           positioning fill the viewport. */
+        :host wa-dialog::part(dialog) {
           inset: 0 !important;
-          width: 100vw !important;
-          max-width: 100vw !important;
-          height: 100vh !important;
-          height: 100dvh !important;
-          max-height: 100vh !important;
-          max-height: 100dvh !important;
+          max-width: none !important;
+          max-height: none !important;
           margin: 0 !important;
           border-radius: 0 !important;
-        }
-
-        wa-dialog::part(body) {
-          flex: 1 1 auto !important;
-          min-height: 0 !important;
         }
 
         .logs-content {
