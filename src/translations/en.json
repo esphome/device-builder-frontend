@@ -141,6 +141,7 @@
     "drawer_close": "Close",
     "drawer_device_online": "Device Online",
     "drawer_device_offline": "Device Offline",
+    "drawer_device_unknown": "Status Unknown",
     "drawer_edit": "Edit",
     "drawer_update": "Update",
     "drawer_logs": "Logs",

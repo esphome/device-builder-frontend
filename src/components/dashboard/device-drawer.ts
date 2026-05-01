@@ -1,5 +1,13 @@
 import { consume } from "@lit/context";
-import { mdiClose, mdiConsole, mdiPencil, mdiUpload, mdiWifi, mdiWifiOff } from "@mdi/js";
+import {
+  mdiCheckNetworkOutline,
+  mdiClose,
+  mdiConsole,
+  mdiHelpNetworkOutline,
+  mdiNetworkOffOutline,
+  mdiPencil,
+  mdiUpload,
+} from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -13,12 +21,13 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./device-drawer-content.js";
 
 registerMdiIcons({
+  "check-network-outline": mdiCheckNetworkOutline,
   close: mdiClose,
   console: mdiConsole,
+  "help-network-outline": mdiHelpNetworkOutline,
+  "network-off-outline": mdiNetworkOffOutline,
   pencil: mdiPencil,
   upload: mdiUpload,
-  wifi: mdiWifi,
-  "wifi-off": mdiWifiOff,
 });
 
 @customElement("esphome-device-drawer")
@@ -177,6 +186,12 @@ export class ESPHomeDeviceDrawer extends LitElement {
           color-mix(in srgb, var(--esphome-error), transparent 70%);
       }
 
+      .status-banner.unknown {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-quiet);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
       .status-banner wa-icon {
         font-size: 20px;
       }
@@ -198,6 +213,11 @@ export class ESPHomeDeviceDrawer extends LitElement {
         background: var(--esphome-error);
         box-shadow: 0 0 8px
           color-mix(in srgb, var(--esphome-error), transparent 50%);
+      }
+
+      .status-dot.unknown {
+        background: var(--wa-color-text-quiet);
+        opacity: 0.5;
       }
 
       /* ─── Body ─── */
@@ -293,7 +313,21 @@ export class ESPHomeDeviceDrawer extends LitElement {
     if (!device) return nothing;
 
     const online = device.state === DeviceState.ONLINE;
-    const stateClass = device.state === DeviceState.ONLINE ? "online" : "offline";
+    const offline = device.state === DeviceState.OFFLINE;
+    const stateClass = online ? "online" : offline ? "offline" : "unknown";
+    // Transport-agnostic network icons — wifi/wifi-off implied a
+    // wireless link, but plenty of devices on the network are on
+    // ethernet, so the icon was misleading at best on those.
+    const stateIcon = online
+      ? "check-network-outline"
+      : offline
+        ? "network-off-outline"
+        : "help-network-outline";
+    const stateLabel = online
+      ? this._localize("dashboard.drawer_device_online")
+      : offline
+        ? this._localize("dashboard.drawer_device_offline")
+        : this._localize("dashboard.drawer_device_unknown");
 
     return html`
       <div class="backdrop" @click=${this._close}></div>
@@ -310,11 +344,8 @@ export class ESPHomeDeviceDrawer extends LitElement {
 
         <div class="status-banner ${stateClass}">
           <span class="status-dot ${stateClass}"></span>
-          <wa-icon
-            library="mdi"
-            name=${online ? "wifi" : "wifi-off"}
-          ></wa-icon>
-          ${online ? this._localize("dashboard.drawer_device_online") : this._localize("dashboard.drawer_device_offline")}
+          <wa-icon library="mdi" name=${stateIcon}></wa-icon>
+          ${stateLabel}
         </div>
 
         <div class="body">

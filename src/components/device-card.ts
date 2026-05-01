@@ -2,16 +2,17 @@ import { consume } from "@lit/context";
 import {
   mdiCancel,
   mdiCheckCircle,
+  mdiCheckNetworkOutline,
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
   mdiCloseCircle,
   mdiDotsVertical,
+  mdiHelpNetworkOutline,
   mdiLock,
   mdiLockOpenVariant,
+  mdiNetworkOffOutline,
   mdiPencil,
   mdiUpload,
-  mdiWifi,
-  mdiWifiOff,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -32,12 +33,13 @@ registerMdiIcons({
   "checkbox-marked": mdiCheckboxMarked,
   "close-circle": mdiCloseCircle,
   "dots-vertical": mdiDotsVertical,
+  "check-network-outline": mdiCheckNetworkOutline,
+  "help-network-outline": mdiHelpNetworkOutline,
   lock: mdiLock,
   "lock-open-variant": mdiLockOpenVariant,
+  "network-off-outline": mdiNetworkOffOutline,
   pencil: mdiPencil,
   upload: mdiUpload,
-  wifi: mdiWifi,
-  "wifi-off": mdiWifiOff,
 });
 
 const RECENT_JOB_ICON: Record<JobStatus, string | null> = {
@@ -476,11 +478,19 @@ export class ESPHomeDeviceCard extends LitElement {
         </div>`;
       }
     }
+    // Transport-agnostic network icons — wifi/wifi-off implied a
+    // wireless link, but plenty of devices on the network are on
+    // ethernet. The ``check-network`` / ``network-off`` /
+    // ``help-network`` trio reads as "online", "offline", and
+    // "unknown" without baking in a guess about the link type.
+    const stateIcon =
+      this.state === DeviceState.ONLINE
+        ? "check-network-outline"
+        : this.state === DeviceState.OFFLINE
+          ? "network-off-outline"
+          : "help-network-outline";
     return html`<div class="device-status ${this.state}">
-      <wa-icon
-        library="mdi"
-        name=${this.state === DeviceState.ONLINE ? "wifi" : "wifi-off"}
-      ></wa-icon>
+      <wa-icon library="mdi" name=${stateIcon}></wa-icon>
       ${this.state === DeviceState.ONLINE
         ? this._localize("dashboard.online")
         : this.state === DeviceState.OFFLINE
