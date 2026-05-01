@@ -97,14 +97,31 @@ function detectLogLevelColor(line: string): string | undefined {
 const ANSI_ESCAPE_RE =
   /(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*([\x40-\x7e])|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>]/g;
 
+/**
+ * Mutable SGR state carried *across* ``parseAnsiLine`` calls.
+ *
+ * ESPHome opens the colour on the first line of a multi-line log
+ * record (e.g. a deprecation WARNING with a YAML-shaped suggestion)
+ * and only resets it on the last. Resetting per call would leave every
+ * continuation line uncoloured, which doesn't match the upstream
+ * dashboard. Hand the same object back into each call so colour /
+ * bold / dim persist until an explicit reset (``\x1b[0m``).
+ */
+interface AnsiState {
+  color: string | undefined;
+  bgColor: string | undefined;
+  bold: boolean;
+  dim: boolean;
+}
+
+function newAnsiState(): AnsiState {
+  return { color: undefined, bgColor: undefined, bold: false, dim: false };
+}
+
 /** Parse a single log line with ANSI codes into styled spans. */
-function parseAnsiLine(line: string): AnsiSpan[] {
+function parseAnsiLine(line: string, state: AnsiState): AnsiSpan[] {
   const spans: AnsiSpan[] = [];
   let lastIndex = 0;
-  let currentColor: string | undefined;
-  let currentBg: string | undefined;
-  let bold = false;
-  let dim = false;
 
   let match: RegExpExecArray | null;
 
@@ -113,10 +130,10 @@ function parseAnsiLine(line: string): AnsiSpan[] {
     if (match.index > lastIndex) {
       spans.push({
         text: line.slice(lastIndex, match.index),
-        color: currentColor,
-        bgColor: currentBg,
-        bold,
-        dim,
+        color: state.color,
+        bgColor: state.bgColor,
+        bold: state.bold,
+        dim: state.dim,
       });
     }
 
@@ -136,29 +153,29 @@ function parseAnsiLine(line: string): AnsiSpan[] {
         .map((p) => (p === "" ? 0 : Number(p)));
       for (const code of codes) {
         if (code === 0) {
-          currentColor = undefined;
-          currentBg = undefined;
-          bold = false;
-          dim = false;
+          state.color = undefined;
+          state.bgColor = undefined;
+          state.bold = false;
+          state.dim = false;
         } else if (code === 1) {
-          bold = true;
+          state.bold = true;
         } else if (code === 2) {
-          dim = true;
+          state.dim = true;
         } else if (code === 22) {
-          bold = false;
-          dim = false;
+          state.bold = false;
+          state.dim = false;
         } else if (code >= 30 && code <= 37) {
-          currentColor = ANSI_COLORS[code];
+          state.color = ANSI_COLORS[code];
         } else if (code >= 90 && code <= 97) {
-          currentColor = ANSI_COLORS[code];
+          state.color = ANSI_COLORS[code];
         } else if (code === 39) {
-          currentColor = undefined;
+          state.color = undefined;
         } else if (code >= 40 && code <= 47) {
-          currentBg = ANSI_BG_COLORS[code];
+          state.bgColor = ANSI_BG_COLORS[code];
         } else if (code >= 100 && code <= 107) {
-          currentBg = ANSI_BG_COLORS[code];
+          state.bgColor = ANSI_BG_COLORS[code];
         } else if (code === 49) {
-          currentBg = undefined;
+          state.bgColor = undefined;
         }
       }
     }
@@ -170,10 +187,10 @@ function parseAnsiLine(line: string): AnsiSpan[] {
   if (lastIndex < line.length) {
     spans.push({
       text: line.slice(lastIndex),
-      color: currentColor,
-      bgColor: currentBg,
-      bold,
-      dim,
+      color: state.color,
+      bgColor: state.bgColor,
+      bold: state.bold,
+      dim: state.dim,
     });
   }
 
@@ -274,11 +291,15 @@ export class ESPHomeAnsiLog extends LitElement {
 
   protected render() {
     const visual = this._chunksToVisualLines(this.lines);
+    // One state object threaded through every line so multi-line
+    // records (a WARNING that opens ``\x1b[33m`` on line 1 and only
+    // resets on line 5) keep their colour on the continuation lines.
+    const state = newAnsiState();
     return html`
       <div class="log-container" @scroll=${this._handleScroll}>
         ${visual.length === 0 && this.placeholder
           ? html`<div class="log-line placeholder">${this.placeholder}</div>`
-          : visual.map((line) => this._renderLine(line))}
+          : visual.map((line) => this._renderLine(line, state))}
       </div>
     `;
   }
@@ -316,22 +337,28 @@ export class ESPHomeAnsiLog extends LitElement {
   }
 
   /**
-   * Strip leading whitespace + ANSI escapes and trailing whitespace
-   * from one chunk, preserving the ANSI escapes that sit interior to
-   * the visible text. Helps lines line up at the same left offset
-   * regardless of how the upstream tool indents.
+   * Strip trailing whitespace and any leading non-SGR ANSI control
+   * sequences (cursor moves, erase-line, OSC) from one chunk.
+   *
+   * Leading whitespace AND leading SGR colour codes are intentionally
+   * preserved: ESPHome's multi-line WARNING records open the colour
+   * on the first line and only reset it on the last, and the
+   * continuation lines (``clk:`` / ``  mode: CLK_OUT`` / ``  pin: 0``)
+   * use indentation as part of the rendered formatting. Stripping
+   * either would left-align continuation lines and drop the colour
+   * carry-over.
    */
   private _cleanLine(line: string): string {
     return line
       .replace(
-        /^(?:\u001b\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x7e]|\u001b\][^\u0007\u001b]*(?:\u0007|\u001b\\)|\u001b[NOPVWX^_=>]|\s)*/g,
+        /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[@-ln-~]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
         "",
       )
       .replace(/\s+$/, "");
   }
 
-  private _renderLine(line: string) {
-    const spans = parseAnsiLine(line);
+  private _renderLine(line: string, state: AnsiState) {
+    const spans = parseAnsiLine(line, state);
     const hasAnsiColor = spans.some((s) => s.color || s.bgColor);
 
     // If no ANSI colors, try ESPHome log-level colorization
