@@ -61,6 +61,14 @@ export class ESPHomeTableRowMenu extends LitElement {
   @property({ type: Boolean, attribute: "anchor-right" })
   anchorRight = false;
 
+  /** When true, the menu is being shown for a card view where every
+   *  inline action button is always rendered. The duplicate menu items
+   *  (Logs, Visit Web UI) are hidden via CSS so the kebab only carries
+   *  what isn't already on the card. The host attribute drives the
+   *  CSS selector — keep it in sync with the property. */
+  @property({ type: Boolean, attribute: "card-mode", reflect: true })
+  cardMode = false;
+
   @query(".menu")
   private _menuEl!: HTMLDivElement;
 
@@ -157,6 +165,30 @@ export class ESPHomeTableRowMenu extends LitElement {
       .menu-item--danger:hover wa-icon {
         color: var(--esphome-error);
       }
+
+      /* Dedupe with the inline action buttons. The card always shows
+         every inline action when applicable, so card-mode hides the
+         duplicate kebab entries unconditionally. The table only shows
+         the inline buttons above each priority breakpoint, so for the
+         table the kebab entries hide only above those same widths.
+         Breakpoints are off-by-one from the inline rules so the
+         transition pixel never has both copies hidden:
+           prio-3 logs    inline shown when width > 920px
+           prio-4 visit   inline shown when width > 1024px */
+      :host([card-mode]) .menu-item--prio-3,
+      :host([card-mode]) .menu-item--prio-4 {
+        display: none;
+      }
+      @media (min-width: 921px) {
+        :host(:not([card-mode])) .menu-item--prio-3 {
+          display: none;
+        }
+      }
+      @media (min-width: 1025px) {
+        :host(:not([card-mode])) .menu-item--prio-4 {
+          display: none;
+        }
+      }
     `,
   ];
 
@@ -169,10 +201,6 @@ export class ESPHomeTableRowMenu extends LitElement {
         class="menu"
         style=${this._initialStyle()}
       >
-        <div class="menu-item" @click=${() => this._emit("edit-device")}>
-          <wa-icon library="mdi" name="pencil"></wa-icon>
-          ${this._localize("dashboard.drawer_edit")}
-        </div>
         <div class="menu-item" @click=${() => this._emit("validate-device")}>
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
@@ -181,7 +209,7 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="upload"></wa-icon>
           ${this._localize("dashboard.action_install")}
         </div>
-        <div class="menu-item ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("open-logs")}>
+        <div class="menu-item menu-item--prio-3 ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
         </div>
@@ -308,7 +336,7 @@ export class ESPHomeTableRowMenu extends LitElement {
     // Referer header and isn't honoured uniformly across browsers.
     return html`
       <a
-        class="menu-item menu-item--link"
+        class="menu-item menu-item--link menu-item--prio-4"
         href=${url}
         target="_blank"
         rel="noopener noreferrer"

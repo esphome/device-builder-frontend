@@ -426,6 +426,7 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-table-row-menu
         .device=${this._cardContextDevice}
         .position=${this._cardContextPosition}
+        card-mode
         ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
         @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
