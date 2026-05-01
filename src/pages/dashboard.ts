@@ -225,7 +225,9 @@ export class ESPHomePageDashboard extends LitElement {
               .device=${device}
               @adopt=${() => this._adoptDialog.open(device)}
               @toggle-ignore=${() =>
-                this._api?.ignoreDevice(device.name, !device.ignored)}
+                this._api
+                  ?.ignoreDevice(device.name, !device.ignored)
+                  .catch(() => {})}
             ></esphome-discovered-device-card>
           `,
         )}
