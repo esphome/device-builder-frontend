@@ -85,6 +85,9 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ type: Boolean, attribute: "has-update-available" })
   hasUpdateAvailable = false;
 
+  @property({ type: Boolean, attribute: "api-enabled" })
+  apiEnabled = false;
+
   @property({ type: Boolean, attribute: "api-encrypted" })
   apiEncrypted = false;
 
@@ -383,16 +386,18 @@ export class ESPHomeDeviceCard extends LitElement {
               ${this.hasUpdateAvailable
                 ? html`<span class="indicator-dot indicator-dot--update" title=${this._localize("dashboard.status_update_available")}></span>`
                 : nothing}
-              <wa-icon
-                class="encryption-icon ${this.apiEncrypted ? "secure" : "insecure"}"
-                library="mdi"
-                name=${this.apiEncrypted ? "lock" : "lock-open-variant"}
-                title=${this._localize(
-                  this.apiEncrypted
-                    ? "dashboard.table_status_encrypted"
-                    : "dashboard.table_status_unencrypted",
-                )}
-              ></wa-icon>
+              ${this.apiEnabled
+                ? html`<wa-icon
+                    class="encryption-icon ${this.apiEncrypted ? "secure" : "insecure"}"
+                    library="mdi"
+                    name=${this.apiEncrypted ? "lock" : "lock-open-variant"}
+                    title=${this._localize(
+                      this.apiEncrypted
+                        ? "dashboard.table_status_encrypted"
+                        : "dashboard.table_status_unencrypted",
+                    )}
+                  ></wa-icon>`
+                : nothing}
             </div>
             <p class="device-config">${this.configuration}</p>
           </div>

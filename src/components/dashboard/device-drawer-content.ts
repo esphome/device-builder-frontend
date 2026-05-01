@@ -4,6 +4,8 @@ import {
   mdiFileDocumentOutline,
   mdiInformationOutline,
   mdiIpNetworkOutline,
+  mdiLock,
+  mdiLockOpenVariant,
   mdiMemory,
   mdiTagMultiple,
   mdiTextShort,
@@ -25,6 +27,8 @@ registerMdiIcons({
   "file-document-outline": mdiFileDocumentOutline,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
+  lock: mdiLock,
+  "lock-open-variant": mdiLockOpenVariant,
   memory: mdiMemory,
   "tag-multiple": mdiTagMultiple,
   "text-short": mdiTextShort,
@@ -174,6 +178,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
         color: var(--esphome-primary);
       }
+
+      .status-badge--encrypted {
+        background: color-mix(in srgb, var(--esphome-success), transparent 88%);
+        color: var(--esphome-success);
+      }
+
+      .status-badge--unencrypted {
+        background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
+        color: var(--esphome-warning, #d97706);
+      }
     `,
   ];
 
@@ -183,9 +197,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
     const hasPendingChanges = d.has_pending_changes === true;
     const hasUpdateAvailable = d.update_available;
+    // ``api_enabled`` gates the lock badge entirely — devices that
+    // don't expose the Native API (MQTT-only, sensor-bridge configs)
+    // shouldn't carry an "insecure" warning for a surface they never
+    // turned on. ``api_encrypted`` only flips the badge variant.
+    const apiEnabled = d.api_enabled === true;
+    const apiEncrypted = d.api_encrypted === true;
+    const showAnyBadge = hasPendingChanges || hasUpdateAvailable || apiEnabled;
 
     return html`
-      ${hasPendingChanges || hasUpdateAvailable
+      ${showAnyBadge
         ? html`<div class="status-badges">
             ${hasPendingChanges
               ? html`<span class="status-badge status-badge--modified">
@@ -197,6 +218,23 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               ? html`<span class="status-badge status-badge--update">
                   <wa-icon library="mdi" name="update"></wa-icon>
                   ${this._localize("dashboard.status_update_available")}
+                </span>`
+              : nothing}
+            ${apiEnabled
+              ? html`<span
+                  class="status-badge ${apiEncrypted
+                    ? "status-badge--encrypted"
+                    : "status-badge--unencrypted"}"
+                >
+                  <wa-icon
+                    library="mdi"
+                    name=${apiEncrypted ? "lock" : "lock-open-variant"}
+                  ></wa-icon>
+                  ${this._localize(
+                    apiEncrypted
+                      ? "dashboard.table_status_encrypted"
+                      : "dashboard.table_status_unencrypted",
+                  )}
                 </span>`
               : nothing}
           </div>`
