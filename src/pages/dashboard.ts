@@ -56,6 +56,9 @@ import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-instal
 import "../components/install-method-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
+import "../components/discovered-device-card.js";
+import "../components/adopt-dialog.js";
+import type { ESPHomeAdoptDialog } from "../components/adopt-dialog.js";
 import "../components/select-bar.js";
 import "../components/command-dialog.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
@@ -174,6 +177,7 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-rename-device-dialog") private _renameDialog!: ESPHomeRenameDeviceDialog;
+  @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog") private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
@@ -199,6 +203,7 @@ export class ESPHomePageDashboard extends LitElement {
 
     return html`
       ${this._renderBanner()}
+      ${this._showDiscovered ? this._renderDiscoveredGrid() : ""}
       ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? this._renderToolbar(filtered.length, this._devices.length)
         : ""}
@@ -207,6 +212,24 @@ export class ESPHomePageDashboard extends LitElement {
       ${this._renderDrawer()}
       ${this._renderSelectBarOrFab()}
       ${this._renderDialogs()}
+    `;
+  }
+
+  private _renderDiscoveredGrid() {
+    if (this._importableDevices.length === 0) return "";
+    return html`
+      <div class="devices-grid">
+        ${this._importableDevices.map(
+          (device) => html`
+            <esphome-discovered-device-card
+              .device=${device}
+              @adopt=${() => this._adoptDialog.open(device)}
+              @toggle-ignore=${() =>
+                this._api?.ignoreDevice(device.name, !device.ignored)}
+            ></esphome-discovered-device-card>
+          `,
+        )}
+      </div>
     `;
   }
 
@@ -222,7 +245,7 @@ export class ESPHomePageDashboard extends LitElement {
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
             <span>${this._localize("dashboard.discovered_count", { count: this._importableDevices.length })}</span>
           </div>
-          <a @click=${() => { this._showDiscovered = !this._showDiscovered; }}>${this._localize("dashboard.show")}</a>
+          <a @click=${() => { this._showDiscovered = !this._showDiscovered; }}>${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}</a>
         </div>
       </div>
     `;
@@ -472,6 +495,7 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
+      <esphome-adopt-dialog></esphome-adopt-dialog>
       <esphome-api-key-dialog></esphome-api-key-dialog>
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-command-dialog></esphome-command-dialog>
