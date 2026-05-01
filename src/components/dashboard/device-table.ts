@@ -546,12 +546,18 @@ export class ESPHomeDeviceTable extends LitElement {
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      this.selectMode
-        ? this._onToggleSelect(device.configuration)
-        : this._onRowClick(device);
-    }
+    if (e.key !== "Enter" && e.key !== " ") return;
+    /* Don't double-fire when the user is keyboard-activating an
+       inline action control (Edit / Logs / Install / Update / Visit
+       Web / kebab). The native button/anchor handles its own activation
+       and the event bubbles up to the row — without this guard,
+       pressing Enter on a focused action also opens the row drawer
+       behind it. */
+    if ((e.target as Element)?.closest("button, a")) return;
+    e.preventDefault();
+    this.selectMode
+      ? this._onToggleSelect(device.configuration)
+      : this._onRowClick(device);
   }
 
   private _openActionsMenu(e: MouseEvent, device: ConfiguredDevice) {

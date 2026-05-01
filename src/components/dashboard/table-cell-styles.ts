@@ -192,6 +192,10 @@ export const tableCellStyles = css`
     color: var(--wa-color-text-quiet);
     cursor: pointer;
     padding: 0;
+    /* Reset anchor presentation so the Visit Web UI link (rendered
+       as <a> for rel=noopener security) matches the surrounding
+       <button> action controls — no underline, no visited tint. */
+    text-decoration: none;
     transition:
       background 0.12s,
       color 0.12s,

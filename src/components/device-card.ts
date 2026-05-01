@@ -345,6 +345,11 @@ export class ESPHomeDeviceCard extends LitElement {
         font-family: inherit;
         cursor: pointer;
         border: var(--wa-border-width-s) solid transparent;
+        /* Reset anchor presentation so the Visit Web UI link
+           (rendered as <a> for rel=noopener security) matches the
+           surrounding <button> action controls — no underline, no
+           visited tint. */
+        text-decoration: none;
         transition:
           background 0.12s,
           border-color 0.12s;
