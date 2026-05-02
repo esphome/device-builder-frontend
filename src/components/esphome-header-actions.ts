@@ -52,8 +52,14 @@ export class ESPHomeHeaderActions extends LitElement {
   static styles = [
     espHomeStyles,
     css`
+      /* inline-flex (instead of display: contents) so the parent
+         header's flex gap doesn't squeeze a gutter between the
+         inline-actions row and the kebab — they should read as one
+         cluster, not as separate header sections. */
       :host {
-        display: contents;
+        display: inline-flex;
+        align-items: center;
+        gap: 0;
       }
 
       /* Inline icon buttons surface the most-used kebab items on
@@ -61,9 +67,7 @@ export class ESPHomeHeaderActions extends LitElement {
          (lives behind a live badge) and Settings (the only kebab
          entry users hit reliably) — and leave the rest in the menu.
          Three would already crowd the header on tighter viewports;
-         fewer would defeat the discoverability point. The kebab is
-         still rendered with the full set so resize / mobile keeps
-         the same items reachable. */
+         fewer would defeat the discoverability point. */
       .inline-actions {
         display: none;
         align-items: center;
@@ -73,6 +77,18 @@ export class ESPHomeHeaderActions extends LitElement {
       @media (min-width: 768px) {
         .inline-actions {
           display: inline-flex;
+        }
+      }
+
+      /* On desktop the inline buttons cover Firmware jobs + Settings,
+         so duplicating them inside the kebab muddies the menu (users
+         see two ways to do the same thing in adjacent UI). Hide the
+         duplicates above the breakpoint; mobile keeps them as the
+         only access point. */
+      @media (min-width: 768px) {
+        .menu-item--inline,
+        .menu-divider--inline {
+          display: none;
         }
       }
 
@@ -224,22 +240,27 @@ export class ESPHomeHeaderActions extends LitElement {
       }
     }
     return html`
-      <div class="inline-actions" role="toolbar">
+      <div
+        class="inline-actions"
+        role="toolbar"
+        aria-label=${this._localize("layout.header_actions_label")}
+      >
         <button
+          type="button"
           class="menu-btn"
           @click=${this._openFirmwareJobs}
           title=${this._localize("firmware_jobs.menu_item")}
-          aria-label=${this._localize("firmware_jobs.menu_item")}
+          aria-label=${activeCount > 0
+            ? this._localize("firmware_jobs.menu_item_with_count", { count: activeCount })
+            : this._localize("firmware_jobs.menu_item")}
         >
           <wa-icon library="mdi" name="playlist-check"></wa-icon>
           ${activeCount > 0
-            ? html`<span
-                class="menu-btn-badge"
-                aria-label=${this._localize("firmware_jobs.badge_label", { count: activeCount })}
-              ></span>`
+            ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
             : nothing}
         </button>
         <button
+          type="button"
           class="menu-btn"
           @click=${this._openSettings}
           title=${this._localize("layout.settings")}
@@ -249,21 +270,24 @@ export class ESPHomeHeaderActions extends LitElement {
         </button>
       </div>
       <button
+        type="button"
         class="menu-btn menu-kebab"
         @click=${this._toggle}
         title=${this._localize("dashboard.more_options")}
-        aria-label=${this._localize("dashboard.more_options")}
+        aria-label=${activeCount > 0
+          ? this._localize("layout.more_options_with_count", { count: activeCount })
+          : this._localize("dashboard.more_options")}
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
         ${activeCount > 0
-          ? html`<span class="menu-btn-badge" aria-label=${this._localize("firmware_jobs.badge_label", { count: activeCount })}></span>`
+          ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
           : nothing}
       </button>
       ${this._open
         ? html`
             <div class="backdrop" @click=${this._close}></div>
             <div class="menu" style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);">
-              <div class="menu-item" @click=${this._openFirmwareJobs}>
+              <div class="menu-item menu-item--inline" @click=${this._openFirmwareJobs}>
                 <wa-icon library="mdi" name="playlist-check"></wa-icon>
                 <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
                 ${activeCount > 0
@@ -294,8 +318,8 @@ export class ESPHomeHeaderActions extends LitElement {
                     ></wa-icon>`
                   : nothing}
               </div>
-              <div class="menu-divider"></div>
-              <div class="menu-item" @click=${this._openSettings}>
+              <div class="menu-divider menu-divider--inline"></div>
+              <div class="menu-item menu-item--inline" @click=${this._openSettings}>
                 <wa-icon library="mdi" name="cog"></wa-icon>
                 ${this._localize("layout.settings")}
               </div>

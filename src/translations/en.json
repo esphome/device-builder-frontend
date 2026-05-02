@@ -480,7 +480,9 @@
     "back": "Back",
     "home_assistant": "Home Assistant",
     "editor": "Editor",
-    "yaml_diff_button": "YAML diff button"
+    "yaml_diff_button": "YAML diff button",
+    "header_actions_label": "Dashboard actions",
+    "more_options_with_count": "More options ({count} firmware task(s) active)"
   },
   "command_palette": {
     "placeholder": "Type a command or search…",
@@ -528,6 +530,7 @@
   },
   "firmware_jobs": {
     "menu_item": "Firmware tasks",
+    "menu_item_with_count": "Firmware tasks ({count} active)",
     "title": "Firmware tasks",
     "badge_label": "{count} active firmware task(s)",
     "empty_title": "No firmware tasks yet",
