@@ -35,8 +35,16 @@ export async function archiveDevice(
     });
     return false;
   }
+  /* The toast carries the discoverability hint for unarchive —
+     archive is a one-way action from the user's POV unless we
+     tell them where to find the restore path. The Archived
+     devices entry lives in the header kebab; spelling it out
+     in the success toast saves a "where did my device go?"
+     support thread. */
   toast.success(localize("dashboard.action_archive_success", { name }), {
+    description: localize("dashboard.action_archive_success_hint"),
     richColors: true,
+    duration: 8000,
   });
   return true;
 }

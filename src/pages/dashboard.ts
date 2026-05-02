@@ -143,6 +143,11 @@ export class ESPHomePageDashboard extends LitElement {
    *  clearing ``_pendingDelete`` — the dialog's copy and confirm
    *  router both branch on which is non-null. */
   @state() private _pendingDeleteArchived: ArchivedDevice | null = null;
+  /** Active device queued for archive confirmation. Archive is
+   *  reversible but wipes the per-device build dir — that's
+   *  expensive (5-10min ESP-IDF recompile) so it deserves a
+   *  confirm step. Same shared dialog as the two delete flows. */
+  @state() private _pendingArchive: ConfiguredDevice | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
    *  device card / row so the user can spot the freshly-imported
@@ -575,7 +580,7 @@ export class ESPHomePageDashboard extends LitElement {
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
         @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
-        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._archiveDevice(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
@@ -628,7 +633,7 @@ export class ESPHomePageDashboard extends LitElement {
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
         @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
-        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._archiveDevice(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._onEnterSelectMode(e.detail.configuration)}
       ></esphome-table-row-menu>
@@ -681,34 +686,52 @@ export class ESPHomePageDashboard extends LitElement {
         this._pendingDeleteArchived.name ||
         this._pendingDeleteArchived.configuration
       : "";
+    const pendingArchiveName = this._pendingArchive
+      ? this._pendingArchive.friendly_name || this._pendingArchive.name
+      : "";
     let dialogHeading: string;
     let dialogMessage: string;
-    if (this._pendingDeleteArchived) {
+    let dialogConfirm: string;
+    let dialogDestructive = false;
+    if (this._pendingArchive) {
+      dialogHeading = this._localize("dashboard.archive_title");
+      dialogMessage = this._localize("dashboard.archive_desc", {
+        name: pendingArchiveName,
+      });
+      dialogConfirm = this._localize("dashboard.archive_confirm");
+    } else if (this._pendingDeleteArchived) {
       dialogHeading = this._localize("dashboard.delete_archived_title");
       dialogMessage = this._localize("dashboard.delete_archived_desc", {
         name: pendingArchivedName,
       });
+      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
+      dialogDestructive = true;
     } else if (this._pendingDelete) {
       dialogHeading = this._localize("dashboard.delete_single_title");
       dialogMessage = this._localize("dashboard.delete_single_desc", {
         name: pendingName,
       });
+      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
+      dialogDestructive = true;
     } else {
       dialogHeading = this._localize("dashboard.delete_selected_title");
       dialogMessage = this._localize("dashboard.delete_selected_desc", {
         count: this._selectedDevices.size,
       });
+      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
+      dialogDestructive = true;
     }
     return html`
       <esphome-confirm-dialog
         heading=${dialogHeading}
         message=${dialogMessage}
-        confirm-label=${this._localize("dashboard.delete_selected_confirm")}
-        destructive
-        @confirm=${this._executeDelete}
+        confirm-label=${dialogConfirm}
+        ?destructive=${dialogDestructive}
+        @confirm=${this._executeConfirm}
         @cancel=${() => {
           this._pendingDelete = null;
           this._pendingDeleteArchived = null;
+          this._pendingArchive = null;
         }}
       ></esphome-confirm-dialog>
       <esphome-rename-device-dialog
@@ -1113,9 +1136,11 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
       return;
     }
-    /* Bulk-delete path — ``_pendingDelete`` stays null so the
-       confirm dialog shows the bulk copy ("Delete N device(s)"). */
+    /* Bulk-delete path — all three pending-* states stay null so
+       the confirm dialog shows the bulk copy ("Delete N device(s)"). */
     this._pendingDelete = null;
+    this._pendingDeleteArchived = null;
+    this._pendingArchive = null;
     this._confirmDialog.open();
   }
 
@@ -1127,6 +1152,7 @@ export class ESPHomePageDashboard extends LitElement {
        missed click on the kebab silently nuked the YAML. */
     this._pendingDelete = device;
     this._pendingDeleteArchived = null;
+    this._pendingArchive = null;
     this._confirmDialog.open();
   }
 
@@ -1136,11 +1162,31 @@ export class ESPHomePageDashboard extends LitElement {
        was already a soft-delete, so this is the "really, gone"
        step — the YAML and its sidecars are unlinked. */
     this._pendingDelete = null;
+    this._pendingArchive = null;
     this._pendingDeleteArchived = device;
     this._confirmDialog.open();
   }
 
-  private _executeDelete() {
+  private _confirmArchive(device: ConfiguredDevice) {
+    /* Archive is reversible but wipes the per-device build dir
+       (5-10 min recompile when restored). Show a confirm dialog
+       that explains both the build wipe and where the user can
+       find the device after archiving — without that hint a
+       silently-disappearing device leads to "where did it go?"
+       support. */
+    this._pendingDelete = null;
+    this._pendingDeleteArchived = null;
+    this._pendingArchive = device;
+    this._confirmDialog.open();
+  }
+
+  private _executeConfirm() {
+    if (this._pendingArchive) {
+      const target = this._pendingArchive;
+      this._pendingArchive = null;
+      this._archiveDevice(target);
+      return;
+    }
     if (this._pendingDeleteArchived) {
       const target = this._pendingDeleteArchived;
       this._pendingDeleteArchived = null;

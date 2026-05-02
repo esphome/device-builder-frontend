@@ -69,6 +69,16 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         --width: 560px;
       }
 
+      /* Cap the dialog short of the viewport edges so toasts that
+         render bottom-right (sonner-js, ~24px gap + ~80px height)
+         aren't covered by a long archive list. The dialog body
+         itself scrolls (see the .body rule below) so the visible
+         chrome (header / desc / footer) always fits in the
+         remaining space. */
+      wa-dialog::part(dialog) {
+        max-block-size: calc(100vh - 160px);
+      }
+
       wa-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
@@ -94,7 +104,11 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
       }
 
       .body {
-        max-height: 60vh;
+        /* Subtract the dialog's own chrome (header ~60px, desc/padding
+           ~80px, action footer ~76px) from the dialog max-height
+           so the rows scroll inside the body instead of pushing the
+           dialog past its viewport cap. */
+        max-height: calc(100vh - 380px);
         overflow-y: auto;
         padding: 0 var(--wa-space-l) var(--wa-space-m);
       }
