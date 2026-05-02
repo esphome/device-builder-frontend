@@ -232,10 +232,21 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
         </div>
-        <div class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("install-device")}>
-          <wa-icon library="mdi" name="upload"></wa-icon>
-          ${this._localize("dashboard.action_install")}
-        </div>
+        ${this.hasUpdate
+          ? html`<div
+              class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
+              @click=${this.busy ? undefined : () => this._emit("update-device")}
+            >
+              <wa-icon library="mdi" name="upload"></wa-icon>
+              ${this._localize("dashboard.update")}
+            </div>`
+          : html`<div
+              class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
+              @click=${this.busy ? undefined : () => this._emit("install-device")}
+            >
+              <wa-icon library="mdi" name="upload"></wa-icon>
+              ${this._localize("dashboard.action_install")}
+            </div>`}
         <div class="menu-item menu-item--logs ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
