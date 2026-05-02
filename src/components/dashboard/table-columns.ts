@@ -189,8 +189,12 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) => {
         const row = info.row.original;
         const device = row._device;
-        const showInstall = row.hasPendingChanges;
-        const showUpdate = !row.hasPendingChanges && row.hasUpdateAvailable;
+        /* Update wins over install when both flags are set: an
+           available newer ESPHome version is the more pressing nudge,
+           and OTA-update will pick up any pending YAML changes as a
+           free side-effect. Mirrors the legacy dashboard. */
+        const showUpdate = row.hasUpdateAvailable;
+        const showInstall = !showUpdate && row.hasPendingChanges;
         const visitUrl = buildWebUiUrl(device);
         const showVisit = visitUrl !== "";
         // Priority order (highest → lowest, last to drop on narrow

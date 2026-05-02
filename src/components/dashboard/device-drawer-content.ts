@@ -1,7 +1,9 @@
 import { consume } from "@lit/context";
 import {
   mdiAlertCircleOutline,
+  mdiCheckCircleOutline,
   mdiFileDocumentOutline,
+  mdiFingerprint,
   mdiInformationOutline,
   mdiIpNetworkOutline,
   mdiLock,
@@ -9,6 +11,7 @@ import {
   mdiLockClock,
   mdiLockOpenVariant,
   mdiMemory,
+  mdiSync,
   mdiTagMultiple,
   mdiTextShort,
   mdiUpdate,
@@ -30,7 +33,9 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
+  "check-circle-outline": mdiCheckCircleOutline,
   "file-document-outline": mdiFileDocumentOutline,
+  fingerprint: mdiFingerprint,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
   lock: mdiLock,
@@ -38,6 +43,7 @@ registerMdiIcons({
   "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
   memory: mdiMemory,
+  sync: mdiSync,
   "tag-multiple": mdiTagMultiple,
   "text-short": mdiTextShort,
   update: mdiUpdate,
@@ -257,6 +263,37 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         background: color-mix(in srgb, var(--esphome-error), transparent 88%);
         color: var(--esphome-error);
       }
+
+      /* Compact in/out-of-sync line shared by both the version and
+         config-hash sections — anywhere the drawer needs a "local
+         matches deployed" verdict. Reads like the encryption /
+         pending / update badges above so the drawer's status surface
+         stays visually consistent; the rows underneath then carry
+         the actual values being compared. */
+      .sync-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: var(--wa-font-size-2xs);
+        font-weight: var(--wa-font-weight-bold);
+        margin-bottom: var(--wa-space-s);
+      }
+
+      .sync-status wa-icon {
+        font-size: 13px;
+      }
+
+      .sync-status--match {
+        background: color-mix(in srgb, var(--esphome-success), transparent 88%);
+        color: var(--esphome-success);
+      }
+
+      .sync-status--diff {
+        background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
+        color: var(--esphome-warning, #d97706);
+      }
     `,
   ];
 
@@ -300,17 +337,15 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
 
-      <div class="section">
-        <h4 class="section-title">${this._localize("dashboard.drawer_version")}</h4>
-        ${this._row("tag-multiple", this._localize("dashboard.drawer_current_version"), d.current_version, true)}
-        ${this._row("upload", this._localize("dashboard.drawer_deployed_version"), d.deployed_version, true)}
-      </div>
+      ${this._renderVersionSection(d)}
 
       <div class="section">
         <h4 class="section-title">${this._localize("dashboard.drawer_configuration")}</h4>
         ${this._row("file-document-outline", this._localize("dashboard.drawer_config_file"), d.configuration, true)}
         ${this._row("text-short", this._localize("dashboard.drawer_comment"), d.comment)}
       </div>
+
+      ${this._renderConfigHashSection(d)}
 
       ${d.loaded_integrations && d.loaded_integrations.length > 0
         ? html`
@@ -333,6 +368,118 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
             </div>
           `
         : nothing}
+    `;
+  }
+
+  /**
+   * Render the local-vs-deployed ESPHome version comparison.
+   *
+   * ``current_version`` is the dashboard's bundled ESPHome — the
+   * version a fresh compile will produce — and
+   * ``deployed_version`` is what the device's mDNS broadcast says
+   * it's actually running. The pair tells "device is up-to-date with
+   * the dashboard's toolchain" apart from "device runs an older
+   * release that just hasn't been re-flashed since the dashboard was
+   * upgraded". The frontend already drives an "Update available"
+   * pill from this comparison; surfacing the underlying numbers in
+   * the drawer is the diagnostic the pill is summarising. Skips the
+   * whole section when neither side has populated yet (brand-new
+   * device that has never compiled and never broadcast).
+   */
+  private _renderVersionSection(d: ConfiguredDevice) {
+    const local = d.current_version || "";
+    const deployed = d.deployed_version || "";
+    if (!local && !deployed) return nothing;
+    const matches = !!local && !!deployed && local === deployed;
+    const statusIcon = matches ? "check-circle-outline" : "sync";
+    const statusKey = matches
+      ? "dashboard.drawer_version_in_sync"
+      : "dashboard.drawer_version_out_of_sync";
+    const statusCls = matches ? "sync-status sync-status--match" : "sync-status sync-status--diff";
+    // Suppress the badge entirely when the device hasn't reported a
+    // version yet (no mDNS announce). Comparing against an empty
+    // string would always read "out of sync" — meaningless noise on
+    // a freshly-added device that's never been online.
+    const showStatus = !!local && !!deployed;
+    return html`
+      <div class="section">
+        <h4 class="section-title">${this._localize("dashboard.drawer_version")}</h4>
+        ${showStatus
+          ? html`<div class=${statusCls}>
+              <wa-icon library="mdi" name=${statusIcon}></wa-icon>
+              <span>${this._localize(statusKey)}</span>
+            </div>`
+          : nothing}
+        ${this._row(
+          "tag-multiple",
+          this._localize("dashboard.drawer_current_version"),
+          local,
+          true,
+        )}
+        ${this._row(
+          "upload",
+          this._localize("dashboard.drawer_deployed_version"),
+          deployed,
+          true,
+        )}
+      </div>
+    `;
+  }
+
+  /**
+   * Render the local-vs-deployed config hash comparison.
+   *
+   * The two 8-char hashes are how the dashboard tells "device runs
+   * the YAML you see in the editor" apart from "device runs an older
+   * compile". Surfacing them in the drawer is the answer to "the
+   * modified dot is on but the YAML hasn't changed — what's actually
+   * mismatched?" — which until now had no diagnostic in the UI.
+   * Suppress the section entirely on devices that have never been
+   * compiled (no expected hash) and never broadcast their hash (no
+   * deployed hash); there's nothing meaningful to show, and the
+   * absence is itself communicated by the absence of the section.
+   */
+  private _renderConfigHashSection(d: ConfiguredDevice) {
+    const expected = d.expected_config_hash || "";
+    const deployed = d.deployed_config_hash || "";
+    if (!expected && !deployed) return nothing;
+    const matches = !!expected && !!deployed && expected === deployed;
+    const statusIcon = matches ? "check-circle-outline" : "sync";
+    const statusKey = matches
+      ? "dashboard.drawer_config_hash_in_sync"
+      : "dashboard.drawer_config_hash_out_of_sync";
+    const statusCls = matches ? "sync-status sync-status--match" : "sync-status sync-status--diff";
+    // Match the version section's gating: only show the pill when
+    // both sides are populated. A device that has compiled but
+    // hasn't broadcast yet (or vice versa) doesn't have enough data
+    // for a verdict — the rows below already convey the missing
+    // side via em-dashes, and an "Out of sync" pill against an empty
+    // string would mis-state the situation.
+    const showStatus = !!expected && !!deployed;
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_config_hash_title")}
+        </h4>
+        ${showStatus
+          ? html`<div class=${statusCls}>
+              <wa-icon library="mdi" name=${statusIcon}></wa-icon>
+              <span>${this._localize(statusKey)}</span>
+            </div>`
+          : nothing}
+        ${this._row(
+          "fingerprint",
+          this._localize("dashboard.drawer_config_hash_local"),
+          expected,
+          true,
+        )}
+        ${this._row(
+          "fingerprint",
+          this._localize("dashboard.drawer_config_hash_deployed"),
+          deployed,
+          true,
+        )}
+      </div>
     `;
   }
 
