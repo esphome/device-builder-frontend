@@ -569,7 +569,9 @@ export interface FirmwareJob {
   output: string[];
   error: string | null;
   port: string;
-  /** New device name, only set on ``rename`` jobs. */
+  /** New device name. Carried only by ``rename`` jobs; the backend
+   *  dataclass defaults to ``""`` for every other job type so the
+   *  field is always present on the wire — required here matches. */
   new_name: string;
   /** 0–100 progress, monotonically non-decreasing while the job runs.
    *  `null` until the underlying tooling (PlatformIO/esptool) emits a
