@@ -12,6 +12,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import { JobStatus, JobType } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -72,6 +73,9 @@ export class ESPHomeCommandDialog extends LitElement {
 
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
+
+  @query("esphome-ansi-log")
+  private _ansiLog?: ESPHomeAnsiLog;
 
   static styles = [
     espHomeStyles,
@@ -243,7 +247,17 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = "";
     this._streamId = "";
     this._dialog.open = true;
+    this._resetAnsiLogScroll();
     this._start();
+  }
+
+  private _resetAnsiLogScroll() {
+    /* The ansi-log instance is reused across opens; if the user
+       scrolled up in a previous session its ``_isUserScrolled`` flag
+       is still set and would suppress auto-scroll for the new
+       session. ``scrollToBottom()`` clears the flag and re-engages
+       streaming-to-bottom for the next batch of lines. */
+    this.updateComplete.then(() => this._ansiLog?.scrollToBottom());
   }
 
   /**
@@ -264,6 +278,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = job.job_id;
     this._streamId = "";
     this._dialog.open = true;
+    this._resetAnsiLogScroll();
     this._followJob(job.job_id);
   }
 
