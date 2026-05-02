@@ -781,8 +781,19 @@ export class ESPHomePageDashboard extends LitElement {
       /* Validated configs route through the firmware queue — the
          compile + OTA install runs there and we follow it in the
          command-dialog so the user sees live output. The toast lands
-         on completion (the job's onResult), not before. */
-      this._commandDialog.followJob(response.job, newName);
+         on completion (the job's onResult), not before.
+         The display label folds the technical rename ("old → new")
+         into the dialog title so the user can see *which* rename
+         this stream belongs to — the firmware-tasks list and the
+         busy badge surface it the same way. When the device has a
+         distinct friendly name, surface that too so the title reads
+         as a sentence rather than as two raw hostnames. */
+      const friendly = device.friendly_name || device.name;
+      const displayName =
+        friendly === device.name
+          ? `${device.name} → ${newName}`
+          : `${friendly} (${device.name} → ${newName})`;
+      this._commandDialog.followJob(response.job, displayName);
       return;
     }
     /* No job: backend did a pure file-level rename inline (config
