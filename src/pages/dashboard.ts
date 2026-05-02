@@ -55,6 +55,8 @@ import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import "../components/install-address-dialog.js";
+import type { ESPHomeInstallAddressDialog } from "../components/install-address-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
@@ -240,6 +242,7 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog") private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+  @query("esphome-install-address-dialog") private _installAddressDialog!: ESPHomeInstallAddressDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
 
   /** Device currently targeted by rename/api-key actions. */
@@ -522,6 +525,7 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
+        @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
@@ -573,6 +577,7 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
+        @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._onEnterSelectMode(e.detail.configuration)}
@@ -646,6 +651,9 @@ export class ESPHomePageDashboard extends LitElement {
         @close=${() => { this._installMethodOpen = false; }}
         @select-method=${this._onInstallMethodSelect}
       ></esphome-install-method-dialog>
+      <esphome-install-address-dialog
+        @install-to-address=${this._onInstallToAddress}
+      ></esphome-install-address-dialog>
     `;
   }
 
@@ -907,6 +915,33 @@ export class ESPHomePageDashboard extends LitElement {
     this._installMethodDevice = device;
     this._installMethodMode = "install";
     this._installMethodOpen = true;
+  }
+
+  /**
+   * Open the advanced "Install to Specific Address" dialog.
+   *
+   * Surfaced from the per-device kebab menu only on devices whose
+   * loaded_integrations include ``api`` — the override only makes
+   * sense for OTA-capable devices. Pre-fills with the device's
+   * resolved IP (or fallback to the configured address) so the
+   * user typically just edits an octet rather than retyping the
+   * whole address.
+   */
+  private _openInstallToAddress(device: ConfiguredDevice) {
+    this._installAddressDialog.open({
+      deviceName: device.friendly_name || device.name,
+      configuration: device.configuration,
+      currentAddress: device.ip || device.address || "",
+    });
+  }
+
+  private _onInstallToAddress(
+    e: CustomEvent<{ configuration: string; port: string }>,
+  ) {
+    const { configuration, port } = e.detail;
+    const device = this._devices.find((d) => d.configuration === configuration);
+    if (!device) return;
+    this._openCommand(device, "install", port);
   }
 
   private _onInstallMethodSelect(e: CustomEvent<{ method: string; port?: string }>) {
