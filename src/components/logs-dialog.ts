@@ -111,10 +111,11 @@ export class ESPHomeLogsDialog extends LitElement {
       }
 
       /* Match the device-editor's title bar (--esphome-primary
-         on white) so the dialog reads as part of the dashboard
-         chrome. The body stays terminal-themed — header colour was
-         the only thing that looked unintentional against the
-         dashboard's blue header bar. */
+         background with --esphome-on-primary text) so the dialog
+         reads as part of the dashboard chrome. The body stays
+         terminal-themed — header colour was the only thing that
+         looked unintentional against the dashboard's blue header
+         bar. */
       wa-dialog::part(header) {
         background: var(--esphome-primary);
         padding: 0 var(--wa-space-m);
@@ -140,8 +141,13 @@ export class ESPHomeLogsDialog extends LitElement {
         cursor: pointer;
       }
 
-      wa-dialog::part(close-button__base):hover {
+      /* Same affordance for keyboard users tabbing to the close
+         button — without a focus-visible style they'd land on an
+         identical-looking control with no visual cue. */
+      wa-dialog::part(close-button__base):hover,
+      wa-dialog::part(close-button__base):focus-visible {
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+        outline: none;
       }
 
       wa-dialog::part(body) {
