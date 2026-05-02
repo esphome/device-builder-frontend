@@ -84,10 +84,14 @@ export class ESPHomeHeaderActions extends LitElement {
          so duplicating them inside the kebab muddies the menu (users
          see two ways to do the same thing in adjacent UI). Hide the
          duplicates above the breakpoint; mobile keeps them as the
-         only access point. */
+         only access point. Chained selector (.menu-item.menu-item--
+         inline) bumps specificity above the bare .menu-item rule
+         defined later in this stylesheet — without it, source order
+         would let the bare display: flex win and the items would
+         stay visible. */
       @media (min-width: 768px) {
-        .menu-item--inline,
-        .menu-divider--inline {
+        .menu-item.menu-item--inline,
+        .menu-divider.menu-divider--inline {
           display: none;
         }
       }
