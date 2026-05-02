@@ -128,6 +128,7 @@ export class ESPHomeDeviceCard extends LitElement {
     css`
       :host {
         display: block;
+        outline: none;
       }
 
       .device-card {
@@ -142,6 +143,14 @@ export class ESPHomeDeviceCard extends LitElement {
 
       .device-card:hover {
         box-shadow: var(--wa-shadow-m);
+      }
+
+      /* Keyboard focus ring on the card itself. The host carries
+         tabindex/role so screen readers and Tab land here; we draw the
+         outline on the inner card so it follows the rounded corners. */
+      :host(:focus-visible) .device-card {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 2px;
       }
 
       .device-card--clickable {
@@ -446,6 +455,43 @@ export class ESPHomeDeviceCard extends LitElement {
     `,
   ];
 
+  connectedCallback() {
+    super.connectedCallback();
+    /* The host is the focusable target for keyboard nav: Tab lands on
+       the card, Enter/Space activates it, arrow keys move to a sibling
+       card in the grid. Inner action buttons remain in the tab order
+       after the card so keyboard users can reach Edit / Install / Logs
+       without leaving the keyboard. */
+    if (!this.hasAttribute("tabindex")) this.tabIndex = 0;
+    if (!this.hasAttribute("role")) this.setAttribute("role", "button");
+    this.addEventListener("keydown", this._onKeydown);
+  }
+
+  disconnectedCallback() {
+    this.removeEventListener("keydown", this._onKeydown);
+    super.disconnectedCallback();
+  }
+
+  protected willUpdate(changedProperties: Map<string, unknown>) {
+    if (
+      changedProperties.has("name") ||
+      changedProperties.has("selectMode") ||
+      changedProperties.has("selected")
+    ) {
+      this.setAttribute(
+        "aria-label",
+        this.selectMode
+          ? `${this.name} (${this.selected ? "selected" : "not selected"})`
+          : this.name,
+      );
+      if (this.selectMode) {
+        this.setAttribute("aria-pressed", String(this.selected));
+      } else {
+        this.removeAttribute("aria-pressed");
+      }
+    }
+  }
+
   protected render() {
     return html`
       <div
@@ -602,6 +648,72 @@ export class ESPHomeDeviceCard extends LitElement {
           ? this._localize("dashboard.offline")
           : this._localize("dashboard.unknown")}
     </div>`;
+  }
+
+  private _onKeydown = (e: KeyboardEvent) => {
+    /* Only handle keys that actually originate on the host. Inner
+       buttons (Edit, Install, kebab, etc.) get their own keyboard
+       behaviour from the browser; if the user is focused on Edit and
+       presses Enter, the button click handler fires — we shouldn't
+       also navigate the card. composedPath()[0] is the real target
+       inside the shadow tree; e.target is retargeted to the host
+       from outside, so it can't be used to distinguish these. */
+    if (e.composedPath()[0] !== this) return;
+
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      this._emit(this.selectMode ? "toggle-select" : "card-click");
+      return;
+    }
+
+    if (
+      e.key === "ArrowRight" ||
+      e.key === "ArrowLeft" ||
+      e.key === "ArrowUp" ||
+      e.key === "ArrowDown" ||
+      e.key === "Home" ||
+      e.key === "End"
+    ) {
+      e.preventDefault();
+      this._navigateCards(e.key);
+    }
+  };
+
+  private _navigateCards(key: string) {
+    const grid = this.parentElement;
+    if (!grid) return;
+    const cards = Array.from(
+      grid.querySelectorAll<ESPHomeDeviceCard>("esphome-device-card"),
+    );
+    const idx = cards.indexOf(this);
+    if (idx < 0) return;
+
+    if (key === "Home") return cards[0]?.focus();
+    if (key === "End") return cards[cards.length - 1]?.focus();
+    if (key === "ArrowRight") return cards[idx + 1]?.focus();
+    if (key === "ArrowLeft") return cards[idx - 1]?.focus();
+
+    /* Up / Down: pick the card on the next row whose horizontal centre
+       is closest to ours. The grid uses auto-fill columns so the column
+       count varies by viewport — using the rendered rects keeps the nav
+       working at any width without re-deriving the column count. */
+    const rect = this.getBoundingClientRect();
+    const myCenter = rect.left + rect.width / 2;
+    const direction = key === "ArrowDown" ? 1 : -1;
+    const withRects = cards
+      .filter((c) => c !== this)
+      .map((c) => ({ c, r: c.getBoundingClientRect() }))
+      .filter(({ r }) => direction * (r.top - rect.top) > 1);
+    if (!withRects.length) return;
+    withRects.sort((a, b) => direction * (a.r.top - b.r.top));
+    const targetTop = withRects[0].r.top;
+    const sameRow = withRects.filter(({ r }) => Math.abs(r.top - targetTop) < 1);
+    sameRow.sort(
+      (a, b) =>
+        Math.abs(a.r.left + a.r.width / 2 - myCenter) -
+        Math.abs(b.r.left + b.r.width / 2 - myCenter),
+    );
+    sameRow[0]?.c.focus();
   }
 
   private _onContextMenu(e: MouseEvent) {
