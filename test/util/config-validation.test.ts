@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
 import {
+  getDeviceNameWarning,
   validateDeviceName,
   validateEntries,
   validateEntry,
@@ -68,8 +69,6 @@ describe("validateDeviceName", () => {
     expect(validateDeviceName("a".repeat(64))?.code).toBe("validation.max_length");
   });
 });
-
-import { getDeviceNameWarning } from "../../src/util/config-validation.js";
 
 describe("getDeviceNameWarning", () => {
   it("warns about underscores (mDNS hostname concern)", () => {

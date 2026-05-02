@@ -771,7 +771,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (!device) return;
     const newName = e.detail;
     if (newName === device.name) return;
-    let response;
+    let response: Awaited<ReturnType<ESPHomeAPI["renameDevice"]>>;
     try {
       response = await this._api.renameDevice(device.configuration, newName);
     } catch {

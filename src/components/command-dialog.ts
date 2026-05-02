@@ -557,11 +557,22 @@ export class ESPHomeCommandDialog extends LitElement {
           <wa-icon library="mdi" name="stop"></wa-icon> ${this._localize("command.stop")}
         </button>`;
       case "error":
-        return html`
-          <button class="term-btn term-btn--start" @click=${this._start}>
-            <wa-icon library="mdi" name="refresh"></wa-icon> ${this._localize("command.retry")}
-          </button>
-          <button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`;
+        /* Retry only makes sense for the command types that ``_start``
+           knows how to re-run from the dialog itself (validate /
+           install / compile / clean). RENAME jobs come in via
+           ``followJob`` and the user originally launched them from
+           the dashboard's rename dialog; surfacing a Retry button
+           here would no-op (``_startFirmwareJob`` returns early for
+           unknown types) and leave the user staring at an action
+           that did nothing. Just show Close — the user can re-open
+           the rename dialog from the device card. */
+        return this._commandType === "rename"
+          ? html`<button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`
+          : html`
+              <button class="term-btn term-btn--start" @click=${this._start}>
+                <wa-icon library="mdi" name="refresh"></wa-icon> ${this._localize("command.retry")}
+              </button>
+              <button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`;
       case "success":
         return html`<button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`;
       default: return nothing;
