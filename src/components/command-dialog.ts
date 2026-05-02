@@ -24,6 +24,7 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -177,7 +178,17 @@ export class ESPHomeCommandDialog extends LitElement {
         min-height: 300px;
         max-height: 70vh;
         overflow: hidden;
+      }
+      /* Wrapper that owns the queued overlay's positioning context.
+         Anchoring on this (rather than .content) means the overlay
+         covers only the log area — the toolbar / banner stay
+         interactive even on narrow viewports where their height
+         doesn't match the previous hard-coded offset. */
+      .log-area {
         position: relative;
+        flex: 1;
+        min-height: 0;
+        display: flex;
       }
       esphome-ansi-log {
         flex: 1;
@@ -192,7 +203,7 @@ export class ESPHomeCommandDialog extends LitElement {
          the "View firmware tasks" button gives them a quick out. */
       .queued-overlay {
         position: absolute;
-        inset: 0 0 var(--queued-toolbar-offset, 36px) 0;
+        inset: 0;
         background: var(--term-bg);
         display: flex;
         flex-direction: column;
@@ -383,8 +394,10 @@ export class ESPHomeCommandDialog extends LitElement {
     return html`
       <wa-dialog label=${this._title} light-dismiss @wa-after-hide=${this._onDialogHide}>
         <div class="content">
-          <esphome-ansi-log .lines=${this._lines} ?light=${!this._darkMode}></esphome-ansi-log>
-          ${this._renderQueuedOverlay()}
+          <div class="log-area">
+            <esphome-ansi-log .lines=${this._lines} ?light=${!this._darkMode}></esphome-ansi-log>
+            ${this._renderQueuedOverlay()}
+          </div>
           ${this._renderBanner()}
           ${this._renderToolbar()}
         </div>
@@ -411,13 +424,7 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   private _jobDisplayName(job: FirmwareJob): string {
-    if (job.job_type === JobType.RESET_BUILD_ENV || !job.configuration) {
-      return this._localize("firmware_jobs.build_env_label");
-    }
-    const device = this._devices.find(
-      (d) => d.configuration === job.configuration,
-    );
-    return device?.friendly_name || device?.name || job.configuration;
+    return firmwareJobDisplayName(job, this._devices, this._localize);
   }
 
   private _renderQueuedOverlay() {
