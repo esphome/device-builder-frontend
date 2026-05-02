@@ -73,6 +73,17 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   private _device: ConfiguredDevice | null = null;
   private _jobId = "";
   private _streamId = "";
+
+  /**
+   * Reject hook for the in-flight ``_compileAndWait`` promise.
+   * ``_compileAndWait`` only settles from the firmwareFollowJob
+   * onResult / onError callbacks, but ``_detachStream`` removes the
+   * local handler in the API client so those callbacks can never
+   * fire after a teardown — without this hook the awaiter
+   * (``_startWebSerialInstall``) would hang forever and leak one
+   * pending install task per dialog reopen.
+   */
+  private _compileReject: ((err: Error) => void) | null = null;
   private _detected: DetectedChip | null = null;
 
   @query("wa-dialog")
@@ -95,6 +106,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   private _init(device: ConfiguredDevice) {
+    // Dispose any stream from a prior session before resetting state.
+    // ``_init`` re-runs on every ``installWebSerial`` call, including
+    // reopens after the user dismissed the previous run via the
+    // ``wa-dialog`` close button / Escape (which routes through
+    // ``_onClose`` and only flips ``_open``). Without this teardown a
+    // still-attached firmwareFollowJob from the prior compile would
+    // keep pushing lines into the new session's ``_logLines``.
+    this._detachStream();
     this._device = device;
     this._open = true;
     this._step = "installing";
@@ -105,9 +124,35 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsExpanded = false;
     this._logsFullHeight = false;
     this._flashPercent = 0;
-    this._jobId = "";
-    this._streamId = "";
+    // ``_jobId`` is already cleared by ``_detachStream`` above; same
+    // for ``_streamId`` and ``_compileReject``.
     this._detected = null;
+  }
+
+  /**
+   * Tear down any active follow_job subscription, both client-side
+   * (drops the local handler so its closure stops appending to
+   * ``_logLines``) and backend-side. Settles a pending
+   * ``_compileAndWait`` promise so the parent flow doesn't hang
+   * waiting for callbacks that can no longer fire, and cancels the
+   * underlying firmware job so the backend stops doing work for a
+   * dialog the user has dismissed. Safe when no stream is active —
+   * every check is null-guarded.
+   */
+  private _detachStream() {
+    if (this._streamId) {
+      this._api.stopStream(this._streamId).catch(() => {});
+      this._streamId = "";
+    }
+    if (this._compileReject) {
+      const reject = this._compileReject;
+      this._compileReject = null;
+      reject(new Error("Install dialog dismissed"));
+    }
+    if (this._jobId) {
+      this._api.firmwareCancel(this._jobId).catch(() => {});
+      this._jobId = "";
+    }
   }
 
   // ─── Styles ────────────────────────────────────────────
@@ -519,6 +564,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   private _compileAndWait(configuration: string): Promise<void> {
     return new Promise(async (resolve, reject) => {
+      // Capture ``reject`` on the dialog so a mid-flight detach
+      // (header-X / Escape / reopen) can settle this promise. The
+      // followJob callbacks below clear the hook back to ``null``
+      // once they fire so a normal completion doesn't double-reject
+      // when the next teardown runs.
+      this._compileReject = reject;
       try {
         const job = await this._api.firmwareCompile(configuration);
         this._jobId = job.job_id;
@@ -533,16 +584,19 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           onResult: (data) => {
             this._streamId = "";
             this._jobId = "";
+            this._compileReject = null;
             const result = data as unknown as { status: string };
             result.status === JobStatus.COMPLETED ? resolve() : reject(new Error("Compilation failed"));
           },
           onError: (error) => {
             this._streamId = "";
             this._jobId = "";
+            this._compileReject = null;
             reject(new Error(error));
           },
         });
       } catch (err) {
+        this._compileReject = null;
         reject(err);
       }
     });
@@ -567,13 +621,23 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   private _close() {
     this._open = false;
     this._device = null;
-    this._jobId = "";
-    this._streamId = "";
+    // ``_detachStream`` clears ``_jobId`` itself (and cancels the
+    // backend job + settles any pending compile promise), so we
+    // don't bare-clear it here.
+    this._detachStream();
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 
+  /**
+   * ``wa-dialog``'s close button (header X) and Escape both fire
+   * ``wa-after-hide``, which routes here. Has to do the same stream
+   * teardown ``_close`` does — otherwise a header-X-then-reopen
+   * leaves the prior firmwareFollowJob attached, and lines from that
+   * subscription duplicate into the new session's log buffer.
+   */
   private _onClose() {
     this._open = false;
+    this._detachStream();
   }
 }
 
