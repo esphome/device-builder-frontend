@@ -63,7 +63,7 @@
     "action_download_yaml": "Télécharger le YAML",
     "action_rename": "Renommer l'hôte",
     "action_clean_build": "Nettoyer les fichiers de compilation",
-    "action_install_to_address": "Installer à une adresse spécifique…",
+    "action_install_to_address": "Installer à une adresse…",
     "action_install_address_title": "Installer à une adresse spécifique",
     "action_install_address_desc": "Remplacer l'adresse à laquelle le tableau de bord flasherait normalement {name}. À utiliser lorsque l'appareil a changé d'adresse (changement de bail DHCP, reconfiguration du réseau) mais que l'adresse mise en cache par le tableau de bord n'a pas encore expiré.",
     "action_install_address_label": "Adresse IP ou nom d'hôte",
