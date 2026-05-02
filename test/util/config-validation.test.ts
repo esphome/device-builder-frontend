@@ -77,7 +77,18 @@ describe("getDeviceNameWarning", () => {
     );
   });
 
-  it("returns null for plain hyphen-only names", () => {
+  it("warns about leading or trailing hyphens", () => {
+    /* RFC 952/1123 forbids edge hyphens in DNS labels, so they
+       have the same mDNS-resolution risk as underscores. */
+    expect(getDeviceNameWarning("-foo")?.code).toBe(
+      "validation.device_name_edge_hyphen",
+    );
+    expect(getDeviceNameWarning("foo-")?.code).toBe(
+      "validation.device_name_edge_hyphen",
+    );
+  });
+
+  it("returns null for clean hyphenated names", () => {
     expect(getDeviceNameWarning("my-device")).toBeNull();
     expect(getDeviceNameWarning("device42")).toBeNull();
   });

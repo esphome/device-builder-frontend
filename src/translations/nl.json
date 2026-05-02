@@ -489,7 +489,8 @@
     "not_an_integer": "Moet een geheel getal zijn",
     "invalid_option": "Geen geldige optie",
     "invalid_device_name": "Alleen kleine letters, cijfers, streepjes en underscores",
-    "device_name_underscore": "Underscores werken maar zijn geen geldige mDNS-hostnamen — het apparaat is mogelijk niet bereikbaar op strikte netwerken"
+    "device_name_underscore": "Underscores werken maar zijn geen geldige mDNS-hostnamen — het apparaat is mogelijk niet bereikbaar op strikte netwerken",
+    "device_name_edge_hyphen": "Namen die met een streepje beginnen of eindigen zijn geen geldige mDNS-hostnamen — het apparaat is mogelijk niet bereikbaar op strikte netwerken"
   },
   "command_palette": {
     "placeholder": "Typ een commando of zoek…",

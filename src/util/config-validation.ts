@@ -69,14 +69,23 @@ export function validateDeviceName(name: string): ValidationError | null {
 
 /** Soft warnings for a device name — same return shape as
  *  ``validateDeviceName`` but the dialog renders these in a less
- *  alarming style and lets the user proceed anyway. Today the only
- *  one is the underscore caution: esphome accepts it, but mDNS /
- *  RFC-strict resolvers don't, so a name with ``_`` may resolve on
- *  some networks and silently fail on others. */
+ *  alarming style and lets the user proceed anyway.
+ *
+ *  Both warnings flag forms that ``esphome rename`` accepts but
+ *  RFC 952/1123 forbid in DNS labels:
+ *
+ *  - Underscore: classic offender, mostly works on home routers
+ *    but bites on RFC-strict resolvers.
+ *  - Leading or trailing hyphen: same RFC clause, same risk;
+ *    common typo when the user means to use a hyphen as a
+ *    separator and overshoots. */
 export function getDeviceNameWarning(name: string): ValidationError | null {
   const trimmed = name.trim();
   if (trimmed.includes("_")) {
     return { key: "name", code: "validation.device_name_underscore" };
+  }
+  if (trimmed.startsWith("-") || trimmed.endsWith("-")) {
+    return { key: "name", code: "validation.device_name_edge_hyphen" };
   }
   return null;
 }

@@ -73,11 +73,15 @@ const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
 /** Extra ``_activeJobs`` keys to mirror this job under, beyond the
  *  primary ``job.configuration`` slot. Today only ``RENAME`` needs
  *  it: the new YAML appears mid-flight so the soon-to-be-named device
- *  card needs to find the live job too. */
+ *  card needs to find the live job too. The new YAML's extension is
+ *  derived from the *old* YAML's extension (``.yaml`` or ``.yml``)
+ *  so devices using ``.yml`` still match. */
 function _renameKeys(job: FirmwareJob): string[] {
   if (job.job_type !== JobType.RENAME) return [];
   if (!job.new_name) return [];
-  const renamed = `${job.new_name}.yaml`;
+  const extMatch = job.configuration.match(/\.ya?ml$/);
+  const ext = extMatch ? extMatch[0] : ".yaml";
+  const renamed = `${job.new_name}${ext}`;
   return renamed === job.configuration ? [] : [renamed];
 }
 
