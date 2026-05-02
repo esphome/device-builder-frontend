@@ -268,6 +268,39 @@ export class ESPHomeTableRowMenu extends LitElement {
     `;
   }
 
+  disconnectedCallback() {
+    /* Belt-and-braces: if the host is removed while the menu is open
+       (e.g. dashboard view swap), drop the window listener so we don't
+       leak it. _setEscListener with false is a no-op when nothing is
+       currently bound. */
+    this._setEscListener(false);
+    super.disconnectedCallback();
+  }
+
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has("device") || changed.has("position")) {
+      this._setEscListener(this.device != null && this.position != null);
+    }
+  }
+
+  private _onWindowKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this._close();
+    }
+  };
+
+  private _escBound = false;
+  private _setEscListener(active: boolean) {
+    if (active && !this._escBound) {
+      window.addEventListener("keydown", this._onWindowKeydown);
+      this._escBound = true;
+    } else if (!active && this._escBound) {
+      window.removeEventListener("keydown", this._onWindowKeydown);
+      this._escBound = false;
+    }
+  }
+
   protected updated() {
     if (!this._menuEl || !this.position) return;
 
