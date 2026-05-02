@@ -275,6 +275,7 @@
     "install_failed": "Installation failed.",
     "compile_failed": "Compilation failed.",
     "download_failed": "Failed to download firmware.",
+    "no_factory_binary": "No factory binary available for this device. web.esphome.io needs a factory image to flash at offset 0x0.",
     "flash_failed": "Failed to flash firmware to device.",
     "chip_mismatch": "Chip mismatch: detected {detected} but device expects {expected}.",
     "validate_title": "Validate — {name}",

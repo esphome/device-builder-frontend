@@ -219,7 +219,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   private _renderMethodList() {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
-    const showWebDownload = !hasWebSerial && !isOnline;
+    const showWebDownload = this.mode === "install" && !hasWebSerial && !isOnline;
 
     return html`
       <div class="list">

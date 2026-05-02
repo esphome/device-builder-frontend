@@ -1062,6 +1062,8 @@ export class ESPHomePageDashboard extends LitElement {
         this._openCommand(device, "install", port!);
       } else if (method === "web-serial") {
         this._firmwareDialog.installWebSerial(device);
+      } else if (method === "web-download") {
+        this._firmwareDialog.installWebDownload(device);
       }
     }
   }

@@ -506,6 +506,7 @@
     "install_failed": "Installatie mislukt.",
     "compile_failed": "Compilatie mislukt.",
     "download_failed": "Firmware downloaden mislukt.",
+    "no_factory_binary": "Geen factory binary beschikbaar voor dit apparaat. web.esphome.io heeft een factory image nodig om te flashen op offset 0x0.",
     "flash_failed": "Firmware flashen naar apparaat mislukt.",
     "chip_mismatch": "Chip-verschil: {detected} gedetecteerd maar apparaat verwacht {expected}.",
     "validate_title": "Valideren — {name}",

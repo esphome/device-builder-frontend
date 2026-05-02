@@ -748,13 +748,16 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_downloading");
     try {
       const binaries = await this._api.firmwareGetBinaries(device.configuration);
+      // web.esphome.io flashes the uploaded file at offset 0x0, so we
+      // need a factory image that includes the bootloader + partition
+      // table. The plain firmware.bin (app-only at 0x10000) would
+      // brick the device if flashed this way.
       const factory = binaries.find((b) => b.file.includes("factory"));
-      const binary = factory || binaries[0];
-      if (!binary) {
-        this._fail(this._localize("serial.no_firmware"));
+      if (!factory) {
+        this._fail(this._localize("firmware.no_factory_binary"));
         return;
       }
-      const result = await this._api.firmwareDownload(device.configuration, binary.file);
+      const result = await this._api.firmwareDownload(device.configuration, factory.file);
       const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
