@@ -364,14 +364,25 @@ export class ESPHomeDeviceDrawer extends LitElement {
             <wa-icon library="mdi" name="pencil"></wa-icon>
             ${this._localize("dashboard.drawer_edit")}
           </button>
-          <button
-            class="action action--accent"
-            ?disabled=${this.busy}
-            @click=${() => this._emitAction("update-device")}
-          >
-            <wa-icon library="mdi" name="upload"></wa-icon>
-            ${this._localize("dashboard.drawer_update")}
-          </button>
+          ${device.update_available
+            ? html`<button
+                class="action action--accent"
+                ?disabled=${this.busy}
+                @click=${() => this._emitAction("update-device")}
+              >
+                <wa-icon library="mdi" name="upload"></wa-icon>
+                ${this._localize("dashboard.drawer_update")}
+              </button>`
+            : device.has_pending_changes === true
+              ? html`<button
+                  class="action action--accent"
+                  ?disabled=${this.busy}
+                  @click=${() => this._emitAction("install-device")}
+                >
+                  <wa-icon library="mdi" name="upload"></wa-icon>
+                  ${this._localize("dashboard.install")}
+                </button>`
+              : nothing}
           <button
             class="action action--ghost"
             ?disabled=${this.busy}

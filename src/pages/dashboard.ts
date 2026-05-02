@@ -541,6 +541,7 @@ export class ESPHomePageDashboard extends LitElement {
         @drawer-close=${() => { this._drawerOpen = false; }}
         @edit-device=${(e: CustomEvent) => { this._drawerOpen = false; editDevice(e.detail); }}
         @update-device=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerOpen = false; this._openCommand(e.detail, "install"); }}
+        @install-device=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerOpen = false; this._openInstallMethod(e.detail); }}
         @open-logs=${(e: CustomEvent) => { this._drawerOpen = false; this._openLogs(e.detail); }}
       ></esphome-device-drawer>
     `;
