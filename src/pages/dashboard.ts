@@ -661,8 +661,18 @@ export class ESPHomePageDashboard extends LitElement {
       changed.has("_devices") &&
       this._devices.some((d) => d.configuration === this._pendingAdoptScroll)
     ) {
-      this._scrollAdoptedIntoView(this._pendingAdoptScroll);
+      const target = this._pendingAdoptScroll;
       this._pendingAdoptScroll = null;
+      /* Wait two animation frames before scrolling. On the render
+         where the device first appears, the card's children
+         (wa-icon, status badge, etc.) are still mounting and the
+         row's height isn't final, so a same-tick ``scrollIntoView``
+         calculates against a too-short layout and stops short. Two
+         rAFs are enough for Lit's children to commit and for the
+         browser to settle the grid track sizes. */
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => this._scrollAdoptedIntoView(target)),
+      );
     }
   }
 
@@ -678,7 +688,12 @@ export class ESPHomePageDashboard extends LitElement {
       `esphome-device-card[data-configuration="${escaped}"]`,
     );
     if (card) {
-      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      /* ``block: "start"`` instead of ``"center"`` because the page
+         has a sticky-ish header that center-positioning has to
+         account for; aligning to the top, then nudging down by the
+         header height, lands the card cleanly below the chrome on
+         mobile where viewport center math is finickier. */
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
       return;
     }
     const table = root.querySelector("esphome-device-table") as

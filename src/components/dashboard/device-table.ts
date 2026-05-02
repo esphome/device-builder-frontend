@@ -563,14 +563,17 @@ export class ESPHomeDeviceTable extends LitElement {
    *  without reaching across the table's shadow-DOM boundary —
    *  ``shadowRoot.querySelector`` from the dashboard can't see rows
    *  rendered in this component's shadow root. No-op when the row
-   *  isn't on the current page. */
+   *  isn't on the current page. ``block: "start"`` puts the row at
+   *  the top of the scroll viewport rather than at center, which is
+   *  more reliable on mobile where center-positioning math is sensitive
+   *  to dvh / sticky-header layout shifts. */
   public scrollConfigurationIntoView(configuration: string): void {
     const root = this.shadowRoot;
     if (!root) return;
     const row = root.querySelector<HTMLElement>(
       `tr[data-configuration="${CSS.escape(configuration)}"]`,
     );
-    row?.scrollIntoView({ behavior: "smooth", block: "center" });
+    row?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
