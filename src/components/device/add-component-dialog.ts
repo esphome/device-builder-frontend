@@ -388,11 +388,25 @@ export class ESPHomeAddComponentDialog extends LitElement {
       (localId) => `featured.${boardId}.${localId}`,
     );
     const [first, ...rest] = fullIds;
-    const component = await this._api.getComponent(
-      first,
-      this.platform || undefined,
-      boardId,
-    );
+    // The WS layer can throw on a transient disconnect / timeout; an
+    // unhandled rejection here would leave the dialog half-transitioned
+    // (still on the catalog view but with bundle state about to be set
+    // by the rest of this handler). Catch and surface via the same
+    // banner the form submit uses, then bail.
+    let component: Awaited<ReturnType<ESPHomeAPI["getComponent"]>>;
+    try {
+      component = await this._api.getComponent(
+        first,
+        this.platform || undefined,
+        boardId,
+      );
+    } catch (err) {
+      this._submitError =
+        err instanceof Error
+          ? err.message
+          : this._localize("device.add_component_error");
+      return;
+    }
     if (!component) {
       this._submitError = this._localize("device.add_component_error");
       return;
