@@ -592,22 +592,31 @@ export class ESPHomeDeviceCard extends LitElement {
                         </button>
                       `
                     : nothing}
-                ${this.webUrl
-                  ? html`<button
-                      class="action-btn action-btn--ghost action-btn--tile"
-                      @click=${() => this._emit("open-logs")}
-                      aria-label=${this._localize("dashboard.drawer_logs")}
-                      title=${this._localize("dashboard.drawer_logs")}
-                    >
-                      <wa-icon library="mdi" name="console"></wa-icon>
-                    </button>`
-                  : html`<button
-                      class="action-btn action-btn--ghost"
-                      @click=${() => this._emit("open-logs")}
-                    >
-                      <wa-icon library="mdi" name="console"></wa-icon>
-                      ${this._localize("dashboard.drawer_logs")}
-                    </button>`}
+                ${
+                  // Collapse Logs to icon-only when the row is at risk
+                  // of cramming. Cramming only happens when *both* an
+                  // accent action (Install/Update) and a Visit-web-UI
+                  // tile are competing for space alongside Edit; if
+                  // there's no accent action, the row has plenty of
+                  // room and the Logs label should stay visible so the
+                  // affordance reads at a glance.
+                  this.webUrl && (this.hasPendingChanges || this.hasUpdateAvailable)
+                    ? html`<button
+                        class="action-btn action-btn--ghost action-btn--tile"
+                        @click=${() => this._emit("open-logs")}
+                        aria-label=${this._localize("dashboard.drawer_logs")}
+                        title=${this._localize("dashboard.drawer_logs")}
+                      >
+                        <wa-icon library="mdi" name="console"></wa-icon>
+                      </button>`
+                    : html`<button
+                        class="action-btn action-btn--ghost"
+                        @click=${() => this._emit("open-logs")}
+                      >
+                        <wa-icon library="mdi" name="console"></wa-icon>
+                        ${this._localize("dashboard.drawer_logs")}
+                      </button>`
+                }
                 ${this.webUrl
                   ? html`<a
                       class="action-btn action-btn--ghost action-btn--tile"
