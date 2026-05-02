@@ -68,7 +68,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
       wa-dialog::part(header) {
         background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
+        /* Right padding is 0 so the close button sits flush with the
+           dialog's corner — the button is explicitly sized to a 40x40
+           square below to give the X a comfortable hit target right
+           where the user reaches for it. */
+        padding: 0 0 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
@@ -109,7 +113,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         background: transparent;
         border: none;
         box-shadow: none;
+        /* Square 40x40 button matching the header height so the X has a
+           comfortable click/tap target instead of just the icon's
+           ~14px footprint. */
         padding: 0;
+        width: 40px;
+        height: 40px;
         min-width: unset;
         min-height: unset;
         color: var(--esphome-on-primary);
