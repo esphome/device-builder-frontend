@@ -178,7 +178,19 @@
     "status_modified": "Modifié",
     "status_update_available": "Mise à jour disponible",
     "status_installing": "Installation…",
-    "status_renaming": "Renommage…"
+    "status_renaming": "Renommage…",
+    "action_archive": "Archiver",
+    "action_archive_success": "« {name} » archivé",
+    "action_archive_failed": "Échec de l'archivage de « {name} » : {error}",
+    "action_unarchive": "Désarchiver",
+    "action_unarchive_success": "« {name} » restauré depuis l'archive",
+    "action_unarchive_failed": "Échec du désarchivage de « {name} » : {error}",
+    "action_delete_permanently": "Supprimer définitivement",
+    "action_delete_archived_success": "« {name} » supprimé définitivement",
+    "action_delete_archived_failed": "Échec de la suppression définitive de « {name} » : {error}",
+    "delete_archived_title": "Supprimer définitivement l'appareil archivé",
+    "delete_archived_desc": "Voulez-vous vraiment supprimer définitivement l'appareil archivé « {name} » ? Cela supprimera son YAML et sa configuration stockée. Cette action est irréversible.",
+    "archived_section_title": "Appareils archivés ({count})"
   },
   "command": {
     "install_title": "Installation — {name}",
@@ -443,6 +455,7 @@
     "theme_system": "Système",
     "settings": "Paramètres",
     "show_ignored_discoveries": "Afficher les découvertes ignorées",
+    "show_archived_devices": "Afficher les appareils archivés ({count})",
     "back": "Retour",
     "home_assistant": "Home Assistant",
     "editor": "Éditeur",

@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiArchiveOutline,
   mdiCheck,
   mdiCog,
   mdiDotsVertical,
@@ -21,6 +22,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "archive-outline": mdiArchiveOutline,
   check: mdiCheck,
   cog: mdiCog,
   "dots-vertical": mdiDotsVertical,
@@ -48,6 +50,25 @@ export class ESPHomeHeaderActions extends LitElement {
    *  level settings. */
   @state()
   private _showIgnored = false;
+
+  /** Persisted "Show archived devices" preference — flips the
+   *  visibility of the archived-devices section at the bottom of
+   *  the dashboard. Toggle is only rendered when ``archivedCount > 0``
+   *  (no point offering a control with nothing to reveal). */
+  @state()
+  private _showArchived = false;
+
+  /** Number of archived devices currently on disk. Synced from the
+   *  dashboard via the ``esphome-archived-count-changed`` window
+   *  event so we don't have to thread a context through the layout
+   *  for a single counter. We hide the toggle entirely when this is
+   *  0 rather than rendering a checkbox that can't surface anything. */
+  @state()
+  private _archivedCount = 0;
+
+  private _onArchivedCountChanged = (e: Event) => {
+    this._archivedCount = (e as CustomEvent<{ value: number }>).detail.value;
+  };
 
   static styles = [
     espHomeStyles,
@@ -332,7 +353,7 @@ export class ESPHomeHeaderActions extends LitElement {
                 tabindex="0"
                 aria-checked=${this._showIgnored}
                 @click=${this._toggleShowIgnored}
-                @keydown=${this._onCheckboxKeydown}
+                @keydown=${this._onShowIgnoredKeydown}
               >
                 <wa-icon library="mdi" name="eye-outline"></wa-icon>
                 <span class="menu-item-label"
@@ -346,6 +367,30 @@ export class ESPHomeHeaderActions extends LitElement {
                     ></wa-icon>`
                   : nothing}
               </div>
+              ${this._archivedCount > 0
+                ? html`<div
+                    class="menu-item ${this._showArchived ? "menu-item--active" : ""}"
+                    role="menuitemcheckbox"
+                    tabindex="0"
+                    aria-checked=${this._showArchived}
+                    @click=${this._toggleShowArchived}
+                    @keydown=${this._onShowArchivedKeydown}
+                  >
+                    <wa-icon library="mdi" name="archive-outline"></wa-icon>
+                    <span class="menu-item-label"
+                      >${this._localize("layout.show_archived_devices", {
+                        count: this._archivedCount,
+                      })}</span
+                    >
+                    ${this._showArchived
+                      ? html`<wa-icon
+                          class="check"
+                          library="mdi"
+                          name="check"
+                        ></wa-icon>`
+                      : nothing}
+                  </div>`
+                : nothing}
               <div class="menu-divider menu-divider--inline" role="separator"></div>
               <div
                 class="menu-item menu-item--inline"
@@ -365,10 +410,11 @@ export class ESPHomeHeaderActions extends LitElement {
 
   private _toggle() {
     if (!this._open) {
-      // Re-read the persisted flag on each open so a second tab's
+      // Re-read the persisted flags on each open so a second tab's
       // change to localStorage is reflected when the user revisits
       // the menu.
       this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
+      this._showArchived = localStorage.getItem("esphome-show-archived") === "true";
     }
     this._open = !this._open;
   }
@@ -381,6 +427,22 @@ export class ESPHomeHeaderActions extends LitElement {
     e.preventDefault();
     this._close();
   });
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener(
+      "esphome-archived-count-changed",
+      this._onArchivedCountChanged,
+    );
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener(
+      "esphome-archived-count-changed",
+      this._onArchivedCountChanged,
+    );
+  }
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
@@ -399,7 +461,7 @@ export class ESPHomeHeaderActions extends LitElement {
     }
   };
 
-  private _onCheckboxKeydown = (e: KeyboardEvent) => {
+  private _onShowIgnoredKeydown = (e: KeyboardEvent) => {
     /* The toggle is a ``<div role="menuitemcheckbox">`` rather than
        a ``<button>`` so it sits visually flush with the surrounding
        menu items (the menu was built with div items predating this
@@ -412,6 +474,13 @@ export class ESPHomeHeaderActions extends LitElement {
     }
   };
 
+  private _onShowArchivedKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      this._toggleShowArchived();
+    }
+  };
+
   private _toggleShowIgnored() {
     this._showIgnored = !this._showIgnored;
     localStorage.setItem("esphome-show-ignored", String(this._showIgnored));
@@ -420,6 +489,16 @@ export class ESPHomeHeaderActions extends LitElement {
     window.dispatchEvent(
       new CustomEvent("esphome-show-ignored-changed", {
         detail: { value: this._showIgnored },
+      }),
+    );
+  }
+
+  private _toggleShowArchived() {
+    this._showArchived = !this._showArchived;
+    localStorage.setItem("esphome-show-archived", String(this._showArchived));
+    window.dispatchEvent(
+      new CustomEvent("esphome-show-archived-changed", {
+        detail: { value: this._showArchived },
       }),
     );
   }

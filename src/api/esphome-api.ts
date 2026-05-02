@@ -8,6 +8,7 @@
  */
 import type {
   AddComponentResponse,
+  ArchivedDevice,
   BoardCatalogEntry,
   BulkDeleteResult,
   CommandMessage,
@@ -397,6 +398,40 @@ export class ESPHomeAPI {
     return this.sendCommand<BulkDeleteResult[]>("devices/delete_bulk", {
       configurations,
     });
+  }
+
+  /**
+   * Archive a device — soft-delete that moves the YAML to
+   * ``<config_dir>/archive/`` and wipes the per-device build dir.
+   * Reversible via ``unarchiveDevice``.
+   */
+  async archiveDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/archive", { configuration });
+  }
+
+  /**
+   * Restore an archived device's YAML to the active config_dir.
+   * Errors with INVALID_ARGS if an active config with the same
+   * filename already exists — the dialog should prompt for
+   * resolution rather than blindly clobbering.
+   */
+  async unarchiveDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/unarchive", { configuration });
+  }
+
+  /** List archived devices for the "Show archived" toggle. */
+  async listArchivedDevices(): Promise<ArchivedDevice[]> {
+    return this.sendCommand<ArchivedDevice[]>("devices/list_archived");
+  }
+
+  /**
+   * Permanently delete an archived device's YAML and its sidecars.
+   * The companion to ``archiveDevice`` for "I really don't want
+   * this back" — irreversible. Surfaces NOT_FOUND if the archive
+   * entry is gone.
+   */
+  async deleteArchivedDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/delete_archived", { configuration });
   }
 
   /** Get device YAML config. */

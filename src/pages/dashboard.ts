@@ -13,7 +13,12 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { DashboardView, DeviceState, SortDirection } from "../api/types.js";
-import type { AdoptableDevice, ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type {
+  AdoptableDevice,
+  ArchivedDevice,
+  ConfiguredDevice,
+  FirmwareJob,
+} from "../api/types.js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
@@ -29,12 +34,15 @@ import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  archiveDevice,
+  deleteArchivedDevice,
   deleteBulkDevices,
   deleteDevice,
   downloadYaml,
   editDevice,
   fetchApiKey,
   streamSerialToDialog,
+  unarchiveDevice,
 } from "./dashboard-actions.js";
 import { buildWebUiUrl } from "../util/web-ui-url.js";
 import { detectChip, disconnect } from "../util/web-serial.js";
@@ -127,6 +135,12 @@ export class ESPHomePageDashboard extends LitElement {
    *  per-device kebab Delete and the select-mode bulk Delete
    *  without juggling two dialog elements. */
   @state() private _pendingDelete: ConfiguredDevice | null = null;
+  /** Archived configuration queued for permanent-delete confirmation.
+   *  Routed through the same ``esphome-confirm-dialog`` instance as
+   *  the active-device delete by setting this state alongside
+   *  clearing ``_pendingDelete`` — the dialog's copy and confirm
+   *  router both branch on which is non-null. */
+  @state() private _pendingDeleteArchived: ArchivedDevice | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
    *  device card / row so the user can spot the freshly-imported
@@ -159,6 +173,19 @@ export class ESPHomePageDashboard extends LitElement {
    *  survives reloads. */
   @state() private _showIgnored = false;
 
+  /** When true, render the archived-devices section at the bottom
+   *  of the device list. Persisted to localStorage; the toggle
+   *  itself in the header kebab is hidden when no archived devices
+   *  exist (no point showing a switch with nothing to reveal). */
+  @state() private _showArchived = false;
+
+  /** Cache of archived devices fetched from
+   *  ``devices/list_archived``. Refreshed on dashboard mount and
+   *  after every archive / unarchive op. The ``length`` drives
+   *  whether the header-kebab toggle renders at all; the rows
+   *  feed the archived-section UI when ``_showArchived`` is on. */
+  @state() private _archivedDevices: ArchivedDevice[] = [];
+
   @state()
   private _view: DashboardView = DashboardView.CARDS;
 
@@ -179,6 +206,7 @@ export class ESPHomePageDashboard extends LitElement {
     // Load preferences once WS is connected (devices loaded means events are flowing)
     if (changed.has("_devicesLoaded") && this._devicesLoaded) {
       this._loadPreferences();
+      this._refreshArchivedDevices();
     }
   }
 
@@ -186,19 +214,27 @@ export class ESPHomePageDashboard extends LitElement {
   private _onShowIgnoredChanged = (e: Event) => {
     this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
   };
+  private _onShowArchivedChanged = (e: Event) => {
+    this._showArchived = (e as CustomEvent<{ value: boolean }>).detail.value;
+  };
 
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
-    /* The "Show ignored discoveries" toggle lives in the header
-       kebab; sync the persisted flag here and listen for changes
-       dispatched from the menu so we don't have to thread props /
-       contexts through the layout. */
+    /* The "Show ignored discoveries" / "Show archived devices"
+       toggles live in the header kebab; sync the persisted flags
+       here and listen for changes dispatched from the menu so we
+       don't have to thread props / contexts through the layout. */
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
+    this._showArchived = localStorage.getItem("esphome-show-archived") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener(
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged,
+    );
+    window.addEventListener(
+      "esphome-show-archived-changed",
+      this._onShowArchivedChanged,
     );
   }
 
@@ -229,9 +265,60 @@ export class ESPHomePageDashboard extends LitElement {
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged,
     );
+    window.removeEventListener(
+      "esphome-show-archived-changed",
+      this._onShowArchivedChanged,
+    );
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
       this._adoptHighlightTimer = null;
+    }
+  }
+
+  /**
+   * Pull the current archive list off the backend.
+   *
+   * Best-effort — the dashboard still works if the call fails (the
+   * archive UI just won't render). Called on initial load + after
+   * any archive / unarchive op so the header-kebab toggle and the
+   * archived-section table stay in sync.
+   */
+  private async _refreshArchivedDevices() {
+    try {
+      this._archivedDevices = await this._api.listArchivedDevices();
+    } catch (err) {
+      console.warn("Failed to list archived devices", err);
+      return;
+    }
+    /* The header-kebab toggle hides itself when nothing's
+       archived; bridge the count to ``esphome-header-actions`` via
+       a window event so we don't have to thread a context through
+       the layout for a single counter. */
+    window.dispatchEvent(
+      new CustomEvent("esphome-archived-count-changed", {
+        detail: { value: this._archivedDevices.length },
+      }),
+    );
+  }
+
+  /**
+   * Archive a device through the WS API and refresh the local cache.
+   *
+   * Backend wipes the per-device build dir + moves the YAML to
+   * ``<config_dir>/archive/`` and fires ``DEVICE_REMOVED``, so the
+   * active device list updates via the existing scan event flow.
+   * The archived list isn't event-driven (it's a directory listing),
+   * so we re-pull it explicitly after the operation.
+   */
+  private async _archiveDevice(device: ConfiguredDevice) {
+    if (await archiveDevice(device, this._api, this._localize)) {
+      await this._refreshArchivedDevices();
+    }
+  }
+
+  private async _unarchiveDevice(configuration: string) {
+    if (await unarchiveDevice(configuration, this._api, this._localize)) {
+      await this._refreshArchivedDevices();
     }
   }
 
@@ -273,9 +360,63 @@ export class ESPHomePageDashboard extends LitElement {
         : ""}
       ${filtered.length === 0 && q && this._view === DashboardView.CARDS ? this._renderEmptySearch() : ""}
       ${this._view === DashboardView.CARDS ? this._renderCardGrid(filtered) : this._renderTable()}
+      ${this._renderArchivedSection()}
       ${this._renderDrawer()}
       ${this._renderSelectBarOrFab()}
       ${this._renderDialogs()}
+    `;
+  }
+
+  private _renderArchivedSection() {
+    /* Section is only useful when the user has explicitly toggled
+       it on AND there's something to show. Header-kebab toggle
+       mirrors the same gate (hidden when count == 0), but render
+       defends in both directions so a stale ``_showArchived=true``
+       persisted from a prior session doesn't render an empty
+       header. */
+    if (!this._showArchived || this._archivedDevices.length === 0) return "";
+    return html`
+      <section class="archived-section">
+        <div class="archived-section-header">
+          <wa-icon library="mdi" name="archive-outline"></wa-icon>
+          <span
+            >${this._localize("dashboard.archived_section_title", {
+              count: this._archivedDevices.length,
+            })}</span
+          >
+        </div>
+        ${this._archivedDevices.map(
+          (device) => html`
+            <div class="archived-row">
+              <div class="archived-row-info">
+                <div class="archived-row-name">${device.friendly_name || device.name}</div>
+                <div class="archived-row-config">${device.configuration}</div>
+                ${device.comment
+                  ? html`<div class="archived-row-comment">${device.comment}</div>`
+                  : ""}
+              </div>
+              <div class="archived-row-actions">
+                <button
+                  class="archived-row-btn"
+                  type="button"
+                  @click=${() => this._unarchiveDevice(device.configuration)}
+                >
+                  <wa-icon library="mdi" name="archive-arrow-up-outline"></wa-icon>
+                  ${this._localize("dashboard.action_unarchive")}
+                </button>
+                <button
+                  class="archived-row-btn archived-row-btn--danger"
+                  type="button"
+                  @click=${() => this._confirmDeleteArchived(device)}
+                >
+                  <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
+                  ${this._localize("dashboard.action_delete_permanently")}
+                </button>
+              </div>
+            </div>
+          `,
+        )}
+      </section>
     `;
   }
 
@@ -527,6 +668,7 @@ export class ESPHomePageDashboard extends LitElement {
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
         @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._archiveDevice(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
@@ -579,6 +721,7 @@ export class ESPHomePageDashboard extends LitElement {
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
         @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._archiveDevice(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._onEnterSelectMode(e.detail.configuration)}
       ></esphome-table-row-menu>
@@ -613,27 +756,53 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderDialogs() {
-    /* One confirm-dialog instance covers both flows (per-device
-       kebab Delete and select-mode bulk Delete) — ``_pendingDelete``
-       drives the copy and the ``@confirm`` router. Picking up the
-       device's friendly name keeps the prompt readable when the
-       technical hostname is something like
+    /* One confirm-dialog instance covers three flows: per-device
+       kebab Delete, select-mode bulk Delete, and Delete-permanently
+       on an archived row. ``_pendingDelete`` and
+       ``_pendingDeleteArchived`` drive the copy + ``@confirm``
+       router; at most one is non-null at a time, with both null
+       falling through to the bulk-delete copy.
+
+       Picking up the device's friendly name keeps the prompt
+       readable when the technical hostname is something like
        ``athom-rgbcw-bulb-998181``. */
     const pendingName = this._pendingDelete
       ? this._pendingDelete.friendly_name || this._pendingDelete.name
       : "";
+    const pendingArchivedName = this._pendingDeleteArchived
+      ? this._pendingDeleteArchived.friendly_name ||
+        this._pendingDeleteArchived.name ||
+        this._pendingDeleteArchived.configuration
+      : "";
+    let dialogHeading: string;
+    let dialogMessage: string;
+    if (this._pendingDeleteArchived) {
+      dialogHeading = this._localize("dashboard.delete_archived_title");
+      dialogMessage = this._localize("dashboard.delete_archived_desc", {
+        name: pendingArchivedName,
+      });
+    } else if (this._pendingDelete) {
+      dialogHeading = this._localize("dashboard.delete_single_title");
+      dialogMessage = this._localize("dashboard.delete_single_desc", {
+        name: pendingName,
+      });
+    } else {
+      dialogHeading = this._localize("dashboard.delete_selected_title");
+      dialogMessage = this._localize("dashboard.delete_selected_desc", {
+        count: this._selectedDevices.size,
+      });
+    }
     return html`
       <esphome-confirm-dialog
-        heading=${this._pendingDelete
-          ? this._localize("dashboard.delete_single_title")
-          : this._localize("dashboard.delete_selected_title")}
-        message=${this._pendingDelete
-          ? this._localize("dashboard.delete_single_desc", { name: pendingName })
-          : this._localize("dashboard.delete_selected_desc", { count: this._selectedDevices.size })}
+        heading=${dialogHeading}
+        message=${dialogMessage}
         confirm-label=${this._localize("dashboard.delete_selected_confirm")}
         destructive
         @confirm=${this._executeDelete}
-        @cancel=${() => { this._pendingDelete = null; }}
+        @cancel=${() => {
+          this._pendingDelete = null;
+          this._pendingDeleteArchived = null;
+        }}
       ></esphome-confirm-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
@@ -1046,10 +1215,27 @@ export class ESPHomePageDashboard extends LitElement {
        and went straight to ``deleteDevice`` — there's no undo, so a
        missed click on the kebab silently nuked the YAML. */
     this._pendingDelete = device;
+    this._pendingDeleteArchived = null;
+    this._confirmDialog.open();
+  }
+
+  private _confirmDeleteArchived(device: ArchivedDevice) {
+    /* Permanent-delete from the archived section. Same dialog as
+       the active-device delete, with branched copy. The archive
+       was already a soft-delete, so this is the "really, gone"
+       step — the YAML and its sidecars are unlinked. */
+    this._pendingDelete = null;
+    this._pendingDeleteArchived = device;
     this._confirmDialog.open();
   }
 
   private _executeDelete() {
+    if (this._pendingDeleteArchived) {
+      const target = this._pendingDeleteArchived;
+      this._pendingDeleteArchived = null;
+      this._deleteArchivedDevice(target);
+      return;
+    }
     if (this._pendingDelete) {
       const target = this._pendingDelete;
       this._pendingDelete = null;
@@ -1060,6 +1246,12 @@ export class ESPHomePageDashboard extends LitElement {
     this._selectMode = false;
     this._selectedDevices = new Set();
     deleteBulkDevices(selected, this._devices, this._api, this._localize);
+  }
+
+  private async _deleteArchivedDevice(device: ArchivedDevice) {
+    if (await deleteArchivedDevice(device, this._api, this._localize)) {
+      await this._refreshArchivedDevices();
+    }
   }
 }
 

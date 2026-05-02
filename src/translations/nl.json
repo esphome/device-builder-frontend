@@ -178,7 +178,19 @@
     "status_modified": "Gewijzigd",
     "status_update_available": "Update beschikbaar",
     "status_installing": "Installeren…",
-    "status_renaming": "Hernoemen…"
+    "status_renaming": "Hernoemen…",
+    "action_archive": "Archiveren",
+    "action_archive_success": "\"{name}\" gearchiveerd",
+    "action_archive_failed": "Archiveren van \"{name}\" mislukt: {error}",
+    "action_unarchive": "Dearchiveren",
+    "action_unarchive_success": "\"{name}\" hersteld uit archief",
+    "action_unarchive_failed": "Dearchiveren van \"{name}\" mislukt: {error}",
+    "action_delete_permanently": "Permanent verwijderen",
+    "action_delete_archived_success": "\"{name}\" permanent verwijderd",
+    "action_delete_archived_failed": "Permanent verwijderen van \"{name}\" mislukt: {error}",
+    "delete_archived_title": "Gearchiveerd apparaat permanent verwijderen",
+    "delete_archived_desc": "Weet je zeker dat je het gearchiveerde apparaat \"{name}\" permanent wilt verwijderen? Dit verwijdert de YAML en opgeslagen configuratie en kan niet ongedaan worden gemaakt.",
+    "archived_section_title": "Gearchiveerde apparaten ({count})"
   },
   "command": {
     "install_title": "Installeren — {name}",
@@ -443,6 +455,7 @@
     "theme_system": "Systeem",
     "settings": "Instellingen",
     "show_ignored_discoveries": "Genegeerde ontdekkingen tonen",
+    "show_archived_devices": "Gearchiveerde apparaten tonen ({count})",
     "back": "Terug",
     "home_assistant": "Home Assistant",
     "editor": "Editor",

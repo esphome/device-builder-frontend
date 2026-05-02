@@ -200,7 +200,19 @@
     "status_modified": "Modified",
     "status_update_available": "Update available",
     "status_installing": "Installing…",
-    "status_renaming": "Renaming…"
+    "status_renaming": "Renaming…",
+    "action_archive": "Archive",
+    "action_archive_success": "\"{name}\" archived",
+    "action_archive_failed": "Failed to archive \"{name}\": {error}",
+    "action_unarchive": "Unarchive",
+    "action_unarchive_success": "\"{name}\" restored from archive",
+    "action_unarchive_failed": "Failed to unarchive \"{name}\": {error}",
+    "action_delete_permanently": "Delete permanently",
+    "action_delete_archived_success": "\"{name}\" permanently deleted",
+    "action_delete_archived_failed": "Failed to permanently delete \"{name}\": {error}",
+    "delete_archived_title": "Permanently delete archived device",
+    "delete_archived_desc": "Are you sure you want to permanently delete the archived device \"{name}\"? This will remove its YAML and stored configuration. This cannot be undone.",
+    "archived_section_title": "Archived devices ({count})"
   },
   "command": {
     "install_title": "Install — {name}",
@@ -507,6 +519,7 @@
     "theme_system": "System",
     "settings": "Settings",
     "show_ignored_discoveries": "Show ignored discoveries",
+    "show_archived_devices": "Show archived devices ({count})",
     "back": "Back",
     "home_assistant": "Home Assistant",
     "editor": "Editor",

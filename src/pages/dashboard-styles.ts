@@ -122,6 +122,121 @@ export const dashboardStyles = css`
     display: none;
   }
 
+  /* ─── Archived section ─── */
+
+  /* Section sits below the active device list when the user has
+     toggled "Show archived devices" in the header kebab. Visually
+     subdued (lower contrast title, muted background on rows) so it
+     doesn't compete with the active-device area but still uses
+     enough chrome to make the rows actionable. */
+  .archived-section {
+    margin: var(--wa-space-l) auto 0;
+    padding: 0 var(--wa-space-l) var(--wa-space-2xl);
+    max-width: 1200px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .archived-section[hidden] {
+    display: none;
+  }
+  .archived-section-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-s) 0;
+    border-bottom: 1px solid var(--wa-color-neutral-fill-loud);
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .archived-section-header wa-icon {
+    font-size: var(--wa-font-size-m);
+  }
+  .archived-row {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-m);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border-bottom: 1px solid var(--wa-color-neutral-fill-quiet);
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+  }
+  .archived-row:last-child {
+    border-bottom: none;
+  }
+  .archived-row-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .archived-row-name {
+    color: var(--wa-color-text-normal);
+    font-weight: var(--wa-font-weight-bold);
+    font-size: var(--wa-font-size-m);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .archived-row-config {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-2xs);
+    font-family: var(--wa-font-family-code);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .archived-row-comment {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-xs);
+    font-style: italic;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .archived-row-actions {
+    display: flex;
+    gap: var(--wa-space-xs);
+    flex-shrink: 0;
+  }
+  .archived-row-btn {
+    background: transparent;
+    border: 1px solid var(--wa-color-neutral-fill-loud);
+    border-radius: var(--wa-border-radius-m);
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    color: var(--wa-color-text-normal);
+    font-size: var(--wa-font-size-2xs);
+    font-family: inherit;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+  .archived-row-btn:hover {
+    background: var(--wa-color-neutral-fill-quiet);
+  }
+  .archived-row-btn:focus-visible {
+    outline: 2px solid var(--esphome-primary-light);
+    outline-offset: 2px;
+  }
+  .archived-row-btn--danger {
+    color: var(--wa-color-danger-text-normal);
+    border-color: var(--wa-color-danger-fill-loud);
+  }
+  .archived-row-btn--danger:hover {
+    background: var(--wa-color-danger-fill-quiet);
+  }
+  .archived-empty {
+    padding: var(--wa-space-l);
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    text-align: center;
+    font-style: italic;
+  }
+
   /* ─── Search toolbar ─── */
 
   .toolbar {
