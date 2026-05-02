@@ -190,9 +190,25 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._dialog.open = true;
   }
 
-  close() {
+  close = () => {
+    /* Arrow function so ``@click=${this.close}`` from the cancel
+       button keeps ``this`` bound to the dialog. With a plain method,
+       Lit hands the listener to ``addEventListener`` which calls it
+       with ``this === undefined`` (strict mode) and the
+       ``this._dialog`` access blows up. */
     this._dialog.open = false;
-  }
+  };
+
+  /** Block dialog dismissal while the import request is in flight,
+   *  so a stray click outside / Esc keypress can't hide an error
+   *  that's about to surface. ``light-dismiss`` is also gated on
+   *  ``!_busy`` for belt-and-suspenders, but the close-request hook
+   *  catches Esc and the close-button-base too. */
+  private _onRequestClose = (e: Event) => {
+    if (this._busy) {
+      e.preventDefault();
+    }
+  };
 
   protected render() {
     /* Always render the wa-dialog with the same template shape, even
@@ -212,7 +228,8 @@ export class ESPHomeAdoptDialog extends LitElement {
     return html`
       <wa-dialog
         label=${this._localize("dashboard.adopt_title")}
-        light-dismiss
+        ?light-dismiss=${!this._busy}
+        @wa-request-close=${this._onRequestClose}
       >
         ${device
           ? html`

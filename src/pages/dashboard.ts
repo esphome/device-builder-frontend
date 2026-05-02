@@ -200,6 +200,10 @@ export class ESPHomePageDashboard extends LitElement {
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged,
     );
+    if (this._adoptHighlightTimer !== null) {
+      clearTimeout(this._adoptHighlightTimer);
+      this._adoptHighlightTimer = null;
+    }
   }
 
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
@@ -275,16 +279,13 @@ export class ESPHomePageDashboard extends LitElement {
     const visible = this._visibleImportableDevices;
     if (visible.length === 0) return "";
     return html`
-      <div class="devices-grid">
+      <div id="discovered-grid" class="devices-grid">
         ${visible.map(
           (device) => html`
             <esphome-discovered-device-card
               .device=${device}
               @adopt=${() => this._adoptDialog.open(device)}
-              @toggle-ignore=${() =>
-                this._api
-                  ?.ignoreDevice(device.name, !device.ignored)
-                  .catch(() => {})}
+              @toggle-ignore=${() => this._toggleIgnore(device)}
             ></esphome-discovered-device-card>
           `,
         )}
@@ -313,7 +314,8 @@ export class ESPHomePageDashboard extends LitElement {
           <button
             class="discovered-banner-toggle"
             type="button"
-            aria-pressed=${this._showDiscovered}
+            aria-expanded=${this._showDiscovered}
+            aria-controls="discovered-grid"
             @click=${() => { this._showDiscovered = !this._showDiscovered; }}
           >${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}</button>
         </div>
@@ -604,6 +606,28 @@ export class ESPHomePageDashboard extends LitElement {
 
   // ─── Actions ───
 
+  private async _toggleIgnore(device: AdoptableDevice) {
+    /* Surface failures so a stuck UI (ignored badge that didn't flip)
+       has an explanation. The frontend's optimistic update isn't
+       used here — we wait for the backend's IMPORTABLE_DEVICE_ADDED
+       re-fire — so a failed call just leaves the card in its prior
+       state, which is fine. */
+    try {
+      await this._api.ignoreDevice(device.name, !device.ignored);
+    } catch {
+      const name = device.friendly_name || device.name;
+      toast.error(
+        this._localize(
+          device.ignored
+            ? "dashboard.action_unignore_failed"
+            : "dashboard.action_ignore_failed",
+          { name },
+        ),
+        { richColors: true },
+      );
+    }
+  }
+
   private _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
     /* Configuration filenames are ``<name>.yaml`` — that's how the
        adopt dialog asks the backend to write the file (see
@@ -623,14 +647,28 @@ export class ESPHomePageDashboard extends LitElement {
     /* Wait one rAF so the device has actually rendered (the backend
        fires DEVICE_ADDED right after the YAML write; the card lands
        in the grid on the next render tick). Then scroll the freshly
-       adopted entry into view so the user can see what just landed. */
+       adopted entry into view so the user can see what just landed.
+       Card view: the card lives in this dashboard's shadow root.
+       Table view: the row lives inside ``esphome-device-table``'s
+       own shadow root; we ask the table to scroll its match instead
+       of trying to reach across the boundary. */
     requestAnimationFrame(() => {
       const root = this.shadowRoot;
       if (!root) return;
-      const target =
-        root.querySelector<HTMLElement>(`[data-configuration="${configuration}"]`)
-        ?? null;
-      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const escaped = CSS.escape(configuration);
+      const card = root.querySelector<HTMLElement>(
+        `esphome-device-card[data-configuration="${escaped}"]`,
+      );
+      if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+      const table = root.querySelector("esphome-device-table") as
+        | (HTMLElement & {
+            scrollConfigurationIntoView?: (configuration: string) => void;
+          })
+        | null;
+      table?.scrollConfigurationIntoView?.(configuration);
     });
   };
 

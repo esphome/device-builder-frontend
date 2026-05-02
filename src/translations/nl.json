@@ -10,6 +10,8 @@
     "action_take_control": "Overnemen",
     "action_ignore": "Negeren",
     "action_unignore": "Niet meer negeren",
+    "action_ignore_failed": "Kon \"{name}\" niet negeren",
+    "action_unignore_failed": "Kon negeren van \"{name}\" niet ongedaan maken",
     "adopt_title": "Overnemen",
     "adopt_description": "Door {name} over te nemen, wordt een lokale ESPHome-configuratie aangemaakt. Vanaf nu beheert u de updates via het dashboard — fabrikantsupdates worden niet meer automatisch toegepast.",
     "adopt_field_name": "Apparaatnaam (hostnaam)",

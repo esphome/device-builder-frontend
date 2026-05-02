@@ -30,6 +30,7 @@ import {
 } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
 import { LitElement, html, nothing } from "lit";
+import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -466,12 +467,13 @@ export class ESPHomeDeviceTable extends LitElement {
                   role="row"
                   tabindex="0"
                   data-configuration=${row.original.config}
-                  class="${this.selectMode &&
-                  this.selectedDevices.has(row.original.config)
-                    ? "selected "
-                    : ""}${this.highlightConfiguration === row.original.config
-                    ? "highlight"
-                    : ""}"
+                  class=${classMap({
+                    selected:
+                      this.selectMode &&
+                      this.selectedDevices.has(row.original.config),
+                    highlight:
+                      this.highlightConfiguration === row.original.config,
+                  })}
                   @click=${() =>
                     this.selectMode
                       ? this._onToggleSelect(row.original.config)
@@ -553,6 +555,22 @@ export class ESPHomeDeviceTable extends LitElement {
         composed: true,
       })
     );
+  }
+
+  /** Scroll the row matching *configuration* into view.
+   *
+   *  Exposed so the dashboard can highlight a freshly-adopted device
+   *  without reaching across the table's shadow-DOM boundary —
+   *  ``shadowRoot.querySelector`` from the dashboard can't see rows
+   *  rendered in this component's shadow root. No-op when the row
+   *  isn't on the current page. */
+  public scrollConfigurationIntoView(configuration: string): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const row = root.querySelector<HTMLElement>(
+      `tr[data-configuration="${CSS.escape(configuration)}"]`,
+    );
+    row?.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
