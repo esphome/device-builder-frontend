@@ -20,7 +20,7 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { DeviceState, JobStatus } from "../api/types.js";
+import { DeviceState, JobStatus, JobType } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
@@ -113,6 +113,12 @@ export class ESPHomeDeviceCard extends LitElement {
 
   @property({ type: Boolean })
   busy = false;
+
+  /** The currently-running job, if any. Powers the status-badge
+   *  label so a rename reads as "Renaming" rather than the generic
+   *  "Installing" copy the install/compile path uses. */
+  @property({ attribute: false })
+  activeJob: FirmwareJob | null = null;
 
   @property({ attribute: false })
   recentJob: FirmwareJob | null = null;
@@ -647,6 +653,10 @@ export class ESPHomeDeviceCard extends LitElement {
 
   private _renderStatusBadge() {
     if (this.busy) {
+      const labelKey =
+        this.activeJob?.job_type === JobType.RENAME
+          ? "dashboard.status_renaming"
+          : "dashboard.status_installing";
       return html`<div
         class="device-status busy"
         @click=${(e: Event) => {
@@ -655,7 +665,7 @@ export class ESPHomeDeviceCard extends LitElement {
         }}
       >
         <wa-spinner></wa-spinner>
-        ${this._localize("dashboard.status_installing")}
+        ${this._localize(labelKey)}
       </div>`;
     }
     if (this.recentJob) {

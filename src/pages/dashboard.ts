@@ -462,6 +462,7 @@ export class ESPHomePageDashboard extends LitElement {
               ?api-encrypted=${device.api_encrypted === true}
               .apiEncryptionActive=${device.api_encryption_active ?? null}
               ?busy=${this._activeJobs.has(device.configuration)}
+              .activeJob=${this._activeJobs.get(device.configuration) ?? null}
               ?highlight=${this._recentlyAdopted === device.configuration}
               .recentJob=${this._recentJobs.get(device.configuration) ?? null}
               .webUrl=${webUrl}

@@ -70,6 +70,17 @@ const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
   JobStatus.CANCELLED,
 ]);
 
+/** Extra ``_activeJobs`` keys to mirror this job under, beyond the
+ *  primary ``job.configuration`` slot. Today only ``RENAME`` needs
+ *  it: the new YAML appears mid-flight so the soon-to-be-named device
+ *  card needs to find the live job too. */
+function _renameKeys(job: FirmwareJob): string[] {
+  if (job.job_type !== JobType.RENAME) return [];
+  if (!job.new_name) return [];
+  const renamed = `${job.new_name}.yaml`;
+  return renamed === job.configuration ? [] : [renamed];
+}
+
 // How long a terminated job stays in `_recentJobs` so the dashboard
 // can flash a status indicator after the spinner clears. Successful
 // completions revert quickly so the device's real online/offline
@@ -388,6 +399,13 @@ export class ESPHomeApp extends LitElement {
     if (TERMINAL_STATUSES.has(job.status)) return;
     const active = new Map(this._activeJobs);
     active.set(job.configuration, job);
+    /* RENAME writes a *new* YAML during the job — the new device card
+       (configured under ``new_name.yaml``) appears mid-flight and
+       would otherwise sit at "Unknown" because nothing in
+       ``_activeJobs`` is keyed under its filename. Mirror the entry
+       under the new key so both the old and new cards show the
+       Renaming spinner until the job lands. */
+    for (const key of _renameKeys(job)) active.set(key, job);
     this._activeJobs = active;
   }
 
@@ -432,11 +450,18 @@ export class ESPHomeApp extends LitElement {
     this._firmwareJobs = next;
     // Only clear the per-device active slot if it points at *this* job —
     // a freshly-queued follow-up for the same device must stay visible.
+    let active: Map<string, FirmwareJob> | null = null;
     if (this._activeJobs.get(job.configuration)?.job_id === job.job_id) {
-      const active = new Map(this._activeJobs);
+      active = new Map(this._activeJobs);
       active.delete(job.configuration);
-      this._activeJobs = active;
     }
+    /* Mirror cleanup for the rename's new-name key — see _upsertJob. */
+    for (const key of _renameKeys(job)) {
+      if (this._activeJobs.get(key)?.job_id !== job.job_id) continue;
+      active = active ?? new Map(this._activeJobs);
+      active.delete(key);
+    }
+    if (active !== null) this._activeJobs = active;
     if (job.configuration) {
       this._markJobRecent(job);
     }

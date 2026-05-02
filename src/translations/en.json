@@ -184,7 +184,8 @@
     "context_select": "Select",
     "status_modified": "Modified",
     "status_update_available": "Update available",
-    "status_installing": "Installing…"
+    "status_installing": "Installing…",
+    "status_renaming": "Renaming…"
   },
   "command": {
     "install_title": "Install — {name}",

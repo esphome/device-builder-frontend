@@ -169,7 +169,8 @@
     "install_method_back": "Retour",
     "status_modified": "Modifié",
     "status_update_available": "Mise à jour disponible",
-    "status_installing": "Installation…"
+    "status_installing": "Installation…",
+    "status_renaming": "Renommage…"
   },
   "command": {
     "install_title": "Installation — {name}",

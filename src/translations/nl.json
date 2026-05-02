@@ -169,7 +169,8 @@
     "install_method_back": "Terug",
     "status_modified": "Gewijzigd",
     "status_update_available": "Update beschikbaar",
-    "status_installing": "Installeren…"
+    "status_installing": "Installeren…",
+    "status_renaming": "Hernoemen…"
   },
   "command": {
     "install_title": "Installeren — {name}",
