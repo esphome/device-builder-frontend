@@ -224,6 +224,11 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onKeydown = (e: KeyboardEvent) => {
     if (e.key !== "Escape") return;
+    /* If a deeper component (the fullscreen YAML editor, an open
+       dialog, etc.) already handled this Esc, don't also navigate
+       back. Mirrors the EscapeController guard so the leave-page
+       behaviour only fires when nothing else has claimed the key. */
+    if (e.defaultPrevented) return;
     /* Don't intercept Esc while the user is typing — the YAML editor,
        text inputs, and contentEditable surfaces all use Esc for their
        own behaviour (closing autocomplete, dropping focus, etc.).

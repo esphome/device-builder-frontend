@@ -4,8 +4,9 @@ export interface EscapeControllerOptions {
   /** Where to bind the keydown listener. Defaults to ``window``. Use
    *  ``document`` when the host needs to ``stopPropagation`` so an
    *  ancestor (a dialog wrapping a popup, for example) doesn't also
-   *  swallow the same Escape. */
-  target?: Window | Document;
+   *  swallow the same Escape. Accepts any ``EventTarget`` so tests can
+   *  inject a stub. */
+  target?: EventTarget;
 }
 
 /**
@@ -27,7 +28,7 @@ export interface EscapeControllerOptions {
  */
 export class EscapeController implements ReactiveController {
   private _bound = false;
-  private readonly _target: Window | Document;
+  private readonly _target: EventTarget;
 
   constructor(
     host: ReactiveControllerHost,
@@ -58,6 +59,14 @@ export class EscapeController implements ReactiveController {
      local — callers receive a properly typed KeyboardEvent. */
   private _handler: EventListener = (e) => {
     const ke = e as KeyboardEvent;
-    if (ke.key === "Escape") this.onEscape(ke);
+    if (ke.key !== "Escape") return;
+    /* Bail if a deeper handler already claimed this Escape (typically
+       by calling preventDefault). Each callback in this codebase
+       preventDefaults, so when multiple surfaces happen to be open at
+       once only the first listener to fire actually closes. Without
+       this guard a single Esc press would close every overlay
+       unintentionally. */
+    if (ke.defaultPrevented) return;
+    this.onEscape(ke);
   };
 }
