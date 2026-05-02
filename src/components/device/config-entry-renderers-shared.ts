@@ -8,6 +8,7 @@
 import { mdiKeyVariant, mdiLockOutline } from "@mdi/js";
 import { html, nothing } from "lit";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
+import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -205,6 +206,19 @@ function renderSuggestionSelect(
 ) {
   const valueLower = value.toLowerCase();
   const placeholder = String(entry.default_value ?? "");
+  // Coerce the picked value back to the entry's declared type before
+  // emitting — the wa-select hands us a string regardless, but a number
+  // entry's YAML value must be a number or downstream validation
+  // (and the backend's locked-value comparison) will reject it.
+  const isNumeric =
+    entry.type === ConfigEntryType.INTEGER ||
+    entry.type === ConfigEntryType.FLOAT;
+  const coerce = (raw: string): string | number => {
+    if (!isNumeric) return raw;
+    if (raw === "") return raw;
+    const n = entry.type === ConfigEntryType.INTEGER ? parseInt(raw, 10) : Number(raw);
+    return Number.isFinite(n) ? n : raw;
+  };
   return html`
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
@@ -213,7 +227,7 @@ function renderSuggestionSelect(
         ?disabled=${disabled}
         placeholder=${placeholder}
         @change=${(e: Event) =>
-          ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
+          ctx.emitChange(path, coerce((e.target as HTMLSelectElement).value))}
       >
         ${(entry.suggestions ?? []).map((s) => {
           const v = String(s);

@@ -121,7 +121,16 @@ export function renderPinField(
         .filter((g): g is number => g !== null),
     );
     if (allowed.size > 0) {
-      visible = visible.filter((p) => allowed.has(p.gpio));
+      const narrowed = visible.filter((p) => allowed.has(p.gpio));
+      // Only apply the narrowing when at least one pin survives —
+      // otherwise a manifest typo (suggestion lists a GPIO that doesn't
+      // exist on the board, or one that fails the field's
+      // `pin_features`) would render an empty dropdown with no escape
+      // hatch. Prefer the feature-filtered superset so the user can
+      // still configure the field.
+      if (narrowed.length > 0) {
+        visible = narrowed;
+      }
     }
   }
   // The board's preset pin trumps generic feature filtering — a locked

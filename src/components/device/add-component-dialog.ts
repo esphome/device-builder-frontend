@@ -476,38 +476,20 @@ export class ESPHomeAddComponentDialog extends LitElement {
         }),
       );
 
-      // Bundle in flight — pop the next featured id and refresh the
-      // form for it. The just-updated `this.yaml` (carried in via the
-      // `yaml-updated` event) is still authoritative for the next
-      // step's ID-reference dropdown, since the host re-binds it on
-      // re-render.
-      if (this._bundleQueue.length > 0 && this._bundleProgress) {
-        const nextId = this._bundleQueue[0];
-        const remaining = this._bundleQueue.slice(1);
-        const nextComponent = await this._api.getComponent(
-          nextId,
-          this.platform || undefined,
-          this.board?.id ?? undefined,
-        );
-        if (!nextComponent) {
-          this._submitError = this._localize("device.add_component_error");
-          return;
-        }
-        this._bundleQueue = remaining;
-        this._bundleProgress = {
-          ...this._bundleProgress,
-          current: this._bundleProgress.current + 1,
-        };
-        this._selected = nextComponent;
-        return;
-      }
-
       if (this._returnTo) {
         // Just finished adding a dependency — restore the original
         // component's form so the user can continue where they left
         // off. The form re-mounts fresh and re-reads `this.yaml`,
         // which now contains the dep, so the ID-reference dropdown
         // will be populated.
+        //
+        // This branch wins over the bundle-advance branch below: if
+        // the user is mid-bundle and detours to add a missing dep,
+        // submitting the dep should return them to the bundle step
+        // they were on, not skip ahead to the next bundle component.
+        // The bundle queue stays intact so the bundle step's own
+        // submit (the next time around) will fall through to the
+        // bundle-advance branch and continue.
         const restore = this._returnTo;
         const depDomain = this._depDomain;
         // If the component the user just added matches the dep domain
@@ -528,6 +510,29 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this._returnTo = null;
         this._depDomain = null;
         this._selected = restore;
+      } else if (this._bundleQueue.length > 0 && this._bundleProgress) {
+        // Bundle in flight — pop the next featured id and refresh the
+        // form for it. The just-updated `this.yaml` (carried in via
+        // the `yaml-updated` event) is still authoritative for the
+        // next step's ID-reference dropdown, since the host re-binds
+        // it on re-render.
+        const nextId = this._bundleQueue[0];
+        const remaining = this._bundleQueue.slice(1);
+        const nextComponent = await this._api.getComponent(
+          nextId,
+          this.platform || undefined,
+          this.board?.id ?? undefined,
+        );
+        if (!nextComponent) {
+          this._submitError = this._localize("device.add_component_error");
+          return;
+        }
+        this._bundleQueue = remaining;
+        this._bundleProgress = {
+          ...this._bundleProgress,
+          current: this._bundleProgress.current + 1,
+        };
+        this._selected = nextComponent;
       } else {
         // Auto-select the just-added component so the navigator
         // highlights it and the section editor jumps to its block.
