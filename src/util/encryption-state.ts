@@ -37,30 +37,34 @@ export type EncryptionState =
 export function getEncryptionState(d: EncryptionInputs): EncryptionState {
   if (!d.api_enabled) return "none";
   if (!d.api_encrypted) return "plaintext";
-  /* Pending changes always pin the indicator to "pending", even
-     when mDNS hasn't reported anything yet. After Take Control the
-     dashboard creates a YAML with ``api: encryption: …`` but the
-     running firmware is still the vendor image with no encryption,
-     so ``api_encrypted=true`` plus ``has_pending_changes=true`` is
-     the "you need to flash to actually get encryption" state.
-     Trusting the YAML there (the previous behaviour) showed a
-     green lock the moment the YAML was saved, which read as
-     "encryption active" while the device was still happily
-     answering plaintext on the wire. */
-  if (d.has_pending_changes) return "pending";
   const observed = d.api_encryption_active;
-  /* mDNS not seen yet: trust the YAML. ``observed == null`` (loose
-     equality) catches both ``null`` and ``undefined`` — the latter
-     can sneak in from older backends or cached WS payloads that
-     predate the field. */
-  if (observed == null) return "active";
-  /* TXT absent → device is running plaintext API. With no pending
-     changes to explain it, the firmware on the device disagrees
-     with the YAML — real mismatch, probably a failed flash or a
-     device flashed elsewhere. */
-  if (observed === "") return "mismatch";
-  /* TXT present (e.g. ``Noise_NNpsk0_25519_ChaChaPoly_SHA256``). */
-  return "active";
+  /* mDNS confirms encryption is *actually* running on the device
+     (e.g. ``Noise_NNpsk0_25519_ChaChaPoly_SHA256``). Truth on the
+     wire trumps everything else — a YAML edit elsewhere
+     (whitespace, comment, sensor tweak) doesn't disable the
+     encryption that's already live, so the indicator stays green
+     even when ``has_pending_changes`` is set. */
+  if (observed) return "active";
+  /* From here ``observed`` is either ``""`` (mDNS seen, TXT
+     absent — device is plaintext) or ``null`` / ``undefined``
+     (mDNS not seen yet). In both cases the running firmware is
+     not confirmed-encrypted, so a pending-changes flag is the
+     "Take Control just added encryption to the YAML, but the
+     vendor image on the device hasn't been replaced yet" path —
+     show "pending" to nudge the user toward Install. */
+  if (d.has_pending_changes) return "pending";
+  /* No pending changes:
+       - ``observed == null`` → mDNS hasn't reported. Trust the
+         YAML; the device is presumed encrypted until proven
+         otherwise. ``observed == null`` (loose equality) covers
+         ``null`` and ``undefined`` — the latter can sneak in
+         from older backends or cached WS payloads that predate
+         the field.
+       - ``observed === ""`` → mDNS confirmed plaintext. The
+         firmware on the device disagrees with the YAML and there
+         is no pending compile to explain it: real mismatch,
+         probably a failed flash or a device flashed elsewhere. */
+  return observed == null ? "active" : "mismatch";
 }
 
 export interface EncryptionVisual {
