@@ -1,5 +1,10 @@
 import { consume } from "@lit/context";
-import { mdiDownload, mdiEyeOffOutline, mdiEyeOutline } from "@mdi/js";
+import {
+  mdiDownload,
+  mdiEyeOffOutline,
+  mdiEyeOutline,
+  mdiOpenInNew,
+} from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { AdoptableDevice } from "../api/types.js";
@@ -14,6 +19,7 @@ registerMdiIcons({
   download: mdiDownload,
   "eye-off-outline": mdiEyeOffOutline,
   "eye-outline": mdiEyeOutline,
+  "open-in-new": mdiOpenInNew,
 });
 
 @customElement("esphome-discovered-device-card")
@@ -134,6 +140,10 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
         font-family: inherit;
         cursor: pointer;
         border: var(--wa-border-width-s) solid transparent;
+        /* Reset anchor presentation so the Visit-web-UI link (rendered
+           as <a> for rel=noopener security) matches the surrounding
+           <button> controls — no underline, no visited tint. */
+        text-decoration: none;
         transition:
           background 0.12s,
           border-color 0.12s;
@@ -152,11 +162,24 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
         background: transparent;
         color: var(--wa-color-text-normal);
         border-color: var(--wa-color-surface-border);
-        margin-left: auto;
       }
 
       .btn--ghost:hover {
         background: var(--wa-color-surface-lowered);
+      }
+
+      /* The last ghost button on the row pushes everything left of
+         it; the visit-web link sits flush next to the take-control
+         button without leaving a gap. */
+      .actions .btn--ghost:last-child {
+        margin-left: auto;
+      }
+
+      /* Compact icon-only variant for the Visit-web-UI link — same
+         visual weight as the kebab/Ignore button but no text label
+         since the open-in-new icon is self-explanatory. */
+      .btn--icon {
+        padding: 5px 7px;
       }
 
       .btn wa-icon {
@@ -198,6 +221,19 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
                   ${this._localize("dashboard.action_take_control")}
                 </button>
               `}
+          ${this.device.web_url
+            ? html`<a
+                class="btn btn--ghost btn--icon"
+                href=${this.device.web_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title=${this._localize("dashboard.action_visit_web_ui")}
+                aria-label=${this._localize("dashboard.action_visit_web_ui")}
+                @click=${(e: Event) => e.stopPropagation()}
+              >
+                <wa-icon library="mdi" name="open-in-new"></wa-icon>
+              </a>`
+            : nothing}
           <button
             class="btn btn--ghost"
             title=${this._localize(

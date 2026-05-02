@@ -120,6 +120,10 @@ export interface AdoptableDevice {
   project_version: string;
   network: string;
   ignored: boolean;
+  /** Pre-built URL when the device also advertises an
+   *  ``_http._tcp.local.`` mDNS service. Empty string hides the
+   *  Visit-web-UI link on the discovered card. */
+  web_url: string;
 }
 
 /** Response from devices/list. */
