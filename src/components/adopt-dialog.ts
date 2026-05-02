@@ -366,12 +366,12 @@ export class ESPHomeAdoptDialog extends LitElement {
           ? err.message
           : this._localize("dashboard.adopt_error_generic");
     } finally {
-      /* Always clear the busy state — whether the call succeeded
-         (close() will hide the dialog anyway) or failed (the user
-         needs the Submit button live again to retry or change inputs).
-         The previous code reset ``_busy`` only in the catch branch,
-         which left the button stuck on "Taking control…" if the
-         success path's close() raced something downstream. */
+      /* Always clear the busy state. On success the dialog closes
+         and the user never sees this — but if anything downstream
+         of the await throws, the dialog stays open and the Submit
+         button has to be live again so the user can retry or edit
+         the inputs. Resetting only in the catch branch would leave
+         the button stuck on "Taking control…" in that edge case. */
       this._busy = false;
     }
   };

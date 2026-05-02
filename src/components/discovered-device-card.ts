@@ -191,6 +191,25 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
   protected render() {
     const title = this.device.friendly_name || this.device.name;
     const showHostname = !!this.device.friendly_name;
+    /* ``web_url`` is built backend-side from mDNS service info, so
+       in normal use it's always ``http://``. Validate the scheme
+       defensively before rendering — a discovered device could in
+       theory advertise a service whose resolved URL parses as
+       ``javascript:`` or similar, and feeding that into ``href``
+       lets a click execute the script. ``new URL`` also catches
+       malformed input early; we render the link only when both the
+       parse succeeds and the protocol is one we trust. */
+    let safeWebUrl = "";
+    if (this.device.web_url) {
+      try {
+        const parsed = new URL(this.device.web_url);
+        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+          safeWebUrl = parsed.toString();
+        }
+      } catch {
+        // Fall through — leave safeWebUrl empty, link is hidden.
+      }
+    }
     return html`
       <div class="card" ?data-ignored=${this.device.ignored}>
         <span class="status">
@@ -221,10 +240,10 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
                   ${this._localize("dashboard.action_take_control")}
                 </button>
               `}
-          ${this.device.web_url
+          ${safeWebUrl
             ? html`<a
                 class="btn btn--ghost btn--icon"
-                href=${this.device.web_url}
+                href=${safeWebUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 title=${this._localize("dashboard.action_visit_web_ui")}

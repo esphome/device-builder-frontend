@@ -123,6 +123,25 @@ export class ESPHomePageDashboard extends LitElement {
    *  device in a long list. Cleared by ``_adoptHighlightTimer``. */
   @state() private _recentlyAdopted: string | null = null;
   private _adoptHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /* The card view has no user-facing sort control, so we sort the
+     device list ourselves: friendly-name first, configuration-filename
+     fallback. Locale-aware via ``Intl.Collator`` with
+     ``sensitivity: base`` (case-insensitive) plus ``numeric: true``
+     (so ``device-2`` sorts before ``device-10``). Built once here
+     rather than each render so re-renders triggered by unrelated
+     state (jobs, search, recent jobs) don't pay the construction
+     cost. ``Intl.Collator`` already handles case-folding, so the
+     sort key passes the raw string instead of pre-lower-casing
+     (which can be wrong in some locales — Turkish dotted-i, etc.). */
+  private static readonly _cardCollator = new Intl.Collator(undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
+  private _sortedDevicesCache: {
+    source: ConfiguredDevice[];
+    sorted: ConfiguredDevice[];
+  } | null = null;
   /** When false (default), discovered devices the user previously
    *  marked as Ignored are hidden from the banner and grid; the
    *  ``Show ignored discoveries`` toggle in the header kebab flips
@@ -226,23 +245,7 @@ export class ESPHomePageDashboard extends LitElement {
     }
 
     const q = this._search.trim().toLowerCase();
-    /* The card view has no user-facing sort control, so we sort the
-       device list ourselves here — case-insensitive, friendly-name-
-       first with a configuration-filename fallback. Without this,
-       the order tracks whatever the backend last sent, so a
-       newly-adopted (or freshly-added) device lands at the end of
-       the grid even when its name would put it mid-alphabet. The
-       table view handles its own sort via TanStack and uses an
-       independent dataset. */
-    const collator = new Intl.Collator(undefined, {
-      sensitivity: "base",
-      numeric: true,
-    });
-    const sortKey = (d: ConfiguredDevice) =>
-      (d.friendly_name || d.name || d.configuration).toLowerCase();
-    const sorted = [...this._devices].sort((a, b) =>
-      collator.compare(sortKey(a), sortKey(b)),
-    );
+    const sorted = this._sortedDevices;
     const filtered = q
       ? sorted.filter(
           (d) =>
@@ -263,6 +266,25 @@ export class ESPHomePageDashboard extends LitElement {
       ${this._renderSelectBarOrFab()}
       ${this._renderDialogs()}
     `;
+  }
+
+  /** Cached, sorted view of ``_devices``. Cache key is the array
+   *  reference, which is replaced (not mutated) by every WS event
+   *  in app-shell, so an event that doesn't touch the device list
+   *  reuses the previous sort verbatim. */
+  private get _sortedDevices(): ConfiguredDevice[] {
+    const source = this._devices;
+    if (this._sortedDevicesCache?.source === source) {
+      return this._sortedDevicesCache.sorted;
+    }
+    const collator = ESPHomePageDashboard._cardCollator;
+    const sortKey = (d: ConfiguredDevice) =>
+      d.friendly_name || d.name || d.configuration;
+    const sorted = [...source].sort((a, b) =>
+      collator.compare(sortKey(a), sortKey(b)),
+    );
+    this._sortedDevicesCache = { source, sorted };
+    return sorted;
   }
 
   private get _visibleImportableDevices(): AdoptableDevice[] {
