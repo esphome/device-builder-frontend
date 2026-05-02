@@ -253,16 +253,25 @@ export class ESPHomeAnsiLog extends LitElement {
       tab-size: 4;
     }
 
-    /* white-space: pre lives on the line, not the container. On the
-       container Lit's html-template inter-element text nodes
+    /* white-space: pre-wrap lives on the line, not the container. On
+       the container Lit's html-template inter-element text nodes
        (whitespace between <div> and the interpolated children) render
-       as visible blank lines above the first real log line. */
+       as visible blank lines above the first real log line.
+
+       pre-wrap (vs plain pre) lets long lines wrap at the dialog edge
+       instead of forcing the user onto an easily-missed horizontal
+       scrollbar — PIO download URLs and full build paths routinely
+       run past 200 chars and the install/log dialogs have no obvious
+       affordance for sideways scrolling. overflow-wrap: anywhere
+       breaks inside unbroken tokens (URLs, paths) so a single long
+       run can't push the line back into overflow. */
     .log-line {
       margin: 0;
       padding: 0;
       border-radius: 2px;
       line-height: 18px;
-      white-space: pre;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
     }
 
     .log-line:hover {
