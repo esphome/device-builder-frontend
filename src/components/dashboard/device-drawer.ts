@@ -163,7 +163,12 @@ export class ESPHomeDeviceDrawer extends LitElement {
         align-items: center;
         gap: var(--wa-space-s);
         padding: var(--wa-space-m) var(--wa-space-l);
-        margin: var(--wa-space-m) var(--wa-space-l) 0;
+        /* Symmetric vertical margin so the banner doesn't collapse
+           against the device-info section that follows. The body
+           below has its own padding, but with a 0 bottom-margin
+           here the first row's icon ended up clipped against the
+           banner's rounded bottom edge. */
+        margin: var(--wa-space-m) var(--wa-space-l);
         border-radius: var(--wa-border-radius-l);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
