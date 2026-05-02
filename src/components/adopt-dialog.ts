@@ -8,6 +8,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
+import { previewPackageImportUrl } from "../util/package-import-url.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
@@ -106,6 +107,27 @@ export class ESPHomeAdoptDialog extends LitElement {
         padding: 6px 10px;
         border-radius: var(--wa-border-radius-s);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        display: block;
+      }
+
+      /* Anchor variant of the URL block for when the value is a
+         recognised github / gitlab shorthand and we can resolve a
+         clickable browse URL. Same monospace + wrap shape as the
+         plain-text variant; just adds hover affordance and the
+         primary-colour underline so the user can tell it's
+         interactive. */
+      a.source-info-url {
+        color: var(--esphome-primary);
+        text-decoration: none;
+      }
+
+      a.source-info-url:hover {
+        text-decoration: underline;
+      }
+
+      a.source-info-url:focus-visible {
+        outline: 2px solid var(--esphome-primary-light);
+        outline-offset: 2px;
       }
 
       .field {
@@ -272,18 +294,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                 })}
               </p>
 
-              ${device.package_import_url
-                ? html`
-                    <div class="source-info">
-                      <div class="source-info-label">
-                        ${this._localize("dashboard.adopt_source_label")}
-                      </div>
-                      <div class="source-info-url">
-                        ${device.package_import_url}
-                      </div>
-                    </div>
-                  `
-                : nothing}
+              ${this._renderSource(device.package_import_url)}
 
               <div class="field">
                 <label for="adopt-name">
@@ -373,6 +384,34 @@ export class ESPHomeAdoptDialog extends LitElement {
             `
           : nothing}
       </wa-dialog>
+    `;
+  }
+
+  private _renderSource(packageImportUrl: string) {
+    if (!packageImportUrl) return nothing;
+    const preview = previewPackageImportUrl(packageImportUrl);
+    // Render the raw shorthand verbatim — the user might recognise
+    // their vendor's domain even if we can't resolve a click target
+    // (e.g. a future ``bitbucket://`` scheme we don't support yet).
+    // When we DO have a browse URL we wrap it in an anchor so the
+    // user can pop the file open in a new tab and read the YAML
+    // before clicking Take Control.
+    const body = preview.browseUrl
+      ? html`<a
+          class="source-info-url"
+          href=${preview.browseUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          >${preview.raw}</a
+        >`
+      : html`<div class="source-info-url">${preview.raw}</div>`;
+    return html`
+      <div class="source-info">
+        <div class="source-info-label">
+          ${this._localize("dashboard.adopt_source_label")}
+        </div>
+        ${body}
+      </div>
     `;
   }
 
