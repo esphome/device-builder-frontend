@@ -222,13 +222,30 @@ export class ESPHomePageDashboard extends LitElement {
     }
 
     const q = this._search.trim().toLowerCase();
+    /* The card view has no user-facing sort control, so we sort the
+       device list ourselves here — case-insensitive, friendly-name-
+       first with a configuration-filename fallback. Without this,
+       the order tracks whatever the backend last sent, so a
+       newly-adopted (or freshly-added) device lands at the end of
+       the grid even when its name would put it mid-alphabet. The
+       table view handles its own sort via TanStack and uses an
+       independent dataset. */
+    const collator = new Intl.Collator(undefined, {
+      sensitivity: "base",
+      numeric: true,
+    });
+    const sortKey = (d: ConfiguredDevice) =>
+      (d.friendly_name || d.name || d.configuration).toLowerCase();
+    const sorted = [...this._devices].sort((a, b) =>
+      collator.compare(sortKey(a), sortKey(b)),
+    );
     const filtered = q
-      ? this._devices.filter(
+      ? sorted.filter(
           (d) =>
             (d.friendly_name || d.name).toLowerCase().includes(q) ||
             d.configuration.toLowerCase().includes(q),
         )
-      : this._devices;
+      : sorted;
 
     return html`
       ${this._renderBanner()}
