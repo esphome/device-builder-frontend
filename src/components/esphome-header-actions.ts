@@ -52,8 +52,48 @@ export class ESPHomeHeaderActions extends LitElement {
   static styles = [
     espHomeStyles,
     css`
+      /* inline-flex (instead of display: contents) so the parent
+         header's flex gap doesn't squeeze a gutter between the
+         inline-actions row and the kebab — they should read as one
+         cluster, not as separate header sections. */
       :host {
-        display: contents;
+        display: inline-flex;
+        align-items: center;
+        gap: 0;
+      }
+
+      /* Inline icon buttons surface the most-used kebab items on
+         desktop where there's room. We promote two — Firmware jobs
+         (lives behind a live badge) and Settings (the only kebab
+         entry users hit reliably) — and leave the rest in the menu.
+         Three would already crowd the header on tighter viewports;
+         fewer would defeat the discoverability point. */
+      .inline-actions {
+        display: none;
+        align-items: center;
+        gap: 2px;
+      }
+
+      @media (min-width: 768px) {
+        .inline-actions {
+          display: inline-flex;
+        }
+      }
+
+      /* On desktop the inline buttons cover Firmware jobs + Settings,
+         so duplicating them inside the kebab muddies the menu (users
+         see two ways to do the same thing in adjacent UI). Hide the
+         duplicates above the breakpoint; mobile keeps them as the
+         only access point. Chained selector (.menu-item.menu-item--
+         inline) bumps specificity above the bare .menu-item rule
+         defined later in this stylesheet — without it, source order
+         would let the bare display: flex win and the items would
+         stay visible. */
+      @media (min-width: 768px) {
+        .menu-item.menu-item--inline,
+        .menu-divider.menu-divider--inline {
+          display: none;
+        }
       }
 
       .menu-btn {
@@ -75,6 +115,12 @@ export class ESPHomeHeaderActions extends LitElement {
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
       }
 
+      .menu-btn:focus-visible {
+        outline: 2px solid var(--esphome-on-primary);
+        outline-offset: 2px;
+        opacity: 1;
+      }
+
       .menu-btn wa-icon {
         font-size: 20px;
       }
@@ -88,6 +134,16 @@ export class ESPHomeHeaderActions extends LitElement {
         border-radius: 50%;
         background: var(--esphome-warning, #f59e0b);
         box-shadow: 0 0 0 2px var(--esphome-primary);
+      }
+
+      /* When the inline buttons are visible, the badge moves to the
+         Firmware-jobs inline button (more discoverable). The kebab
+         keeps its own badge for mobile where the inline row is
+         hidden — two parallel badges, only one ever shown. */
+      @media (min-width: 768px) {
+        .menu-kebab .menu-btn-badge {
+          display: none;
+        }
       }
 
       .backdrop {
@@ -187,25 +243,86 @@ export class ESPHomeHeaderActions extends LitElement {
         activeCount++;
       }
     }
+    /* Single source of truth for the firmware-jobs and kebab labels —
+       the count-aware string drives both ``title`` and ``aria-label``
+       so the hover tooltip and the screen-reader announcement stay in
+       sync (Copilot flagged the divergence). */
+    const firmwareJobsLabel =
+      activeCount > 0
+        ? this._localize("firmware_jobs.menu_item_with_count", { count: activeCount })
+        : this._localize("firmware_jobs.menu_item");
+    const kebabLabel =
+      activeCount > 0
+        ? this._localize("layout.more_options_with_count", { count: activeCount })
+        : this._localize("dashboard.more_options");
     return html`
-      <button class="menu-btn" @click=${this._toggle}>
+      <div
+        class="inline-actions"
+        role="toolbar"
+        aria-label=${this._localize("layout.header_actions_label")}
+      >
+        <button
+          type="button"
+          class="menu-btn"
+          @click=${this._openFirmwareJobs}
+          title=${firmwareJobsLabel}
+          aria-label=${firmwareJobsLabel}
+        >
+          <wa-icon library="mdi" name="playlist-check"></wa-icon>
+          ${activeCount > 0
+            ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
+            : nothing}
+        </button>
+        <button
+          type="button"
+          class="menu-btn"
+          @click=${this._openSettings}
+          title=${this._localize("layout.settings")}
+          aria-label=${this._localize("layout.settings")}
+        >
+          <wa-icon library="mdi" name="cog"></wa-icon>
+        </button>
+      </div>
+      <button
+        type="button"
+        class="menu-btn menu-kebab"
+        @click=${this._toggle}
+        title=${kebabLabel}
+        aria-label=${kebabLabel}
+      >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
         ${activeCount > 0
-          ? html`<span class="menu-btn-badge" aria-label=${this._localize("firmware_jobs.badge_label", { count: activeCount })}></span>`
+          ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
           : nothing}
       </button>
       ${this._open
         ? html`
             <div class="backdrop" @click=${this._close}></div>
-            <div class="menu" style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);">
-              <div class="menu-item" @click=${this._openFirmwareJobs}>
+            <div
+              class="menu"
+              role="menu"
+              style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);"
+            >
+              <div
+                class="menu-item menu-item--inline"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openFirmwareJobs}
+                @keydown=${this._onMenuItemKeydown}
+              >
                 <wa-icon library="mdi" name="playlist-check"></wa-icon>
                 <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
                 ${activeCount > 0
                   ? html`<span class="menu-item-count">${activeCount}</span>`
                   : nothing}
               </div>
-              <div class="menu-item" @click=${this._openSecrets}>
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openSecrets}
+                @keydown=${this._onMenuItemKeydown}
+              >
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 ${this._localize("layout.secrets")}
               </div>
@@ -229,8 +346,14 @@ export class ESPHomeHeaderActions extends LitElement {
                     ></wa-icon>`
                   : nothing}
               </div>
-              <div class="menu-divider"></div>
-              <div class="menu-item" @click=${this._openSettings}>
+              <div class="menu-divider menu-divider--inline" role="separator"></div>
+              <div
+                class="menu-item menu-item--inline"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openSettings}
+                @keydown=${this._onMenuItemKeydown}
+              >
                 <wa-icon library="mdi" name="cog"></wa-icon>
                 ${this._localize("layout.settings")}
               </div>
@@ -262,6 +385,19 @@ export class ESPHomeHeaderActions extends LitElement {
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
   }
+
+  private _onMenuItemKeydown = (e: KeyboardEvent) => {
+    /* The kebab menu items are ``<div role="menuitem">`` rather than
+       <button>s so they sit visually flush with the checkbox-style
+       toggle below. role + tabindex make them focusable; this handler
+       maps Enter / Space to the same click the mouse would dispatch.
+       ``e.currentTarget.click()`` re-uses the @click handler bound on
+       the same element, so any per-item logic stays where it lives. */
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).click();
+    }
+  };
 
   private _onCheckboxKeydown = (e: KeyboardEvent) => {
     /* The toggle is a ``<div role="menuitemcheckbox">`` rather than

@@ -430,7 +430,13 @@
     "back": "Retour",
     "home_assistant": "Home Assistant",
     "editor": "Éditeur",
-    "yaml_diff_button": "Bouton de diff YAML"
+    "yaml_diff_button": "Bouton de diff YAML",
+    "header_actions_label": "Actions du tableau de bord",
+    "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))"
+  },
+  "firmware_jobs": {
+    "menu_item": "Tâches firmware",
+    "menu_item_with_count": "Tâches firmware ({count} active(s))"
   },
   "secrets": {
     "title": "Secrets",
