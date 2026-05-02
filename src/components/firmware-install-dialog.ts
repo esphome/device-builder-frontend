@@ -95,6 +95,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   private _init(device: ConfiguredDevice) {
+    // Dispose any stream from a prior session before resetting state.
+    // ``_init`` re-runs on every ``installWebSerial`` call, including
+    // reopens after the user dismissed the previous run via the
+    // ``wa-dialog`` close button / Escape (which routes through
+    // ``_onClose`` and only flips ``_open``). Without this teardown a
+    // still-attached firmwareFollowJob from the prior compile would
+    // keep pushing lines into the new session's ``_logLines``.
+    this._detachStream();
     this._device = device;
     this._open = true;
     this._step = "installing";
@@ -106,8 +114,20 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsFullHeight = false;
     this._flashPercent = 0;
     this._jobId = "";
-    this._streamId = "";
     this._detected = null;
+  }
+
+  /**
+   * Tear down any active follow_job subscription, both client-side
+   * (drops the local handler so its closure stops appending to
+   * ``_logLines``) and backend-side. Safe when no stream is active.
+   * Used by every dialog-close path so a stale stream can't survive
+   * the next reopen.
+   */
+  private _detachStream() {
+    if (!this._streamId) return;
+    this._api.stopStream(this._streamId).catch(() => {});
+    this._streamId = "";
   }
 
   // ─── Styles ────────────────────────────────────────────
@@ -568,20 +588,20 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._open = false;
     this._device = null;
     this._jobId = "";
-    // Tear down any in-flight stream so its onOutput handler stops
-    // appending to ``_logLines`` after the dialog closes — otherwise
-    // a reopen of the dialog while the prior stream is still live
-    // would duplicate lines (the bug fixed for the command-dialog
-    // path; the install path has the same shape).
-    if (this._streamId) {
-      this._api.stopStream(this._streamId).catch(() => {});
-      this._streamId = "";
-    }
+    this._detachStream();
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 
+  /**
+   * ``wa-dialog``'s close button (header X) and Escape both fire
+   * ``wa-after-hide``, which routes here. Has to do the same stream
+   * teardown ``_close`` does — otherwise a header-X-then-reopen
+   * leaves the prior firmwareFollowJob attached, and lines from that
+   * subscription duplicate into the new session's log buffer.
+   */
   private _onClose() {
     this._open = false;
+    this._detachStream();
   }
 }
 
