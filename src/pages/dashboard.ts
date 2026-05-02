@@ -471,7 +471,7 @@ export class ESPHomePageDashboard extends LitElement {
               @update-device=${() => this._openCommand(device, "install")}
               @open-logs=${() => this._openLogs(device)}
               @show-progress=${() => this._showJobProgress(device)}
-              @card-click=${() => { this._drawerDevice = device; this._drawerOpen = true; }}
+              @card-click=${() => this._toggleDrawerForDevice(device)}
               @card-context-menu=${(e: CustomEvent) => { this._cardContextDevice = device; this._cardContextPosition = e.detail; }}
               @toggle-select=${() => this._toggleDevice(device.configuration)}
             ></esphome-device-card>
@@ -498,7 +498,7 @@ export class ESPHomePageDashboard extends LitElement {
         @table-sort-change=${this._saveTablePreference}
         @table-visibility-change=${this._saveTablePreference}
         @table-page-size-change=${this._saveTablePreference}
-        @row-click=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerDevice = e.detail; this._drawerOpen = true; }}
+        @row-click=${(e: CustomEvent<ConfiguredDevice>) => this._toggleDrawerForDevice(e.detail)}
         @show-progress=${(e: CustomEvent<ConfiguredDevice>) => this._showJobProgress(e.detail)}
         @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
         @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
@@ -822,6 +822,19 @@ export class ESPHomePageDashboard extends LitElement {
       // Detection failed or user cancelled — open wizard at board step as fallback
       this._createDialog.open("board");
     }
+  }
+
+  private _toggleDrawerForDevice(device: ConfiguredDevice) {
+    /* Card / row activation toggles the drawer rather than always
+       opening it, so a keyboard user can hit Enter or Space twice on
+       the same card to dismiss it without reaching for Escape. Tapping
+       a different card while one is open swaps to the new device. */
+    if (this._drawerOpen && this._drawerDevice?.configuration === device.configuration) {
+      this._drawerOpen = false;
+      return;
+    }
+    this._drawerDevice = device;
+    this._drawerOpen = true;
   }
 
   private _openCommand(device: ConfiguredDevice, type: CommandType, port?: string) {
