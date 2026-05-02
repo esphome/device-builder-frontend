@@ -13,11 +13,28 @@ import {
   sectionEndLine,
 } from "../../util/config-entry-yaml-scan.js";
 import {
+  effectiveDisabled,
   renderFieldError,
   renderLabel,
   renderStringField,
   type RenderCtx,
 } from "./config-entry-renderers-shared.js";
+
+/**
+ * Parse a `suggestions` value into a GPIO number. Featured manifests
+ * write these as either bare ints (`12`) or string forms (`"GPIO12"`,
+ * `"gpio12"`); the wire shape is `ConfigPrimitive`, so we accept both.
+ * Returns `null` for anything we can't parse — the caller drops those
+ * entries rather than letting a typo crash the renderer.
+ */
+function parseSuggestionGpio(s: unknown): number | null {
+  if (typeof s === "number" && Number.isFinite(s)) return s;
+  if (typeof s === "string") {
+    const m = s.match(/^\s*(?:GPIO)?(\d+)\s*$/i);
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
 
 interface PinOptionView {
   optValue: string;
@@ -80,24 +97,68 @@ export function renderPinField(
     return renderStringField(entry, "text", path, ctx);
   }
 
-  const value = String(ctx.getAt(path) ?? "");
+  // Pin presets land as either bare ints (`12`) or `GPIOn` strings —
+  // the wa-option values are always the `GPIOn` form, so normalise
+  // before comparing or the disabled select renders blank.
+  const rawValue = ctx.getAt(path);
+  const valueGpio = parseSuggestionGpio(rawValue);
+  const value =
+    valueGpio !== null ? `GPIO${valueGpio}` : String(rawValue ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const required = entry.pin_features ?? [];
   const matchesFeatures = (pin: BoardPin) =>
     required.every((f) => pin.features.includes(f));
-  const visible = ctx.board.pins.filter(matchesFeatures);
+  let visible = ctx.board.pins.filter(matchesFeatures);
+  // A featured-component preset can narrow the pin set further — e.g.
+  // pin the ESK-1 PIR motion sensor to one of the two FPC-connector
+  // GPIOs. Skip the narrowing if no parseable GPIOs survive (a manifest
+  // typo shouldn't blank the dropdown — the user will see the full
+  // feature-filtered set instead, with a visible error for the field).
+  if (entry.suggestions && entry.suggestions.length > 0) {
+    const allowed = new Set(
+      entry.suggestions
+        .map(parseSuggestionGpio)
+        .filter((g): g is number => g !== null),
+    );
+    if (allowed.size > 0) {
+      const narrowed = visible.filter((p) => allowed.has(p.gpio));
+      // Only apply the narrowing when at least one pin survives —
+      // otherwise a manifest typo (suggestion lists a GPIO that doesn't
+      // exist on the board, or one that fails the field's
+      // `pin_features`) would render an empty dropdown with no escape
+      // hatch. Prefer the feature-filtered superset so the user can
+      // still configure the field.
+      if (narrowed.length > 0) {
+        visible = narrowed;
+      }
+    }
+  }
+  // The board's preset pin trumps generic feature filtering — a locked
+  // GPIO12 (Sonoff relay) doesn't necessarily declare the same features
+  // the underlying `switch.gpio` schema asks for, but the manifest is
+  // authoritative. Make sure the active value's pin is always in the
+  // dropdown so the disabled select still shows the right option.
+  if (
+    valueGpio !== null &&
+    !visible.some((p) => p.gpio === valueGpio) &&
+    ctx.board.pins.some((p) => p.gpio === valueGpio)
+  ) {
+    const pin = ctx.board.pins.find((p) => p.gpio === valueGpio)!;
+    visible = [pin, ...visible];
+  }
   const usedPins = findUsedPins(
     ctx.yaml,
     ctx.fromLine,
     sectionEndLine(ctx.yaml, ctx.fromLine),
   );
+  const fieldDisabled = effectiveDisabled(entry, ctx);
 
   return html`
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}
-        ?disabled=${ctx.disabled}
+        ?disabled=${fieldDisabled}
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
       >

@@ -1,11 +1,117 @@
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { BulkDeleteResult, ConfiguredDevice } from "../api/types.js";
+import type {
+  ArchivedDevice,
+  BulkDeleteResult,
+  ConfiguredDevice,
+} from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 export function editDevice(device: ConfiguredDevice) {
   window.history.pushState({}, "", `/device/${device.configuration}`);
   window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
+/**
+ * Soft-delete: backend moves YAML to ``<config_dir>/archive/`` and
+ * wipes the per-device build dir. Reversible via ``unarchiveDevice``.
+ *
+ * The backend fires ``DEVICE_REMOVED`` so the active device list
+ * updates via the existing scan event flow. Caller is responsible
+ * for refreshing the archived list afterwards (it's not event-driven).
+ */
+export async function archiveDevice(
+  device: ConfiguredDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+): Promise<boolean> {
+  const name = device.friendly_name || device.name;
+  try {
+    await api.archiveDevice(device.configuration);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    toast.error(localize("dashboard.action_archive_failed", { name, error }), {
+      richColors: true,
+    });
+    return false;
+  }
+  /* The toast carries the discoverability hint for unarchive —
+     archive is a one-way action from the user's POV unless we
+     tell them where to find the restore path. The Archived
+     devices entry lives in the header kebab; spelling it out
+     in the success toast saves a "where did my device go?"
+     support thread. */
+  toast.success(localize("dashboard.action_archive_success", { name }), {
+    description: localize("dashboard.action_archive_success_hint"),
+    richColors: true,
+    duration: 8000,
+  });
+  return true;
+}
+
+/**
+ * Restore an archived YAML back into the active config dir.
+ *
+ * Backend errors with INVALID_ARGS if an active config with the
+ * same filename already exists; surface the server message in the
+ * toast so the user can resolve it (delete or rename the active
+ * one before retrying).
+ *
+ * Takes the full ``ArchivedDevice`` (not just the ``configuration``)
+ * so toasts can show ``friendly_name`` / ``name`` in the same shape
+ * as ``archiveDevice`` and ``deleteArchivedDevice`` instead of
+ * showing the raw YAML filename.
+ */
+export async function unarchiveDevice(
+  device: ArchivedDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+): Promise<boolean> {
+  const name = device.friendly_name || device.name || device.configuration;
+  try {
+    await api.unarchiveDevice(device.configuration);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    toast.error(
+      localize("dashboard.action_unarchive_failed", { name, error }),
+      { richColors: true },
+    );
+    return false;
+  }
+  toast.success(
+    localize("dashboard.action_unarchive_success", { name }),
+    { richColors: true },
+  );
+  return true;
+}
+
+/**
+ * Permanently delete an archived YAML and its sidecars. Companion
+ * to ``archiveDevice`` for "I really don't want this back" — caller
+ * is expected to have already gated this through a confirm dialog
+ * since it's irreversible.
+ */
+export async function deleteArchivedDevice(
+  device: ArchivedDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+): Promise<boolean> {
+  const name = device.friendly_name || device.name || device.configuration;
+  try {
+    await api.deleteArchivedDevice(device.configuration);
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    toast.error(
+      localize("dashboard.action_delete_archived_failed", { name, error }),
+      { richColors: true },
+    );
+    return false;
+  }
+  toast.success(
+    localize("dashboard.action_delete_archived_success", { name }),
+    { richColors: true },
+  );
+  return true;
 }
 
 export function deleteDevice(

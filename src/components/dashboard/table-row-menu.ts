@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiArchiveOutline,
   mdiBroom,
   mdiCheckboxMultipleBlankOutline,
   mdiCheckDecagram,
@@ -7,6 +8,7 @@ import {
   mdiDelete,
   mdiDownload,
   mdiFileDownloadOutline,
+  mdiIpNetworkOutline,
   mdiKeyVariant,
   mdiOpenInNew,
   mdiPencil,
@@ -26,6 +28,7 @@ import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "archive-outline": mdiArchiveOutline,
   broom: mdiBroom,
   "checkbox-multiple-blank-outline": mdiCheckboxMultipleBlankOutline,
   "check-decagram": mdiCheckDecagram,
@@ -33,6 +36,7 @@ registerMdiIcons({
   delete: mdiDelete,
   download: mdiDownload,
   "file-download-outline": mdiFileDownloadOutline,
+  "ip-network-outline": mdiIpNetworkOutline,
   "key-variant": mdiKeyVariant,
   "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
@@ -270,6 +274,15 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="rename-outline"></wa-icon>
           ${this._localize("dashboard.action_rename")}
         </div>
+        ${this.device?.loaded_integrations?.includes("api")
+          ? html`<div
+              class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+              @click=${this.busy ? undefined : () => this._emit("install-to-address")}
+            >
+              <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
+              ${this._localize("dashboard.action_install_to_address")}
+            </div>`
+          : nothing}
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("clean-build")}
@@ -287,6 +300,13 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.context_select")}
         </div>
         <div class="menu-divider"></div>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("archive-device")}
+        >
+          <wa-icon library="mdi" name="archive-outline"></wa-icon>
+          ${this._localize("dashboard.action_archive")}
+        </div>
         <div
           class="menu-item menu-item--danger ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("delete-device")}

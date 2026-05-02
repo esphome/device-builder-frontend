@@ -8,6 +8,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
+import { previewPackageImportUrl } from "../util/package-import-url.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
@@ -73,6 +74,66 @@ export class ESPHomeAdoptDialog extends LitElement {
         color: var(--wa-color-text-normal);
         margin: 0 0 var(--wa-space-m);
         line-height: 1.5;
+      }
+
+      /* Surface the package_import_url so the user can see where
+         the adoption flow is fetching its YAML / Python from.
+         Most "Made for ESPHome" firmware advertises this routinely
+         (Athom, Apollo, etc.), so neutral informational treatment
+         rather than a warning. The user can still notice if the
+         hostname looks unfamiliar. See
+         esphome/device-builder#120 finding B-2. */
+      .source-info {
+        margin-bottom: var(--wa-space-m);
+      }
+
+      .source-info-label {
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-quiet);
+        margin-bottom: var(--wa-space-2xs);
+      }
+
+      /* Show the URL in monospace; long URLs wrap inside the
+         dialog instead of overflowing or getting truncated. The
+         word-break:break-word + overflow-wrap:anywhere pair
+         (same one yaml-diff.ts and ansi-log.ts use) breaks only
+         on the longest unbreakable run rather than mid-token —
+         hostnames stay intact, which matters here because the
+         hostname is the highest-signal part for deciding trust.
+         break-all would happily split github.com across two
+         lines and hide the signal. */
+      .source-info-url {
+        font-family: var(--wa-font-family-code);
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-normal);
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        background: var(--wa-color-surface-lowered);
+        padding: 6px 10px;
+        border-radius: var(--wa-border-radius-s);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        display: block;
+      }
+
+      /* Anchor variant of the URL block for when the value is a
+         recognised github / gitlab shorthand and we can resolve a
+         clickable browse URL. Same monospace + wrap shape as the
+         plain-text variant; just adds hover affordance and the
+         primary-colour underline so the user can tell it's
+         interactive. */
+      a.source-info-url {
+        color: var(--esphome-primary);
+        text-decoration: none;
+      }
+
+      a.source-info-url:hover {
+        text-decoration: underline;
+      }
+
+      a.source-info-url:focus-visible {
+        outline: 2px solid var(--esphome-primary-light);
+        outline-offset: 2px;
       }
 
       .field {
@@ -239,6 +300,8 @@ export class ESPHomeAdoptDialog extends LitElement {
                 })}
               </p>
 
+              ${this._renderSource(device.package_import_url)}
+
               <div class="field">
                 <label for="adopt-name">
                   ${this._localize("dashboard.adopt_field_name")}
@@ -327,6 +390,34 @@ export class ESPHomeAdoptDialog extends LitElement {
             `
           : nothing}
       </wa-dialog>
+    `;
+  }
+
+  private _renderSource(packageImportUrl: string) {
+    if (!packageImportUrl) return nothing;
+    const preview = previewPackageImportUrl(packageImportUrl);
+    // Render the raw shorthand verbatim — the user might recognise
+    // their vendor's domain even if we can't resolve a click target
+    // (e.g. a future ``bitbucket://`` scheme we don't support yet).
+    // When we DO have a browse URL we wrap it in an anchor so the
+    // user can pop the file open in a new tab and read the YAML
+    // before clicking Take Control.
+    const body = preview.browseUrl
+      ? html`<a
+          class="source-info-url"
+          href=${preview.browseUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          >${preview.raw}</a
+        >`
+      : html`<div class="source-info-url">${preview.raw}</div>`;
+    return html`
+      <div class="source-info">
+        <div class="source-info-label">
+          ${this._localize("dashboard.adopt_source_label")}
+        </div>
+        ${body}
+      </div>
     `;
   }
 

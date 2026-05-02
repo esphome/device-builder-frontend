@@ -32,6 +32,8 @@ function makeEntry(overrides: Partial<ConfigEntry>): ConfigEntry {
     references_component: null,
     pin_features: [],
     pin_mode: null,
+    locked: false,
+    suggestions: null,
     config_entries: null,
     platform_type: null,
     ...overrides,

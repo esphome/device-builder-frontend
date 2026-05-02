@@ -19,7 +19,13 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
   name: "esphome-frontend",
   mode: isProdBuild ? "production" : "development",
   target: "browserslist:modern",
-  devtool: isProdBuild ? "nosources-source-map" : "eval-cheap-module-source-map",
+  // ``eval-cheap-module-source-map`` is the rspack default for dev
+  // and uses ``eval()`` to evaluate each module — clashes with our
+  // CSP's lack of ``script-src 'unsafe-eval'`` so the dev server
+  // would 100% fail to boot the app. ``cheap-module-source-map``
+  // emits a separate ``.map`` file and avoids eval entirely; same
+  // line-level fidelity, slower hot reloads (acceptable for dev).
+  devtool: isProdBuild ? "nosources-source-map" : "cheap-module-source-map",
   entry: {
     app: path.resolve(SRC_DIR, "entrypoint.ts"),
   },

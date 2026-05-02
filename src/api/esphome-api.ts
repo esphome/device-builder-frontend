@@ -8,6 +8,7 @@
  */
 import type {
   AddComponentResponse,
+  ArchivedDevice,
   BoardCatalogEntry,
   BulkDeleteResult,
   CommandMessage,
@@ -399,6 +400,40 @@ export class ESPHomeAPI {
     });
   }
 
+  /**
+   * Archive a device — soft-delete that moves the YAML to
+   * ``<config_dir>/archive/`` and wipes the per-device build dir.
+   * Reversible via ``unarchiveDevice``.
+   */
+  async archiveDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/archive", { configuration });
+  }
+
+  /**
+   * Restore an archived device's YAML to the active config_dir.
+   * Errors with INVALID_ARGS if an active config with the same
+   * filename already exists — the dialog should prompt for
+   * resolution rather than blindly clobbering.
+   */
+  async unarchiveDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/unarchive", { configuration });
+  }
+
+  /** List archived devices for the archived-devices dialog. */
+  async listArchivedDevices(): Promise<ArchivedDevice[]> {
+    return this.sendCommand<ArchivedDevice[]>("devices/list_archived");
+  }
+
+  /**
+   * Permanently delete an archived device's YAML and its sidecars.
+   * The companion to ``archiveDevice`` for "I really don't want
+   * this back" — irreversible. Surfaces NOT_FOUND if the archive
+   * entry is gone.
+   */
+  async deleteArchivedDevice(configuration: string): Promise<void> {
+    await this.sendCommand("devices/delete_archived", { configuration });
+  }
+
   /** Get device YAML config. */
   async getConfig(configuration: string): Promise<string> {
     return this.sendCommand<string>("devices/get_config", { configuration });
@@ -468,9 +503,25 @@ export class ESPHomeAPI {
 
   // ─── Streaming Commands (per-connection) ───────────────────
 
-  /** Validate a device configuration (streaming, not queued). */
-  validate(configuration: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/validate", { configuration }, callbacks);
+  /**
+   * Validate a device configuration (streaming, not queued).
+   *
+   * ``options.showSecrets`` passes through to the backend as
+   * ``--show-secrets`` on the underlying ``esphome config`` call.
+   * Default off — resolved ``!secret`` values appear as
+   * ``<removed>`` until the user explicitly opts in via the toolbar
+   * toggle in the validate output dialog.
+   */
+  validate(
+    configuration: string,
+    callbacks: StreamCallbacks,
+    options: { showSecrets?: boolean } = {},
+  ): string {
+    const payload: Record<string, unknown> = { configuration };
+    if (options.showSecrets) {
+      payload.show_secrets = true;
+    }
+    return this.sendStreamCommand("devices/validate", payload, callbacks);
   }
 
   /** Stream logs from a device (streaming, not queued). */

@@ -5,9 +5,10 @@
  * barrel.
  */
 
-import { mdiKeyVariant } from "@mdi/js";
+import { mdiKeyVariant, mdiLockOutline } from "@mdi/js";
 import { html, nothing } from "lit";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
+import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -15,7 +16,18 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 
 registerMdiIcons({
   "key-variant": mdiKeyVariant,
+  "lock-outline": mdiLockOutline,
 });
+
+/**
+ * Disable predicate that combines the form-wide `disabled` state with
+ * the per-entry `locked` overlay used by featured components. Renderers
+ * thread this through every `?disabled=...` binding so a board-pinned
+ * field stays read-only even when the rest of the form is editable.
+ */
+export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
+  return ctx.disabled || entry.locked;
+}
 
 /** ESPHome stores secret references as `!secret <key>` literal strings
  *  in the YAML — match that shape so any string-shaped field can flag
@@ -98,6 +110,14 @@ export function renderLabel(
     <label class="field-label">
       ${labelFor(entry, ctx)}
       ${entry.required ? html`<span class="required">*</span>` : nothing}
+      ${entry.locked
+        ? html`<wa-icon
+            class="lock-icon"
+            library="mdi"
+            name="lock-outline"
+            title=${ctx.localize("device.field_locked_by_board")}
+          ></wa-icon>`
+        : nothing}
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
     ${entry.description
@@ -126,6 +146,14 @@ export function renderStringField(
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const placeholder = String(entry.default_value ?? "");
+  const disabled = effectiveDisabled(entry, ctx);
+  // When the entry carries a closed list of `suggestions`, render a
+  // strict <wa-select> regardless of the underlying inputType — used
+  // by featured components to pin the field to one of a few values
+  // (e.g. a PIR pin to one of two FPC-connector GPIOs).
+  if (entry.suggestions && entry.suggestions.length > 0) {
+    return renderSuggestionSelect(entry, path, value, invalid, disabled, ctx);
+  }
   // Password inputs render the dedicated component so they get a
   // reveal/hide toggle. Keeping the show-state inside the component
   // means the form's re-renders don't blow it away.
@@ -136,7 +164,7 @@ export function renderStringField(
         <esphome-password-input
           .value=${value}
           .invalid=${invalid}
-          .disabled=${ctx.disabled}
+          .disabled=${disabled}
           .placeholder=${placeholder}
           @input=${(e: CustomEvent<{ value: string }>) =>
             ctx.emitChange(path, e.detail.value)}
@@ -152,11 +180,65 @@ export function renderStringField(
         type=${inputType}
         class=${invalid ? "invalid" : ""}
         .value=${value}
-        ?disabled=${ctx.disabled}
+        ?disabled=${disabled}
         placeholder=${placeholder}
         @input=${(e: Event) => ctx.emitChange(path, (e.target as HTMLInputElement).value)}
       />
       ${renderSecretHint(value, ctx)} ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
+/**
+ * Render a closed `<wa-select>` for entries carrying a `suggestions`
+ * list (featured components only). Mirrors the strict-select branch of
+ * `renderSelectField` in `config-entry-renderers.ts` but lives in the
+ * shared module so the simple-field renderer can reuse it without
+ * importing the barrel.
+ */
+function renderSuggestionSelect(
+  entry: ConfigEntry,
+  path: string[],
+  value: string,
+  invalid: boolean,
+  disabled: boolean,
+  ctx: RenderCtx,
+) {
+  const valueLower = value.toLowerCase();
+  const placeholder = String(entry.default_value ?? "");
+  // Coerce the picked value back to the entry's declared type before
+  // emitting — the wa-select hands us a string regardless, but a number
+  // entry's YAML value must be a number or downstream validation
+  // (and the backend's locked-value comparison) will reject it.
+  const isNumeric =
+    entry.type === ConfigEntryType.INTEGER ||
+    entry.type === ConfigEntryType.FLOAT;
+  const coerce = (raw: string): string | number => {
+    if (!isNumeric) return raw;
+    if (raw === "") return raw;
+    const n = entry.type === ConfigEntryType.INTEGER ? parseInt(raw, 10) : Number(raw);
+    return Number.isFinite(n) ? n : raw;
+  };
+  return html`
+    <div class="field" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      <wa-select
+        class=${invalid ? "invalid" : ""}
+        ?disabled=${disabled}
+        placeholder=${placeholder}
+        @change=${(e: Event) =>
+          ctx.emitChange(path, coerce((e.target as HTMLSelectElement).value))}
+      >
+        ${(entry.suggestions ?? []).map((s) => {
+          const v = String(s);
+          return html`<wa-option
+            value=${v}
+            ?selected=${v.toLowerCase() === valueLower}
+            >${v}</wa-option
+          >`;
+        })}
+      </wa-select>
+      ${renderFieldError(path, ctx)}
     </div>
   `;
 }

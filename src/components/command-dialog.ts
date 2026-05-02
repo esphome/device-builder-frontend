@@ -4,6 +4,8 @@ import {
   mdiCheckCircle,
   mdiClose,
   mdiDownload,
+  mdiKey,
+  mdiKeyOutline,
   mdiPlaylistCheck,
   mdiRefresh,
   mdiStop,
@@ -36,6 +38,8 @@ import "./ansi-log.js";
 registerMdiIcons({
   close: mdiClose,
   download: mdiDownload,
+  key: mdiKey,
+  "key-outline": mdiKeyOutline,
   stop: mdiStop,
   refresh: mdiRefresh,
   "check-circle": mdiCheckCircle,
@@ -99,6 +103,25 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() private _state: CommandState | null = null;
   @state() private _lines: string[] = [];
   @state() private _statusMessage = "";
+  /** Show-secrets toggle for the validate path. Re-runs validation
+   *  when flipped (the ``--show-secrets`` flag is set on the
+   *  ``esphome config`` subprocess at spawn time, so toggling has
+   *  to tear down and re-spawn the underlying stream — same shape
+   *  as logs-dialog's States toggle). Persisted only for the
+   *  current dialog session: each fresh ``open`` resets to off so
+   *  resolved secrets never leak into a screen-share without an
+   *  explicit click. */
+  @state() private _showSecrets = false;
+  /** Guard against re-entrancy on the show-secrets toggle.
+   *  ``_detachStream`` clears ``_streamId`` synchronously and only
+   *  awaits the backend stop afterwards; without this flag a fast
+   *  double-click could fire two overlapping restarts (the second
+   *  finds ``_streamId === ""``, treats the detach as a no-op, and
+   *  spawns its own stream while the first is still awaiting the
+   *  backend's stop response). Plain boolean rather than a queue —
+   *  on a double-click we want the second click to be a no-op, not
+   *  to chain another restart after the first. */
+  private _restartInflight = false;
 
   /** Active job ID (for cancel). Not used for validate. */
   private _jobId = "";
@@ -319,6 +342,15 @@ export class ESPHomeCommandDialog extends LitElement {
         background: var(--term-hover); color: var(--term-fg);
         border-color: var(--term-fg-muted);
       }
+      /* Active state for toggle ghost buttons (e.g. show-secrets).
+         Same accent palette as the start button so it reads as "this
+         mode is currently on" without being mistaken for a destructive
+         or stop action. Mirrors the logs-dialog --states toggle. */
+      .term-btn--ghost.is-active {
+        background: color-mix(in srgb, var(--term-accent), transparent 85%);
+        color: var(--term-accent);
+        border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
+      }
       .term-btn--stop {
         background: color-mix(in srgb, var(--term-error), transparent 85%);
         color: var(--term-error);
@@ -352,6 +384,11 @@ export class ESPHomeCommandDialog extends LitElement {
     this._statusMessage = "";
     this._jobId = "";
     this._jobStatus = null;
+    /* Always start with secrets redacted on a fresh open — the
+       toggle is opt-in per session so a screen-share / pair-coding
+       moment can't accidentally inherit a previous "show secrets"
+       state. */
+    this._showSecrets = false;
     this._detachStream();
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -412,10 +449,21 @@ export class ESPHomeCommandDialog extends LitElement {
    * lines for a job we're no longer watching). Safe to call when
    * no stream is active.
    */
-  private _detachStream() {
+  private async _detachStream(): Promise<void> {
     if (!this._streamId) return;
-    this._api.stopStream(this._streamId).catch(() => {});
+    const streamId = this._streamId;
     this._streamId = "";
+    /* Awaiting here lets callers that need the backend subprocess
+       to actually exit before respawning (e.g. the show-secrets
+       toggle, which restarts the same command with a different
+       flag) chain off the promise. Swallow errors — a stop that
+       fails because the stream already finished is the common
+       case, not a bug. */
+    try {
+      await this._api.stopStream(streamId);
+    } catch {
+      /* ignore */
+    }
   }
 
   private get _title(): string {
@@ -520,6 +568,7 @@ export class ESPHomeCommandDialog extends LitElement {
       <div class="terminal-toolbar">
         ${this._renderStatus()}
         <span class="spacer"></span>
+        ${this._renderShowSecretsToggle()}
         ${this._lines.length > 0
           ? html`<button
               class="term-btn term-btn--ghost"
@@ -533,6 +582,36 @@ export class ESPHomeCommandDialog extends LitElement {
         ${this._renderActions()}
       </div>
     `;
+  }
+
+  /**
+   * Render the show-secrets toggle — validate only.
+   *
+   * Only relevant for the validate path: ``--show-secrets`` is an
+   * ``esphome config`` flag, not something the compile / install /
+   * clean flows respect. Hide on every other command type so the
+   * toolbar doesn't accumulate a row of inert buttons. Same shape
+   * as the logs-dialog "States" toggle: ghost button, ``is-active``
+   * class when on, ``aria-pressed`` for screen readers, label
+   * swaps between Show / Hide.
+   */
+  private _renderShowSecretsToggle() {
+    if (this._commandType !== "validate") return nothing;
+    const labelKey = this._showSecrets
+      ? "command.hide_secrets"
+      : "command.show_secrets";
+    const tooltipKey = this._showSecrets
+      ? "command.hide_secrets_tooltip"
+      : "command.show_secrets_tooltip";
+    return html`<button
+      class="term-btn term-btn--ghost ${this._showSecrets ? "is-active" : ""}"
+      @click=${this._toggleShowSecrets}
+      title=${this._localize(tooltipKey)}
+      aria-pressed=${this._showSecrets ? "true" : "false"}
+    >
+      <wa-icon library="mdi" name=${this._showSecrets ? "key" : "key-outline"}></wa-icon>
+      ${this._localize(labelKey)}
+    </button>`;
   }
 
   /**
@@ -597,21 +676,63 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Validate uses the per-connection streaming command (not a queued job). */
   private _startValidateStream() {
-    this._streamId = this._api.validate(this.configuration, {
-      onOutput: (line) => { this._lines = [...this._lines, line]; },
-      onResult: (data) => {
-        this._streamId = "";
-        this._state = data.success ? "success" : "error";
-        this._statusMessage = this._localize(
-          data.success ? "command.validate_success" : "command.validate_failed",
-        );
+    this._streamId = this._api.validate(
+      this.configuration,
+      {
+        onOutput: (line) => { this._lines = [...this._lines, line]; },
+        onResult: (data) => {
+          this._streamId = "";
+          this._state = data.success ? "success" : "error";
+          this._statusMessage = this._localize(
+            data.success ? "command.validate_success" : "command.validate_failed",
+          );
+        },
+        onError: (error) => {
+          this._streamId = "";
+          this._state = "error";
+          this._statusMessage = error;
+        },
       },
-      onError: (error) => {
-        this._streamId = "";
-        this._state = "error";
-        this._statusMessage = error;
-      },
-    });
+      { showSecrets: this._showSecrets },
+    );
+  }
+
+  /**
+   * Re-run validation with the show-secrets flag flipped.
+   *
+   * The ``--show-secrets`` flag is baked into the esphome config
+   * subprocess at spawn time, so flipping the toggle has to tear
+   * down the current stream and start a fresh one. Mirrors the
+   * logs-dialog "States" toggle. Output is cleared before the
+   * restart so users don't see the redacted-then-resolved values
+   * stitched into one scrollback, and the ansi-log scroll position
+   * is reset so a previously-scrolled-up view doesn't suppress
+   * auto-scroll on the new output.
+   *
+   * Serialised via ``_restartInflight`` so a fast double-toggle
+   * doesn't race two restarts. ``_detachStream`` clears the stream
+   * id synchronously, so without the guard a second click during
+   * the awaited stop sees ``_streamId === ""``, proceeds with a
+   * no-op detach + spawn, and when the original ``await`` resumes
+   * it spawns another stream against the same dialog — two
+   * concurrent ``esphome config`` runs interleaving into
+   * ``_lines``.
+   */
+  private async _toggleShowSecrets() {
+    this._showSecrets = !this._showSecrets;
+    if (this._commandType !== "validate") return;
+    if (this._restartInflight) return;
+    this._restartInflight = true;
+    try {
+      await this._detachStream();
+      this._lines = [];
+      this._state = "running";
+      this._statusMessage = "";
+      this._resetAnsiLogScroll();
+      this._startValidateStream();
+    } finally {
+      this._restartInflight = false;
+    }
   }
 
   /**

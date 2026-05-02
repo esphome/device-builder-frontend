@@ -13,7 +13,12 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { DashboardView, DeviceState, SortDirection } from "../api/types.js";
-import type { AdoptableDevice, ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type {
+  AdoptableDevice,
+  ArchivedDevice,
+  ConfiguredDevice,
+  FirmwareJob,
+} from "../api/types.js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
@@ -29,12 +34,15 @@ import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  archiveDevice,
+  deleteArchivedDevice,
   deleteBulkDevices,
   deleteDevice,
   downloadYaml,
   editDevice,
   fetchApiKey,
   streamSerialToDialog,
+  unarchiveDevice,
 } from "./dashboard-actions.js";
 import { buildWebUiUrl } from "../util/web-ui-url.js";
 import { detectChip, disconnect } from "../util/web-serial.js";
@@ -45,6 +53,8 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/input/input.js";
 import "../components/api-key-dialog.js";
 import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
+import "../components/archived-devices-dialog.js";
+import type { ESPHomeArchivedDevicesDialog } from "../components/archived-devices-dialog.js";
 import "../components/confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import "../components/dashboard/device-drawer.js";
@@ -55,6 +65,8 @@ import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import "../components/install-address-dialog.js";
+import type { ESPHomeInstallAddressDialog } from "../components/install-address-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
@@ -125,6 +137,17 @@ export class ESPHomePageDashboard extends LitElement {
    *  per-device kebab Delete and the select-mode bulk Delete
    *  without juggling two dialog elements. */
   @state() private _pendingDelete: ConfiguredDevice | null = null;
+  /** Archived configuration queued for permanent-delete confirmation.
+   *  Routed through the same ``esphome-confirm-dialog`` instance as
+   *  the active-device delete by setting this state alongside
+   *  clearing ``_pendingDelete`` — the dialog's copy and confirm
+   *  router both branch on which is non-null. */
+  @state() private _pendingDeleteArchived: ArchivedDevice | null = null;
+  /** Active device queued for archive confirmation. Archive is
+   *  reversible but wipes the per-device build dir — that's
+   *  expensive (5-10min ESP-IDF recompile) so it deserves a
+   *  confirm step. Same shared dialog as the two delete flows. */
+  @state() private _pendingArchive: ConfiguredDevice | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
    *  device card / row so the user can spot the freshly-imported
@@ -184,19 +207,26 @@ export class ESPHomePageDashboard extends LitElement {
   private _onShowIgnoredChanged = (e: Event) => {
     this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
   };
+  private _onShowArchivedDialog = () => {
+    this._archivedDialog?.open();
+  };
 
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
-    /* The "Show ignored discoveries" toggle lives in the header
-       kebab; sync the persisted flag here and listen for changes
-       dispatched from the menu so we don't have to thread props /
-       contexts through the layout. */
+    /* The "Show ignored discoveries" toggle and "Archived devices"
+       trigger live in the header kebab; sync the persisted flag
+       here and listen for the kebab's window events so we don't
+       have to thread props / contexts through the layout. */
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener(
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged,
+    );
+    window.addEventListener(
+      "esphome-show-archived-dialog",
+      this._onShowArchivedDialog,
     );
   }
 
@@ -227,19 +257,45 @@ export class ESPHomePageDashboard extends LitElement {
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged,
     );
+    window.removeEventListener(
+      "esphome-show-archived-dialog",
+      this._onShowArchivedDialog,
+    );
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
       this._adoptHighlightTimer = null;
     }
   }
 
+  /**
+   * Archive a device through the WS API.
+   *
+   * Backend wipes the per-device build dir + moves the YAML to
+   * ``<config_dir>/archive/`` and fires ``DEVICE_REMOVED``, so the
+   * active device list updates via the existing scan event flow.
+   * The archived-devices dialog is its own component and pulls a
+   * fresh list every time it opens, so we don't have to push an
+   * update from here.
+   */
+  private async _archiveDevice(device: ConfiguredDevice) {
+    await archiveDevice(device, this._api, this._localize);
+  }
+
+  private async _unarchiveDevice(device: ArchivedDevice) {
+    if (await unarchiveDevice(device, this._api, this._localize)) {
+      await this._archivedDialog?.refresh();
+    }
+  }
+
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
+  @query("esphome-archived-devices-dialog") private _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-rename-device-dialog") private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog") private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+  @query("esphome-install-address-dialog") private _installAddressDialog!: ESPHomeInstallAddressDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
 
   /** Device currently targeted by rename/api-key actions. */
@@ -522,7 +578,9 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
+        @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
@@ -573,7 +631,9 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
+        @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._onEnterSelectMode(e.detail.configuration)}
       ></esphome-table-row-menu>
@@ -608,27 +668,71 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderDialogs() {
-    /* One confirm-dialog instance covers both flows (per-device
-       kebab Delete and select-mode bulk Delete) — ``_pendingDelete``
-       drives the copy and the ``@confirm`` router. Picking up the
-       device's friendly name keeps the prompt readable when the
-       technical hostname is something like
+    /* One confirm-dialog instance covers three flows: per-device
+       kebab Delete, select-mode bulk Delete, and Delete-permanently
+       on an archived row. ``_pendingDelete`` and
+       ``_pendingDeleteArchived`` drive the copy + ``@confirm``
+       router; at most one is non-null at a time, with both null
+       falling through to the bulk-delete copy.
+
+       Picking up the device's friendly name keeps the prompt
+       readable when the technical hostname is something like
        ``athom-rgbcw-bulb-998181``. */
     const pendingName = this._pendingDelete
       ? this._pendingDelete.friendly_name || this._pendingDelete.name
       : "";
+    const pendingArchivedName = this._pendingDeleteArchived
+      ? this._pendingDeleteArchived.friendly_name ||
+        this._pendingDeleteArchived.name ||
+        this._pendingDeleteArchived.configuration
+      : "";
+    const pendingArchiveName = this._pendingArchive
+      ? this._pendingArchive.friendly_name || this._pendingArchive.name
+      : "";
+    let dialogHeading: string;
+    let dialogMessage: string;
+    let dialogConfirm: string;
+    let dialogDestructive = false;
+    if (this._pendingArchive) {
+      dialogHeading = this._localize("dashboard.archive_title");
+      dialogMessage = this._localize("dashboard.archive_desc", {
+        name: pendingArchiveName,
+      });
+      dialogConfirm = this._localize("dashboard.archive_confirm");
+    } else if (this._pendingDeleteArchived) {
+      dialogHeading = this._localize("dashboard.delete_archived_title");
+      dialogMessage = this._localize("dashboard.delete_archived_desc", {
+        name: pendingArchivedName,
+      });
+      dialogConfirm = this._localize("dashboard.action_delete_permanently");
+      dialogDestructive = true;
+    } else if (this._pendingDelete) {
+      dialogHeading = this._localize("dashboard.delete_single_title");
+      dialogMessage = this._localize("dashboard.delete_single_desc", {
+        name: pendingName,
+      });
+      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
+      dialogDestructive = true;
+    } else {
+      dialogHeading = this._localize("dashboard.delete_selected_title");
+      dialogMessage = this._localize("dashboard.delete_selected_desc", {
+        count: this._selectedDevices.size,
+      });
+      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
+      dialogDestructive = true;
+    }
     return html`
       <esphome-confirm-dialog
-        heading=${this._pendingDelete
-          ? this._localize("dashboard.delete_single_title")
-          : this._localize("dashboard.delete_selected_title")}
-        message=${this._pendingDelete
-          ? this._localize("dashboard.delete_single_desc", { name: pendingName })
-          : this._localize("dashboard.delete_selected_desc", { count: this._selectedDevices.size })}
-        confirm-label=${this._localize("dashboard.delete_selected_confirm")}
-        destructive
-        @confirm=${this._executeDelete}
-        @cancel=${() => { this._pendingDelete = null; }}
+        heading=${dialogHeading}
+        message=${dialogMessage}
+        confirm-label=${dialogConfirm}
+        ?destructive=${dialogDestructive}
+        @confirm=${this._executeConfirm}
+        @cancel=${() => {
+          this._pendingDelete = null;
+          this._pendingDeleteArchived = null;
+          this._pendingArchive = null;
+        }}
       ></esphome-confirm-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
@@ -646,6 +750,13 @@ export class ESPHomePageDashboard extends LitElement {
         @close=${() => { this._installMethodOpen = false; }}
         @select-method=${this._onInstallMethodSelect}
       ></esphome-install-method-dialog>
+      <esphome-install-address-dialog
+        @install-to-address=${this._onInstallToAddress}
+      ></esphome-install-address-dialog>
+      <esphome-archived-devices-dialog
+        @unarchive=${(e: CustomEvent<ArchivedDevice>) => this._unarchiveDevice(e.detail)}
+        @delete-archived=${(e: CustomEvent<ArchivedDevice>) => this._confirmDeleteArchived(e.detail)}
+      ></esphome-archived-devices-dialog>
     `;
   }
 
@@ -909,6 +1020,33 @@ export class ESPHomePageDashboard extends LitElement {
     this._installMethodOpen = true;
   }
 
+  /**
+   * Open the advanced "Install to Specific Address" dialog.
+   *
+   * Surfaced from the per-device kebab menu only on devices whose
+   * loaded_integrations include ``api`` — the override only makes
+   * sense for OTA-capable devices. Pre-fills with the device's
+   * resolved IP (or fallback to the configured address) so the
+   * user typically just edits an octet rather than retyping the
+   * whole address.
+   */
+  private _openInstallToAddress(device: ConfiguredDevice) {
+    this._installAddressDialog.open({
+      deviceName: device.friendly_name || device.name,
+      configuration: device.configuration,
+      currentAddress: device.ip || device.address || "",
+    });
+  }
+
+  private _onInstallToAddress(
+    e: CustomEvent<{ configuration: string; port: string }>,
+  ) {
+    const { configuration, port } = e.detail;
+    const device = this._devices.find((d) => d.configuration === configuration);
+    if (!device) return;
+    this._openCommand(device, "install", port);
+  }
+
   private _onInstallMethodSelect(e: CustomEvent<{ method: string; port?: string }>) {
     const device = this._installMethodDevice;
     this._installMethodOpen = false;
@@ -998,9 +1136,11 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
       return;
     }
-    /* Bulk-delete path — ``_pendingDelete`` stays null so the
-       confirm dialog shows the bulk copy ("Delete N device(s)"). */
+    /* Bulk-delete path — all three pending-* states stay null so
+       the confirm dialog shows the bulk copy ("Delete N device(s)"). */
     this._pendingDelete = null;
+    this._pendingDeleteArchived = null;
+    this._pendingArchive = null;
     this._confirmDialog.open();
   }
 
@@ -1011,10 +1151,48 @@ export class ESPHomePageDashboard extends LitElement {
        and went straight to ``deleteDevice`` — there's no undo, so a
        missed click on the kebab silently nuked the YAML. */
     this._pendingDelete = device;
+    this._pendingDeleteArchived = null;
+    this._pendingArchive = null;
     this._confirmDialog.open();
   }
 
-  private _executeDelete() {
+  private _confirmDeleteArchived(device: ArchivedDevice) {
+    /* Permanent-delete from the archived section. Same dialog as
+       the active-device delete, with branched copy. The archive
+       was already a soft-delete, so this is the "really, gone"
+       step — the YAML and its sidecars are unlinked. */
+    this._pendingDelete = null;
+    this._pendingArchive = null;
+    this._pendingDeleteArchived = device;
+    this._confirmDialog.open();
+  }
+
+  private _confirmArchive(device: ConfiguredDevice) {
+    /* Archive is reversible but wipes the per-device build dir
+       (5-10 min recompile when restored). Show a confirm dialog
+       that explains both the build wipe and where the user can
+       find the device after archiving — without that hint a
+       silently-disappearing device leads to "where did it go?"
+       support. */
+    this._pendingDelete = null;
+    this._pendingDeleteArchived = null;
+    this._pendingArchive = device;
+    this._confirmDialog.open();
+  }
+
+  private _executeConfirm() {
+    if (this._pendingArchive) {
+      const target = this._pendingArchive;
+      this._pendingArchive = null;
+      this._archiveDevice(target);
+      return;
+    }
+    if (this._pendingDeleteArchived) {
+      const target = this._pendingDeleteArchived;
+      this._pendingDeleteArchived = null;
+      this._deleteArchivedDevice(target);
+      return;
+    }
     if (this._pendingDelete) {
       const target = this._pendingDelete;
       this._pendingDelete = null;
@@ -1025,6 +1203,12 @@ export class ESPHomePageDashboard extends LitElement {
     this._selectMode = false;
     this._selectedDevices = new Set();
     deleteBulkDevices(selected, this._devices, this._api, this._localize);
+  }
+
+  private async _deleteArchivedDevice(device: ArchivedDevice) {
+    if (await deleteArchivedDevice(device, this._api, this._localize)) {
+      await this._archivedDialog?.refresh();
+    }
   }
 }
 

@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiArchiveOutline,
   mdiCheck,
   mdiCog,
   mdiDotsVertical,
@@ -21,6 +22,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "archive-outline": mdiArchiveOutline,
   check: mdiCheck,
   cog: mdiCog,
   "dots-vertical": mdiDotsVertical,
@@ -332,7 +334,7 @@ export class ESPHomeHeaderActions extends LitElement {
                 tabindex="0"
                 aria-checked=${this._showIgnored}
                 @click=${this._toggleShowIgnored}
-                @keydown=${this._onCheckboxKeydown}
+                @keydown=${this._onShowIgnoredKeydown}
               >
                 <wa-icon library="mdi" name="eye-outline"></wa-icon>
                 <span class="menu-item-label"
@@ -345,6 +347,16 @@ export class ESPHomeHeaderActions extends LitElement {
                       name="check"
                     ></wa-icon>`
                   : nothing}
+              </div>
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openArchivedDevices}
+                @keydown=${this._onMenuItemKeydown}
+              >
+                <wa-icon library="mdi" name="archive-outline"></wa-icon>
+                ${this._localize("layout.archived_devices")}
               </div>
               <div class="menu-divider menu-divider--inline" role="separator"></div>
               <div
@@ -399,7 +411,7 @@ export class ESPHomeHeaderActions extends LitElement {
     }
   };
 
-  private _onCheckboxKeydown = (e: KeyboardEvent) => {
+  private _onShowIgnoredKeydown = (e: KeyboardEvent) => {
     /* The toggle is a ``<div role="menuitemcheckbox">`` rather than
        a ``<button>`` so it sits visually flush with the surrounding
        menu items (the menu was built with div items predating this
@@ -423,6 +435,16 @@ export class ESPHomeHeaderActions extends LitElement {
       }),
     );
   }
+
+  private _openArchivedDevices = () => {
+    /* Dashboard hosts the dialog instance and listens for this
+       window event to open it. Same window-event bridge the rest
+       of the kebab menu uses (show-ignored toggle) so we stay
+       consistent and don't have to thread a context through the
+       layout for a single trigger. */
+    this._close();
+    window.dispatchEvent(new Event("esphome-show-archived-dialog"));
+  };
 
   private _openSecrets() {
     this._close();
