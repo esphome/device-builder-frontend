@@ -97,7 +97,13 @@ export function renderPinField(
     return renderStringField(entry, "text", path, ctx);
   }
 
-  const value = String(ctx.getAt(path) ?? "");
+  // Pin presets land as either bare ints (`12`) or `GPIOn` strings —
+  // the wa-option values are always the `GPIOn` form, so normalise
+  // before comparing or the disabled select renders blank.
+  const rawValue = ctx.getAt(path);
+  const valueGpio = parseSuggestionGpio(rawValue);
+  const value =
+    valueGpio !== null ? `GPIO${valueGpio}` : String(rawValue ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const required = entry.pin_features ?? [];
   const matchesFeatures = (pin: BoardPin) =>
@@ -117,6 +123,19 @@ export function renderPinField(
     if (allowed.size > 0) {
       visible = visible.filter((p) => allowed.has(p.gpio));
     }
+  }
+  // The board's preset pin trumps generic feature filtering — a locked
+  // GPIO12 (Sonoff relay) doesn't necessarily declare the same features
+  // the underlying `switch.gpio` schema asks for, but the manifest is
+  // authoritative. Make sure the active value's pin is always in the
+  // dropdown so the disabled select still shows the right option.
+  if (
+    valueGpio !== null &&
+    !visible.some((p) => p.gpio === valueGpio) &&
+    ctx.board.pins.some((p) => p.gpio === valueGpio)
+  ) {
+    const pin = ctx.board.pins.find((p) => p.gpio === valueGpio)!;
+    visible = [pin, ...visible];
   }
   const usedPins = findUsedPins(
     ctx.yaml,

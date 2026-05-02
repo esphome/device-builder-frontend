@@ -6,7 +6,6 @@ import {
   mdiOpenInNew,
   mdiPackageVariantClosed,
   mdiPlus,
-  mdiStar,
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -39,7 +38,6 @@ registerMdiIcons({
   "open-in-new": mdiOpenInNew,
   "package-variant-closed": mdiPackageVariantClosed,
   plus: mdiPlus,
-  star: mdiStar,
 });
 
 @customElement("esphome-component-catalog")
@@ -102,12 +100,6 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   @state()
   private _total = 0;
-
-  /** Featured component entries fetched from `category=featured&board_id=...`.
-   *  Empty when the board has no recommendations. Rendered in the
-   *  pinned "Recommended" section above the regular grid. */
-  @state()
-  private _featured: ComponentCatalogEntry[] = [];
 
   @state()
   private _loading = true;
@@ -225,6 +217,23 @@ export class ESPHomeComponentCatalog extends LitElement {
    * per dialog open.
    */
   public load() {
+    // Auto-select the "Featured" tab on open when the board has any
+    // recommendations — that's the curated short list users on those
+    // boards reach for first. Falls back to "all" otherwise (and resets
+    // away from "featured" if the dialog is reopened against a board
+    // without recommendations).
+    const featuredCount =
+      (this.board?.featured_components?.length ?? 0) +
+      (this.board?.featured_bundles?.length ?? 0);
+    const hasFeatured =
+      this.lockedCategories.length === 0 &&
+      !!this.boardId &&
+      featuredCount > 0;
+    if (hasFeatured) {
+      this._category = ComponentCategory.FEATURED;
+    } else if (this._category === ComponentCategory.FEATURED) {
+      this._category = "all";
+    }
     this._fetchComponents();
   }
 
@@ -273,38 +282,17 @@ export class ESPHomeComponentCatalog extends LitElement {
           : undefined;
       const platform = this.platform || undefined;
       const board_id = this.boardId || undefined;
-      // Fetch the regular grid and the featured set in parallel. The
-      // featured request only fires when we're actually going to
-      // render the pinned Recommended section: when the user has
-      // picked any specific category (sidebar filter active) or the
-      // parent has locked us to a non-default category set, the
-      // pinned section is hidden anyway, so the second call would
-      // just be wasted bytes. The "Featured" sidebar entry already
-      // returns featured components through the regular call.
-      const wantFeatured = !!board_id && !locked && this._category === "all";
-      const [response, featuredResponse] = await Promise.all([
-        this._api.getComponents({
-          query,
-          category,
-          exclude_category,
-          platform,
-          board_id,
-          limit: 50,
-        }),
-        wantFeatured
-          ? this._api.getComponents({
-              query,
-              category: ComponentCategory.FEATURED,
-              platform,
-              board_id,
-              limit: 100,
-            })
-          : Promise.resolve(null),
-      ]);
+      const response = await this._api.getComponents({
+        query,
+        category,
+        exclude_category,
+        platform,
+        board_id,
+        limit: 50,
+      });
       this._components = response.components;
       this._categories = response.categories;
       this._total = response.total;
-      this._featured = featuredResponse?.components ?? [];
     } catch (e) {
       console.error("Failed to load component catalog:", e);
     } finally {
@@ -666,39 +654,9 @@ export class ESPHomeComponentCatalog extends LitElement {
         font-size: var(--wa-font-size-s);
       }
 
-      /* Pinned "Recommended for <board>" section above the regular
-         grid. Visually distinguished from the rest of the catalog by
-         the section heading + a primary-coloured accent on each
-         card. */
-      .featured-section {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-xs);
-      }
-
-      .featured-heading {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-2xs);
-        margin: 0;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-subtle);
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-      }
-
-      .featured-heading wa-icon {
-        font-size: 14px;
-        color: var(--esphome-primary);
-      }
-
-      .featured-divider {
-        height: 1px;
-        background: var(--wa-color-surface-border);
-        margin: var(--wa-space-xs) 0 0;
-      }
-
+      /* Cards in the "Featured" view get a subtle primary-coloured
+         border accent so they read as the curated set, distinct from
+         the regular catalog. */
       .component-card--featured {
         border-color: color-mix(
           in srgb,
@@ -738,18 +696,11 @@ export class ESPHomeComponentCatalog extends LitElement {
     // filtered list.
     const showSidebar = this.lockedCategories.length === 0;
 
-    // Pinned "Recommended for <board>" section. Only shown when the
-    // user is browsing all categories (the sidebar default) — when
-    // they pick a specific category they're focusing on it; mixing
-    // unrelated featured cards above the focused list would be noise.
-    // The dedicated "Featured" sidebar entry already lists every
-    // featured component on its own.
-    const filteredBundles = this._filteredBundles;
-    const showRecommended =
-      !this._loading &&
-      this._category === "all" &&
-      this.lockedCategories.length === 0 &&
-      (this._featured.length + filteredBundles.length) > 0;
+    // Bundle cards live alongside featured components and only surface
+    // in the dedicated "Featured" view. In every other view the grid
+    // is just the regular component slice from the backend.
+    const filteredBundles =
+      this._category === ComponentCategory.FEATURED ? this._filteredBundles : [];
 
     return html`
       ${showSidebar
@@ -782,40 +733,27 @@ export class ESPHomeComponentCatalog extends LitElement {
           placeholder=${this._localize("device.search_components_placeholder")}
         />
         ${!this._loading
-          ? html`<span class="result-count">${this._visibleComponents.length} of ${this._total} components</span>`
+          ? html`<span class="result-count">${this._visibleComponents.length + filteredBundles.length} of ${this._total + filteredBundles.length} components</span>`
           : ""}
         <div class="grid-scroll">
-          ${showRecommended ? this._renderRecommendedSection(filteredBundles) : nothing}
           <div class="components-grid">
             ${this._loading
               ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
-              : this._visibleComponents.length
-                ? this._visibleComponents.map((c) => this._renderCard(c, c.id === this._expandedId))
+              : this._visibleComponents.length + filteredBundles.length
+                ? html`
+                    ${filteredBundles.map((b) => this._renderBundleCard(b))}
+                    ${this._visibleComponents.map((c) =>
+                      this._renderCard(
+                        c,
+                        c.id === this._expandedId,
+                        this._category === ComponentCategory.FEATURED,
+                      ),
+                    )}
+                  `
                 : html`<p class="empty">${this._localize("device.no_components_found")}</p>`}
           </div>
         </div>
       </div>
-    `;
-  }
-
-  private _renderRecommendedSection(bundles: FeaturedBundle[]) {
-    const boardName = this.board?.name || "";
-    return html`
-      <section class="featured-section">
-        <h3 class="featured-heading">
-          <wa-icon library="mdi" name="star"></wa-icon>
-          ${boardName
-            ? this._localize("device.recommended_for_board", { name: boardName })
-            : this._localize("device.component_category_featured")}
-        </h3>
-        <div class="components-grid">
-          ${this._featured.map((c) =>
-            this._renderCard(c, c.id === this._expandedId, true),
-          )}
-          ${bundles.map((b) => this._renderBundleCard(b))}
-        </div>
-        <div class="featured-divider"></div>
-      </section>
     `;
   }
 
@@ -858,17 +796,34 @@ export class ESPHomeComponentCatalog extends LitElement {
     // dialog instead). The total count is also adjusted to match.
     const excluded = new Set(this.excludeCategories);
     const visibleCats = this._categories.filter((c) => !excluded.has(c.id));
+    // The "Featured" category gets its own pinned slot at the top —
+    // peel it out of the alphabetical list so it doesn't appear twice.
+    const featuredCat = visibleCats.find(
+      (c) => c.id === ComponentCategory.FEATURED,
+    );
+    const bundleCount = this.board?.featured_bundles?.length ?? 0;
+    // Bundles are surfaced under the Featured tab too but live on the
+    // board manifest, not in the components categories response. Add
+    // them to the headline count so the badge matches the rendered
+    // grid.
+    const featuredBadge = featuredCat
+      ? featuredCat.count + bundleCount
+      : bundleCount;
+    const sortableCats = visibleCats.filter(
+      (c) => c.id !== ComponentCategory.FEATURED,
+    );
     const visibleTotal = excluded.size
-      ? visibleCats.reduce((sum, c) => sum + c.count, 0)
+      ? sortableCats.reduce((sum, c) => sum + c.count, 0)
       : this._total;
     // Resolve each category's display label first (i18n key when one
     // exists, otherwise the backend-provided fallback), then sort
     // alphabetically by what the user actually reads. The backend
     // sorts by component count which doesn't help discovery — finding
     // "Sensor" in a 30-entry list is much faster when it's in
-    // alphabetical order. "All" stays pinned at the top.
+    // alphabetical order. "Featured" (when present) and "All" stay
+    // pinned at the top.
     const collator = new Intl.Collator(undefined, { sensitivity: "base" });
-    const sortedCats = visibleCats
+    const sortedCats = sortableCats
       .map((cat) => {
         const key = `device.component_category_${cat.id}`;
         const translated = this._localize(key);
@@ -879,14 +834,20 @@ export class ESPHomeComponentCatalog extends LitElement {
         };
       })
       .sort((a, b) => collator.compare(a.label, b.label));
-    const cats = [
-      {
-        id: "all",
-        label: this._localize("device.component_category_all"),
-        count: visibleTotal,
-      },
-      ...sortedCats,
-    ];
+    const cats: Array<{ id: string; label: string; count: number }> = [];
+    if (featuredBadge > 0) {
+      cats.push({
+        id: ComponentCategory.FEATURED,
+        label: this._localize("device.component_category_featured"),
+        count: featuredBadge,
+      });
+    }
+    cats.push({
+      id: "all",
+      label: this._localize("device.component_category_all"),
+      count: visibleTotal,
+    });
+    cats.push(...sortedCats);
     return cats;
   }
 

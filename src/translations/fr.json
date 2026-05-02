@@ -353,7 +353,6 @@
     "search_components_placeholder": "Rechercher des composants…",
     "no_components_found": "Aucun composant trouvé",
     "add_component_action": "Ajouter",
-    "recommended_for_board": "Recommandé pour {name}",
     "featured_bundle_badge": "Pack",
     "field_locked_by_board": "Défini par la carte",
     "bundle_step_progress": "Étape {current} sur {total} — Ajout de {name}",

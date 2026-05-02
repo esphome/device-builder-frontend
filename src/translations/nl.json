@@ -353,7 +353,6 @@
     "search_components_placeholder": "Componenten zoeken…",
     "no_components_found": "Geen componenten gevonden",
     "add_component_action": "Toevoegen",
-    "recommended_for_board": "Aanbevolen voor {name}",
     "featured_bundle_badge": "Bundel",
     "field_locked_by_board": "Vastgezet door het bord",
     "bundle_step_progress": "Stap {current} van {total} — {name} toevoegen",
