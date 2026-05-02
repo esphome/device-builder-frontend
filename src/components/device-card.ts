@@ -10,6 +10,8 @@ import {
   mdiDotsVertical,
   mdiHelpNetworkOutline,
   mdiLock,
+  mdiLockAlert,
+  mdiLockClock,
   mdiLockOpenVariant,
   mdiNetworkOffOutline,
   mdiOpenInNew,
@@ -23,6 +25,10 @@ import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import {
+  getEncryptionState,
+  getEncryptionVisual,
+} from "../util/encryption-state.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -39,6 +45,8 @@ registerMdiIcons({
   "check-network-outline": mdiCheckNetworkOutline,
   "help-network-outline": mdiHelpNetworkOutline,
   lock: mdiLock,
+  "lock-alert": mdiLockAlert,
+  "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
   "network-off-outline": mdiNetworkOffOutline,
   "open-in-new": mdiOpenInNew,
@@ -96,6 +104,12 @@ export class ESPHomeDeviceCard extends LitElement {
 
   @property({ type: Boolean, attribute: "api-encrypted" })
   apiEncrypted = false;
+
+  /** ``api_encryption`` TXT observed via mDNS — see api/types.ts for
+   *  the tri-state semantics. Combined with ``apiEncrypted`` and
+   *  ``hasPendingChanges`` to drive the four-state lock indicator. */
+  @property({ attribute: false })
+  apiEncryptionActive: string | null = null;
 
   @property({ type: Boolean })
   busy = false;
@@ -248,9 +262,11 @@ export class ESPHomeDeviceCard extends LitElement {
         box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-primary), transparent 50%);
       }
 
-      /* API-encryption indicator. Filled lock for encrypted (the
-         expected case) reads as 'this is fine'; the open lock shares
-         the warning palette so insecure devices catch the eye. */
+      /* API-encryption indicator. Four states (see encryption-state.ts):
+           secure     → filled lock, success palette ("this is fine")
+           insecure   → open lock, warning palette ("plaintext API")
+           pending    → lock with clock, info palette ("flash to apply")
+           mismatch   → lock with alert, error palette ("YAML/device disagree") */
       .encryption-icon {
         font-size: 14px;
         flex-shrink: 0;
@@ -261,6 +277,12 @@ export class ESPHomeDeviceCard extends LitElement {
       }
       .encryption-icon.insecure {
         color: var(--esphome-warning, #f59e0b);
+      }
+      .encryption-icon.pending {
+        color: var(--esphome-primary);
+      }
+      .encryption-icon.mismatch {
+        color: var(--esphome-error);
       }
 
       .device-config {
@@ -524,18 +546,7 @@ export class ESPHomeDeviceCard extends LitElement {
               ${this.hasUpdateAvailable
                 ? html`<span class="indicator-dot indicator-dot--update" title=${this._localize("dashboard.status_update_available")}></span>`
                 : nothing}
-              ${this.apiEnabled
-                ? html`<wa-icon
-                    class="encryption-icon ${this.apiEncrypted ? "secure" : "insecure"}"
-                    library="mdi"
-                    name=${this.apiEncrypted ? "lock" : "lock-open-variant"}
-                    title=${this._localize(
-                      this.apiEncrypted
-                        ? "dashboard.table_status_encrypted_tooltip"
-                        : "dashboard.table_status_unencrypted_tooltip",
-                    )}
-                  ></wa-icon>`
-                : nothing}
+              ${this._renderEncryptionIcon()}
             </div>
             <p class="device-config">${this.configuration}</p>
           </div>
@@ -606,6 +617,23 @@ export class ESPHomeDeviceCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  private _renderEncryptionIcon() {
+    const state = getEncryptionState({
+      api_enabled: this.apiEnabled,
+      api_encrypted: this.apiEncrypted,
+      api_encryption_active: this.apiEncryptionActive,
+      has_pending_changes: this.hasPendingChanges,
+    });
+    const visual = getEncryptionVisual(state);
+    if (!visual) return nothing;
+    return html`<wa-icon
+      class="encryption-icon ${visual.cssClass}"
+      library="mdi"
+      name=${visual.iconName}
+      title=${this._localize(visual.tooltipKey)}
+    ></wa-icon>`;
   }
 
   private _renderStatusBadge() {

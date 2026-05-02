@@ -21,6 +21,7 @@ const _baseDevice = {
   update_available: false,
   api_enabled: false,
   api_encrypted: false,
+  api_encryption_active: null,
 } satisfies ConfiguredDevice;
 
 function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {

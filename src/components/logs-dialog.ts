@@ -88,13 +88,17 @@ export class ESPHomeLogsDialog extends LitElement {
       }
 
       wa-dialog {
-        /* 900px clipped roughly the last ~100px off a typical ESPHome
-           log line on a laptop display once the timestamp + level +
-           module prefix was included. Bump to 1100px so the common
-           case fits without wrap; the expand button is still useful
-           for the wider tails (long config-dump lines, stack traces)
-           by stretching to nearly full viewport. */
-        --width: min(1100px, 90vw);
+        /* Width history: 900 wrapped, 1100 still ~100px short, 1200
+           still wrapped on retina / HiDPI screens where ESPHome's
+           ANSI-coloured output reads at a slightly larger glyph and
+           the timestamp + [C][module:NNN] prefix eats more
+           horizontal real estate than expected. 1300 fits the
+           common case end-to-end on a 13-inch laptop and leaves the
+           expand button as the answer for long-tail lines
+           (multi-component config dumps, stack traces) past ~150
+           columns. min(..., 94vw) keeps the dialog from kissing the
+           viewport edges on smaller screens. */
+        --width: min(1300px, 94vw);
       }
 
       /* Expanded → "just give me logs": full viewport, the body fills

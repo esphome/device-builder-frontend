@@ -109,6 +109,21 @@ export interface ConfiguredDevice {
    * ``devices/get_api_key``.
    */
   api_encrypted: boolean;
+  /**
+   * Encryption state observed from the device's
+   * ``_esphomelib._tcp.local.`` mDNS broadcast.
+   *
+   * - ``null`` — mDNS not seen yet. Trust ``api_encrypted`` verbatim
+   *   (assume the device matches the YAML).
+   * - ``""`` — mDNS seen, ``api_encryption`` TXT absent. The device
+   *   is broadcasting plaintext API.
+   * - non-empty (e.g. ``"Noise_NNpsk0_25519_ChaChaPoly_SHA256"``) —
+   *   encryption is confirmed live on the device.
+   *
+   * Drives the four-state lock indicator: active / pending-flash /
+   * mismatch / plaintext.
+   */
+  api_encryption_active: string | null;
 }
 
 /** An adoptable/importable ESPHome device. */
