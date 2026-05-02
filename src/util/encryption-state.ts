@@ -37,18 +37,28 @@ export type EncryptionState =
 export function getEncryptionState(d: EncryptionInputs): EncryptionState {
   if (!d.api_enabled) return "none";
   if (!d.api_encrypted) return "plaintext";
+  /* Pending changes always pin the indicator to "pending", even
+     when mDNS hasn't reported anything yet. After Take Control the
+     dashboard creates a YAML with ``api: encryption: …`` but the
+     running firmware is still the vendor image with no encryption,
+     so ``api_encrypted=true`` plus ``has_pending_changes=true`` is
+     the "you need to flash to actually get encryption" state.
+     Trusting the YAML there (the previous behaviour) showed a
+     green lock the moment the YAML was saved, which read as
+     "encryption active" while the device was still happily
+     answering plaintext on the wire. */
+  if (d.has_pending_changes) return "pending";
   const observed = d.api_encryption_active;
   /* mDNS not seen yet: trust the YAML. ``observed == null`` (loose
      equality) catches both ``null`` and ``undefined`` — the latter
      can sneak in from older backends or cached WS payloads that
      predate the field. */
   if (observed == null) return "active";
-  /* TXT absent → device is running plaintext API. If the user has
-     unflashed changes, they probably know — surface "pending" so the
-     indicator nudges toward Install. Otherwise it's a real mismatch. */
-  if (observed === "") {
-    return d.has_pending_changes ? "pending" : "mismatch";
-  }
+  /* TXT absent → device is running plaintext API. With no pending
+     changes to explain it, the firmware on the device disagrees
+     with the YAML — real mismatch, probably a failed flash or a
+     device flashed elsewhere. */
+  if (observed === "") return "mismatch";
   /* TXT present (e.g. ``Noise_NNpsk0_25519_ChaChaPoly_SHA256``). */
   return "active";
 }

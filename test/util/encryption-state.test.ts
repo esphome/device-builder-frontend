@@ -29,7 +29,7 @@ describe("getEncryptionState", () => {
     expect(getEncryptionState(inputs({ api_encrypted: false }))).toBe("plaintext");
   });
 
-  it("returns 'active' when YAML encrypted and mDNS not seen yet", () => {
+  it("returns 'active' when YAML encrypted, in sync, and mDNS not seen yet", () => {
     expect(getEncryptionState(inputs({ api_encryption_active: null }))).toBe("active");
   });
 
@@ -49,12 +49,22 @@ describe("getEncryptionState", () => {
     ).toBe("active");
   });
 
-  it("returns 'pending' when YAML encrypted, mDNS reports plaintext, and changes are pending", () => {
-    expect(
-      getEncryptionState(
-        inputs({ api_encryption_active: "", has_pending_changes: true }),
-      ),
-    ).toBe("pending");
+  it("returns 'pending' on pending changes regardless of mDNS state", () => {
+    /* Take Control adds ``api: encryption: …`` to the YAML before
+       the user has flashed. The running firmware is still the
+       vendor image with no encryption, so the indicator must read
+       "pending" — even when mDNS hasn't observed the device yet
+       (the previous behaviour fell through to "active" via the
+       null/undefined path and showed a green lock for an
+       unencrypted device). All three mDNS states collapse to
+       "pending" once ``has_pending_changes`` is set. */
+    for (const observed of [null, "", "Noise_NNpsk0_25519_ChaChaPoly_SHA256"]) {
+      expect(
+        getEncryptionState(
+          inputs({ api_encryption_active: observed, has_pending_changes: true }),
+        ),
+      ).toBe("pending");
+    }
   });
 
   it("returns 'mismatch' when YAML encrypted, mDNS reports plaintext, no pending changes", () => {
