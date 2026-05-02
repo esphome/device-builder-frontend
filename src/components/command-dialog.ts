@@ -112,6 +112,16 @@ export class ESPHomeCommandDialog extends LitElement {
    *  resolved secrets never leak into a screen-share without an
    *  explicit click. */
   @state() private _showSecrets = false;
+  /** Guard against re-entrancy on the show-secrets toggle.
+   *  ``_detachStream`` clears ``_streamId`` synchronously and only
+   *  awaits the backend stop afterwards; without this flag a fast
+   *  double-click could fire two overlapping restarts (the second
+   *  finds ``_streamId === ""``, treats the detach as a no-op, and
+   *  spawns its own stream while the first is still awaiting the
+   *  backend's stop response). Plain boolean rather than a queue —
+   *  on a double-click we want the second click to be a no-op, not
+   *  to chain another restart after the first. */
+  private _restartInflight = false;
 
   /** Active job ID (for cancel). Not used for validate. */
   private _jobId = "";
@@ -693,22 +703,36 @@ export class ESPHomeCommandDialog extends LitElement {
    * The ``--show-secrets`` flag is baked into the esphome config
    * subprocess at spawn time, so flipping the toggle has to tear
    * down the current stream and start a fresh one. Mirrors the
-   * logs-dialog "States" toggle. Awaiting the cancel ensures the
-   * backend has actually killed the previous subprocess before we
-   * spawn the new one — a fast double-toggle would otherwise leave
-   * two ``esphome config`` runs racing each other into the same
-   * line buffer. Output is cleared before the restart so users
-   * don't see the redacted-then-resolved values stitched into one
-   * scrollback.
+   * logs-dialog "States" toggle. Output is cleared before the
+   * restart so users don't see the redacted-then-resolved values
+   * stitched into one scrollback, and the ansi-log scroll position
+   * is reset so a previously-scrolled-up view doesn't suppress
+   * auto-scroll on the new output.
+   *
+   * Serialised via ``_restartInflight`` so a fast double-toggle
+   * doesn't race two restarts. ``_detachStream`` clears the stream
+   * id synchronously, so without the guard a second click during
+   * the awaited stop sees ``_streamId === ""``, proceeds with a
+   * no-op detach + spawn, and when the original ``await`` resumes
+   * it spawns another stream against the same dialog — two
+   * concurrent ``esphome config`` runs interleaving into
+   * ``_lines``.
    */
   private async _toggleShowSecrets() {
     this._showSecrets = !this._showSecrets;
     if (this._commandType !== "validate") return;
-    await this._detachStream();
-    this._lines = [];
-    this._state = "running";
-    this._statusMessage = "";
-    this._startValidateStream();
+    if (this._restartInflight) return;
+    this._restartInflight = true;
+    try {
+      await this._detachStream();
+      this._lines = [];
+      this._state = "running";
+      this._statusMessage = "";
+      this._resetAnsiLogScroll();
+      this._startValidateStream();
+    } finally {
+      this._restartInflight = false;
+    }
   }
 
   /**
