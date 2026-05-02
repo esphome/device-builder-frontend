@@ -9,6 +9,7 @@ import { html } from "lit";
 import type { ConfigEntry } from "../../api/types.js";
 import { findReferencedComponents } from "../../util/config-entry-yaml-scan.js";
 import {
+  effectiveDisabled,
   renderFieldError,
   renderLabel,
   type RenderCtx,
@@ -64,7 +65,7 @@ export function renderIdReferenceField(
         ${renderLabel(entry, ctx)}
         <wa-select
           class=${invalid ? "invalid" : ""}
-          ?disabled=${ctx.disabled}
+          ?disabled=${effectiveDisabled(entry, ctx)}
           placeholder=${ctx.localize("device.id_reference_empty", { domain })}
           @change=${onChange}
         >
@@ -80,7 +81,7 @@ export function renderIdReferenceField(
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}
-        ?disabled=${ctx.disabled}
+        ?disabled=${effectiveDisabled(entry, ctx)}
         @change=${onChange}
       >
         ${candidates.map(

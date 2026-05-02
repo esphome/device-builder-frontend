@@ -29,6 +29,25 @@ interface Segment {
 }
 
 /**
+ * Schemes we render as live anchors. Catalog descriptions in
+ * practice only use ``http(s)://`` (docs cross-references) and a
+ * handful of ``mailto:`` links to maintainers; anything else
+ * (``javascript:``, ``data:``, ``vbscript:``, ``file:``, bare
+ * fragments, scheme-less relative URLs) falls back to plain text
+ * so a future supply-chain compromise of the catalog data can't
+ * inject a clickable XSS vector. Repo-controlled today, so this
+ * is defense in depth — see esphome/device-builder#120 (F-1).
+ *
+ * Exported for the unit test; production callers should go
+ * through ``renderMarkdown`` which gates link rendering on this.
+ */
+const SAFE_LINK_SCHEMES = /^\s*(?:https?|mailto):/i;
+
+export function isSafeLinkHref(href: string | undefined): boolean {
+  return href !== undefined && SAFE_LINK_SCHEMES.test(href);
+}
+
+/**
  * Single regex with prioritised alternatives — alternatives are
  * tried left-to-right so links match before bold and bold matches
  * before italic (so `**foo**` is one bold token, not two italics).
@@ -77,6 +96,13 @@ function renderSegment(seg: Segment): TemplateResult | string {
     case "text":
       return seg.text;
     case "link":
+      // Unsafe (or missing) scheme → fall back to the link text as
+      // plain content so a ``[click me](javascript:alert(1))`` in
+      // the catalog can't render as a live anchor. The ``[text]``
+      // is preserved so the user still sees the words.
+      if (!isSafeLinkHref(seg.href)) {
+        return seg.text;
+      }
       return html`<a
         class="md-link"
         href=${seg.href ?? ""}
