@@ -195,6 +195,7 @@
     "stop": "Stop",
     "retry": "Retry",
     "close": "Close",
+    "download": "Download output",
     "done": "Done",
     "failed": "Failed",
     "stopped": "Stopped by user.",
