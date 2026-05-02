@@ -108,8 +108,9 @@ export class ESPHomeCommandDialog extends LitElement {
       wa-dialog::part(header) {
         background: var(--esphome-primary);
         /* Right padding is 0 so the close button sits flush with the
-           dialog's corner — the button's own padding gives it a square
-           hit target right where the user reaches for it. */
+           dialog's corner — the button is explicitly sized to a 40x40
+           square below to give the X a comfortable hit target right
+           where the user reaches for it. */
         padding: 0 0 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
