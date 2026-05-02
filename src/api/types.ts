@@ -87,6 +87,26 @@ export interface ConfiguredDevice {
   deployed_version: string;
   loaded_integrations: string[];
   state: DeviceState;
+  /**
+   * 8-char hex hash of the YAML as last successfully compiled,
+   * persisted in the device-builder metadata sidecar. Matches the
+   * runtime ``CORE.config_hash`` ESPHome bakes into the firmware
+   * (esphome/esphome#16145), so a comparison against
+   * ``deployed_config_hash`` answers "is the running firmware the
+   * latest compile?". Empty string when the device has never been
+   * compiled — the drawer renders an em-dash for that.
+   */
+  expected_config_hash: string;
+  /**
+   * 8-char hex hash the running firmware reports via the
+   * ``config_hash`` TXT record on its ``_esphomelib._tcp`` mDNS
+   * broadcast. Drives ``has_pending_changes`` together with
+   * ``expected_config_hash``. Empty string when the device hasn't
+   * announced yet, or runs firmware older than the broadcast
+   * (esphome/esphome#16145) — the dashboard then falls back to
+   * mtime-based change detection.
+   */
+  deployed_config_hash: string;
   /** True until successfully compiled + deployed */
   has_pending_changes: boolean;
   /** True if compiled with older ESPHome version */

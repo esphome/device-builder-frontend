@@ -17,6 +17,8 @@ const _baseDevice = {
   deployed_version: "",
   loaded_integrations: [],
   state: DeviceState.UNKNOWN,
+  expected_config_hash: "",
+  deployed_config_hash: "",
   has_pending_changes: false,
   update_available: false,
   api_enabled: false,
