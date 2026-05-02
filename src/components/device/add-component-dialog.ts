@@ -411,6 +411,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._submitError = this._localize("device.add_component_error");
       return;
     }
+    // Picking a bundle is a fresh sequence — abandon any in-flight
+    // dep-detour state from the previous component the user was filling.
+    // Without this clear, the bundle's first submit would route through
+    // the `_returnTo` branch in `_onFormSubmit`, restoring the unrelated
+    // component while the bundle queue + banner stayed live, and the
+    // next submit would jump into bundle step 2 from there.
+    this._returnTo = null;
+    this._depDomain = null;
+    this._prefillReference = null;
     this._bundleQueue = rest;
     this._bundleProgress = {
       current: 1,
