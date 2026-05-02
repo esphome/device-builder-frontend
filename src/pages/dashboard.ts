@@ -553,6 +553,7 @@ export class ESPHomePageDashboard extends LitElement {
         .position=${this._cardContextPosition}
         card-mode
         ?has-pending=${this._cardContextDevice?.has_pending_changes === true}
+        ?has-update=${this._cardContextDevice?.update_available === true}
         ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
         @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}

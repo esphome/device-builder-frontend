@@ -254,27 +254,27 @@ export class ESPHomeDeviceEditor extends LitElement {
         </header>
         <div class="card-body">
           <div class="editor-floating-actions">
-            ${this.hasPendingChanges
+            ${this.hasUpdateAvailable
               ? html`<button
                   type="button"
                   class="install-fab"
                   ?disabled=${this.busy}
-                  @click=${this._onInstall}
-                  title=${this._localize("dashboard.install")}
+                  @click=${this._onUpdate}
+                  title=${this._localize("dashboard.update")}
                 >
                   <wa-icon library="mdi" name="upload"></wa-icon>
-                  ${this._localize("dashboard.install")}
+                  ${this._localize("dashboard.update")}
                 </button>`
-              : this.hasUpdateAvailable
+              : this.hasPendingChanges
                 ? html`<button
                     type="button"
                     class="install-fab"
                     ?disabled=${this.busy}
-                    @click=${this._onUpdate}
-                    title=${this._localize("dashboard.update")}
+                    @click=${this._onInstall}
+                    title=${this._localize("dashboard.install")}
                   >
                     <wa-icon library="mdi" name="upload"></wa-icon>
-                    ${this._localize("dashboard.update")}
+                    ${this._localize("dashboard.install")}
                   </button>`
                 : nothing}
             <button

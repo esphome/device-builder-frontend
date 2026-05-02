@@ -569,26 +569,26 @@ export class ESPHomeDeviceCard extends LitElement {
                   <wa-icon library="mdi" name="pencil"></wa-icon>
                   ${this._localize("dashboard.edit")}
                 </button>
-                ${this.hasPendingChanges
+                ${this.hasUpdateAvailable
                   ? html`
                       <button
                         class="action-btn action-btn--accent"
                         ?disabled=${this.busy}
-                        @click=${() => this._emit("install-device")}
+                        @click=${() => this._emit("update-device")}
                       >
                         <wa-icon library="mdi" name="upload"></wa-icon>
-                        ${this._localize("dashboard.install")}
+                        ${this._localize("dashboard.update")}
                       </button>
                     `
-                  : this.hasUpdateAvailable
+                  : this.hasPendingChanges
                     ? html`
                         <button
                           class="action-btn action-btn--accent"
                           ?disabled=${this.busy}
-                          @click=${() => this._emit("update-device")}
+                          @click=${() => this._emit("install-device")}
                         >
                           <wa-icon library="mdi" name="upload"></wa-icon>
-                          ${this._localize("dashboard.update")}
+                          ${this._localize("dashboard.install")}
                         </button>
                       `
                     : nothing}

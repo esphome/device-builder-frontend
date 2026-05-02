@@ -78,6 +78,13 @@ export class ESPHomeTableRowMenu extends LitElement {
   @property({ type: Boolean, attribute: "has-pending", reflect: true })
   hasPending = false;
 
+  /** Mirrors ``ConfiguredDevice.update_available`` for the open
+   *  device. The inline Update button takes precedence over Install
+   *  when this is true; the kebab's Install entry hides for the same
+   *  reason as ``hasPending``. */
+  @property({ type: Boolean, attribute: "has-update", reflect: true })
+  hasUpdate = false;
+
   @query(".menu")
   private _menuEl!: HTMLDivElement;
 
@@ -189,11 +196,13 @@ export class ESPHomeTableRowMenu extends LitElement {
            menu-item--visit-web                         inline > 1024px */
       :host([card-mode]) .menu-item--logs,
       :host([card-mode]) .menu-item--visit-web,
-      :host([card-mode][has-pending]) .menu-item--install {
+      :host([card-mode][has-pending]) .menu-item--install,
+      :host([card-mode][has-update]) .menu-item--install {
         display: none;
       }
       @media (min-width: 821px) {
-        :host(:not([card-mode])[has-pending]) .menu-item--install {
+        :host(:not([card-mode])[has-pending]) .menu-item--install,
+        :host(:not([card-mode])[has-update]) .menu-item--install {
           display: none;
         }
       }
