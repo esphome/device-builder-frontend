@@ -210,7 +210,11 @@ export class ESPHomeHeaderActions extends LitElement {
               </div>
               <div
                 class="menu-item ${this._showIgnored ? "menu-item--active" : ""}"
+                role="menuitemcheckbox"
+                tabindex="0"
+                aria-checked=${this._showIgnored}
                 @click=${this._toggleShowIgnored}
+                @keydown=${this._onCheckboxKeydown}
               >
                 <wa-icon library="mdi" name="eye-outline"></wa-icon>
                 <span class="menu-item-label"
@@ -248,6 +252,19 @@ export class ESPHomeHeaderActions extends LitElement {
   private _close() {
     this._open = false;
   }
+
+  private _onCheckboxKeydown = (e: KeyboardEvent) => {
+    /* The toggle is a ``<div role="menuitemcheckbox">`` rather than
+       a ``<button>`` so it sits visually flush with the surrounding
+       menu items (the menu was built with div items predating this
+       PR). The role + tabindex make it focusable and AT-readable as
+       a checkable control; this handler wires Enter / Space activation
+       so keyboard users get the same toggle a click would produce. */
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      this._toggleShowIgnored();
+    }
+  };
 
   private _toggleShowIgnored() {
     this._showIgnored = !this._showIgnored;
