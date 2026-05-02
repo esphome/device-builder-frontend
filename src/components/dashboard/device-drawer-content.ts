@@ -264,13 +264,13 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         color: var(--esphome-error);
       }
 
-      /* Compact in/out-of-sync line that sits at the top of the
-         config-hash section. Reads like the encryption / pending /
-         update badges above so the drawer's status surface is visually
-         consistent — same icon-plus-text shape, same coloured-tint
-         background. The actual hex hashes follow in the standard rows
-         beneath, so this line is just the at-a-glance verdict. */
-      .hash-status {
+      /* Compact in/out-of-sync line shared by both the version and
+         config-hash sections — anywhere the drawer needs a "local
+         matches deployed" verdict. Reads like the encryption /
+         pending / update badges above so the drawer's status surface
+         stays visually consistent; the rows underneath then carry
+         the actual values being compared. */
+      .sync-status {
         display: inline-flex;
         align-items: center;
         gap: 6px;
@@ -281,16 +281,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         margin-bottom: var(--wa-space-s);
       }
 
-      .hash-status wa-icon {
+      .sync-status wa-icon {
         font-size: 13px;
       }
 
-      .hash-status--match {
+      .sync-status--match {
         background: color-mix(in srgb, var(--esphome-success), transparent 88%);
         color: var(--esphome-success);
       }
 
-      .hash-status--diff {
+      .sync-status--diff {
         background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
         color: var(--esphome-warning, #d97706);
       }
@@ -395,7 +395,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const statusKey = matches
       ? "dashboard.drawer_version_in_sync"
       : "dashboard.drawer_version_out_of_sync";
-    const statusCls = matches ? "hash-status hash-status--match" : "hash-status hash-status--diff";
+    const statusCls = matches ? "sync-status sync-status--match" : "sync-status sync-status--diff";
     // Suppress the badge entirely when the device hasn't reported a
     // version yet (no mDNS announce). Comparing against an empty
     // string would always read "out of sync" — meaningless noise on
@@ -448,16 +448,25 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const statusKey = matches
       ? "dashboard.drawer_config_hash_in_sync"
       : "dashboard.drawer_config_hash_out_of_sync";
-    const statusCls = matches ? "hash-status hash-status--match" : "hash-status hash-status--diff";
+    const statusCls = matches ? "sync-status sync-status--match" : "sync-status sync-status--diff";
+    // Match the version section's gating: only show the pill when
+    // both sides are populated. A device that has compiled but
+    // hasn't broadcast yet (or vice versa) doesn't have enough data
+    // for a verdict — the rows below already convey the missing
+    // side via em-dashes, and an "Out of sync" pill against an empty
+    // string would mis-state the situation.
+    const showStatus = !!expected && !!deployed;
     return html`
       <div class="section">
         <h4 class="section-title">
           ${this._localize("dashboard.drawer_config_hash_title")}
         </h4>
-        <div class=${statusCls}>
-          <wa-icon library="mdi" name=${statusIcon}></wa-icon>
-          <span>${this._localize(statusKey)}</span>
-        </div>
+        ${showStatus
+          ? html`<div class=${statusCls}>
+              <wa-icon library="mdi" name=${statusIcon}></wa-icon>
+              <span>${this._localize(statusKey)}</span>
+            </div>`
+          : nothing}
         ${this._row(
           "fingerprint",
           this._localize("dashboard.drawer_config_hash_local"),
