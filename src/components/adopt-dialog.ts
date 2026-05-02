@@ -11,20 +11,6 @@ import { validateDeviceName } from "../util/config-validation.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
-/**
- * Strip the optional ``-aabbcc`` / ``-aabbccddeeff`` MAC suffix that
- * factory firmware appends when ``name_add_mac_suffix: True`` is in
- * effect. The resulting YAML the backend writes carries
- * ``name_add_mac_suffix: False`` so the user-chosen name sticks
- * verbatim — pre-filling the field with the stripped form gives users
- * the cleaner default they almost always want, while still letting
- * them keep the suffixed form by editing the input.
- */
-const MAC_SUFFIX_RE = /-([0-9a-f]{6}|[0-9a-f]{12})$/i;
-function stripMacSuffix(name: string): string {
-  return name.replace(MAC_SUFFIX_RE, "");
-}
-
 @customElement("esphome-adopt-dialog")
 export class ESPHomeAdoptDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -190,7 +176,13 @@ export class ESPHomeAdoptDialog extends LitElement {
 
   open(device: AdoptableDevice) {
     this._device = device;
-    this._name = stripMacSuffix(device.name);
+    /* Default to the discovered hostname verbatim — including the
+       MAC-suffix factory firmware appends. The backend writes the
+       new YAML with ``name_add_mac_suffix: False`` so whatever the
+       user picks sticks; users who want a cleaner name can edit the
+       suffix off, but defaulting to a stripped form silently dropped
+       the disambiguator on devices like ``apollo-plt-1-983300``. */
+    this._name = device.name;
     this._friendlyName = device.friendly_name || "";
     this._encryption = true;
     this._busy = false;
@@ -340,11 +332,18 @@ export class ESPHomeAdoptDialog extends LitElement {
         }),
       );
     } catch (err) {
-      this._busy = false;
       this._error =
         err instanceof Error
           ? err.message
           : this._localize("dashboard.adopt_error_generic");
+    } finally {
+      /* Always clear the busy state — whether the call succeeded
+         (close() will hide the dialog anyway) or failed (the user
+         needs the Submit button live again to retry or change inputs).
+         The previous code reset ``_busy`` only in the catch branch,
+         which left the button stuck on "Taking control…" if the
+         success path's close() raced something downstream. */
+      this._busy = false;
     }
   };
 }
