@@ -446,7 +446,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _renderCardGrid(filtered: ConfiguredDevice[]) {
     return html`
-      <div class="devices-grid">
+      <div class="devices-grid devices-grid--configured">
         ${this._devices.length === 0 ? this._renderAddDeviceCard() : ""}
         ${filtered.map((device) => {
           const webUrl = buildWebUiUrl(device);

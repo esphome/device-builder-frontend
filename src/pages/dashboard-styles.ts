@@ -99,15 +99,18 @@ export const dashboardStyles = css`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
-    /* Bottom padding leaves clearance for the fixed Create-device FAB
-       so the last card's action row (Edit / Install / Logs / kebab) is
-       reachable on mobile, where the grid is single-column and the FAB
-       otherwise sits directly on top of the trailing card's controls.
-       Driven by the same --fab-* tokens as the .fab-container rule
-       below so the two can't drift. The table view doesn't need
-       this — it scrolls inside its own container with its own
-       footer offset. */
-    padding: var(--wa-space-l) var(--wa-space-l) var(--fab-clearance);
+    padding: var(--wa-space-l);
+  }
+
+  /* Only the configured-device grid needs FAB clearance: it's the
+     last block on the page in card view, and the FAB sits directly
+     on top of its trailing card's actions on a single-column mobile
+     viewport. The discovered grid and skeleton both render above
+     other content, so the normal bottom padding is fine. Driven by
+     the same --fab-* tokens as the .fab-container rule below so the
+     two can't drift. */
+  .devices-grid--configured {
+    padding-bottom: var(--fab-clearance);
   }
 
   /* display:grid wins over the user-agent hidden rule, so an
