@@ -101,14 +101,18 @@ export class ESPHomeCommandDialog extends LitElement {
       }
 
       wa-dialog { --width: min(900px, 90vw); }
+      /* Header matches the device-editor's title bar
+         (--esphome-primary background with --esphome-on-primary
+         text) so Validate / Install / Clean dialogs read as part
+         of the dashboard chrome. Body keeps the terminal palette. */
       wa-dialog::part(header) {
-        background: var(--term-bg);
+        background: var(--esphome-primary);
         padding: 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
       wa-dialog::part(title) {
-        color: var(--term-accent);
+        color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
@@ -116,7 +120,15 @@ export class ESPHomeCommandDialog extends LitElement {
       wa-dialog::part(close-button__base) {
         background: transparent; border: none; box-shadow: none;
         padding: 0; min-width: unset; min-height: unset;
-        color: var(--term-fg-muted); cursor: pointer;
+        color: var(--esphome-on-primary); cursor: pointer;
+      }
+      /* Same affordance for hover and keyboard focus so the close
+         button is discoverable either way on the new lighter
+         background. */
+      wa-dialog::part(close-button__base):hover,
+      wa-dialog::part(close-button__base):focus-visible {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+        outline: none;
       }
       wa-dialog::part(body) { padding: 0; background: var(--term-bg); overflow: hidden; }
       wa-dialog::part(footer) { display: none; }

@@ -26,7 +26,8 @@ import type {
   DeviceEventData,
   DeviceStateChangedEventData,
   FirmwareJob,
-  ImportableDeviceEventData,
+  ImportableDeviceAddedEventData,
+  ImportableDeviceRemovedEventData,
   InitialStateEventData,
   ServerInfoMessage,
 } from "../api/types.js";
@@ -449,8 +450,9 @@ export class ESPHomeApp extends LitElement {
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
-        const { devices } = data as InitialStateEventData;
+        const { devices, importable } = data as InitialStateEventData;
         this._devices = devices;
+        this._importableDevices = importable;
         this._devicesLoaded = true;
         break;
       }
@@ -487,16 +489,30 @@ export class ESPHomeApp extends LitElement {
         break;
       }
       case DeviceEventType.IMPORTABLE_DEVICE_ADDED: {
-        const { device } = data as ImportableDeviceEventData;
-        if (!this._importableDevices.some((d) => d.name === device.name)) {
+        const { device } = data as ImportableDeviceAddedEventData;
+        // Upsert by name so the ignore-toggle's re-fire updates the
+        // ``ignored`` flag in place; a fresh discovery falls through
+        // the same path as an append.
+        const idx = this._importableDevices.findIndex(
+          (d) => d.name === device.name,
+        );
+        if (idx === -1) {
           this._importableDevices = [...this._importableDevices, device];
+        } else {
+          const next = [...this._importableDevices];
+          next[idx] = device;
+          this._importableDevices = next;
         }
         break;
       }
       case DeviceEventType.IMPORTABLE_DEVICE_REMOVED: {
-        const { device } = data as ImportableDeviceEventData;
+        // Backend payload is ``{name: string}`` — the original
+        // AdoptableDevice is already gone from ``import_result`` by
+        // the time the event fires, and we only need the name to
+        // drop the matching entry locally.
+        const { name } = data as ImportableDeviceRemovedEventData;
         this._importableDevices = this._importableDevices.filter(
-          (d) => d.name !== device.name
+          (d) => d.name !== name,
         );
         break;
       }

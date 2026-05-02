@@ -57,6 +57,9 @@ import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-instal
 import "../components/install-method-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
+import "../components/discovered-device-card.js";
+import "../components/adopt-dialog.js";
+import type { ESPHomeAdoptDialog } from "../components/adopt-dialog.js";
 import "../components/select-bar.js";
 import "../components/command-dialog.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
@@ -114,6 +117,37 @@ export class ESPHomePageDashboard extends LitElement {
   @state() private _drawerDevice: ConfiguredDevice | null = null;
   @state() private _cardContextDevice: ConfiguredDevice | null = null;
   @state() private _cardContextPosition: { x: number; y: number } | null = null;
+  /** Configuration filename of the most recently adopted device.
+   *  Drives a short-lived ``highlight`` attribute on the matching
+   *  device card / row so the user can spot the freshly-imported
+   *  device in a long list. Cleared by ``_adoptHighlightTimer``. */
+  @state() private _recentlyAdopted: string | null = null;
+  private _adoptHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /* The card view has no user-facing sort control, so we sort the
+     device list ourselves: friendly-name first, configuration-filename
+     fallback. Locale-aware via ``Intl.Collator`` with
+     ``sensitivity: base`` (case-insensitive) plus ``numeric: true``
+     (so ``device-2`` sorts before ``device-10``). Built once here
+     rather than each render so re-renders triggered by unrelated
+     state (jobs, search, recent jobs) don't pay the construction
+     cost. ``Intl.Collator`` already handles case-folding, so the
+     sort key passes the raw string instead of pre-lower-casing
+     (which can be wrong in some locales — Turkish dotted-i, etc.). */
+  private static readonly _cardCollator = new Intl.Collator(undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
+  private _sortedDevicesCache: {
+    source: ConfiguredDevice[];
+    sorted: ConfiguredDevice[];
+  } | null = null;
+  /** When false (default), discovered devices the user previously
+   *  marked as Ignored are hidden from the banner and grid; the
+   *  ``Show ignored discoveries`` toggle in the header kebab flips
+   *  this to ``true``. Persisted to localStorage so the choice
+   *  survives reloads. */
+  @state() private _showIgnored = false;
 
   @state()
   private _view: DashboardView = DashboardView.CARDS;
@@ -139,11 +173,23 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _onSerialSetup = () => this._detectAndOpenWizard();
+  private _onShowIgnoredChanged = (e: Event) => {
+    this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
+  };
 
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
+    /* The "Show ignored discoveries" toggle lives in the header
+       kebab; sync the persisted flag here and listen for changes
+       dispatched from the menu so we don't have to thread props /
+       contexts through the layout. */
+    this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
+    window.addEventListener(
+      "esphome-show-ignored-changed",
+      this._onShowIgnoredChanged,
+    );
   }
 
   private async _loadPreferences() {
@@ -169,12 +215,21 @@ export class ESPHomePageDashboard extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
+    window.removeEventListener(
+      "esphome-show-ignored-changed",
+      this._onShowIgnoredChanged,
+    );
+    if (this._adoptHighlightTimer !== null) {
+      clearTimeout(this._adoptHighlightTimer);
+      this._adoptHighlightTimer = null;
+    }
   }
 
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-rename-device-dialog") private _renameDialog!: ESPHomeRenameDeviceDialog;
+  @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog") private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
@@ -190,16 +245,18 @@ export class ESPHomePageDashboard extends LitElement {
     }
 
     const q = this._search.trim().toLowerCase();
+    const sorted = this._sortedDevices;
     const filtered = q
-      ? this._devices.filter(
+      ? sorted.filter(
           (d) =>
             (d.friendly_name || d.name).toLowerCase().includes(q) ||
             d.configuration.toLowerCase().includes(q),
         )
-      : this._devices;
+      : sorted;
 
     return html`
       ${this._renderBanner()}
+      ${this._renderDiscoveredGrid()}
       ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? this._renderToolbar(filtered.length, this._devices.length)
         : ""}
@@ -211,19 +268,88 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  /** Cached, sorted view of ``_devices``. Cache key is the array
+   *  reference, which is replaced (not mutated) by every WS event
+   *  in app-shell, so an event that doesn't touch the device list
+   *  reuses the previous sort verbatim. */
+  private get _sortedDevices(): ConfiguredDevice[] {
+    const source = this._devices;
+    if (this._sortedDevicesCache?.source === source) {
+      return this._sortedDevicesCache.sorted;
+    }
+    const collator = ESPHomePageDashboard._cardCollator;
+    const sortKey = (d: ConfiguredDevice) =>
+      d.friendly_name || d.name || d.configuration;
+    const sorted = [...source].sort((a, b) =>
+      collator.compare(sortKey(a), sortKey(b)),
+    );
+    this._sortedDevicesCache = { source, sorted };
+    return sorted;
+  }
+
+  private get _visibleImportableDevices(): AdoptableDevice[] {
+    /* Hide ignored discoveries by default — the user already said
+       "don't show me this", so a fresh page load shouldn't put them
+       back in front. The header kebab's "Show ignored discoveries"
+       toggle flips ``_showIgnored`` to surface them again. */
+    return this._showIgnored
+      ? this._importableDevices
+      : this._importableDevices.filter((d) => !d.ignored);
+  }
+
+  private _renderDiscoveredGrid() {
+    const visible = this._visibleImportableDevices;
+    /* Always render the container — the banner toggle's
+       ``aria-controls="discovered-grid"`` points here, and assistive
+       tech expects the referenced element to exist in the DOM whether
+       or not it's currently visible. ``hidden`` toggles display via
+       the user agent and is exposed to AT correctly. The empty-grid
+       case (no visible discoveries) also renders an empty container
+       so the reference stays valid. */
+    return html`
+      <div
+        id="discovered-grid"
+        class="devices-grid"
+        ?hidden=${!this._showDiscovered || visible.length === 0}
+      >
+        ${visible.map(
+          (device) => html`
+            <esphome-discovered-device-card
+              .device=${device}
+              @adopt=${() => this._adoptDialog.open(device)}
+              @toggle-ignore=${() => this._toggleIgnore(device)}
+            ></esphome-discovered-device-card>
+          `,
+        )}
+      </div>
+    `;
+  }
+
   // ─── Render helpers ───
 
   private _renderBanner() {
-    if (this._importableDevices.length === 0) return "";
+    /* Banner counts only what's visible — when every discovery is
+       ignored (and "Show ignored" is off) the banner disappears
+       entirely. The user can still bring them back via the header
+       menu, but they shouldn't see a "Discovered N" prompt for
+       devices they already chose to dismiss. */
+    const visible = this._visibleImportableDevices;
+    if (visible.length === 0) return "";
     return html`
       <div class="discovered-banner-wrap">
         <div class="discovered-banner">
           <div class="discovered-banner-empty"></div>
           <div style="justify-content: center; display: flex; align-items: center">
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
-            <span>${this._localize("dashboard.discovered_count", { count: this._importableDevices.length })}</span>
+            <span>${this._localize("dashboard.discovered_count", { count: visible.length })}</span>
           </div>
-          <a @click=${() => { this._showDiscovered = !this._showDiscovered; }}>${this._localize("dashboard.show")}</a>
+          <button
+            class="discovered-banner-toggle"
+            type="button"
+            aria-expanded=${this._showDiscovered}
+            aria-controls="discovered-grid"
+            @click=${() => { this._showDiscovered = !this._showDiscovered; }}
+          >${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}</button>
         </div>
       </div>
     `;
@@ -326,6 +452,7 @@ export class ESPHomePageDashboard extends LitElement {
           const webUrl = buildWebUiUrl(device);
           return html`
             <esphome-device-card
+              data-configuration=${device.configuration}
               .name=${device.friendly_name || device.name}
               .configuration=${device.configuration}
               .state=${device.state}
@@ -334,6 +461,7 @@ export class ESPHomePageDashboard extends LitElement {
               ?api-enabled=${device.api_enabled === true}
               ?api-encrypted=${device.api_encrypted === true}
               ?busy=${this._activeJobs.has(device.configuration)}
+              ?highlight=${this._recentlyAdopted === device.configuration}
               .recentJob=${this._recentJobs.get(device.configuration) ?? null}
               .webUrl=${webUrl}
               ?select-mode=${this._selectMode}
@@ -366,6 +494,7 @@ export class ESPHomePageDashboard extends LitElement {
         .initialColumnVisibility=${this._tableColumnVisibility}
         ?select-mode=${this._selectMode}
         .selectedDevices=${this._selectedDevices}
+        .highlightConfiguration=${this._recentlyAdopted}
         @table-sort-change=${this._saveTablePreference}
         @table-visibility-change=${this._saveTablePreference}
         @table-page-size-change=${this._saveTablePreference}
@@ -478,6 +607,7 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
+      <esphome-adopt-dialog @adopted=${this._onAdopted}></esphome-adopt-dialog>
       <esphome-api-key-dialog></esphome-api-key-dialog>
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-command-dialog></esphome-command-dialog>
@@ -507,6 +637,105 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   // ─── Actions ───
+
+  private async _toggleIgnore(device: AdoptableDevice) {
+    /* Surface failures so a stuck UI (ignored badge that didn't flip)
+       has an explanation. The frontend's optimistic update isn't
+       used here — we wait for the backend's IMPORTABLE_DEVICE_ADDED
+       re-fire — so a failed call just leaves the card in its prior
+       state, which is fine. */
+    try {
+      await this._api.ignoreDevice(device.name, !device.ignored);
+    } catch {
+      const name = device.friendly_name || device.name;
+      toast.error(
+        this._localize(
+          device.ignored
+            ? "dashboard.action_unignore_failed"
+            : "dashboard.action_ignore_failed",
+          { name },
+        ),
+        { richColors: true },
+      );
+    }
+  }
+
+  private _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
+    /* Configuration filenames are ``<name>.yaml`` — that's how the
+       adopt dialog asks the backend to write the file (see
+       ``import_device``), so the filename is deterministic from the
+       submitted name. Driving the highlight off the configuration
+       string lets us light up either the card or the table row,
+       both of which key on ``device.configuration``. */
+    const configuration = `${e.detail.name}.yaml`;
+    this._recentlyAdopted = configuration;
+    /* Mark this configuration as scroll-pending. The actual scroll
+       happens in ``updated()`` once the matching device shows up in
+       ``_devices`` — the WS DEVICE_ADDED event lags the dialog's
+       ``adopted`` event, especially on mobile where the round-trip
+       is slower, so a scroll fired right now hits a layout that
+       doesn't have the new card yet. */
+    this._pendingAdoptScroll = configuration;
+    if (this._adoptHighlightTimer !== null) {
+      clearTimeout(this._adoptHighlightTimer);
+    }
+    this._adoptHighlightTimer = setTimeout(() => {
+      this._recentlyAdopted = null;
+      this._adoptHighlightTimer = null;
+    }, 4000);
+  };
+
+  private _pendingAdoptScroll: string | null = null;
+
+  protected updated(changed: PropertyValues): void {
+    if (
+      this._pendingAdoptScroll !== null &&
+      changed.has("_devices") &&
+      this._devices.some((d) => d.configuration === this._pendingAdoptScroll)
+    ) {
+      const target = this._pendingAdoptScroll;
+      this._pendingAdoptScroll = null;
+      /* Wait two animation frames before scrolling. On the render
+         where the device first appears, the card's children
+         (wa-icon, status badge, etc.) are still mounting and the
+         row's height isn't final, so a same-tick ``scrollIntoView``
+         calculates against a too-short layout and stops short. Two
+         rAFs are enough for Lit's children to commit and for the
+         browser to settle the grid track sizes. */
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => this._scrollAdoptedIntoView(target)),
+      );
+    }
+  }
+
+  private _scrollAdoptedIntoView(configuration: string): void {
+    /* Card view: the card lives in this dashboard's shadow root.
+       Table view: the row lives inside ``esphome-device-table``'s
+       own shadow root; ask the table to scroll its match instead of
+       trying to reach across the boundary.
+       ``behavior: "instant"`` (rather than "smooth") avoids Chrome
+       mobile's well-known bug where ``scrollIntoView`` aborts the
+       smooth animation after one viewport-height of motion — the
+       card highlight already gives the user transition feedback, so
+       jumping straight to the right scroll position is the more
+       reliable signal. */
+    const root = this.shadowRoot;
+    if (!root) return;
+    const escaped = CSS.escape(configuration);
+    const card = root.querySelector<HTMLElement>(
+      `esphome-device-card[data-configuration="${escaped}"]`,
+    );
+    if (card) {
+      card.scrollIntoView({ behavior: "instant", block: "center" });
+      return;
+    }
+    const table = root.querySelector("esphome-device-table") as
+      | (HTMLElement & {
+          scrollConfigurationIntoView?: (configuration: string) => void;
+        })
+      | null;
+    table?.scrollConfigurationIntoView?.(configuration);
+  }
 
   private _setView(view: DashboardView) {
     this._view = view;

@@ -30,6 +30,7 @@ import {
 } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
 import { LitElement, html, nothing } from "lit";
+import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -95,6 +96,12 @@ export class ESPHomeDeviceTable extends LitElement {
 
   @property({ attribute: false })
   selectedDevices = new Set<string>();
+
+  /** Configuration filename of the row to highlight briefly — used
+   *  by the dashboard to flash the freshly-adopted device. ``null``
+   *  when nothing should be highlighted. */
+  @property({ attribute: false })
+  highlightConfiguration: string | null = null;
 
   @property({ attribute: false })
   activeJobs = new Map<string, unknown>();
@@ -459,10 +466,14 @@ export class ESPHomeDeviceTable extends LitElement {
                 <tr
                   role="row"
                   tabindex="0"
-                  class="${this.selectMode &&
-                  this.selectedDevices.has(row.original.config)
-                    ? "selected"
-                    : ""}"
+                  data-configuration=${row.original.config}
+                  class=${classMap({
+                    selected:
+                      this.selectMode &&
+                      this.selectedDevices.has(row.original.config),
+                    highlight:
+                      this.highlightConfiguration === row.original.config,
+                  })}
                   @click=${() =>
                     this.selectMode
                       ? this._onToggleSelect(row.original.config)
@@ -544,6 +555,25 @@ export class ESPHomeDeviceTable extends LitElement {
         composed: true,
       })
     );
+  }
+
+  /** Scroll the row matching *configuration* into view.
+   *
+   *  Exposed so the dashboard can highlight a freshly-adopted device
+   *  without reaching across the table's shadow-DOM boundary —
+   *  ``shadowRoot.querySelector`` from the dashboard can't see rows
+   *  rendered in this component's shadow root. No-op when the row
+   *  isn't on the current page. ``behavior: "instant"`` dodges
+   *  Chrome mobile's smooth-scroll abort and lands the row at the
+   *  intended position — the highlight pulse handles transition
+   *  feedback. */
+  public scrollConfigurationIntoView(configuration: string): void {
+    const root = this.shadowRoot;
+    if (!root) return;
+    const row = root.querySelector<HTMLElement>(
+      `tr[data-configuration="${CSS.escape(configuration)}"]`,
+    );
+    row?.scrollIntoView({ behavior: "instant", block: "center" });
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {
