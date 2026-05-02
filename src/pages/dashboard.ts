@@ -688,12 +688,7 @@ export class ESPHomePageDashboard extends LitElement {
       `esphome-device-card[data-configuration="${escaped}"]`,
     );
     if (card) {
-      /* ``block: "start"`` instead of ``"center"`` because the page
-         has a sticky-ish header that center-positioning has to
-         account for; aligning to the top, then nudging down by the
-         header height, lands the card cleanly below the chrome on
-         mobile where viewport center math is finickier. */
-      card.scrollIntoView({ behavior: "smooth", block: "start" });
+      this._smoothScrollTo(card);
       return;
     }
     const table = root.querySelector("esphome-device-table") as
@@ -702,6 +697,29 @@ export class ESPHomePageDashboard extends LitElement {
         })
       | null;
     table?.scrollConfigurationIntoView?.(configuration);
+  }
+
+  /** Scroll *element* to just below the sticky app header.
+   *
+   *  ``element.scrollIntoView({behavior: "smooth"})`` has a known
+   *  quirk on Chrome mobile where the smooth animation aborts after
+   *  one viewport-height worth of scroll, leaving the target stuck
+   *  partway down the page. Computing the absolute target Y from
+   *  ``getBoundingClientRect()`` + ``window.scrollY`` and driving
+   *  ``window.scrollTo({top, behavior: "smooth"})`` directly avoids
+   *  the bug while still respecting the user's reduced-motion
+   *  preference (``scrollTo`` honours it the same way). The header
+   *  offset keeps the card from landing under the sticky chrome. */
+  private _smoothScrollTo(element: HTMLElement): void {
+    const rect = element.getBoundingClientRect();
+    const headerOffset = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue(
+        "--esphome-header-height",
+      ) || "56",
+      10,
+    );
+    const top = rect.top + window.scrollY - headerOffset - 16;
+    window.scrollTo({ top, behavior: "smooth" });
   }
 
   private _setView(view: DashboardView) {
