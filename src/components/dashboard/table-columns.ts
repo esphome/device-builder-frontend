@@ -3,6 +3,10 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import {
+  getEncryptionState,
+  getEncryptionVisual,
+} from "../../util/encryption-state.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
@@ -18,6 +22,7 @@ export interface DeviceRow {
   hasUpdateAvailable: boolean;
   api_enabled: boolean;
   api_encrypted: boolean;
+  api_encryption_active: string | null;
   busy: boolean;
   recentJob: FirmwareJob | null;
   _device: ConfiguredDevice;
@@ -106,15 +111,13 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       header: localize("dashboard.table_col_name"),
       cell: (info) => {
         const row = info.row.original;
-        // No lock at all when the device doesn't expose the Native API.
-        // "Insecure" only makes sense for a surface that's actually on.
-        const encryptionIcon = row.api_encrypted ? "lock" : "lock-open-variant";
-        // Icon-only indicator → use the longer descriptive tooltip;
-        // there's no visible label competing for space.
-        const encryptionTitle = row.api_encrypted
-          ? localize("dashboard.table_status_encrypted_tooltip")
-          : localize("dashboard.table_status_unencrypted_tooltip");
-        const encryptionClass = row.api_encrypted ? "secure" : "insecure";
+        const encState = getEncryptionState({
+          api_enabled: row.api_enabled,
+          api_encrypted: row.api_encrypted,
+          api_encryption_active: row.api_encryption_active,
+          has_pending_changes: row.hasPendingChanges,
+        });
+        const encVisual = getEncryptionVisual(encState);
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
@@ -123,12 +126,12 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           ${row.hasUpdateAvailable
             ? html`<span class="cell-indicator cell-indicator--update" title=${localize("dashboard.status_update_available")}></span>`
             : nothing}
-          ${row.api_enabled
+          ${encVisual
             ? html`<wa-icon
-                class="cell-encryption ${encryptionClass}"
+                class="cell-encryption ${encVisual.cssClass}"
                 library="mdi"
-                name=${encryptionIcon}
-                title=${encryptionTitle}
+                name=${encVisual.iconName}
+                title=${localize(encVisual.tooltipKey)}
               ></wa-icon>`
             : nothing}
         </span>`;

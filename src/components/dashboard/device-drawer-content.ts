@@ -5,6 +5,8 @@ import {
   mdiInformationOutline,
   mdiIpNetworkOutline,
   mdiLock,
+  mdiLockAlert,
+  mdiLockClock,
   mdiLockOpenVariant,
   mdiMemory,
   mdiTagMultiple,
@@ -21,6 +23,7 @@ import {
   localizeContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -31,6 +34,8 @@ registerMdiIcons({
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
   lock: mdiLock,
+  "lock-alert": mdiLockAlert,
+  "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
   memory: mdiMemory,
   "tag-multiple": mdiTagMultiple,
@@ -242,6 +247,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
         color: var(--esphome-warning, #d97706);
       }
+
+      .status-badge--encryption-pending {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        color: var(--esphome-primary);
+      }
+
+      .status-badge--encryption-mismatch {
+        background: color-mix(in srgb, var(--esphome-error), transparent 88%);
+        color: var(--esphome-error);
+      }
     `,
   ];
 
@@ -251,12 +266,13 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
     const hasPendingChanges = d.has_pending_changes === true;
     const hasUpdateAvailable = d.update_available;
-    // ``api_enabled`` gates the lock badge entirely — devices that
-    // don't expose the Native API (MQTT-only, sensor-bridge configs)
-    // shouldn't carry an "insecure" warning for a surface they never
-    // turned on. ``api_encrypted`` only flips the badge variant.
-    const apiEnabled = d.api_enabled === true;
-    const apiEncrypted = d.api_encrypted === true;
+    // Four-state encryption indicator. ``getEncryptionState`` returns
+    // ``"none"`` for devices without a Native API surface — those
+    // shouldn't carry an "insecure" warning. The other four states
+    // (active / pending / mismatch / plaintext) each map to a distinct
+    // badge variant.
+    const encState = getEncryptionState(d);
+    const apiEnabled = encState !== "none";
     const showAnyBadge = hasPendingChanges || hasUpdateAvailable || apiEnabled;
 
     return html`
@@ -274,28 +290,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
                   ${this._localize("dashboard.status_update_available")}
                 </span>`
               : nothing}
-            ${apiEnabled
-              ? html`<span
-                  class="status-badge ${apiEncrypted
-                    ? "status-badge--encrypted"
-                    : "status-badge--unencrypted"}"
-                  title=${this._localize(
-                    apiEncrypted
-                      ? "dashboard.table_status_encrypted_tooltip"
-                      : "dashboard.table_status_unencrypted_tooltip",
-                  )}
-                >
-                  <wa-icon
-                    library="mdi"
-                    name=${apiEncrypted ? "lock" : "lock-open-variant"}
-                  ></wa-icon>
-                  ${this._localize(
-                    apiEncrypted
-                      ? "dashboard.table_status_encrypted"
-                      : "dashboard.table_status_unencrypted",
-                  )}
-                </span>`
-              : nothing}
+            ${apiEnabled ? this._renderEncryptionBadge(encState) : nothing}
           </div>`
         : nothing}
       <div class="section">
@@ -339,6 +334,46 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           `
         : nothing}
     `;
+  }
+
+  private _renderEncryptionBadge(state: "active" | "plaintext" | "pending" | "mismatch" | "none") {
+    /* The four-state mapping for the drawer's coloured pill. The
+       ``getEncryptionVisual`` helper carries the icon + tooltip
+       choices for the icon-only views (card, table); the drawer adds
+       a localized label too, so it owns the per-state class/label
+       table here. */
+    const variants = {
+      active: {
+        cls: "status-badge--encrypted",
+        icon: "lock",
+        labelKey: "dashboard.table_status_encrypted",
+        titleKey: "dashboard.table_status_encrypted_tooltip",
+      },
+      plaintext: {
+        cls: "status-badge--unencrypted",
+        icon: "lock-open-variant",
+        labelKey: "dashboard.table_status_unencrypted",
+        titleKey: "dashboard.table_status_unencrypted_tooltip",
+      },
+      pending: {
+        cls: "status-badge--encryption-pending",
+        icon: "lock-clock",
+        labelKey: "dashboard.table_status_encryption_pending",
+        titleKey: "dashboard.table_status_encryption_pending_tooltip",
+      },
+      mismatch: {
+        cls: "status-badge--encryption-mismatch",
+        icon: "lock-alert",
+        labelKey: "dashboard.table_status_encryption_mismatch",
+        titleKey: "dashboard.table_status_encryption_mismatch_tooltip",
+      },
+    } as const;
+    if (state === "none") return nothing;
+    const v = variants[state];
+    return html`<span class="status-badge ${v.cls}" title=${this._localize(v.titleKey)}>
+      <wa-icon library="mdi" name=${v.icon}></wa-icon>
+      ${this._localize(v.labelKey)}
+    </span>`;
   }
 
   private _row(icon: string, label: string, value: string | null, mono = false) {

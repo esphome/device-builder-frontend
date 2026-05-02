@@ -252,6 +252,7 @@ export class ESPHomeDeviceTable extends LitElement {
         hasUpdateAvailable: d.update_available,
         api_enabled: d.api_enabled === true,
         api_encrypted: d.api_encrypted === true,
+        api_encryption_active: d.api_encryption_active ?? null,
         busy: this.activeJobs.has(d.configuration),
         recentJob: this.recentJobs.get(d.configuration) ?? null,
         _device: d,

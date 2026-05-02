@@ -74,6 +74,13 @@ export const tableCellStyles = css`
     color: var(--esphome-warning, #f59e0b);
     opacity: 0.9;
   }
+  .cell-encryption.pending {
+    color: var(--esphome-primary);
+    opacity: 0.9;
+  }
+  .cell-encryption.mismatch {
+    color: var(--esphome-error);
+  }
 
   .status-recent wa-icon {
     font-size: 16px;
