@@ -207,7 +207,11 @@
     "clean_success": "Build files cleaned.",
     "clean_failed": "Clean failed.",
     "reset_success": "Build environment reset. The next compile will redownload the toolchain.",
-    "reset_failed": "Failed to reset the build environment."
+    "reset_failed": "Failed to reset the build environment.",
+    "queued_title": "Waiting in queue",
+    "queued_message": "Another firmware task is running. This task will start when it finishes.",
+    "queued_waiting_for": "Waiting for {name} to finish.",
+    "queued_view_all": "View firmware tasks"
   },
   "firmware": {
     "install_title": "Install — {name}",

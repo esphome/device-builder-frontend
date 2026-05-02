@@ -192,7 +192,11 @@
     "clean_success": "Fichiers de compilation nettoyés.",
     "clean_failed": "Échec du nettoyage.",
     "reset_success": "Environnement de compilation réinitialisé. La prochaine compilation retéléchargera la chaîne d'outils.",
-    "reset_failed": "Échec de la réinitialisation de l'environnement de compilation."
+    "reset_failed": "Échec de la réinitialisation de l'environnement de compilation.",
+    "queued_title": "En file d'attente",
+    "queued_message": "Une autre tâche firmware est en cours. Celle-ci démarrera à la fin.",
+    "queued_waiting_for": "En attente de {name}.",
+    "queued_view_all": "Voir les tâches firmware"
   },
   "serial": {
     "title": "Appareil USB",
