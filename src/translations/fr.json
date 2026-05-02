@@ -47,6 +47,8 @@
     "delete_selected_title": "Supprimer les appareils",
     "delete_selected_desc": "Êtes-vous sûr de vouloir supprimer {count} appareil(s) ? Cela supprimera leurs fichiers de configuration et ne pourra pas être annulé.",
     "delete_selected_confirm": "Supprimer",
+    "delete_single_title": "Supprimer l'appareil",
+    "delete_single_desc": "Êtes-vous sûr de vouloir supprimer \"{name}\" ? Cela supprimera ses fichiers de configuration et ne pourra pas être annulé.",
     "delete_all_none": "Aucun appareil sélectionné à supprimer",
     "delete_bulk_success": "{count} appareil(s) supprimé(s)",
     "delete_bulk_failed": "Échec de la suppression en lot",

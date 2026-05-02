@@ -118,6 +118,13 @@ export class ESPHomePageDashboard extends LitElement {
   @state() private _drawerDevice: ConfiguredDevice | null = null;
   @state() private _cardContextDevice: ConfiguredDevice | null = null;
   @state() private _cardContextPosition: { x: number; y: number } | null = null;
+  /** Single device queued for delete confirmation. ``null`` means
+   *  the shared confirm dialog is in bulk-delete mode (driven by
+   *  ``_selectedDevices``). The state-keyed mode-switch lets us
+   *  reuse one ``esphome-confirm-dialog`` instance for both the
+   *  per-device kebab Delete and the select-mode bulk Delete
+   *  without juggling two dialog elements. */
+  @state() private _pendingDelete: ConfiguredDevice | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
    *  device card / row so the user can spot the freshly-imported
@@ -516,7 +523,7 @@ export class ESPHomePageDashboard extends LitElement {
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
-        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => deleteDevice(e.detail, this._api, this._devices, this._localize)}
+        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
       >
         <div slot="toolbar" class="toolbar-row">
@@ -567,7 +574,7 @@ export class ESPHomePageDashboard extends LitElement {
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
-        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => deleteDevice(e.detail, this._api, this._devices, this._localize)}
+        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._onEnterSelectMode(e.detail.configuration)}
       ></esphome-table-row-menu>
     `;
@@ -601,13 +608,27 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderDialogs() {
+    /* One confirm-dialog instance covers both flows (per-device
+       kebab Delete and select-mode bulk Delete) — ``_pendingDelete``
+       drives the copy and the ``@confirm`` router. Picking up the
+       device's friendly name keeps the prompt readable when the
+       technical hostname is something like
+       ``athom-rgbcw-bulb-998181``. */
+    const pendingName = this._pendingDelete
+      ? this._pendingDelete.friendly_name || this._pendingDelete.name
+      : "";
     return html`
       <esphome-confirm-dialog
-        heading=${this._localize("dashboard.delete_selected_title")}
-        message=${this._localize("dashboard.delete_selected_desc", { count: this._selectedDevices.size })}
+        heading=${this._pendingDelete
+          ? this._localize("dashboard.delete_single_title")
+          : this._localize("dashboard.delete_selected_title")}
+        message=${this._pendingDelete
+          ? this._localize("dashboard.delete_single_desc", { name: pendingName })
+          : this._localize("dashboard.delete_selected_desc", { count: this._selectedDevices.size })}
         confirm-label=${this._localize("dashboard.delete_selected_confirm")}
         destructive
-        @confirm=${this._executeDeleteSelected}
+        @confirm=${this._executeDelete}
+        @cancel=${() => { this._pendingDelete = null; }}
       ></esphome-confirm-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
@@ -977,10 +998,29 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
       return;
     }
+    /* Bulk-delete path — ``_pendingDelete`` stays null so the
+       confirm dialog shows the bulk copy ("Delete N device(s)"). */
+    this._pendingDelete = null;
     this._confirmDialog.open();
   }
 
-  private _executeDeleteSelected() {
+  private _confirmDeleteSingle(device: ConfiguredDevice) {
+    /* Per-device kebab Delete — set ``_pendingDelete`` so the
+       confirm dialog shows the single-device copy and routes to the
+       single-device path. Earlier this skipped the dialog entirely
+       and went straight to ``deleteDevice`` — there's no undo, so a
+       missed click on the kebab silently nuked the YAML. */
+    this._pendingDelete = device;
+    this._confirmDialog.open();
+  }
+
+  private _executeDelete() {
+    if (this._pendingDelete) {
+      const target = this._pendingDelete;
+      this._pendingDelete = null;
+      deleteDevice(target, this._api, this._devices, this._localize);
+      return;
+    }
     const selected = [...this._selectedDevices];
     this._selectMode = false;
     this._selectedDevices = new Set();

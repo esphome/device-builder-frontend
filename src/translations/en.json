@@ -71,6 +71,8 @@
     "delete_selected_title": "Delete devices",
     "delete_selected_desc": "Are you sure you want to delete {count} device(s)? This will remove their configuration files and cannot be undone.",
     "delete_selected_confirm": "Delete",
+    "delete_single_title": "Delete device",
+    "delete_single_desc": "Are you sure you want to delete \"{name}\"? This will remove its configuration files and cannot be undone.",
     "delete_all_none": "No devices selected to delete",
     "delete_bulk_success": "{count} device(s) deleted",
     "delete_bulk_failed": "Bulk delete failed",

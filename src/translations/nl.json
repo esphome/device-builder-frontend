@@ -47,6 +47,8 @@
     "delete_selected_title": "Apparaten verwijderen",
     "delete_selected_desc": "Weet u zeker dat u {count} apparaat/apparaten wilt verwijderen? Dit verwijdert hun configuratiebestanden en kan niet ongedaan worden gemaakt.",
     "delete_selected_confirm": "Verwijderen",
+    "delete_single_title": "Apparaat verwijderen",
+    "delete_single_desc": "Weet u zeker dat u \"{name}\" wilt verwijderen? Dit verwijdert de configuratiebestanden en kan niet ongedaan worden gemaakt.",
     "delete_all_none": "Geen apparaten geselecteerd om te verwijderen",
     "delete_bulk_success": "{count} apparaat/apparaten verwijderd",
     "delete_bulk_failed": "Bulkverwijdering mislukt",
