@@ -117,6 +117,18 @@ export class ESPHomePageDashboard extends LitElement {
   @state() private _drawerDevice: ConfiguredDevice | null = null;
   @state() private _cardContextDevice: ConfiguredDevice | null = null;
   @state() private _cardContextPosition: { x: number; y: number } | null = null;
+  /** Configuration filename of the most recently adopted device.
+   *  Drives a short-lived ``highlight`` attribute on the matching
+   *  device card / row so the user can spot the freshly-imported
+   *  device in a long list. Cleared by ``_adoptHighlightTimer``. */
+  @state() private _recentlyAdopted: string | null = null;
+  private _adoptHighlightTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When false (default), discovered devices the user previously
+   *  marked as Ignored are hidden from the banner and grid; the
+   *  ``Show ignored discoveries`` toggle in the header kebab flips
+   *  this to ``true``. Persisted to localStorage so the choice
+   *  survives reloads. */
+  @state() private _showIgnored = false;
 
   @state()
   private _view: DashboardView = DashboardView.CARDS;
@@ -142,11 +154,23 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _onSerialSetup = () => this._detectAndOpenWizard();
+  private _onShowIgnoredChanged = (e: Event) => {
+    this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
+  };
 
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
+    /* The "Show ignored discoveries" toggle lives in the header
+       kebab; sync the persisted flag here and listen for changes
+       dispatched from the menu so we don't have to thread props /
+       contexts through the layout. */
+    this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
+    window.addEventListener(
+      "esphome-show-ignored-changed",
+      this._onShowIgnoredChanged,
+    );
   }
 
   private async _loadPreferences() {
@@ -172,6 +196,10 @@ export class ESPHomePageDashboard extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
+    window.removeEventListener(
+      "esphome-show-ignored-changed",
+      this._onShowIgnoredChanged,
+    );
   }
 
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
@@ -216,11 +244,22 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  private get _visibleImportableDevices(): AdoptableDevice[] {
+    /* Hide ignored discoveries by default — the user already said
+       "don't show me this", so a fresh page load shouldn't put them
+       back in front. The header kebab's "Show ignored discoveries"
+       toggle flips ``_showIgnored`` to surface them again. */
+    return this._showIgnored
+      ? this._importableDevices
+      : this._importableDevices.filter((d) => !d.ignored);
+  }
+
   private _renderDiscoveredGrid() {
-    if (this._importableDevices.length === 0) return "";
+    const visible = this._visibleImportableDevices;
+    if (visible.length === 0) return "";
     return html`
       <div class="devices-grid">
-        ${this._importableDevices.map(
+        ${visible.map(
           (device) => html`
             <esphome-discovered-device-card
               .device=${device}
@@ -239,14 +278,20 @@ export class ESPHomePageDashboard extends LitElement {
   // ─── Render helpers ───
 
   private _renderBanner() {
-    if (this._importableDevices.length === 0) return "";
+    /* Banner counts only what's visible — when every discovery is
+       ignored (and "Show ignored" is off) the banner disappears
+       entirely. The user can still bring them back via the header
+       menu, but they shouldn't see a "Discovered N" prompt for
+       devices they already chose to dismiss. */
+    const visible = this._visibleImportableDevices;
+    if (visible.length === 0) return "";
     return html`
       <div class="discovered-banner-wrap">
         <div class="discovered-banner">
           <div class="discovered-banner-empty"></div>
           <div style="justify-content: center; display: flex; align-items: center">
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
-            <span>${this._localize("dashboard.discovered_count", { count: this._importableDevices.length })}</span>
+            <span>${this._localize("dashboard.discovered_count", { count: visible.length })}</span>
           </div>
           <button
             class="discovered-banner-toggle"
@@ -356,6 +401,7 @@ export class ESPHomePageDashboard extends LitElement {
           const webUrl = buildWebUiUrl(device);
           return html`
             <esphome-device-card
+              data-configuration=${device.configuration}
               .name=${device.friendly_name || device.name}
               .configuration=${device.configuration}
               .state=${device.state}
@@ -364,6 +410,7 @@ export class ESPHomePageDashboard extends LitElement {
               ?api-enabled=${device.api_enabled === true}
               ?api-encrypted=${device.api_encrypted === true}
               ?busy=${this._activeJobs.has(device.configuration)}
+              ?highlight=${this._recentlyAdopted === device.configuration}
               .recentJob=${this._recentJobs.get(device.configuration) ?? null}
               .webUrl=${webUrl}
               ?select-mode=${this._selectMode}
@@ -396,6 +443,7 @@ export class ESPHomePageDashboard extends LitElement {
         .initialColumnVisibility=${this._tableColumnVisibility}
         ?select-mode=${this._selectMode}
         .selectedDevices=${this._selectedDevices}
+        .highlightConfiguration=${this._recentlyAdopted}
         @table-sort-change=${this._saveTablePreference}
         @table-visibility-change=${this._saveTablePreference}
         @table-page-size-change=${this._saveTablePreference}
@@ -508,7 +556,7 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
-      <esphome-adopt-dialog></esphome-adopt-dialog>
+      <esphome-adopt-dialog @adopted=${this._onAdopted}></esphome-adopt-dialog>
       <esphome-api-key-dialog></esphome-api-key-dialog>
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-command-dialog></esphome-command-dialog>
@@ -538,6 +586,36 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   // ─── Actions ───
+
+  private _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
+    /* Configuration filenames are ``<name>.yaml`` — that's how the
+       adopt dialog asks the backend to write the file (see
+       ``import_device``), so the filename is deterministic from the
+       submitted name. Driving the highlight off the configuration
+       string lets us light up either the card or the table row,
+       both of which key on ``device.configuration``. */
+    const configuration = `${e.detail.name}.yaml`;
+    this._recentlyAdopted = configuration;
+    if (this._adoptHighlightTimer !== null) {
+      clearTimeout(this._adoptHighlightTimer);
+    }
+    this._adoptHighlightTimer = setTimeout(() => {
+      this._recentlyAdopted = null;
+      this._adoptHighlightTimer = null;
+    }, 4000);
+    /* Wait one rAF so the device has actually rendered (the backend
+       fires DEVICE_ADDED right after the YAML write; the card lands
+       in the grid on the next render tick). Then scroll the freshly
+       adopted entry into view so the user can see what just landed. */
+    requestAnimationFrame(() => {
+      const root = this.shadowRoot;
+      if (!root) return;
+      const target =
+        root.querySelector<HTMLElement>(`[data-configuration="${configuration}"]`)
+        ?? null;
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  };
 
   private _setView(view: DashboardView) {
     this._view = view;

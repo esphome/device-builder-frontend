@@ -424,6 +424,7 @@
     "theme_dark": "Sombre",
     "theme_system": "Système",
     "settings": "Paramètres",
+    "show_ignored_discoveries": "Afficher les découvertes ignorées",
     "back": "Retour",
     "home_assistant": "Home Assistant",
     "editor": "Éditeur",

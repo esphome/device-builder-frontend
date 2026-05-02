@@ -470,6 +470,7 @@
     "theme_dark": "Dark",
     "theme_system": "System",
     "settings": "Settings",
+    "show_ignored_discoveries": "Show ignored discoveries",
     "back": "Back",
     "home_assistant": "Home Assistant",
     "editor": "Editor",

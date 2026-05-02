@@ -96,6 +96,12 @@ export class ESPHomeDeviceTable extends LitElement {
   @property({ attribute: false })
   selectedDevices = new Set<string>();
 
+  /** Configuration filename of the row to highlight briefly — used
+   *  by the dashboard to flash the freshly-adopted device. ``null``
+   *  when nothing should be highlighted. */
+  @property({ attribute: false })
+  highlightConfiguration: string | null = null;
+
   @property({ attribute: false })
   activeJobs = new Map<string, unknown>();
 
@@ -459,9 +465,12 @@ export class ESPHomeDeviceTable extends LitElement {
                 <tr
                   role="row"
                   tabindex="0"
+                  data-configuration=${row.original.config}
                   class="${this.selectMode &&
                   this.selectedDevices.has(row.original.config)
-                    ? "selected"
+                    ? "selected "
+                    : ""}${this.highlightConfiguration === row.original.config
+                    ? "highlight"
                     : ""}"
                   @click=${() =>
                     this.selectMode

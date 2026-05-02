@@ -424,6 +424,7 @@
     "theme_dark": "Donker",
     "theme_system": "Systeem",
     "settings": "Instellingen",
+    "show_ignored_discoveries": "Genegeerde ontdekkingen tonen",
     "back": "Terug",
     "home_assistant": "Home Assistant",
     "editor": "Editor",
