@@ -17,7 +17,16 @@ import { stripAnsi } from "./strip-ansi.js";
  * re-parse the Blob.
  */
 export function downloadAnsiText(lines: string[], filename: string): string {
-  const text = lines.map(stripAnsi).join("\n");
+  /* Some streams (notably the firmware-job follow path) deliver
+     each line *with* its trailing ``\n`` / ``\r\n`` baked into the
+     payload. Joining those with another ``\n`` produces a blank line
+     between every entry in the saved file. Strip trailing line
+     terminators per entry before the join so the output reads as one
+     real log line per file row regardless of which side included
+     the terminator. */
+  const text = lines
+    .map((line) => stripAnsi(line).replace(/\r?\n+$/, ""))
+    .join("\n");
   const blob = new Blob([text], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

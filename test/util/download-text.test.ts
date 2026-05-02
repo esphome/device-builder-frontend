@@ -77,6 +77,16 @@ describe("downloadAnsiText", () => {
     expect(result).toBe("");
   });
 
+  it("strips trailing line terminators so each entry stays on its own row", () => {
+    /* The firmware-job follow path delivers lines with the original
+       ``\n`` / ``\r\n`` baked in. Without the per-line trim, the
+       saved file ended up with a blank row between every entry. */
+    const { result } = withBrowserStubs(() =>
+      downloadAnsiText(["one\n", "two\r\n", "three"], "log.txt"),
+    );
+    expect(result).toBe("one\ntwo\nthree");
+  });
+
   it("preserves bracketed text that isn't an ANSI escape (no ESC byte)", () => {
     const { result } = withBrowserStubs(() =>
       downloadAnsiText(["[INFO] startup", "[1;31m not-an-escape"], "log.txt"),
