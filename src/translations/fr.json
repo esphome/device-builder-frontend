@@ -171,6 +171,8 @@
     "install_method_usb_local_unsupported": "Nécessite un navigateur compatible Web Serial (ex. Chrome)",
     "install_method_usb_server": "Brancher sur l'ordinateur exécutant le tableau de bord ESPHome",
     "install_method_usb_server_desc": "Pour les appareils connectés via USB au serveur",
+    "install_method_web_download": "Télécharger le firmware pour le flasher via web.esphome.io",
+    "install_method_web_download_desc": "Compilez ici, puis flashez depuis un ordinateur qui prend en charge Web Serial",
     "install": "Installer",
     "install_method_select_port": "Sélectionnez un port série",
     "install_method_no_ports": "Aucun port série trouvé. Assurez-vous que l'appareil est connecté au serveur.",
@@ -511,7 +513,13 @@
     "validate_success": "La configuration est valide !",
     "validate_failed": "Échec de la validation.",
     "show_details": "Afficher les détails",
-    "hide_details": "Masquer les détails"
+    "hide_details": "Masquer les détails",
+    "web_download_done_title": "Firmware prêt à flasher",
+    "web_download_done_body": "Enregistré sous {filename}. Ouvrez web.esphome.io sur un ordinateur capable de se connecter à votre appareil via USB et flashez le fichier.",
+    "web_download_step_open": "Ouvrez web.esphome.io",
+    "web_download_step_connect": "Cliquez sur Connect et choisissez le port série de votre appareil",
+    "web_download_step_install": "Choisissez Install et sélectionnez le fichier téléchargé {filename}",
+    "web_download_open_button": "Ouvrir web.esphome.io"
   },
   "validation": {
     "required": "Ce champ est requis",

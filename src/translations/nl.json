@@ -171,6 +171,8 @@
     "install_method_usb_local_unsupported": "Vereist een browser met Web Serial-ondersteuning (bijv. Chrome)",
     "install_method_usb_server": "Aansluiten op de computer met ESPHome Dashboard",
     "install_method_usb_server_desc": "Voor apparaten die via USB op de server zijn aangesloten",
+    "install_method_web_download": "Download firmware om te flashen via web.esphome.io",
+    "install_method_web_download_desc": "Compileer hier en flash daarna vanaf een computer die Web Serial ondersteunt",
     "install": "Installeren",
     "install_method_select_port": "Selecteer een seriële poort",
     "install_method_no_ports": "Geen seriële poorten gevonden. Zorg dat het apparaat op de server is aangesloten.",
@@ -511,7 +513,13 @@
     "validate_success": "Configuratie is geldig!",
     "validate_failed": "Validatie mislukt.",
     "show_details": "Details tonen",
-    "hide_details": "Details verbergen"
+    "hide_details": "Details verbergen",
+    "web_download_done_title": "Firmware klaar om te flashen",
+    "web_download_done_body": "Opgeslagen als {filename}. Open web.esphome.io op een computer die via USB met je apparaat kan verbinden en flash het bestand.",
+    "web_download_step_open": "Open web.esphome.io",
+    "web_download_step_connect": "Klik op Connect en kies de seriële poort van je apparaat",
+    "web_download_step_install": "Kies Install en selecteer het gedownloade bestand {filename}",
+    "web_download_open_button": "Open web.esphome.io"
   },
   "validation": {
     "required": "Dit veld is verplicht",

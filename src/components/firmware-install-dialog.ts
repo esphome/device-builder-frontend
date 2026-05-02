@@ -41,7 +41,15 @@ registerMdiIcons({
   close: mdiClose,
 });
 
-type InstallStep = "connecting" | "queued" | "installing" | "compiling" | "flashing" | "done" | "error";
+type InstallStep =
+  | "connecting"
+  | "queued"
+  | "installing"
+  | "compiling"
+  | "flashing"
+  | "done"
+  | "download-ready"
+  | "error";
 
 function normalizeChipName(name: string): string {
   return name.split("(")[0].trim().toLowerCase().replace(/-/g, "");
@@ -69,6 +77,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() private _logsExpanded = false;
   @state() private _logsFullHeight = false;
   @state() private _flashPercent = 0;
+  @state() private _downloadedFilename = "";
 
   private _device: ConfiguredDevice | null = null;
   private _jobId = "";
@@ -105,6 +114,21 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._startWebSerialInstall();
   }
 
+  /**
+   * Compile the firmware on the server, download the resulting binary
+   * to the user's machine, and show instructions to flash it via
+   * web.esphome.io. Used as the fallback path when neither OTA nor
+   * Web Serial is available (e.g. dashboard served over HTTP and the
+   * device is offline / first-flash).
+   */
+  installWebDownload(device: ConfiguredDevice) {
+    this._init(device);
+    this._step = "queued";
+    this._statusMessage = this._localize("firmware.status_queued");
+    this._dialog.open = true;
+    this._startWebDownload();
+  }
+
   private _init(device: ConfiguredDevice) {
     // Dispose any stream from a prior session before resetting state.
     // ``_init`` re-runs on every ``installWebSerial`` call, including
@@ -117,13 +141,16 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._device = device;
     this._open = true;
     this._step = "installing";
-    this._title = this._localize("firmware.install_title", { name: device.friendly_name || device.name });
+    this._title = this._localize("firmware.install_title", {
+      name: device.friendly_name || device.name,
+    });
     this._statusMessage = "";
     this._errorMessage = "";
     this._logLines = [];
     this._logsExpanded = false;
     this._logsFullHeight = false;
     this._flashPercent = 0;
+    this._downloadedFilename = "";
     // ``_jobId`` is already cleared by ``_detachStream`` above; same
     // for ``_streamId`` and ``_compileReject``.
     this._detected = null;
@@ -175,8 +202,13 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         --term-error: #c72e2e;
       }
 
-      wa-dialog { --width: 520px; transition: width 0.2s; }
-      :host([expanded]) wa-dialog { --width: min(900px, 90vw); }
+      wa-dialog {
+        --width: 520px;
+        transition: width 0.2s;
+      }
+      :host([expanded]) wa-dialog {
+        --width: min(900px, 90vw);
+      }
 
       wa-dialog::part(header) {
         background: var(--esphome-primary);
@@ -190,14 +222,21 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         font-weight: var(--wa-font-weight-bold);
       }
       wa-dialog::part(close-button__base) {
-        background: transparent; border: none; box-shadow: none;
-        padding: 0; min-width: unset; min-height: unset;
-        color: var(--esphome-on-primary); cursor: pointer;
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        min-width: unset;
+        min-height: unset;
+        color: var(--esphome-on-primary);
+        cursor: pointer;
       }
       wa-dialog::part(body) {
         padding: var(--wa-space-l) var(--wa-space-xl);
       }
-      wa-dialog::part(footer) { display: none; }
+      wa-dialog::part(footer) {
+        display: none;
+      }
 
       .status {
         display: flex;
@@ -217,8 +256,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       .status-icon {
         font-size: 42px;
       }
-      .status-icon--success { color: var(--esphome-success); }
-      .status-icon--error { color: var(--esphome-error); }
+      .status-icon--success {
+        color: var(--esphome-success);
+      }
+      .status-icon--error {
+        color: var(--esphome-error);
+      }
 
       .status-text {
         font-size: var(--wa-font-size-m);
@@ -231,6 +274,21 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         max-width: 380px;
         line-height: 1.5;
+      }
+
+      .instructions {
+        margin: var(--wa-space-m) 0 0;
+        padding-left: var(--wa-space-l);
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-normal);
+        line-height: 1.6;
+      }
+      .instructions li + li {
+        margin-top: var(--wa-space-2xs);
+      }
+
+      a.btn {
+        text-decoration: none;
       }
 
       .progress-bar {
@@ -262,8 +320,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         cursor: pointer;
       }
-      .logs-toggle:hover { color: var(--wa-color-text-normal); }
-      .logs-toggle wa-icon { font-size: 16px; }
+      .logs-toggle:hover {
+        color: var(--wa-color-text-normal);
+      }
+      .logs-toggle wa-icon {
+        font-size: 16px;
+      }
 
       .logs-header {
         display: flex;
@@ -281,7 +343,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         cursor: pointer;
       }
-      .expand-btn:hover { color: var(--wa-color-text-normal); }
+      .expand-btn:hover {
+        color: var(--wa-color-text-normal);
+      }
 
       .logs-container {
         margin-top: var(--wa-space-s);
@@ -297,7 +361,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       .logs-container--full esphome-ansi-log {
         --log-height: 50vh;
       }
-      esphome-ansi-log::part(container) { border-radius: 0; }
+      esphome-ansi-log::part(container) {
+        border-radius: 0;
+      }
 
       .footer {
         display: flex;
@@ -346,14 +412,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog
-        label=${this._title}
-        ?open=${this._open}
-        @wa-after-hide=${this._onClose}
-      >
-        ${this._renderStatus()}
-        ${this._renderProgress()}
-        ${this._renderLogs()}
+      <wa-dialog label=${this._title} ?open=${this._open} @wa-after-hide=${this._onClose}>
+        ${this._renderStatus()} ${this._renderProgress()} ${this._renderLogs()}
         ${this._renderFooter()}
       </wa-dialog>
     `;
@@ -363,15 +423,46 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (this._step === "done") {
       return html`
         <div class="status">
-          <wa-icon class="status-icon status-icon--success" library="mdi" name="check-circle"></wa-icon>
+          <wa-icon
+            class="status-icon status-icon--success"
+            library="mdi"
+            name="check-circle"
+          ></wa-icon>
           <span class="status-text">${this._statusMessage}</span>
         </div>
+      `;
+    }
+    if (this._step === "download-ready") {
+      const filename = this._downloadedFilename;
+      return html`
+        <div class="status">
+          <wa-icon
+            class="status-icon status-icon--success"
+            library="mdi"
+            name="check-circle"
+          ></wa-icon>
+          <span class="status-text"
+            >${this._localize("firmware.web_download_done_title")}</span
+          >
+          <span class="status-detail"
+            >${this._localize("firmware.web_download_done_body", { filename })}</span
+          >
+        </div>
+        <ol class="instructions">
+          <li>${this._localize("firmware.web_download_step_open")}</li>
+          <li>${this._localize("firmware.web_download_step_connect")}</li>
+          <li>${this._localize("firmware.web_download_step_install", { filename })}</li>
+        </ol>
       `;
     }
     if (this._step === "error") {
       return html`
         <div class="status">
-          <wa-icon class="status-icon status-icon--error" library="mdi" name="alert-circle"></wa-icon>
+          <wa-icon
+            class="status-icon status-icon--error"
+            library="mdi"
+            name="alert-circle"
+          ></wa-icon>
           <span class="status-text">${this._statusMessage}</span>
           <span class="status-detail">${this._errorMessage}</span>
         </div>
@@ -398,31 +489,81 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (this._logLines.length === 0) return nothing;
     return html`
       <div class="logs-header">
-        <button class="logs-toggle" @click=${() => { this._logsExpanded = !this._logsExpanded; }}>
-          <wa-icon library="mdi" name=${this._logsExpanded ? "chevron-up" : "chevron-down"}></wa-icon>
-          ${this._logsExpanded ? this._localize("firmware.hide_details") : this._localize("firmware.show_details")}
+        <button
+          class="logs-toggle"
+          @click=${() => {
+            this._logsExpanded = !this._logsExpanded;
+          }}
+        >
+          <wa-icon
+            library="mdi"
+            name=${this._logsExpanded ? "chevron-up" : "chevron-down"}
+          ></wa-icon>
+          ${this._logsExpanded
+            ? this._localize("firmware.hide_details")
+            : this._localize("firmware.show_details")}
         </button>
         ${this._logsExpanded
-          ? html`<button class="expand-btn" @click=${() => { this._logsFullHeight = !this._logsFullHeight; }}>
-              <wa-icon library="mdi" name=${this._logsFullHeight ? "arrow-collapse" : "arrow-expand"}></wa-icon>
+          ? html`<button
+              class="expand-btn"
+              @click=${() => {
+                this._logsFullHeight = !this._logsFullHeight;
+              }}
+            >
+              <wa-icon
+                library="mdi"
+                name=${this._logsFullHeight ? "arrow-collapse" : "arrow-expand"}
+              ></wa-icon>
             </button>`
           : nothing}
       </div>
       ${this._logsExpanded
-        ? html`<div class="logs-container ${this._logsFullHeight ? "logs-container--full" : ""}">
-            <esphome-ansi-log .lines=${this._logLines} ?light=${!this._darkMode}></esphome-ansi-log>
+        ? html`<div
+            class="logs-container ${this._logsFullHeight ? "logs-container--full" : ""}"
+          >
+            <esphome-ansi-log
+              .lines=${this._logLines}
+              ?light=${!this._darkMode}
+            ></esphome-ansi-log>
           </div>`
         : nothing}
     `;
   }
 
   private _renderFooter() {
-    const isRunning = this._step !== "done" && this._step !== "error";
+    const isRunning =
+      this._step !== "done" && this._step !== "error" && this._step !== "download-ready";
+    if (isRunning) {
+      return html`
+        <div class="footer">
+          <button class="btn btn--ghost" @click=${this._cancel}>
+            ${this._localize("command.stop")}
+          </button>
+        </div>
+      `;
+    }
+    if (this._step === "download-ready") {
+      return html`
+        <div class="footer">
+          <button class="btn btn--ghost" @click=${this._close}>
+            ${this._localize("command.close")}
+          </button>
+          <a
+            class="btn btn--primary"
+            href="https://web.esphome.io"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            ${this._localize("firmware.web_download_open_button")}
+          </a>
+        </div>
+      `;
+    }
     return html`
       <div class="footer">
-        ${isRunning
-          ? html`<button class="btn btn--ghost" @click=${this._cancel}>${this._localize("command.stop")}</button>`
-          : html`<button class="btn btn--primary" @click=${this._close}>${this._localize("command.close")}</button>`}
+        <button class="btn btn--primary" @click=${this._close}>
+          ${this._localize("command.close")}
+        </button>
       </div>
     `;
   }
@@ -471,12 +612,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const expectedNorm = expected ? expected.toLowerCase().replace(/-/g, "") : "";
     // Without a resolved variant, "esp32" can stand in for any ESP32
     // family chip — don't reject the install in that case.
-    const expectedIsCoarseEsp32 =
-      !hasAuthoritativeVariant && expectedNorm === "esp32";
+    const expectedIsCoarseEsp32 = !hasAuthoritativeVariant && expectedNorm === "esp32";
     console.debug(
-      "[Web Serial] Detected chip:", detected.chipName, "→", detectedNorm,
-      "| Expected:", expected, "→", expectedNorm,
-      "| authoritative:", hasAuthoritativeVariant,
+      "[Web Serial] Detected chip:",
+      detected.chipName,
+      "→",
+      detectedNorm,
+      "| Expected:",
+      expected,
+      "→",
+      expectedNorm,
+      "| authoritative:",
+      hasAuthoritativeVariant
     );
     if (
       expectedNorm &&
@@ -484,13 +631,26 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       detectedNorm !== expectedNorm &&
       !(expectedIsCoarseEsp32 && detectedNorm.startsWith("esp32"))
     ) {
-      try { await disconnect(detected.transport); } catch { /* ignore */ }
-      this._fail(this._localize("firmware.chip_mismatch", { detected: detected.chipName, expected }));
+      try {
+        await disconnect(detected.transport);
+      } catch {
+        /* ignore */
+      }
+      this._fail(
+        this._localize("firmware.chip_mismatch", {
+          detected: detected.chipName,
+          expected,
+        })
+      );
       return;
     }
 
     // Disconnect during compile — we'll reconnect to flash
-    try { await disconnect(detected.transport); } catch { /* ignore */ }
+    try {
+      await disconnect(detected.transport);
+    } catch {
+      /* ignore */
+    }
 
     // 3. Compile
     this._step = "queued";
@@ -544,10 +704,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       console.error("[Web Serial] Flash error:", err);
       // If progress reached 100%, treat as success (device may have reset during verification)
       if (this._flashPercent >= 100) {
-        console.debug("[Web Serial] Flash reached 100%, treating as success despite error");
+        console.debug(
+          "[Web Serial] Flash reached 100%, treating as success despite error"
+        );
       } else {
-        try { await disconnect(flashDetected.transport); } catch { /* ignore */ }
-        this._fail(err instanceof Error ? err.message : this._localize("firmware.flash_failed"));
+        try {
+          await disconnect(flashDetected.transport);
+        } catch {
+          /* ignore */
+        }
+        this._fail(
+          err instanceof Error ? err.message : this._localize("firmware.flash_failed")
+        );
         return;
       }
     }
@@ -556,10 +724,53 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_resetting");
     try {
       await resetAndDisconnect(flashDetected.loader, flashDetected.transport);
-    } catch { /* ignore reset errors */ }
+    } catch {
+      /* ignore reset errors */
+    }
 
     this._statusMessage = this._localize("firmware.status_done");
     this._step = "done";
+  }
+
+  // ─── Web Download (compile + save .bin for web.esphome.io) ─────
+
+  private async _startWebDownload() {
+    const device = this._device;
+    if (!device) return;
+
+    try {
+      await this._compileAndWait(device.configuration);
+    } catch {
+      this._fail(this._localize("firmware.compile_failed"));
+      return;
+    }
+
+    this._statusMessage = this._localize("firmware.status_downloading");
+    try {
+      const binaries = await this._api.firmwareGetBinaries(device.configuration);
+      const factory = binaries.find((b) => b.file.includes("factory"));
+      const binary = factory || binaries[0];
+      if (!binary) {
+        this._fail(this._localize("serial.no_firmware"));
+        return;
+      }
+      const result = await this._api.firmwareDownload(device.configuration, binary.file);
+      const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: "application/octet-stream" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = result.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      this._downloadedFilename = result.filename;
+    } catch {
+      this._fail(this._localize("firmware.download_failed"));
+      return;
+    }
+
+    this._step = "download-ready";
+    this._statusMessage = "";
   }
 
   private _compileAndWait(configuration: string): Promise<void> {
@@ -586,7 +797,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
             this._jobId = "";
             this._compileReject = null;
             const result = data as unknown as { status: string };
-            result.status === JobStatus.COMPLETED ? resolve() : reject(new Error("Compilation failed"));
+            result.status === JobStatus.COMPLETED
+              ? resolve()
+              : reject(new Error("Compilation failed"));
           },
           onError: (error) => {
             this._streamId = "";
@@ -613,7 +826,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   private async _cancel() {
     if (this._jobId) {
-      try { await this._api.firmwareCancel(this._jobId); } catch { /* ignore */ }
+      try {
+        await this._api.firmwareCancel(this._jobId);
+      } catch {
+        /* ignore */
+      }
     }
     this._close();
   }

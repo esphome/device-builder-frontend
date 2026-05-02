@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiSerialPort, mdiUsb, mdiWifi } from "@mdi/js";
+import { mdiArrowLeft, mdiCloudDownload, mdiSerialPort, mdiUsb, mdiWifi } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -19,6 +19,7 @@ registerMdiIcons({
   wifi: mdiWifi,
   usb: mdiUsb,
   "serial-port": mdiSerialPort,
+  "cloud-download": mdiCloudDownload,
 });
 
 type DialogView = "method" | "port-select";
@@ -218,6 +219,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   private _renderMethodList() {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
+    const showWebDownload = !hasWebSerial && !isOnline;
 
     return html`
       <div class="list">
@@ -227,8 +229,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         >
           <wa-icon library="mdi" name="wifi"></wa-icon>
           <div class="info">
-            <span class="title">${this._localize("dashboard.install_method_network")}</span>
-            <span class="desc">${this._localize("dashboard.install_method_network_desc")}</span>
+            <span class="title"
+              >${this._localize("dashboard.install_method_network")}</span
+            >
+            <span class="desc"
+              >${this._localize("dashboard.install_method_network_desc")}</span
+            >
           </div>
         </div>
         <div
@@ -237,19 +243,42 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         >
           <wa-icon library="mdi" name="usb"></wa-icon>
           <div class="info">
-            <span class="title">${this._localize("dashboard.install_method_usb_local")}</span>
-            <span class="desc">${hasWebSerial
-              ? this._localize("dashboard.install_method_usb_local_desc")
-              : this._localize("dashboard.install_method_usb_local_unsupported")}</span>
+            <span class="title"
+              >${this._localize("dashboard.install_method_usb_local")}</span
+            >
+            <span class="desc"
+              >${hasWebSerial
+                ? this._localize("dashboard.install_method_usb_local_desc")
+                : this._localize("dashboard.install_method_usb_local_unsupported")}</span
+            >
           </div>
         </div>
         <div class="option" @click=${this._onServerSerial}>
           <wa-icon library="mdi" name="serial-port"></wa-icon>
           <div class="info">
-            <span class="title">${this._localize("dashboard.install_method_usb_server")}</span>
-            <span class="desc">${this._localize("dashboard.install_method_usb_server_desc")}</span>
+            <span class="title"
+              >${this._localize("dashboard.install_method_usb_server")}</span
+            >
+            <span class="desc"
+              >${this._localize("dashboard.install_method_usb_server_desc")}</span
+            >
           </div>
         </div>
+        ${showWebDownload
+          ? html`
+              <div class="option" @click=${() => this._selectMethod("web-download")}>
+                <wa-icon library="mdi" name="cloud-download"></wa-icon>
+                <div class="info">
+                  <span class="title"
+                    >${this._localize("dashboard.install_method_web_download")}</span
+                  >
+                  <span class="desc"
+                    >${this._localize("dashboard.install_method_web_download_desc")}</span
+                  >
+                </div>
+              </div>
+            `
+          : nothing}
       </div>
     `;
   }
@@ -265,12 +294,19 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     }
 
     return html`
-      <button class="back-btn" @click=${() => { this._view = "method"; }}>
+      <button
+        class="back-btn"
+        @click=${() => {
+          this._view = "method";
+        }}
+      >
         <wa-icon library="mdi" name="arrow-left"></wa-icon>
         ${this._localize("dashboard.install_method_back")}
       </button>
       ${this._ports.length === 0
-        ? html`<div class="empty">${this._localize("dashboard.install_method_no_ports")}</div>`
+        ? html`<div class="empty">
+            ${this._localize("dashboard.install_method_no_ports")}
+          </div>`
         : html`
             <div class="list">
               ${this._ports.map(
@@ -282,7 +318,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
                       ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
                     </div>
                   </div>
-                `,
+                `
               )}
             </div>
           `}
@@ -306,7 +342,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         detail: { method },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -316,14 +352,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         detail: { method: "server-serial", port },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
   private _onClose() {
-    this.dispatchEvent(
-      new CustomEvent("close", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 }
 

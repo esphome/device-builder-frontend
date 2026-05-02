@@ -1,9 +1,6 @@
 import { type ReactiveController, type ReactiveControllerHost } from "lit";
 import { DeviceState, type ConfiguredDevice } from "../../api/types.js";
-import type {
-  CommandType,
-  ESPHomeCommandDialog,
-} from "../command-dialog.js";
+import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 
 export interface DeviceInstallControllerHost extends ReactiveControllerHost {
@@ -51,9 +48,7 @@ export class DeviceInstallController implements ReactiveController {
     this._host.requestUpdate();
   };
 
-  onInstallMethodSelect = (
-    e: CustomEvent<{ method: string; port?: string }>
-  ) => {
+  onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) => {
     const device = this._host.device;
     this.installMethodOpen = false;
     this._host.requestUpdate();
@@ -65,14 +60,12 @@ export class DeviceInstallController implements ReactiveController {
       this._openCommand(device, "install", port!);
     } else if (method === "web-serial") {
       this._host.firmwareDialog?.installWebSerial(device);
+    } else if (method === "web-download") {
+      this._host.firmwareDialog?.installWebDownload(device);
     }
   };
 
-  private _openCommand(
-    device: ConfiguredDevice,
-    type: CommandType,
-    port?: string
-  ) {
+  private _openCommand(device: ConfiguredDevice, type: CommandType, port?: string) {
     const dialog = this._host.commandDialog;
     if (!dialog) return;
     dialog.configuration = device.configuration;
