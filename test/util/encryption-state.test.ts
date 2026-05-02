@@ -33,6 +33,14 @@ describe("getEncryptionState", () => {
     expect(getEncryptionState(inputs({ api_encryption_active: null }))).toBe("active");
   });
 
+  it("treats undefined the same as null (older backend / cached payload)", () => {
+    /* Cast through ``as unknown`` so we can simulate an older WS
+       payload that omits the field entirely; ``EncryptionInputs``
+       declares it required to keep call-site coverage tight. */
+    const stale = { ...inputs(), api_encryption_active: undefined } as unknown as EncryptionInputs;
+    expect(getEncryptionState(stale)).toBe("active");
+  });
+
   it("returns 'active' when YAML encrypted and mDNS confirms encryption", () => {
     expect(
       getEncryptionState(

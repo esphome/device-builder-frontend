@@ -38,10 +38,11 @@ export function getEncryptionState(d: EncryptionInputs): EncryptionState {
   if (!d.api_enabled) return "none";
   if (!d.api_encrypted) return "plaintext";
   const observed = d.api_encryption_active;
-  /* mDNS not seen yet: trust the YAML. The dashboard would otherwise
-     spend the first few seconds after start-up showing every device
-     as "pending" until the browser turned up. */
-  if (observed === null) return "active";
+  /* mDNS not seen yet: trust the YAML. ``observed == null`` (loose
+     equality) catches both ``null`` and ``undefined`` — the latter
+     can sneak in from older backends or cached WS payloads that
+     predate the field. */
+  if (observed == null) return "active";
   /* TXT absent → device is running plaintext API. If the user has
      unflashed changes, they probably know — surface "pending" so the
      indicator nudges toward Install. Otherwise it's a real mismatch. */
