@@ -75,7 +75,13 @@ export const dashboardStyles = css`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
-    padding: var(--wa-space-l);
+    /* Bottom padding leaves clearance for the fixed Create-device FAB
+       so the last card's action row (Edit / Install / Logs / kebab) is
+       reachable on mobile, where the grid is single-column and the FAB
+       otherwise sits directly on top of the trailing card's controls.
+       The table view doesn't need this — it scrolls inside its own
+       container with its own footer offset. */
+    padding: var(--wa-space-l) var(--wa-space-l) calc(var(--wa-space-3xl) + 32px);
   }
 
   /* ─── Search toolbar ─── */
