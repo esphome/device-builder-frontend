@@ -210,6 +210,7 @@ export class ESPHomePageDevice extends LitElement {
     setLeaveGuard(this._confirmLeave);
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
+    window.addEventListener("keydown", this._onKeydown);
   }
 
   disconnectedCallback() {
@@ -217,7 +218,44 @@ export class ESPHomePageDevice extends LitElement {
     setLeaveGuard(null);
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
+    window.removeEventListener("keydown", this._onKeydown);
     this._resolvePendingLeave(false);
+  }
+
+  private _onKeydown = (e: KeyboardEvent) => {
+    if (e.key !== "Escape") return;
+    /* Don't intercept Esc while the user is typing — the YAML editor,
+       text inputs, and contentEditable surfaces all use Esc for their
+       own behaviour (closing autocomplete, dropping focus, etc.).
+       composedPath()[0] is the actual focused element across shadow
+       boundaries; e.target gets retargeted to the host. */
+    const target = e.composedPath()[0] as HTMLElement | undefined;
+    if (this._isTextEntry(target)) return;
+    if (this._drawerOpen) {
+      e.preventDefault();
+      this._drawerOpen = false;
+      return;
+    }
+    /* Otherwise leave the editor — same path as the back button, so
+       the unsaved-changes guard runs via popstate. */
+    e.preventDefault();
+    window.history.back();
+  };
+
+  private _isTextEntry(el: HTMLElement | undefined): boolean {
+    if (!el) return false;
+    const tag = el.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (el.isContentEditable) return true;
+    /* The Monaco-style YAML editor renders its caret inside a
+       textarea-like child but the focused element can vary by version.
+       Walk up looking for a recognisable editor host. */
+    let cur: HTMLElement | null = el;
+    while (cur) {
+      if (cur.tagName === "ESPHOME-YAML-EDITOR") return true;
+      cur = cur.parentElement;
+    }
+    return false;
   }
 
   updated(changedProperties: Map<string, unknown>) {
