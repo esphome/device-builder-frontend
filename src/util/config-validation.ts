@@ -43,7 +43,17 @@ export interface ValidationError {
   params?: Record<string, string | number>;
 }
 
-const DEVICE_NAME_RE = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/;
+/* Mirrors esphome's ``ALLOWED_NAME_CHARS`` (const.py) — what
+   ``esphome rename`` and the YAML ``name:`` validator both accept.
+   Underscore is included because plenty of existing configs already
+   use it (e.g. ``master_tv_cabinet_32``), and rejecting it here
+   would make those devices un-renamable from the dashboard. We do
+   warn separately (see ``getDeviceNameWarning``) because underscores
+   aren't valid mDNS hostnames per RFC 952/1123 and produce flaky
+   resolution on some networks. The 63-char cap keeps us inside what
+   works as a hostname; esphome itself doesn't bound length at the
+   rename step but the device wouldn't be reachable past 63 anyway. */
+const DEVICE_NAME_RE = /^[a-z0-9_-]+$/;
 
 export function validateDeviceName(name: string): ValidationError | null {
   const trimmed = name.trim();
@@ -53,6 +63,20 @@ export function validateDeviceName(name: string): ValidationError | null {
   }
   if (!DEVICE_NAME_RE.test(trimmed)) {
     return { key: "name", code: "validation.invalid_device_name" };
+  }
+  return null;
+}
+
+/** Soft warnings for a device name — same return shape as
+ *  ``validateDeviceName`` but the dialog renders these in a less
+ *  alarming style and lets the user proceed anyway. Today the only
+ *  one is the underscore caution: esphome accepts it, but mDNS /
+ *  RFC-strict resolvers don't, so a name with ``_`` may resolve on
+ *  some networks and silently fail on others. */
+export function getDeviceNameWarning(name: string): ValidationError | null {
+  const trimmed = name.trim();
+  if (trimmed.includes("_")) {
+    return { key: "name", code: "validation.device_name_underscore" };
   }
   return null;
 }

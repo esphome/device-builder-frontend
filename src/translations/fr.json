@@ -488,7 +488,8 @@
     "not_a_number": "Doit être un nombre",
     "not_an_integer": "Doit être un entier",
     "invalid_option": "Option invalide",
-    "invalid_device_name": "Uniquement minuscules, chiffres et tirets ; doit commencer/finir par une lettre ou un chiffre"
+    "invalid_device_name": "Uniquement minuscules, chiffres, tirets et underscores",
+    "device_name_underscore": "Les underscores fonctionnent mais ne sont pas des noms d'hôte mDNS valides — l'appareil peut ne pas se résoudre sur certains réseaux"
   },
   "command_palette": {
     "placeholder": "Tapez une commande ou recherchez…",

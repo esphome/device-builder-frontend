@@ -5,7 +5,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { validateDeviceName } from "../util/config-validation.js";
+import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
@@ -117,6 +117,15 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
         font-size: var(--wa-font-size-xs);
         margin-top: var(--wa-space-2xs);
       }
+
+      /* Soft warning shown alongside the input — same slot as the
+         hard error but warning-coloured so the user can tell the two
+         apart, and the submit button stays enabled. */
+      .field-warning {
+        color: var(--esphome-warning, #d97706);
+        font-size: var(--wa-font-size-xs);
+        margin-top: var(--wa-space-2xs);
+      }
     `,
   ];
 
@@ -133,7 +142,12 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
   protected render() {
     const trimmed = this._value.trim();
     const unchanged = trimmed === this.deviceName || !trimmed;
-    const err = trimmed && trimmed !== this.deviceName ? validateDeviceName(trimmed) : null;
+    const showsValidation = trimmed && trimmed !== this.deviceName;
+    const err = showsValidation ? validateDeviceName(trimmed) : null;
+    /* Warnings only render when there's no hard error to show — the
+       error messaging would otherwise compete with the warning for
+       the same slot. */
+    const warning = showsValidation && !err ? getDeviceNameWarning(trimmed) : null;
     const canSubmit = !unchanged && !err;
 
     return html`
@@ -149,7 +163,9 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
           />
           ${err
             ? html`<span class="field-error">${this._localize(err.code, err.params)}</span>`
-            : nothing}
+            : warning
+              ? html`<span class="field-warning">${this._localize(warning.code, warning.params)}</span>`
+              : nothing}
         </div>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>

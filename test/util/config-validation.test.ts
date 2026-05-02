@@ -47,18 +47,40 @@ describe("validateDeviceName", () => {
     expect(validateDeviceName("   ")?.code).toBe("validation.required");
   });
 
-  it("rejects uppercase and underscores", () => {
+  it("rejects uppercase characters", () => {
     expect(validateDeviceName("MyDevice")?.code).toBe("validation.invalid_device_name");
-    expect(validateDeviceName("my_device")?.code).toBe("validation.invalid_device_name");
   });
 
-  it("rejects leading/trailing hyphen", () => {
-    expect(validateDeviceName("-foo")?.code).toBe("validation.invalid_device_name");
-    expect(validateDeviceName("foo-")?.code).toBe("validation.invalid_device_name");
+  it("accepts underscores (esphome rename allows them)", () => {
+    /* Plenty of existing configs use ``my_device`` style; rejecting
+       them here would make those devices un-renamable from the
+       dashboard. The ``getDeviceNameWarning`` companion flags them
+       as a soft mDNS-hostname warning instead. */
+    expect(validateDeviceName("my_device")).toBeNull();
+  });
+
+  it("accepts leading/trailing hyphen (esphome rename allows them)", () => {
+    expect(validateDeviceName("-foo")).toBeNull();
+    expect(validateDeviceName("foo-")).toBeNull();
   });
 
   it("rejects names over 63 chars", () => {
     expect(validateDeviceName("a".repeat(64))?.code).toBe("validation.max_length");
+  });
+});
+
+import { getDeviceNameWarning } from "../../src/util/config-validation.js";
+
+describe("getDeviceNameWarning", () => {
+  it("warns about underscores (mDNS hostname concern)", () => {
+    expect(getDeviceNameWarning("my_device")?.code).toBe(
+      "validation.device_name_underscore",
+    );
+  });
+
+  it("returns null for plain hyphen-only names", () => {
+    expect(getDeviceNameWarning("my-device")).toBeNull();
+    expect(getDeviceNameWarning("device42")).toBeNull();
   });
 });
 

@@ -12,6 +12,10 @@ import type { LocalizeFunc } from "../common/localize.js";
  *
  * - ``RESET_BUILD_ENV`` jobs (and any job without a ``configuration``)
  *   render as the localized "build environment" label.
+ * - ``RENAME`` jobs surface the technical transition (``old → new``)
+ *   so reopening one from the firmware-tasks list still says *which*
+ *   rename this stream belongs to. Friendly name is prepended in
+ *   parentheses when it differs from the raw hostname.
  * - Otherwise prefer the configured device's friendly name → fall
  *   back to ``name`` → fall back to the raw configuration filename.
  */
@@ -22,6 +26,23 @@ export function firmwareJobDisplayName(
 ): string {
   if (job.job_type === JobType.RESET_BUILD_ENV || !job.configuration) {
     return localize("firmware_jobs.build_env_label");
+  }
+  if (job.job_type === JobType.RENAME && job.new_name) {
+    /* job.configuration is the *old* YAML filename (``foo.yaml``);
+       strip the extension to recover the old device name for the
+       transition label. */
+    const oldName = job.configuration.replace(/\.ya?ml$/, "");
+    /* Look the configured device up under either side of the rename.
+       Mid-flight both YAMLs can briefly exist (the new one written
+       before the old one's deleted); after the job lands only the
+       new YAML survives. Either lookup gives us the friendly name. */
+    const device =
+      devices.find((d) => d.configuration === job.configuration) ??
+      devices.find((d) => d.configuration === `${job.new_name}.yaml`);
+    const friendly = device?.friendly_name || device?.name;
+    return friendly && friendly !== oldName
+      ? `${friendly} (${oldName} → ${job.new_name})`
+      : `${oldName} → ${job.new_name}`;
   }
   const device = devices.find((d) => d.configuration === job.configuration);
   return device?.friendly_name || device?.name || job.configuration;

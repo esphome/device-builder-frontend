@@ -488,7 +488,8 @@
     "not_a_number": "Moet een getal zijn",
     "not_an_integer": "Moet een geheel getal zijn",
     "invalid_option": "Geen geldige optie",
-    "invalid_device_name": "Alleen kleine letters, cijfers en streepjes; moet beginnen/eindigen met een letter of cijfer"
+    "invalid_device_name": "Alleen kleine letters, cijfers, streepjes en underscores",
+    "device_name_underscore": "Underscores werken maar zijn geen geldige mDNS-hostnamen — het apparaat is mogelijk niet bereikbaar op strikte netwerken"
   },
   "command_palette": {
     "placeholder": "Typ een commando of zoek…",

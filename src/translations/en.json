@@ -469,7 +469,8 @@
     "not_a_number": "Must be a number",
     "not_an_integer": "Must be a whole number",
     "invalid_option": "Not a valid option",
-    "invalid_device_name": "Only lowercase letters, digits and hyphens; must start/end with letter or digit"
+    "invalid_device_name": "Only lowercase letters, digits, hyphens and underscores",
+    "device_name_underscore": "Underscores work but aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks"
   },
   "layout": {
     "secrets": "Secrets",
