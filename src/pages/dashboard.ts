@@ -637,6 +637,13 @@ export class ESPHomePageDashboard extends LitElement {
        both of which key on ``device.configuration``. */
     const configuration = `${e.detail.name}.yaml`;
     this._recentlyAdopted = configuration;
+    /* Mark this configuration as scroll-pending. The actual scroll
+       happens in ``updated()`` once the matching device shows up in
+       ``_devices`` — the WS DEVICE_ADDED event lags the dialog's
+       ``adopted`` event, especially on mobile where the round-trip
+       is slower, so a scroll fired right now hits a layout that
+       doesn't have the new card yet. */
+    this._pendingAdoptScroll = configuration;
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
     }
@@ -644,33 +651,43 @@ export class ESPHomePageDashboard extends LitElement {
       this._recentlyAdopted = null;
       this._adoptHighlightTimer = null;
     }, 4000);
-    /* Wait one rAF so the device has actually rendered (the backend
-       fires DEVICE_ADDED right after the YAML write; the card lands
-       in the grid on the next render tick). Then scroll the freshly
-       adopted entry into view so the user can see what just landed.
-       Card view: the card lives in this dashboard's shadow root.
-       Table view: the row lives inside ``esphome-device-table``'s
-       own shadow root; we ask the table to scroll its match instead
-       of trying to reach across the boundary. */
-    requestAnimationFrame(() => {
-      const root = this.shadowRoot;
-      if (!root) return;
-      const escaped = CSS.escape(configuration);
-      const card = root.querySelector<HTMLElement>(
-        `esphome-device-card[data-configuration="${escaped}"]`,
-      );
-      if (card) {
-        card.scrollIntoView({ behavior: "smooth", block: "center" });
-        return;
-      }
-      const table = root.querySelector("esphome-device-table") as
-        | (HTMLElement & {
-            scrollConfigurationIntoView?: (configuration: string) => void;
-          })
-        | null;
-      table?.scrollConfigurationIntoView?.(configuration);
-    });
   };
+
+  private _pendingAdoptScroll: string | null = null;
+
+  protected updated(changed: PropertyValues): void {
+    if (
+      this._pendingAdoptScroll !== null &&
+      changed.has("_devices") &&
+      this._devices.some((d) => d.configuration === this._pendingAdoptScroll)
+    ) {
+      this._scrollAdoptedIntoView(this._pendingAdoptScroll);
+      this._pendingAdoptScroll = null;
+    }
+  }
+
+  private _scrollAdoptedIntoView(configuration: string): void {
+    /* Card view: the card lives in this dashboard's shadow root.
+       Table view: the row lives inside ``esphome-device-table``'s
+       own shadow root; ask the table to scroll its match instead of
+       trying to reach across the boundary. */
+    const root = this.shadowRoot;
+    if (!root) return;
+    const escaped = CSS.escape(configuration);
+    const card = root.querySelector<HTMLElement>(
+      `esphome-device-card[data-configuration="${escaped}"]`,
+    );
+    if (card) {
+      card.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+    const table = root.querySelector("esphome-device-table") as
+      | (HTMLElement & {
+          scrollConfigurationIntoView?: (configuration: string) => void;
+        })
+      | null;
+    table?.scrollConfigurationIntoView?.(configuration);
+  }
 
   private _setView(view: DashboardView) {
     this._view = view;
