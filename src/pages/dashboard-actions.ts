@@ -148,9 +148,22 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
   return () => {
     if (cancelled) return;
     cancelled = true;
-    reader.cancel().catch(() => {
-      /* Already disposed — nothing to do. */
-    });
+    // Cancel the reader first so its lock is released, then close
+    // the port. Without ``port.close()`` the browser keeps the OS
+    // handle open: every reopen of the passive logs viewer leaks
+    // another open port and eventually trips the per-tab Web Serial
+    // ceiling so the user can't reconnect to the same device until
+    // they refresh the page.
+    reader
+      .cancel()
+      .catch(() => {
+        /* Already disposed — nothing to do. */
+      })
+      .finally(() => {
+        port.close().catch(() => {
+          /* Port already closed (user pulled the cable, etc). */
+        });
+      });
   };
 }
 
