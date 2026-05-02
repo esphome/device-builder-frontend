@@ -4,6 +4,47 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#038fc7" />
+    <!--
+      Content-Security-Policy - defense in depth against any future
+      XSS that slips past Lit's auto-escaping. Catches injected
+      <script src="https://evil.com/...">, eval() of attacker text,
+      and reparenting via <base>. Not a substitute for sanitising
+      user content; it's the second wall.
+
+      Trade-offs we live with today:
+        * style-src 'unsafe-inline' - required by the inline <style>
+          block below AND by Lit's style-map / styleMap directive
+          (emits inline style="..." attributes). Tightening to a
+          hashed/nonced block + class-toggle migration is tracked
+          as a follow-up - see esphome/device-builder#120.
+        * img-src data: + font-src data: - the yaml-editor squiggle
+          markers and the MDI icon paths build data: URIs at runtime.
+        * connect-src 'self' ws: wss: - the dashboard, its assets,
+          and its WebSocket share an origin in every default
+          deployment (port-6052 direct, ESPHome Desktop, HA add-on
+          via Ingress, single-hostname nginx reverse proxy). The
+          ws: / wss: openers make split-hostname proxy setups
+          (ws.api.example.com + dash.example.com) work too - those
+          have been a recurring pain point on the legacy dashboard.
+          Trade-off: an XSS already in our bundle could exfiltrate
+          via a WebSocket to an attacker origin. We still block the
+          loud / easy injection paths (script-src falls back to
+          default-src 'self' so <script src="https://evil.com/...">
+          stays blocked), and the residual is the same one we'd
+          accept by dropping CSP entirely. xhr / fetch exfil is
+          NOT covered by ws: / wss: - those still go through the
+          default-src 'self' gate.
+        * No frame-ancestors directive - HA Ingress iframes us from
+          a different origin (homeassistant.local), so locking
+          framing would break the add-on. Browser default (allow
+          all) leaves clickjacking unblocked; operators behind a
+          reverse proxy can add their own frame-ancestors via
+          response headers.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ws: wss:; object-src 'none'; base-uri 'self'; form-action 'self'"
+    />
     <title>ESPHome</title>
     <link rel="icon" type="image/svg+xml" href="/assets/logo/esphome.svg" />
     <style>
