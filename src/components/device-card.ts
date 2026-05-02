@@ -465,25 +465,31 @@ export class ESPHomeDeviceCard extends LitElement {
     if (!this.hasAttribute("tabindex")) this.tabIndex = 0;
     if (!this.hasAttribute("role")) this.setAttribute("role", "button");
     this.addEventListener("keydown", this._onKeydown);
+    /* Activation has to live on the host. Some assistive tech
+       activates a focused role="button" by dispatching `click` on the
+       focused element itself; if the handler were on the inner
+       .device-card div, that synthesised click wouldn't reach it.
+       Inner buttons + the actions row already stopPropagation, so a
+       host-level click only fires for clicks on the card body. */
+    this.addEventListener("click", this._onClick);
+    this.addEventListener("contextmenu", this._onHostContextMenu);
   }
 
   disconnectedCallback() {
     this.removeEventListener("keydown", this._onKeydown);
+    this.removeEventListener("click", this._onClick);
+    this.removeEventListener("contextmenu", this._onHostContextMenu);
     super.disconnectedCallback();
   }
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
-    if (
-      changedProperties.has("name") ||
-      changedProperties.has("selectMode") ||
-      changedProperties.has("selected")
-    ) {
-      this.setAttribute(
-        "aria-label",
-        this.selectMode
-          ? `${this.name} (${this.selected ? "selected" : "not selected"})`
-          : this.name,
-      );
+    if (changedProperties.has("name")) {
+      /* Label is just the device name; selected state is conveyed via
+         aria-pressed below so screen readers announce it in the user's
+         locale instead of a hard-coded English string. */
+      this.setAttribute("aria-label", this.name);
+    }
+    if (changedProperties.has("selectMode") || changedProperties.has("selected")) {
       if (this.selectMode) {
         this.setAttribute("aria-pressed", String(this.selected));
       } else {
@@ -496,8 +502,6 @@ export class ESPHomeDeviceCard extends LitElement {
     return html`
       <div
         class="device-card ${this.selectMode ? "device-card--selectable" : "device-card--clickable"} ${this.selectMode && this.selected ? "device-card--selected" : ""}"
-        @click=${this.selectMode ? () => this._emit("toggle-select") : () => this._emit("card-click")}
-        @contextmenu=${this.selectMode ? nothing : this._onContextMenu}
       >
         <div class="device-card-header">
           ${this.selectMode
@@ -716,7 +720,15 @@ export class ESPHomeDeviceCard extends LitElement {
     sameRow[0]?.c.focus();
   }
 
-  private _onContextMenu(e: MouseEvent) {
+  private _onClick = () => {
+    this._emit(this.selectMode ? "toggle-select" : "card-click");
+  };
+
+  private _onHostContextMenu = (e: MouseEvent) => {
+    /* Suppressed in select mode — the dashboard hides per-row actions
+       there and a right-click menu would just be misleading. Otherwise
+       open the same overflow menu the kebab dispatches. */
+    if (this.selectMode) return;
     e.preventDefault();
     e.stopPropagation();
     this.dispatchEvent(
@@ -726,7 +738,7 @@ export class ESPHomeDeviceCard extends LitElement {
         composed: true,
       }),
     );
-  }
+  };
 
   private _onDotsClick(e: MouseEvent) {
     e.stopPropagation();
