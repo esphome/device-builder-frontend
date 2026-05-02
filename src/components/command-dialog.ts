@@ -92,6 +92,14 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Active job ID (for cancel). Not used for validate. */
   private _jobId = "";
+  /** Latest known status of the followed job. Primed from the
+   *  ``firmware/install`` (etc.) response so the queued overlay can
+   *  render immediately on open instead of waiting for the matching
+   *  ``job_queued`` event to land in ``firmwareJobsContext``. The
+   *  context value takes precedence once it arrives — see
+   *  ``_isQueued`` below. */
+  @state()
+  private _jobStatus: JobStatus | null = null;
   /** Stream message ID (for both validate streaming and follow_job streaming). */
   private _streamId = "";
   /** Install target port — "OTA" for network, an actual port for server-serial. */
@@ -324,6 +332,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._lines = [];
     this._statusMessage = "";
     this._jobId = "";
+    this._jobStatus = null;
     this._detachStream();
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -355,6 +364,10 @@ export class ESPHomeCommandDialog extends LitElement {
     this._lines = [];
     this._statusMessage = "";
     this._jobId = job.job_id;
+    /* Prime from the job we were handed so the queued overlay can
+       render on the very first paint instead of after the next
+       context update. */
+    this._jobStatus = job.status;
     // Cancel any prior follow before starting a new one. Without
     // this, every reopen of the dialog (clicking the busy spinner
     // again while a job is still running) layered on a fresh
@@ -410,7 +423,12 @@ export class ESPHomeCommandDialog extends LitElement {
    *  off while another job is running sits at QUEUED until its turn. */
   private get _isQueued(): boolean {
     if (!this._jobId) return false;
-    return this._jobs.get(this._jobId)?.status === JobStatus.QUEUED;
+    /* Context wins once it has the entry — the backend may transition
+       the job (e.g. QUEUED → RUNNING) before we'd see it locally.
+       The locally-primed ``_jobStatus`` only fills the gap before the
+       first context update. */
+    const ctxStatus = this._jobs.get(this._jobId)?.status;
+    return (ctxStatus ?? this._jobStatus) === JobStatus.QUEUED;
   }
 
   /** The job currently holding the firmware queue, if any. Used to
@@ -573,6 +591,11 @@ export class ESPHomeCommandDialog extends LitElement {
     }
 
     this._jobId = job.job_id;
+    /* Prime status from the API response so the queued overlay shows
+       up immediately. The matching ``job_queued`` event will lands in
+       ``firmwareJobsContext`` shortly after and the getter will
+       prefer that live value going forward. */
+    this._jobStatus = job.status;
     this._followJob(job.job_id);
   }
 
