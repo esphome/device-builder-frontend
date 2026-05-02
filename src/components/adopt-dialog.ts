@@ -195,108 +195,120 @@ export class ESPHomeAdoptDialog extends LitElement {
   }
 
   protected render() {
-    if (!this._device) {
-      return html`<wa-dialog></wa-dialog>`;
-    }
+    /* Always render the wa-dialog with the same template shape, even
+       before a device is set. Returning a different template
+       (``<wa-dialog></wa-dialog>``) on the first render and then a
+       fully-populated one on the second made Lit swap the wa-dialog
+       instance — so the ``_dialog.open = true`` we set in ``open()``
+       was applied to a wa-dialog that was about to be thrown away,
+       and the user had to click Take Control twice for the dialog to
+       actually appear. */
+    const device = this._device;
     const nameTrimmed = this._name.trim();
     const nameErr = nameTrimmed ? validateDeviceName(nameTrimmed) : null;
-    const canSubmit = !!nameTrimmed && !nameErr && !this._busy;
-    const displayName = this._device.friendly_name || this._device.name;
+    const canSubmit = !!device && !!nameTrimmed && !nameErr && !this._busy;
+    const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
       <wa-dialog
         label=${this._localize("dashboard.adopt_title")}
         light-dismiss
       >
-        <p class="description">
-          ${this._localize("dashboard.adopt_description", {
-            name: displayName,
-          })}
-        </p>
+        ${device
+          ? html`
+              <p class="description">
+                ${this._localize("dashboard.adopt_description", {
+                  name: displayName,
+                })}
+              </p>
 
-        <div class="field">
-          <label for="adopt-name">
-            ${this._localize("dashboard.adopt_field_name")}
-          </label>
-          <input
-            id="adopt-name"
-            type="text"
-            class=${nameErr ? "invalid" : ""}
-            .value=${this._name}
-            ?disabled=${this._busy}
-            @input=${(e: Event) => {
-              this._name = (e.target as HTMLInputElement).value;
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" && canSubmit) this._submit();
-            }}
-          />
-          ${nameErr
-            ? html`<span class="field-error"
-                >${this._localize(nameErr.code, nameErr.params)}</span
-              >`
-            : nothing}
-        </div>
+              <div class="field">
+                <label for="adopt-name">
+                  ${this._localize("dashboard.adopt_field_name")}
+                </label>
+                <input
+                  id="adopt-name"
+                  type="text"
+                  class=${nameErr ? "invalid" : ""}
+                  .value=${this._name}
+                  ?disabled=${this._busy}
+                  @input=${(e: Event) => {
+                    this._name = (e.target as HTMLInputElement).value;
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" && canSubmit) this._submit();
+                  }}
+                />
+                ${nameErr
+                  ? html`<span class="field-error"
+                      >${this._localize(nameErr.code, nameErr.params)}</span
+                    >`
+                  : nothing}
+              </div>
 
-        <div class="field">
-          <label for="adopt-friendly-name">
-            ${this._localize("dashboard.adopt_field_friendly_name")}
-          </label>
-          <input
-            id="adopt-friendly-name"
-            type="text"
-            .value=${this._friendlyName}
-            ?disabled=${this._busy}
-            @input=${(e: Event) => {
-              this._friendlyName = (e.target as HTMLInputElement).value;
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" && canSubmit) this._submit();
-            }}
-          />
-        </div>
+              <div class="field">
+                <label for="adopt-friendly-name">
+                  ${this._localize("dashboard.adopt_field_friendly_name")}
+                </label>
+                <input
+                  id="adopt-friendly-name"
+                  type="text"
+                  .value=${this._friendlyName}
+                  ?disabled=${this._busy}
+                  @input=${(e: Event) => {
+                    this._friendlyName = (e.target as HTMLInputElement).value;
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" && canSubmit) this._submit();
+                  }}
+                />
+              </div>
 
-        <label class="checkbox-row">
-          <input
-            type="checkbox"
-            ?checked=${this._encryption}
-            ?disabled=${this._busy}
-            @change=${(e: Event) => {
-              this._encryption = (e.target as HTMLInputElement).checked;
-            }}
-          />
-          <span class="checkbox-text">
-            <span class="checkbox-title"
-              >${this._localize("dashboard.adopt_encryption_title")}</span
-            >
-            <span class="checkbox-hint"
-              >${this._localize("dashboard.adopt_encryption_hint")}</span
-            >
-          </span>
-        </label>
+              <label class="checkbox-row">
+                <input
+                  type="checkbox"
+                  ?checked=${this._encryption}
+                  ?disabled=${this._busy}
+                  @change=${(e: Event) => {
+                    this._encryption = (e.target as HTMLInputElement).checked;
+                  }}
+                />
+                <span class="checkbox-text">
+                  <span class="checkbox-title"
+                    >${this._localize(
+                      "dashboard.adopt_encryption_title",
+                    )}</span
+                  >
+                  <span class="checkbox-hint"
+                    >${this._localize("dashboard.adopt_encryption_hint")}</span
+                  >
+                </span>
+              </label>
 
-        ${this._error
-          ? html`<div class="submit-error">${this._error}</div>`
+              ${this._error
+                ? html`<div class="submit-error">${this._error}</div>`
+                : nothing}
+
+              <div class="actions">
+                <button
+                  class="btn btn--cancel"
+                  ?disabled=${this._busy}
+                  @click=${this.close}
+                >
+                  ${this._localize("layout.cancel")}
+                </button>
+                <button
+                  class="btn btn--primary"
+                  ?disabled=${!canSubmit}
+                  @click=${this._submit}
+                >
+                  ${this._busy
+                    ? this._localize("dashboard.adopt_submit_busy")
+                    : this._localize("dashboard.adopt_submit")}
+                </button>
+              </div>
+            `
           : nothing}
-
-        <div class="actions">
-          <button
-            class="btn btn--cancel"
-            ?disabled=${this._busy}
-            @click=${this.close}
-          >
-            ${this._localize("layout.cancel")}
-          </button>
-          <button
-            class="btn btn--primary"
-            ?disabled=${!canSubmit}
-            @click=${this._submit}
-          >
-            ${this._busy
-              ? this._localize("dashboard.adopt_submit_busy")
-              : this._localize("dashboard.adopt_submit")}
-          </button>
-        </div>
       </wa-dialog>
     `;
   }
