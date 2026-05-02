@@ -468,9 +468,25 @@ export class ESPHomeAPI {
 
   // ─── Streaming Commands (per-connection) ───────────────────
 
-  /** Validate a device configuration (streaming, not queued). */
-  validate(configuration: string, callbacks: StreamCallbacks): string {
-    return this.sendStreamCommand("devices/validate", { configuration }, callbacks);
+  /**
+   * Validate a device configuration (streaming, not queued).
+   *
+   * ``options.showSecrets`` passes through to the backend as
+   * ``--show-secrets`` on the underlying ``esphome config`` call.
+   * Default off — resolved ``!secret`` values appear as
+   * ``<removed>`` until the user explicitly opts in via the toolbar
+   * toggle in the validate output dialog.
+   */
+  validate(
+    configuration: string,
+    callbacks: StreamCallbacks,
+    options: { showSecrets?: boolean } = {},
+  ): string {
+    const payload: Record<string, unknown> = { configuration };
+    if (options.showSecrets) {
+      payload.show_secrets = true;
+    }
+    return this.sendStreamCommand("devices/validate", payload, callbacks);
   }
 
   /** Stream logs from a device (streaming, not queued). */
