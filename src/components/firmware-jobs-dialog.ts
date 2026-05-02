@@ -10,6 +10,7 @@ import {
   mdiDeleteSweep,
   mdiHammerWrench,
   mdiPlaylistRemove,
+  mdiRenameOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
@@ -51,6 +52,7 @@ registerMdiIcons({
   "delete-sweep": mdiDeleteSweep,
   "hammer-wrench": mdiHammerWrench,
   "playlist-remove": mdiPlaylistRemove,
+  "rename-outline": mdiRenameOutline,
   upload: mdiUpload,
 });
 
@@ -60,6 +62,7 @@ const TYPE_ICONS: Record<JobType, string> = {
   [JobType.INSTALL]: "upload",
   [JobType.CLEAN]: "broom",
   [JobType.RESET_BUILD_ENV]: "cog-refresh",
+  [JobType.RENAME]: "rename-outline",
 };
 
 const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([

@@ -44,7 +44,13 @@ registerMdiIcons({
   "timer-sand": mdiTimerSand,
 });
 
-export type CommandType = "install" | "compile" | "validate" | "clean" | "reset";
+export type CommandType =
+  | "install"
+  | "compile"
+  | "validate"
+  | "clean"
+  | "reset"
+  | "rename";
 type CommandState = "running" | "success" | "error";
 
 const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
@@ -53,6 +59,7 @@ const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
   [JobType.UPLOAD]: "install",
   [JobType.CLEAN]: "clean",
   [JobType.RESET_BUILD_ENV]: "reset",
+  [JobType.RENAME]: "rename",
 };
 
 @customElement("esphome-command-dialog")

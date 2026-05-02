@@ -365,9 +365,26 @@ export class ESPHomeAPI {
     return this.sendCommand<UpdateDeviceResponse>("devices/update", args);
   }
 
-  /** Rename a device via the ESPHome CLI (renames YAML file + hostname). */
-  async renameDevice(configuration: string, newName: string): Promise<void> {
-    await this.sendCommand("devices/rename", { configuration, new_name: newName }, 60000);
+  /** Rename a device via the ESPHome CLI (renames YAML file + hostname).
+   *
+   *  When the YAML validates, this kicks off a queued firmware
+   *  ``RENAME`` job that compiles + OTA-installs + swaps the YAML —
+   *  the returned ``job`` is what the caller follows in the
+   *  command-dialog so the user sees streaming output.
+   *
+   *  When the YAML doesn't validate (typical for a freshly-created
+   *  empty config), the backend does a pure file-level rename inline
+   *  and returns ``job: null``.
+   */
+  async renameDevice(
+    configuration: string,
+    newName: string,
+  ): Promise<{ configuration: string; job: FirmwareJob | null }> {
+    return this.sendCommand<{ configuration: string; job: FirmwareJob | null }>(
+      "devices/rename",
+      { configuration, new_name: newName },
+      60000,
+    );
   }
 
   /** Delete a device and all associated files. */

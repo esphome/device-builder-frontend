@@ -769,12 +769,25 @@ export class ESPHomePageDashboard extends LitElement {
     if (!device) return;
     const newName = e.detail;
     if (newName === device.name) return;
+    let response;
     try {
-      await this._api.renameDevice(device.configuration, newName);
-      toast.success(this._localize("dashboard.action_rename_success", { name: newName }), { richColors: true });
+      response = await this._api.renameDevice(device.configuration, newName);
     } catch {
       toast.error(this._localize("dashboard.action_rename_failed", { name: device.name }), { richColors: true });
+      return;
     }
+    if (response.job) {
+      /* Validated configs route through the firmware queue — the
+         compile + OTA install runs there and we follow it in the
+         command-dialog so the user sees live output. The toast lands
+         on completion (the job's onResult), not before. */
+      this._commandDialog.followJob(response.job, newName);
+      return;
+    }
+    /* No job: backend did a pure file-level rename inline (config
+       didn't validate, nothing to flash). Show the success toast
+       immediately. */
+    toast.success(this._localize("dashboard.action_rename_success", { name: newName }), { richColors: true });
   }
 
   private async _showApiKey(device: ConfiguredDevice) {

@@ -554,6 +554,7 @@ export enum JobType {
   INSTALL = "install",
   CLEAN = "clean",
   RESET_BUILD_ENV = "reset_build_env",
+  RENAME = "rename",
 }
 
 export interface FirmwareJob {
@@ -568,6 +569,8 @@ export interface FirmwareJob {
   output: string[];
   error: string | null;
   port: string;
+  /** New device name, only set on ``rename`` jobs. */
+  new_name: string;
   /** 0–100 progress, monotonically non-decreasing while the job runs.
    *  `null` until the underlying tooling (PlatformIO/esptool) emits a
    *  percentage we can latch onto. */

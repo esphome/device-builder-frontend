@@ -209,6 +209,9 @@
     "clean_failed": "Clean failed.",
     "reset_success": "Build environment reset. The next compile will redownload the toolchain.",
     "reset_failed": "Failed to reset the build environment.",
+    "rename_title": "Rename — {name}",
+    "rename_success": "Rename complete!",
+    "rename_failed": "Rename failed.",
     "queued_title": "Waiting in queue",
     "queued_message": "Another firmware task is running. This task will start when it finishes.",
     "queued_waiting_for": "Waiting for {name} to finish.",
@@ -559,6 +562,7 @@
     "type_install": "Install",
     "type_clean": "Clean",
     "type_reset_build_env": "Reset",
+    "type_rename": "Rename",
     "time_queued": "queued {time}",
     "time_started": "started {time}",
     "time_finished": "finished {time}"
