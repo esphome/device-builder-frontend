@@ -245,7 +245,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._lines = [];
     this._statusMessage = "";
     this._jobId = "";
-    this._streamId = "";
+    this._detachStream();
     this._dialog.open = true;
     this._resetAnsiLogScroll();
     this._start();
@@ -276,15 +276,35 @@ export class ESPHomeCommandDialog extends LitElement {
     this._lines = [];
     this._statusMessage = "";
     this._jobId = job.job_id;
-    this._streamId = "";
+    // Cancel any prior follow before starting a new one. Without
+    // this, every reopen of the dialog (clicking the busy spinner
+    // again while a job is still running) layered on a fresh
+    // ``firmwareFollowJob`` while the previous one was still pumping
+    // ``onOutput`` callbacks into ``this._lines`` — each new line
+    // appeared once per leaked subscription, so output duplicated
+    // five times after five clicks.
+    this._detachStream();
     this._dialog.open = true;
     this._resetAnsiLogScroll();
     this._followJob(job.job_id);
   }
 
   public close() {
-    this._streamId = "";
+    this._detachStream();
     this._dialog.open = false;
+  }
+
+  /**
+   * Tear down the active stream subscription, both client-side
+   * (drops the local handler so its closure stops appending to
+   * ``_lines``) and backend-side (the queued task can stop pushing
+   * lines for a job we're no longer watching). Safe to call when
+   * no stream is active.
+   */
+  private _detachStream() {
+    if (!this._streamId) return;
+    this._api.stopStream(this._streamId).catch(() => {});
+    this._streamId = "";
   }
 
   private get _title(): string {
@@ -350,7 +370,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // ─── Command execution ─────────────────────────────────────
 
   private async _start() {
-    this._streamId = "";
+    this._detachStream();
     this._jobId = "";
     this._state = "running";
     this._lines = [];
@@ -450,12 +470,12 @@ export class ESPHomeCommandDialog extends LitElement {
     }
     this._state = "error";
     this._statusMessage = this._localize("command.stopped");
-    this._streamId = "";
+    this._detachStream();
     this._jobId = "";
   }
 
   private _onDialogHide() {
-    this._streamId = "";
+    this._detachStream();
   }
 }
 

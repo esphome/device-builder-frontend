@@ -568,7 +568,15 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._open = false;
     this._device = null;
     this._jobId = "";
-    this._streamId = "";
+    // Tear down any in-flight stream so its onOutput handler stops
+    // appending to ``_logLines`` after the dialog closes — otherwise
+    // a reopen of the dialog while the prior stream is still live
+    // would duplicate lines (the bug fixed for the command-dialog
+    // path; the install path has the same shape).
+    if (this._streamId) {
+      this._api.stopStream(this._streamId).catch(() => {});
+      this._streamId = "";
+    }
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 
