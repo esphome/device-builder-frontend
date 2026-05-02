@@ -282,7 +282,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private async _unarchiveDevice(device: ArchivedDevice) {
-    if (await unarchiveDevice(device.configuration, this._api, this._localize)) {
+    if (await unarchiveDevice(device, this._api, this._localize)) {
       await this._archivedDialog?.refresh();
     }
   }
@@ -704,7 +704,7 @@ export class ESPHomePageDashboard extends LitElement {
       dialogMessage = this._localize("dashboard.delete_archived_desc", {
         name: pendingArchivedName,
       });
-      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
+      dialogConfirm = this._localize("dashboard.action_delete_permanently");
       dialogDestructive = true;
     } else if (this._pendingDelete) {
       dialogHeading = this._localize("dashboard.delete_single_title");

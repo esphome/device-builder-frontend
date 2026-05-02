@@ -56,27 +56,30 @@ export async function archiveDevice(
  * same filename already exists; surface the server message in the
  * toast so the user can resolve it (delete or rename the active
  * one before retrying).
+ *
+ * Takes the full ``ArchivedDevice`` (not just the ``configuration``)
+ * so toasts can show ``friendly_name`` / ``name`` in the same shape
+ * as ``archiveDevice`` and ``deleteArchivedDevice`` instead of
+ * showing the raw YAML filename.
  */
 export async function unarchiveDevice(
-  configuration: string,
+  device: ArchivedDevice,
   api: ESPHomeAPI,
   localize: LocalizeFunc,
 ): Promise<boolean> {
+  const name = device.friendly_name || device.name || device.configuration;
   try {
-    await api.unarchiveDevice(configuration);
+    await api.unarchiveDevice(device.configuration);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
     toast.error(
-      localize("dashboard.action_unarchive_failed", {
-        name: configuration,
-        error,
-      }),
+      localize("dashboard.action_unarchive_failed", { name, error }),
       { richColors: true },
     );
     return false;
   }
   toast.success(
-    localize("dashboard.action_unarchive_success", { name: configuration }),
+    localize("dashboard.action_unarchive_success", { name }),
     { richColors: true },
   );
   return true;

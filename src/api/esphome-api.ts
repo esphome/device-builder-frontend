@@ -419,7 +419,7 @@ export class ESPHomeAPI {
     await this.sendCommand("devices/unarchive", { configuration });
   }
 
-  /** List archived devices for the "Show archived" toggle. */
+  /** List archived devices for the archived-devices dialog. */
   async listArchivedDevices(): Promise<ArchivedDevice[]> {
     return this.sendCommand<ArchivedDevice[]>("devices/list_archived");
   }

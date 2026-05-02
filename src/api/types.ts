@@ -562,10 +562,10 @@ export interface BulkDeleteResult {
  * Soft-deleted device row returned by ``devices/list_archived``.
  *
  * Shape mirrors a stripped-down ``ConfiguredDevice``: just enough
- * metadata for the dashboard's "Show archived devices" section to
- * render a row + Unarchive / Delete-permanently controls. The
- * full YAML / metadata stays on disk under
- * ``<config_dir>/archive/`` and is fetched on demand.
+ * metadata for the dashboard's archived-devices dialog (opened
+ * from the header kebab) to render a row + Unarchive /
+ * Delete-permanently controls. The full YAML / metadata stays on
+ * disk under ``<config_dir>/archive/`` and is fetched on demand.
  */
 export interface ArchivedDevice {
   configuration: string;
