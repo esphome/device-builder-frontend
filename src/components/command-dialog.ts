@@ -107,7 +107,10 @@ export class ESPHomeCommandDialog extends LitElement {
          of the dashboard chrome. Body keeps the terminal palette. */
       wa-dialog::part(header) {
         background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
+        /* Right padding is 0 so the close button sits flush with the
+           dialog's corner — the button's own padding gives it a square
+           hit target right where the user reaches for it. */
+        padding: 0 0 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
@@ -119,7 +122,11 @@ export class ESPHomeCommandDialog extends LitElement {
       }
       wa-dialog::part(close-button__base) {
         background: transparent; border: none; box-shadow: none;
-        padding: 0; min-width: unset; min-height: unset;
+        /* Square 40x40 button matching the header height so the X has a
+           comfortable click/tap target instead of just the icon's
+           ~14px footprint. */
+        padding: 0; width: 40px; height: 40px;
+        min-width: unset; min-height: unset;
         color: var(--esphome-on-primary); cursor: pointer;
       }
       /* Same affordance for hover and keyboard focus so the close
