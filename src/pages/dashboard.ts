@@ -868,9 +868,16 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _showJobProgress(device: ConfiguredDevice) {
     const job = this._activeJobs.get(device.configuration);
-    if (job) {
-      this._commandDialog.followJob(job, device.friendly_name || device.name);
-    }
+    if (!job) return;
+    /* Defer to the shared display-name helper so RENAME jobs keep
+       the "old → new" transition in their title — clicking the
+       Renaming badge used to land in a dialog labelled with just
+       the device's friendly name, losing the same context the
+       initial rename dialog had. */
+    this._commandDialog.followJob(
+      job,
+      firmwareJobDisplayName(job, this._devices, this._localize),
+    );
   }
 
   private _openInstallMethod(device: ConfiguredDevice) {
