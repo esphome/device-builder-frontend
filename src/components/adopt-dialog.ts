@@ -75,6 +75,39 @@ export class ESPHomeAdoptDialog extends LitElement {
         line-height: 1.5;
       }
 
+      /* Surface the package_import_url so the user can see where
+         the adoption flow is fetching its YAML / Python from.
+         Most "Made for ESPHome" firmware advertises this routinely
+         (Athom, Apollo, etc.), so neutral informational treatment
+         rather than a warning. The user can still notice if the
+         hostname looks unfamiliar. See
+         esphome/device-builder#120 finding B-2. */
+      .source-info {
+        margin-bottom: var(--wa-space-m);
+      }
+
+      .source-info-label {
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-quiet);
+        margin-bottom: var(--wa-space-2xs);
+      }
+
+      /* Show the URL in monospace with break-all wrapping so a
+         long URL fits inside the dialog instead of overflowing or
+         getting truncated. Hostname is the highest-signal part for
+         deciding trust; truncating would hide it. */
+      .source-info-url {
+        font-family: var(--wa-font-family-code);
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-normal);
+        word-break: break-all;
+        background: var(--wa-color-surface-lowered);
+        padding: 6px 10px;
+        border-radius: var(--wa-border-radius-s);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
       .field {
         display: flex;
         flex-direction: column;
@@ -238,6 +271,19 @@ export class ESPHomeAdoptDialog extends LitElement {
                   name: displayName,
                 })}
               </p>
+
+              ${device.package_import_url
+                ? html`
+                    <div class="source-info">
+                      <div class="source-info-label">
+                        ${this._localize("dashboard.adopt_source_label")}
+                      </div>
+                      <div class="source-info-url">
+                        ${device.package_import_url}
+                      </div>
+                    </div>
+                  `
+                : nothing}
 
               <div class="field">
                 <label for="adopt-name">

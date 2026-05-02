@@ -14,6 +14,7 @@
     "action_unignore_failed": "Failed to unignore \"{name}\"",
     "adopt_title": "Take control",
     "adopt_description": "Taking control of {name} creates a local ESPHome configuration. From now on you manage updates from the dashboard — vendor-provided firmware updates won't apply automatically.",
+    "adopt_source_label": "Configuration source",
     "adopt_field_name": "Device name (hostname)",
     "adopt_field_friendly_name": "Friendly name (optional)",
     "adopt_encryption_title": "Enable API encryption",

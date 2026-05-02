@@ -14,6 +14,7 @@
     "action_unignore_failed": "Kon negeren van \"{name}\" niet ongedaan maken",
     "adopt_title": "Overnemen",
     "adopt_description": "Door {name} over te nemen, wordt een lokale ESPHome-configuratie aangemaakt. Vanaf nu beheert u de updates via het dashboard — fabrikantsupdates worden niet meer automatisch toegepast.",
+    "adopt_source_label": "Bron van configuratie",
     "adopt_field_name": "Apparaatnaam (hostnaam)",
     "adopt_field_friendly_name": "Vriendelijke naam (optioneel)",
     "adopt_encryption_title": "API-encryptie inschakelen",

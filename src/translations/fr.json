@@ -14,6 +14,7 @@
     "action_unignore_failed": "Échec de la levée de l'ignorance de \"{name}\"",
     "adopt_title": "Prendre le contrôle",
     "adopt_description": "Prendre le contrôle de {name} crée une configuration ESPHome locale. À partir de maintenant, vous gérez les mises à jour depuis le tableau de bord — les mises à jour du fournisseur ne s'appliqueront plus automatiquement.",
+    "adopt_source_label": "Source de la configuration",
     "adopt_field_name": "Nom de l'appareil (hôte)",
     "adopt_field_friendly_name": "Nom convivial (optionnel)",
     "adopt_encryption_title": "Activer le chiffrement API",
