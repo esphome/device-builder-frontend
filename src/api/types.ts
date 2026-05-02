@@ -622,9 +622,19 @@ export interface DeviceStateChangedEventData {
   state: DeviceState;
 }
 
-/** Data payload for importable_device_added / importable_device_removed events. */
-export interface ImportableDeviceEventData {
+/** Data payload for importable_device_added events. */
+export interface ImportableDeviceAddedEventData {
   device: AdoptableDevice;
+}
+
+/** Data payload for importable_device_removed events.
+ *
+ *  Removal carries only the device name — by the time the event
+ *  fires the original ``AdoptableDevice`` is gone from the backend's
+ *  ``import_result`` cache, and the frontend doesn't need anything
+ *  beyond the name to evict its own copy. */
+export interface ImportableDeviceRemovedEventData {
+  name: string;
 }
 
 /** Callback for event subscription push events. */
