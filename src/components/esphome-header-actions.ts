@@ -56,6 +56,26 @@ export class ESPHomeHeaderActions extends LitElement {
         display: contents;
       }
 
+      /* Inline icon buttons surface the most-used kebab items on
+         desktop where there's room. We promote two — Firmware jobs
+         (lives behind a live badge) and Settings (the only kebab
+         entry users hit reliably) — and leave the rest in the menu.
+         Three would already crowd the header on tighter viewports;
+         fewer would defeat the discoverability point. The kebab is
+         still rendered with the full set so resize / mobile keeps
+         the same items reachable. */
+      .inline-actions {
+        display: none;
+        align-items: center;
+        gap: 2px;
+      }
+
+      @media (min-width: 768px) {
+        .inline-actions {
+          display: inline-flex;
+        }
+      }
+
       .menu-btn {
         position: relative;
         display: inline-flex;
@@ -75,6 +95,12 @@ export class ESPHomeHeaderActions extends LitElement {
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
       }
 
+      .menu-btn:focus-visible {
+        outline: 2px solid var(--esphome-on-primary);
+        outline-offset: 2px;
+        opacity: 1;
+      }
+
       .menu-btn wa-icon {
         font-size: 20px;
       }
@@ -88,6 +114,16 @@ export class ESPHomeHeaderActions extends LitElement {
         border-radius: 50%;
         background: var(--esphome-warning, #f59e0b);
         box-shadow: 0 0 0 2px var(--esphome-primary);
+      }
+
+      /* When the inline buttons are visible, the badge moves to the
+         Firmware-jobs inline button (more discoverable). The kebab
+         keeps its own badge for mobile where the inline row is
+         hidden — two parallel badges, only one ever shown. */
+      @media (min-width: 768px) {
+        .menu-kebab .menu-btn-badge {
+          display: none;
+        }
       }
 
       .backdrop {
@@ -188,7 +224,36 @@ export class ESPHomeHeaderActions extends LitElement {
       }
     }
     return html`
-      <button class="menu-btn" @click=${this._toggle}>
+      <div class="inline-actions" role="toolbar">
+        <button
+          class="menu-btn"
+          @click=${this._openFirmwareJobs}
+          title=${this._localize("firmware_jobs.menu_item")}
+          aria-label=${this._localize("firmware_jobs.menu_item")}
+        >
+          <wa-icon library="mdi" name="playlist-check"></wa-icon>
+          ${activeCount > 0
+            ? html`<span
+                class="menu-btn-badge"
+                aria-label=${this._localize("firmware_jobs.badge_label", { count: activeCount })}
+              ></span>`
+            : nothing}
+        </button>
+        <button
+          class="menu-btn"
+          @click=${this._openSettings}
+          title=${this._localize("layout.settings")}
+          aria-label=${this._localize("layout.settings")}
+        >
+          <wa-icon library="mdi" name="cog"></wa-icon>
+        </button>
+      </div>
+      <button
+        class="menu-btn menu-kebab"
+        @click=${this._toggle}
+        title=${this._localize("dashboard.more_options")}
+        aria-label=${this._localize("dashboard.more_options")}
+      >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
         ${activeCount > 0
           ? html`<span class="menu-btn-badge" aria-label=${this._localize("firmware_jobs.badge_label", { count: activeCount })}></span>`
