@@ -39,6 +39,25 @@ registerMdiIcons({
   upload: mdiUpload,
 });
 
+/**
+ * Whitelist docs URLs to the canonical esphome.io site over HTTPS.
+ *
+ * The map is populated by the backend from the in-house catalog, so a
+ * compromised payload is the practical concern here — interpolating an
+ * untrusted ``href`` directly would let a ``javascript:`` or
+ * ``data:`` scheme run code on click. Bound the rendered anchors to
+ * exactly the host the catalog targets and fall back to plain text
+ * otherwise.
+ */
+function _isSafeDocsUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === "https:" && parsed.hostname === "esphome.io";
+  } catch {
+    return false;
+  }
+}
+
 @customElement("esphome-device-drawer-content")
 export class ESPHomeDeviceDrawerContent extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -168,9 +187,18 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           border-color 0.12s;
       }
 
-      .tag--link:hover {
+      .tag--link:hover,
+      .tag--link:focus-visible {
         background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
         border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+      }
+
+      /* Keyboard users tabbing onto the tag need the same affordance
+         mouse users get on hover, plus a visible focus ring so the
+         active tag stands out from its peers in the row. */
+      .tag--link:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 2px;
       }
 
       .status-badges {
@@ -296,7 +324,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               <div class="tags-wrap">
                 ${d.loaded_integrations.map((i) => {
                   const url = this._integrationDocs[i];
-                  return url
+                  return url && _isSafeDocsUrl(url)
                     ? html`<a
                         class="tag tag--link"
                         href=${url}
