@@ -3,6 +3,7 @@ import {
   mdiAlertCircle,
   mdiCheckCircle,
   mdiClose,
+  mdiDownload,
   mdiPlaylistCheck,
   mdiRefresh,
   mdiStop,
@@ -24,6 +25,7 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -33,6 +35,7 @@ import "./ansi-log.js";
 
 registerMdiIcons({
   close: mdiClose,
+  download: mdiDownload,
   stop: mdiStop,
   refresh: mdiRefresh,
   "check-circle": mdiCheckCircle,
@@ -499,9 +502,31 @@ export class ESPHomeCommandDialog extends LitElement {
   private _renderToolbar() {
     return html`
       <div class="terminal-toolbar">
-        ${this._renderStatus()} <span class="spacer"></span> ${this._renderActions()}
+        ${this._renderStatus()}
+        <span class="spacer"></span>
+        ${this._lines.length > 0
+          ? html`<button
+              class="term-btn term-btn--ghost"
+              @click=${this._downloadOutput}
+              title=${this._localize("command.download")}
+              aria-label=${this._localize("command.download")}
+            >
+              <wa-icon library="mdi" name="download"></wa-icon>
+            </button>`
+          : nothing}
+        ${this._renderActions()}
       </div>
     `;
+  }
+
+  /**
+   * Save the buffered output to a text file. File-name pattern is
+   * configuration stem + command type so a user with several saved
+   * files can tell which is which.
+   */
+  private _downloadOutput() {
+    const stem = this.configuration.replace(/\.ya?ml$/, "") || "output";
+    downloadAnsiText(this._lines, `${stem}-${this._commandType}.txt`);
   }
 
   private _renderStatus() {

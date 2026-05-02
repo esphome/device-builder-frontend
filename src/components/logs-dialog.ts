@@ -7,6 +7,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -551,16 +552,8 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _downloadLogs() {
-    const text = this._lines
-      .map((l) => l.replace(/\u001b\[[0-9;]*m/g, ""))
-      .join("\n");
-    const blob = new Blob([text], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${this.configuration.replace(/\.yaml$/, "")}-logs.txt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const stem = this.configuration.replace(/\.ya?ml$/, "") || "logs";
+    downloadAnsiText(this._lines, `${stem}-logs.txt`);
   }
 
   private _toggleExpanded() {
