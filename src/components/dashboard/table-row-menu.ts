@@ -243,11 +243,17 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="download"></wa-icon>
           ${this._localize("dashboard.action_download_yaml")}
         </div>
-        <div class="menu-item" @click=${() => this._emit("rename-device")}>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("rename-device")}
+        >
           <wa-icon library="mdi" name="rename-outline"></wa-icon>
           ${this._localize("dashboard.action_rename")}
         </div>
-        <div class="menu-item" @click=${() => this._emit("clean-build")}>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("clean-build")}
+        >
           <wa-icon library="mdi" name="broom"></wa-icon>
           ${this._localize("dashboard.action_clean_build")}
         </div>
@@ -261,7 +267,10 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.context_select")}
         </div>
         <div class="menu-divider"></div>
-        <div class="menu-item menu-item--danger" @click=${() => this._emit("delete-device")}>
+        <div
+          class="menu-item menu-item--danger ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("delete-device")}
+        >
           <wa-icon library="mdi" name="delete"></wa-icon>
           ${this._localize("dashboard.delete")}
         </div>

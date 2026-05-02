@@ -204,6 +204,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             class="cell-action-btn cell-action-btn--edit"
             aria-label=${localize("dashboard.table_action_edit")}
             title=${localize("dashboard.table_action_edit")}
+            ?disabled=${row.busy}
             @click=${(e: Event) => dispatchRowEvent(e, "edit-device", device)}
           >
             <wa-icon library="mdi" name="pencil"></wa-icon>
