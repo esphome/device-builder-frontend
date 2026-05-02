@@ -19,13 +19,15 @@ import { stripAnsi } from "./strip-ansi.js";
 export function downloadAnsiText(lines: string[], filename: string): string {
   /* Some streams (notably the firmware-job follow path) deliver
      each line *with* its trailing ``\n`` / ``\r\n`` baked into the
-     payload. Joining those with another ``\n`` produces a blank line
-     between every entry in the saved file. Strip trailing line
-     terminators per entry before the join so the output reads as one
-     real log line per file row regardless of which side included
-     the terminator. */
+     payload, and a few — esptool / PlatformIO progress lines that
+     drive in-place updates — end on a bare ``\r``. Joining those
+     with another ``\n`` produces blank rows or stray carriage
+     returns in the saved file. Strip every trailing CR / LF combo
+     per entry before the join so the output reads as one real log
+     line per file row regardless of which terminator the upstream
+     used. */
   const text = lines
-    .map((line) => stripAnsi(line).replace(/\r?\n+$/, ""))
+    .map((line) => stripAnsi(line).replace(/[\r\n]+$/, ""))
     .join("\n");
   const blob = new Blob([text], { type: "text/plain" });
   const url = URL.createObjectURL(blob);
