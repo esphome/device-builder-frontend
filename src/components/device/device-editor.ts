@@ -15,6 +15,7 @@ import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 import type { HighlightRange } from "../yaml-editor.js";
@@ -80,24 +81,24 @@ export class ESPHomeDeviceEditor extends LitElement {
     this._isMobile = e.matches;
   };
 
-  /** Cmd/Ctrl+S → save the YAML if there are unsaved changes. Also
-   *  ESC to exit fullscreen so the editor matches the logs dialog
-   *  pattern. Listens at the document level so the shortcut works
-   *  regardless of which child (CodeMirror, navigator, etc.) currently
-   *  has focus. */
+  /** Cmd/Ctrl+S → save the YAML if there are unsaved changes.
+   *  Listens at the window level so the shortcut works regardless of
+   *  which child (CodeMirror, navigator, etc.) currently has focus.
+   *  Esc-to-exit-fullscreen is wired through EscapeController below
+   *  so the listener is only attached while fullscreen is active. */
   private _onGlobalKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
       e.preventDefault();
       if (this.yaml !== this.savedYaml) {
         this._onSave();
       }
-      return;
-    }
-    if (e.key === "Escape" && this._fullscreen) {
-      e.preventDefault();
-      this._fullscreen = false;
     }
   };
+
+  private _escape = new EscapeController(this, (e) => {
+    e.preventDefault();
+    this._fullscreen = false;
+  });
 
   connectedCallback() {
     super.connectedCallback();
@@ -387,6 +388,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_fullscreen")) {
       this.toggleAttribute("fullscreen", this._fullscreen);
+      this._escape.set(this._fullscreen);
     }
   }
 

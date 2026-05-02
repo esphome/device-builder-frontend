@@ -13,6 +13,7 @@ import { mdiClose, mdiMagnify, mdiPalette } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { inputStyles } from "../styles/inputs.js";
+import { EscapeController } from "../util/escape-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -377,27 +378,33 @@ export class ESPHomeMdiIconPicker extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     document.addEventListener("click", this._onDocumentClick, true);
-    document.addEventListener("keydown", this._onDocumentKeydown);
   }
 
   disconnectedCallback() {
     super.disconnectedCallback();
     document.removeEventListener("click", this._onDocumentClick, true);
-    document.removeEventListener("keydown", this._onDocumentKeydown);
   }
+
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has("_open")) this._escape.set(this._open);
+  }
+
+  /* Esc binds to ``document`` (not ``window``) and the callback uses
+     ``stopPropagation`` so a parent dialog wrapping the picker doesn't
+     also close on the same keypress. */
+  private _escape = new EscapeController(
+    this,
+    (e) => {
+      e.stopPropagation();
+      this._close();
+    },
+    { target: document },
+  );
 
   private _onDocumentClick = (e: Event) => {
     if (!this._open) return;
     const path = e.composedPath();
     if (!path.includes(this)) {
-      this._close();
-    }
-  };
-
-  private _onDocumentKeydown = (e: KeyboardEvent) => {
-    if (!this._open) return;
-    if (e.key === "Escape") {
-      e.stopPropagation();
       this._close();
     }
   };

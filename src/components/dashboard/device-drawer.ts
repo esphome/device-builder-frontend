@@ -391,7 +391,10 @@ export class ESPHomeDeviceDrawer extends LitElement {
     );
   }
 
-  private _escape = new EscapeController(this, () => this._close());
+  private _escape = new EscapeController(this, (e) => {
+    e.preventDefault();
+    this._close();
+  });
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("open")) this._escape.set(this.open);

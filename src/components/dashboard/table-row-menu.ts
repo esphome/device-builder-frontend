@@ -269,7 +269,10 @@ export class ESPHomeTableRowMenu extends LitElement {
     `;
   }
 
-  private _escape = new EscapeController(this, () => this._close());
+  private _escape = new EscapeController(this, (e) => {
+    e.preventDefault();
+    this._close();
+  });
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("device") || changed.has("position")) {

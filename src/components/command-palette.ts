@@ -20,6 +20,7 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
@@ -93,13 +94,17 @@ export class ESPHomeCommandPalette extends LitElement {
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
       this._toggle();
-      return;
-    }
-    if (this._open && e.key === "Escape") {
-      e.preventDefault();
-      this.close();
     }
   };
+
+  /* Cmd+K is always-on (it opens the palette), so it stays on a
+     dedicated keydown listener. Esc only matters while the palette is
+     open and is handled by EscapeController, which attaches/detaches
+     in lockstep with ``_open``. */
+  private _escape = new EscapeController(this, (e) => {
+    e.preventDefault();
+    this.close();
+  });
 
   connectedCallback() {
     super.connectedCallback();
@@ -228,6 +233,10 @@ export class ESPHomeCommandPalette extends LitElement {
         .toLowerCase();
       return haystack.includes(q);
     });
+  }
+
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has("_open")) this._escape.set(this._open);
   }
 
   protected updated(changed: Map<string, unknown>) {
