@@ -141,7 +141,16 @@ export class ESPHomeCommandDialog extends LitElement {
         --term-success: #3d7a28;
       }
 
-      wa-dialog { --width: min(900px, 90vw); }
+      /* Match the logs-dialog width — same body content (ANSI-coloured
+         terminal output from esphome's --dashboard mode), same wrap
+         budget. 900 wrapped routinely on retina laptops where the
+         timestamp + [C][module:NNN] prefix eats more horizontal real
+         estate than expected; 1300 fits the common case end-to-end on
+         a 13-inch laptop and leaves long-tail lines (multi-component
+         config dumps, stack traces) to the user's browser scrollbar.
+         min(..., 94vw) keeps the dialog from kissing the viewport
+         edges on smaller screens. */
+      wa-dialog { --width: min(1300px, 94vw); }
       /* Header matches the device-editor's title bar
          (--esphome-primary background with --esphome-on-primary
          text) so Validate / Install / Clean dialogs read as part
