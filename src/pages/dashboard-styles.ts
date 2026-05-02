@@ -91,6 +91,15 @@ export const dashboardStyles = css`
     padding: var(--wa-space-l);
   }
 
+  /* display:grid wins over the user-agent hidden rule, so an
+     explicitly hidden grid would still take its padding-worth of
+     vertical space. Force display:none to honour the hidden
+     attribute — used for #discovered-grid when the banner is
+     collapsed or every discovery is filtered out. */
+  .devices-grid[hidden] {
+    display: none;
+  }
+
   /* ─── Search toolbar ─── */
 
   .toolbar {
