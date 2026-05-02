@@ -48,6 +48,7 @@ import {
   recentJobsContext,
   firmwareJobsContext,
   importableDevicesContext,
+  integrationDocsContext,
   isHaIngressContext,
   localizeContext,
   versionContext,
@@ -142,6 +143,13 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: yamlDiffButtonContext })
   @state()
   private _yamlDiffButton = false;
+
+  // Frozen catalog-derived map; refreshed only with a backend release.
+  // Cheap to leave at {} until the fetch lands — the device drawer
+  // falls back to plain-text tags whenever a name isn't in the map.
+  @provide({ context: integrationDocsContext })
+  @state()
+  private _integrationDocs: Record<string, string> = {};
 
   // ─── Router ──────────────────────────────────────────────
 
@@ -262,6 +270,7 @@ export class ESPHomeApp extends LitElement {
       this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
       this._subscribeToEvents();
       this._subscribeToFollowJobs();
+      this._loadIntegrationDocs();
     };
 
     this._api.onDisconnected = () => {
@@ -277,6 +286,21 @@ export class ESPHomeApp extends LitElement {
       this._loadThemePreference();
     } catch (err) {
       console.error("Failed to connect to WebSocket:", err);
+    }
+  }
+
+  /**
+   * Fetch the integration → docs URL map once per connection and stash
+   * it in context. The map is catalog-derived and only changes with a
+   * backend release, so no need to re-fetch on event flow. A failure
+   * here is non-fatal: we leave ``_integrationDocs`` empty and the
+   * drawer falls back to plain-text tags.
+   */
+  private async _loadIntegrationDocs() {
+    try {
+      this._integrationDocs = await this._api.getIntegrationDocs();
+    } catch (err) {
+      console.warn("Failed to load integration docs URLs:", err);
     }
   }
 

@@ -72,3 +72,11 @@ export const firmwareJobsContext = createContext<Map<string, FirmwareJob>>(
 export const yamlDiffButtonContext = createContext<boolean>(
   Symbol("esphome-yaml-diff-button")
 );
+
+/** Context for the integration → esphome.io docs URL map. Populated
+ *  once on app load via ``components/get_integration_docs``; the
+ *  drawer's loaded-integration tags consult it to decide whether to
+ *  render each name as a link or plain text. */
+export const integrationDocsContext = createContext<Record<string, string>>(
+  Symbol("esphome-integration-docs")
+);

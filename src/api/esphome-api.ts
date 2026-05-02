@@ -674,6 +674,19 @@ export class ESPHomeAPI {
     return this.sendCommand<PagedComponentsResponse>("components/get_components", args);
   }
 
+  /**
+   * Map of integration name → esphome.io docs URL for every
+   * loaded-integration name we can resolve. Names with no docs page
+   * are simply absent from the map; the dashboard renders those as
+   * plain text. Fetched once at app load — the dataset only refreshes
+   * with a backend release.
+   */
+  async getIntegrationDocs(): Promise<Record<string, string>> {
+    return this.sendCommand<Record<string, string>>(
+      "components/get_integration_docs",
+    );
+  }
+
   // ─── Config Commands ──────────────────────────────────────
 
   /** Get ESPHome and server version. */

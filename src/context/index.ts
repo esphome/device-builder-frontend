@@ -11,4 +11,5 @@ export {
   recentJobsContext,
   firmwareJobsContext,
   yamlDiffButtonContext,
+  integrationDocsContext,
 } from "./contexts.js";
