@@ -262,15 +262,18 @@ export class ESPHomeAnsiLog extends LitElement {
        instead of forcing the user onto an easily-missed horizontal
        scrollbar — PIO download URLs and full build paths routinely
        run past 200 chars and the install/log dialogs have no obvious
-       affordance for sideways scrolling. overflow-wrap: anywhere
-       breaks inside unbroken tokens (URLs, paths) so a single long
-       run can't push the line back into overflow. */
+       affordance for sideways scrolling. word-break: break-word +
+       overflow-wrap: anywhere is the same belt-and-suspenders pair
+       yaml-diff.ts uses — Safari historically honoured the former
+       earlier than the latter, so keeping both ensures unbroken
+       tokens (URLs, paths) wrap consistently across engines. */
     .log-line {
       margin: 0;
       padding: 0;
       border-radius: 2px;
       line-height: 18px;
       white-space: pre-wrap;
+      word-break: break-word;
       overflow-wrap: anywhere;
     }
 
