@@ -6,6 +6,17 @@ export const dashboardStyles = css`
     flex-direction: column;
     height: calc(100vh - var(--esphome-header-height));
     overflow: hidden;
+    /* Single source of truth for the floating Create-device button's
+       footprint. --fab-bottom is the gap between the FAB and the
+       viewport edge (also the FAB's CSS bottom); --fab-height
+       approximates the rendered button height (12+12px padding plus
+       text). The card grid pads its bottom by their sum so the
+       trailing card's action row never sits under the FAB. Defining
+       these once stops the grid clearance and the FAB position from
+       drifting if either gets tweaked later. */
+    --fab-bottom: var(--wa-space-l);
+    --fab-height: 48px;
+    --fab-clearance: calc(var(--fab-bottom) + var(--fab-height) + var(--wa-space-xs));
   }
 
   :host([view="cards"]) {
@@ -89,6 +100,17 @@ export const dashboardStyles = css`
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
     padding: var(--wa-space-l);
+  }
+
+  /* Only the configured-device grid needs FAB clearance: it's the
+     last block on the page in card view, and the FAB sits directly
+     on top of its trailing card's actions on a single-column mobile
+     viewport. The discovered grid and skeleton both render above
+     other content, so the normal bottom padding is fine. Driven by
+     the same --fab-* tokens as the .fab-container rule below so the
+     two can't drift. */
+  .devices-grid--configured {
+    padding-bottom: var(--fab-clearance);
   }
 
   /* display:grid wins over the user-agent hidden rule, so an
@@ -471,7 +493,7 @@ export const dashboardStyles = css`
 
   .fab-container {
     position: fixed;
-    bottom: var(--wa-space-l);
+    bottom: var(--fab-bottom);
     right: var(--wa-space-xl);
     z-index: 10;
   }
