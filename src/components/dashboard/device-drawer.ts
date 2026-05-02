@@ -390,6 +390,33 @@ export class ESPHomeDeviceDrawer extends LitElement {
     );
   }
 
+  disconnectedCallback() {
+    this._setEscListener(false);
+    super.disconnectedCallback();
+  }
+
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has("open")) this._setEscListener(this.open);
+  }
+
+  private _onWindowKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      this._close();
+    }
+  };
+
+  private _escBound = false;
+  private _setEscListener(active: boolean) {
+    if (active && !this._escBound) {
+      window.addEventListener("keydown", this._onWindowKeydown);
+      this._escBound = true;
+    } else if (!active && this._escBound) {
+      window.removeEventListener("keydown", this._onWindowKeydown);
+      this._escBound = false;
+    }
+  }
+
   private _emitAction(name: string) {
     this.dispatchEvent(
       new CustomEvent(name, {
