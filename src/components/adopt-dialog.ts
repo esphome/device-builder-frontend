@@ -94,15 +94,21 @@ export class ESPHomeAdoptDialog extends LitElement {
         margin-bottom: var(--wa-space-2xs);
       }
 
-      /* Show the URL in monospace with break-all wrapping so a
-         long URL fits inside the dialog instead of overflowing or
-         getting truncated. Hostname is the highest-signal part for
-         deciding trust; truncating would hide it. */
+      /* Show the URL in monospace; long URLs wrap inside the
+         dialog instead of overflowing or getting truncated. The
+         word-break:break-word + overflow-wrap:anywhere pair
+         (same one yaml-diff.ts and ansi-log.ts use) breaks only
+         on the longest unbreakable run rather than mid-token —
+         hostnames stay intact, which matters here because the
+         hostname is the highest-signal part for deciding trust.
+         break-all would happily split github.com across two
+         lines and hide the signal. */
       .source-info-url {
         font-family: var(--wa-font-family-code);
         font-size: var(--wa-font-size-2xs);
         color: var(--wa-color-text-normal);
-        word-break: break-all;
+        word-break: break-word;
+        overflow-wrap: anywhere;
         background: var(--wa-color-surface-lowered);
         padding: 6px 10px;
         border-radius: var(--wa-border-radius-s);
