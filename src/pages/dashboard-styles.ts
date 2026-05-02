@@ -122,7 +122,6 @@ export const dashboardStyles = css`
     display: none;
   }
 
-
   /* ─── Search toolbar ─── */
 
   .toolbar {
