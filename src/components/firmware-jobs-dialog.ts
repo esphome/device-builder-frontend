@@ -30,6 +30,7 @@ import {
   formatAbsoluteTime,
   formatRelativeTime,
 } from "../util/format-job-time.js";
+import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -677,11 +678,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   };
 
   private _jobDisplayName(job: FirmwareJob): string {
-    if (job.job_type === JobType.RESET_BUILD_ENV || !job.configuration) {
-      return this._localize("firmware_jobs.build_env_label");
-    }
-    const device = this._devices.find((d) => d.configuration === job.configuration);
-    return device?.friendly_name || device?.name || job.configuration;
+    return firmwareJobDisplayName(job, this._devices, this._localize);
   }
 
   private _openJob(job: FirmwareJob) {

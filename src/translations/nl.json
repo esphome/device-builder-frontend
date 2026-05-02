@@ -192,7 +192,11 @@
     "clean_success": "Bouwbestanden opgeschoond.",
     "clean_failed": "Opschonen mislukt.",
     "reset_success": "Bouw-omgeving gereset. De volgende compilatie downloadt de toolchain opnieuw.",
-    "reset_failed": "Resetten van de bouw-omgeving mislukt."
+    "reset_failed": "Resetten van de bouw-omgeving mislukt.",
+    "queued_title": "In wachtrij",
+    "queued_message": "Er draait al een andere firmwaretaak. Deze start zodra die klaar is.",
+    "queued_waiting_for": "Wachten tot {name} klaar is.",
+    "queued_view_all": "Firmwaretaken bekijken"
   },
   "serial": {
     "title": "USB-apparaat",
