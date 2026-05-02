@@ -227,7 +227,7 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="upload"></wa-icon>
           ${this._localize("dashboard.action_install")}
         </div>
-        <div class="menu-item menu-item--logs ${this.busy ? "menu-item--disabled" : ""}" @click=${this.busy ? undefined : () => this._emit("open-logs")}>
+        <div class="menu-item menu-item--logs" @click=${() => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
         </div>

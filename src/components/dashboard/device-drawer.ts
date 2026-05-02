@@ -374,7 +374,6 @@ export class ESPHomeDeviceDrawer extends LitElement {
           </button>
           <button
             class="action action--ghost"
-            ?disabled=${this.busy}
             @click=${() => this._emitAction("open-logs")}
           >
             <wa-icon library="mdi" name="console"></wa-icon>
