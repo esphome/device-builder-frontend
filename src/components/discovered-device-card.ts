@@ -12,6 +12,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { safeWebUiUrl } from "../util/web-ui-url.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -192,24 +193,11 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
     const title = this.device.friendly_name || this.device.name;
     const showHostname = !!this.device.friendly_name;
     /* ``web_url`` is built backend-side from mDNS service info, so
-       in normal use it's always ``http://``. Validate the scheme
-       defensively before rendering — a discovered device could in
-       theory advertise a service whose resolved URL parses as
-       ``javascript:`` or similar, and feeding that into ``href``
-       lets a click execute the script. ``new URL`` also catches
-       malformed input early; we render the link only when both the
-       parse succeeds and the protocol is one we trust. */
-    let safeWebUrl = "";
-    if (this.device.web_url) {
-      try {
-        const parsed = new URL(this.device.web_url);
-        if (parsed.protocol === "http:" || parsed.protocol === "https:") {
-          safeWebUrl = parsed.toString();
-        }
-      } catch {
-        // Fall through — leave safeWebUrl empty, link is hidden.
-      }
-    }
+       in normal use it's always ``http://``. Run it through the
+       shared guard anyway — a discovered device could advertise a
+       service whose resolved URL parses as ``javascript:``, and
+       feeding that into ``href`` lets a click execute the script. */
+    const safeWebUrl = safeWebUiUrl(this.device.web_url);
     return html`
       <div class="card" ?data-ignored=${this.device.ignored}>
         <span class="status">
