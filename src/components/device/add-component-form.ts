@@ -173,7 +173,14 @@ export class ESPHomeAddComponentForm extends LitElement {
    *     prefill the field that points at that domain with the new id.
    */
   private _initValues() {
-    let next = this._seedDefaults(this.component.config_entries);
+    // Featured-component entries (ids prefixed with `featured.`) carry
+    // backend-baked presets in `default_value` for arbitrary fields,
+    // not just required ones. Seed every entry with a non-null default
+    // when filling a featured entry so a board-pinned (locked) optional
+    // field actually emits its preset on submit — otherwise the
+    // backend's locked-validation would reject the empty payload.
+    const seedAll = this.component.id.startsWith("featured.");
+    let next = this._seedDefaults(this.component.config_entries, seedAll);
 
     const idEntry = this.component.config_entries.find(
       (e) => e.key === "id" && e.type === ConfigEntryType.ID,
@@ -225,27 +232,34 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
-   * Seed initial form values. We're showing only required fields, so
-   * we only pre-fill required fields' defaults — pre-filling optional
-   * fields the user can't see would just bloat the payload with
-   * values they never explicitly chose. NESTED entries recurse
-   * regardless of whether the parent is required, since a non-required
-   * group can still contain required descendants we want to seed.
+   * Seed initial form values. By default only required fields' defaults
+   * are pre-filled — pre-filling optional fields the user can't see
+   * would just bloat the payload with values they never explicitly
+   * chose. NESTED entries recurse regardless of whether the parent is
+   * required, since a non-required group can still contain required
+   * descendants we want to seed.
+   *
+   * When `seedAll` is true, every entry with a non-null `default_value`
+   * is seeded — used for featured components so backend-baked presets
+   * land in the payload even on optional fields.
    */
-  private _seedDefaults(entries: ConfigEntry[]): Record<string, unknown> {
+  private _seedDefaults(
+    entries: ConfigEntry[],
+    seedAll: boolean = false,
+  ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const entry of entries) {
       if (entry.type === ConfigEntryType.NESTED) {
-        const sub = this._seedDefaults(entry.config_entries ?? []);
+        const sub = this._seedDefaults(entry.config_entries ?? [], seedAll);
         if (Object.keys(sub).length > 0) out[entry.key] = sub;
         continue;
       }
-      if (!entry.required) continue;
+      if (!seedAll && !entry.required) continue;
       if (entry.default_value != null) {
         out[entry.key] = entry.multi_value
           ? [String(entry.default_value)]
           : entry.default_value;
-      } else if (entry.multi_value) {
+      } else if (entry.multi_value && entry.required) {
         out[entry.key] = [];
       }
     }

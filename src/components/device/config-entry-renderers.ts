@@ -15,6 +15,7 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import {
+  effectiveDisabled,
   labelFor,
   renderFieldError,
   renderHelpLink,
@@ -24,6 +25,7 @@ import {
 } from "./config-entry-renderers-shared.js";
 
 export {
+  effectiveDisabled,
   labelFor,
   renderLabel,
   renderStringField,
@@ -40,10 +42,17 @@ export function renderNumberField(
   path: string[],
   ctx: RenderCtx,
 ) {
+  // A featured-entry preset can pin the choice to a short list of
+  // numbers — defer to the suggestion-aware string renderer which
+  // converts the picked value back to a number on change.
+  if (entry.suggestions && entry.suggestions.length > 0) {
+    return renderStringField(entry, "number", path, ctx);
+  }
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const min = entry.range ? String(entry.range[0]) : undefined;
   const max = entry.range ? String(entry.range[1]) : undefined;
+  const disabled = effectiveDisabled(entry, ctx);
   return html`
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
@@ -51,7 +60,7 @@ export function renderNumberField(
         type="number"
         class=${invalid ? "invalid" : ""}
         .value=${value}
-        ?disabled=${ctx.disabled}
+        ?disabled=${disabled}
         min=${min ?? ""}
         max=${max ?? ""}
         step=${entry.type === ConfigEntryType.FLOAT ? "any" : "1"}
@@ -81,7 +90,7 @@ export function renderBooleanField(
       ${renderHelpLink(entry, ctx)}
       <wa-switch
         ?checked=${checked}
-        ?disabled=${ctx.disabled}
+        ?disabled=${effectiveDisabled(entry, ctx)}
         @change=${(e: Event) =>
           ctx.emitChange(
             path,
@@ -99,6 +108,36 @@ export function renderSelectField(
 ) {
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
+  // A featured-entry `suggestions` list overrides the catalog `options`
+  // if both are set — the board author has narrowed the choice further.
+  // Always render a strict select; suggestions are a closed set, so the
+  // combobox path doesn't apply.
+  if (entry.suggestions && entry.suggestions.length > 0) {
+    const valueLower = value.toLowerCase();
+    return html`
+      <div class="field" data-field-key=${path.join(".")}>
+        ${renderLabel(entry, ctx)}
+        <wa-select
+          class=${invalid ? "invalid" : ""}
+          ?disabled=${disabled}
+          placeholder=${String(entry.default_value ?? "")}
+          @change=${(e: Event) =>
+            ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
+        >
+          ${entry.suggestions.map((s) => {
+            const v = String(s);
+            return html`<wa-option
+              value=${v}
+              ?selected=${v.toLowerCase() === valueLower}
+              >${v}</wa-option
+            >`;
+          })}
+        </wa-select>
+        ${renderFieldError(path, ctx)}
+      </div>
+    `;
+  }
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
     const listId = `combobox-${path.join("-")}`;
     return html`
@@ -109,7 +148,7 @@ export function renderSelectField(
           class="combobox-input ${invalid ? "invalid" : ""}"
           list=${listId}
           .value=${value}
-          ?disabled=${ctx.disabled}
+          ?disabled=${disabled}
           placeholder=${String(entry.default_value ?? "")}
           @input=${(e: Event) =>
             ctx.emitChange(path, (e.target as HTMLInputElement).value)}
@@ -146,7 +185,7 @@ export function renderSelectField(
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}
-        ?disabled=${ctx.disabled}
+        ?disabled=${disabled}
         placeholder=${placeholder}
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
@@ -178,7 +217,7 @@ export function renderTextareaField(
       <textarea
         class="textarea-field ${invalid ? "invalid" : ""}"
         rows="4"
-        ?disabled=${ctx.disabled}
+        ?disabled=${effectiveDisabled(entry, ctx)}
         .value=${value}
         placeholder=${String(entry.default_value ?? "")}
         @input=${(e: Event) =>
@@ -202,7 +241,7 @@ export function renderIconField(
       <esphome-mdi-icon-picker
         .value=${value}
         .invalid=${invalid}
-        .disabled=${ctx.disabled}
+        .disabled=${effectiveDisabled(entry, ctx)}
         .placeholder=${String(entry.default_value ?? "Choose an icon…")}
         @change=${(e: CustomEvent<{ value: string }>) =>
           ctx.emitChange(path, e.detail.value)}
@@ -220,6 +259,7 @@ export function renderMultiValueField(
   const raw = ctx.getAt(path);
   const items: string[] = Array.isArray(raw) ? raw.map((v) => String(v)) : [];
   const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
 
   const updateAt = (idx: number, value: string) => {
     const cur = ctx.getAt(path);
@@ -256,14 +296,14 @@ export function renderMultiValueField(
               type="text"
               class="multi-input ${invalid ? "invalid" : ""}"
               .value=${item}
-              ?disabled=${ctx.disabled}
+              ?disabled=${disabled}
               @input=${(e: Event) =>
                 updateAt(i, (e.target as HTMLInputElement).value)}
             />
             <button
               type="button"
               class="multi-btn"
-              ?disabled=${ctx.disabled}
+              ?disabled=${disabled}
               aria-label=${ctx.localize("device.multi_value_remove")}
               @click=${() => removeAt(i)}
             >
@@ -275,7 +315,7 @@ export function renderMultiValueField(
       <button
         type="button"
         class="multi-btn multi-add"
-        ?disabled=${ctx.disabled}
+        ?disabled=${disabled}
         @click=${addItem}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
@@ -313,6 +353,7 @@ export function renderMapField(
       ? (raw as Record<string, unknown>)
       : {};
   const keys = Object.keys(map);
+  const disabled = effectiveDisabled(entry, ctx);
 
   const readMap = (): Record<string, unknown> => {
     const cur = ctx.getAt(path);
@@ -366,7 +407,7 @@ export function renderMapField(
           type="text"
           class="multi-input map-key-input"
           .value=${rowKey}
-          ?disabled=${ctx.disabled}
+          ?disabled=${disabled}
           @change=${(e: Event) =>
             renameKey(rowKey, (e.target as HTMLInputElement).value)}
         />
@@ -376,7 +417,7 @@ export function renderMapField(
         <button
           type="button"
           class="multi-btn"
-          ?disabled=${ctx.disabled}
+          ?disabled=${disabled}
           aria-label=${ctx.localize("device.map_remove")}
           @click=${() => removeEntry(rowKey)}
         >
@@ -398,7 +439,7 @@ export function renderMapField(
       <button
         type="button"
         class="multi-btn multi-add"
-        ?disabled=${ctx.disabled}
+        ?disabled=${disabled}
         @click=${addEntry}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>

@@ -26,6 +26,13 @@ export const configEntryFormStyles = css`
     color: var(--esphome-error);
   }
 
+  /* Indicator on featured-component fields the board has pinned to a
+     fixed value. Sits next to the help-link icon. */
+  .field-label .lock-icon {
+    font-size: 13px;
+    color: var(--wa-color-text-quiet);
+  }
+
   .field-error {
     color: var(--esphome-error);
     font-size: var(--wa-font-size-2xs);

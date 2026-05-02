@@ -1,8 +1,20 @@
 import { consume } from "@lit/context";
-import { mdiArrowCollapseAll, mdiArrowExpandAll, mdiMemory, mdiOpenInNew, mdiPlus } from "@mdi/js";
+import {
+  mdiArrowCollapseAll,
+  mdiArrowExpandAll,
+  mdiMemory,
+  mdiOpenInNew,
+  mdiPackageVariantClosed,
+  mdiPlus,
+  mdiStar,
+} from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { ComponentCatalogEntry } from "../../api/types.js";
+import type {
+  BoardCatalogEntry,
+  ComponentCatalogEntry,
+  FeaturedBundle,
+} from "../../api/types.js";
 import { ComponentCategory } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -25,7 +37,9 @@ registerMdiIcons({
   "arrow-expand-all": mdiArrowExpandAll,
   memory: mdiMemory,
   "open-in-new": mdiOpenInNew,
+  "package-variant-closed": mdiPackageVariantClosed,
   plus: mdiPlus,
+  star: mdiStar,
 });
 
 @customElement("esphome-component-catalog")
@@ -49,6 +63,13 @@ export class ESPHomeComponentCatalog extends LitElement {
    * have to plumb it through later. */
   @property({ attribute: "board-id" })
   boardId = "";
+
+  /** Full board metadata. Used to surface `featured_bundles` (those
+   * aren't returned through `components/*`, only via `boards/get_board`)
+   * and to render the bundle cards' "Recommended for {board name}"
+   * section title. */
+  @property({ attribute: false })
+  board: BoardCatalogEntry | null = null;
 
   /** Current device YAML. Used to hide components that are already
    *  configured AND are not multi-conf — a single-instance component
@@ -81,6 +102,12 @@ export class ESPHomeComponentCatalog extends LitElement {
 
   @state()
   private _total = 0;
+
+  /** Featured component entries fetched from `category=featured&board_id=...`.
+   *  Empty when the board has no recommendations. Rendered in the
+   *  pinned "Recommended" section above the regular grid. */
+  @state()
+  private _featured: ComponentCatalogEntry[] = [];
 
   @state()
   private _loading = true;
@@ -246,23 +273,63 @@ export class ESPHomeComponentCatalog extends LitElement {
           : undefined;
       const platform = this.platform || undefined;
       const board_id = this.boardId || undefined;
-      const response = await this._api.getComponents({
-        query,
-        category,
-        exclude_category,
-        platform,
-        board_id,
-        limit: 50,
-      });
+      // Fetch the regular grid and the featured set in parallel. The
+      // featured request only fires when we're actually going to
+      // render the pinned Recommended section: when the user has
+      // picked any specific category (sidebar filter active) or the
+      // parent has locked us to a non-default category set, the
+      // pinned section is hidden anyway, so the second call would
+      // just be wasted bytes. The "Featured" sidebar entry already
+      // returns featured components through the regular call.
+      const wantFeatured = !!board_id && !locked && this._category === "all";
+      const [response, featuredResponse] = await Promise.all([
+        this._api.getComponents({
+          query,
+          category,
+          exclude_category,
+          platform,
+          board_id,
+          limit: 50,
+        }),
+        wantFeatured
+          ? this._api.getComponents({
+              query,
+              category: ComponentCategory.FEATURED,
+              platform,
+              board_id,
+              limit: 100,
+            })
+          : Promise.resolve(null),
+      ]);
       this._components = response.components;
       this._categories = response.categories;
       this._total = response.total;
+      this._featured = featuredResponse?.components ?? [];
     } catch (e) {
       console.error("Failed to load component catalog:", e);
     } finally {
       this._loading = false;
       this._initialLoad = false;
     }
+  }
+
+  /**
+   * Bundles surfaced from the board manifest, optionally filtered by
+   * the search query. Bundles aren't returned through `components/*`
+   * — they live on `boards/get_board` and we filter them client-side
+   * so a search behaves consistently across featured + bundles +
+   * regular components.
+   */
+  private get _filteredBundles(): FeaturedBundle[] {
+    const bundles = this.board?.featured_bundles ?? [];
+    const q = this._search.trim().toLowerCase();
+    if (!q) return bundles;
+    return bundles.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.description.toLowerCase().includes(q) ||
+        b.id.toLowerCase().includes(q),
+    );
   }
 
   static styles = [
@@ -598,6 +665,63 @@ export class ESPHomeComponentCatalog extends LitElement {
         color: var(--wa-color-text-quiet);
         font-size: var(--wa-font-size-s);
       }
+
+      /* Pinned "Recommended for <board>" section above the regular
+         grid. Visually distinguished from the rest of the catalog by
+         the section heading + a primary-coloured accent on each
+         card. */
+      .featured-section {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-xs);
+      }
+
+      .featured-heading {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-2xs);
+        margin: 0;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-subtle);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+
+      .featured-heading wa-icon {
+        font-size: 14px;
+        color: var(--esphome-primary);
+      }
+
+      .featured-divider {
+        height: 1px;
+        background: var(--wa-color-surface-border);
+        margin: var(--wa-space-xs) 0 0;
+      }
+
+      .component-card--featured {
+        border-color: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 70%
+        );
+      }
+
+      .bundle-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        font-size: var(--wa-font-size-2xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--esphome-primary);
+        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        border-radius: var(--wa-border-radius-s);
+        padding: 1px 6px;
+      }
+
+      .bundle-badge wa-icon {
+        font-size: 11px;
+      }
     `,
   ];
 
@@ -613,6 +737,19 @@ export class ESPHomeComponentCatalog extends LitElement {
     // Hide the sidebar entirely so the catalog acts like a simple
     // filtered list.
     const showSidebar = this.lockedCategories.length === 0;
+
+    // Pinned "Recommended for <board>" section. Only shown when the
+    // user is browsing all categories (the sidebar default) — when
+    // they pick a specific category they're focusing on it; mixing
+    // unrelated featured cards above the focused list would be noise.
+    // The dedicated "Featured" sidebar entry already lists every
+    // featured component on its own.
+    const filteredBundles = this._filteredBundles;
+    const showRecommended =
+      !this._loading &&
+      this._category === "all" &&
+      this.lockedCategories.length === 0 &&
+      (this._featured.length + filteredBundles.length) > 0;
 
     return html`
       ${showSidebar
@@ -648,6 +785,7 @@ export class ESPHomeComponentCatalog extends LitElement {
           ? html`<span class="result-count">${this._visibleComponents.length} of ${this._total} components</span>`
           : ""}
         <div class="grid-scroll">
+          ${showRecommended ? this._renderRecommendedSection(filteredBundles) : nothing}
           <div class="components-grid">
             ${this._loading
               ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
@@ -657,6 +795,58 @@ export class ESPHomeComponentCatalog extends LitElement {
           </div>
         </div>
       </div>
+    `;
+  }
+
+  private _renderRecommendedSection(bundles: FeaturedBundle[]) {
+    const boardName = this.board?.name || "";
+    return html`
+      <section class="featured-section">
+        <h3 class="featured-heading">
+          <wa-icon library="mdi" name="star"></wa-icon>
+          ${boardName
+            ? this._localize("device.recommended_for_board", { name: boardName })
+            : this._localize("device.component_category_featured")}
+        </h3>
+        <div class="components-grid">
+          ${this._featured.map((c) =>
+            this._renderCard(c, c.id === this._expandedId, true),
+          )}
+          ${bundles.map((b) => this._renderBundleCard(b))}
+        </div>
+        <div class="featured-divider"></div>
+      </section>
+    `;
+  }
+
+  private _renderBundleCard(bundle: FeaturedBundle) {
+    return html`
+      <article class="component-card component-card--featured">
+        <div class="component-card-header">
+          <div class="component-image--placeholder">
+            <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+          </div>
+          <div class="component-card-header-text">
+            <h3 class="component-title">${bundle.name}</h3>
+          </div>
+          <span class="bundle-badge">
+            <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+            ${this._localize("device.featured_bundle_badge")}
+          </span>
+        </div>
+        ${bundle.description
+          ? html`<p class="component-description component-description--clamp">
+              ${renderMarkdown(bundle.description)}
+            </p>`
+          : nothing}
+        <div class="card-footer">
+          <span></span>
+          <div class="select-component" @click=${() => this._onAddBundle(bundle)}>
+            <wa-icon library="mdi" name="plus"></wa-icon>
+            ${this._localize("device.add_component_action")}
+          </div>
+        </div>
+      </article>
     `;
   }
 
@@ -700,11 +890,17 @@ export class ESPHomeComponentCatalog extends LitElement {
     return cats;
   }
 
-  private _renderCard(component: ComponentCatalogEntry, expanded: boolean) {
+  private _renderCard(
+    component: ComponentCatalogEntry,
+    expanded: boolean,
+    featured: boolean = false,
+  ) {
     const hasImage =
       !!component.image_url && !this._imageFailed.has(component.id);
     return html`
-      <article class="component-card ${expanded ? "component-card--expanded" : ""}">
+      <article
+        class="component-card ${expanded ? "component-card--expanded" : ""} ${featured ? "component-card--featured" : ""}"
+      >
         <div class="component-card-header">
           ${hasImage
             ? html`<div class="component-image">
@@ -775,6 +971,16 @@ export class ESPHomeComponentCatalog extends LitElement {
         bubbles: true,
         composed: true,
       })
+    );
+  }
+
+  private _onAddBundle(bundle: FeaturedBundle) {
+    this.dispatchEvent(
+      new CustomEvent("add-bundle", {
+        detail: { bundle, boardId: this.boardId },
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 }

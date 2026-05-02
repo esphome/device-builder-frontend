@@ -1,11 +1,12 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiClose } from "@mdi/js";
+import { mdiArrowLeft, mdiClose, mdiPackageVariantClosed } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import {
   CORE_CATEGORIES,
   type BoardCatalogEntry,
   type ComponentCatalogEntry,
+  type FeaturedBundle,
 } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
@@ -21,7 +22,11 @@ import "./component-catalog.js";
 import "./add-component-form.js";
 import type { ESPHomeComponentCatalog } from "./component-catalog.js";
 
-registerMdiIcons({ close: mdiClose, "arrow-left": mdiArrowLeft });
+registerMdiIcons({
+  close: mdiClose,
+  "arrow-left": mdiArrowLeft,
+  "package-variant-closed": mdiPackageVariantClosed,
+});
 
 @customElement("esphome-add-component-dialog")
 export class ESPHomeAddComponentDialog extends LitElement {
@@ -101,6 +106,29 @@ export class ESPHomeAddComponentDialog extends LitElement {
    *  selections. */
   @state()
   private _prefillReference: { domain: string; id: string } | null = null;
+
+  /**
+   * Featured-component ids waiting to be added as part of the current
+   * bundle, excluding the one currently in `_selected`. Each id is
+   * already in the full `featured.<board>.<local>` shape so we can
+   * fetch + send it without re-derivation. Empty when no bundle is in
+   * flight.
+   */
+  @state()
+  private _bundleQueue: string[] = [];
+
+  /**
+   * Progress shown in the form view while a bundle is being added.
+   * `current` is the 1-based index of the component currently shown
+   * in the form; `total` is the bundle's full length. Null when no
+   * bundle is in flight.
+   */
+  @state()
+  private _bundleProgress: {
+    current: number;
+    total: number;
+    bundleName: string;
+  } | null = null;
 
   static styles = [
     espHomeStyles,
@@ -195,6 +223,28 @@ export class ESPHomeAddComponentDialog extends LitElement {
         color: var(--wa-color-text-normal);
         font-weight: var(--wa-font-weight-semibold);
       }
+
+      .bundle-banner {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+        margin-bottom: var(--wa-space-m);
+        padding: var(--wa-space-xs) var(--wa-space-s);
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 92%
+        );
+        border-left: 3px solid var(--esphome-primary);
+        border-radius: var(--wa-border-radius-s);
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-normal);
+      }
+
+      .bundle-banner wa-icon {
+        font-size: 14px;
+        color: var(--esphome-primary);
+      }
     `,
   ];
 
@@ -227,6 +277,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._returnTo = null;
     this._depDomain = null;
     this._prefillReference = null;
+    this._bundleQueue = [];
+    this._bundleProgress = null;
   }
 
   protected render() {
@@ -252,6 +304,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         class=${isForm ? "form-view" : ""}
         light-dismiss
         @add-component=${this._onComponentSelected}
+        @add-bundle=${this._onBundleSelected}
         @form-cancel=${this._onBack}
         @form-submit=${this._onFormSubmit}
         @navigate-to-dep=${this._onNavigateToDep}
@@ -276,10 +329,23 @@ export class ESPHomeAddComponentDialog extends LitElement {
               ${this._localize("device.return_to_after_dep_suffix")}
             </div>`
           : nothing}
+        ${isForm && this._bundleProgress
+          ? html`<div class="bundle-banner">
+              <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
+              <span
+                >${this._localize("device.bundle_step_progress", {
+                  current: this._bundleProgress.current,
+                  total: this._bundleProgress.total,
+                  name: this._bundleProgress.bundleName,
+                })}</span
+              >
+            </div>`
+          : nothing}
         <esphome-component-catalog
           ?hidden=${isForm}
           .platform=${this.platform}
           .boardId=${this.board?.id ?? ""}
+          .board=${this.board}
           .yaml=${this.yaml}
           .lockedCategories=${this.lockedCategories}
           .excludeCategories=${isCore ? [] : CORE_CATEGORIES}
@@ -304,6 +370,43 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
   }
 
+  /**
+   * Picking a bundle queues the bundle's components and opens the
+   * form view on the first one. Each successful submit advances the
+   * queue (`_onFormSubmit`); cancelling clears state but keeps any
+   * already-added components in the YAML — no rollback, consistent
+   * with the regular flow.
+   */
+  private async _onBundleSelected(
+    e: CustomEvent<{ bundle: FeaturedBundle; boardId: string }>,
+  ) {
+    e.stopPropagation();
+    if (this._submitting) return;
+    const { bundle, boardId } = e.detail;
+    if (!boardId || bundle.component_ids.length === 0) return;
+    const fullIds = bundle.component_ids.map(
+      (localId) => `featured.${boardId}.${localId}`,
+    );
+    const [first, ...rest] = fullIds;
+    const component = await this._api.getComponent(
+      first,
+      this.platform || undefined,
+      boardId,
+    );
+    if (!component) {
+      this._submitError = this._localize("device.add_component_error");
+      return;
+    }
+    this._bundleQueue = rest;
+    this._bundleProgress = {
+      current: 1,
+      total: fullIds.length,
+      bundleName: bundle.name,
+    };
+    this._selected = component;
+    this._submitError = "";
+  }
+
   private _onBack() {
     if (this._submitting) return;
     // If the user is in the middle of a "go add a dependency" detour
@@ -316,6 +419,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._selected = restore;
       this._submitError = "";
       return;
+    }
+    // Mid-bundle back is a cancel — drop the queue and return to the
+    // catalog. Already-added components stay in the YAML; we don't
+    // roll them back (consistent with the regular flow's no-rollback
+    // behaviour on errors).
+    if (this._bundleProgress) {
+      this._bundleQueue = [];
+      this._bundleProgress = null;
     }
     this._selected = null;
     this._submitError = "";
@@ -364,6 +475,32 @@ export class ESPHomeAddComponentDialog extends LitElement {
           composed: true,
         }),
       );
+
+      // Bundle in flight — pop the next featured id and refresh the
+      // form for it. The just-updated `this.yaml` (carried in via the
+      // `yaml-updated` event) is still authoritative for the next
+      // step's ID-reference dropdown, since the host re-binds it on
+      // re-render.
+      if (this._bundleQueue.length > 0 && this._bundleProgress) {
+        const nextId = this._bundleQueue[0];
+        const remaining = this._bundleQueue.slice(1);
+        const nextComponent = await this._api.getComponent(
+          nextId,
+          this.platform || undefined,
+          this.board?.id ?? undefined,
+        );
+        if (!nextComponent) {
+          this._submitError = this._localize("device.add_component_error");
+          return;
+        }
+        this._bundleQueue = remaining;
+        this._bundleProgress = {
+          ...this._bundleProgress,
+          current: this._bundleProgress.current + 1,
+        };
+        this._selected = nextComponent;
+        return;
+      }
 
       if (this._returnTo) {
         // Just finished adding a dependency — restore the original
