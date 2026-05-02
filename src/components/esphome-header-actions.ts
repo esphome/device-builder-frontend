@@ -243,6 +243,18 @@ export class ESPHomeHeaderActions extends LitElement {
         activeCount++;
       }
     }
+    /* Single source of truth for the firmware-jobs and kebab labels —
+       the count-aware string drives both ``title`` and ``aria-label``
+       so the hover tooltip and the screen-reader announcement stay in
+       sync (Copilot flagged the divergence). */
+    const firmwareJobsLabel =
+      activeCount > 0
+        ? this._localize("firmware_jobs.menu_item_with_count", { count: activeCount })
+        : this._localize("firmware_jobs.menu_item");
+    const kebabLabel =
+      activeCount > 0
+        ? this._localize("layout.more_options_with_count", { count: activeCount })
+        : this._localize("dashboard.more_options");
     return html`
       <div
         class="inline-actions"
@@ -253,10 +265,8 @@ export class ESPHomeHeaderActions extends LitElement {
           type="button"
           class="menu-btn"
           @click=${this._openFirmwareJobs}
-          title=${this._localize("firmware_jobs.menu_item")}
-          aria-label=${activeCount > 0
-            ? this._localize("firmware_jobs.menu_item_with_count", { count: activeCount })
-            : this._localize("firmware_jobs.menu_item")}
+          title=${firmwareJobsLabel}
+          aria-label=${firmwareJobsLabel}
         >
           <wa-icon library="mdi" name="playlist-check"></wa-icon>
           ${activeCount > 0
@@ -277,10 +287,8 @@ export class ESPHomeHeaderActions extends LitElement {
         type="button"
         class="menu-btn menu-kebab"
         @click=${this._toggle}
-        title=${this._localize("dashboard.more_options")}
-        aria-label=${activeCount > 0
-          ? this._localize("layout.more_options_with_count", { count: activeCount })
-          : this._localize("dashboard.more_options")}
+        title=${kebabLabel}
+        aria-label=${kebabLabel}
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
         ${activeCount > 0
