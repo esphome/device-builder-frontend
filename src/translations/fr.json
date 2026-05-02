@@ -190,7 +190,11 @@
     "action_delete_archived_failed": "Échec de la suppression définitive de « {name} » : {error}",
     "delete_archived_title": "Supprimer définitivement l'appareil archivé",
     "delete_archived_desc": "Voulez-vous vraiment supprimer définitivement l'appareil archivé « {name} » ? Cela supprimera son YAML et sa configuration stockée. Cette action est irréversible.",
-    "archived_section_title": "Appareils archivés ({count})"
+    "archived_dialog_title": "Appareils archivés",
+    "archived_dialog_desc": "Les appareils archivés sont conservés ici pour pouvoir être restaurés plus tard. Utilisez Désarchiver pour le remettre dans la liste active, ou Supprimer définitivement pour le retirer.",
+    "archived_dialog_loading": "Chargement…",
+    "archived_dialog_empty": "Vous n'avez encore archivé aucun appareil.",
+    "archived_dialog_close": "Fermer"
   },
   "command": {
     "install_title": "Installation — {name}",
@@ -455,7 +459,7 @@
     "theme_system": "Système",
     "settings": "Paramètres",
     "show_ignored_discoveries": "Afficher les découvertes ignorées",
-    "show_archived_devices": "Afficher les appareils archivés ({count})",
+    "archived_devices": "Appareils archivés",
     "back": "Retour",
     "home_assistant": "Home Assistant",
     "editor": "Éditeur",

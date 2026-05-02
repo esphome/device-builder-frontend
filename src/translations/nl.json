@@ -190,7 +190,11 @@
     "action_delete_archived_failed": "Permanent verwijderen van \"{name}\" mislukt: {error}",
     "delete_archived_title": "Gearchiveerd apparaat permanent verwijderen",
     "delete_archived_desc": "Weet je zeker dat je het gearchiveerde apparaat \"{name}\" permanent wilt verwijderen? Dit verwijdert de YAML en opgeslagen configuratie en kan niet ongedaan worden gemaakt.",
-    "archived_section_title": "Gearchiveerde apparaten ({count})"
+    "archived_dialog_title": "Gearchiveerde apparaten",
+    "archived_dialog_desc": "Gearchiveerde apparaten worden hier bewaard zodat je ze later kunt herstellen. Gebruik Dearchiveren om een apparaat terug in de actieve lijst te zetten, of Permanent verwijderen om het definitief weg te halen.",
+    "archived_dialog_loading": "Laden…",
+    "archived_dialog_empty": "Je hebt nog geen apparaten gearchiveerd.",
+    "archived_dialog_close": "Sluiten"
   },
   "command": {
     "install_title": "Installeren — {name}",
@@ -455,7 +459,7 @@
     "theme_system": "Systeem",
     "settings": "Instellingen",
     "show_ignored_discoveries": "Genegeerde ontdekkingen tonen",
-    "show_archived_devices": "Gearchiveerde apparaten tonen ({count})",
+    "archived_devices": "Gearchiveerde apparaten",
     "back": "Terug",
     "home_assistant": "Home Assistant",
     "editor": "Editor",

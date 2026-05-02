@@ -53,6 +53,8 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/input/input.js";
 import "../components/api-key-dialog.js";
 import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
+import "../components/archived-devices-dialog.js";
+import type { ESPHomeArchivedDevicesDialog } from "../components/archived-devices-dialog.js";
 import "../components/confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import "../components/dashboard/device-drawer.js";
@@ -173,19 +175,6 @@ export class ESPHomePageDashboard extends LitElement {
    *  survives reloads. */
   @state() private _showIgnored = false;
 
-  /** When true, render the archived-devices section at the bottom
-   *  of the device list. Persisted to localStorage; the toggle
-   *  itself in the header kebab is hidden when no archived devices
-   *  exist (no point showing a switch with nothing to reveal). */
-  @state() private _showArchived = false;
-
-  /** Cache of archived devices fetched from
-   *  ``devices/list_archived``. Refreshed on dashboard mount and
-   *  after every archive / unarchive op. The ``length`` drives
-   *  whether the header-kebab toggle renders at all; the rows
-   *  feed the archived-section UI when ``_showArchived`` is on. */
-  @state() private _archivedDevices: ArchivedDevice[] = [];
-
   @state()
   private _view: DashboardView = DashboardView.CARDS;
 
@@ -206,7 +195,6 @@ export class ESPHomePageDashboard extends LitElement {
     // Load preferences once WS is connected (devices loaded means events are flowing)
     if (changed.has("_devicesLoaded") && this._devicesLoaded) {
       this._loadPreferences();
-      this._refreshArchivedDevices();
     }
   }
 
@@ -214,27 +202,26 @@ export class ESPHomePageDashboard extends LitElement {
   private _onShowIgnoredChanged = (e: Event) => {
     this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
   };
-  private _onShowArchivedChanged = (e: Event) => {
-    this._showArchived = (e as CustomEvent<{ value: boolean }>).detail.value;
+  private _onShowArchivedDialog = () => {
+    this._archivedDialog?.open();
   };
 
   connectedCallback() {
     super.connectedCallback();
     this.setAttribute("view", this._view);
-    /* The "Show ignored discoveries" / "Show archived devices"
-       toggles live in the header kebab; sync the persisted flags
-       here and listen for changes dispatched from the menu so we
-       don't have to thread props / contexts through the layout. */
+    /* The "Show ignored discoveries" toggle and "Archived devices"
+       trigger live in the header kebab; sync the persisted flag
+       here and listen for the kebab's window events so we don't
+       have to thread props / contexts through the layout. */
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
-    this._showArchived = localStorage.getItem("esphome-show-archived") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener(
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged,
     );
     window.addEventListener(
-      "esphome-show-archived-changed",
-      this._onShowArchivedChanged,
+      "esphome-show-archived-dialog",
+      this._onShowArchivedDialog,
     );
   }
 
@@ -266,8 +253,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._onShowIgnoredChanged,
     );
     window.removeEventListener(
-      "esphome-show-archived-changed",
-      this._onShowArchivedChanged,
+      "esphome-show-archived-dialog",
+      this._onShowArchivedDialog,
     );
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
@@ -276,53 +263,27 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * Pull the current archive list off the backend.
-   *
-   * Best-effort — the dashboard still works if the call fails (the
-   * archive UI just won't render). Called on initial load + after
-   * any archive / unarchive op so the header-kebab toggle and the
-   * archived-section table stay in sync.
-   */
-  private async _refreshArchivedDevices() {
-    try {
-      this._archivedDevices = await this._api.listArchivedDevices();
-    } catch (err) {
-      console.warn("Failed to list archived devices", err);
-      return;
-    }
-    /* The header-kebab toggle hides itself when nothing's
-       archived; bridge the count to ``esphome-header-actions`` via
-       a window event so we don't have to thread a context through
-       the layout for a single counter. */
-    window.dispatchEvent(
-      new CustomEvent("esphome-archived-count-changed", {
-        detail: { value: this._archivedDevices.length },
-      }),
-    );
-  }
-
-  /**
-   * Archive a device through the WS API and refresh the local cache.
+   * Archive a device through the WS API.
    *
    * Backend wipes the per-device build dir + moves the YAML to
    * ``<config_dir>/archive/`` and fires ``DEVICE_REMOVED``, so the
    * active device list updates via the existing scan event flow.
-   * The archived list isn't event-driven (it's a directory listing),
-   * so we re-pull it explicitly after the operation.
+   * The archived-devices dialog is its own component and pulls a
+   * fresh list every time it opens, so we don't have to push an
+   * update from here.
    */
   private async _archiveDevice(device: ConfiguredDevice) {
-    if (await archiveDevice(device, this._api, this._localize)) {
-      await this._refreshArchivedDevices();
-    }
+    await archiveDevice(device, this._api, this._localize);
   }
 
-  private async _unarchiveDevice(configuration: string) {
-    if (await unarchiveDevice(configuration, this._api, this._localize)) {
-      await this._refreshArchivedDevices();
+  private async _unarchiveDevice(device: ArchivedDevice) {
+    if (await unarchiveDevice(device.configuration, this._api, this._localize)) {
+      await this._archivedDialog?.refresh();
     }
   }
 
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
+  @query("esphome-archived-devices-dialog") private _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-rename-device-dialog") private _renameDialog!: ESPHomeRenameDeviceDialog;
@@ -360,63 +321,9 @@ export class ESPHomePageDashboard extends LitElement {
         : ""}
       ${filtered.length === 0 && q && this._view === DashboardView.CARDS ? this._renderEmptySearch() : ""}
       ${this._view === DashboardView.CARDS ? this._renderCardGrid(filtered) : this._renderTable()}
-      ${this._renderArchivedSection()}
       ${this._renderDrawer()}
       ${this._renderSelectBarOrFab()}
       ${this._renderDialogs()}
-    `;
-  }
-
-  private _renderArchivedSection() {
-    /* Section is only useful when the user has explicitly toggled
-       it on AND there's something to show. Header-kebab toggle
-       mirrors the same gate (hidden when count == 0), but render
-       defends in both directions so a stale ``_showArchived=true``
-       persisted from a prior session doesn't render an empty
-       header. */
-    if (!this._showArchived || this._archivedDevices.length === 0) return "";
-    return html`
-      <section class="archived-section">
-        <div class="archived-section-header">
-          <wa-icon library="mdi" name="archive-outline"></wa-icon>
-          <span
-            >${this._localize("dashboard.archived_section_title", {
-              count: this._archivedDevices.length,
-            })}</span
-          >
-        </div>
-        ${this._archivedDevices.map(
-          (device) => html`
-            <div class="archived-row">
-              <div class="archived-row-info">
-                <div class="archived-row-name">${device.friendly_name || device.name}</div>
-                <div class="archived-row-config">${device.configuration}</div>
-                ${device.comment
-                  ? html`<div class="archived-row-comment">${device.comment}</div>`
-                  : ""}
-              </div>
-              <div class="archived-row-actions">
-                <button
-                  class="archived-row-btn"
-                  type="button"
-                  @click=${() => this._unarchiveDevice(device.configuration)}
-                >
-                  <wa-icon library="mdi" name="archive-arrow-up-outline"></wa-icon>
-                  ${this._localize("dashboard.action_unarchive")}
-                </button>
-                <button
-                  class="archived-row-btn archived-row-btn--danger"
-                  type="button"
-                  @click=${() => this._confirmDeleteArchived(device)}
-                >
-                  <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
-                  ${this._localize("dashboard.action_delete_permanently")}
-                </button>
-              </div>
-            </div>
-          `,
-        )}
-      </section>
     `;
   }
 
@@ -823,6 +730,10 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-install-address-dialog
         @install-to-address=${this._onInstallToAddress}
       ></esphome-install-address-dialog>
+      <esphome-archived-devices-dialog
+        @unarchive=${(e: CustomEvent<ArchivedDevice>) => this._unarchiveDevice(e.detail)}
+        @delete-archived=${(e: CustomEvent<ArchivedDevice>) => this._confirmDeleteArchived(e.detail)}
+      ></esphome-archived-devices-dialog>
     `;
   }
 
@@ -1250,7 +1161,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   private async _deleteArchivedDevice(device: ArchivedDevice) {
     if (await deleteArchivedDevice(device, this._api, this._localize)) {
-      await this._refreshArchivedDevices();
+      await this._archivedDialog?.refresh();
     }
   }
 }
