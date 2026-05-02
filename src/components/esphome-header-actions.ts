@@ -14,6 +14,7 @@ import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { firmwareJobsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -253,31 +254,10 @@ export class ESPHomeHeaderActions extends LitElement {
     this._open = false;
   }
 
-  disconnectedCallback() {
-    this._setEscListener(false);
-    super.disconnectedCallback();
-  }
+  private _escape = new EscapeController(this, () => this._close());
 
   protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("_open")) this._setEscListener(this._open);
-  }
-
-  private _onWindowKeydown = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
-      e.preventDefault();
-      this._close();
-    }
-  };
-
-  private _escBound = false;
-  private _setEscListener(active: boolean) {
-    if (active && !this._escBound) {
-      window.addEventListener("keydown", this._onWindowKeydown);
-      this._escBound = true;
-    } else if (!active && this._escBound) {
-      window.removeEventListener("keydown", this._onWindowKeydown);
-      this._escBound = false;
-    }
+    if (changed.has("_open")) this._escape.set(this._open);
   }
 
   private _onCheckboxKeydown = (e: KeyboardEvent) => {

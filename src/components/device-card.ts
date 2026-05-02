@@ -465,6 +465,7 @@ export class ESPHomeDeviceCard extends LitElement {
     if (!this.hasAttribute("tabindex")) this.tabIndex = 0;
     if (!this.hasAttribute("role")) this.setAttribute("role", "button");
     this.addEventListener("keydown", this._onKeydown);
+    this.addEventListener("keyup", this._onKeyup);
     /* Activation has to live on the host. Some assistive tech
        activates a focused role="button" by dispatching `click` on the
        focused element itself; if the handler were on the inner
@@ -477,6 +478,7 @@ export class ESPHomeDeviceCard extends LitElement {
 
   disconnectedCallback() {
     this.removeEventListener("keydown", this._onKeydown);
+    this.removeEventListener("keyup", this._onKeyup);
     this.removeEventListener("click", this._onClick);
     this.removeEventListener("contextmenu", this._onHostContextMenu);
     super.disconnectedCallback();
@@ -664,9 +666,22 @@ export class ESPHomeDeviceCard extends LitElement {
        from outside, so it can't be used to distinguish these. */
     if (e.composedPath()[0] !== this) return;
 
-    if (e.key === "Enter" || e.key === " ") {
+    if (e.key === "Enter") {
+      /* Native buttons activate Enter on keydown — match that so users
+         get the same instant feedback they'd see on a <button>. */
+      if (e.repeat) return;
       e.preventDefault();
       this._emit(this.selectMode ? "toggle-select" : "card-click");
+      return;
+    }
+
+    if (e.key === " ") {
+      /* Space activation is deferred to keyup (the native <button>
+         contract). preventDefault on keydown stops the page-scroll
+         that Space would otherwise trigger; the actual emit happens
+         in _onKeyup so a held-down Space doesn't fire repeatedly. */
+      e.preventDefault();
+      this._spaceArmed = true;
       return;
     }
 
@@ -681,6 +696,16 @@ export class ESPHomeDeviceCard extends LitElement {
       e.preventDefault();
       this._navigateCards(e.key);
     }
+  };
+
+  private _spaceArmed = false;
+  private _onKeyup = (e: KeyboardEvent) => {
+    if (e.key !== " ") return;
+    if (e.composedPath()[0] !== this) return;
+    if (!this._spaceArmed) return;
+    this._spaceArmed = false;
+    e.preventDefault();
+    this._emit(this.selectMode ? "toggle-select" : "card-click");
   };
 
   private _navigateCards(key: string) {
@@ -729,6 +754,19 @@ export class ESPHomeDeviceCard extends LitElement {
        there and a right-click menu would just be misleading. Otherwise
        open the same overflow menu the kebab dispatches. */
     if (this.selectMode) return;
+    /* Don't hijack right-clicks that originate on inner interactive
+       controls. The Visit Web UI link in particular needs the
+       browser's native context menu so users can "Open in new tab" /
+       "Copy link"; same goes for any inner button. composedPath()
+       crosses the shadow boundary so we see the real target. */
+    for (const el of e.composedPath()) {
+      if (!(el instanceof HTMLElement)) continue;
+      if (el === this) break;
+      const tag = el.tagName;
+      if (tag === "A" || tag === "BUTTON" || tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") {
+        return;
+      }
+    }
     e.preventDefault();
     e.stopPropagation();
     this.dispatchEvent(
