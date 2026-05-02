@@ -256,7 +256,7 @@ export class ESPHomePageDashboard extends LitElement {
 
     return html`
       ${this._renderBanner()}
-      ${this._showDiscovered ? this._renderDiscoveredGrid() : ""}
+      ${this._renderDiscoveredGrid()}
       ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? this._renderToolbar(filtered.length, this._devices.length)
         : ""}
@@ -299,9 +299,19 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _renderDiscoveredGrid() {
     const visible = this._visibleImportableDevices;
-    if (visible.length === 0) return "";
+    /* Always render the container — the banner toggle's
+       ``aria-controls="discovered-grid"`` points here, and assistive
+       tech expects the referenced element to exist in the DOM whether
+       or not it's currently visible. ``hidden`` toggles display via
+       the user agent and is exposed to AT correctly. The empty-grid
+       case (no visible discoveries) also renders an empty container
+       so the reference stays valid. */
     return html`
-      <div id="discovered-grid" class="devices-grid">
+      <div
+        id="discovered-grid"
+        class="devices-grid"
+        ?hidden=${!this._showDiscovered || visible.length === 0}
+      >
         ${visible.map(
           (device) => html`
             <esphome-discovered-device-card

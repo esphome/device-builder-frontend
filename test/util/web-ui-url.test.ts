@@ -1,29 +1,71 @@
 import { describe, expect, it } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types.js";
 import { DeviceState } from "../../src/api/types.js";
-import { buildWebUiUrl } from "../../src/util/web-ui-url.js";
+import { buildWebUiUrl, safeWebUiUrl } from "../../src/util/web-ui-url.js";
+
+const _baseDevice = {
+  name: "kitchen",
+  friendly_name: "Kitchen",
+  configuration: "kitchen.yaml",
+  comment: null,
+  board_id: "esp32-c3-devkitm-1",
+  target_platform: "esp32",
+  address: "kitchen.local",
+  ip: "",
+  web_port: null,
+  current_version: "",
+  deployed_version: "",
+  loaded_integrations: [],
+  state: DeviceState.UNKNOWN,
+  has_pending_changes: false,
+  update_available: false,
+  api_enabled: false,
+  api_encrypted: false,
+} satisfies ConfiguredDevice;
 
 function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
-  return {
-    name: "kitchen",
-    friendly_name: "Kitchen",
-    configuration: "kitchen.yaml",
-    address: "kitchen.local",
-    ip: "",
-    state: DeviceState.UNKNOWN,
-    platform: "esp32",
-    deployed_version: "",
-    current_version: "",
-    comment: "",
-    has_pending_changes: false,
-    update_available: false,
-    api_enabled: false,
-    api_encrypted: false,
-    loaded_integrations: [],
-    web_port: null,
-    ...overrides,
-  } as ConfiguredDevice;
+  return { ..._baseDevice, ...overrides };
 }
+
+describe("safeWebUiUrl", () => {
+  it("accepts http URLs", () => {
+    expect(safeWebUiUrl("http://kitchen.local")).toBe("http://kitchen.local");
+    expect(safeWebUiUrl("http://kitchen.local:8080")).toBe(
+      "http://kitchen.local:8080",
+    );
+  });
+
+  it("accepts https URLs", () => {
+    expect(safeWebUiUrl("https://kitchen.local")).toBe("https://kitchen.local");
+  });
+
+  it("rejects javascript: URLs", () => {
+    expect(safeWebUiUrl("javascript:alert(1)")).toBe("");
+  });
+
+  it("rejects data: URLs", () => {
+    expect(safeWebUiUrl("data:text/html,<script>alert(1)</script>")).toBe("");
+  });
+
+  it("rejects file: URLs", () => {
+    expect(safeWebUiUrl("file:///etc/passwd")).toBe("");
+  });
+
+  it("rejects malformed URLs", () => {
+    expect(safeWebUiUrl("not a url")).toBe("");
+    expect(safeWebUiUrl("://kitchen.local")).toBe("");
+  });
+
+  it("rejects empty string", () => {
+    expect(safeWebUiUrl("")).toBe("");
+  });
+
+  it("returns the input verbatim (no canonicalization)", () => {
+    // ``new URL("http://host:22").toString()`` adds a trailing
+    // slash; we return the raw input so callers see the terse form.
+    expect(safeWebUiUrl("http://host:22")).toBe("http://host:22");
+  });
+});
 
 describe("buildWebUiUrl", () => {
   it("returns empty string when web_port is null", () => {
