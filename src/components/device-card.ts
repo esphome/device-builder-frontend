@@ -117,6 +117,12 @@ export class ESPHomeDeviceCard extends LitElement {
   @property()
   webUrl = "";
 
+  /** Briefly highlight the card with an accent border + glow, e.g.
+   *  to point out a freshly-adopted device. Driven by the dashboard;
+   *  cleared by a timer on its end. */
+  @property({ type: Boolean, reflect: true })
+  highlight = false;
+
   static styles = [
     espHomeStyles,
     css`
@@ -149,6 +155,35 @@ export class ESPHomeDeviceCard extends LitElement {
       .device-card--selected {
         border-color: var(--esphome-primary);
         background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+      }
+
+      /* Brief accent flash to draw the eye to a just-adopted card.
+         The dashboard sets the highlight attribute for ~4s after a
+         successful adoption, then clears it; the animation runs once
+         during that window. Honours prefers-reduced-motion: keep the
+         static border tint, drop the glow pulse. */
+      :host([highlight]) .device-card {
+        border-color: var(--esphome-primary);
+        animation: card-highlight-glow 2s ease-out 1;
+      }
+      @keyframes card-highlight-glow {
+        0% {
+          box-shadow: 0 0 0 0
+            color-mix(in srgb, var(--esphome-primary), transparent 40%);
+        }
+        50% {
+          box-shadow: 0 0 0 8px
+            color-mix(in srgb, var(--esphome-primary), transparent 65%);
+        }
+        100% {
+          box-shadow: 0 0 0 0
+            color-mix(in srgb, var(--esphome-primary), transparent 100%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        :host([highlight]) .device-card {
+          animation: none;
+        }
       }
 
       .device-card-header {

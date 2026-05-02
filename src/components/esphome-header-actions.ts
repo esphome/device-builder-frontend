@@ -1,7 +1,9 @@
 import { consume } from "@lit/context";
 import {
+  mdiCheck,
   mdiCog,
   mdiDotsVertical,
+  mdiEyeOutline,
   mdiKeyVariant,
   mdiPlaylistCheck,
 } from "@mdi/js";
@@ -18,8 +20,10 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  check: mdiCheck,
   cog: mdiCog,
   "dots-vertical": mdiDotsVertical,
+  "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
   "playlist-check": mdiPlaylistCheck,
 });
@@ -36,6 +40,13 @@ export class ESPHomeHeaderActions extends LitElement {
 
   @state()
   private _open = false;
+
+  /** Persisted "Show ignored discoveries" preference. The dashboard
+   *  filters its discovered banner / grid against this flag; we own
+   *  the toggle UI here so the menu sits next to other dashboard-
+   *  level settings. */
+  @state()
+  private _showIgnored = false;
 
   static styles = [
     espHomeStyles,
@@ -197,6 +208,26 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 ${this._localize("layout.secrets")}
               </div>
+              <div
+                class="menu-item ${this._showIgnored ? "menu-item--active" : ""}"
+                role="menuitemcheckbox"
+                tabindex="0"
+                aria-checked=${this._showIgnored}
+                @click=${this._toggleShowIgnored}
+                @keydown=${this._onCheckboxKeydown}
+              >
+                <wa-icon library="mdi" name="eye-outline"></wa-icon>
+                <span class="menu-item-label"
+                  >${this._localize("layout.show_ignored_discoveries")}</span
+                >
+                ${this._showIgnored
+                  ? html`<wa-icon
+                      class="check"
+                      library="mdi"
+                      name="check"
+                    ></wa-icon>`
+                  : nothing}
+              </div>
               <div class="menu-divider"></div>
               <div class="menu-item" @click=${this._openSettings}>
                 <wa-icon library="mdi" name="cog"></wa-icon>
@@ -209,11 +240,42 @@ export class ESPHomeHeaderActions extends LitElement {
   }
 
   private _toggle() {
+    if (!this._open) {
+      // Re-read the persisted flag on each open so a second tab's
+      // change to localStorage is reflected when the user revisits
+      // the menu.
+      this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
+    }
     this._open = !this._open;
   }
 
   private _close() {
     this._open = false;
+  }
+
+  private _onCheckboxKeydown = (e: KeyboardEvent) => {
+    /* The toggle is a ``<div role="menuitemcheckbox">`` rather than
+       a ``<button>`` so it sits visually flush with the surrounding
+       menu items (the menu was built with div items predating this
+       PR). The role + tabindex make it focusable and AT-readable as
+       a checkable control; this handler wires Enter / Space activation
+       so keyboard users get the same toggle a click would produce. */
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      this._toggleShowIgnored();
+    }
+  };
+
+  private _toggleShowIgnored() {
+    this._showIgnored = !this._showIgnored;
+    localStorage.setItem("esphome-show-ignored", String(this._showIgnored));
+    /* Dashboard listens on ``window`` for this event so we don't have
+       to thread a context through the layout for a single-pref toggle. */
+    window.dispatchEvent(
+      new CustomEvent("esphome-show-ignored-changed", {
+        detail: { value: this._showIgnored },
+      }),
+    );
   }
 
   private _openSecrets() {

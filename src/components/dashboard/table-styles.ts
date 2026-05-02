@@ -201,6 +201,27 @@ export const tableLayoutStyles = css`
     color: var(--esphome-primary);
   }
 
+  /* Brief accent flash on a freshly-adopted row. The dashboard sets
+     the highlight class for ~4s; the animation runs once during
+     that window. Honours prefers-reduced-motion. */
+  tbody tr.highlight {
+    animation: row-highlight-glow 2s ease-out 1;
+  }
+  @keyframes row-highlight-glow {
+    0% {
+      background: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    }
+    100% {
+      background: transparent;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    tbody tr.highlight {
+      animation: none;
+      background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    }
+  }
+
   thead .row-checkbox {
     color: var(--wa-color-text-quiet);
   }

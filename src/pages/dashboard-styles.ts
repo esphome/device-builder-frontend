@@ -49,16 +49,29 @@ export const dashboardStyles = css`
     color: var(--esphome-on-primary);
     margin-right: 10px;
   }
-  .discovered-banner a {
+  /* Rendered as a real <button> (not an <a> without href) so the
+     toggle is keyboard-focusable and announced as a button by
+     assistive tech. The styling resets the native button chrome to
+     keep the link-like look the design has always had. */
+  .discovered-banner-toggle {
+    background: transparent;
+    border: none;
+    padding: 0;
     color: var(--esphome-primary-light);
     cursor: pointer;
     text-decoration: underline;
     font-weight: var(--wa-font-weight-bold);
     font-size: var(--wa-font-size-2xs);
+    font-family: inherit;
     margin-left: var(--wa-space-4xl);
     opacity: 0.85;
   }
-  .discovered-banner a:hover {
+  .discovered-banner-toggle:hover {
+    opacity: 1;
+  }
+  .discovered-banner-toggle:focus-visible {
+    outline: 2px solid var(--esphome-primary-light);
+    outline-offset: 2px;
     opacity: 1;
   }
   .discovered-banner span {
@@ -76,6 +89,15 @@ export const dashboardStyles = css`
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
     padding: var(--wa-space-l);
+  }
+
+  /* display:grid wins over the user-agent hidden rule, so an
+     explicitly hidden grid would still take its padding-worth of
+     vertical space. Force display:none to honour the hidden
+     attribute — used for #discovered-grid when the banner is
+     collapsed or every discovery is filtered out. */
+  .devices-grid[hidden] {
+    display: none;
   }
 
   /* ─── Search toolbar ─── */

@@ -4,6 +4,20 @@ A web-based dashboard for managing, configuring, and deploying ESPHome IoT devic
 
 > **This repository contains the frontend source only.** The dashboard runs as part of the **[ESPHome Device Builder Dashboard](https://github.com/esphome/device-builder)**, which ships a prebuilt copy of this frontend bundled in. End users should follow the install / run instructions in the backend repo — there's nothing to deploy from here on its own.
 
+## Screenshots
+
+Configured devices in the table view, with the discovered-devices banner above:
+
+![Dashboard table view](docs/screenshots/dashboard-table.png)
+
+Discovered devices expanded — each card surfaces the project metadata and offers a one-click "Take control" adoption flow:
+
+![Discovered devices ready to adopt](docs/screenshots/dashboard-discovered.png)
+
+Create-device wizard's board picker — searchable, filterable by chip family, with curated featured boards up front:
+
+![Board picker in the create-device wizard](docs/screenshots/wizard-board-picker.png)
+
 ## Tech stack
 
 - **[Lit](https://lit.dev/)** — Web components framework

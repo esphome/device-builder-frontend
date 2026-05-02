@@ -120,6 +120,10 @@ export interface AdoptableDevice {
   project_version: string;
   network: string;
   ignored: boolean;
+  /** Pre-built URL when the device also advertises an
+   *  ``_http._tcp.local.`` mDNS service. Empty string hides the
+   *  Visit-web-UI link on the discovered card. */
+  web_url: string;
 }
 
 /** Response from devices/list. */
@@ -604,6 +608,11 @@ export interface JobOutputEventData {
 /** Data payload for initial_state event. */
 export interface InitialStateEventData {
   devices: ConfiguredDevice[];
+  /** Discovered factory-firmware devices the dashboard knew about
+   *  before this client subscribed. The backend follows up with
+   *  ``IMPORTABLE_DEVICE_ADDED`` / ``_REMOVED`` events for changes
+   *  after subscription. */
+  importable: AdoptableDevice[];
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
@@ -617,9 +626,19 @@ export interface DeviceStateChangedEventData {
   state: DeviceState;
 }
 
-/** Data payload for importable_device_added / importable_device_removed events. */
-export interface ImportableDeviceEventData {
+/** Data payload for importable_device_added events. */
+export interface ImportableDeviceAddedEventData {
   device: AdoptableDevice;
+}
+
+/** Data payload for importable_device_removed events.
+ *
+ *  Removal carries only the device name — by the time the event
+ *  fires the original ``AdoptableDevice`` is gone from the backend's
+ *  ``import_result`` cache, and the frontend doesn't need anything
+ *  beyond the name to evict its own copy. */
+export interface ImportableDeviceRemovedEventData {
+  name: string;
 }
 
 /** Callback for event subscription push events. */
