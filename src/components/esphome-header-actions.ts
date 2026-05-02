@@ -298,15 +298,31 @@ export class ESPHomeHeaderActions extends LitElement {
       ${this._open
         ? html`
             <div class="backdrop" @click=${this._close}></div>
-            <div class="menu" style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);">
-              <div class="menu-item menu-item--inline" @click=${this._openFirmwareJobs}>
+            <div
+              class="menu"
+              role="menu"
+              style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);"
+            >
+              <div
+                class="menu-item menu-item--inline"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openFirmwareJobs}
+                @keydown=${this._onMenuItemKeydown}
+              >
                 <wa-icon library="mdi" name="playlist-check"></wa-icon>
                 <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
                 ${activeCount > 0
                   ? html`<span class="menu-item-count">${activeCount}</span>`
                   : nothing}
               </div>
-              <div class="menu-item" @click=${this._openSecrets}>
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openSecrets}
+                @keydown=${this._onMenuItemKeydown}
+              >
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 ${this._localize("layout.secrets")}
               </div>
@@ -330,8 +346,14 @@ export class ESPHomeHeaderActions extends LitElement {
                     ></wa-icon>`
                   : nothing}
               </div>
-              <div class="menu-divider menu-divider--inline"></div>
-              <div class="menu-item menu-item--inline" @click=${this._openSettings}>
+              <div class="menu-divider menu-divider--inline" role="separator"></div>
+              <div
+                class="menu-item menu-item--inline"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openSettings}
+                @keydown=${this._onMenuItemKeydown}
+              >
                 <wa-icon library="mdi" name="cog"></wa-icon>
                 ${this._localize("layout.settings")}
               </div>
@@ -363,6 +385,19 @@ export class ESPHomeHeaderActions extends LitElement {
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
   }
+
+  private _onMenuItemKeydown = (e: KeyboardEvent) => {
+    /* The kebab menu items are ``<div role="menuitem">`` rather than
+       <button>s so they sit visually flush with the checkbox-style
+       toggle below. role + tabindex make them focusable; this handler
+       maps Enter / Space to the same click the mouse would dispatch.
+       ``e.currentTarget.click()`` re-uses the @click handler bound on
+       the same element, so any per-item logic stays where it lives. */
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).click();
+    }
+  };
 
   private _onCheckboxKeydown = (e: KeyboardEvent) => {
     /* The toggle is a ``<div role="menuitemcheckbox">`` rather than

@@ -434,6 +434,10 @@
     "header_actions_label": "Actions du tableau de bord",
     "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))"
   },
+  "firmware_jobs": {
+    "menu_item": "Tâches firmware",
+    "menu_item_with_count": "Tâches firmware ({count} active(s))"
+  },
   "secrets": {
     "title": "Secrets",
     "desc": "Gérez les valeurs sensibles référencées dans vos configurations d'appareils avec !secret",
