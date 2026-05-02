@@ -748,16 +748,24 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_downloading");
     try {
       const binaries = await this._api.firmwareGetBinaries(device.configuration);
-      // web.esphome.io flashes the uploaded file at offset 0x0, so we
-      // need a factory image that includes the bootloader + partition
-      // table. The plain firmware.bin (app-only at 0x10000) would
-      // brick the device if flashed this way.
-      const factory = binaries.find((b) => b.file.includes("factory"));
-      if (!factory) {
+      // web.esphome.io flashes the uploaded file at 0x0, so we need a
+      // self-contained image. Per ESPHome's get_download_types(): ESP32
+      // returns "firmware.factory.bin" (bootloader + partitions + app);
+      // ESP8266 returns just "firmware.bin" which is itself the full
+      // image (no bootloader/partition split on ESP8266). RP2040 / nrf52
+      // / libretiny return .uf2 files which web.esphome.io can't flash —
+      // reject those with a clear error.
+      const flashable =
+        binaries.find((b) => b.file === "firmware.factory.bin") ??
+        binaries.find((b) => b.file === "firmware.bin");
+      if (!flashable) {
         this._fail(this._localize("firmware.no_factory_binary"));
         return;
       }
-      const result = await this._api.firmwareDownload(device.configuration, factory.file);
+      const result = await this._api.firmwareDownload(
+        device.configuration,
+        flashable.file
+      );
       const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
       const blob = new Blob([bytes], { type: "application/octet-stream" });
       const url = URL.createObjectURL(blob);
