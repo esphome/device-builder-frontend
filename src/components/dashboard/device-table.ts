@@ -563,24 +563,17 @@ export class ESPHomeDeviceTable extends LitElement {
    *  without reaching across the table's shadow-DOM boundary —
    *  ``shadowRoot.querySelector`` from the dashboard can't see rows
    *  rendered in this component's shadow root. No-op when the row
-   *  isn't on the current page.
-   *
-   *  Manually drives ``scrollTop`` rather than calling
-   *  ``element.scrollIntoView({behavior: "smooth"})`` — Chrome
-   *  mobile aborts the smooth animation after one viewport's worth
-   *  of distance, leaving the row partway down the page. */
+   *  isn't on the current page. ``behavior: "instant"`` dodges
+   *  Chrome mobile's smooth-scroll abort and lands the row at the
+   *  intended position — the highlight pulse handles transition
+   *  feedback. */
   public scrollConfigurationIntoView(configuration: string): void {
     const root = this.shadowRoot;
     if (!root) return;
     const row = root.querySelector<HTMLElement>(
       `tr[data-configuration="${CSS.escape(configuration)}"]`,
     );
-    const scroller = root.querySelector<HTMLElement>(".table-scroll");
-    if (!row || !scroller) return;
-    const rowRect = row.getBoundingClientRect();
-    const scrollerRect = scroller.getBoundingClientRect();
-    const top = scroller.scrollTop + rowRect.top - scrollerRect.top - 16;
-    scroller.scrollTo({ top, behavior: "smooth" });
+    row?.scrollIntoView({ behavior: "instant", block: "center" });
   }
 
   private _onRowKeydown(e: KeyboardEvent, device: ConfiguredDevice) {

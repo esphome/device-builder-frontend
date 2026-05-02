@@ -680,7 +680,13 @@ export class ESPHomePageDashboard extends LitElement {
     /* Card view: the card lives in this dashboard's shadow root.
        Table view: the row lives inside ``esphome-device-table``'s
        own shadow root; ask the table to scroll its match instead of
-       trying to reach across the boundary. */
+       trying to reach across the boundary.
+       ``behavior: "instant"`` (rather than "smooth") avoids Chrome
+       mobile's well-known bug where ``scrollIntoView`` aborts the
+       smooth animation after one viewport-height of motion — the
+       card highlight already gives the user transition feedback, so
+       jumping straight to the right scroll position is the more
+       reliable signal. */
     const root = this.shadowRoot;
     if (!root) return;
     const escaped = CSS.escape(configuration);
@@ -688,7 +694,7 @@ export class ESPHomePageDashboard extends LitElement {
       `esphome-device-card[data-configuration="${escaped}"]`,
     );
     if (card) {
-      this._smoothScrollTo(card);
+      card.scrollIntoView({ behavior: "instant", block: "center" });
       return;
     }
     const table = root.querySelector("esphome-device-table") as
@@ -697,29 +703,6 @@ export class ESPHomePageDashboard extends LitElement {
         })
       | null;
     table?.scrollConfigurationIntoView?.(configuration);
-  }
-
-  /** Scroll *element* to just below the sticky app header.
-   *
-   *  ``element.scrollIntoView({behavior: "smooth"})`` has a known
-   *  quirk on Chrome mobile where the smooth animation aborts after
-   *  one viewport-height worth of scroll, leaving the target stuck
-   *  partway down the page. Computing the absolute target Y from
-   *  ``getBoundingClientRect()`` + ``window.scrollY`` and driving
-   *  ``window.scrollTo({top, behavior: "smooth"})`` directly avoids
-   *  the bug while still respecting the user's reduced-motion
-   *  preference (``scrollTo`` honours it the same way). The header
-   *  offset keeps the card from landing under the sticky chrome. */
-  private _smoothScrollTo(element: HTMLElement): void {
-    const rect = element.getBoundingClientRect();
-    const headerOffset = parseInt(
-      getComputedStyle(document.documentElement).getPropertyValue(
-        "--esphome-header-height",
-      ) || "56",
-      10,
-    );
-    const top = rect.top + window.scrollY - headerOffset - 16;
-    window.scrollTo({ top, behavior: "smooth" });
   }
 
   private _setView(view: DashboardView) {
