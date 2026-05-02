@@ -60,6 +60,15 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _streamId = "";
 
+  /**
+   * Cancel handle for an active Web Serial read loop. ``openPassive``
+   * runs the loop outside the WS-stream world, so it isn't covered by
+   * ``_streamId`` / ``stopStream`` — without an explicit hook the loop
+   * survived dialog closes and bled the previous device's output into
+   * the next session.
+   */
+  private _serialCancel: (() => void) | null = null;
+
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
@@ -376,7 +385,33 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   /** Open dialog without auto-starting streaming (for Web Serial feed). */
+  /**
+   * Register a cancel for the active Web Serial reader so the dialog
+   * can tear it down on close or when ``openPassive`` starts a new
+   * session. Caller (``streamSerialToDialog``) returns one cancel
+   * fn per loop; the dialog only ever holds one at a time and
+   * disposes the prior one when a new one is registered.
+   */
+  public setSerialCancel(cancel: () => void) {
+    this._stopSerial();
+    this._serialCancel = cancel;
+  }
+
+  private _stopSerial() {
+    if (this._serialCancel) {
+      const cancel = this._serialCancel;
+      this._serialCancel = null;
+      cancel();
+    }
+  }
+
   public openPassive() {
+    // Tear down any previous Web Serial read loop before kicking off
+    // the new session — without this the prior reader keeps shoving
+    // bytes into ``_lines`` and the new device's output is mixed
+    // with the old one's. Same shape as ``_detachStream`` in
+    // command-dialog.ts; different stream type, identical bug.
+    this._stopSerial();
     this._port = "";
     this._lines = [];
     this._streaming = true;
@@ -497,6 +532,12 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _stopStreaming(): Promise<void> {
+    // Stop both flavours of stream the dialog can carry: a backend
+    // ``logs`` WS subscription and a local Web Serial read loop.
+    // Closing one but not the other left passive sessions with a
+    // live reader still pushing bytes into ``_lines`` after the
+    // user hit Stop / Close.
+    this._stopSerial();
     const streamId = this._streamId;
     this._streaming = false;
     this._streamId = "";

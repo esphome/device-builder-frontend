@@ -899,7 +899,8 @@ export class ESPHomePageDashboard extends LitElement {
         this._logsDialog.configuration = device.configuration;
         this._logsDialog.name = device.friendly_name || device.name;
         this._logsDialog.openPassive();
-        streamSerialToDialog(serialPort, this._logsDialog);
+        const cancelSerial = streamSerialToDialog(serialPort, this._logsDialog);
+        this._logsDialog.setSerialCancel(cancelSerial);
       } catch { /* User cancelled */ }
     }
   }

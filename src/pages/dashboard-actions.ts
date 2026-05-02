@@ -95,16 +95,38 @@ export async function fetchApiKey(
   }
 }
 
-export function streamSerialToDialog(port: any, dialog: any) {
+/**
+ * Pipe a Web Serial port into the logs dialog's line buffer.
+ *
+ * Returns a cancel function the dialog stores and calls on
+ * close / openPassive (to stop a previous session before starting
+ * a new one). Without that hook the read loop survived dialog
+ * closes and bled output from a previous serial port into the
+ * next session — a Copilot find on PR #68.
+ *
+ * The cancel:
+ *   * ``reader.cancel()`` releases the pending ``read()`` so the
+ *     loop's ``await`` settles and the loop exits via ``done``.
+ *   * ``reader.releaseLock()`` lets the decoder pipeline tear down
+ *     cleanly; otherwise a future getReader() call on the same
+ *     readable would throw.
+ */
+export function streamSerialToDialog(port: any, dialog: any): () => void {
   const decoder = new TextDecoderStream();
-  port.readable.pipeTo(decoder.writable);
+  port.readable.pipeTo(decoder.writable).catch(() => {
+    /* Pipe rejection happens when the reader is cancelled below;
+       swallow it so the unhandled promise rejection doesn't bubble
+       up into the console. */
+  });
   const reader = decoder.readable.getReader();
   let buffer = "";
+  let cancelled = false;
   const readLoop = async () => {
     try {
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
+        if (cancelled) break;
         buffer += value;
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -113,9 +135,22 @@ export function streamSerialToDialog(port: any, dialog: any) {
         }
       }
     } catch {
-      /* Port closed */
+      /* Port closed or reader cancelled — both are normal exits. */
+    } finally {
+      try {
+        reader.releaseLock();
+      } catch {
+        /* Lock already released — ignore. */
+      }
     }
   };
   readLoop();
+  return () => {
+    if (cancelled) return;
+    cancelled = true;
+    reader.cancel().catch(() => {
+      /* Already disposed — nothing to do. */
+    });
+  };
 }
 
