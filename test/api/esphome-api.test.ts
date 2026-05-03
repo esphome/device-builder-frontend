@@ -701,6 +701,102 @@ describe("ESPHomeAPI — auth", () => {
     expect(localStorage.getItem("esphome.auth-token")).toBeNull();
   });
 
+  it("falls back to the in-memory token when localStorage writes silently fail", async () => {
+    // Private-mode browsers / sandboxed iframes throw on every
+    // localStorage access. ``login()`` still keeps a copy in
+    // ``_authToken`` so reconnects within the same tab can replay it
+    // without dropping the user back to the form.
+    vi.stubGlobal("localStorage", {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error("blocked");
+      },
+      removeItem: () => {
+        throw new Error("blocked");
+      },
+      clear: () => {},
+    });
+
+    const api = new ESPHomeAPI();
+    const onAuthRequired = vi.fn();
+    api.onAuthRequired = onAuthRequired;
+
+    // First connect: server requires auth, no stored token → form.
+    const pending = api.connect();
+    const ws = MockWebSocket.latest();
+    ws.open();
+    ws.receive(serverInfoAuthRequired);
+    await pending;
+    expect(onAuthRequired).toHaveBeenCalledTimes(1);
+
+    // User signs in. setStoredToken throws but is swallowed; the API
+    // client caches the token in memory.
+    const loginPromise = api.login({ username: "admin", password: "hunter2" });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: { token: "in-mem-tok", expires_at: 1_900_000_000 },
+    });
+    await loginPromise;
+
+    // Socket drops, reconnect. The stored-token lookup misses (private
+    // mode) but the in-memory cache carries the session forward.
+    ws.close();
+
+    const reconnect = api.connect();
+    const ws2 = MockWebSocket.latest();
+    ws2.open();
+    ws2.receive(serverInfoAuthRequired);
+    await reconnect;
+
+    const replay = ws2.sentAs<{
+      command: string;
+      args: Record<string, unknown>;
+      message_id: string;
+    }>(0);
+    expect(replay.command).toBe("auth/login");
+    expect(replay.args).toEqual({ token: "in-mem-tok" });
+
+    // No second prompt — onAuthRequired was only called for the first
+    // (pre-login) connect.
+    expect(onAuthRequired).toHaveBeenCalledTimes(1);
+  });
+
+  it("ready parks until the next successful connect+auth after a disconnect", async () => {
+    // Without this contract, any caller that awaits ``api.ready``
+    // during the reconnect-backoff window resumes against the closed
+    // socket and immediately hits "WebSocket not connected".
+    const api = new ESPHomeAPI();
+    const pending = api.connect();
+    const ws = MockWebSocket.latest();
+    ws.open();
+    ws.receive(serverInfo);
+    await pending;
+    await api.ready; // resolves immediately — no auth required.
+
+    // Drop the socket. ``ready`` should now be a fresh pending
+    // promise — anyone awaiting it parks until the reconnect lands.
+    ws.close();
+
+    let resolved = false;
+    void api.ready.then(() => {
+      resolved = true;
+    });
+    // Yield twice so any spurious resolution would have flushed.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(resolved).toBe(false);
+
+    // Reconnect; ``ready`` resolves only after the new serverinfo.
+    const second = api.connect();
+    const ws2 = MockWebSocket.latest();
+    ws2.open();
+    ws2.receive(serverInfo);
+    await second;
+    await api.ready;
+    expect(resolved).toBe(true);
+  });
+
   it("logout clears the stored token even when the request fails", async () => {
     // The intent of ``logout`` is "sign me out of this browser" — a
     // backend hiccup (network blip, internal_error) shouldn't strand

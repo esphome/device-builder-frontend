@@ -133,7 +133,14 @@ export class ESPHomeAPI {
     return this._readyPromise;
   }
 
+  /** Replace ``ready`` with a fresh pending promise — but only when
+   *  the previous one was already resolved. This keeps the same
+   *  pending promise alive across the ``connect()`` → ``_onClose``
+   *  → reconnect chain so callers that attached ``.then(...)`` during
+   *  the disconnected window aren't stranded when the reconnect's
+   *  ``connect()`` runs. */
   private _resetReady(): void {
+    if (this._readyResolve !== null) return;
     this._readyPromise = new Promise<void>((resolve) => {
       this._readyResolve = resolve;
     });
@@ -302,13 +309,19 @@ export class ESPHomeAPI {
       return;
     }
 
-    const stored = getStoredToken();
-    if (!stored) {
+    // Prefer the localStorage copy (it's "the most recent token we
+    // know about" since ``setStoredToken`` runs on every successful
+    // login), but fall back to the in-memory ``_authToken`` so private
+    // mode / sandboxed iframes — where ``setStoredToken`` is silently
+    // a no-op — don't drop the user back to the login form on every
+    // reconnect.
+    const token = getStoredToken() ?? this._authToken;
+    if (!token) {
       this.onAuthRequired?.();
       return;
     }
 
-    void this._tryStoredTokenLogin(stored);
+    void this._tryStoredTokenLogin(token);
   }
 
   private async _tryStoredTokenLogin(token: string): Promise<void> {
@@ -327,6 +340,12 @@ export class ESPHomeAPI {
     const wasConnected = this._connected;
     this._connected = false;
     this._ws = null;
+
+    // Park ``ready`` until the next successful connect+auth. Without
+    // this, anyone awaiting it during the reconnect-backoff window
+    // would resume against a closed socket and immediately hit
+    // "WebSocket not connected".
+    this._resetReady();
 
     // Reject all pending requests
     for (const [, pending] of this._pendingRequests) {
