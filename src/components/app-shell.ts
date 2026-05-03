@@ -188,7 +188,15 @@ export class ESPHomeApp extends LitElement {
         return true;
       },
       render: ({ id }) =>
-        html`<esphome-page-device .id=${id ?? ""}></esphome-page-device>`,
+        // Decode the path param so the device page's
+        // ``this._devices.find(d => d.configuration === this.id)``
+        // comparison works against the raw filename on disk. The
+        // browser's URL parser percent-encodes any non-ASCII path
+        // segment regardless of whether the navigator pre-encoded,
+        // so by the time the router matches, ``id`` is encoded.
+        html`<esphome-page-device
+          .id=${id ? decodeURIComponent(id) : ""}
+        ></esphome-page-device>`,
     },
   ]);
 

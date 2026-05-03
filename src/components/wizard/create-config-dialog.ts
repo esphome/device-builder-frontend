@@ -279,7 +279,14 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       });
       markJustCreated(configuration);
       this.close();
-      window.history.pushState({}, "", `/device/${configuration}`);
+      // ``encodeURIComponent`` so spaces / Unicode / accented chars in
+      // the imported filename survive the URL round-trip. The Lit router
+      // decodes path params before handing them to the device page.
+      window.history.pushState(
+        {},
+        "",
+        `/device/${encodeURIComponent(configuration)}`,
+      );
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (err) {
       console.error("Failed to create empty config:", err);
@@ -320,7 +327,14 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       });
       markJustCreated(configuration);
       this.close();
-      window.history.pushState({}, "", `/device/${configuration}`);
+      // ``encodeURIComponent`` so spaces / Unicode / accented chars in
+      // the imported filename survive the URL round-trip. The Lit router
+      // decodes path params before handing them to the device page.
+      window.history.pushState(
+        {},
+        "",
+        `/device/${encodeURIComponent(configuration)}`,
+      );
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -355,7 +369,14 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       });
       markJustCreated(configuration);
       this.close();
-      window.history.pushState({}, "", `/device/${configuration}`);
+      // ``encodeURIComponent`` so spaces / Unicode / accented chars in
+      // the imported filename survive the URL round-trip. The Lit router
+      // decodes path params before handing them to the device page.
+      window.history.pushState(
+        {},
+        "",
+        `/device/${encodeURIComponent(configuration)}`,
+      );
       window.dispatchEvent(new PopStateEvent("popstate"));
     } catch (err) {
       console.error("Failed to create device:", err);

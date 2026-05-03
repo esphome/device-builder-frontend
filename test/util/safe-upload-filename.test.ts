@@ -61,6 +61,34 @@ describe("safeUploadFilename", () => {
     expect(safeUploadFilename('foo<bar>baz:qux"|?*')).toBe("foobarbazqux");
   });
 
+  it("strips ``#`` so the configuration round-trips through pushState", () => {
+    // The dashboard navigates to ``/device/<configuration>`` after
+    // import. A literal ``#`` splits the URL at the fragment marker
+    // regardless of ``encodeURIComponent`` — strip up-front so the
+    // navigation can't land on a half-URL.
+    expect(safeUploadFilename("foo#bar")).toBe("foobar");
+  });
+
+  it("suffixes Windows reserved device names with ``_``", () => {
+    // ``CON``, ``PRN``, ``AUX``, ``NUL``, ``COM1``..``COM9``,
+    // ``LPT1``..``LPT9`` are unwritable on Windows even with an
+    // extension (``CON.yaml`` still resolves to the console device).
+    // Append ``_`` so the on-disk filename sidesteps the reservation.
+    expect(safeUploadFilename("CON")).toBe("CON_");
+    expect(safeUploadFilename("con")).toBe("con_");
+    expect(safeUploadFilename("Aux")).toBe("Aux_");
+    expect(safeUploadFilename("COM1")).toBe("COM1_");
+    expect(safeUploadFilename("LPT9")).toBe("LPT9_");
+  });
+
+  it("leaves names that merely *contain* a reserved word alone", () => {
+    // Only the bare reserved name is unwritable. ``console``,
+    // ``aux-mqtt``, ``com10`` are all fine.
+    expect(safeUploadFilename("console")).toBe("console");
+    expect(safeUploadFilename("aux-mqtt")).toBe("aux-mqtt");
+    expect(safeUploadFilename("com10")).toBe("com10");
+  });
+
   it("trims surrounding whitespace and dots", () => {
     // Windows silently strips trailing whitespace/dots at write time;
     // do it here so ``foo`` and ``foo `` and ``foo.`` can't collide.

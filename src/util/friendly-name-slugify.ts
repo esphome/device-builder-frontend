@@ -21,9 +21,12 @@
 export function friendlyNameSlugify(value: string): string {
   let v = value
     // Strip diacritics: NFD splits ``é`` into ``e`` + combining acute,
-    // then drop the combining-mark range.
+    // then drop the U+0300..U+036F combining-mark range. Use the
+    // escaped form rather than literal combining characters in the
+    // regex so the source survives editor / normalizer round-trips
+    // and reads cleanly in review.
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/ /g, "_")
     .replace(/-/g, "_");

@@ -45,8 +45,10 @@ describe("friendlyNameSlugify", () => {
   it("returns empty string for fully-stripped input", () => {
     expect(friendlyNameSlugify("...")).toBe("");
     expect(friendlyNameSlugify("")).toBe("");
-    // All-diacritic input collapses to empty (the diacritic itself is
-    // in the combining-mark range, but the base char is outside Latin).
+    // Non-Latin input collapses to empty: ``中文`` has no combining
+    // marks, but the base codepoints are outside ``[a-z0-9_-]`` so
+    // the post-NFD filter strips them. Same outcome upstream
+    // ``friendly_name_slugify`` produces.
     expect(friendlyNameSlugify("中文")).toBe("");
   });
 });
