@@ -506,7 +506,7 @@
     "install_failed": "Installatie mislukt.",
     "compile_failed": "Compilatie mislukt.",
     "download_failed": "Firmware downloaden mislukt.",
-    "no_factory_binary": "Geen geschikte binary beschikbaar voor dit apparaat. web.esphome.io ondersteunt alleen ESP32 en ESP8266.",
+    "no_flashable_binary": "Geen geschikte binary beschikbaar voor dit apparaat. web.esphome.io ondersteunt alleen ESP32 en ESP8266.",
     "flash_failed": "Firmware flashen naar apparaat mislukt.",
     "chip_mismatch": "Chip-verschil: {detected} gedetecteerd maar apparaat verwacht {expected}.",
     "validate_title": "Valideren — {name}",

@@ -506,7 +506,7 @@
     "install_failed": "Échec de l'installation.",
     "compile_failed": "Échec de la compilation.",
     "download_failed": "Échec du téléchargement du firmware.",
-    "no_factory_binary": "Aucun binaire flashable disponible pour cet appareil. web.esphome.io ne prend en charge que ESP32 et ESP8266.",
+    "no_flashable_binary": "Aucun binaire flashable disponible pour cet appareil. web.esphome.io ne prend en charge que ESP32 et ESP8266.",
     "flash_failed": "Échec du flashage du firmware sur l'appareil.",
     "chip_mismatch": "Puce incompatible : détecté {detected} mais l'appareil attend {expected}.",
     "validate_title": "Validation — {name}",

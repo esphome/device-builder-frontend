@@ -759,7 +759,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         binaries.find((b) => b.file === "firmware.factory.bin") ??
         binaries.find((b) => b.file === "firmware.bin");
       if (!flashable) {
-        this._fail(this._localize("firmware.no_factory_binary"));
+        this._fail(this._localize("firmware.no_flashable_binary"));
         return;
       }
       const result = await this._api.firmwareDownload(
