@@ -8,6 +8,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
+import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -443,6 +444,11 @@ export class ESPHomeAdoptDialog extends LitElement {
       if (friendlyName) args.friendly_name = friendlyName;
       if (this._encryption) args.encryption = "true";
       await this._api.importDevice(args);
+      // Configuration filenames are ``<name>.yaml``; mirror the same
+      // derivation the dashboard's ``_onAdopted`` handler uses so
+      // both the welcome-banner flag (consumed on first device-editor
+      // mount) and the highlight signal key off the same string.
+      markJustCreated(`${name}.yaml`);
       this.close();
       this.dispatchEvent(
         new CustomEvent("adopted", {

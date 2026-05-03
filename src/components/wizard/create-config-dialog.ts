@@ -9,6 +9,7 @@ import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { friendlyNameSlugify } from "../../util/friendly-name-slugify.js";
 import { markJustCreated } from "../../util/just-created.js";
+import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { safeUploadFilename } from "../../util/safe-upload-filename.js";
 
@@ -266,17 +267,26 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     }
   }
 
-  /** Close the dialog and navigate to the new device's editor.
+  /** Run the post-``createDevice`` UX shared by all three wizard paths.
    *
-   * Centralised so the three creation paths can't drift apart on
-   * the navigation contract (``markJustCreated`` arms the editor's
-   * one-shot welcome banner; ``encodeURIComponent`` keeps spaces /
-   * Unicode safe in the URL — ``app-shell``'s router render decodes
-   * the param on the receiving side so ``this.id`` stays the raw
-   * filename for ``configuration`` comparison).
+   * - ``markJustCreated`` arms the device editor's one-shot welcome
+   *   banner (consumed on first mount).
+   * - ``markPendingHighlight`` arms the dashboard's one-shot
+   *   highlight + scroll for the next time the user lands back on
+   *   ``/`` (e.g. after closing the editor with the back button).
+   * - Then close the dialog and navigate to the device editor.
+   *   ``encodeURIComponent`` keeps spaces / Unicode safe in the URL
+   *   — ``app-shell``'s router render decodes the param on the
+   *   receiving side so ``this.id`` stays the raw filename for
+   *   ``configuration`` comparison.
+   *
+   * Centralised so the three creation paths can't drift on which
+   * one-shot signals they arm — every path opens the editor and
+   * arms both flags.
    */
   private _navigateToCreated(configuration: string): void {
     markJustCreated(configuration);
+    markPendingHighlight(configuration);
     this.close();
     window.history.pushState(
       {},

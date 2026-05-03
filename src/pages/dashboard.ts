@@ -32,6 +32,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   archiveDevice,
@@ -228,6 +229,15 @@ export class ESPHomePageDashboard extends LitElement {
       "esphome-show-archived-dialog",
       this._onShowArchivedDialog,
     );
+    /* Consume the one-shot pending-highlight signal the wizard arms
+       before opening the device editor. The user typically lands
+       here when they hit the back button to leave the editor — at
+       which point we want their freshly-created device to flash and
+       scroll into view, the same way an adopted device does. */
+    const pending = consumePendingHighlight();
+    if (pending !== null) {
+      this._highlightFreshDevice(pending);
+    }
   }
 
   private async _loadPreferences() {
@@ -798,21 +808,18 @@ export class ESPHomePageDashboard extends LitElement {
     }
   }
 
-  private _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
-    /* Configuration filenames are ``<name>.yaml`` — that's how the
-       adopt dialog asks the backend to write the file (see
-       ``import_device``), so the filename is deterministic from the
-       submitted name. Driving the highlight off the configuration
-       string lets us light up either the card or the table row,
-       both of which key on ``device.configuration``. */
-    const configuration = `${e.detail.name}.yaml`;
+  /** Light up + queue a scroll for a freshly-arrived configuration.
+
+      Drives the highlight off the configuration string so it matches
+      either the card view or the table row, both of which key on
+      ``device.configuration``. The actual scroll happens in
+      ``updated()`` once the matching device shows up in
+      ``_devices`` — the WS DEVICE_ADDED event lags the triggering
+      dialog event, especially on mobile where the round-trip is
+      slower, so scrolling now would hit a layout that doesn't have
+      the new card yet. */
+  private _highlightFreshDevice(configuration: string): void {
     this._recentlyAdopted = configuration;
-    /* Mark this configuration as scroll-pending. The actual scroll
-       happens in ``updated()`` once the matching device shows up in
-       ``_devices`` — the WS DEVICE_ADDED event lags the dialog's
-       ``adopted`` event, especially on mobile where the round-trip
-       is slower, so a scroll fired right now hits a layout that
-       doesn't have the new card yet. */
     this._pendingAdoptScroll = configuration;
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
@@ -821,6 +828,23 @@ export class ESPHomePageDashboard extends LitElement {
       this._recentlyAdopted = null;
       this._adoptHighlightTimer = null;
     }, 4000);
+  }
+
+  private _onAdopted = (e: CustomEvent<{ name: string; friendlyName: string }>) => {
+    /* Configuration filenames are ``<name>.yaml`` — that's how the
+       adopt dialog asks the backend to write the file (see
+       ``import_device``), so the filename is deterministic from the
+       submitted name. */
+    this._highlightFreshDevice(`${e.detail.name}.yaml`);
+  };
+
+  private _onYamlImported = (e: CustomEvent<{ configuration: string }>) => {
+    /* Wizard's YAML-import path closes the dialog and lands the user
+       back on the dashboard (unlike basic / empty creation, which
+       navigates to the device editor for further setup). Re-use the
+       adopt flow's highlight + scroll machinery so the new device
+       lights up the same way a freshly-adopted one does. */
+    this._highlightFreshDevice(e.detail.configuration);
   };
 
   private _pendingAdoptScroll: string | null = null;
