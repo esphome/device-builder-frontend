@@ -266,6 +266,26 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     }
   }
 
+  /** Close the dialog and navigate to the new device's editor.
+   *
+   * Centralised so the three creation paths can't drift apart on
+   * the navigation contract (``markJustCreated`` arms the editor's
+   * one-shot welcome banner; ``encodeURIComponent`` keeps spaces /
+   * Unicode safe in the URL — ``app-shell``'s router render decodes
+   * the param on the receiving side so ``this.id`` stays the raw
+   * filename for ``configuration`` comparison).
+   */
+  private _navigateToCreated(configuration: string): void {
+    markJustCreated(configuration);
+    this.close();
+    window.history.pushState(
+      {},
+      "",
+      `/device/${encodeURIComponent(configuration)}`,
+    );
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  }
+
   private async _onCreateEmptyConfig(e: CustomEvent<{ name: string }>) {
     if (this._submitting) return;
     const { name } = e.detail;
@@ -277,20 +297,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       });
-      markJustCreated(configuration);
-      this.close();
-      // ``encodeURIComponent`` so spaces / Unicode / accented chars in
-      // the imported filename survive the URL round-trip. ``app-shell``'s
-      // router render explicitly ``decodeURIComponent``s the path
-      // param on the receiving side (Lit Router itself just hands
-      // through the raw URL match), so the device page sees the
-      // original filename for ``configuration`` comparison.
-      window.history.pushState(
-        {},
-        "",
-        `/device/${encodeURIComponent(configuration)}`,
-      );
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      this._navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create empty config:", err);
     } finally {
@@ -321,6 +328,19 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const name = this._importFile.name.replace(/\.(yaml|yml)$/i, "");
     const slug = safeUploadFilename(name);
 
+    // ``safeUploadFilename`` returns ``""`` when the input was made
+    // entirely of stripped chars (``"..."``, ``"///"``, ``"\x00"``).
+    // Surface a specific error before the network call instead of
+    // letting the backend's generic ``INVALID_ARGS`` bubble up as
+    // ``import_general_error`` — the user can rename the file and
+    // try again, which they can't do if we hide the actual cause.
+    if (!slug) {
+      this._importError = this._localize("wizard.import_invalid_filename", {
+        name,
+      });
+      return;
+    }
+
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
@@ -328,20 +348,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         config_type: "upload",
         file_content: fileContent,
       });
-      markJustCreated(configuration);
-      this.close();
-      // ``encodeURIComponent`` so spaces / Unicode / accented chars in
-      // the imported filename survive the URL round-trip. ``app-shell``'s
-      // router render explicitly ``decodeURIComponent``s the path
-      // param on the receiving side (Lit Router itself just hands
-      // through the raw URL match), so the device page sees the
-      // original filename for ``configuration`` comparison.
-      window.history.pushState(
-        {},
-        "",
-        `/device/${encodeURIComponent(configuration)}`,
-      );
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      this._navigateToCreated(configuration);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this._importError = msg.includes("409")
@@ -373,20 +380,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         ssid: wifiSsid,
         psk: wifiPassword,
       });
-      markJustCreated(configuration);
-      this.close();
-      // ``encodeURIComponent`` so spaces / Unicode / accented chars in
-      // the imported filename survive the URL round-trip. ``app-shell``'s
-      // router render explicitly ``decodeURIComponent``s the path
-      // param on the receiving side (Lit Router itself just hands
-      // through the raw URL match), so the device page sees the
-      // original filename for ``configuration`` comparison.
-      window.history.pushState(
-        {},
-        "",
-        `/device/${encodeURIComponent(configuration)}`,
-      );
-      window.dispatchEvent(new PopStateEvent("popstate"));
+      this._navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
     } finally {

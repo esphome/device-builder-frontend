@@ -350,6 +350,7 @@
     "import_read_error": "Failed to read the file.",
     "import_duplicate_error": "A device named \"{name}\" already exists.",
     "import_general_error": "Failed to import the config file. Please try again.",
+    "import_invalid_filename": "The filename \"{name}\" can't be used as-is — it contains only characters that aren't allowed in a configuration filename. Rename the file to something with letters, digits, hyphens, or underscores and try again.",
     "importing_device": "Creating device from imported file…",
     "tag": {
       "esp32": "ESP32",
