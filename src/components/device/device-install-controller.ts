@@ -29,6 +29,10 @@ export class DeviceInstallController implements ReactiveController {
     return this._host.device?.state ?? DeviceState.UNKNOWN;
   }
 
+  get deviceTargetPlatform(): string {
+    return this._host.device?.target_platform ?? "";
+  }
+
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;

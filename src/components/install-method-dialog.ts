@@ -40,6 +40,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   deviceState: DeviceState = DeviceState.UNKNOWN;
 
   @property()
+  deviceTargetPlatform = "";
+
+  @property()
   mode: "install" | "logs" = "install";
 
   @state() private _view: DialogView = "method";
@@ -48,6 +51,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   private get _supportsWebSerial(): boolean {
     return "serial" in navigator;
+  }
+
+  /**
+   * web.esphome.io / esp-web-tools only supports ESP32 (all variants)
+   * and ESP8266. UF2 platforms (RP2040, nrf52, libretiny) ship a
+   * different binary format that the browser flasher can't handle, so
+   * we hide the option entirely for those.
+   */
+  private get _supportsWebDownload(): boolean {
+    const p = this.deviceTargetPlatform.toLowerCase();
+    return p.startsWith("esp32") || p === "esp8266";
   }
 
   protected willUpdate(changed: Map<string, unknown>) {
@@ -219,7 +233,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   private _renderMethodList() {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
-    const showWebDownload = this.mode === "install" && !hasWebSerial && !isOnline;
+    const showWebDownload =
+      this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
 
     return html`
       <div class="list">

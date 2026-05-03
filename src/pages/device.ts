@@ -447,6 +447,7 @@ export class ESPHomePageDevice extends LitElement {
       <esphome-install-method-dialog
         ?open=${this._installCtrl.installMethodOpen}
         .deviceState=${this._installCtrl.deviceState}
+        .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
         @close=${this._installCtrl.onInstallMethodClose}
         @select-method=${this._installCtrl.onInstallMethodSelect}
       ></esphome-install-method-dialog>
