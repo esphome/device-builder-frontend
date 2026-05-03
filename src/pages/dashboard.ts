@@ -838,21 +838,24 @@ export class ESPHomePageDashboard extends LitElement {
     this._highlightFreshDevice(`${e.detail.name}.yaml`);
   };
 
-  private _onYamlImported = (e: CustomEvent<{ configuration: string }>) => {
-    /* Wizard's YAML-import path closes the dialog and lands the user
-       back on the dashboard (unlike basic / empty creation, which
-       navigates to the device editor for further setup). Re-use the
-       adopt flow's highlight + scroll machinery so the new device
-       lights up the same way a freshly-adopted one does. */
-    this._highlightFreshDevice(e.detail.configuration);
-  };
-
   private _pendingAdoptScroll: string | null = null;
 
   protected updated(changed: PropertyValues): void {
+    /* Two distinct triggers land here:
+       - Adopt flow: pending-scroll is set synchronously while the
+         device is still propagating from the WS; the matching
+         ``_devices`` change is what fires this branch.
+       - YAML-import / wizard return: ``connectedCallback`` reads the
+         pending-highlight ``sessionStorage`` flag *after* the host
+         is back on the dashboard. By that point the WS may already
+         have pushed the device into ``_devices`` (e.g. the user
+         spent time in the editor). There's no future ``_devices``
+         change to wait for, so check on the very first ``updated``
+         tick after mount too — ``changed.size === 0`` indicates
+         the post-connect render. */
     if (
       this._pendingAdoptScroll !== null &&
-      changed.has("_devices") &&
+      (changed.has("_devices") || changed.size === 0) &&
       this._devices.some((d) => d.configuration === this._pendingAdoptScroll)
     ) {
       const target = this._pendingAdoptScroll;
