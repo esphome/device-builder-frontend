@@ -478,6 +478,19 @@
     "header_actions_label": "Dashboardacties",
     "more_options_with_count": "Meer opties ({count} firmwaretaken actief)"
   },
+  "auth": {
+    "connecting": "Verbinden…",
+    "sign_in": "Inloggen",
+    "description": "Log in om je ESPHome-apparaten te beheren.",
+    "username": "Gebruikersnaam",
+    "password": "Wachtwoord",
+    "submit": "Inloggen",
+    "submitting": "Bezig met inloggen…",
+    "invalid_credentials": "Ongeldige gebruikersnaam of wachtwoord.",
+    "rate_limited": "Te veel mislukte pogingen. Probeer het over {seconds}s opnieuw.",
+    "rate_limited_generic": "Te veel mislukte pogingen. Probeer het later opnieuw.",
+    "unexpected_error": "Inloggen mislukt. Probeer het opnieuw."
+  },
   "firmware_jobs": {
     "menu_item": "Firmwaretaken",
     "menu_item_with_count": "Firmwaretaken ({count} actief)"

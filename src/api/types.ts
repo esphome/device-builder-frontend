@@ -52,6 +52,8 @@ export enum ErrorCode {
   INVALID_ARGS = "invalid_args",
   NOT_FOUND = "not_found",
   INTERNAL_ERROR = "internal_error",
+  NOT_AUTHENTICATED = "not_authenticated",
+  RATE_LIMITED = "rate_limited",
 }
 
 // ─── Paged Responses ─────────────────────────────────────────

@@ -594,6 +594,19 @@
     "save_error": "Failed to save secrets",
     "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
   },
+  "auth": {
+    "connecting": "Connecting…",
+    "sign_in": "Sign in",
+    "description": "Sign in to manage your ESPHome devices.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "invalid_credentials": "Invalid username or password.",
+    "rate_limited": "Too many failed attempts. Try again in {seconds}s.",
+    "rate_limited_generic": "Too many failed attempts. Try again later.",
+    "unexpected_error": "Sign-in failed. Please try again."
+  },
   "firmware_jobs": {
     "menu_item": "Firmware tasks",
     "menu_item_with_count": "Firmware tasks ({count} active)",

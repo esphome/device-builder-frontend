@@ -478,6 +478,19 @@
     "header_actions_label": "Actions du tableau de bord",
     "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))"
   },
+  "auth": {
+    "connecting": "Connexion…",
+    "sign_in": "Connexion",
+    "description": "Connectez-vous pour gérer vos appareils ESPHome.",
+    "username": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "submit": "Se connecter",
+    "submitting": "Connexion…",
+    "invalid_credentials": "Nom d'utilisateur ou mot de passe invalide.",
+    "rate_limited": "Trop de tentatives échouées. Réessayez dans {seconds}s.",
+    "rate_limited_generic": "Trop de tentatives échouées. Réessayez plus tard.",
+    "unexpected_error": "Échec de la connexion. Veuillez réessayer."
+  },
   "firmware_jobs": {
     "menu_item": "Tâches firmware",
     "menu_item_with_count": "Tâches firmware ({count} active(s))"

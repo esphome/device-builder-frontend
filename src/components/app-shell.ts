@@ -12,10 +12,11 @@ import { provide } from "@lit/context";
 import { css, html, LitElement } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
-import { ESPHomeAPI } from "../api/index.js";
+import { APIError, ESPHomeAPI } from "../api/index.js";
 import {
   DeviceEventType,
   DeviceState,
+  ErrorCode,
   JobStatus,
   JobType,
   Theme,
@@ -100,10 +101,23 @@ const RECENT_JOB_TTL_MS_ATTENTION = 30_000;
 import "../pages/dashboard.js";
 import "./command-palette.js";
 import "./esphome-layout.js";
+import "./esphome-login.js";
 import "./firmware-jobs-dialog.js";
 import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
+
+type AuthState = "connecting" | "needs-login" | "authing" | "authed";
+
+/** Parse the "try again in Xs" hint out of the backend's rate-limit
+ *  details string. Returns 0 when no number is present so the caller
+ *  can fall back to a generic "try again later" message. */
+function parseRateLimitSeconds(details: string): number {
+  const match = /in\s+(\d+)\s*s/.exec(details);
+  if (!match) return 0;
+  const n = Number(match[1]);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 
 /** Decode the ``:id`` path param for the device route, falling back to
  *  the raw value when the URL contains a malformed ``%`` sequence.
@@ -184,6 +198,21 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _integrationDocs: Record<string, string> = {};
 
+  // ─── Auth gate ───────────────────────────────────────────
+  // Drives whether we render the connecting spinner, the login form,
+  // or the actual app. Starts at "connecting" until the first
+  // serverinfo lands; the API client either marks ``ready`` immediately
+  // (no auth required) or fires ``onAuthRequired`` so we surface
+  // ``<esphome-login>``.
+  @state()
+  private _authState: AuthState = "connecting";
+
+  @state()
+  private _authError: string | null = null;
+
+  @state()
+  private _rateLimitedUntil = 0;
+
   // ─── Router ──────────────────────────────────────────────
 
   private _router = new Router(this, [
@@ -236,6 +265,32 @@ export class ESPHomeApp extends LitElement {
         width: 100vw;
         overflow-y: auto;
         background: var(--wa-color-surface-default, #f8f9fa);
+      }
+
+      .auth-status-screen {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100%;
+        gap: var(--wa-space-m);
+        color: var(--wa-color-text-quiet);
+        font-size: var(--wa-font-size-s);
+      }
+
+      .auth-spinner {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 3px solid color-mix(in srgb, var(--esphome-primary), transparent 80%);
+        border-top-color: var(--esphome-primary);
+        animation: auth-spin 0.9s linear infinite;
+      }
+
+      @keyframes auth-spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
     `,
   ];
@@ -312,29 +367,54 @@ export class ESPHomeApp extends LitElement {
       this._localize = ((key: string, ..._args: unknown[]) => key) as LocalizeFunc;
     }
 
-    // Set up connection callbacks
+    // Set up connection callbacks. ServerInfo is safe to consume
+    // pre-auth (it's the auth-gate input itself), but anything that
+    // sends backend commands has to wait for ``api.ready``.
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
       this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
-      this._subscribeToEvents();
-      this._subscribeToFollowJobs();
-      this._loadIntegrationDocs();
+      // ``api.ready`` resolves when the connection is usable — either
+      // ``requires_auth: false``, or a stored token replay succeeds.
+      // If neither path takes, ``onAuthRequired`` fires below and the
+      // app shell flips to ``needs-login``; this await stays parked
+      // until the user signs in, then resumes the post-auth setup.
+      void this._api.ready.then(() => this._afterAuthenticated());
+    };
+
+    this._api.onAuthRequired = () => {
+      this._authState = "needs-login";
+      this._authError = null;
+      this._rateLimitedUntil = 0;
     };
 
     this._api.onDisconnected = () => {
       console.warn("WebSocket disconnected, will auto-reconnect...");
+      // While the socket is down, hide the dashboard behind the
+      // connecting spinner. Either the auto-reconnect's serverinfo
+      // marks ready again (transparent), or onAuthRequired flips us
+      // to needs-login.
+      if (this._authState === "authed") {
+        this._authState = "connecting";
+      }
     };
 
     // Connect to WebSocket
     try {
-      const info = await this._api.connect();
-      this._version = info.esphome_version;
-      this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
-      // Sync theme from backend once connected
-      this._loadThemePreference();
+      await this._api.connect();
     } catch (err) {
       console.error("Failed to connect to WebSocket:", err);
     }
+  }
+
+  /** Runs once auth has succeeded for the current connection (or
+   *  immediately when no auth is required). Idempotent across reconnects. */
+  private async _afterAuthenticated() {
+    this._authState = "authed";
+    this._authError = null;
+    this._subscribeToEvents();
+    this._subscribeToFollowJobs();
+    this._loadIntegrationDocs();
+    this._loadThemePreference();
   }
 
   /**
@@ -614,6 +694,26 @@ export class ESPHomeApp extends LitElement {
   private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
 
   protected render() {
+    if (this._authState === "connecting") {
+      return html`
+        <div class="auth-status-screen">
+          <div class="auth-spinner" aria-hidden="true"></div>
+          <p>${this._localize("auth.connecting")}</p>
+        </div>
+      `;
+    }
+
+    if (this._authState === "needs-login" || this._authState === "authing") {
+      return html`
+        <esphome-login
+          ?submitting=${this._authState === "authing"}
+          .error=${this._authError}
+          rate-limited-until=${this._rateLimitedUntil}
+          @submit-credentials=${this._onLoginSubmit}
+        ></esphome-login>
+      `;
+    }
+
     return html`
       <esphome-layout
         @set-theme=${this._onSetTheme}
@@ -638,6 +738,46 @@ export class ESPHomeApp extends LitElement {
         @firmware-history-cleared=${this._onFirmwareHistoryCleared}
       ></esphome-firmware-jobs-dialog>
     `;
+  }
+
+  private async _onLoginSubmit(
+    e: CustomEvent<{ username: string; password: string }>,
+  ) {
+    if (this._authState === "authing") return;
+    this._authState = "authing";
+    this._authError = null;
+    try {
+      await this._api.login(e.detail);
+      // ``api.login`` already resolved ``api.ready`` — the
+      // ``onConnected.then`` chain in ``_init`` will pick that up and
+      // call ``_afterAuthenticated`` which flips the state to
+      // ``authed``. Nothing else to do here.
+    } catch (err) {
+      this._authState = "needs-login";
+      if (err instanceof APIError) {
+        if (err.errorCode === ErrorCode.NOT_AUTHENTICATED) {
+          this._authError = this._localize("auth.invalid_credentials");
+          this._rateLimitedUntil = 0;
+          return;
+        }
+        if (err.errorCode === ErrorCode.RATE_LIMITED) {
+          const seconds = parseRateLimitSeconds(err.details);
+          if (seconds > 0) {
+            this._rateLimitedUntil = Date.now() + seconds * 1000;
+            this._authError = this._localize("auth.rate_limited", {
+              seconds,
+            });
+          } else {
+            this._rateLimitedUntil = 0;
+            this._authError = this._localize("auth.rate_limited_generic");
+          }
+          return;
+        }
+      }
+      console.error("Unexpected sign-in error:", err);
+      this._authError = this._localize("auth.unexpected_error");
+      this._rateLimitedUntil = 0;
+    }
   }
 
   private _onSetTheme(e: CustomEvent<string>) {
