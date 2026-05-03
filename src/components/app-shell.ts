@@ -213,6 +213,15 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _rateLimitedUntil = 0;
 
+  // Tracks the WebSocket connection independently from the auth gate.
+  // We deliberately *do not* flip ``_authState`` on disconnect — that
+  // would unmount the routed app on every transient blip and lose
+  // page-local state like the device editor's unsaved YAML buffer.
+  // Components that care (currently just the login form's submit
+  // button) read this directly.
+  @state()
+  private _apiConnected = false;
+
   // ─── Router ──────────────────────────────────────────────
 
   private _router = new Router(this, [
@@ -373,6 +382,7 @@ export class ESPHomeApp extends LitElement {
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
       this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
+      this._apiConnected = true;
       // ``api.ready`` resolves when the connection is usable — either
       // ``requires_auth: false``, or a stored token replay succeeds.
       // If neither path takes, ``onAuthRequired`` fires below and the
@@ -389,13 +399,12 @@ export class ESPHomeApp extends LitElement {
 
     this._api.onDisconnected = () => {
       console.warn("WebSocket disconnected, will auto-reconnect...");
-      // While the socket is down, hide the dashboard behind the
-      // connecting spinner. Either the auto-reconnect's serverinfo
-      // marks ready again (transparent), or onAuthRequired flips us
-      // to needs-login.
-      if (this._authState === "authed") {
-        this._authState = "connecting";
-      }
+      // Don't touch ``_authState`` — keeping the routed app mounted
+      // during transparent reconnects preserves page-local state like
+      // the device editor's unsaved YAML buffer. The login form (when
+      // visible) reads ``_apiConnected`` to disable submit while the
+      // socket is down.
+      this._apiConnected = false;
     };
 
     // Connect to WebSocket
@@ -707,6 +716,7 @@ export class ESPHomeApp extends LitElement {
       return html`
         <esphome-login
           ?submitting=${this._authState === "authing"}
+          ?disconnected=${!this._apiConnected}
           .error=${this._authError}
           rate-limited-until=${this._rateLimitedUntil}
           @submit-credentials=${this._onLoginSubmit}
@@ -754,6 +764,15 @@ export class ESPHomeApp extends LitElement {
       // ``authed``. Nothing else to do here.
     } catch (err) {
       this._authState = "needs-login";
+      if (!this._apiConnected) {
+        // Socket dropped mid-login. The form is already showing
+        // "Reconnecting…" via the ``disconnected`` prop; surfacing a
+        // stale "sign-in failed" toast on top of that would just be
+        // noise — the auto-reconnect will land and the user can retry.
+        this._authError = null;
+        this._rateLimitedUntil = 0;
+        return;
+      }
       if (err instanceof APIError) {
         if (err.errorCode === ErrorCode.NOT_AUTHENTICATED) {
           this._authError = this._localize("auth.invalid_credentials");

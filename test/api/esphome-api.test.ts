@@ -670,7 +670,7 @@ describe("ESPHomeAPI — auth", () => {
     }
   });
 
-  it("logout clears the stored token even if the request fails", async () => {
+  it("logout clears the stored token on success", async () => {
     stubLocalStorage({
       "esphome.auth-token": JSON.stringify({
         token: "tok",
@@ -698,6 +698,46 @@ describe("ESPHomeAPI — auth", () => {
     ws.receive({ message_id: sent.message_id, result: { logged_out: true } });
     await logoutPromise;
 
+    expect(localStorage.getItem("esphome.auth-token")).toBeNull();
+  });
+
+  it("logout clears the stored token even when the request fails", async () => {
+    // The intent of ``logout`` is "sign me out of this browser" — a
+    // backend hiccup (network blip, internal_error) shouldn't strand
+    // the token in localStorage where the next reconnect would
+    // happily replay it. The ``finally`` block in ``logout()`` is the
+    // contract we're pinning here.
+    stubLocalStorage({
+      "esphome.auth-token": JSON.stringify({
+        token: "tok",
+        expires_at: 1_700_000_000,
+      }),
+    });
+    const api = new ESPHomeAPI();
+    const pending = api.connect();
+    const ws = MockWebSocket.latest();
+    ws.open();
+    ws.receive(serverInfoAuthRequired);
+    await pending;
+
+    const replay = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: replay.message_id,
+      result: { token: "tok", expires_at: 1_800_000_000 },
+    });
+    await api.ready;
+
+    const logoutPromise = api.logout();
+    const sent = ws.sentAs<{ command: string; message_id: string }>(1);
+    expect(sent.command).toBe("auth/logout");
+    ws.receive({
+      message_id: sent.message_id,
+      error_code: "internal_error",
+      details: "boom",
+    });
+
+    await expect(logoutPromise).rejects.toBeInstanceOf(APIError);
+    // Local state cleared regardless of the rejection.
     expect(localStorage.getItem("esphome.auth-token")).toBeNull();
   });
 });

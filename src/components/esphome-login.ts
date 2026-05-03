@@ -24,6 +24,13 @@ export class ESPHomeLogin extends LitElement {
   @property({ type: Boolean })
   submitting = false;
 
+  /** True when the WebSocket is currently down (reconnect in flight).
+   *  Disables submit so we don't fire dead requests, and swaps the
+   *  button copy for a "reconnecting…" hint. Inputs stay enabled so
+   *  the user can keep typing while waiting. */
+  @property({ type: Boolean })
+  disconnected = false;
+
   /** Already-localized error string. ``null`` hides the error region. */
   @property({ type: String })
   error: string | null = null;
@@ -170,12 +177,17 @@ export class ESPHomeLogin extends LitElement {
       Math.ceil((this.rateLimitedUntil - this._now) / 1000),
     );
     const rateLimited = secondsLeft > 0;
-    const submitDisabled = this.submitting || rateLimited;
-    const submitLabel = this.submitting
-      ? this._localize("auth.submitting")
-      : rateLimited
-        ? this._localize("auth.rate_limited", { seconds: secondsLeft })
-        : this._localize("auth.submit");
+    const submitDisabled = this.submitting || rateLimited || this.disconnected;
+    // Disconnected wins over the other states because submitting one
+    // wouldn't go anywhere — the user sees the form is alive but
+    // queued behind the reconnect.
+    const submitLabel = this.disconnected
+      ? this._localize("auth.connecting")
+      : this.submitting
+        ? this._localize("auth.submitting")
+        : rateLimited
+          ? this._localize("auth.rate_limited", { seconds: secondsLeft })
+          : this._localize("auth.submit");
 
     return html`
       <div class="card">
@@ -234,6 +246,7 @@ export class ESPHomeLogin extends LitElement {
   private _onSubmit = (e: SubmitEvent) => {
     e.preventDefault();
     if (this.submitting) return;
+    if (this.disconnected) return;
     if (this.rateLimitedUntil > Date.now()) return;
     this.dispatchEvent(
       new CustomEvent("submit-credentials", {
