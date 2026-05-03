@@ -81,5 +81,4 @@ jobs:
     with:
       version: ${{ needs.check-and-release.outputs.version }}
     secrets:
-      ESPHOME_GITHUB_APP_ID: ${{ secrets.ESPHOME_GITHUB_APP_ID }}
       ESPHOME_GITHUB_APP_PRIVATE_KEY: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
