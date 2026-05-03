@@ -26,7 +26,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.12"
-  NODE_VERSION: "22.x"
+  NODE_VERSION: "24.x"
   BACKEND_REPO: esphome/device-builder
   PACKAGE_NAME: esphome-device-builder-frontend
   WHEEL_NAME: esphome_device_builder_frontend
