@@ -9,6 +9,10 @@ on:
 env:
   NODE_VERSION: "22.x"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-and-lint:
     name: Test and Lint
