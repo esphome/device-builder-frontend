@@ -172,10 +172,29 @@ export class ESPHomePageDevice extends LitElement {
     r?.(value);
   }
 
-  private _onLeaveDiscard = () => this._resolvePendingLeave(true);
+  /* Discard / Save flip ``_allowingLeave`` BEFORE resolving the
+   * guard Promise. Two callers wait on that resolve:
+   *   - The browser-back path, which then calls ``history.back()``
+   *     itself (the popstate handler's ``.then`` would set
+   *     ``_allowingLeave`` afterwards).
+   *   - ``navigate()`` (in-app Back / logo click), which on
+   *     ``canLeave=true`` does ``pushState + dispatchEvent(popstate)``
+   *     synchronously. That synthetic popstate would otherwise be
+   *     re-intercepted by ``_onPopState`` (because ``_isDirty`` is
+   *     still true here — Discard doesn't revert the buffer) and
+   *     bounced back to the device URL, leaving the user stuck on
+   *     the page they were trying to leave. Setting the flag here
+   *     short-circuits the next popstate so navigate's URL push
+   *     actually sticks.
+   */
+  private _onLeaveDiscard = () => {
+    this._allowingLeave = true;
+    this._resolvePendingLeave(true);
+  };
 
   private _onLeaveSave = () => {
     this._saveYaml();
+    this._allowingLeave = true;
     this._resolvePendingLeave(true);
   };
 
@@ -537,7 +556,15 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
+    /* ``yaml-updated`` is fired by the visual-editor section save and
+     * the add-component dialog AFTER the new YAML has already been
+     * persisted to disk via ``api.updateConfig`` / ``api.addComponent``.
+     * Both ``_yaml`` (the in-memory buffer) and ``_savedYaml`` (the
+     * "what's on disk" reference for ``_isDirty``) advance together
+     * so the YAML editor's Save button doesn't latch on as if the
+     * user had unsaved changes after a successful section save. */
     this._yaml = e.detail.yaml;
+    this._savedYaml = e.detail.yaml;
   }
 
   private _onSectionSelect(
