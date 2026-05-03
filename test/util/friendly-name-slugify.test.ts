@@ -26,11 +26,11 @@ describe("friendlyNameSlugify", () => {
   });
 
   it("collapses runs of separators and trims ends", () => {
-    // Upstream:
-    //   "  My  Cool - Device  " → strip+lower+space-to-_ → "__my__cool___device__"
-    //   collapse __ → "_my_cool_device_"
-    //   strip _ → "my_cool_device"
-    //   _ → -    → "my-cool-device"
+    // Pin the cleaner output our ``/_+/g`` collapse produces. This
+    // is a deliberate divergence from upstream's single-pass
+    // ``.replace("__", "_")`` (which would leave ``my-cool--device``
+    // for the same input). See the implementation comment for the
+    // why.
     expect(friendlyNameSlugify("  My  Cool - Device  ")).toBe(
       "my-cool-device",
     );

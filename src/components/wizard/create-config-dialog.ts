@@ -280,8 +280,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       markJustCreated(configuration);
       this.close();
       // ``encodeURIComponent`` so spaces / Unicode / accented chars in
-      // the imported filename survive the URL round-trip. The Lit router
-      // decodes path params before handing them to the device page.
+      // the imported filename survive the URL round-trip. ``app-shell``'s
+      // router render explicitly ``decodeURIComponent``s the path
+      // param on the receiving side (Lit Router itself just hands
+      // through the raw URL match), so the device page sees the
+      // original filename for ``configuration`` comparison.
       window.history.pushState(
         {},
         "",
@@ -328,8 +331,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       markJustCreated(configuration);
       this.close();
       // ``encodeURIComponent`` so spaces / Unicode / accented chars in
-      // the imported filename survive the URL round-trip. The Lit router
-      // decodes path params before handing them to the device page.
+      // the imported filename survive the URL round-trip. ``app-shell``'s
+      // router render explicitly ``decodeURIComponent``s the path
+      // param on the receiving side (Lit Router itself just hands
+      // through the raw URL match), so the device page sees the
+      // original filename for ``configuration`` comparison.
       window.history.pushState(
         {},
         "",
@@ -370,8 +376,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       markJustCreated(configuration);
       this.close();
       // ``encodeURIComponent`` so spaces / Unicode / accented chars in
-      // the imported filename survive the URL round-trip. The Lit router
-      // decodes path params before handing them to the device page.
+      // the imported filename survive the URL round-trip. ``app-shell``'s
+      // router render explicitly ``decodeURIComponent``s the path
+      // param on the receiving side (Lit Router itself just hands
+      // through the raw URL match), so the device page sees the
+      // original filename for ``configuration`` comparison.
       window.history.pushState(
         {},
         "",

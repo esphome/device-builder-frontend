@@ -20,10 +20,13 @@
  *   render unintelligibly in the device list.
  * - Windows-illegal punctuation (``< > : " | ? *``) so a config
  *   imported on Linux still flashes from a Windows host.
- * - URL fragment delimiter (``#``) — the dashboard navigates to
- *   ``/device/<configuration>`` after import, and a literal ``#``
- *   would split the URL at the fragment boundary regardless of
- *   ``encodeURIComponent``.
+ * - URL fragment delimiter (``#``). Stripping defends against any
+ *   navigation site that forgets to wrap the configuration in
+ *   ``encodeURIComponent`` — the navigator we ship at
+ *   ``create-config-dialog`` does encode (so ``#`` would survive as
+ *   ``%23``), but ``configuration`` flows into other URL builders
+ *   downstream too. Cheaper to drop ``#`` once here than to trust
+ *   every consumer to encode.
  *
  * Surrounding whitespace and dots are also trimmed because Windows
  * silently strips trailing ones at write time, which would let
@@ -31,9 +34,11 @@
  *
  * Windows reserved device names (``CON``, ``PRN``, ``AUX``, ``NUL``,
  * ``COM1``..``COM9``, ``LPT1``..``LPT9``, case-insensitive) are
- * suffixed with ``_`` so the resulting ``CON.yaml`` doesn't collide
- * with the Windows console device. Detected on the *stem* before any
- * extension, matching how Windows' own file APIs evaluate it.
+ * suffixed with ``_`` so the resulting ``CON.yaml`` or ``CON.txt``
+ * doesn't collide with the Windows console device. Windows treats
+ * ``CON``, ``CON.txt``, and ``CON.txt.bak`` as the same device, so
+ * we match on the part before the *first* dot in the stem and
+ * insert the suffix there (``CON.txt`` → ``CON_.txt``).
  *
  * Returns the empty string when the input was made entirely of
  * stripped chars — the caller is responsible for surfacing that as a
@@ -70,13 +75,16 @@ export function safeUploadFilename(stem: string): string {
     // eslint-disable-next-line no-control-regex
     .replace(/[<>:"|?*#\x00-\x1f]/g, "")
     .replace(/^[\s.]+|[\s.]+$/g, "");
-  // Suffix reserved Windows device names so writing ``CON.yaml`` etc.
-  // doesn't try to address the console / printer / serial port. Match
-  // is on the upper-cased stem regardless of trailing extension because
-  // Windows treats ``CON``, ``CON.yaml``, ``CON.yaml.bak`` all as the
-  // same device.
-  if (WINDOWS_RESERVED_NAMES.has(cleaned.toUpperCase())) {
-    return `${cleaned}_`;
+  // Windows reserves the device name regardless of any trailing
+  // extension — ``CON``, ``CON.txt``, ``AUX.mqtt``, ``COM1.backup``
+  // are all unwritable. Detect on the part before the first dot and
+  // insert the disambiguating ``_`` there so the rest of the
+  // filename (``.txt``, ``.mqtt``, sub-extensions) is preserved.
+  const firstDot = cleaned.indexOf(".");
+  const beforeDot = firstDot === -1 ? cleaned : cleaned.slice(0, firstDot);
+  if (WINDOWS_RESERVED_NAMES.has(beforeDot.toUpperCase())) {
+    const tail = firstDot === -1 ? "" : cleaned.slice(firstDot);
+    return `${beforeDot}_${tail}`;
   }
   return cleaned;
 }

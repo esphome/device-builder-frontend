@@ -61,24 +61,38 @@ describe("safeUploadFilename", () => {
     expect(safeUploadFilename('foo<bar>baz:qux"|?*')).toBe("foobarbazqux");
   });
 
-  it("strips ``#`` so the configuration round-trips through pushState", () => {
-    // The dashboard navigates to ``/device/<configuration>`` after
-    // import. A literal ``#`` splits the URL at the fragment marker
-    // regardless of ``encodeURIComponent`` — strip up-front so the
-    // navigation can't land on a half-URL.
+  it("strips ``#`` as a defense against unencoded navigation sites", () => {
+    // ``encodeURIComponent`` *does* encode ``#`` to ``%23`` — but
+    // ``configuration`` flows into multiple URL-building call sites,
+    // and any one of them forgetting to wrap in ``encodeURIComponent``
+    // would split the URL at the fragment boundary. Stripping ``#``
+    // here once is cheaper than trusting every downstream consumer
+    // to encode.
     expect(safeUploadFilename("foo#bar")).toBe("foobar");
   });
 
   it("suffixes Windows reserved device names with ``_``", () => {
     // ``CON``, ``PRN``, ``AUX``, ``NUL``, ``COM1``..``COM9``,
     // ``LPT1``..``LPT9`` are unwritable on Windows even with an
-    // extension (``CON.yaml`` still resolves to the console device).
-    // Append ``_`` so the on-disk filename sidesteps the reservation.
+    // extension. Append ``_`` so the on-disk filename sidesteps the
+    // reservation.
     expect(safeUploadFilename("CON")).toBe("CON_");
     expect(safeUploadFilename("con")).toBe("con_");
     expect(safeUploadFilename("Aux")).toBe("Aux_");
     expect(safeUploadFilename("COM1")).toBe("COM1_");
     expect(safeUploadFilename("LPT9")).toBe("LPT9_");
+  });
+
+  it("suffixes Windows reserved names that carry a sub-extension", () => {
+    // The user's ``stem`` arrives with ``.yaml`` already stripped, but
+    // a config like ``CON.txt.yaml`` lands here as ``CON.txt`` — and
+    // ``CON.txt`` is *also* the console device on Windows. Match on
+    // the part before the first dot and insert the suffix there so
+    // ``CON.txt`` → ``CON_.txt`` (preserving the sub-extension).
+    expect(safeUploadFilename("CON.txt")).toBe("CON_.txt");
+    expect(safeUploadFilename("AUX.mqtt")).toBe("AUX_.mqtt");
+    expect(safeUploadFilename("com1.backup")).toBe("com1_.backup");
+    expect(safeUploadFilename("LPT9.v2.cfg")).toBe("LPT9_.v2.cfg");
   });
 
   it("leaves names that merely *contain* a reserved word alone", () => {
@@ -87,6 +101,10 @@ describe("safeUploadFilename", () => {
     expect(safeUploadFilename("console")).toBe("console");
     expect(safeUploadFilename("aux-mqtt")).toBe("aux-mqtt");
     expect(safeUploadFilename("com10")).toBe("com10");
+    // ``console.txt`` starts with a real word that just happens to
+    // share a prefix with ``CON``; the dot-split test above keys
+    // off the *full* segment before the dot, not a startsWith.
+    expect(safeUploadFilename("console.txt")).toBe("console.txt");
   });
 
   it("trims surrounding whitespace and dots", () => {

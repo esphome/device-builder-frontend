@@ -105,6 +105,24 @@ import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
+/** Decode the ``:id`` path param for the device route, falling back to
+ *  the raw value when the URL contains a malformed ``%`` sequence.
+ *
+ *  ``decodeURIComponent`` raises ``URIError`` on inputs like ``%E0``
+ *  (a partial UTF-8 byte) or any lone ``%``; that would crash the
+ *  router and blank the whole app. Falling back to the raw param
+ *  lets the device-list lookup miss naturally and the device page
+ *  shows its "not found" empty state — the correct UX for a
+ *  hand-crafted broken URL. */
+function decodeIdParam(id: string | undefined): string {
+  if (!id) return "";
+  try {
+    return decodeURIComponent(id);
+  } catch {
+    return id;
+  }
+}
+
 @customElement("esphome-app")
 export class ESPHomeApp extends LitElement {
   // ─── Context Providers ───────────────────────────────────
@@ -194,8 +212,15 @@ export class ESPHomeApp extends LitElement {
         // browser's URL parser percent-encodes any non-ASCII path
         // segment regardless of whether the navigator pre-encoded,
         // so by the time the router matches, ``id`` is encoded.
+        // Wrap in try/catch: ``decodeURIComponent`` raises
+        // ``URIError`` on a malformed ``%`` sequence
+        // (``/device/%E0`` from a hand-crafted URL would otherwise
+        // crash the whole router). Fall back to the raw param —
+        // the device-list lookup will miss and the page will show
+        // its "device not found" empty state, which is the right
+        // UX for a deliberately-broken URL.
         html`<esphome-page-device
-          .id=${id ? decodeURIComponent(id) : ""}
+          .id=${decodeIdParam(id)}
         ></esphome-page-device>`,
     },
   ]);

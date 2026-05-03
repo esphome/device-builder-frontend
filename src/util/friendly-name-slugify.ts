@@ -2,9 +2,7 @@
  * Slugify a user-typed device name into a valid ESPHome ``esphome.name``
  * value.
  *
- * Mirrors upstream ``esphome.helpers.friendly_name_slugify`` exactly so
- * the dashboard's typed-name flows produce the same on-disk filenames
- * the legacy dashboard did:
+ * Closely follows upstream ``esphome.helpers.friendly_name_slugify``:
  *
  * 1. Strip combining diacritics (``é`` → ``e``, ``ü`` → ``u``).
  * 2. Lowercase.
@@ -12,6 +10,12 @@
  * 4. Collapse runs of underscores and trim leading/trailing.
  * 5. Filter to ``[a-z0-9_-]`` (drop everything else).
  * 6. Replace underscores with hyphens.
+ *
+ * One deliberate divergence from upstream is the underscore collapse —
+ * see the comment at the implementation site. Every other step
+ * matches upstream byte-for-byte, so the slugs the legacy dashboard
+ * would have produced for previously-imported devices still match
+ * the on-disk filenames.
  *
  * Used for the **typed-name** flows (basic / empty config). Uploaded
  * YAML filenames go through ``safeUploadFilename`` instead — those
@@ -30,10 +34,16 @@ export function friendlyNameSlugify(value: string): string {
     .toLowerCase()
     .replace(/ /g, "_")
     .replace(/-/g, "_");
-  // Collapse runs of underscores, trim ends. Upstream's
-  // ``.replace("__", "_")`` is a single non-overlapping pass; the regex
-  // here covers 3+-underscore runs in one shot, which matches how
-  // multi-word inputs actually round-trip.
+  // Collapse runs of underscores, then trim ends. **Deliberate
+  // divergence from upstream** here: upstream's
+  // ``.replace("__", "_")`` is a single non-overlapping pass, so
+  // ``____`` collapses to ``__`` and the final slug ends up with
+  // doubled separators (``"a    b"`` → ``"a--b"``). Our ``/_+/g``
+  // regex collapses any run to one ``_`` in a single pass, so
+  // ``"a    b"`` slugs cleanly to ``"a-b"``. The divergence is
+  // user-visible but only on inputs that the legacy dashboard
+  // would also have rendered awkwardly — existing on-disk
+  // filenames are unaffected (they were already legal slugs).
   v = v.replace(/_+/g, "_").replace(/^_+|_+$/g, "");
   // Filter to ALLOWED_NAME_CHARS = lowercase + digits + ``-`` + ``_``.
   v = v.replace(/[^a-z0-9_-]/g, "");
