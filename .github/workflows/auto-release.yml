@@ -75,8 +75,8 @@ jobs:
     needs: check-and-release
     if: needs.check-and-release.outputs.should_release == 'true'
     permissions:
-      contents: write
-      pull-requests: read
+      contents: read    # ceiling for release.yml's checkout + gh release view
+      id-token: write   # ceiling for release.yml's PyPI Trusted Publishing
     uses: ./.github/workflows/release.yml
     with:
       version: ${{ needs.check-and-release.outputs.version }}
