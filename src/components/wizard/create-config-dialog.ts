@@ -7,8 +7,10 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { friendlyNameSlugify } from "../../util/friendly-name-slugify.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { safeUploadFilename } from "../../util/safe-upload-filename.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -267,7 +269,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   private async _onCreateEmptyConfig(e: CustomEvent<{ name: string }>) {
     if (this._submitting) return;
     const { name } = e.detail;
-    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = friendlyNameSlugify(name);
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
@@ -300,8 +302,14 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       return;
     }
 
+    // Preserve the user's original filename character-for-character —
+    // they're importing a working config, not typing a new device
+    // name. ``safeUploadFilename`` only strips characters that would
+    // actually break a filesystem write (NUL, path separators,
+    // Windows-illegal punctuation) so underscores, accented letters,
+    // and non-Latin scripts all round-trip.
     const name = this._importFile.name.replace(/\.(yaml|yml)$/i, "");
-    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = safeUploadFilename(name);
 
     this._submitting = true;
     try {
@@ -335,7 +343,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (this._submitting) return;
     const { board, name, wifiSsid, wifiPassword } = e.detail;
     if (!board) return;
-    const slug = name.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    const slug = friendlyNameSlugify(name);
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
