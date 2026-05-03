@@ -133,13 +133,13 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
 
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+
       - name: Publish release
         run: gh release edit "${{ inputs.version }}" --draft=false
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
 
   bump-backend:
     name: Open bump PR on backend
