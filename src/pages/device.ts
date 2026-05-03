@@ -556,13 +556,24 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
-    /* ``yaml-updated`` is fired by the visual-editor section save and
-     * the add-component dialog AFTER the new YAML has already been
-     * persisted to disk via ``api.updateConfig`` / ``api.addComponent``.
-     * Both ``_yaml`` (the in-memory buffer) and ``_savedYaml`` (the
-     * "what's on disk" reference for ``_isDirty``) advance together
-     * so the YAML editor's Save button doesn't latch on as if the
-     * user had unsaved changes after a successful section save. */
+    /* ``yaml-updated`` fires from the visual-editor section save,
+     * the add-component dialog, and the section-delete path. Two
+     * emitters (``add-component-dialog`` and the section-delete
+     * branch) ``await`` the API call before dispatching; the
+     * section-save path is intentionally optimistic — it kicks
+     * off ``api.updateConfig`` without awaiting and dispatches
+     * immediately so the form clears its dirty state without an
+     * extra round-trip. ``_savedYaml`` advances optimistically to
+     * match: it tracks "what we believe is on disk", consistent
+     * with the section component's own optimistic ``_dirty=false``.
+     * If the save fails, the section's existing error toast
+     * surfaces it; the parent's dirty state is the rare wrong
+     * follower of the optimistic flow.
+     *
+     * Without this, the YAML editor's Save button stayed enabled
+     * after a successful visual save because ``_isDirty`` (which
+     * compares ``_yaml`` vs ``_savedYaml``) latched true on the
+     * first ``yaml-updated``. */
     this._yaml = e.detail.yaml;
     this._savedYaml = e.detail.yaml;
   }
