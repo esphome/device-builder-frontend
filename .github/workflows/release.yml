@@ -28,9 +28,7 @@ env:
   BACKEND_REPO: esphome/device-builder
   PACKAGE_NAME: esphome-device-builder-frontend
 
-permissions:
-  contents: write
-  pull-requests: read
+permissions: {}
 
 jobs:
   create-release:
@@ -71,6 +69,9 @@ jobs:
     name: Build wheel and attach to release
     needs: create-release
     runs-on: ubuntu-latest
+    permissions:
+      contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
+      id-token: write   # OIDC for PyPI Trusted Publishing
     steps:
       - name: Generate a token
         id: generate-token
