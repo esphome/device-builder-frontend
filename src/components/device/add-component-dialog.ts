@@ -452,14 +452,13 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._submitError = "";
       return;
     }
-    // Mid-bundle back is a cancel — drop the queue and return to the
-    // catalog. Already-added components stay in the YAML; we don't
-    // roll them back (consistent with the regular flow's no-rollback
-    // behaviour on errors).
-    if (this._bundleProgress) {
-      this._bundleQueue = [];
-      this._bundleProgress = null;
-    }
+    // Returning to the catalog (mid-bundle cancel or otherwise) —
+    // drop all detour state so a leftover `_prefillReference` from an
+    // abandoned bundle step can't leak into the next component the
+    // user selects. Already-added bundle components stay in the YAML;
+    // we don't roll them back (consistent with the regular flow's
+    // no-rollback behaviour on errors).
+    this._resetDetourState();
     this._selected = null;
     this._submitError = "";
   }
