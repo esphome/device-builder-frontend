@@ -427,10 +427,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
       </div>
 
       <div class="helper-row">
-        <button class="connect-board-btn" type="button" @click=${this._connectBoard}>
-          <wa-icon library="mdi" name="usb-port"></wa-icon>
-          ${this._localize("wizard.connect_your_board")}
-        </button>
+        ${isWebSerialSupported()
+          ? html`<button
+              class="connect-board-btn"
+              type="button"
+              @click=${this._connectBoard}
+            >
+              <wa-icon library="mdi" name="usb-port"></wa-icon>
+              ${this._localize("wizard.connect_your_board")}
+            </button>`
+          : nothing}
         <button class="helper-link" type="button">
           ${this._localize("wizard.dont_know_board")}
         </button>
