@@ -136,6 +136,11 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
+        with:
+          # Skip dists already on PyPI so a partial-failure rerun
+          # (e.g. release-edit failed after PyPI succeeded) doesn't
+          # blow up on the duplicate version.
+          skip-existing: true
 
       - name: Publish release
         run: gh release edit "${{ inputs.version }}" --draft=false
@@ -192,7 +197,13 @@ jobs:
           # correctly when this body is rendered on the backend repo's PR.
           notes = re.sub(r"(?<![\w/])#(\d+)\b", rf"{repo}#\1", notes)
           # Defuse @user mentions so the backend PR doesn't ping contributors.
-          notes = re.sub(r"(?<![\w@`])@([A-Za-z0-9][A-Za-z0-9-]*)", r"`@\1`", notes)
+          # The trailing lookahead skips scoped npm package refs like
+          # @home-assistant/webawesome that appear in PR titles.
+          notes = re.sub(
+              r"(?<![\w@`])@([A-Za-z0-9][A-Za-z0-9-]*)(?![A-Za-z0-9/-])",
+              r"`@\1`",
+              notes,
+          )
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write("body<<NOTES_EOF\n")
