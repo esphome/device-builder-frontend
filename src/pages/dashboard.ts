@@ -32,6 +32,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { clearJustCreated } from "../util/just-created.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -233,10 +234,15 @@ export class ESPHomePageDashboard extends LitElement {
        before opening the device editor. The user typically lands
        here when they hit the back button to leave the editor — at
        which point we want their freshly-created device to flash and
-       scroll into view, the same way an adopted device does. */
+       scroll into view, the same way an adopted device does.
+       ``_tryConsumePendingScroll`` covers the "device is already
+       in ``_devices`` at mount time" case (WS pushed it while the
+       user was in the editor); ``updated()`` handles the
+       "arrives later" case. */
     const pending = consumePendingHighlight();
     if (pending !== null) {
       this._highlightFreshDevice(pending);
+      this._tryConsumePendingScroll();
     }
   }
 
@@ -847,30 +853,61 @@ export class ESPHomePageDashboard extends LitElement {
          ``_devices`` change is what fires this branch.
        - YAML-import / wizard return: ``connectedCallback`` reads the
          pending-highlight ``sessionStorage`` flag *after* the host
-         is back on the dashboard. By that point the WS may already
-         have pushed the device into ``_devices`` (e.g. the user
-         spent time in the editor). There's no future ``_devices``
-         change to wait for, so check on the very first ``updated``
-         tick after mount too — ``changed.size === 0`` indicates
-         the post-connect render. */
+         is back on the dashboard. The WS may already have pushed
+         the device into ``_devices`` while the user was in the
+         editor — that case is handled directly in
+         ``connectedCallback`` (``_tryConsumePendingScroll``); this
+         branch only needs to fire when the device arrives *after*
+         the dashboard mounts.
+
+       Earlier versions used ``changed.size === 0`` as a "first
+       render after mount" signal, but ``connectedCallback``
+       mutates ``_showIgnored`` from localStorage so the first
+       ``updated()`` call has ``changed.size > 0`` whenever that
+       toggle is on — the post-mount scroll silently stopped firing.
+       The direct call from ``connectedCallback`` removes that
+       brittle dependency. */
     if (
       this._pendingAdoptScroll !== null &&
-      (changed.has("_devices") || changed.size === 0) &&
+      changed.has("_devices") &&
       this._devices.some((d) => d.configuration === this._pendingAdoptScroll)
     ) {
       const target = this._pendingAdoptScroll;
       this._pendingAdoptScroll = null;
-      /* Wait two animation frames before scrolling. On the render
-         where the device first appears, the card's children
-         (wa-icon, status badge, etc.) are still mounting and the
-         row's height isn't final, so a same-tick ``scrollIntoView``
-         calculates against a too-short layout and stops short. Two
-         rAFs are enough for Lit's children to commit and for the
-         browser to settle the grid track sizes. */
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => this._scrollAdoptedIntoView(target)),
-      );
+      this._scheduleScrollIntoView(target);
     }
+  }
+
+  /** Try to scroll a pending-highlight target into view *now* if the
+   *  matching device is already in ``_devices``.
+   *
+   *  Called from ``connectedCallback`` after consuming the
+   *  ``sessionStorage`` flag — by the time the dashboard re-mounts
+   *  on back-navigation from the editor, the WS may already have
+   *  pushed the freshly-created device into ``_devices`` and there's
+   *  no future ``_devices`` change for ``updated()`` to react to.
+   *  When the device isn't there yet, leave ``_pendingAdoptScroll``
+   *  armed so ``updated()`` fires the scroll on the first
+   *  ``_devices`` change. */
+  private _tryConsumePendingScroll(): void {
+    if (this._pendingAdoptScroll === null) return;
+    const target = this._pendingAdoptScroll;
+    if (!this._devices.some((d) => d.configuration === target)) return;
+    this._pendingAdoptScroll = null;
+    this._scheduleScrollIntoView(target);
+  }
+
+  /** Wait two animation frames before scrolling. On the render
+   *  where the device first appears, the card's children (wa-icon,
+   *  status badge, etc.) are still mounting and the row's height
+   *  isn't final, so a same-tick ``scrollIntoView`` calculates
+   *  against a too-short layout and stops short. Two rAFs are
+   *  enough for Lit's children to commit and for the browser to
+   *  settle the grid track sizes. */
+  private _scheduleScrollIntoView(configuration: string): void {
+    requestAnimationFrame(() =>
+      requestAnimationFrame(() => this._scrollAdoptedIntoView(configuration)),
+    );
   }
 
   private _scrollAdoptedIntoView(configuration: string): void {
@@ -940,6 +977,12 @@ export class ESPHomePageDashboard extends LitElement {
       toast.error(this._localize("dashboard.action_rename_failed", { name: device.name }), { richColors: true });
       return;
     }
+    /* Drop any pending welcome-banner flag — if the user just
+       adopted / created the device and renamed it before opening
+       the editor, the stored configuration string is now stale
+       (the file lives at the renamed path) and the banner is moot
+       anyway: the user has already engaged with the device. */
+    clearJustCreated();
     if (response.job) {
       /* Validated configs route through the firmware queue — the
          compile + OTA install runs there and we follow it in the

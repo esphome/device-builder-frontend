@@ -448,6 +448,11 @@ export class ESPHomeAdoptDialog extends LitElement {
       // derivation the dashboard's ``_onAdopted`` handler uses so
       // both the welcome-banner flag (consumed on first device-editor
       // mount) and the highlight signal key off the same string.
+      // Pre-rename flag survives a rename only if the user opens
+      // the editor first — if they rename before opening, the rename
+      // flow drops the flag (see ``clearJustCreated`` call in
+      // ``_executeRename``); they've already engaged with the device
+      // so the welcome banner would just be noise.
       markJustCreated(`${name}.yaml`);
       this.close();
       this.dispatchEvent(

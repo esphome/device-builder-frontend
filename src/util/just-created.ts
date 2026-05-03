@@ -33,3 +33,20 @@ export function consumeJustCreated(configuration: string): boolean {
   }
   return false;
 }
+
+/** Drop any pending just-created flag.
+ *
+ * Called from flows that imply the user has already engaged with
+ * the device (rename, archive, etc.) — at that point the welcome
+ * banner is moot and the stored configuration string would be
+ * stale anyway (rename changes the filename the device-page mount
+ * would key off). Cheaper than tracking the rename and rewriting
+ * the stored value.
+ */
+export function clearJustCreated(): void {
+  try {
+    sessionStorage.removeItem(KEY);
+  } catch {
+    // Ignore — see comment in markJustCreated.
+  }
+}
