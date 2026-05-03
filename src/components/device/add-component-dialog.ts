@@ -559,6 +559,22 @@ export class ESPHomeAddComponentDialog extends LitElement {
           this._submitError = this._localize("device.add_component_error");
           return;
         }
+        // Hand the just-added component's id to the next step's matching
+        // `references_component` field. Bundles are designed to chain —
+        // e.g. `Status LED (full setup)` adds an `output.gpio`, then a
+        // `light.binary` whose `output:` field has to point at it — and
+        // without this prefill the user has to re-pick the id they just
+        // typed in the previous step from a dropdown.
+        const justAddedId = e.detail.fields["id"];
+        const justAddedDomain = this._selected.category;
+        if (typeof justAddedId === "string" && justAddedDomain) {
+          this._prefillReference = {
+            domain: justAddedDomain,
+            id: justAddedId,
+          };
+        } else {
+          this._prefillReference = null;
+        }
         this._bundleQueue = remaining;
         this._bundleProgress = {
           ...this._bundleProgress,

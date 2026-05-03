@@ -21,17 +21,25 @@ import {
 } from "./config-entry-renderers-shared.js";
 
 /**
- * Parse a `suggestions` value into a GPIO number. Featured manifests
- * write these as either bare ints (`12`) or string forms (`"GPIO12"`,
- * `"gpio12"`); the wire shape is `ConfigPrimitive`, so we accept both.
- * Returns `null` for anything we can't parse — the caller drops those
- * entries rather than letting a typo crash the renderer.
+ * Parse a pin reference into a GPIO number. Used both for the field's
+ * current value and for individual `suggestions` entries. Featured
+ * manifests write pins as bare ints (`12`), string forms (`"GPIO12"`,
+ * `"gpio12"`), or — for fields whose locked preset needs the long-form
+ * ESPHome pin block — an object like
+ * `{ number: 0, mode: { input: true, pullup: true }, inverted: true }`
+ * (Sonoff Basic's front-panel button is the canonical example: the pin
+ * is occupied + inverted + needs the internal pull-up, all baked into
+ * the preset). Returns `null` for anything we can't parse — the caller
+ * drops those entries rather than letting a typo blank the dropdown.
  */
-function parseSuggestionGpio(s: unknown): number | null {
+export function parsePinGpio(s: unknown): number | null {
   if (typeof s === "number" && Number.isFinite(s)) return s;
   if (typeof s === "string") {
     const m = s.match(/^\s*(?:GPIO)?(\d+)\s*$/i);
     if (m) return Number(m[1]);
+  }
+  if (s !== null && typeof s === "object" && !Array.isArray(s)) {
+    return parsePinGpio((s as Record<string, unknown>).number);
   }
   return null;
 }
@@ -97,11 +105,12 @@ export function renderPinField(
     return renderStringField(entry, "text", path, ctx);
   }
 
-  // Pin presets land as either bare ints (`12`) or `GPIOn` strings —
-  // the wa-option values are always the `GPIOn` form, so normalise
+  // Pin presets can land as bare ints (`12`), `GPIOn` strings, or the
+  // long-form pin block (`{ number: N, mode: {...}, inverted: ... }`).
+  // The wa-option values are always the `GPIOn` form, so normalise
   // before comparing or the disabled select renders blank.
   const rawValue = ctx.getAt(path);
-  const valueGpio = parseSuggestionGpio(rawValue);
+  const valueGpio = parsePinGpio(rawValue);
   const value =
     valueGpio !== null ? `GPIO${valueGpio}` : String(rawValue ?? "");
   const invalid = ctx.errorAt(path) !== null;
@@ -117,7 +126,7 @@ export function renderPinField(
   if (entry.suggestions && entry.suggestions.length > 0) {
     const allowed = new Set(
       entry.suggestions
-        .map(parseSuggestionGpio)
+        .map(parsePinGpio)
         .filter((g): g is number => g !== null),
     );
     if (allowed.size > 0) {
