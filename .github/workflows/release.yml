@@ -154,6 +154,7 @@ jobs:
           owner: ${{ github.repository_owner }}
           repositories: |
             device-builder
+            device-builder-frontend
           permission-contents: write
           permission-pull-requests: write
           permission-issues: write
