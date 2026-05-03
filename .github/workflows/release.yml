@@ -2,8 +2,9 @@ name: Release
 
 # Tags the version, drafts release notes, builds the Python wheel
 # containing the prebuilt frontend, attaches the wheel + sdist to
-# the GitHub release, and opens / updates a single bump PR on the
-# backend repo so it picks up the new wheel URL.
+# the draft release, publishes the wheel to PyPI, then flips the
+# GitHub release to public, and finally opens / updates a single
+# bump PR on the backend repo so it picks up the new PyPI version.
 
 on:
   workflow_dispatch:
