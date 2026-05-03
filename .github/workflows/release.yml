@@ -19,8 +19,6 @@ on:
         required: true
         type: string
     secrets:
-      ESPHOME_GITHUB_APP_ID:
-        required: true
       ESPHOME_GITHUB_APP_PRIVATE_KEY:
         required: true
 
@@ -29,7 +27,6 @@ env:
   NODE_VERSION: "22.x"
   BACKEND_REPO: esphome/device-builder
   PACKAGE_NAME: esphome-device-builder-frontend
-  WHEEL_NAME: esphome_device_builder_frontend
 
 permissions:
   contents: write
@@ -39,17 +36,23 @@ jobs:
   create-release:
     name: Tag and draft release
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ inputs.version }}
     steps:
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        with:
+          client-id: ${{ vars.ESPHOME_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
+          token: ${{ steps.generate-token.outputs.token }}
 
       - name: Create and push tag
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "esphome[bot]"
+          git config user.email "115708604+esphome[bot]@users.noreply.github.com"
           git tag -a "${{ inputs.version }}" -m "Release ${{ inputs.version }}"
           git push origin "${{ inputs.version }}"
 
@@ -59,16 +62,23 @@ jobs:
           config-name: release-drafter.yml
           version: ${{ inputs.version }}
           tag: ${{ inputs.version }}
-          publish: true
+          publish: false
           prerelease: false
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.generate-token.outputs.token }}
 
   build-and-attach:
     name: Build wheel and attach to release
     needs: create-release
     runs-on: ubuntu-latest
     steps:
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        with:
+          client-id: ${{ vars.ESPHOME_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
+
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.version }}
@@ -120,28 +130,26 @@ jobs:
       - name: Attach to release
         run: gh release upload "${{ inputs.version }}" dist/*.whl dist/*.tar.gz
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+
+      - name: Publish release
+        run: gh release edit "${{ inputs.version }}" --draft=false
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
 
   bump-backend:
     name: Open bump PR on backend
     needs: build-and-attach
     runs-on: ubuntu-latest
     steps:
-      - name: Validate GitHub App configuration
-        env:
-          GITHUB_APP_ID: ${{ secrets.ESPHOME_GITHUB_APP_ID || vars.ESPHOME_GITHUB_APP_ID }}
-        run: |
-          if [ -z "$GITHUB_APP_ID" ]; then
-            echo "::error::Missing GitHub App ID."
-            echo "::error::Set Actions secret or variable ESPHOME_GITHUB_APP_ID and ensure it is shared with this repository."
-            exit 1
-          fi
-
       - name: Create backend app token
         id: app-token
-        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
         with:
-          app-id: ${{ secrets.ESPHOME_GITHUB_APP_ID || vars.ESPHOME_GITHUB_APP_ID }}
+          client-id: ${{ vars.ESPHOME_GITHUB_APP_CLIENT_ID }}
           private-key: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
           repositories: |
@@ -160,25 +168,40 @@ jobs:
 
       - name: Get release notes
         id: notes
-        run: |
-          NOTES=$(gh release view "${{ inputs.version }}" \
-            --repo "${{ github.repository }}" \
-            --json body --jq '.body')
-          {
-            echo "body<<NOTES_EOF"
-            echo "$NOTES"
-            echo "NOTES_EOF"
-          } >> "$GITHUB_OUTPUT"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          import subprocess
+
+          repo = os.environ["GITHUB_REPOSITORY"]
+          notes = subprocess.check_output(
+              ["gh", "release", "view", os.environ["VERSION"],
+               "--repo", repo,
+               "--json", "body", "--jq", ".body"],
+              text=True,
+          )
+          # Qualify bare #NNN refs with the source repo so they resolve
+          # correctly when this body is rendered on the backend repo's PR.
+          notes = re.sub(r"(?<![\w/])#(\d+)\b", rf"{repo}#\1", notes)
+          # Defuse @user mentions so the backend PR doesn't ping contributors.
+          notes = re.sub(r"(?<![\w@`])@([A-Za-z0-9][A-Za-z0-9-]*)", r"`@\1`", notes)
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write("body<<NOTES_EOF\n")
+              f.write(notes)
+              if not notes.endswith("\n"):
+                  f.write("\n")
+              f.write("NOTES_EOF\n")
+          PY
 
       - name: Update backend pyproject.toml
         working-directory: backend
         env:
           VERSION: ${{ inputs.version }}
-          PACKAGE_NAME: ${{ env.PACKAGE_NAME }}
-          WHEEL_NAME: ${{ env.WHEEL_NAME }}
-          REPO: ${{ github.repository }}
         run: |
           python3 - <<'PY'
           import os
@@ -187,13 +210,7 @@ jobs:
 
           version = os.environ["VERSION"]
           package = os.environ["PACKAGE_NAME"]
-          wheel = os.environ["WHEEL_NAME"]
-          repo = os.environ["REPO"]
-          url = (
-              f"https://github.com/{repo}/releases/download/"
-              f"{version}/{wheel}-{version}-py3-none-any.whl"
-          )
-          dep = f'"{package} @ {url}"'
+          dep = f'"{package}=={version}"'
 
           path = Path("pyproject.toml")
           text = path.read_text()
