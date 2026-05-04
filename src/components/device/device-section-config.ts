@@ -97,6 +97,19 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @property({ type: Number })
   fromLine?: number;
 
+  /**
+   * Live YAML for the device — the same string the YAML pane on
+   * the right shows, including any unsaved edits. Save and delete
+   * operate on this rather than re-fetching from the server: the
+   * navigator emits `fromLine` relative to the *live* YAML, so an
+   * out-of-sync saved version would point the splice at the
+   * wrong line and clobber a different section. The page that
+   * owns this state (`pages/device.ts`) feeds it through
+   * `device-board-info`.
+   */
+  @property()
+  yaml = "";
+
   /** Whether the device editor's YAML pane is currently visible.
    *  When it isn't, the YAML-only notice grows a "Show YAML editor"
    *  button so the user can reach the editor in one click. */
@@ -206,7 +219,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         return;
       }
 
-      const yaml = await this._api.getConfig(this.configuration);
+      // Use the live YAML the parent passes in; `fromLine` is
+      // relative to that. A `_api.getConfig` re-fetch would
+      // disagree with the user-visible YAML when the editor
+      // pane has unsaved edits and seed the form from a
+      // different section than the one they clicked.
+      const yaml = this.yaml;
 
       if (id !== this._loadId) return;
 
@@ -409,13 +427,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._error = "";
     const title = this._config.title;
     try {
-      const yaml = await this._api.getConfig(this.configuration);
+      // Same rationale as `_onSave`: operate on the live YAML the
+      // page passes in, not a re-fetch — `this.fromLine` is
+      // relative to the live YAML the navigator most recently
+      // parsed.
       const newYaml = removeSectionFromYaml(
-        yaml,
+        this.yaml,
         this.sectionKey,
         this.fromLine,
       );
-      if (newYaml === yaml) {
+      if (newYaml === this.yaml) {
         this._error = this._localize("device.section_delete_error");
         return;
       }
@@ -524,9 +545,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._saving = true;
     this._error = "";
     try {
-      const yaml = await this._api.getConfig(this.configuration);
+      // Operate on the live YAML the page hands us — `this.fromLine`
+      // is relative to whatever the navigator most recently parsed,
+      // and that's the live YAML, not the server's. Re-fetching
+      // would mismatch line numbers when the YAML pane has unsaved
+      // edits and write the wrong section.
       const newYaml = updateSectionInYaml(
-        yaml,
+        this.yaml,
         this.sectionKey,
         this._values,
         this.fromLine,

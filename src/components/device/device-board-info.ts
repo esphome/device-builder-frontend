@@ -378,6 +378,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
               .configuration=${this.configuration}
               .sectionKey=${this.selectedSection}
               .fromLine=${this.selectedFromLine}
+              .yaml=${this.yaml}
               .board=${this.board}
               ?yamlPaneVisible=${this.yamlPaneVisible}
             ></esphome-device-section-config>
