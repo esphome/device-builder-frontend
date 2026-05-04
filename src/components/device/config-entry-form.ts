@@ -183,8 +183,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected render() {
     const ctx = this._buildCtx();
     const visible = this._filterRenderable(this.entries, this.values);
+    // An empty key means "this entry IS the whole values dict" —
+    // used by top-level user-keyed sections (substitutions:) where
+    // the component itself is the map. Pass ``[]`` so the entry's
+    // renderer sees the values dict directly via ``ctx.getAt([])``.
     return html`${visible.map((entry) =>
-      this._renderEntry(entry, [entry.key], ctx),
+      this._renderEntry(entry, entry.key ? [entry.key] : [], ctx),
     )}`;
   }
 
@@ -342,6 +346,42 @@ export class ESPHomeConfigEntryForm extends LitElement {
   // ─── Entry dispatch ─────────────────────────────────────────────
 
   private _renderEntry(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
+    try {
+      return this._renderEntryUnsafe(entry, path, ctx);
+    } catch (err) {
+      // Surface render failures in the UI rather than swallowing
+      // them into a blank section. Without this, a renderer that
+      // throws (or silently returns ``nothing`` because the entry
+      // shape is wrong) leaves the user staring at empty space —
+      // the visible form looks correct, the data appears gone,
+      // and the only signal is in the dev console.
+      // eslint-disable-next-line no-console
+      console.error(
+        "esphome-config-entry-form: render failed for entry",
+        { key: entry.key, type: entry.type, path },
+        err,
+      );
+      const message = err instanceof Error ? err.message : String(err);
+      return html`<div class="render-error" role="alert">
+        <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
+        <div>
+          <strong>
+            ${this._localize("device.entry_render_error_title")}
+          </strong>
+          <code class="render-error-key"
+            >${entry.key || "(empty key)"} · ${entry.type}</code
+          >
+          <pre class="render-error-message">${message}</pre>
+        </div>
+      </div>`;
+    }
+  }
+
+  private _renderEntryUnsafe(
+    entry: ConfigEntry,
+    path: string[],
+    ctx: RenderCtx,
+  ) {
     if (entry.type === ConfigEntryType.DIVIDER) {
       return html`<wa-divider></wa-divider>`;
     }

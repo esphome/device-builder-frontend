@@ -27,9 +27,21 @@ describe("setIn", () => {
     });
   });
 
-  it("returns the input unchanged on an empty path", () => {
-    const before = { a: 1 };
-    expect(setIn(before, [], 99)).toBe(before);
+  it("replaces the whole object when the path is empty", () => {
+    // Empty path is the "this entry IS the whole values dict"
+    // signal used by top-level user-keyed sections
+    // (substitutions:). Value must be object-shaped; the function
+    // coerces non-objects to an empty object so the caller's
+    // ``Record<string, unknown>`` contract holds.
+    expect(setIn({ a: 1 }, [], { b: 2 })).toEqual({ b: 2 });
+    expect(setIn({ a: 1 }, [], {})).toEqual({});
+  });
+
+  it("coerces non-object values to {} when replacing on empty path", () => {
+    expect(setIn({ a: 1 }, [], 99)).toEqual({});
+    expect(setIn({ a: 1 }, [], null)).toEqual({});
+    expect(setIn({ a: 1 }, [], "wat")).toEqual({});
+    expect(setIn({ a: 1 }, [], [1, 2])).toEqual({});
   });
 });
 

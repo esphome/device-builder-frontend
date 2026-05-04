@@ -21,6 +21,7 @@ import {
   placeholderForFloatWithUnit,
   serializeFloatWithUnit,
 } from "../../util/float-with-unit.js";
+import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
   labelFor,
@@ -523,8 +524,17 @@ export function renderMapField(
   // entry through the standard dispatch, so it picks up the right
   // control type. The value template's label is suppressed inside
   // rows by the .map-row CSS.
+  // Lists / dicts (substitutions can carry arbitrary YAML —
+  // verified against ESPHome's
+  // ``CONFIG_SCHEMA = cv.Schema({validate_substitution_key: object})``)
+  // would render as ``[object Object]`` through the string-shaped
+  // value template and lose data on save. Detect non-primitive
+  // values per-row and surface a "edit in YAML" placeholder
+  // instead — the row is preserved (key still renames / deletes),
+  // only the value cell is structurally non-editable here.
   const renderRow = (rowKey: string) => {
     const valuePath = [...path, rowKey];
+    const complex = !isPrimitiveOrNullish(map[rowKey]);
     return html`
       <div class="map-row">
         <input
@@ -536,7 +546,13 @@ export function renderMapField(
             renameKey(rowKey, (e.target as HTMLInputElement).value)}
         />
         <div class="map-value">
-          ${valueTemplate ? ctx.renderEntry(valueTemplate, valuePath) : nothing}
+          ${complex
+            ? html`<p class="map-value-yaml-only">
+                ${ctx.localize("device.map_value_edit_in_yaml")}
+              </p>`
+            : valueTemplate
+              ? ctx.renderEntry(valueTemplate, valuePath)
+              : nothing}
         </div>
         <button
           type="button"

@@ -10,6 +10,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
+import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -398,16 +399,24 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     if (!this._config) return nothing;
 
     const showAdvanced = this._showAdvanced;
-    const hasAdvanced = anyAdvancedEntry(this._config.entries);
+    // ``resolveSectionEntries`` handles overrides for sections
+    // whose backend schema doesn't match the actual user-keyed
+    // shape (currently just ``substitutions``); see the helper's
+    // docstring for the rationale + the failure mode it pins.
+    const renderEntries = resolveSectionEntries(
+      this.sectionKey,
+      this._config.entries,
+    );
+    const hasAdvanced = anyAdvancedEntry(renderEntries);
     // Free-form / structural sections: show the description + a
     // "edit via YAML" notice instead of attempting to render the form.
-    // We force this for `substitutions`, `globals`, `packages` (where
-    // any schema the backend returns won't match the actual list /
-    // dict shape) and also fall back to it for any section that
-    // happens to come back with no entries at all.
+    // We force this for `packages` (where any schema the backend
+    // returns won't match the actual list / dict shape) and also
+    // fall back to it for any section that happens to come back
+    // with no entries at all.
     const yamlOnly =
       YAML_ONLY_SECTIONS.has(this.sectionKey) ||
-      this._config.entries.length === 0;
+      renderEntries.length === 0;
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 
@@ -475,7 +484,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               : nothing}`
         : html`
             <esphome-config-entry-form
-              .entries=${this._config.entries}
+              .entries=${renderEntries}
               .values=${this._values}
               .errors=${this._fieldErrors}
               .board=${this.board}

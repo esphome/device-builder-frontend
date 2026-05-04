@@ -279,6 +279,59 @@ export const configEntryFormStyles = css`
     gap: 0;
   }
 
+  /* "Complex value — edit in YAML" placeholder for map rows whose
+     value isn't a primitive (lists / dicts can't round-trip through
+     a single text input). Quiet, italic, padded to vertically
+     match the size of a wa-input so the row alignment is preserved. */
+  .map-row .map-value-yaml-only {
+    margin: 0;
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    color: var(--wa-color-text-quiet);
+    font-style: italic;
+    font-size: var(--wa-font-size-s);
+    line-height: var(--wa-form-control-line-height, 1.5);
+  }
+
+  /* Per-entry render-error tile. A renderer that throws (or
+     receives a malformed entry shape) would otherwise leave a
+     silent gap in the form — the user can't tell whether their
+     data is gone or the form just doesn't show that field. The
+     tile makes the failure visible with the entry's key/type
+     and the error message so a user can report the problem
+     instead of silently losing their work. */
+  .render-error {
+    display: flex;
+    gap: var(--wa-space-s);
+    align-items: flex-start;
+    padding: var(--wa-space-s);
+    border: 1px solid var(--wa-color-danger-fill-loud, currentColor);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-danger-fill-quiet, transparent);
+    color: var(--wa-color-danger-on-quiet, currentColor);
+  }
+  .render-error wa-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .render-error > div {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+    min-width: 0;
+  }
+  .render-error-key {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: var(--wa-font-size-xs);
+    opacity: 0.85;
+  }
+  .render-error-message {
+    margin: 0;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: var(--wa-font-size-xs);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
   .textarea-field {
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-xs);

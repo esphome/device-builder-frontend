@@ -17,7 +17,17 @@ export function setIn(
   path: string[],
   value: unknown,
 ): Record<string, unknown> {
-  if (path.length === 0) return obj;
+  // Empty path → caller is replacing the whole object with *value*
+  // (used by top-level map sections like ``substitutions:``, where
+  // the entire component IS the user-keyed mapping). Coerce to an
+  // empty object when value isn't object-shaped so the caller's
+  // contract that this returns a Record<string, unknown> stays
+  // intact.
+  if (path.length === 0) {
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  }
   const [head, ...rest] = path;
   if (rest.length === 0) return { ...obj, [head]: value };
   const child = obj[head];

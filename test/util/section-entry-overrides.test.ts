@@ -1,0 +1,144 @@
+/**
+ * Pinning tests for ``resolveSectionEntries`` — the seam the
+ * substitutions-section render path goes through.
+ *
+ * A previous iteration of #160 had ``MAP_SECTIONS`` and the
+ * synthesised ``SUBSTITUTIONS_ENTRIES`` in the section component
+ * but bound the form's ``.entries`` prop to the *catalog's*
+ * entries by mistake — leaving the section silently empty in the
+ * UI. Hoisting the resolution into a pure function lets us test
+ * "for sectionKey=substitutions, the result IS the synthesised
+ * MAP entry, regardless of what the catalog ships" without
+ * standing up a Lit shadow root.
+ */
+import { describe, expect, it } from "vitest";
+import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
+import {
+  MAP_SECTIONS,
+  SUBSTITUTIONS_ENTRIES,
+  resolveSectionEntries,
+} from "../../src/util/section-entry-overrides.js";
+import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
+
+describe("MAP_SECTIONS", () => {
+  it("contains 'substitutions'", () => {
+    expect(MAP_SECTIONS.has("substitutions")).toBe(true);
+  });
+});
+
+describe("SUBSTITUTIONS_ENTRIES", () => {
+  it("is a single MAP entry with an empty key", () => {
+    // Empty key is the "this entry IS the whole values dict"
+    // signal the form's ``_renderEntry`` reads to switch to
+    // ``path=[]`` for ``ctx.getAt`` / ``ctx.emitChange``.
+    expect(SUBSTITUTIONS_ENTRIES).toHaveLength(1);
+    expect(SUBSTITUTIONS_ENTRIES[0].key).toBe("");
+    expect(SUBSTITUTIONS_ENTRIES[0].type).toBe(ConfigEntryType.MAP);
+  });
+
+  it("declares a string value template at config_entries[0]", () => {
+    // The MAP renderer uses ``entry.config_entries[0]`` as the
+    // value template — it must be a string-shaped entry so
+    // primitive values (the common case) get a text input.
+    const valueTemplate = SUBSTITUTIONS_ENTRIES[0].config_entries?.[0];
+    expect(valueTemplate).toBeDefined();
+    expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
+    expect(valueTemplate!.required).toBe(true);
+  });
+});
+
+describe("resolveSectionEntries", () => {
+  it("returns the synthesised MAP entry for substitutions, ignoring the catalog's bogus shape", () => {
+    // Regression test: the catalog ships ``substitutions`` with
+    // ``[{key: "string", type: "string", advanced: true}]`` (the
+    // sync script doesn't honour ``key_type`` at component
+    // level). Without this override the section renders ONE
+    // advanced text field labelled "String" — the bug from #160.
+    // Pin that the resolver returns the synthesised MAP entry
+    // even when the catalog's input is the bogus shape.
+    const bogusCatalogEntry: ConfigEntry = makeConfigEntry({
+      key: "string",
+      type: ConfigEntryType.STRING,
+      label: "String",
+      advanced: true,
+    });
+    const result = resolveSectionEntries("substitutions", [bogusCatalogEntry]);
+    expect(result).toBe(SUBSTITUTIONS_ENTRIES);
+  });
+
+  it("returns the catalog entries unchanged for non-overridden sections", () => {
+    const catalogEntries: ConfigEntry[] = [
+      makeConfigEntry({ key: "name", required: true }),
+      makeConfigEntry({ key: "ssid", required: true }),
+    ];
+    expect(resolveSectionEntries("wifi", catalogEntries)).toBe(catalogEntries);
+  });
+
+  it("returns an empty list unchanged for an unknown section that has no entries", () => {
+    // The section component falls back to YAML-only when the
+    // resolved list is empty; pin that pass-through is faithful.
+    expect(resolveSectionEntries("custom_unknown", [])).toEqual([]);
+  });
+
+  it("is referentially stable for substitutions (same reference across calls)", () => {
+    // The form re-renders on every state change; if the resolver
+    // built a new array each time, the form's ``.entries`` prop
+    // would change reference and Lit would re-mount the rows.
+    // Same reference → no churn.
+    const a = resolveSectionEntries("substitutions", []);
+    const b = resolveSectionEntries("substitutions", []);
+    expect(a).toBe(b);
+  });
+});
+
+describe("device-section-config wiring", () => {
+  // The section component imports Lit decorators that need DOM
+  // globals (vitest runs in ``node``), so we can't render it
+  // here. Instead, scan the source for the wiring contract:
+  // the form's ``.entries`` prop must bind to the resolver's
+  // output, not the catalog's raw ``this._config.entries``.
+  //
+  // Regression pin: a previous iteration of #160 had
+  // ``MAP_SECTIONS`` and ``SUBSTITUTIONS_ENTRIES`` defined in
+  // the section component but bound the form's ``.entries``
+  // prop directly to the catalog source — leaving the
+  // substitutions section silently empty in the UI.
+  it("forwards renderEntries / resolveSectionEntries to the form's .entries prop", async () => {
+    // ``tsconfig.json`` restricts ``types`` to ``@types/w3c-web-serial``
+    // for the production build, so ``@types/node`` isn't visible to
+    // ``tsc`` even though it's installed for runtime use. Skip the
+    // type check for these node-only imports — the test runs in
+    // vitest's node environment where they resolve fine.
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const fs = await import("node:fs");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const path = await import("node:path");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../src/components/device/device-section-config.ts",
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+
+    // The form binding must reference the resolver-derived
+    // entries — accept either the local ``renderEntries`` const
+    // or a direct ``resolveSectionEntries(...)`` call.
+    const entriesBinding = /\.entries\s*=\s*\$\{([^}]+)\}/;
+    const match = src.match(entriesBinding);
+    expect(match, "form's .entries prop binding is missing").not.toBeNull();
+    const expr = match![1].trim();
+    expect(
+      expr.includes("renderEntries") || expr.includes("resolveSectionEntries"),
+      `form's .entries binds to '${expr}', not to the resolver's output`,
+    ).toBe(true);
+
+    // Pin the inverse too: the catalog source ``this._config.entries``
+    // must NOT be the value bound to the form's ``.entries`` prop.
+    expect(
+      expr.includes("this._config.entries"),
+      "form's .entries binds to the raw catalog entries — substitutions override is bypassed",
+    ).toBe(false);
+  });
+});
