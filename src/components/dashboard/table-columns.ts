@@ -119,7 +119,13 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           api_encryption_active: row.api_encryption_active,
           has_pending_changes: row.hasPendingChanges,
         });
-        const encVisual = getEncryptionVisual(encState);
+        // Confirmed-encrypted is the steady state on a healthy
+        // fleet — repeating a green lock on every row drowns out
+        // the rows that need attention. Hide it in the table; the
+        // drawer keeps the full tri-state for single-device
+        // inspection. (issue #141)
+        const encVisual =
+          encState === "active" ? null : getEncryptionVisual(encState);
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
