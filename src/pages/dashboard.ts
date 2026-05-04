@@ -943,16 +943,29 @@ export class ESPHomePageDashboard extends LitElement {
         <p class="empty-search-desc">
           ${this._localize("dashboard.no_results_desc", { query: this._search.trim() })}
         </p>
-        ${this._renderYamlPreviewPivot()}
-        <button
-          class="empty-search-clear"
-          @click=${() => {
-            this._search = "";
-          }}
-        >
-          ${this._localize("dashboard.no_results_clear")}
-        </button>
+        ${this._renderNoResultsExtras()}
       </div>
+    `;
+  }
+
+  /**
+   * Shared no-results extras: optional "Try YAML search — N
+   * matches" pivot + a "Clear search" button. Used by both the
+   * cards-view ``_renderEmptySearch`` tile and the table-view
+   * ``no-results-extra`` slot so the affordances stay identical
+   * across views (same copy, same click handlers, same order).
+   */
+  private _renderNoResultsExtras() {
+    return html`
+      ${this._renderYamlPreviewPivot()}
+      <button
+        class="empty-search-clear"
+        @click=${() => {
+          this._search = "";
+        }}
+      >
+        ${this._localize("dashboard.no_results_clear")}
+      </button>
     `;
   }
 
@@ -1095,26 +1108,11 @@ export class ESPHomePageDashboard extends LitElement {
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("dashboard.create_device")}
         </button>
-        ${this._renderYamlPreviewPivotInline()}
+        <div slot="no-results-extra" class="yaml-preview-banner">
+          ${this._renderNoResultsExtras()}
+        </div>
       </esphome-device-table>
     `;
-  }
-
-  /**
-   * Slot the YAML-search pivot into the table's no-results
-   * empty cell so it appears on the same line as
-   * "No results found." instead of below the table chrome.
-   * Slot is rendered unconditionally (not gated on whether the
-   * table is empty) — the pivot itself returns ``""`` until the
-   * preview controller has hits, and the slot only paints when
-   * the table is showing its no-results row.
-   */
-  private _renderYamlPreviewPivotInline() {
-    const pivot = this._renderYamlPreviewPivot();
-    if (!pivot) return "";
-    return html`<div slot="no-results-extra" class="yaml-preview-banner">
-      ${pivot}
-    </div>`;
   }
 
   private _renderDrawer() {
