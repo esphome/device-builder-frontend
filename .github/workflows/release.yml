@@ -1,10 +1,11 @@
 name: Release
 
-# Tags the version, drafts release notes, builds the Python wheel
-# containing the prebuilt frontend, attaches the wheel + sdist to
-# the draft release, publishes the wheel to PyPI, then flips the
-# GitHub release to public, and finally opens / updates a single
-# bump PR on the backend repo so it picks up the new PyPI version.
+# Drafts release notes, builds the Python wheel containing the
+# prebuilt frontend, attaches the wheel + sdist to the draft
+# release, publishes the wheel to PyPI, then flips the GitHub
+# release to public (which creates the tag at the target SHA),
+# and finally opens / updates a single bump PR on the backend
+# repo so it picks up the new PyPI version.
 
 on:
   workflow_dispatch:
@@ -24,7 +25,7 @@ permissions: {}
 
 jobs:
   create-release:
-    name: Tag and draft release
+    name: Draft release
     runs-on: ubuntu-latest
     steps:
       - name: Generate a token
@@ -39,19 +40,13 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.generate-token.outputs.token }}
 
-      - name: Create and push tag
-        run: |
-          git config user.name "esphome[bot]"
-          git config user.email "115708604+esphome[bot]@users.noreply.github.com"
-          git tag -a "${{ inputs.version }}" -m "Release ${{ inputs.version }}"
-          git push origin "${{ inputs.version }}"
-
       - name: Generate release notes
         uses: release-drafter/release-drafter@563bf132657a13ded0b01fcb723c5a58cdd824e2 # v7.2.1
         with:
           config-name: release-drafter.yml
           version: ${{ inputs.version }}
           tag: ${{ inputs.version }}
+          commitish: ${{ github.sha }}
           publish: false
           prerelease: false
         env:
@@ -75,7 +70,10 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.version }}
+          # Tag doesn't exist yet — it's created when the draft release
+          # is published. Build from the SHA the workflow ran on, which
+          # is also what release-drafter targets via commitish.
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
