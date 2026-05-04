@@ -30,6 +30,7 @@ import {
   type ComponentCatalogEntry,
   type ConfigEntry,
 } from "../api/types.js";
+import { getTriggerKeys } from "./esphome-schema.js";
 
 interface CatalogIndex {
   /** Loaded list of components — used for top-level keys. */
@@ -237,6 +238,50 @@ function platformValueCompletion(c: ComponentCatalogEntry): Completion {
   };
 }
 
+/**
+ * Render a trigger config-var (``on_boot`` / ``on_press`` / …) as a
+ * completion. Mirrors the legacy dashboard's behaviour: the canonical
+ * shape of an automation trigger is ``on_*: \n  then: \n    - `` so
+ * we apply that snippet directly — saves the user three Tab presses
+ * to land at the action position.
+ */
+function triggerToCompletion(t: { key: string; docs?: string }): Completion {
+  return {
+    label: t.key,
+    apply: `${t.key}:\n  then:\n    - `,
+    type: "namespace",
+    detail: "trigger",
+    info: t.docs ?? undefined,
+    boost: 2,
+  };
+}
+
+/**
+ * Map a YAML parent block (``esphome``, ``binary_sensor`` plus a
+ * ``platform: gpio`` sibling, …) to the schema-bundle filename and
+ * the component key inside that bundle. Returns ``null`` when the
+ * parent isn't a component the schema would carry triggers for —
+ * the catalog lookup that came before us already filtered to
+ * recognised components, so ``null`` here just means "no schema
+ * lookup to attempt".
+ */
+function bundleFor(
+  parentKey: string,
+  platformValue: string | null,
+): { bundle: string; componentKey: string } | null {
+  // Platform-style block: ``binary_sensor: - platform: gpio`` →
+  // bundle ``binary_sensor``, component ``binary_sensor.gpio``.
+  if (platformValue) {
+    return {
+      bundle: parentKey,
+      componentKey: `${parentKey}.${platformValue}`,
+    };
+  }
+  // Plain component: ``esphome:`` / ``wifi:`` / ``logger:`` →
+  // bundle and component name match.
+  return { bundle: parentKey, componentKey: parentKey };
+}
+
 // ─── Lookups ─────────────────────────────────────────────────────────
 
 /**
@@ -393,19 +438,30 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     if (!parent) return null;
 
     const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-    const entries = await resolveAvailableEntries(
-      api,
-      catalog,
-      parent.key,
-      platformValue,
-    );
-    if (entries.length === 0) return null;
+    const [entries, triggers] = await Promise.all([
+      resolveAvailableEntries(api, catalog, parent.key, platformValue),
+      // Pull the typed schema's ``on_*`` triggers from
+      // ``schema.esphome.io`` and stack them on top of the
+      // catalog's config-vars. ``getTriggerKeys`` returns ``[]``
+      // on any failure (CSP / offline / missing bundle), so the
+      // catalog completions stay the floor — graceful
+      // degradation for when schema.esphome.io isn't reachable.
+      (async () => {
+        const target = bundleFor(parent.key, platformValue);
+        if (!target) return [];
+        return getTriggerKeys(api, target.bundle, target.componentKey);
+      })(),
+    ]);
+    if (entries.length === 0 && triggers.length === 0) return null;
+
+    const options: Completion[] = [
+      ...entries.filter((e) => !e.hidden).map(entryToCompletion),
+      ...triggers.map(triggerToCompletion),
+    ];
 
     return {
       from: keyFrom,
-      options: entries
-        .filter((e) => !e.hidden)
-        .map(entryToCompletion),
+      options,
       validFor: /^[A-Za-z0-9_]*$/,
     };
   };
