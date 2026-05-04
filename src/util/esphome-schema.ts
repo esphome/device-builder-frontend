@@ -52,14 +52,19 @@ export interface SchemaConfigVarRegistry extends SchemaConfigVarBase {
 }
 
 export interface SchemaConfigVarOther extends SchemaConfigVarBase {
-  type:
-    | "enum"
-    | "pin"
-    | "boolean"
-    | "string"
-    | "integer"
-    | "use_id";
+  type: "pin" | "boolean" | "string" | "integer" | "use_id";
   schema?: SchemaSchema;
+}
+
+/** ``type: "enum"`` — a fixed set of allowed values. The schema
+ *  serialises *values* as a map keyed by the value string with
+ *  optional per-value metadata (``docs``). Pulled out of
+ *  ``SchemaConfigVarOther`` so the discriminated union actually
+ *  models what the bundle declares; ``getConfigVarValueOptions``
+ *  consumes the ``values`` field. */
+export interface SchemaConfigVarEnum extends SchemaConfigVarBase {
+  type: "enum";
+  values?: Record<string, { docs?: string } | undefined>;
 }
 
 /** ``cv.typed_schema`` — discriminated union keyed by ``typed_key``.
@@ -80,6 +85,7 @@ export type SchemaConfigVar =
   | SchemaConfigVarSchema
   | SchemaConfigVarRegistry
   | SchemaConfigVarTyped
+  | SchemaConfigVarEnum
   | SchemaConfigVarOther;
 
 export interface SchemaSchema {
@@ -576,16 +582,14 @@ async function collectEnumValues(
     vars: Record<string, SchemaConfigVar | undefined> | undefined,
   ): boolean => {
     const decl = vars?.[varKey];
+    // Discriminated union narrows ``decl`` to ``SchemaConfigVarEnum``
+    // here, so ``decl.values`` is typed without a cast.
     if (!decl || decl.type !== "enum") return false;
-    const values = (decl as SchemaConfigVarOther & { values?: unknown }).values;
-    if (!values || typeof values !== "object") return false;
-    for (const [v, meta] of Object.entries(values)) {
+    if (!decl.values) return false;
+    for (const [v, meta] of Object.entries(decl.values)) {
       out.push({
         value: v,
-        docs:
-          meta && typeof meta === "object" && "docs" in meta
-            ? String((meta as { docs?: unknown }).docs ?? "")
-            : undefined,
+        docs: meta?.docs ? String(meta.docs) : undefined,
       });
     }
     return true;
