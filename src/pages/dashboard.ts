@@ -431,7 +431,9 @@ export class ESPHomePageDashboard extends LitElement {
         : this._localize("yaml_search.match_count_plural");
     return html`
       <div class="toolbar">
-        <div class="toolbar-row">${this._renderSearchInput()}</div>
+        <div class="toolbar-row">
+          ${this._renderSearchInput()} ${this._renderViewToggle()}
+        </div>
         ${this._renderDiscoveryHint()}
         ${matchCount !== null
           ? html`<span class="device-count"
