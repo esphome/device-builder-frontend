@@ -32,6 +32,19 @@ const LIST_ITEM_INLINE_KEY_RE = new RegExp(
   `^\\s+-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
 );
 
+/**
+ * Detect a YAML list-item start. Accepts both the standard
+ * `  - <content>` form and the bare `  -` (end-of-line) form
+ * `updateSectionInYaml` emits when a list item's inline-keyed
+ * value can't be represented inline (object / array / null).
+ *
+ * Loosened from a stricter `/^\s+-\s/` so the parser agrees with
+ * what the serializer in this same module can emit. ESPHome's
+ * own YAML output never produces a bare-`-` outside that
+ * round-trip path, so this is the only realistic source.
+ */
+const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
+
 const childRegexFor = (indent: string) =>
   new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
 
@@ -105,6 +118,12 @@ export function findSectionStart(
  * Parse the values inside a YAML section into a plain object.
  * Walks from `fromLine` (or the first `${sectionKey}:` line) and
  * stops at the next sibling section.
+ *
+ * List-item recognition uses the loose `LIST_ITEM_START_RE` so
+ * the parser agrees with what `updateSectionInYaml` in this same
+ * module can emit (including the bare `  -` dash that the
+ * non-scalar inline-value path produces). The parser must agree
+ * with the serializer; if you tighten one, tighten both.
  */
 export function parseYamlSectionValues(
   yaml: string,
@@ -129,7 +148,7 @@ export function parseYamlSectionValues(
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) return values;
 
-  const isListItem = /^\s+-(\s|$)/.test(lines[startIdx]);
+  const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
   const childIndent = isListItem ? "    " : "  ";
   const childRegex = childRegexFor(childIndent);
 
@@ -150,7 +169,7 @@ export function parseYamlSectionValues(
     const line = lines[i];
     if (line.trim() === "") continue;
     if (isListItem) {
-      if (/^\s+-(\s|$)/.test(line) || /^[a-zA-Z]/.test(line)) break;
+      if (LIST_ITEM_START_RE.test(line) || /^[a-zA-Z]/.test(line)) break;
     } else if (/^[a-zA-Z]/.test(line)) {
       break;
     }
@@ -274,11 +293,11 @@ export function findSectionRange(
   const start = findSectionStart(lines, sectionKey, fromLine);
   if (start < 0) return { start: -1, end: -1 };
 
-  const isListItem = /^\s+-(\s|$)/.test(lines[start]);
+  const isListItem = LIST_ITEM_START_RE.test(lines[start]);
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
     if (isListItem) {
-      if (/^\s+-(\s|$)/.test(lines[i]) || /^[a-zA-Z]/.test(lines[i])) {
+      if (LIST_ITEM_START_RE.test(lines[i]) || /^[a-zA-Z]/.test(lines[i])) {
         end = i;
         break;
       }
@@ -301,7 +320,7 @@ export function updateSectionInYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
-  const isListItem = /^\s+-(\s|$)/.test(lines[start]);
+  const isListItem = LIST_ITEM_START_RE.test(lines[start]);
   const childIndent = isListItem ? "    " : "  ";
   let toSerialize = values;
   let dashLine = lines[start];
@@ -346,6 +365,14 @@ export function updateSectionInYaml(
         // key — `dashPrefix` (with the trailing space) is what
         // the rewrite path needs, and the indent alone is what
         // the bare-dash path needs.
+        //
+        // Group 2 (trailing whitespace) only exists because we
+        // hit this branch from `LIST_ITEM_INLINE_KEY_RE`, which
+        // already required `\s+` between `-` and the inline
+        // key. The `?? " "` fallback is theoretical defense — a
+        // bare-dash line wouldn't reach here because it
+        // wouldn't have matched `LIST_ITEM_INLINE_KEY_RE` in
+        // the first place.
         const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/);
         const dashIndent = dashPrefixMatch?.[1] ?? "  ";
         const dashPrefix = `${dashIndent}-${dashPrefixMatch?.[2] ?? " "}`;
@@ -396,7 +423,7 @@ export function removeSectionFromYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
-  const isListItem = /^\s+-(\s|$)/.test(lines[start]);
+  const isListItem = LIST_ITEM_START_RE.test(lines[start]);
   lines.splice(start, end - start);
 
   if (isListItem) {

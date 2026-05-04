@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  findSectionStart,
   parseYamlSectionValues,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
+
+/** 1-indexed line of the first list-item dash following `parent:`
+ *  in `yaml`. Section-editor callers pass that line as `fromLine`;
+ *  resolving it here keeps the tests robust to layout edits
+ *  (e.g. a leading comment line shifting positions). */
+function listItemLine(yaml: string, parent: string): number {
+  const lines = yaml.split("\n");
+  const start = findSectionStart(lines, parent);
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^\s+-(\s|$)/.test(lines[i])) return i + 1;
+  }
+  throw new Error(`no list-item dash under ${parent}: in test fixture`);
+}
 
 describe("parseYamlSectionValues — prototype pollution defense", () => {
   // YAML keys like `__proto__` / `constructor` / `prototype`
@@ -172,11 +186,12 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // once (under its own line), preserving the no-duplicate
     // contract regardless of value type.
     const before = "wrap:\n  - platform: x\n";
+    const fromLine = listItemLine(before, "wrap");
     const after = updateSectionInYaml(
       before,
       "wrap.x",
       { platform: { complex: "object" } },
-      2,
+      fromLine,
     );
     expect(after.match(/platform:/g)).toHaveLength(1);
     expect(after).not.toContain("- platform: x");
@@ -185,6 +200,13 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // the list item into a plain dict (no leading `-`) would
     // otherwise pass the not-contains assertions silently.
     expect(after).toMatch(/^\s+-\s*$/m);
+
+    // Round-trip closes the loop on whether the parser walks
+    // children correctly under a bare-dash list-item head when
+    // the body is a non-scalar nested mapping.
+    const afterFromLine = listItemLine(after, "wrap");
+    const reparsed = parseYamlSectionValues(after, "wrap.x", afterFromLine);
+    expect(reparsed).toEqual({ platform: { complex: "object" } });
   });
 
   it("collapses dash to bare `-` when the form's value is null", () => {
@@ -194,11 +216,12 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // serializer skips null/empty values; net result is just
     // the bare `-` with whatever else the form holds.
     const before = "ota:\n  - platform: esphome\n";
+    const fromLine = listItemLine(before, "ota");
     const after = updateSectionInYaml(
       before,
       "ota.esphome",
       { platform: null, password: "secret" },
-      2,
+      fromLine,
     );
     expect(after).not.toContain("- platform: esphome");
     expect(after).toContain("password: secret");
@@ -206,9 +229,13 @@ describe("updateSectionInYaml — list item with inline key", () => {
 
     // Round-trip: the bare-`-` shape parses back to the same
     // values the form holds (minus the null, which the
-    // serializer drops). Closes the loop on whether ESPHome's
-    // YAML reader handles the unusual but valid list-item shape.
-    const reparsed = parseYamlSectionValues(after, "ota.esphome", 2);
+    // serializer drops).
+    const afterFromLine = listItemLine(after, "ota");
+    const reparsed = parseYamlSectionValues(
+      after,
+      "ota.esphome",
+      afterFromLine,
+    );
     expect(reparsed).toEqual({ password: "secret" });
   });
 
