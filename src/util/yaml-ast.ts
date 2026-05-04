@@ -171,23 +171,31 @@ export function getPlatformValue(
   state: EditorState,
   pos: number,
 ): string | null {
-  const node = syntaxTree(state).resolveInner(pos, -1);
-  // Walk up to the enclosing Item.
-  let cur: SyntaxNode | null = node;
-  while (cur && cur.name !== "Item") cur = cur.parent;
-  if (!cur) return null;
-  // Item's value should be a BlockMapping (list of mappings).
-  const map = cur.firstChild;
-  if (map?.name !== "BlockMapping") return null;
-  // Find the ``platform`` pair and read its scalar value.
-  for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
-    if (pair.name !== "Pair") continue;
-    if (getPairKey(state, pair) !== "platform") continue;
-    let v: SyntaxNode | null = pair.lastChild;
-    while (v && v.name !== "Literal" && v.name !== "QuotedLiteral") {
-      v = v.prevSibling;
+  // Walk up through every enclosing ``Item`` until one has a
+  // ``platform:`` pair as a direct child of its mapping. Inner
+  // list-of-mappings positions (cursor inside a ``filters:`` /
+  // ``then:`` item nested under ``- platform: gpio``) need to
+  // skip over the inner items to reach the outer
+  // platform-declaring one — without that, registry / config-var
+  // completion can't resolve the platform context.
+  let cur: SyntaxNode | null = syntaxTree(state).resolveInner(pos, -1);
+  while (cur) {
+    while (cur && cur.name !== "Item") cur = cur.parent;
+    if (!cur) return null;
+    const map = cur.firstChild;
+    if (map?.name === "BlockMapping") {
+      for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
+        if (pair.name !== "Pair") continue;
+        if (getPairKey(state, pair) !== "platform") continue;
+        let v: SyntaxNode | null = pair.lastChild;
+        while (v && v.name !== "Literal" && v.name !== "QuotedLiteral") {
+          v = v.prevSibling;
+        }
+        return v ? readLiteralText(state, v) : null;
+      }
     }
-    return v ? readLiteralText(state, v) : null;
+    // No ``platform:`` here — keep walking up.
+    cur = cur.parent;
   }
   return null;
 }

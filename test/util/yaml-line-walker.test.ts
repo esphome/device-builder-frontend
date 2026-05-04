@@ -129,6 +129,26 @@ describe("readPlatformSibling (regex fallback)", () => {
     expect(readPlatformSibling(lines, 3, 4)).toBe("uptime");
   });
 
+  it("walks past intermediate keys to find a platform several levels up", () => {
+    // User-reported: cursor sits at a list-item position under
+    // ``filters:`` (deeply nested under the outer
+    // ``- platform: uptime`` sensor item). The immediate
+    // ancestor at parent.key is ``filters``, not ``platform``,
+    // so the same-indent walker can't find the platform. Walk
+    // back-and-up looking for any ``- platform: <value>`` line
+    // at a shallower indent than the cursor. AST is silent here
+    // because the trailing ``      - `` is a half-typed Item
+    // Lezer hasn't completed yet.
+    const lines = [
+      "sensor:",
+      "  - platform: uptime",
+      "    name: zwave",
+      "    filters:",
+      "      - ",
+    ];
+    expect(readPlatformSibling(lines, 4, 6)).toBe("uptime");
+  });
+
   it("returns null when there's no platform sibling", () => {
     const lines = ["wifi:", "  ssid: x", "  password: y"];
     expect(readPlatformSibling(lines, 2, 2)).toBeNull();

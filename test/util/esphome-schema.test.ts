@@ -5,7 +5,9 @@ import {
   getActions,
   getConfigVarKeys,
   getConfigVarValueOptions,
+  getRegistryEntries,
   getTriggerKeys,
+  lookupRegistryRef,
 } from "../../src/util/esphome-schema.js";
 
 interface ApiStub {
@@ -692,6 +694,165 @@ describe("getConfigVarValueOptions", () => {
     );
     expect(values).toEqual([]);
     debugSpy.mockRestore();
+  });
+});
+
+describe("lookupRegistryRef + getRegistryEntries", () => {
+  // Scenario: typing under ``filters:`` inside a sensor item.
+  // The schema declares ``filters`` as ``type: "registry"`` on
+  // ``sensor._SENSOR_SCHEMA`` (inherited via the typed-schema
+  // extends chain). The registry members live at
+  // ``sensor.filter`` in the bundle.
+  it("resolves a registry-typed config-var through the extends chain", async () => {
+    const UPTIME_BUNDLE = {
+      "uptime.sensor": {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "typed",
+            typed_key: "type",
+            types: {
+              seconds: {
+                config_vars: {},
+                extends: ["sensor._SENSOR_SCHEMA"],
+              },
+            },
+          },
+        },
+      },
+    };
+    const SENSOR_BUNDLE_WITH_FILTERS = {
+      sensor: {
+        schemas: {
+          _SENSOR_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                filters: {
+                  type: "registry",
+                  registry: "sensor.filter",
+                  is_list: true,
+                },
+              },
+            },
+          },
+        },
+        filter: {
+          calibrate_linear: { docs: "Linear calibration" },
+          clamp: { docs: "Clamp values" },
+          multiply: {},
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.includes("uptime.json"))
+        return new Response(JSON.stringify(UPTIME_BUNDLE), { status: 200 });
+      if (url.includes("sensor.json"))
+        return new Response(JSON.stringify(SENSOR_BUNDLE_WITH_FILTERS), {
+          status: 200,
+        });
+      throw new Error(`unexpected ${url}`);
+    });
+    const ref = await lookupRegistryRef(
+      makeApi() as never,
+      "uptime",
+      "uptime.sensor",
+      "filters",
+    );
+    expect(ref).toBe("sensor.filter");
+    const entries = await getRegistryEntries(
+      makeApi() as never,
+      ref!,
+    );
+    expect(entries.map((e) => e.key).sort()).toEqual([
+      "calibrate_linear",
+      "clamp",
+      "multiply",
+    ]);
+    expect(entries.find((e) => e.key === "calibrate_linear")?.docs).toBe(
+      "Linear calibration",
+    );
+  });
+
+  it("propagates is_list to the schema-bundle config-var key", async () => {
+    // When ``filters: { is_list: true }`` shows up in the
+    // schema, ``getConfigVarKeys`` must surface ``isList: true``
+    // so the completion source can switch to the list-block
+    // apply snippet (``filters:\n  - ``) instead of ``key: ``.
+    const BUNDLE = {
+      thing: {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                filters: {
+                  type: "registry",
+                  registry: "thing.filter",
+                  is_list: true,
+                },
+                name: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const keys = await getConfigVarKeys(
+      makeApi() as never,
+      "thing",
+      "thing",
+    );
+    expect(keys.find((k) => k.key === "filters")?.isList).toBe(true);
+    expect(keys.find((k) => k.key === "name")?.isList).toBe(false);
+  });
+
+  it("returns [] for a non-registry config-var", async () => {
+    const BUNDLE = {
+      thing: {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: { config_vars: { name: { type: "string" } } },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const ref = await lookupRegistryRef(
+      makeApi() as never,
+      "thing",
+      "thing",
+      "name",
+    );
+    expect(ref).toBeNull();
+  });
+
+  it("returns [] when the registry ref points at a missing slot", async () => {
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(
+        JSON.stringify({ thing: { schemas: {} } }),
+        { status: 200 },
+      );
+    });
+    const entries = await getRegistryEntries(
+      makeApi() as never,
+      "thing.filter",
+    );
+    expect(entries).toEqual([]);
+  });
+
+  it("returns [] for a malformed registry ref (no dot)", async () => {
+    const entries = await getRegistryEntries(makeApi() as never, "broken");
+    expect(entries).toEqual([]);
   });
 });
 

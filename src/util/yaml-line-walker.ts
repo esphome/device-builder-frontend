@@ -113,30 +113,35 @@ export function readPlatformSibling(
   lineIdx: number,
   indent: number,
 ): string | null {
+  // First pass: scan back for *any* ``- platform: <value>`` at a
+  // shallower indent than the cursor. This catches the
+  // deeply-nested case where the cursor sits inside ``filters:``
+  // / ``then:`` / etc. — the list-item dash that declares the
+  // platform may be several indent levels up. Without this scan,
+  // the walker stops at the immediate enclosing block and misses
+  // the outer platform declaration entirely.
+  for (let i = lineIdx - 1; i >= 0; i--) {
+    const raw = lines[i];
+    const stripped = stripComment(raw);
+    if (!stripped.trim()) continue;
+    const ind = indentOf(stripped);
+    if (ind >= indent) continue;
+    if (!/^\s*-\s/.test(raw)) continue;
+    const m = stripped.match(RE_PLATFORM_SIBLING);
+    if (m) return m[1];
+  }
+  // Second pass: same-indent list-item header (``- platform:
+  // gpio`` then siblings on the lines below). Walk up to the
+  // top-of-block, then forward-scan for the ``platform:`` sibling.
   let topOfBlock = lineIdx;
   for (let i = lineIdx - 1; i >= 0; i--) {
     const raw = lines[i];
     const stripped = stripComment(raw);
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
-    // The list-item-header line carries the dash at indent
-    // ``cursorIndent - 2`` (the body keys live one indent step
-    // deeper than the dash). When the walker hits a line whose
-    // indent is shallower than the cursor's AND it starts with
-    // a dash, that's the enclosing list-item header — read its
-    // ``platform:`` value directly. Without this, the walker
-    // breaks before parsing the dash line and the value-position
-    // completion misses the platform context entirely.
-    if (ind < indent) {
-      if (/^\s*-\s/.test(raw)) {
-        const m = stripped.match(RE_PLATFORM_SIBLING);
-        if (m) return m[1];
-      }
-      break;
-    }
+    if (ind < indent) break;
     if (ind === indent) {
       topOfBlock = i;
-      // Stop when we hit a list-item dash — the item starts here.
       if (/^\s*-\s/.test(raw)) break;
     }
   }

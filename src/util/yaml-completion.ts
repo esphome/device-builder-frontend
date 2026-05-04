@@ -39,9 +39,12 @@ import {
   getActions,
   getConfigVarKeys,
   getConfigVarValueOptions,
+  getRegistryEntries,
   getTriggerKeys,
+  lookupRegistryRef,
   type SchemaAction,
   type SchemaConfigVarKey,
+  type SchemaRegistryEntry,
 } from "./esphome-schema.js";
 import {
   collectTopLevelKeys,
@@ -390,6 +393,27 @@ function applyKeyInsertion(
   startCompletion(view);
 }
 
+/** Insert ``key:\n${lead}${INDENT}- `` for list-of-mapping
+ *  config-vars (``filters:``, ``then:``, …). The user lands at
+ *  the dash ready to type the first list item; ``startCompletion``
+ *  re-opens the popup so the registry / action options surface
+ *  immediately. */
+function applyListBlockInsertion(
+  view: EditorView,
+  from: number,
+  to: number,
+  key: string,
+): void {
+  const lead = readLineLead(view, from);
+  applyInsertion(
+    view,
+    from,
+    to,
+    `${key}:\n${lead}${ESPHOME_YAML_INDENT}- `,
+  );
+  startCompletion(view);
+}
+
 /** Read the leading-whitespace prefix of the editor line that
  *  contains *from*. Used by completion ``apply`` callbacks that
  *  need to emit a multi-line snippet whose indent must match the
@@ -414,7 +438,9 @@ function schemaKeyToCompletion(k: SchemaConfigVarKey): Completion {
   return {
     label: k.key,
     apply: (view, _completion, from, to) =>
-      applyKeyInsertion(view, from, to, k.key),
+      k.isList
+        ? applyListBlockInsertion(view, from, to, k.key)
+        : applyKeyInsertion(view, from, to, k.key),
     type: "property",
     detail: k.required ? "required" : undefined,
     info: k.docs ?? undefined,
@@ -467,6 +493,36 @@ function actionToCompletion(a: SchemaAction): Completion {
     type: "function",
     detail: "action",
     info: a.docs ?? undefined,
+  };
+}
+
+/** Render a schema-registry entry (``calibrate_linear``,
+ *  ``clamp``, …) as a list-item completion. Same dash-aware
+ *  apply as ``actionToCompletion`` — both surface at list-item
+ *  positions where the user may or may not have typed the dash
+ *  yet. ``detail`` is the registry-key name itself
+ *  (``filter`` / ``effects``) so the popup distinguishes
+ *  filters from actions when both could apply. */
+function registryToCompletion(
+  e: SchemaRegistryEntry,
+  registryKey: string,
+): Completion {
+  return {
+    label: e.key,
+    apply: (view, _completion, from, to) => {
+      const line = view.state.doc.lineAt(from);
+      const before = line.text.slice(0, from - line.from);
+      const hasListDash = /^\s*-\s+$/.test(before);
+      applyInsertion(
+        view,
+        from,
+        to,
+        hasListDash ? `${e.key}: ` : `- ${e.key}: `,
+      );
+    },
+    type: "function",
+    detail: registryKey,
+    info: e.docs ?? undefined,
   };
 }
 
@@ -858,10 +914,33 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       return getActions(api, bundles, [...tops, "core"]);
     };
 
-    const [entries, triggers, actions] = await Promise.all([
+    // Filter / condition / effect registries — when the cursor
+    // sits at a list-item position whose parent key resolves to
+    // a ``type: "registry"`` config-var (``filters:``,
+    // ``effects:``, …), the entries to suggest are the registry
+    // members declared in the schema bundle (``sensor.filter`` →
+    // ``calibrate_linear`` / ``clamp`` / …). Distinct from
+    // ``inAutomation`` (``then:`` action-registry) which has its
+    // own legacy carve-out for cross-component aggregation.
+    const fetchRegistry = async (): Promise<SchemaRegistryEntry[]> => {
+      if (!isListItem || inAutomation) return [];
+      if (!ctx2.topLevelKey) return [];
+      const target = bundleFor(ctx2.topLevelKey, ctx2.platformValue);
+      const ref = await lookupRegistryRef(
+        api,
+        target.bundle,
+        target.componentKey,
+        parent.key,
+      );
+      if (!ref) return [];
+      return getRegistryEntries(api, ref);
+    };
+
+    const [entries, triggers, actions, registry] = await Promise.all([
       fetchEntries(),
       fetchTriggers(),
       fetchActions(),
+      fetchRegistry(),
     ]);
     // Schema-bundle fallback for the platform-merged case.
     // Some platform implementations (``sensor.uptime``,
@@ -922,20 +1001,8 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ? [
           {
             label: "then",
-            apply: (view, _completion, from, to) => {
-              // ``then:`` is at the same indent as the current
-              // partial; the action list-item ``-`` lives one
-              // indent step deeper. Read the current line's lead
-              // so the snippet stays valid YAML at any nesting
-              // depth.
-              const lead = readLineLead(view, from);
-              applyInsertion(
-                view,
-                from,
-                to,
-                `then:\n${lead}${ESPHOME_YAML_INDENT}- `,
-              );
-            },
+            apply: (view, _completion, from, to) =>
+              applyListBlockInsertion(view, from, to, "then"),
             type: "namespace",
             detail: "trigger body",
             boost: 5,
@@ -947,6 +1014,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       entries.length === 0 &&
       triggers.length === 0 &&
       actions.length === 0 &&
+      registry.length === 0 &&
       schemaKeys.length === 0 &&
       triggerBody.length === 0 &&
       platformKey.length === 0
@@ -958,6 +1026,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ...schemaKeys.map(schemaKeyToCompletion),
       ...triggers.map(triggerToCompletion),
       ...actions.map(actionToCompletion),
+      ...registry.map((e) => registryToCompletion(e, parent.key)),
       ...triggerBody,
       ...platformKey,
     ];

@@ -168,6 +168,27 @@ describe("getPlatformValue", () => {
     const state = makeState(yaml);
     expect(getPlatformValue(state, posAt(yaml, 3, 5))).toBeNull();
   });
+
+  it("walks past inner Items to find the outer platform-declaring one", () => {
+    // Cursor inside the nested ``filters:`` item under the
+    // sensor's ``- platform: uptime`` block. The immediate
+    // enclosing Item is the filters' inner item (which has its
+    // own platform-less mapping); the walker must keep walking
+    // up to the outer sensor item to resolve the platform
+    // context. Without this, registry completion at deeper
+    // nesting can't query the right schema bundle.
+    const yaml = [
+      "sensor:",
+      "  - platform: uptime",
+      "    name: zwave",
+      "    filters:",
+      "      - clamp:",
+      "          min_value: 0",
+    ].join("\n");
+    const state = makeState(yaml);
+    // Cursor inside the ``min_value: 0`` line.
+    expect(getPlatformValue(state, posAt(yaml, 6, 12))).toBe("uptime");
+  });
 });
 
 describe("isUnderThenItem", () => {

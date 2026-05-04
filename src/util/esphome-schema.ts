@@ -93,6 +93,27 @@ export interface SchemaSchema {
   extends?: string[];
 }
 
+/** Top-level registry slots a ``SchemaComponent`` can carry. The
+ *  legacy dashboard's ``getRegistry(name, doc)`` switches on
+ *  these names; pinning the union keeps callsites that index by
+ *  registry name (``getRegistryEntries``) honest about which
+ *  slots are valid. */
+export const SCHEMA_REGISTRY_KEYS = [
+  "action",
+  "condition",
+  "filter",
+  "effects",
+] as const;
+export type SchemaRegistryKey = (typeof SCHEMA_REGISTRY_KEYS)[number];
+
+const REGISTRY_KEY_SET = new Set<string>(SCHEMA_REGISTRY_KEYS);
+
+/** Type guard for the registry-key union — the legacy
+ *  ``SchemaComponent`` only carries these four slots. */
+function isRegistryKey(name: string): name is SchemaRegistryKey {
+  return REGISTRY_KEY_SET.has(name);
+}
+
 export interface SchemaComponent {
   schemas?: Record<string, SchemaConfigVar | undefined> & {
     CONFIG_SCHEMA?: SchemaConfigVarSchema;
@@ -342,6 +363,12 @@ export interface SchemaConfigVarKey {
    *  the schema declares it explicitly. Used to mark required
    *  fields in completion details. */
   required?: boolean;
+  /** True when the schema declares ``is_list: true`` — the value
+   *  is a list of mappings (``filters:`` is the canonical
+   *  example). Drives the apply snippet shape: ``key:\n  - ``
+   *  instead of ``key: `` so the user lands ready to type the
+   *  first list item. */
+  isList?: boolean;
 }
 
 /**
@@ -469,6 +496,7 @@ function pushConfigVars(
       key,
       docs: decl.docs,
       required: decl.key === "Required",
+      isList: decl.is_list === true,
     });
   }
 }
@@ -642,6 +670,137 @@ export interface SchemaAction {
    *  or just ``delay`` / ``if`` / ``lambda`` for core actions. */
   key: string;
   docs?: string;
+}
+
+export interface SchemaRegistryEntry {
+  key: string;
+  docs?: string;
+}
+
+/**
+ * Walk the schema for *componentKey* (typed-schema variants +
+ * extends) looking for a config-var named *varKey* with
+ * ``type: "registry"``. Returns the dotted registry reference
+ * (e.g. ``sensor.filter``) when found. Used to discover the
+ * registry that backs ``filters:`` and similar list-of-mapping
+ * config-vars whose entries live in a bundle-level registry
+ * map rather than as ordinary config_vars.
+ */
+export async function lookupRegistryRef(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  varKey: string,
+): Promise<string | null> {
+  const out: { ref: string | null } = { ref: null };
+  await collectRegistryRef(
+    api,
+    bundleName,
+    componentKey,
+    "CONFIG_SCHEMA",
+    varKey,
+    out,
+    new Set(),
+  );
+  return out.ref;
+}
+
+async function collectRegistryRef(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  schemaName: string,
+  varKey: string,
+  out: { ref: string | null },
+  visited: Set<string>,
+): Promise<void> {
+  if (out.ref) return;
+  const cv = await loadSchemaCv(
+    api,
+    bundleName,
+    componentKey,
+    schemaName,
+    visited,
+  );
+  if (!cv) return;
+
+  const tryVars = (
+    vars: Record<string, SchemaConfigVar | undefined> | undefined,
+  ): boolean => {
+    const decl = vars?.[varKey];
+    if (!decl || decl.type !== "registry") return false;
+    out.ref = decl.registry;
+    return true;
+  };
+
+  if (cv.type === "typed") {
+    for (const variant of Object.values(cv.types ?? {})) {
+      if (!variant) continue;
+      if (tryVars(variant.config_vars)) return;
+      for (const ext of variant.extends ?? []) {
+        const ref = parseExtendsRef(ext);
+        if (!ref) continue;
+        await collectRegistryRef(
+          api,
+          ref.bundle,
+          ref.componentKey,
+          ref.schemaName,
+          varKey,
+          out,
+          visited,
+        );
+        if (out.ref) return;
+      }
+    }
+    return;
+  }
+
+  const schema = "schema" in cv ? cv.schema : undefined;
+  if (!schema) return;
+  if (tryVars(schema.config_vars)) return;
+  for (const ext of schema.extends ?? []) {
+    const ref = parseExtendsRef(ext);
+    if (!ref) continue;
+    await collectRegistryRef(
+      api,
+      ref.bundle,
+      ref.componentKey,
+      ref.schemaName,
+      varKey,
+      out,
+      visited,
+    );
+    if (out.ref) return;
+  }
+}
+
+/**
+ * Fetch the entries of a single registry (e.g. ``sensor.filter``).
+ * The registry ref is a ``<bundle>.<registry>`` pair; bundle name
+ * and registry-key parsing matches the legacy
+ * ``getRegistry(name, doc)``. Returns ``[]`` on any failure
+ * (CSP / offline / missing bundle / no such registry).
+ */
+export async function getRegistryEntries(
+  api: ESPHomeAPI,
+  registryRef: string,
+): Promise<SchemaRegistryEntry[]> {
+  const dot = registryRef.indexOf(".");
+  if (dot < 0) return [];
+  const bundleName = registryRef.slice(0, dot);
+  const registryKey = registryRef.slice(dot + 1);
+  const bundle = await fetchBundle(api, bundleName);
+  if (!bundle) return [];
+  const component = bundle[bundleName];
+  if (!component) return [];
+  if (!isRegistryKey(registryKey)) return [];
+  const registry = (component as SchemaComponent | undefined)?.[registryKey];
+  if (!registry) return [];
+  const out: SchemaRegistryEntry[] = [];
+  for (const [name, cv] of Object.entries(registry)) {
+    out.push({ key: name, docs: cv?.docs });
+  }
+  return out;
 }
 
 /**
