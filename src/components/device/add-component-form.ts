@@ -17,6 +17,7 @@ import {
   validateEntries,
   type ValidationError,
 } from "../../util/config-validation.js";
+import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -218,6 +219,20 @@ export class ESPHomeAddComponentForm extends LitElement {
       next = { ...next, id: this._generateDefaultId() };
     }
 
+    // Seed pin entries from the board's manifest when the board has
+    // a pin tagged with the matching peripheral feature. Without this,
+    // ESPHome falls back to its compile-time defaults — which on the
+    // ESP32-C3 (and other variants without an SCL/SDA alias) are
+    // either invalid or wrong-numbered (the original symptom from
+    // MasterOfNone: i2c on C3 emitting an "Invalid pin number: 22"
+    // squiggle because the bus block fell back to ESP32 GPIO22/21).
+    next = seedBoardPinDefaults(
+      this.component.id,
+      this.component.config_entries,
+      this.board,
+      next,
+    );
+
     if (this.prefillReference) {
       const targetPath = this._findReferencePath(
         this.component.config_entries,
@@ -231,6 +246,7 @@ export class ESPHomeAddComponentForm extends LitElement {
 
     this._values = next;
   }
+
 
   /**
    * Walk the schema recursively to find the path of the first entry
