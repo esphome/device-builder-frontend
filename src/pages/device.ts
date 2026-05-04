@@ -4,11 +4,7 @@ import { html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type {
-  BoardCatalogEntry,
-  ConfiguredDevice,
-  FirmwareJob,
-} from "../api/types.js";
+import type { BoardCatalogEntry, ConfiguredDevice, FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { NavSectionName } from "../components/device/device-board-info.js";
@@ -18,6 +14,7 @@ import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
 import {
@@ -29,6 +26,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
+import { handlePostInstallShowLogs } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { devicePageStyles } from "./device-styles.js";
@@ -39,6 +37,7 @@ import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
 import "../components/firmware-install-dialog.js";
 import "../components/install-method-dialog.js";
+import "../components/logs-dialog.js";
 import "../components/unsaved-changes-dialog.js";
 
 registerMdiIcons({
@@ -149,6 +148,13 @@ export class ESPHomePageDevice extends LitElement {
 
   @query("esphome-firmware-install-dialog")
   private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+
+  @query("esphome-logs-dialog")
+  private _logsDialog!: ESPHomeLogsDialog;
+
+  private _onPostInstallShowLogs = (
+    e: CustomEvent<import("../util/post-install-logs.js").PostInstallShowLogsDetail>
+  ) => handlePostInstallShowLogs(e, this._logsDialog);
 
   private _installCtrl = this._createInstallController();
 
@@ -467,8 +473,13 @@ export class ESPHomePageDevice extends LitElement {
         @save=${this._onLeaveSave}
         @cancel=${this._onLeaveCancel}
       ></esphome-unsaved-changes-dialog>
-      <esphome-command-dialog></esphome-command-dialog>
-      <esphome-firmware-install-dialog></esphome-firmware-install-dialog>
+      <esphome-command-dialog
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
+      ></esphome-command-dialog>
+      <esphome-firmware-install-dialog
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
+      ></esphome-firmware-install-dialog>
+      <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
         ?open=${this._installCtrl.installMethodOpen}
         .deviceState=${this._installCtrl.deviceState}
@@ -496,7 +507,9 @@ export class ESPHomePageDevice extends LitElement {
       this._drawerOpen = !this._drawerOpen;
     } else {
       this._navCollapsed = !this._navCollapsed;
-      this._api.updatePreferences({ navigator_visible: !this._navCollapsed }).catch(() => {});
+      this._api
+        .updatePreferences({ navigator_visible: !this._navCollapsed })
+        .catch(() => {});
     }
   }
 
@@ -526,9 +539,7 @@ export class ESPHomePageDevice extends LitElement {
    * navigator's three top-level groups are rendered in order
    * (core = 0, components = 1, automations = 2).
    */
-  private _onNavSectionShow(
-    e: CustomEvent<{ section: NavSectionName }>,
-  ) {
+  private _onNavSectionShow(e: CustomEvent<{ section: NavSectionName }>) {
     const indexBySection = { core: 0, components: 1, automations: 2 };
     const idx = indexBySection[e.detail.section];
     if (idx === undefined) return;
@@ -540,9 +551,7 @@ export class ESPHomePageDevice extends LitElement {
       this._navCollapsed = false;
       // Persist so the nav stays open across reloads — same path the
       // toggle button takes when the user un-hides manually.
-      this._api
-        .updatePreferences({ navigator_visible: true })
-        .catch(() => {});
+      this._api.updatePreferences({ navigator_visible: true }).catch(() => {});
     }
   }
 

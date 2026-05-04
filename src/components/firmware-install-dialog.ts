@@ -7,6 +7,7 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
+  mdiConsole,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
@@ -17,6 +18,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { chipNameToVariant } from "../util/chip-variant.js";
+import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   connectToPort,
@@ -40,6 +42,7 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
+  console: mdiConsole,
 });
 
 type InstallStep =
@@ -75,6 +78,19 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() private _logsFullHeight = false;
   @state() private _flashPercent = 0;
   @state() private _downloadedFilename = "";
+  /** Auto-flip to the logs dialog after a successful Web Serial
+   *  install. Default on so users see device output the way
+   *  ``esphome run`` does on the CLI; opt out by clicking the
+   *  toolbar toggle before the install finishes. Reset to default
+   *  per ``_init`` so an opt-out on one run doesn't silently
+   *  persist into unrelated future runs. ``installWebDownload``
+   *  doesn't connect to a device, so the toggle is install-only. */
+  @state() private _showLogsAfterInstall = true;
+  /** Which entry point opened the dialog. ``web-serial`` shows the
+   *  show-logs-after-install toggle and dispatches the auto-flip on
+   *  success; ``web-download`` doesn't connect to a device so the
+   *  toggle is hidden and there's nothing to flip to. */
+  @state() private _installer: "web-serial" | "web-download" | null = null;
 
   private _device: ConfiguredDevice | null = null;
   private _jobId = "";
@@ -105,6 +121,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    */
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
+    this._installer = "web-serial";
     this._step = "connecting";
     this._statusMessage = this._localize("firmware.status_connecting");
     this._dialog.open = true;
@@ -120,10 +137,22 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    */
   installWebDownload(device: ConfiguredDevice) {
     this._init(device);
+    this._installer = "web-download";
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
     this._dialog.open = true;
     this._startWebDownload();
+  }
+
+  /**
+   * Reopen this dialog without clearing the line buffer or status.
+   * Used by the logs-dialog's "Back to install" button after the
+   * Web Serial post-install hand-off so the user can review the
+   * install output. State (status, log lines, success icon) is
+   * preserved across the flip.
+   */
+  public reopen() {
+    this._dialog.open = true;
   }
 
   private _init(device: ConfiguredDevice) {
@@ -148,6 +177,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsFullHeight = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
+    this._showLogsAfterInstall = true;
+    this._installer = null;
     // ``_jobId`` is already cleared by ``_detachStream`` above; same
     // for ``_streamId`` and ``_compileReject``.
     this._detected = null;
@@ -393,6 +424,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         color: var(--wa-color-text-normal);
         border-color: var(--wa-color-surface-border);
       }
+      /* Active state for ghost toggle buttons (the show-logs-after
+         toggle uses this to read as "currently on"). Mirrors the
+         shape used in command-dialog / logs-dialog so the visual
+         language is consistent across the install flow. */
+      .btn--ghost.is-active {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+        color: var(--esphome-primary);
+        border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+      }
+      .btn--ghost wa-icon {
+        font-size: 14px;
+      }
     `,
   ];
 
@@ -531,8 +574,24 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     const isRunning =
       this._step !== "done" && this._step !== "error" && this._step !== "download-ready";
     if (isRunning) {
+      /* Surface the show-logs-after-install toggle on Web Serial
+         installs so users get the same opt-out point the command
+         dialog has. ``installWebDownload`` doesn't connect to a
+         device so the toggle is hidden there. */
+      const showToggle = this._installer === "web-serial";
       return html`
         <div class="footer">
+          ${showToggle
+            ? html`<button
+                class="btn btn--ghost ${this._showLogsAfterInstall ? "is-active" : ""}"
+                @click=${this._toggleShowLogsAfterInstall}
+                aria-pressed=${this._showLogsAfterInstall ? "true" : "false"}
+                title=${this._localize("command.show_logs_after_install_tooltip")}
+              >
+                <wa-icon library="mdi" name="console"></wa-icon>
+                ${this._localize("command.show_logs_after_install")}
+              </button>`
+            : nothing}
           <button class="btn btn--ghost" @click=${this._cancel}>
             ${this._localize("command.stop")}
           </button>
@@ -556,14 +615,37 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         </div>
       `;
     }
+    /* Web Serial install success: surface a "Logs" action so the
+       user has a one-click path back to the logs viewer after
+       they've clicked its "Back to install" button. Same auto-flip
+       handler is reused. ``_detected`` survives the auto-hide path
+       (``_onClose`` doesn't clear it) but ``_close`` does, so the
+       button only renders while the SerialPort reference is still
+       around. */
+    const canShowLogs =
+      this._installer === "web-serial" &&
+      this._step === "done" &&
+      this._detected !== null;
     return html`
       <div class="footer">
-        <button class="btn btn--primary" @click=${this._close}>
-          ${this._localize("command.close")}
-        </button>
+        ${canShowLogs
+          ? html`<button class="btn btn--primary" @click=${this._showLogsAgain}>
+                <wa-icon library="mdi" name="console"></wa-icon>
+                ${this._localize("command.show_logs")}
+              </button>
+              <button class="btn btn--ghost" @click=${this._close}>
+                ${this._localize("command.close")}
+              </button>`
+          : html`<button class="btn btn--primary" @click=${this._close}>
+              ${this._localize("command.close")}
+            </button>`}
       </div>
     `;
   }
+
+  private _showLogsAgain = () => {
+    if (this._detected) this._flipToLogs(this._detected.port);
+  };
 
   // ─── Web Serial Install ────────────────────────────────
 
@@ -727,6 +809,35 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
     this._statusMessage = this._localize("firmware.status_done");
     this._step = "done";
+    /* Only auto-flip if the dialog is still on screen — ``_cancel``
+       closes the UI but doesn't actually interrupt the Web Serial
+       flash loop, so a dismissed install can still reach this point.
+       Without the ``_open`` guard the logs viewer would pop up out
+       of nowhere on a user who already walked away. */
+    if (this._open && this._showLogsAfterInstall) {
+      this._flipToLogs(flashDetected.port);
+    }
+  }
+
+  /**
+   * Successful-Web-Serial-install hand-off: dispatch the same
+   * ``request-show-logs-after-install`` event the command-dialog
+   * uses, but with the live ``SerialPort`` attached so the host
+   * can re-open it at log baud and stream device output without
+   * re-prompting the user for port selection. The event is
+   * cancelable: only hide this dialog if a host claimed it via
+   * ``preventDefault()``. ``reopenInstall`` lets the logs
+   * dialog's "Back to install" button bring this dialog back. */
+  private _flipToLogs(webSerialPort: SerialPort) {
+    const device = this._device;
+    if (!device) return;
+    const handled = dispatchShowLogsAfterInstall(this, {
+      configuration: device.configuration,
+      name: device.friendly_name || device.name,
+      webSerialPort,
+      reopenInstall: () => this.reopen(),
+    });
+    if (handled) this._dialog.open = false;
   }
 
   // ─── Web Download (compile + save .bin for web.esphome.io) ─────
@@ -824,6 +935,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   // ─── Helpers ───────────────────────────────────────────
+
+  private _toggleShowLogsAfterInstall = () => {
+    this._showLogsAfterInstall = !this._showLogsAfterInstall;
+  };
 
   private _fail(message: string) {
     this._step = "error";

@@ -1,5 +1,15 @@
 import { consume } from "@lit/context";
-import { mdiArrowCollapse, mdiArrowExpand, mdiClose, mdiDeleteSweep, mdiDownload, mdiPlay, mdiPulse, mdiStop } from "@mdi/js";
+import {
+  mdiArrowCollapse,
+  mdiArrowExpand,
+  mdiArrowLeft,
+  mdiClose,
+  mdiDeleteSweep,
+  mdiDownload,
+  mdiPlay,
+  mdiPulse,
+  mdiStop,
+} from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -17,6 +27,7 @@ import "./ansi-log.js";
 registerMdiIcons({
   "arrow-collapse": mdiArrowCollapse,
   "arrow-expand": mdiArrowExpand,
+  "arrow-left": mdiArrowLeft,
   close: mdiClose,
   download: mdiDownload,
   play: mdiPlay,
@@ -55,6 +66,24 @@ export class ESPHomeLogsDialog extends LitElement {
 
   @state()
   private _passive = false;
+
+  /**
+   * Set when this session was launched as the post-install logs
+   * hand-off. Surfaces a "Back to install" button in the toolbar;
+   * clicking it stops the stream, closes the dialog, and invokes
+   * the supplied callback so the source install dialog (could be
+   * either the command-dialog or the firmware-install-dialog) can
+   * re-show itself with its preserved state. Reset on every fresh
+   * ``open`` / ``openPassive`` so the affordance only appears for
+   * the run that asked for it.
+   *
+   * Callback in the field, boolean in the state — the boolean
+   * drives the toolbar render and updates trigger Lit reactivity;
+   * the callback closure isn't render-relevant on its own.
+   */
+  @state()
+  private _backToInstall = false;
+  private _backToInstallHandler: (() => void) | null = null;
 
   @state()
   _lines: string[] = [];
@@ -233,7 +262,9 @@ export class ESPHomeLogsDialog extends LitElement {
         font-family: "SF Mono", "Fira Code", monospace;
         cursor: pointer;
         border: 1px solid var(--term-border);
-        transition: background 0.1s, border-color 0.1s;
+        transition:
+          background 0.1s,
+          border-color 0.1s;
       }
 
       .term-btn wa-icon {
@@ -290,8 +321,13 @@ export class ESPHomeLogsDialog extends LitElement {
       }
 
       @keyframes pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.3; }
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
       }
 
       /* Full-viewport rules — the same shape applies when the user
@@ -357,7 +393,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _port = "OTA";
 
-  public open(port = "OTA") {
+  public open(port = "OTA", options: { onBackToInstall?: () => void } = {}) {
     this._port = port;
     this._lines = [];
     this._streaming = false;
@@ -368,6 +404,8 @@ export class ESPHomeLogsDialog extends LitElement {
        explicitly flips the toggle this session. */
     this._showStates = true;
     this._passive = false;
+    this._backToInstallHandler = options.onBackToInstall ?? null;
+    this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -406,7 +444,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  public openPassive() {
+  public openPassive(options: { onBackToInstall?: () => void } = {}) {
     // Tear down any previous Web Serial read loop before kicking off
     // the new session — without this the prior reader keeps shoving
     // bytes into ``_lines`` and the new device's output is mixed
@@ -423,6 +461,8 @@ export class ESPHomeLogsDialog extends LitElement {
        subprocess to pass ``--no-states`` to, so the toggle is hidden
        in passive mode to avoid implying state filtering is available. */
     this._passive = true;
+    this._backToInstallHandler = options.onBackToInstall ?? null;
+    this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -436,15 +476,11 @@ export class ESPHomeLogsDialog extends LitElement {
   protected render() {
     const title = this._localize("dashboard.logs_title", { name: this.name });
     const toggleLabel = this._localize(
-      this._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states",
+      this._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states"
     );
 
     return html`
-      <wa-dialog
-        label=${title}
-        light-dismiss
-        @wa-after-hide=${this._onDialogHide}
-      >
+      <wa-dialog label=${title} light-dismiss @wa-after-hide=${this._onDialogHide}>
         <div class="logs-content">
           <esphome-ansi-log
             .lines=${this._lines}
@@ -452,15 +488,27 @@ export class ESPHomeLogsDialog extends LitElement {
             ?light=${!this._darkMode}
           ></esphome-ansi-log>
           <div class="terminal-toolbar">
-            ${this._streaming
-              ? html`<span class="streaming-dot"></span>`
+            ${this._backToInstall
+              ? html`
+                  <button
+                    class="term-btn term-btn--ghost"
+                    @click=${this._onBackToInstall}
+                    title=${this._localize("dashboard.logs_back_to_install_tooltip")}
+                  >
+                    <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                    ${this._localize("dashboard.logs_back_to_install")}
+                  </button>
+                `
               : ""}
+            ${this._streaming ? html`<span class="streaming-dot"></span>` : ""}
             <span class="spacer"></span>
             ${this._passive
               ? ""
               : html`
                   <button
-                    class="term-btn term-btn--ghost ${this._showStates ? "is-active" : ""}"
+                    class="term-btn term-btn--ghost ${this._showStates
+                      ? "is-active"
+                      : ""}"
                     @click=${this._toggleShowStates}
                     title=${toggleLabel}
                     aria-pressed=${this._showStates ? "true" : "false"}
@@ -473,12 +521,12 @@ export class ESPHomeLogsDialog extends LitElement {
               class="term-btn term-btn--ghost expand-btn"
               @click=${this._toggleExpanded}
             >
-              <wa-icon library="mdi" name=${this._expanded ? "arrow-collapse" : "arrow-expand"}></wa-icon>
+              <wa-icon
+                library="mdi"
+                name=${this._expanded ? "arrow-collapse" : "arrow-expand"}
+              ></wa-icon>
             </button>
-            <button
-              class="term-btn term-btn--ghost"
-              @click=${this._downloadLogs}
-            >
+            <button class="term-btn term-btn--ghost" @click=${this._downloadLogs}>
               <wa-icon library="mdi" name="download"></wa-icon>
             </button>
             <button
@@ -528,7 +576,7 @@ export class ESPHomeLogsDialog extends LitElement {
           this._streamId = "";
         },
       },
-      { noStates: !this._showStates },
+      { noStates: !this._showStates }
     );
   }
 
@@ -548,7 +596,10 @@ export class ESPHomeLogsDialog extends LitElement {
     // any error from the call. Returns a promise so callers that need
     // to wait for the cancel to land (e.g. the states toggle, which
     // immediately spawns a fresh stream) can await it.
-    return this._api.stopStream(streamId).catch(() => undefined).then(() => undefined);
+    return this._api
+      .stopStream(streamId)
+      .catch(() => undefined)
+      .then(() => undefined);
   }
 
   private _downloadLogs() {
@@ -582,6 +633,27 @@ export class ESPHomeLogsDialog extends LitElement {
   private _onDialogHide() {
     this._stopStreaming();
   }
+
+  /**
+   * "Back to install" handler — only visible when an ``onBackToInstall``
+   * callback was supplied to ``open`` / ``openPassive`` (post-install
+   * hand-off). Stops the live stream, closes this dialog, and invokes
+   * the supplied callback to re-show the source install dialog with
+   * its preserved state.
+   *
+   * Awaits ``_stopStreaming`` so the backend log subprocess has
+   * actually torn down before the install dialog re-takes the
+   * screen. Without the await, a fast ``Back → Logs → Back → Logs``
+   * toggle by the user could leave two backend log subscriptions
+   * running briefly, both pumping lines into the same buffer. */
+  private _onBackToInstall = async () => {
+    await this._stopStreaming();
+    const handler = this._backToInstallHandler;
+    this._backToInstall = false;
+    this._backToInstallHandler = null;
+    this._dialog.open = false;
+    handler?.();
+  };
 }
 
 declare global {

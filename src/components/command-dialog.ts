@@ -3,6 +3,7 @@ import {
   mdiAlertCircle,
   mdiCheckCircle,
   mdiClose,
+  mdiConsole,
   mdiDownload,
   mdiKey,
   mdiKeyOutline,
@@ -29,6 +30,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -37,6 +39,7 @@ import "./ansi-log.js";
 
 registerMdiIcons({
   close: mdiClose,
+  console: mdiConsole,
   download: mdiDownload,
   key: mdiKey,
   "key-outline": mdiKeyOutline,
@@ -112,6 +115,12 @@ export class ESPHomeCommandDialog extends LitElement {
    *  resolved secrets never leak into a screen-share without an
    *  explicit click. */
   @state() private _showSecrets = false;
+  /** Auto-flip to the logs dialog after a successful install. Default
+   *  on so users see device output the way ``esphome run`` does on
+   *  the CLI; opt out by clicking the toolbar toggle before the
+   *  install finishes. Reset to default per ``open()`` so an opt-out
+   *  on one run doesn't silently persist into unrelated future runs. */
+  @state() private _showLogsAfterInstall = true;
   /** Guard against re-entrancy on the show-secrets toggle.
    *  ``_detachStream`` clears ``_streamId`` synchronously and only
    *  awaits the backend stop afterwards; without this flag a fast
@@ -180,7 +189,9 @@ export class ESPHomeCommandDialog extends LitElement {
          config dumps, stack traces) to the user's browser scrollbar.
          min(..., 94vw) keeps the dialog from kissing the viewport
          edges on smaller screens. */
-      wa-dialog { --width: min(1300px, 94vw); }
+      wa-dialog {
+        --width: min(1300px, 94vw);
+      }
       /* Header matches the device-editor's title bar
          (--esphome-primary background with --esphome-on-primary
          text) so Validate / Install / Clean dialogs read as part
@@ -202,13 +213,19 @@ export class ESPHomeCommandDialog extends LitElement {
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       }
       wa-dialog::part(close-button__base) {
-        background: transparent; border: none; box-shadow: none;
+        background: transparent;
+        border: none;
+        box-shadow: none;
         /* Square 40x40 button matching the header height so the X has a
            comfortable click/tap target instead of just the icon's
            ~14px footprint. */
-        padding: 0; width: 40px; height: 40px;
-        min-width: unset; min-height: unset;
-        color: var(--esphome-on-primary); cursor: pointer;
+        padding: 0;
+        width: 40px;
+        height: 40px;
+        min-width: unset;
+        min-height: unset;
+        color: var(--esphome-on-primary);
+        cursor: pointer;
       }
       /* Same affordance for hover and keyboard focus so the close
          button is discoverable either way on the new lighter
@@ -218,8 +235,14 @@ export class ESPHomeCommandDialog extends LitElement {
         background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
         outline: none;
       }
-      wa-dialog::part(body) { padding: 0; background: var(--term-bg); overflow: hidden; }
-      wa-dialog::part(footer) { display: none; }
+      wa-dialog::part(body) {
+        padding: 0;
+        background: var(--term-bg);
+        overflow: hidden;
+      }
+      wa-dialog::part(footer) {
+        display: none;
+      }
 
       .content {
         display: flex;
@@ -245,7 +268,9 @@ export class ESPHomeCommandDialog extends LitElement {
         min-height: 0;
         --log-height: 100%;
       }
-      esphome-ansi-log::part(container) { border-radius: 0; }
+      esphome-ansi-log::part(container) {
+        border-radius: 0;
+      }
 
       /* Queued-overlay — covers the empty log area while the job is
          waiting in line behind another firmware task. The dialog
@@ -272,11 +297,18 @@ export class ESPHomeCommandDialog extends LitElement {
         animation: queued-pulse 2s ease-in-out infinite;
       }
       @keyframes queued-pulse {
-        0%, 100% { opacity: 0.7; }
-        50% { opacity: 1; }
+        0%,
+        100% {
+          opacity: 0.7;
+        }
+        50% {
+          opacity: 1;
+        }
       }
       @media (prefers-reduced-motion: reduce) {
-        .queued-overlay wa-icon[name="timer-sand"] { animation: none; }
+        .queued-overlay wa-icon[name="timer-sand"] {
+          animation: none;
+        }
       }
       .queued-title {
         font-size: 16px;
@@ -314,32 +346,60 @@ export class ESPHomeCommandDialog extends LitElement {
 
       .terminal-toolbar {
         flex-shrink: 0;
-        display: flex; align-items: center; gap: var(--wa-space-xs);
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
         padding: 6px var(--wa-space-m);
         background: var(--term-bg-alt);
         border-top: 1px solid var(--term-border);
       }
-      .terminal-toolbar .spacer { flex: 1; }
+      .terminal-toolbar .spacer {
+        flex: 1;
+      }
 
       .streaming-dot {
-        width: 6px; height: 6px; border-radius: 50%;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
         background: var(--term-accent);
         animation: pulse 1.5s infinite;
       }
-      @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.3;
+        }
+      }
 
       .term-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        gap: 5px; padding: 4px 12px; border-radius: 4px;
-        font-size: 12px; font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 4px 12px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
         font-family: "SF Mono", "Fira Code", monospace;
-        cursor: pointer; border: 1px solid var(--term-border);
-        transition: background 0.1s, border-color 0.1s;
+        cursor: pointer;
+        border: 1px solid var(--term-border);
+        transition:
+          background 0.1s,
+          border-color 0.1s;
       }
-      .term-btn wa-icon { font-size: 14px; }
-      .term-btn--ghost { background: transparent; color: var(--term-fg-muted); }
+      .term-btn wa-icon {
+        font-size: 14px;
+      }
+      .term-btn--ghost {
+        background: transparent;
+        color: var(--term-fg-muted);
+      }
       .term-btn--ghost:hover {
-        background: var(--term-hover); color: var(--term-fg);
+        background: var(--term-hover);
+        color: var(--term-fg);
         border-color: var(--term-fg-muted);
       }
       /* Active state for toggle ghost buttons (e.g. show-secrets).
@@ -389,6 +449,7 @@ export class ESPHomeCommandDialog extends LitElement {
        moment can't accidentally inherit a previous "show secrets"
        state. */
     this._showSecrets = false;
+    this._showLogsAfterInstall = true;
     this._detachStream();
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -419,6 +480,14 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = "running";
     this._lines = [];
     this._statusMessage = "";
+    /* Match ``open()``: every fresh attach is a fresh session, so
+       reset the per-toggle defaults rather than letting the prior
+       run's choice leak into this one. Most relevant for
+       ``_showLogsAfterInstall`` because a user who flipped the
+       toggle off on a prior install would otherwise see this re-
+       attached install silently inherit that opt-out. */
+    this._showSecrets = false;
+    this._showLogsAfterInstall = true;
     this._jobId = job.job_id;
     /* Prime from the job we were handed so the queued overlay can
        render on the very first paint instead of after the next
@@ -441,6 +510,44 @@ export class ESPHomeCommandDialog extends LitElement {
     this._detachStream();
     this._dialog.open = false;
   }
+
+  /**
+   * Reopen this dialog without clearing the line buffer or status.
+   * Used by the logs-dialog's "Back to install" button after the
+   * post-install hand-off so the user can review the install
+   * output. Safe to call when the dialog has been dismissed via X
+   * / Escape — the dialog instance stays in the DOM and all state
+   * lives on this host. */
+  public reopen() {
+    this._dialog.open = true;
+    this._resetAnsiLogScroll();
+  }
+
+  /**
+   * Successful-install hand-off: ask the host to open the logs
+   * dialog tailing the same configuration, and (only if a host
+   * acknowledged the request via ``preventDefault()``) hide this
+   * dialog so the logs dialog has the screen to itself. The
+   * install ``port`` carries through so server-serial installs
+   * become server-serial logs and OTA installs become network
+   * logs.
+   *
+   * The event is cancelable: contexts that don't mount a
+   * ``<esphome-logs-dialog>`` (e.g. ``firmware-jobs-dialog``,
+   * which mounts its own ``<esphome-command-dialog>`` for past
+   * job output but no logs viewer) leave the command dialog
+   * open instead of vanishing into nothing. Pages that DO wire
+   * the handoff call ``e.preventDefault()`` from
+   * ``handlePostInstallShowLogs`` to claim it. */
+  private _flipToLogs = () => {
+    const handled = dispatchShowLogsAfterInstall(this, {
+      configuration: this.configuration,
+      name: this.name,
+      port: this._port,
+      reopenInstall: () => this.reopen(),
+    });
+    if (handled) this._dialog.open = false;
+  };
 
   /**
    * Tear down the active stream subscription, both client-side
@@ -475,11 +582,13 @@ export class ESPHomeCommandDialog extends LitElement {
       <wa-dialog label=${this._title} light-dismiss @wa-after-hide=${this._onDialogHide}>
         <div class="content">
           <div class="log-area">
-            <esphome-ansi-log .lines=${this._lines} ?light=${!this._darkMode}></esphome-ansi-log>
+            <esphome-ansi-log
+              .lines=${this._lines}
+              ?light=${!this._darkMode}
+            ></esphome-ansi-log>
             ${this._renderQueuedOverlay()}
           </div>
-          ${this._renderBanner()}
-          ${this._renderToolbar()}
+          ${this._renderBanner()} ${this._renderToolbar()}
         </div>
       </wa-dialog>
     `;
@@ -518,9 +627,7 @@ export class ESPHomeCommandDialog extends LitElement {
     return html`
       <div class="queued-overlay" role="status" aria-live="polite">
         <wa-icon library="mdi" name="timer-sand"></wa-icon>
-        <div class="queued-title">
-          ${this._localize("command.queued_title")}
-        </div>
+        <div class="queued-title">${this._localize("command.queued_title")}</div>
         <div class="queued-message">
           ${running
             ? this._localize("command.queued_waiting_for", {
@@ -546,7 +653,7 @@ export class ESPHomeCommandDialog extends LitElement {
       new CustomEvent("open-firmware-jobs", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -568,7 +675,7 @@ export class ESPHomeCommandDialog extends LitElement {
       <div class="terminal-toolbar">
         ${this._renderStatus()}
         <span class="spacer"></span>
-        ${this._renderShowSecretsToggle()}
+        ${this._renderShowSecretsToggle()} ${this._renderShowLogsAfterInstallToggle()}
         ${this._lines.length > 0
           ? html`<button
               class="term-btn term-btn--ghost"
@@ -585,34 +692,94 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   /**
-   * Render the show-secrets toggle — validate only.
-   *
-   * Only relevant for the validate path: ``--show-secrets`` is an
-   * ``esphome config`` flag, not something the compile / install /
-   * clean flows respect. Hide on every other command type so the
-   * toolbar doesn't accumulate a row of inert buttons. Same shape
-   * as the logs-dialog "States" toggle: ghost button, ``is-active``
-   * class when on, ``aria-pressed`` for screen readers, label
-   * swaps between Show / Hide.
+   * Render a toolbar toggle button — shared shape used by every
+   * is-active toggle in this dialog (and mirrored by the logs-dialog
+   * "States" toggle). Ghost button, ``is-active`` class when on,
+   * ``aria-pressed`` for screen readers, label and tooltip swap
+   * between the active and inactive states. Each per-toggle render
+   * method just supplies the active flag, click handler, icon, and
+   * the four translation keys.
    */
-  private _renderShowSecretsToggle() {
-    if (this._commandType !== "validate") return nothing;
-    const labelKey = this._showSecrets
-      ? "command.hide_secrets"
-      : "command.show_secrets";
-    const tooltipKey = this._showSecrets
-      ? "command.hide_secrets_tooltip"
-      : "command.show_secrets_tooltip";
+  private _renderToolbarToggle(opts: {
+    active: boolean;
+    onClick: () => void;
+    iconActive: string;
+    iconInactive: string;
+    labelKeyActive: string;
+    labelKeyInactive: string;
+    tooltipKeyActive: string;
+    tooltipKeyInactive: string;
+  }) {
+    const labelKey = opts.active ? opts.labelKeyActive : opts.labelKeyInactive;
+    const tooltipKey = opts.active ? opts.tooltipKeyActive : opts.tooltipKeyInactive;
+    const icon = opts.active ? opts.iconActive : opts.iconInactive;
     return html`<button
-      class="term-btn term-btn--ghost ${this._showSecrets ? "is-active" : ""}"
-      @click=${this._toggleShowSecrets}
+      class="term-btn term-btn--ghost ${opts.active ? "is-active" : ""}"
+      @click=${opts.onClick}
       title=${this._localize(tooltipKey)}
-      aria-pressed=${this._showSecrets ? "true" : "false"}
+      aria-pressed=${opts.active ? "true" : "false"}
     >
-      <wa-icon library="mdi" name=${this._showSecrets ? "key" : "key-outline"}></wa-icon>
+      <wa-icon library="mdi" name=${icon}></wa-icon>
       ${this._localize(labelKey)}
     </button>`;
   }
+
+  /**
+   * Show-secrets toggle — validate only.
+   *
+   * ``--show-secrets`` is an ``esphome config`` flag, not something
+   * the compile / install / clean flows respect, so the toggle is
+   * hidden on every other command type to keep the toolbar from
+   * accumulating inert buttons.
+   */
+  private _renderShowSecretsToggle() {
+    if (this._commandType !== "validate") return nothing;
+    return this._renderToolbarToggle({
+      active: this._showSecrets,
+      onClick: this._toggleShowSecrets,
+      iconActive: "key",
+      iconInactive: "key-outline",
+      labelKeyActive: "command.hide_secrets",
+      labelKeyInactive: "command.show_secrets",
+      tooltipKeyActive: "command.hide_secrets_tooltip",
+      tooltipKeyInactive: "command.show_secrets_tooltip",
+    });
+  }
+
+  /**
+   * Show-logs-after-install toggle — install only, only while the
+   * install is still running.
+   *
+   * When on (default), a successful install dispatches
+   * ``request-show-logs-after-install`` and the host flips the logs
+   * dialog open so the user sees device output the way
+   * ``esphome run`` does on the CLI. The toggle disappears once the
+   * install settles to success / error — the user has already
+   * declared their preference, no point in showing a no-op control
+   * once the decision has been made.
+   */
+  private _renderShowLogsAfterInstallToggle() {
+    if (this._commandType !== "install") return nothing;
+    if (this._state === "success" || this._state === "error") return nothing;
+    return this._renderToolbarToggle({
+      active: this._showLogsAfterInstall,
+      onClick: this._toggleShowLogsAfterInstall,
+      iconActive: "console",
+      iconInactive: "console",
+      /* Single label both ways — this is a checkbox-style toggle
+         (the ``is-active`` styling carries the on/off signal); the
+         text never swaps to "Skip logs after" so the user only has
+         to read one phrase to know what the control does. */
+      labelKeyActive: "command.show_logs_after_install",
+      labelKeyInactive: "command.show_logs_after_install",
+      tooltipKeyActive: "command.show_logs_after_install_tooltip",
+      tooltipKeyInactive: "command.show_logs_after_install_tooltip",
+    });
+  }
+
+  private _toggleShowLogsAfterInstall = () => {
+    this._showLogsAfterInstall = !this._showLogsAfterInstall;
+  };
 
   /**
    * Save the buffered output to a text file. File-name pattern is
@@ -646,15 +813,39 @@ export class ESPHomeCommandDialog extends LitElement {
            that did nothing. Just show Close — the user can re-open
            the rename dialog from the device card. */
         return this._commandType === "rename"
-          ? html`<button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`
-          : html`
-              <button class="term-btn term-btn--start" @click=${this._start}>
-                <wa-icon library="mdi" name="refresh"></wa-icon> ${this._localize("command.retry")}
+          ? html`<button class="term-btn term-btn--ghost" @click=${this.close}>
+              ${this._localize("command.close")}
+            </button>`
+          : html` <button class="term-btn term-btn--start" @click=${this._start}>
+                <wa-icon library="mdi" name="refresh"></wa-icon> ${this._localize(
+                  "command.retry"
+                )}
               </button>
-              <button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`;
+              <button class="term-btn term-btn--ghost" @click=${this.close}>
+                ${this._localize("command.close")}
+              </button>`;
       case "success":
-        return html`<button class="term-btn term-btn--ghost" @click=${this.close}>${this._localize("command.close")}</button>`;
-      default: return nothing;
+        /* Surface a "Show logs" action on a successful install so
+           the user has a one-click path back to the live logs dialog
+           after they've clicked its "Back to install" button. The
+           same auto-flip path is reused so server-serial installs
+           open server-serial logs and OTA installs open network
+           logs. Other command types (compile / clean) don't have a
+           sensible logs follow-up, so we only surface it for
+           install. */
+        return this._commandType === "install"
+          ? html`<button class="term-btn term-btn--start" @click=${this._flipToLogs}>
+                <wa-icon library="mdi" name="console"></wa-icon>
+                ${this._localize("command.show_logs")}
+              </button>
+              <button class="term-btn term-btn--ghost" @click=${this.close}>
+                ${this._localize("command.close")}
+              </button>`
+          : html`<button class="term-btn term-btn--ghost" @click=${this.close}>
+              ${this._localize("command.close")}
+            </button>`;
+      default:
+        return nothing;
     }
   }
 
@@ -679,12 +870,14 @@ export class ESPHomeCommandDialog extends LitElement {
     this._streamId = this._api.validate(
       this.configuration,
       {
-        onOutput: (line) => { this._lines = [...this._lines, line]; },
+        onOutput: (line) => {
+          this._lines = [...this._lines, line];
+        },
         onResult: (data) => {
           this._streamId = "";
           this._state = data.success ? "success" : "error";
           this._statusMessage = this._localize(
-            data.success ? "command.validate_success" : "command.validate_failed",
+            data.success ? "command.validate_success" : "command.validate_failed"
           );
         },
         onError: (error) => {
@@ -693,7 +886,7 @@ export class ESPHomeCommandDialog extends LitElement {
           this._statusMessage = error;
         },
       },
-      { showSecrets: this._showSecrets },
+      { showSecrets: this._showSecrets }
     );
   }
 
@@ -774,6 +967,16 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Attach to a job's output stream. Works for queued, running, or finished jobs. */
   private _followJob(jobId: string) {
+    /* Capture the pre-attach status so we can tell whether this
+       session saw a live transition (QUEUED/RUNNING → COMPLETED)
+       or just replayed a job that was already terminal at attach
+       time. The latter is what happens when the user clicks a
+       finished install in firmware-jobs-dialog to review its
+       output — auto-flipping to logs there would be surprising
+       (the user wanted to read the past install output, not start
+       tailing the device). */
+    const wasLiveAtAttach =
+      this._jobStatus === JobStatus.QUEUED || this._jobStatus === JobStatus.RUNNING;
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];
@@ -786,9 +989,17 @@ export class ESPHomeCommandDialog extends LitElement {
         this._statusMessage = this._localize(
           success
             ? `command.${this._commandType}_success`
-            : `command.${this._commandType}_failed`,
+            : `command.${this._commandType}_failed`
         );
         this._jobId = "";
+        if (
+          success &&
+          wasLiveAtAttach &&
+          this._commandType === "install" &&
+          this._showLogsAfterInstall
+        ) {
+          this._flipToLogs();
+        }
       },
       onError: (error) => {
         this._streamId = "";

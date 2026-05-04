@@ -34,6 +34,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { clearJustCreated } from "../util/just-created.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
+import { handlePostInstallShowLogs } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   archiveDevice,
@@ -220,14 +221,8 @@ export class ESPHomePageDashboard extends LitElement {
        have to thread props / contexts through the layout. */
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
-    window.addEventListener(
-      "esphome-show-ignored-changed",
-      this._onShowIgnoredChanged,
-    );
-    window.addEventListener(
-      "esphome-show-archived-dialog",
-      this._onShowArchivedDialog,
-    );
+    window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
+    window.addEventListener("esphome-show-archived-dialog", this._onShowArchivedDialog);
     /* Consume the one-shot pending-highlight signal the wizard arms
        before opening the device editor. The user typically lands
        here when they hit the back button to leave the editor — at
@@ -254,7 +249,10 @@ export class ESPHomePageDashboard extends LitElement {
       // Convert backend sort (column + direction) to TanStack SortingState
       if (prefs.table_sort_column) {
         this._tableSorting = [
-          { id: prefs.table_sort_column, desc: prefs.table_sort_direction === SortDirection.DESC },
+          {
+            id: prefs.table_sort_column,
+            desc: prefs.table_sort_direction === SortDirection.DESC,
+          },
         ];
       } else {
         this._tableSorting = [];
@@ -269,11 +267,11 @@ export class ESPHomePageDashboard extends LitElement {
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
     window.removeEventListener(
       "esphome-show-ignored-changed",
-      this._onShowIgnoredChanged,
+      this._onShowIgnoredChanged
     );
     window.removeEventListener(
       "esphome-show-archived-dialog",
-      this._onShowArchivedDialog,
+      this._onShowArchivedDialog
     );
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
@@ -302,13 +300,17 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   @query("esphome-api-key-dialog") private _apiKeyDialog!: ESPHomeApiKeyDialog;
-  @query("esphome-archived-devices-dialog") private _archivedDialog?: ESPHomeArchivedDevicesDialog;
+  @query("esphome-archived-devices-dialog")
+  private _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
-  @query("esphome-create-config-dialog") private _createDialog!: ESPHomeCreateConfigDialog;
-  @query("esphome-rename-device-dialog") private _renameDialog!: ESPHomeRenameDeviceDialog;
+  @query("esphome-create-config-dialog")
+  private _createDialog!: ESPHomeCreateConfigDialog;
+  @query("esphome-rename-device-dialog")
+  private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
-  @query("esphome-firmware-install-dialog") private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+  @query("esphome-firmware-install-dialog")
+  private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
 
   /** Device currently targeted by rename/api-key actions. */
@@ -318,7 +320,9 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected render() {
     if (!this._devicesLoaded) {
-      return this._view === DashboardView.TABLE ? tableSkeletonTemplate : cardSkeletonTemplate;
+      return this._view === DashboardView.TABLE
+        ? tableSkeletonTemplate
+        : cardSkeletonTemplate;
     }
 
     const q = this._search.trim().toLowerCase();
@@ -327,21 +331,22 @@ export class ESPHomePageDashboard extends LitElement {
       ? sorted.filter(
           (d) =>
             (d.friendly_name || d.name).toLowerCase().includes(q) ||
-            d.configuration.toLowerCase().includes(q),
+            d.configuration.toLowerCase().includes(q)
         )
       : sorted;
 
     return html`
-      ${this._renderBanner()}
-      ${this._renderDiscoveredGrid()}
+      ${this._renderBanner()} ${this._renderDiscoveredGrid()}
       ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? this._renderToolbar(filtered.length, this._devices.length)
         : ""}
-      ${filtered.length === 0 && q && this._view === DashboardView.CARDS ? this._renderEmptySearch() : ""}
-      ${this._view === DashboardView.CARDS ? this._renderCardGrid(filtered) : this._renderTable()}
-      ${this._renderDrawer()}
-      ${this._renderSelectBarOrFab()}
-      ${this._renderDialogs()}
+      ${filtered.length === 0 && q && this._view === DashboardView.CARDS
+        ? this._renderEmptySearch()
+        : ""}
+      ${this._view === DashboardView.CARDS
+        ? this._renderCardGrid(filtered)
+        : this._renderTable()}
+      ${this._renderDrawer()} ${this._renderSelectBarOrFab()} ${this._renderDialogs()}
     `;
   }
 
@@ -355,11 +360,8 @@ export class ESPHomePageDashboard extends LitElement {
       return this._sortedDevicesCache.sorted;
     }
     const collator = ESPHomePageDashboard._cardCollator;
-    const sortKey = (d: ConfiguredDevice) =>
-      d.friendly_name || d.name || d.configuration;
-    const sorted = [...source].sort((a, b) =>
-      collator.compare(sortKey(a), sortKey(b)),
-    );
+    const sortKey = (d: ConfiguredDevice) => d.friendly_name || d.name || d.configuration;
+    const sorted = [...source].sort((a, b) => collator.compare(sortKey(a), sortKey(b)));
     this._sortedDevicesCache = { source, sorted };
     return sorted;
   }
@@ -396,7 +398,7 @@ export class ESPHomePageDashboard extends LitElement {
               @adopt=${() => this._adoptDialog.open(device)}
               @toggle-ignore=${() => this._toggleIgnore(device)}
             ></esphome-discovered-device-card>
-          `,
+          `
         )}
       </div>
     `;
@@ -418,15 +420,23 @@ export class ESPHomePageDashboard extends LitElement {
           <div class="discovered-banner-empty"></div>
           <div style="justify-content: center; display: flex; align-items: center">
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
-            <span>${this._localize("dashboard.discovered_count", { count: visible.length })}</span>
+            <span
+              >${this._localize("dashboard.discovered_count", {
+                count: visible.length,
+              })}</span
+            >
           </div>
           <button
             class="discovered-banner-toggle"
             type="button"
             aria-expanded=${this._showDiscovered}
             aria-controls="discovered-grid"
-            @click=${() => { this._showDiscovered = !this._showDiscovered; }}
-          >${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}</button>
+            @click=${() => {
+              this._showDiscovered = !this._showDiscovered;
+            }}
+          >
+            ${this._localize(this._showDiscovered ? "dashboard.hide" : "dashboard.show")}
+          </button>
         </div>
       </div>
     `;
@@ -436,10 +446,16 @@ export class ESPHomePageDashboard extends LitElement {
     const view = this._view;
     return html`
       <div class="view-toggle">
-        <button class="view-toggle-btn ${view === DashboardView.CARDS ? "active" : ""}" @click=${() => this._setView(DashboardView.CARDS)}>
+        <button
+          class="view-toggle-btn ${view === DashboardView.CARDS ? "active" : ""}"
+          @click=${() => this._setView(DashboardView.CARDS)}
+        >
           <wa-icon library="mdi" name="view-grid"></wa-icon>
         </button>
-        <button class="view-toggle-btn ${view === DashboardView.TABLE ? "active" : ""}" @click=${() => this._setView(DashboardView.TABLE)}>
+        <button
+          class="view-toggle-btn ${view === DashboardView.TABLE ? "active" : ""}"
+          @click=${() => this._setView(DashboardView.TABLE)}
+        >
           <wa-icon library="mdi" name="table"></wa-icon>
         </button>
       </div>
@@ -496,13 +512,15 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _renderToolbar(matchCount: number, total: number) {
     const q = this._search.trim();
-    const unit = matchCount === 1 ? this._localize("dashboard.device_singular") : this._localize("dashboard.device_plural");
+    const unit =
+      matchCount === 1
+        ? this._localize("dashboard.device_singular")
+        : this._localize("dashboard.device_plural");
     const suffix = q ? " " + this._localize("dashboard.search_of", { total }) : "";
     return html`
       <div class="toolbar">
         <div class="toolbar-row">
-          ${this._renderSearchInput()}
-          ${this._renderSelectToggle()}
+          ${this._renderSearchInput()} ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
         </div>
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
@@ -514,9 +532,20 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       <div class="empty-search">
         <wa-icon class="empty-search-icon" library="mdi" name="magnify"></wa-icon>
-        <h3 class="empty-search-title">${this._localize("dashboard.no_results_title")}</h3>
-        <p class="empty-search-desc">${this._localize("dashboard.no_results_desc", { query: this._search.trim() })}</p>
-        <button class="empty-search-clear" @click=${() => { this._search = ""; }}>${this._localize("dashboard.no_results_clear")}</button>
+        <h3 class="empty-search-title">
+          ${this._localize("dashboard.no_results_title")}
+        </h3>
+        <p class="empty-search-desc">
+          ${this._localize("dashboard.no_results_desc", { query: this._search.trim() })}
+        </p>
+        <button
+          class="empty-search-clear"
+          @click=${() => {
+            this._search = "";
+          }}
+        >
+          ${this._localize("dashboard.no_results_clear")}
+        </button>
       </div>
     `;
   }
@@ -551,7 +580,10 @@ export class ESPHomePageDashboard extends LitElement {
               @open-logs=${() => this._openLogs(device)}
               @show-progress=${() => this._showJobProgress(device)}
               @card-click=${() => this._toggleDrawerForDevice(device)}
-              @card-context-menu=${(e: CustomEvent) => { this._cardContextDevice = device; this._cardContextPosition = e.detail; }}
+              @card-context-menu=${(e: CustomEvent) => {
+                this._cardContextDevice = device;
+                this._cardContextPosition = e.detail;
+              }}
               @toggle-select=${() => this._toggleDevice(device.configuration)}
             ></esphome-device-card>
           `;
@@ -577,31 +609,49 @@ export class ESPHomePageDashboard extends LitElement {
         @table-sort-change=${this._saveTablePreference}
         @table-visibility-change=${this._saveTablePreference}
         @table-page-size-change=${this._saveTablePreference}
-        @row-click=${(e: CustomEvent<ConfiguredDevice>) => this._toggleDrawerForDevice(e.detail)}
-        @show-progress=${(e: CustomEvent<ConfiguredDevice>) => this._showJobProgress(e.detail)}
+        @row-click=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._toggleDrawerForDevice(e.detail)}
+        @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._showJobProgress(e.detail)}
         @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
-        @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
-        @deselect-all=${() => { this._selectedDevices = new Set(); }}
+        @select-all=${() => {
+          this._selectedDevices = new Set(this._devices.map((d) => d.configuration));
+        }}
+        @deselect-all=${() => {
+          this._selectedDevices = new Set();
+        }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
-        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "install")}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "install")}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
-        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "validate")}
-        @install-device=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallMethod(e.detail)}
+        @validate-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "validate")}
+        @install-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openInstallMethod(e.detail)}
         @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => this._showApiKey(e.detail)}
-        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
+        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
+          downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
-        @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
-        @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
-        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
-        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
-        @enter-select-mode=${(e: CustomEvent<string>) => this._onEnterSelectMode(e.detail)}
+        @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "clean")}
+        @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._downloadFirmware(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._confirmArchive(e.detail)}
+        @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._confirmDeleteSingle(e.detail)}
+        @enter-select-mode=${(e: CustomEvent<string>) =>
+          this._onEnterSelectMode(e.detail)}
       >
         <div slot="toolbar" class="toolbar-row">
-          ${this._renderSearchInput()}
-          ${this._renderSelectToggle()}
+          ${this._renderSearchInput()} ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
         </div>
-        <button slot="actions" class="table-create-btn" @click=${() => this._createDialog.open()}>
+        <button
+          slot="actions"
+          class="table-create-btn"
+          @click=${() => this._createDialog.open()}
+        >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("dashboard.create_device")}
         </button>
@@ -614,12 +664,28 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-device-drawer
         ?open=${this._drawerOpen}
         .device=${this._drawerDevice}
-        ?busy=${this._drawerDevice ? this._activeJobs.has(this._drawerDevice.configuration) : false}
-        @drawer-close=${() => { this._drawerOpen = false; }}
-        @edit-device=${(e: CustomEvent) => { this._drawerOpen = false; editDevice(e.detail); }}
-        @update-device=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerOpen = false; this._openCommand(e.detail, "install"); }}
-        @install-device=${(e: CustomEvent<ConfiguredDevice>) => { this._drawerOpen = false; this._openInstallMethod(e.detail); }}
-        @open-logs=${(e: CustomEvent) => { this._drawerOpen = false; this._openLogs(e.detail); }}
+        ?busy=${this._drawerDevice
+          ? this._activeJobs.has(this._drawerDevice.configuration)
+          : false}
+        @drawer-close=${() => {
+          this._drawerOpen = false;
+        }}
+        @edit-device=${(e: CustomEvent) => {
+          this._drawerOpen = false;
+          editDevice(e.detail);
+        }}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) => {
+          this._drawerOpen = false;
+          this._openCommand(e.detail, "install");
+        }}
+        @install-device=${(e: CustomEvent<ConfiguredDevice>) => {
+          this._drawerOpen = false;
+          this._openInstallMethod(e.detail);
+        }}
+        @open-logs=${(e: CustomEvent) => {
+          this._drawerOpen = false;
+          this._openLogs(e.detail);
+        }}
       ></esphome-device-drawer>
     `;
   }
@@ -630,21 +696,35 @@ export class ESPHomePageDashboard extends LitElement {
         .device=${this._cardContextDevice}
         .position=${this._cardContextPosition}
         card-mode
-        ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
-        @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
+        ?busy=${this._cardContextDevice
+          ? this._activeJobs.has(this._cardContextDevice.configuration)
+          : false}
+        @menu-close=${() => {
+          this._cardContextDevice = null;
+          this._cardContextPosition = null;
+        }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
-        @update-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "install")}
+        @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "install")}
         @open-logs=${(e: CustomEvent<ConfiguredDevice>) => this._openLogs(e.detail)}
-        @validate-device=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "validate")}
-        @install-device=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallMethod(e.detail)}
+        @validate-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "validate")}
+        @install-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openInstallMethod(e.detail)}
         @show-api-key=${(e: CustomEvent<ConfiguredDevice>) => this._showApiKey(e.detail)}
-        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
+        @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
+          downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
-        @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
-        @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
-        @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
-        @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
-        @enter-select=${(e: CustomEvent<ConfiguredDevice>) => this._onEnterSelectMode(e.detail.configuration)}
+        @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "clean")}
+        @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._downloadFirmware(e.detail)}
+        @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._confirmArchive(e.detail)}
+        @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._confirmDeleteSingle(e.detail)}
+        @enter-select=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._onEnterSelectMode(e.detail.configuration)}
       ></esphome-table-row-menu>
     `;
   }
@@ -655,9 +735,16 @@ export class ESPHomePageDashboard extends LitElement {
         <esphome-select-bar
           selected-count=${this._selectedDevices.size}
           total-count=${this._devices.length}
-          @select-all=${() => { this._selectedDevices = new Set(this._devices.map((d) => d.configuration)); }}
-          @deselect-all=${() => { this._selectedDevices = new Set(); }}
-          @cancel=${() => { this._selectMode = false; this._selectedDevices = new Set(); }}
+          @select-all=${() => {
+            this._selectedDevices = new Set(this._devices.map((d) => d.configuration));
+          }}
+          @deselect-all=${() => {
+            this._selectedDevices = new Set();
+          }}
+          @cancel=${() => {
+            this._selectMode = false;
+            this._selectedDevices = new Set();
+          }}
           @update-selected=${this._updateSelected}
           @delete-selected=${this._deleteSelected}
         ></esphome-select-bar>
@@ -749,8 +836,12 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-adopt-dialog @adopted=${this._onAdopted}></esphome-adopt-dialog>
       <esphome-api-key-dialog></esphome-api-key-dialog>
       <esphome-create-config-dialog></esphome-create-config-dialog>
-      <esphome-command-dialog></esphome-command-dialog>
-      <esphome-firmware-install-dialog></esphome-firmware-install-dialog>
+      <esphome-command-dialog
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
+      ></esphome-command-dialog>
+      <esphome-firmware-install-dialog
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
+      ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
         ?open=${this._installMethodOpen}
@@ -760,12 +851,15 @@ export class ESPHomePageDashboard extends LitElement {
         this._installMethodDevice?.address ||
         ""}
         .mode=${this._installMethodMode}
-        @close=${() => { this._installMethodOpen = false; }}
+        @close=${() => {
+          this._installMethodOpen = false;
+        }}
         @select-method=${this._onInstallMethodSelect}
       ></esphome-install-method-dialog>
       <esphome-archived-devices-dialog
         @unarchive=${(e: CustomEvent<ArchivedDevice>) => this._unarchiveDevice(e.detail)}
-        @delete-archived=${(e: CustomEvent<ArchivedDevice>) => this._confirmDeleteArchived(e.detail)}
+        @delete-archived=${(e: CustomEvent<ArchivedDevice>) =>
+          this._confirmDeleteArchived(e.detail)}
       ></esphome-archived-devices-dialog>
     `;
   }
@@ -773,11 +867,25 @@ export class ESPHomePageDashboard extends LitElement {
   private _renderAddDeviceCard() {
     return html`
       <div class="add-device-card" @click=${() => this._createDialog.open()}>
-        <div class="add-device-icon-wrap"><wa-icon library="mdi" name="plus"></wa-icon></div>
-        <span class="add-device-label">${this._localize("dashboard.add_new_device")}</span>
-        <span class="add-device-hint">${this._localize("dashboard.add_new_device_hint")}</span>
-        <a class="esphome-web-link" href="https://web.esphome.io" target="_blank" rel="noopener" @click=${(e: Event) => e.stopPropagation()}>
-          <wa-icon library="mdi" name="web"></wa-icon> ${this._localize("dashboard.esphome_web")}
+        <div class="add-device-icon-wrap">
+          <wa-icon library="mdi" name="plus"></wa-icon>
+        </div>
+        <span class="add-device-label"
+          >${this._localize("dashboard.add_new_device")}</span
+        >
+        <span class="add-device-hint"
+          >${this._localize("dashboard.add_new_device_hint")}</span
+        >
+        <a
+          class="esphome-web-link"
+          href="https://web.esphome.io"
+          target="_blank"
+          rel="noopener"
+          @click=${(e: Event) => e.stopPropagation()}
+        >
+          <wa-icon library="mdi" name="web"></wa-icon> ${this._localize(
+            "dashboard.esphome_web"
+          )}
         </a>
       </div>
     `;
@@ -800,9 +908,9 @@ export class ESPHomePageDashboard extends LitElement {
           device.ignored
             ? "dashboard.action_unignore_failed"
             : "dashboard.action_ignore_failed",
-          { name },
+          { name }
         ),
-        { richColors: true },
+        { richColors: true }
       );
     }
   }
@@ -899,7 +1007,7 @@ export class ESPHomePageDashboard extends LitElement {
    *  settle the grid track sizes. */
   private _scheduleScrollIntoView(configuration: string): void {
     requestAnimationFrame(() =>
-      requestAnimationFrame(() => this._scrollAdoptedIntoView(configuration)),
+      requestAnimationFrame(() => this._scrollAdoptedIntoView(configuration))
     );
   }
 
@@ -918,7 +1026,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (!root) return;
     const escaped = CSS.escape(configuration);
     const card = root.querySelector<HTMLElement>(
-      `esphome-device-card[data-configuration="${escaped}"]`,
+      `esphome-device-card[data-configuration="${escaped}"]`
     );
     if (card) {
       card.scrollIntoView({ behavior: "instant", block: "center" });
@@ -942,14 +1050,26 @@ export class ESPHomePageDashboard extends LitElement {
     if (type === "table-sort-change") {
       const sorting = (e as CustomEvent<SortingState>).detail;
       const first = sorting[0] ?? null;
-      this._api.updatePreferences({
-        table_sort_column: first?.id ?? null,
-        table_sort_direction: first ? (first.desc ? SortDirection.DESC : SortDirection.ASC) : null,
-      }).catch(() => {});
+      this._api
+        .updatePreferences({
+          table_sort_column: first?.id ?? null,
+          table_sort_direction: first
+            ? first.desc
+              ? SortDirection.DESC
+              : SortDirection.ASC
+            : null,
+        })
+        .catch(() => {});
     } else if (type === "table-visibility-change") {
-      this._api.updatePreferences({ table_column_visibility: (e as CustomEvent<VisibilityState>).detail }).catch(() => {});
+      this._api
+        .updatePreferences({
+          table_column_visibility: (e as CustomEvent<VisibilityState>).detail,
+        })
+        .catch(() => {});
     } else if (type === "table-page-size-change") {
-      this._api.updatePreferences({ table_page_size: (e as CustomEvent<number>).detail }).catch(() => {});
+      this._api
+        .updatePreferences({ table_page_size: (e as CustomEvent<number>).detail })
+        .catch(() => {});
     }
   }
 
@@ -967,7 +1087,10 @@ export class ESPHomePageDashboard extends LitElement {
     try {
       response = await this._api.renameDevice(device.configuration, newName);
     } catch {
-      toast.error(this._localize("dashboard.action_rename_failed", { name: device.name }), { richColors: true });
+      toast.error(
+        this._localize("dashboard.action_rename_failed", { name: device.name }),
+        { richColors: true }
+      );
       return;
     }
     /* Drop any pending welcome-banner flag — if the user just
@@ -987,14 +1110,16 @@ export class ESPHomePageDashboard extends LitElement {
          when the user reopens this same job mid-flight. */
       this._commandDialog.followJob(
         response.job,
-        firmwareJobDisplayName(response.job, this._devices, this._localize),
+        firmwareJobDisplayName(response.job, this._devices, this._localize)
       );
       return;
     }
     /* No job: backend did a pure file-level rename inline (config
        didn't validate, nothing to flash). Show the success toast
        immediately. */
-    toast.success(this._localize("dashboard.action_rename_success", { name: newName }), { richColors: true });
+    toast.success(this._localize("dashboard.action_rename_success", { name: newName }), {
+      richColors: true,
+    });
   }
 
   private async _showApiKey(device: ConfiguredDevice) {
@@ -1007,7 +1132,9 @@ export class ESPHomePageDashboard extends LitElement {
     try {
       const binaries = await this._api.firmwareGetBinaries(device.configuration);
       if (binaries.length === 0) {
-        toast.error(this._localize("dashboard.download_no_binaries", { name }), { richColors: true });
+        toast.error(this._localize("dashboard.download_no_binaries", { name }), {
+          richColors: true,
+        });
         return;
       }
       const binary = binaries[0];
@@ -1021,7 +1148,9 @@ export class ESPHomePageDashboard extends LitElement {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      toast.error(this._localize("dashboard.download_firmware_failed", { name }), { richColors: true });
+      toast.error(this._localize("dashboard.download_firmware_failed", { name }), {
+        richColors: true,
+      });
     }
   }
 
@@ -1074,7 +1203,7 @@ export class ESPHomePageDashboard extends LitElement {
        initial rename dialog had. */
     this._commandDialog.followJob(
       job,
-      firmwareJobDisplayName(job, this._devices, this._localize),
+      firmwareJobDisplayName(job, this._devices, this._localize)
     );
   }
 
@@ -1110,7 +1239,11 @@ export class ESPHomePageDashboard extends LitElement {
     }
   }
 
-  private async _openLogsWithMethod(device: ConfiguredDevice, method: string, port?: string) {
+  private async _openLogsWithMethod(
+    device: ConfiguredDevice,
+    method: string,
+    port?: string
+  ) {
     if (method === "ota") {
       // Network logs
       this._logsDialog.configuration = device.configuration;
@@ -1124,7 +1257,9 @@ export class ESPHomePageDashboard extends LitElement {
     } else if (method === "web-serial") {
       // Web Serial logs — prompt port first, then open dialog without auto-streaming
       if (!("serial" in navigator)) {
-        toast.error(this._localize("dashboard.logs_web_serial_unsupported"), { richColors: true });
+        toast.error(this._localize("dashboard.logs_web_serial_unsupported"), {
+          richColors: true,
+        });
         return;
       }
       try {
@@ -1135,9 +1270,15 @@ export class ESPHomePageDashboard extends LitElement {
         this._logsDialog.openPassive();
         const cancelSerial = streamSerialToDialog(serialPort, this._logsDialog);
         this._logsDialog.setSerialCancel(cancelSerial);
-      } catch { /* User cancelled */ }
+      } catch {
+        /* User cancelled */
+      }
     }
   }
+
+  private _onPostInstallShowLogs = (
+    e: CustomEvent<import("../util/post-install-logs.js").PostInstallShowLogsDetail>
+  ) => handlePostInstallShowLogs(e, this._logsDialog);
 
   private _openLogs(device: ConfiguredDevice) {
     if (device.state === DeviceState.ONLINE) {
@@ -1167,7 +1308,9 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("layout.update_all_none"), { richColors: true });
       return;
     }
-    toast.info(this._localize("layout.update_all_started", { count: selected.length }), { richColors: true });
+    toast.info(this._localize("layout.update_all_started", { count: selected.length }), {
+      richColors: true,
+    });
     try {
       await this._api.firmwareInstallBulk(selected);
     } catch {
