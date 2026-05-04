@@ -553,10 +553,11 @@ export class ESPHomeAPI {
    * Backed by the backend's ``yaml/search`` command. Returns one
    * entry per matching device with up to 5 matches per file
    * (backend cap) and at most ``max_results`` total matches across
-   * the fleet. Empty / whitespace queries return ``[]`` without
-   * round-tripping to the backend's iteration loop, but we still
-   * call through so the request shape stays a simple round trip
-   * the dropdown can debounce.
+   * the fleet. Empty / whitespace queries are short-circuited by
+   * the backend (returns ``[]`` before walking the fleet); the
+   * caller is expected to filter them out before calling so the
+   * request shape stays a simple round trip the dropdown can
+   * debounce.
    */
   async searchYaml(args: {
     query: string;
