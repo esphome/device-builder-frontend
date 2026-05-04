@@ -11,7 +11,7 @@ import { basicSetup, EditorView } from "codemirror";
 import { EditorState } from "@codemirror/state";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { apiContext, darkModeContext } from "../context/index.js";
-import { esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { createBackendYamlLinter } from "../util/yaml-lint-backend.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import type { YamlSection } from "../util/yaml-sections.js";
@@ -99,7 +99,7 @@ export class ESPHomeYamlEditor extends LitElement {
     const extensions = [
       basicSetup,
       esphomeYaml(),
-      indentUnit.of("  "),
+      indentUnit.of(ESPHOME_YAML_INDENT),
       keymap.of([indentWithTab]),
       highlightField,
       EditorView.theme({

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import { getIndentation } from "@codemirror/language";
-import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
+import { getIndentation, indentUnit } from "@codemirror/language";
+import {
+  ESPHOME_YAML_INDENT,
+  esphomeYaml,
+} from "../../src/util/esphome-yaml-lang.js";
 
 /**
  * The indent service mirrors the legacy esphome dashboard's Monaco
@@ -15,9 +18,12 @@ import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
  * directly) keeps the test resilient to internal API changes.
  */
 function indentAt(yaml: string): number | null {
+  // Pin ``indentUnit`` to ``ESPHOME_YAML_INDENT`` — same shared
+  // constant the editor wires up — so assertions below are
+  // deterministic and don't drift with CodeMirror's default.
   const state = EditorState.create({
     doc: yaml,
-    extensions: [esphomeYaml()],
+    extensions: [indentUnit.of(ESPHOME_YAML_INDENT), esphomeYaml()],
   });
   // Indent the LAST line of the doc — that's what gets recomputed
   // when the user presses Enter at the end of a content line.
@@ -77,6 +83,16 @@ describe("esphome-yaml indent service", () => {
     // → indent 0. (Yes, that's malformed YAML; we still want the
     // editor to behave gracefully.)
     expect(indentAt("esphome: test\n")).toBe(0);
+  });
+
+  it("indents +step after a block-scalar header", () => {
+    // ``lambda: |-`` opens a block scalar; the next line is its
+    // content and should land one step deeper than the key.
+    // Mirrors the ESPHome ``lambda: |-`` / ``!lambda |-`` shape
+    // — without this users have to hand-indent every C++ line.
+    expect(indentAt("on_boot:\n  - lambda: |-\n")).toBe(6);
+    expect(indentAt("foo:\n  bar: >+\n")).toBe(4);
+    expect(indentAt("foo:\n  bar: |\n")).toBe(4);
   });
 });
 

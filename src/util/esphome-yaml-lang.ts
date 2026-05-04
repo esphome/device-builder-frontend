@@ -21,6 +21,14 @@ import type { SyntaxNodeRef, Input } from "@lezer/common";
 const LAMBDA_TAG = "!lambda";
 
 /**
+ * Single source of truth for ESPHome YAML's indent width. Two
+ * spaces matches the legacy dashboard and the upstream ESPHome
+ * code style. Exported so consumers (the editor, tests) share
+ * the same unit and the indent service derives ``step`` from it.
+ */
+export const ESPHOME_YAML_INDENT = "  ";
+
+/**
  * Mixed parser wrapper: when we encounter a Tagged node whose Tag is
  * `!lambda`, overlay the C++ parser on the value content.
  */
@@ -125,7 +133,15 @@ const yamlIndentService = indentService.of((context, pos) => {
     // ``# comment`` first so ``key:  # note`` still triggers
     // (ESPHome configs sprinkle inline comments freely).
     const noComment = text.replace(/\s+#.*$/, "");
-    if (/:\s*$/.test(noComment)) {
+    // Two block-opener shapes:
+    //   1. ``key:`` — plain mapping → child indent + step
+    //   2. ``key: |-`` / ``key: >+`` / ``lambda: |`` etc. — YAML
+    //      block-scalar header. The next line is the scalar's
+    //      content, which lives one step deeper than the key.
+    //      Crucial for ESPHome's ``lambda: |-`` and ``!lambda |-``
+    //      patterns, which would otherwise force the user to
+    //      hand-indent every line of C++.
+    if (/:\s*$/.test(noComment) || /:\s*[|>][+-]?\s*$/.test(noComment)) {
       return baseIndent + step;
     }
     return baseIndent;
