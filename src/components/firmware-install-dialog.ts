@@ -615,14 +615,37 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         </div>
       `;
     }
+    /* Web Serial install success: surface a "Logs" action so the
+       user has a one-click path back to the logs viewer after
+       they've clicked its "Back to install" button. Same auto-flip
+       handler is reused. ``_detected`` survives the auto-hide path
+       (``_onClose`` doesn't clear it) but ``_close`` does, so the
+       button only renders while the SerialPort reference is still
+       around. */
+    const canShowLogs =
+      this._installer === "web-serial" &&
+      this._step === "done" &&
+      this._detected !== null;
     return html`
       <div class="footer">
-        <button class="btn btn--primary" @click=${this._close}>
-          ${this._localize("command.close")}
-        </button>
+        ${canShowLogs
+          ? html`<button class="btn btn--primary" @click=${this._showLogsAgain}>
+                <wa-icon library="mdi" name="console"></wa-icon>
+                ${this._localize("command.show_logs")}
+              </button>
+              <button class="btn btn--ghost" @click=${this._close}>
+                ${this._localize("command.close")}
+              </button>`
+          : html`<button class="btn btn--primary" @click=${this._close}>
+              ${this._localize("command.close")}
+            </button>`}
       </div>
     `;
   }
+
+  private _showLogsAgain = () => {
+    if (this._detected) this._flipToLogs(this._detected.port);
+  };
 
   // ─── Web Serial Install ────────────────────────────────
 
@@ -786,7 +809,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
     this._statusMessage = this._localize("firmware.status_done");
     this._step = "done";
-    if (this._showLogsAfterInstall) this._flipToLogs(flashDetected.port);
+    /* Only auto-flip if the dialog is still on screen — ``_cancel``
+       closes the UI but doesn't actually interrupt the Web Serial
+       flash loop, so a dismissed install can still reach this point.
+       Without the ``_open`` guard the logs viewer would pop up out
+       of nowhere on a user who already walked away. */
+    if (this._open && this._showLogsAfterInstall) {
+      this._flipToLogs(flashDetected.port);
+    }
   }
 
   /**

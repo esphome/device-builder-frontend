@@ -967,6 +967,16 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Attach to a job's output stream. Works for queued, running, or finished jobs. */
   private _followJob(jobId: string) {
+    /* Capture the pre-attach status so we can tell whether this
+       session saw a live transition (QUEUED/RUNNING → COMPLETED)
+       or just replayed a job that was already terminal at attach
+       time. The latter is what happens when the user clicks a
+       finished install in firmware-jobs-dialog to review its
+       output — auto-flipping to logs there would be surprising
+       (the user wanted to read the past install output, not start
+       tailing the device). */
+    const wasLiveAtAttach =
+      this._jobStatus === JobStatus.QUEUED || this._jobStatus === JobStatus.RUNNING;
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];
@@ -982,7 +992,12 @@ export class ESPHomeCommandDialog extends LitElement {
             : `command.${this._commandType}_failed`
         );
         this._jobId = "";
-        if (success && this._commandType === "install" && this._showLogsAfterInstall) {
+        if (
+          success &&
+          wasLiveAtAttach &&
+          this._commandType === "install" &&
+          this._showLogsAfterInstall
+        ) {
           this._flipToLogs();
         }
       },
