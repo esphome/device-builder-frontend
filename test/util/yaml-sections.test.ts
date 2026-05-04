@@ -273,6 +273,32 @@ sensor:
   it("returns null on empty yaml", () => {
     expect(sectionAtLine("", 1)).toBeNull();
   });
+
+  // Pinning current behaviour for the known follow-up: when the
+  // cursor is inside an inline automation block (e.g. `on_press:`
+  // nested under a `binary_sensor` list item), `sectionAtLine`
+  // returns the enclosing component item, NOT the automation.
+  // Until the helper is extended to consult `parseYamlAutomations`
+  // and prefer the most-specific (smallest) range, this asymmetry
+  // means cursor-following picks the parent component while
+  // clicking the navigator's matching automation entry takes you
+  // to the automation. The test locks the contract so the
+  // follow-up doesn't accidentally regress the common case.
+  it("attributes inline automation lines to the enclosing component (known gap)", () => {
+    const yaml = `binary_sensor:
+  - platform: gpio
+    name: door
+    pin: D2
+    on_press:
+      then:
+        - logger.log: pressed
+`;
+    // `on_press:` itself is line 5; its body is lines 6-7.
+    const m = sectionAtLine(yaml, 6);
+    expect(m?.key).toBe("binary_sensor");
+    expect(m?.platform).toBe("gpio");
+    expect(m?.name).toBe("door");
+  });
 });
 
 describe("categorizeSections", () => {

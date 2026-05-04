@@ -338,7 +338,34 @@ export class ESPHomeYamlEditor extends LitElement {
     }
   }
 
+  /**
+   * Tear down the current view and mount a fresh one against
+   * `this.value`. Both rebuild branches in `updated()` (theme/API
+   * change, configuration change) end with the same destroy +
+   * clear + reset-throttle + remount sequence; without this
+   * helper the throttle reset in particular tends to drift
+   * across the two copies (forgetting to reset
+   * `_lastReportedCursorLine` after a configuration change is
+   * what regressed cross-device cursor dispatch — a host-side
+   * field outliving the destroyed view).
+   */
+  private _remountEditor() {
+    this._view!.destroy();
+    this._container.innerHTML = "";
+    this._lastReportedCursorLine = 0;
+    this._mountEditor();
+  }
+
   updated(changed: Map<string, unknown>) {
+    // FIRST-MATCH-WINS: each branch below ends in `return` so a
+    // single render cycle takes exactly one path through this
+    // method. The same-document `value` branch is the fallthrough
+    // for the common case (no rebuild needed). Adding a fourth
+    // branch later? Preserve the early-return pattern — letting
+    // the value-change branch fire after a destroy + remount
+    // would dispatch a stale-cursor preservation against the
+    // freshly-mounted view.
+
     // Theme / API changes require a full editor rebuild — CodeMirror
     // extensions are static once the state is built. The user may
     // have unsaved edits in the view that the parent's `value` prop
@@ -350,11 +377,8 @@ export class ESPHomeYamlEditor extends LitElement {
       (changed.has("_darkMode") || changed.has("_api")) &&
       this._view
     ) {
-      const doc = this._view.state.doc.toString();
-      this._view.destroy();
-      this._container.innerHTML = "";
-      this.value = doc;
-      this._mountEditor();
+      this.value = this._view.state.doc.toString();
+      this._remountEditor();
       return;
     }
 
@@ -365,12 +389,11 @@ export class ESPHomeYamlEditor extends LitElement {
     // the previous device's content or run the same-document
     // preservation path below, which would map the prior file's
     // cursor offset onto the new file (very disorienting on
-    // cross-device navigation). New-device load = fresh state,
-    // cursor at 0, scroll at top.
+    // cross-device navigation). Initial cursor / scroll state is
+    // owned by `_mountEditor` (offset 0, scroll top via
+    // `EditorState.create`'s default selection), not this branch.
     if (changed.has("configuration") && this._view) {
-      this._view.destroy();
-      this._container.innerHTML = "";
-      this._mountEditor();
+      this._remountEditor();
       return;
     }
 
