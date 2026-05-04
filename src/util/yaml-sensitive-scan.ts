@@ -51,6 +51,35 @@ const PARENT_SCOPED_SENSITIVE_KEYS: Record<string, Set<string>> = {
 };
 
 const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_]*):(\s*)(.*)$/;
+// Block-scalar header tail: `|`, `>`, optional chomping indicator (`+`/`-`),
+// optional explicit indentation digit, optional trailing comment.
+const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
+
+/** Find the closing quote of a YAML scalar starting at `quoteStart`,
+ *  honouring the (limited) escapes both quote styles allow:
+ *    - single-quoted: `''` is a literal `'`
+ *    - double-quoted: `\"` is a literal `"`
+ *  Returns the index of the closing quote, or -1 if the scalar runs
+ *  past end-of-line (we treat that as "no comment can follow"). */
+function findClosingQuote(line: string, quoteStart: number): number {
+  const q = line[quoteStart];
+  let k = quoteStart + 1;
+  while (k < line.length) {
+    if (line[k] === q) {
+      if (q === "'" && line[k + 1] === "'") {
+        k += 2;
+        continue;
+      }
+      if (q === '"' && line[k - 1] === "\\") {
+        k++;
+        continue;
+      }
+      return k;
+    }
+    k++;
+  }
+  return -1;
+}
 
 export function findSensitiveValueRanges(yaml: string): SensitiveValueRange[] {
   const ranges: SensitiveValueRange[] = [];
@@ -63,10 +92,17 @@ export function findSensitiveValueRanges(yaml: string): SensitiveValueRange[] {
   // indent >= N is no longer an ancestor and is popped.
   const stack: Array<{ indent: number; key: string }> = [];
 
-  for (let i = 0; i < lines.length; i++) {
+  // 0-indexed line cursor we advance manually so block-scalar bodies
+  // (whose content can contain `:` and would otherwise be misparsed
+  // as keys) are consumed by the block handler, not the outer loop.
+  let i = 0;
+  while (i < lines.length) {
     const line = lines[i];
     const m = line.match(KEY_LINE);
-    if (!m) continue;
+    if (!m) {
+      i++;
+      continue;
+    }
 
     const leading = m[1];
     const dash = m[2] ?? "";
@@ -93,39 +129,85 @@ export function findSensitiveValueRanges(yaml: string): SensitiveValueRange[] {
 
     stack.push({ indent, key });
 
-    if (!sensitive) continue;
-    // No inline value (block scalar / nested mapping start) — nothing
-    // to mask on this line.
-    if (rest === "" || rest.trimStart().startsWith("#")) continue;
+    if (!sensitive) {
+      i++;
+      continue;
+    }
+
+    const trimmedRest = rest.trimStart();
+
+    // Pure key (no inline value, no block scalar) or comment-only —
+    // nothing to mask on this line.
+    if (rest === "" || trimmedRest.startsWith("#")) {
+      i++;
+      continue;
+    }
 
     // `!secret <name>` carries only the indirection name, not the
     // credential itself. Leave it as-is so the user can still see
-    // *which* secret is being referenced.
-    if (/^!secret\b/.test(rest.trimStart())) continue;
+    // which secret is being referenced.
+    if (/^!secret\b/.test(trimmedRest)) {
+      i++;
+      continue;
+    }
+
+    // Block scalar (`|` / `>` with optional chomping/indent indicator):
+    // the credential lives on the indented continuation lines, not on
+    // this header line. Consume the whole block in one shot — masking
+    // each non-blank continuation line and skipping past it so the
+    // outer loop doesn't try to reinterpret content like `secret: x`
+    // inside the block as YAML keys.
+    if (BLOCK_SCALAR_HEADER.test(trimmedRest)) {
+      const headerIndent = leading.length;
+      let next = i + 1;
+      while (next < lines.length) {
+        const cont = lines[next];
+        if (cont.trim() === "") {
+          next++;
+          continue;
+        }
+        const contIndent = (cont.match(/^(\s*)/)?.[1] ?? "").length;
+        if (contIndent <= headerIndent) break;
+        let valEnd = cont.length;
+        while (valEnd > contIndent && /\s/.test(cont[valEnd - 1])) valEnd--;
+        if (valEnd > contIndent) {
+          ranges.push({ line: next + 1, valueFrom: contIndent, valueTo: valEnd });
+        }
+        next++;
+      }
+      i = next;
+      continue;
+    }
 
     const valueStart = leading.length + dash.length + key.length + 1 + sep.length;
     let valueEnd = line.length;
 
-    // Strip trailing `  # comment`. The comment marker has to be
-    // preceded by whitespace to avoid eating a `#` that's part of
-    // a quoted value (`"abc#def"`).
-    const commentMatch = rest.match(/(^|\s)#/);
-    if (commentMatch && commentMatch.index !== undefined) {
-      const commentRel = commentMatch.index + (commentMatch[1] === "" ? 0 : 1);
-      valueEnd = valueStart + commentRel;
-      // Trim trailing whitespace that sat between value and comment.
-      while (valueEnd > valueStart && /\s/.test(line[valueEnd - 1])) {
-        valueEnd--;
-      }
-    } else {
-      // Trim trailing whitespace at end of line.
-      while (valueEnd > valueStart && /\s/.test(line[valueEnd - 1])) {
-        valueEnd--;
-      }
+    // For comment-stripping purposes, a `#` only starts a comment when
+    // preceded by whitespace AND outside any quoted scalar. So we
+    // skip past a leading quoted string before looking for the `#`.
+    let searchFrom = valueStart;
+    const firstChar = trimmedRest[0];
+    if (firstChar === '"' || firstChar === "'") {
+      const quoteStart = valueStart + (rest.length - trimmedRest.length);
+      const quoteEnd = findClosingQuote(line, quoteStart);
+      if (quoteEnd !== -1) searchFrom = quoteEnd + 1;
+      else searchFrom = line.length; // unterminated — treat rest as value
     }
 
-    if (valueEnd <= valueStart) continue;
-    ranges.push({ line: i + 1, valueFrom: valueStart, valueTo: valueEnd });
+    let commentIdx = -1;
+    for (let k = searchFrom; k < line.length; k++) {
+      if (line[k] === "#" && k > 0 && /\s/.test(line[k - 1])) {
+        commentIdx = k;
+        break;
+      }
+    }
+    if (commentIdx !== -1) valueEnd = commentIdx;
+    while (valueEnd > valueStart && /\s/.test(line[valueEnd - 1])) valueEnd--;
+
+    if (valueEnd > valueStart) {
+      ranges.push({ line: i + 1, valueFrom: valueStart, valueTo: valueEnd });
+    }
+    i++;
   }
 
   return ranges;

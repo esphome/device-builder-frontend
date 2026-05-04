@@ -202,22 +202,26 @@ export class ESPHomeDeviceEditor extends LitElement {
           </div>
           <div class="header-actions">
             ${effectiveLayout !== "left"
-              ? html`<button
-                  type="button"
-                  class="diff-toggle"
-                  aria-pressed=${this._revealSensitive}
-                  @click=${this._toggleRevealSensitive}
-                  title=${this._localize(
+              ? (() => {
+                  const sensitiveLabel = this._localize(
                     this._revealSensitive
                       ? "device.yaml_mask_sensitive"
                       : "device.yaml_reveal_sensitive",
-                  )}
-                >
-                  <wa-icon
-                    library="mdi"
-                    name=${this._revealSensitive ? "eye-off" : "eye"}
-                  ></wa-icon>
-                </button>`
+                  );
+                  return html`<button
+                    type="button"
+                    class="diff-toggle"
+                    aria-pressed=${this._revealSensitive}
+                    aria-label=${sensitiveLabel}
+                    @click=${this._toggleRevealSensitive}
+                    title=${sensitiveLabel}
+                  >
+                    <wa-icon
+                      library="mdi"
+                      name=${this._revealSensitive ? "eye-off" : "eye"}
+                    ></wa-icon>
+                  </button>`;
+                })()
               : nothing}
             ${this._showDiffButton
               ? html`<button

@@ -128,4 +128,115 @@ api:
     expect(ranges).toHaveLength(1);
     expect(ranges[0].line).toBe(3);
   });
+
+  it("masks block-scalar bodies (literal `|`)", () => {
+    // The credential lives on the indented continuation lines, not
+    // the `password: |` header. Without this, the body would render
+    // as plain text right next to the masked-empty header glyph.
+    const yaml = `api:
+  password: |
+    line-one-secret
+    line-two-secret
+mqtt:
+  password: hunter2
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([
+      "line-one-secret",
+      "line-two-secret",
+      "hunter2",
+    ]);
+  });
+
+  it("masks block-scalar bodies (folded `>`) with chomping indicator", () => {
+    const yaml = `api:
+  password: >-
+    folded
+    secret
+ota:
+  password: ok
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual(["folded", "secret", "ok"]);
+  });
+
+  it("does not misinterpret block-scalar contents as YAML keys", () => {
+    // `secret: foo` inside a block scalar is part of the credential,
+    // not a child key — masking it would mean the outer-loop key
+    // tracker tried to interpret it. Verify only the body lines get
+    // masked, and a sibling key after the block is still scanned.
+    const yaml = `api:
+  password: |
+    secret: not-a-key
+    other-line
+  encryption:
+    key: real-noise-key
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([
+      "secret: not-a-key",
+      "other-line",
+      "real-noise-key",
+    ]);
+  });
+
+  it("preserves leading indentation on block-scalar lines (only value masked)", () => {
+    const yaml = `api:
+  password: |
+    indented-secret
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(ranges).toHaveLength(1);
+    // Range should start at the first non-whitespace character so the
+    // editor's indentation guides remain visible.
+    expect(ranges[0].valueFrom).toBe(4);
+    expect(ranges[0].valueTo).toBe(4 + "indented-secret".length);
+  });
+
+  it("does not treat `#` inside a quoted value as a comment", () => {
+    const yaml = `api:
+  password: "abc # def"
+ota:
+  password: 'has # hash'
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([`"abc # def"`, `'has # hash'`]);
+  });
+
+  it("strips a real trailing comment after a quoted value", () => {
+    const yaml = `api:
+  password: "abc # def" # the real comment
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([`"abc # def"`]);
+  });
+
+  it("handles escaped quotes in double- and single-quoted values", () => {
+    const yaml = `api:
+  password: "with \\"escaped\\" inside"
+ota:
+  password: 'don''t # quote'
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([
+      `"with \\"escaped\\" inside"`,
+      `'don''t # quote'`,
+    ]);
+  });
+
+  it("does NOT mask `key:` under `api:` (only under `encryption:`)", () => {
+    // Defensive test: if someone broadens PARENT_SCOPED_SENSITIVE_KEYS
+    // accidentally, this catches it. `key:` is too generic to mask
+    // by parent name alone.
+    const yaml = `api:
+  key: not-a-credential
+`;
+    expect(findSensitiveValueRanges(yaml)).toEqual([]);
+  });
+
+  it("does NOT mask a top-level bare `key:`", () => {
+    const yaml = `key: not-a-credential
+`;
+    expect(findSensitiveValueRanges(yaml)).toEqual([]);
+  });
 });
