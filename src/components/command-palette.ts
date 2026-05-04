@@ -14,7 +14,7 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice, YamlSearchHit } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
 import {
   apiContext,
