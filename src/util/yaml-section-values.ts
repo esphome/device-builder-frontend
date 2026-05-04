@@ -112,7 +112,14 @@ export function parseYamlSectionValues(
   fromLine?: number,
 ): Record<string, unknown> {
   const lines = yaml.split("\n");
-  const values: Record<string, unknown> = {};
+  // Null-prototype map so a YAML key like `__proto__` /
+  // `constructor` / `prototype` lands as a normal own property
+  // instead of mutating the inherited prototype chain — defends
+  // against prototype-pollution via crafted YAML. ESPHome doesn't
+  // use those names as legitimate keys, but the values map flows
+  // into the form and into downstream code that does property
+  // access; a null-prototype root keeps the dunder attempts inert.
+  const values: Record<string, unknown> = Object.create(null);
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) return values;
 
@@ -197,7 +204,10 @@ function parseNestedBlock(
   const childRegex = childRegexFor(indent);
   const listItemPrefix = `${indent}  - `;
   const listItemRegex = listItemRegexFor(indent);
-  const values: Record<string, unknown> = {};
+  // Null-prototype — same prototype-pollution defense as the
+  // top-level `parseYamlSectionValues` map; nested blocks recurse
+  // into here so they need the same safety.
+  const values: Record<string, unknown> = Object.create(null);
   let i = startIdx;
   while (i < lines.length) {
     const line = lines[i];

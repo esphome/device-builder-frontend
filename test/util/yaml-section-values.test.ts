@@ -4,6 +4,39 @@ import {
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
 
+describe("parseYamlSectionValues — prototype pollution defense", () => {
+  // YAML keys like `__proto__` / `constructor` / `prototype`
+  // would otherwise hit the corresponding setter on
+  // `Object.prototype` and either mutate the prototype chain or
+  // create a footgun for downstream property access. The values
+  // map is built on a null-prototype object so these names land
+  // as plain own properties without escalating.
+
+  it("does not pollute Object.prototype via a __proto__ key", () => {
+    const yaml = "wrap:\n  __proto__: hacked\n";
+    const values = parseYamlSectionValues(yaml, "wrap");
+    // Property is captured as data on the values map…
+    expect(values.__proto__).toBe("hacked");
+    // …without touching the prototype of bystanders.
+    const bystander: Record<string, unknown> = {};
+    expect(bystander.polluted).toBeUndefined();
+    expect((Object.prototype as { hacked?: unknown }).hacked).toBeUndefined();
+  });
+
+  it("captures constructor / prototype keys as plain data", () => {
+    const yaml = "wrap:\n  constructor: a\n  prototype: b\n";
+    const values = parseYamlSectionValues(yaml, "wrap");
+    expect(values.constructor).toBe("a");
+    expect(values.prototype).toBe("b");
+  });
+
+  it("uses a null-prototype root so dunder access stays inert", () => {
+    const yaml = "wrap:\n  ssid: x\n";
+    const values = parseYamlSectionValues(yaml, "wrap");
+    expect(Object.getPrototypeOf(values)).toBeNull();
+  });
+});
+
 describe("updateSectionInYaml — list item with inline key", () => {
   it("does not duplicate the inline key when adding a sibling field", () => {
     // The OTA section as the wizard emits it: a list with one
