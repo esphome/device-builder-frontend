@@ -181,34 +181,6 @@ export const dashboardStyles = css`
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-xs);
   }
-  /* Keystroke hint cap (Tip: press / to search…). Monospace
-     font + light border + small padding gives the usual <kbd>
-     look while keeping <button> semantics for the click. */
-  .search-discover-key {
-    display: inline-block;
-    padding: 0 5px;
-    background: transparent;
-    border: 1px solid var(--wa-color-text-quieter, currentColor);
-    border-radius: 3px;
-    color: var(--wa-color-text-quiet);
-    font-family: var(--wa-font-family-code, ui-monospace, monospace);
-    font-size: var(--wa-font-size-xs);
-    line-height: 1.4;
-    cursor: pointer;
-    transition:
-      color 0.15s ease,
-      border-color 0.15s ease,
-      background-color 0.15s ease;
-    vertical-align: baseline;
-  }
-  .search-discover-key:hover,
-  .search-discover-key:focus-visible {
-    color: var(--wa-color-brand-on-quiet);
-    border-color: currentColor;
-    background: var(--wa-color-surface-raised);
-    outline: none;
-  }
-
   /* Back-to-device-search link in YAML mode. A regular text
      link — not a kbd cap — because the action is "navigate
      back", not "press this key". Plain inline so it flows on

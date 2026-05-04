@@ -60,12 +60,11 @@ describe("resolveSectionForUrlLine", () => {
     expect(got!.sectionKey).toContain("binary_sensor");
   });
 
-  it("returns null when the line falls outside any section", () => {
-    // Line 4 is the blank line between esphome and esp32. Some
-    // parsers attribute blank lines to the preceding section; pin
-    // whatever the actual behaviour is so a regression here is
-    // visible. (Either non-null with esphome, or null — either is
-    // valid; we just shouldn't crash.)
+  it("returns null when the line is past end-of-file", () => {
+    // Line 999 is way past the end of SAMPLE_YAML. Pin that
+    // out-of-bounds line numbers (truncated YAML, malformed URL)
+    // resolve to null rather than throwing or returning a stale
+    // last-section match.
     const got = resolveSectionForUrlLine(SAMPLE_YAML, 999, null);
     expect(got).toBeNull();
   });

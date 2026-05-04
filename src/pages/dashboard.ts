@@ -656,7 +656,11 @@ export class ESPHomePageDashboard extends LitElement {
     // clicking ``{}`` flips into YAML mode and the underlying
     // ``_view`` is preserved for when the user returns.
     return html`
-      <div class="view-toggle" role="group" aria-label=${cardsLabel}>
+      <div
+        class="view-toggle"
+        role="group"
+        aria-label=${this._localize("dashboard.view_toggle_group_label")}
+      >
         <button
           class="view-toggle-btn ${!yaml && view === DashboardView.CARDS ? "active" : ""}"
           type="button"
@@ -801,11 +805,8 @@ export class ESPHomePageDashboard extends LitElement {
    * In YAML mode, render a "Back to device search" link below
    * the search input so the user has an obvious one-click exit
    * even if they don't realise the segmented view-toggle
-   * affords the same.
-   *
-   * Device-mode discovery is handled by the always-visible
-   * ``{}`` segment in the view toggle, so no caption is needed
-   * there — keeping the toolbar uncluttered.
+   * affords the same. Returns ``""`` in device mode — discovery
+   * lives in the always-visible ``{}`` view-toggle segment.
    */
   private _renderDiscoveryHint() {
     if (!this._yamlMode) return "";

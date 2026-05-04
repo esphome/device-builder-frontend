@@ -142,6 +142,7 @@
     "table_toggle_columns": "Toggle columns",
     "view_cards": "Card view",
     "view_table": "List view",
+    "view_toggle_group_label": "View",
     "table_col_status": "Status",
     "table_col_name": "Name",
     "table_col_address": "Address",
@@ -588,9 +589,6 @@
     "switch_to_yaml": "Search YAML content",
     "switch_to_devices": "Search devices",
     "placeholder": "Search YAML content…",
-    "discover_prefix": "Tip: press",
-    "discover_link": "/",
-    "discover_suffix": "to search YAML content across all configs",
     "back_to_devices": "Back to device search",
     "no_match_yaml_preview": "Try YAML search — found {count} match across your configs",
     "no_match_yaml_preview_plural": "Try YAML search — found {count} matches across your configs"
