@@ -4,8 +4,13 @@
  * The default palette, applied at the `:host` level so it kicks
  * in whenever the host element doesn't have a more specific
  * theme attribute (e.g. `light`) set. Values mirror VS Code's
- * Dark+ flavour: muted, easy on the eyes against the dark log
- * surface that this component always renders against.
+ * Dark+ flavour: muted, easy on the eyes against a dark log
+ * surface.
+ *
+ * Owns the dark-mode log surface variables (`--log-bg` etc.) as
+ * the baseline. Other themes are free to override them — see
+ * `./light.ts` which gives the log a light surface to match a
+ * light-themed dashboard.
  *
  * Adding a new theme: copy this file as `<theme-name>.ts`,
  * change the selector to `:host([<theme-name>])`, override the
@@ -16,10 +21,7 @@ import { css } from "lit";
 
 export const ansiLogThemeDark = css`
   :host {
-    /* Log surface: dark in every theme — randybb noted in #145 that
-       a light log surface drowns out the muted ANSI palette and the
-       legacy ESPHome dashboard already keeps its log dark on every
-       theme. Other themes shouldn't override these. */
+    /* Dark log surface — VS Code Dark+ flavour. */
     --log-bg: #1e1e1e;
     --log-fg: #d4d4d4;
     --log-hover: rgba(255, 255, 255, 0.04);
