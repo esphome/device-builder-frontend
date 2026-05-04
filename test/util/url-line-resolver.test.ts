@@ -35,25 +35,27 @@ describe("resolveSectionForUrlLine", () => {
     expect(resolveSectionForUrlLine(SAMPLE_YAML, 5, "esphome")).toBeNull();
   });
 
-  it("resolves a line in the esphome block to esphome section + range", () => {
+  it("resolves a line in the esphome block to esphome section + line-pinned range", () => {
+    // Range is the SINGLE line the URL pointed at, not the whole
+    // containing section. Editor scrolls to ``range.fromLine``;
+    // widening to section.fromLine→toLine would silently land
+    // every hit inside a section on the section header.
     const got = resolveSectionForUrlLine(SAMPLE_YAML, 2, null);
     expect(got).not.toBeNull();
     expect(got!.sectionKey).toBe("esphome");
-    expect(got!.range.fromLine).toBe(1);
-    expect(got!.range.toLine).toBeGreaterThanOrEqual(3);
+    expect(got!.range).toEqual({ fromLine: 2, toLine: 2 });
   });
 
   it("resolves a line in the wifi block to wifi", () => {
-    // Line 10 is ``  ssid: home_network`` inside the ``wifi:`` block.
-    const got = resolveSectionForUrlLine(SAMPLE_YAML, 10, null);
+    // Line 9 is ``  ssid: home_network`` inside the ``wifi:`` block.
+    const got = resolveSectionForUrlLine(SAMPLE_YAML, 9, null);
     expect(got).not.toBeNull();
     expect(got!.sectionKey).toBe("wifi");
   });
 
   it("resolves a line inside binary_sensor to that platform-keyed section", () => {
-    // Line 18-20 is the binary_sensor entry. ``sectionKeyOf`` picks
-    // the platform-qualified key for platform-style sections.
-    const got = resolveSectionForUrlLine(SAMPLE_YAML, 19, null);
+    // Line 17 is ``  - platform: gpio`` inside binary_sensor.
+    const got = resolveSectionForUrlLine(SAMPLE_YAML, 17, null);
     expect(got).not.toBeNull();
     expect(got!.sectionKey).toContain("binary_sensor");
   });
@@ -68,14 +70,30 @@ describe("resolveSectionForUrlLine", () => {
     expect(got).toBeNull();
   });
 
-  it("range.toLine is >= range.fromLine for any successful resolution", () => {
-    // Walk every line — every successful resolution should produce
-    // a sensible (fromLine <= toLine) range. Pin the invariant.
+  it("two hits inside the same section land on different lines (not just the section header)", () => {
+    // Regression pin for the bug where the resolver returned the
+    // whole containing section's range — the editor scrolls to
+    // ``range.fromLine``, so every hit inside ``binary_sensor``
+    // would have landed on the platform line. Pin that the URL
+    // line drives the range so deep-link to line N actually
+    // lands on line N.
+    const a = resolveSectionForUrlLine(SAMPLE_YAML, 18, null); // pin: GPIO2
+    const b = resolveSectionForUrlLine(SAMPLE_YAML, 19, null); // name: Doorbell
+    expect(a).not.toBeNull();
+    expect(b).not.toBeNull();
+    expect(a!.sectionKey).toBe(b!.sectionKey);
+    expect(a!.range.fromLine).toBe(18);
+    expect(b!.range.fromLine).toBe(19);
+  });
+
+  it("range.toLine equals range.fromLine for any successful resolution", () => {
+    // Single-line range invariant.
     const lines = SAMPLE_YAML.split("\n").length;
     for (let i = 1; i <= lines; i++) {
       const got = resolveSectionForUrlLine(SAMPLE_YAML, i, null);
       if (got) {
-        expect(got.range.toLine).toBeGreaterThanOrEqual(got.range.fromLine);
+        expect(got.range.toLine).toBe(got.range.fromLine);
+        expect(got.range.fromLine).toBe(i);
       }
     }
   });

@@ -18,7 +18,17 @@ import { sectionAtLine, sectionKeyOf } from "./yaml-sections.js";
 export interface ResolvedUrlLine {
   /** Section key (e.g. ``"esphome"``, ``"sensor.dht"``) the line falls within. */
   sectionKey: string;
-  /** Highlight range to feed the YAML editor — covers the full section block. */
+  /**
+   * Highlight range fed to the YAML editor.
+   *
+   * Pinned to a *single line* (``fromLine === toLine === line``)
+   * rather than the full containing section. The editor scrolls
+   * to ``range.fromLine``, so widening to the section's range
+   * would land the user on the section header even when their
+   * URL pointed deep inside it — and multiple hits within the
+   * same section would all jump to the same spot. The user
+   * clicked a specific line; land on that line.
+   */
   range: { fromLine: number; toLine: number };
 }
 
@@ -51,6 +61,6 @@ export function resolveSectionForUrlLine(
   if (!match) return null;
   return {
     sectionKey: sectionKeyOf(match),
-    range: { fromLine: match.fromLine, toLine: match.toLine },
+    range: { fromLine: line, toLine: line },
   };
 }

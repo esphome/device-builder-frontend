@@ -1,8 +1,10 @@
 /**
- * YAML-content-search reactive controller for the command palette.
+ * Shared YAML-content-search reactive controller.
  *
- * Bundles every piece of state the palette needs to drive a
- * live, debounced ``yaml/search`` against the backend:
+ * Used by every UI surface that drives a live, debounced
+ * ``yaml/search`` against the backend — currently the command
+ * palette and the dashboard's YAML-mode search. Bundles every
+ * piece of state a host needs:
  *
  * - ``hits`` — the current result list (``null`` while a search
  *   is pending or in flight; ``[]`` after a fetch returned no
@@ -17,12 +19,12 @@
  *   window (so a typing storm collapses to "first + last"
  *   rather than "every keystroke").
  *
- * Hosted on the palette via ``addController`` so a host
- * disconnect (palette removed from DOM) calls ``clear()``
- * automatically — no leaked timers or pending dispatches across
- * a teardown.
+ * Hosted on the consumer via ``addController`` so a host
+ * disconnect (palette removed from DOM, dashboard navigated
+ * away from) calls ``clear()`` automatically — no leaked timers
+ * or pending dispatches across a teardown.
  *
- * The palette only ever talks to ``hits``, ``scheduleQuery``,
+ * Hosts only ever talk to ``hits``, ``scheduleQuery``, ``sync``,
  * and ``clear``; everything else is internal.
  */
 
