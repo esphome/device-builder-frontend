@@ -10,11 +10,10 @@
  *    whether a validation error has any chance of being seen by
  *    the user (a red ring on a paint that's actually onscreen).
  *
- * If they ever diverge, the add-component form regresses to the
- * silent-Add-button bug: validation finds an error on an entry
- * the rendering filter dropped, the form bails on submit, and
- * the user sees nothing because no field is highlighted.
- * Pinning the predicate in one place is the structural fix.
+ * If they diverge, validation can flag an error on an entry the
+ * filter has dropped: the form bails on submit and the user sees
+ * nothing — no red ring, no message — because the field isn't
+ * onscreen. Pinning the predicate in one place avoids that.
  *
  * Returns the rendered list (rather than a boolean predicate) so
  * NESTED groups can be skipped when none of their children

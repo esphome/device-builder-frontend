@@ -136,35 +136,29 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
-   * picked before typing a numeric value. Keyed by the dotted
-   * path. The renderer's `chooseDisplayUnit` reads this layer
-   * before falling back to the catalog default's unit, so a
-   * pick survives the rerender cycle even though the form value
-   * is still empty (`""`).
+   * picked before typing a numeric value. Keyed by dotted path.
+   * `chooseDisplayUnit` reads this layer before falling back to
+   * the catalog default, so the picker survives a rerender even
+   * when the form value is still `""`.
    *
-   * Stored as a private map rather than `@state`, but the setter
-   * (in `_buildCtx`) calls `requestUpdate()` so a unit-only pick
-   * still trips a rerender — the form's normal value-change cycle
-   * isn't entered when there's no magnitude yet (no `emit()`
-   * happens), so we have to nudge Lit ourselves.
+   * The setter (in `_buildCtx`) calls `requestUpdate()` because
+   * a unit-only pick doesn't reach the form's value-change cycle
+   * — no `emit()` happens — so Lit needs the explicit nudge.
    *
-   * Cleared on `entries` change (different component shape) so a
-   * dep-flow detour doesn't bleed picks across; otherwise an
-   * entry's pick is naturally superseded once a non-empty
-   * `parsed.unit` from the form value beats the pending layer in
-   * `chooseDisplayUnit`'s precedence.
+   * Cleared on `entries` change so a different component's picks
+   * don't bleed across; otherwise superseded once a non-empty
+   * `parsed.unit` from the form value beats the pending layer.
    */
   private _pendingUnits: Map<string, string> = new Map();
 
   /**
    * Transient raw-text buffer for FLOAT_WITH_UNIT magnitude inputs.
-   * `<input type="number">` reads `""` from `.value` while the user
-   * is mid-typing intermediate states (`"-"`, `"1e"`, `"1."`).
-   * Lit's `.value=` property binding then re-writes `""` over the
+   * `<input type="number">` reads `""` from `.value` for
+   * mid-typing intermediates (`"-"`, `"1e"`, `"1."`); Lit's
+   * `.value=` property binding then re-writes `""` over the
    * partial text. The renderer reads from this buffer first so
-   * the in-progress typing survives until the user produces a
-   * parseable value (which lands in `this.values` normally and
-   * supersedes the buffer) or blurs the field.
+   * partial input survives until the user produces a parseable
+   * value (which lands in `this.values` normally) or blurs.
    */
   private _editingMagnitudes: Map<string, string> = new Map();
 

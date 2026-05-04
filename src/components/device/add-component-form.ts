@@ -503,10 +503,8 @@ export class ESPHomeAddComponentForm extends LitElement {
    * True when at least one error in the map lands on an entry the
    * shared ``esphome-config-entry-form`` actually renders. Built on
    * ``collectRenderablePaths`` so the visibility check stays in
-   * lockstep with the form's render filter — any divergence would
-   * reintroduce the silent-button regression — validation error
-   * on a hidden field → form bails on submit with no red ring
-   * anywhere.
+   * lockstep with the form's render filter — without that lockstep
+   * an error on a hidden field would bail the submit silently.
    *
    * The add-component form passes ``required-only`` and never
    * exposes a show-advanced toggle, so we always pass

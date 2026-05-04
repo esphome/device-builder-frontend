@@ -222,35 +222,22 @@ describe("validateEntries", () => {
   });
 
   // ---------------------------------------------------------------------
-  // Optional default_value fallback regression — MasterOfNone bug
+  // Optional default_value fallback
   // ---------------------------------------------------------------------
   //
-  // ESPHome catalog entries often carry unit-suffixed defaults
-  // (``frequency: "50kHz"``, ``timeout: "10s"``, ``update_interval:
-  // "60s"``) on numeric / time-period entries. The validator used to
-  // fall back to ``default_value`` for ALL entries, which made
-  // ``Number("50kHz") = NaN`` for every untouched optional numeric
-  // field — flagging ``validation.not_a_number`` for fields the user
-  // can't see in ``required-only`` mode.
-  //
-  // The form's submit guard then bailed silently on the validation
-  // error and the user reported the symptom as
-  // ``Add ES7210 → Add i2c → blue Add does nothing``.
-  //
-  // Pin: optional entries with unit-suffixed defaults must validate
-  // clean when the user hasn't touched them. Required entries still
-  // need the fallback so a required-without-input entry that's been
-  // pre-defaulted by the catalog doesn't surface as ``required``.
+  // ESPHome catalog entries can carry unit-suffixed string defaults
+  // on numeric / time-period entries (``frequency: "50kHz"``,
+  // ``timeout: "10s"``, ``update_interval: "60s"``). Optional entries
+  // must validate clean when the user hasn't touched them — the
+  // backend never sees the default, so validating against it is
+  // wrong by design. Required entries still need the fallback so a
+  // required-without-input entry that's been pre-defaulted by the
+  // catalog doesn't surface as ``required``.
 
   it("does not validate optional entries against their default_value", () => {
     // Optional defaults aren't sent to the backend — ``_coerceFields``
     // strips empty optional values from the API payload — so
-    // validating against them is wrong by design. Pin the
-    // optional-skip so a regression that re-adds the unconditional
-    // fallback would re-introduce the silent-Add-button class of
-    // bug for any optional entry whose default is invalid for its
-    // type (e.g. a catalog-typing miss where a string default lives
-    // on a FLOAT-typed entry).
+    // validating against them is wrong by design.
     const entries = [
       makeEntry({
         key: "frequency",
@@ -298,9 +285,9 @@ describe("validateEntries", () => {
   });
 
   it("validates the i2c bus shape cleanly end-to-end", () => {
-    // End-to-end shape of the i2c bus catalog entry (the original
-    // MasterOfNone repro): id + several optional numeric / boolean
-    // entries, every numeric one carrying a unit-suffixed default.
+    // End-to-end shape of the i2c bus catalog entry: id + several
+    // optional numeric / boolean entries, every numeric one
+    // carrying a unit-suffixed default.
     const i2cEntries = [
       makeEntry({ key: "scl", type: ConfigEntryType.PIN, default_value: "SCL" }),
       makeEntry({ key: "sda", type: ConfigEntryType.PIN, default_value: "SDA" }),
