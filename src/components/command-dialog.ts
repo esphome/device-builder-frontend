@@ -107,6 +107,11 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() private _state: CommandState | null = null;
   @state() private _lines: string[] = [];
   @state() private _statusMessage = "";
+  /** Distinguishes "user clicked Stop" from "the backend job failed".
+   *  Both routes flip ``_state`` to ``"error"``, but only real
+   *  failures should surface the reset-build-env hint — a user-cancel
+   *  isn't a build problem. */
+  @state() private _userStopped = false;
   /** Show-secrets toggle for the validate path. Re-runs validation
    *  when flipped (the ``--show-secrets`` flag is set on the
    *  ``esphome config`` subprocess at spawn time, so toggling has
@@ -514,6 +519,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = "running";
     this._lines = [];
     this._statusMessage = "";
+    this._userStopped = false;
     /* Match ``open()``: every fresh attach is a fresh session, so
        reset the per-toggle defaults rather than letting the prior
        run's choice leak into this one. Most relevant for
@@ -723,6 +729,7 @@ export class ESPHomeCommandDialog extends LitElement {
    *  reads naturally. */
   private _renderResetSuggestion() {
     if (this._state !== "error") return nothing;
+    if (this._userStopped) return nothing;
     if (this._commandType !== "install" && this._commandType !== "compile") {
       return nothing;
     }
@@ -952,6 +959,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = "running";
     this._lines = [];
     this._statusMessage = "";
+    this._userStopped = false;
 
     if (this._commandType === "validate") {
       this._startValidateStream();
@@ -1112,6 +1120,7 @@ export class ESPHomeCommandDialog extends LitElement {
       this._api.firmwareCancel(this._jobId).catch(() => {});
     }
     this._state = "error";
+    this._userStopped = true;
     this._statusMessage = this._localize("command.stopped");
     this._detachStream();
     this._jobId = "";
