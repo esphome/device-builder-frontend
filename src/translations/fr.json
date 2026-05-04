@@ -171,8 +171,11 @@
     "install_method_usb_local_unsupported": "Nécessite un navigateur compatible Web Serial (ex. Chrome)",
     "install_method_usb_server": "Brancher sur l'ordinateur exécutant le tableau de bord ESPHome",
     "install_method_usb_server_desc": "Pour les appareils connectés via USB au serveur",
-    "install_method_web_download": "Télécharger le firmware pour le flasher via web.esphome.io",
-    "install_method_web_download_desc": "Compilez ici, puis flashez depuis un ordinateur qui prend en charge Web Serial",
+    "install_method_web_download": "Flasher sur cet ordinateur via {link}",
+    "install_method_web_download_link": "web.esphome.io",
+    "install_method_web_download_desc": "Nécessite un navigateur compatible Web Serial (ex. Chrome)",
+    "install_method_manual_download": "Télécharger le binaire du firmware",
+    "install_method_manual_download_desc": "Compilez ici et téléchargez le binaire, puis flashez-le manuellement avec votre outil préféré",
     "install": "Installer",
     "install_method_select_port": "Sélectionnez un port série",
     "install_method_no_ports": "Aucun port série trouvé. Assurez-vous que l'appareil est connecté au serveur.",
@@ -526,6 +529,7 @@
     "compile_failed": "Échec de la compilation.",
     "download_failed": "Échec du téléchargement du firmware.",
     "no_flashable_binary": "Aucun binaire flashable disponible pour cet appareil. web.esphome.io ne prend en charge que ESP32 et ESP8266.",
+    "no_binaries": "Aucun binaire n'a été produit pour cet appareil. Vérifiez que la compilation s'est terminée avec succès.",
     "flash_failed": "Échec du flashage du firmware sur l'appareil.",
     "chip_mismatch": "Puce incompatible : détecté {detected} mais l'appareil attend {expected}.",
     "validate_title": "Validation — {name}",
@@ -539,7 +543,9 @@
     "web_download_step_open": "Ouvrez web.esphome.io",
     "web_download_step_connect": "Cliquez sur Connect et choisissez le port série de votre appareil",
     "web_download_step_install": "Choisissez Install et sélectionnez le fichier téléchargé {filename}",
-    "web_download_open_button": "Ouvrir web.esphome.io"
+    "web_download_open_button": "Ouvrir web.esphome.io",
+    "binary_download_done_title": "Binaire du firmware téléchargé",
+    "binary_download_done_body": "Enregistré sous {filename}. Flashez-le sur votre appareil avec votre outil préféré."
   },
   "validation": {
     "required": "Ce champ est requis",

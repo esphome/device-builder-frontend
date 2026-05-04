@@ -473,25 +473,32 @@ export class ESPHomeInstallMethodDialog extends LitElement {
    * "start install" on the parent row.
    *
    * Translation splits on the ``{link}`` marker so other locales can
-   * place the URL anywhere within the sentence.
+   * place the URL anywhere within the sentence. Locales that don't
+   * include the marker (e.g. an older translation that already inlines
+   * the host name) fall back to rendering the title verbatim — without
+   * this guard the link would be appended after the existing inlined
+   * URL, producing duplicates like "... web.esphome.io web.esphome.io".
    */
   private _renderWebDownloadOption() {
     const titleTemplate = this._localize("dashboard.install_method_web_download");
     const linkText = this._localize("dashboard.install_method_web_download_link");
+    const hasMarker = titleTemplate.includes("{link}");
     const [before, after = ""] = titleTemplate.split("{link}");
     return html`
       <div class="option" @click=${() => this._selectMethod("web-download")}>
         <wa-icon library="mdi" name="cloud-download"></wa-icon>
         <div class="info">
           <span class="title"
-            >${before}<a
-              class="inline-link"
-              href="https://web.esphome.io"
-              target="_blank"
-              rel="noopener noreferrer"
-              @click=${(e: MouseEvent) => e.stopPropagation()}
-              >${linkText}</a
-            >${after}</span
+            >${hasMarker
+              ? html`${before}<a
+                    class="inline-link"
+                    href="https://web.esphome.io"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    @click=${(e: MouseEvent) => e.stopPropagation()}
+                    >${linkText}</a
+                  >${after}`
+              : titleTemplate}</span
           >
           <span class="desc"
             >${this._localize("dashboard.install_method_web_download_desc")}</span

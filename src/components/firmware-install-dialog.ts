@@ -1012,7 +1012,16 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         binaries.find((b) => b.file === "firmware.bin") ??
         (isWebFlasher ? undefined : binaries[0]);
       if (!flashable) {
-        this._fail(this._localize("firmware.no_flashable_binary"));
+        // The web-flasher path can only handle ESP32 .factory.bin or
+        // ESP8266 .bin, so a missing match almost always means a UF2
+        // platform — surface that clearly. The manual path falls back
+        // to ``binaries[0]`` and only ends up here when nothing was
+        // produced at all, so use the more general "no binaries" copy.
+        this._fail(
+          this._localize(
+            isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries"
+          )
+        );
         return;
       }
       const result = await this._api.firmwareDownload(
