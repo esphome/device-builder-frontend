@@ -369,41 +369,28 @@ function actionToCompletion(a: SchemaAction): Completion {
 /**
  * Map a YAML parent block (``esphome``, ``binary_sensor`` plus a
  * ``platform: gpio`` sibling, …) to the schema-bundle filename and
- * the component key inside that bundle. Returns ``null`` when the
- * parent doesn't name a component the schema host carries —
- * critically, when the regex picked up a YAML keyword from a
- * list-item header (``- platform: gpio`` → key ``platform``), we'd
- * otherwise fetch ``platform.json`` and 404 on every keystroke.
- * The catalog is loaded by this point so we use it as the
- * recognised-component filter.
+ * the component key inside that bundle.
+ *
+ * The earlier version rejected anything not in the local catalog
+ * to avoid 404 storms — but the catalog doesn't always carry
+ * bare-domain entries (``binary_sensor`` itself isn't a
+ * platform), and rejecting them here meant trigger lookup never
+ * fired for legitimate platform-style blocks. With the AST giving
+ * us a structurally-correct ``topLevelKey`` (no more
+ * ``platform``-keyword false-positives) and the schema fetcher
+ * permanent-caching 404s, it's safe to attempt every name and
+ * let the host say yes/no — once.
  */
 function bundleFor(
-  catalog: CatalogIndex,
-  parentKey: string,
+  topLevelKey: string,
   platformValue: string | null,
-): { bundle: string; componentKey: string } | null {
-  // ``parent.key`` may be the literal YAML keyword ``platform``
-  // when the cursor is nested under ``- platform: gpio`` —
-  // ``findParentKey``'s regex matches the first key on the
-  // list-item header. There's no ``platform.json`` bundle, so
-  // skip the lookup. The resolution we want for that case
-  // (``binary_sensor.gpio``) reaches us as the *outer* block via
-  // ``findTopLevelBlock`` — handled below.
-  if (parentKey === "platform") return null;
-  // Platform-style block: ``binary_sensor: - platform: gpio`` →
-  // bundle ``binary_sensor``, component ``binary_sensor.gpio``.
-  if (platformValue) {
-    if (!catalog.byId.has(parentKey)) return null;
-    return {
-      bundle: parentKey,
-      componentKey: `${parentKey}.${platformValue}`,
-    };
-  }
-  // Plain component: ``esphome:`` / ``wifi:`` / ``logger:`` →
-  // bundle and component name match. Only attempt when the
-  // catalog actually knows this name.
-  if (!catalog.byId.has(parentKey)) return null;
-  return { bundle: parentKey, componentKey: parentKey };
+): { bundle: string; componentKey: string } {
+  return platformValue
+    ? {
+        bundle: topLevelKey,
+        componentKey: `${topLevelKey}.${platformValue}`,
+      }
+    : { bundle: topLevelKey, componentKey: topLevelKey };
 }
 
 // ─── Lookups ─────────────────────────────────────────────────────────
@@ -603,18 +590,23 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         if (!partialCouldBeTrigger) return [];
         if (!bundleCtx) return [];
         const target = bundleFor(
-          catalog,
           bundleCtx.topLevelKey,
           bundleCtx.platformValue,
         );
-        if (!target) return [];
         return getTriggerKeys(api, target.bundle, target.componentKey);
       })(),
       // Aggregate action-registry entries across components in
       // the doc when the cursor is inside a ``then:`` list-item.
+      // Component keys passed twice: as bundle names (one fetch
+      // per top-level component in the doc) AND as the filter set
+      // (so we only pull actions from those specific entries
+      // inside each fetched bundle, matching the legacy editor's
+      // ``getDocComponents`` scope). ``core`` is always included
+      // for ``delay`` / ``if`` / ``lambda``.
       (async () => {
         if (!inAutomation) return [] as SchemaAction[];
-        return getActions(api, collectTopLevelKeys(state));
+        const tops = collectTopLevelKeys(state);
+        return getActions(api, tops, [...tops, "core"]);
       })(),
     ]);
     if (

@@ -51,6 +51,26 @@ describe("resolveBundleContext", () => {
     const state = makeState("");
     expect(resolveBundleContext(state, 0)).toBeNull();
   });
+
+  it("resolves bundle context at a partial-key position mid-edit", () => {
+    // User's actual scenario: typing ``o`` for ``on_press`` after
+    // a fully-typed list-item header. The ``o`` is an incomplete
+    // Pair (no value yet), and we need the trigger lookup to fire.
+    const yaml = [
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    id: button",
+      "    name: Gate Trigger 32 Relay",
+      "    pin: 21",
+      "    o",
+    ].join("\n");
+    const state = makeState(yaml);
+    const ctx = resolveBundleContext(state, yaml.length);
+    expect(ctx).toEqual({
+      topLevelKey: "binary_sensor",
+      platformValue: "gpio",
+    });
+  });
 });
 
 describe("isUnderThenItem", () => {
@@ -62,19 +82,19 @@ describe("isUnderThenItem", () => {
     expect(isUnderThenItem(state, posAt(yaml, 4, 9))).toBe(true);
   });
 
-  it("returns false for action arguments nested inside a then: item", () => {
-    // ``message:`` is a child of the action mapping, not a new
-    // list-item — should NOT trigger action-registry completion.
+  it("returns true even for nested action arguments under a then: item", () => {
+    // ``message:`` is a child of the action mapping (deep inside
+    // the same Item that contains ``logger.log``). The structural
+    // test is "are we under a then: Item?" which is still true
+    // here — tighter discrimination (new list-item vs mapping
+    // value inside an existing Item) is the caller's job: the
+    // completion source additionally gates on the ``isListItem``
+    // line-text matcher so action-registry completion only fires
+    // at the dash position.
     const yaml =
       "esphome:\n  on_boot:\n    then:\n      - logger.log:\n          level: WARN\n          message: hi\n";
     const state = makeState(yaml);
-    // Cursor on ``message:`` line, deep inside the action.
     expect(isUnderThenItem(state, posAt(yaml, 6, 11))).toBe(true);
-    // Hmm — the cursor IS still inside an Item under a then: BlockSequence
-    // (the same Item that contains logger.log). The structural test is
-    // "are we under a then: Item?" which is true here. Tighter discrimination
-    // (new list-item vs mapping value inside an existing Item) lives in the
-    // caller, which gates additionally on the ``isListItem`` regex.
   });
 
   it("returns false outside a then: block", () => {

@@ -100,16 +100,23 @@ export interface SchemaBundle {
   [name: string]: SchemaComponent | SchemaCore | undefined;
 }
 
-/** Module-level cache. Keyed by bundle name (``esphome``, ``sensor``,
- *  ``binary_sensor``, …); each entry is the resolved ``Promise`` so
- *  in-flight fetches are deduplicated and second callers wait on the
- *  same network round-trip. ``null`` is a *successful* sentinel for
- *  "fetch failed; degrade gracefully" — distinct from an absent key
- *  which means "haven't tried yet". */
+/** Module-level bundle cache. Keyed by ``<version>/<name>`` so a
+ *  multi-tenant session that switches devices (different
+ *  ``esphome_version``) can't reuse cached bundles from the wrong
+ *  version. Each entry is the resolved ``Promise`` so in-flight
+ *  fetches are deduplicated and second callers wait on the same
+ *  network round-trip. ``null`` is a successful sentinel for
+ *  "fetch failed; degrade gracefully" — distinct from an absent
+ *  key which means "haven't tried yet". */
 const cache = new Map<string, Promise<SchemaBundle | null>>();
 
-let activeVersion: string = "dev";
-let versionResolved = false;
+/** In-flight version-resolution promise. Stored as a promise so
+ *  concurrent callers wait on the same answer; cleared on
+ *  failure so the next caller retries (Copilot-flagged: marking
+ *  versionResolved=true on failure made version negotiation
+ *  non-retriable for the page lifetime — inconsistent with the
+ *  bundle cache's transient-eviction behaviour). */
+let versionPromise: Promise<string> | null = null;
 
 /**
  * Reset the in-memory cache. Test-only entry point — production
@@ -118,8 +125,7 @@ let versionResolved = false;
  */
 export function _resetSchemaCacheForTests() {
   cache.clear();
-  activeVersion = "dev";
-  versionResolved = false;
+  versionPromise = null;
 }
 
 /**
@@ -128,30 +134,31 @@ export function _resetSchemaCacheForTests() {
  * reported ``esphome_version`` is the authoritative answer, but if
  * that build hasn't published a schema yet we fall back to ``dev``
  * (the rolling latest). Probes the host with a HEAD on
- * ``esphome.json`` to confirm; any failure → fall back to ``dev``.
+ * ``esphome.json`` to confirm.
+ *
+ * On any failure (offline / CSP / DNS), the promise is *evicted*
+ * so the next caller retries — no permanent stuck-on-``dev``
+ * state when conditions change.
  */
 async function resolveVersion(api: ESPHomeAPI): Promise<string> {
-  if (versionResolved) return activeVersion;
-  try {
+  if (versionPromise) return versionPromise;
+  const promise = (async () => {
     const { esphome_version } = await api.getVersion();
-    if (esphome_version.endsWith("dev")) {
-      activeVersion = "dev";
-    } else {
-      const probe = await fetch(
-        `${SCHEMA_HOST}/${esphome_version}/esphome.json`,
-        { method: "HEAD" },
-      );
-      activeVersion = probe.ok ? esphome_version : "dev";
-    }
-  } catch {
-    /* HEAD probe (or getVersion) failed — likely CSP / offline /
-       host down. Fall through to ``dev`` so subsequent
-       ``fetchBundle`` calls still get a chance against the rolling
-       schema. */
-    activeVersion = "dev";
-  }
-  versionResolved = true;
-  return activeVersion;
+    if (esphome_version.endsWith("dev")) return "dev";
+    const probe = await fetch(
+      `${SCHEMA_HOST}/${esphome_version}/esphome.json`,
+      { method: "HEAD" },
+    );
+    return probe.ok ? esphome_version : "dev";
+  })();
+  versionPromise = promise;
+  // Evict on failure so subsequent calls retry. A successful
+  // resolution stays cached for the session — the dashboard's
+  // ``esphome_version`` doesn't change without a page reload.
+  promise.catch(() => {
+    if (versionPromise === promise) versionPromise = null;
+  });
+  return promise;
 }
 
 /**
@@ -164,19 +171,31 @@ export function fetchBundle(
   api: ESPHomeAPI,
   name: string,
 ): Promise<SchemaBundle | null> {
-  const cached = cache.get(name);
-  if (cached) return cached;
+  // First-line dedupe: concurrent callers asking for the same
+  // bundle name (before we know the version) share one promise.
+  // Once the version resolves, the entry gets re-keyed under
+  // ``<version>/<name>`` so a later session-swap with a
+  // different ``esphome_version`` can't reuse the wrong cache.
+  const inflight = cache.get(name);
+  if (inflight) return inflight;
   // ``transient`` flips to false when we get a definitive
   // "this bundle doesn't exist" answer (404). Transient failures
   // (thrown — CSP / DNS / offline — or 5xx) stay evictable so the
   // next caller can retry when conditions change; permanent
   // failures stay cached so we don't retry-storm against a URL
-  // that's never going to resolve (e.g. a YAML keyword the parent
-  // walker mistook for a component name).
+  // that's never going to resolve (e.g. a component name the
+  // schema host doesn't carry).
   let transient = true;
+  let cacheKey: string | null = null;
   const promise = (async () => {
     try {
       const version = await resolveVersion(api);
+      cacheKey = `${version}/${name}`;
+      // After resolving the version, an earlier caller may have
+      // already cached this bundle under the version-keyed key
+      // — return that result directly.
+      const versioned = cache.get(cacheKey);
+      if (versioned && versioned !== promise) return versioned;
       const res = await fetch(`${SCHEMA_HOST}/${version}/${name}.json`);
       if (res.status === 404) {
         transient = false;
@@ -190,10 +209,17 @@ export function fetchBundle(
       return null;
     }
   })();
+  // Register under the bare name so concurrent callers dedupe
+  // before the version resolves. Once it does, swap to the
+  // version-keyed entry (or evict on a transient failure).
   cache.set(name, promise);
   promise.then((value) => {
-    if (value === null && transient && cache.get(name) === promise) {
-      cache.delete(name);
+    if (cache.get(name) === promise) cache.delete(name);
+    if (cacheKey) {
+      const evict = value === null && transient;
+      if (!evict) {
+        cache.set(cacheKey, promise);
+      }
     }
   });
   return promise;
@@ -232,13 +258,22 @@ export interface SchemaAction {
 }
 
 /**
- * Aggregate the action-registry entries reachable from the components
- * actually present in *bundleNames*. Mirrors the legacy dashboard's
+ * Aggregate the action-registry entries reachable from a specific
+ * set of components. Mirrors the legacy dashboard's
  * ``getRegistry("action", doc)`` behaviour: only suggest actions
  * contributed by components the user is editing, so a config that
  * touches ``logger:`` and ``light:`` gets ``logger.log`` and
  * ``light.turn_on`` but not ``sensor.*`` actions if no sensor block
  * is configured.
+ *
+ * *componentKeys* is the precise set of component-name entries to
+ * pull actions from inside each bundle (e.g. ``["binary_sensor",
+ * "binary_sensor.gpio", "core"]``). Restricting by key is what
+ * keeps the action list scoped to the user's doc — without it we'd
+ * yield every component's actions inside any bundle that happened
+ * to be fetched (e.g. ``binary_sensor.json`` carries ALL the
+ * platform-specific schemas; we only want the ones the user is
+ * actually using).
  *
  * The legacy yields each action under ``<reversedDomain>.<name>``
  * for non-``core`` registries — e.g. an action named ``turn_on``
@@ -250,16 +285,19 @@ export interface SchemaAction {
 export async function getActions(
   api: ESPHomeAPI,
   bundleNames: string[],
+  componentKeys: string[],
 ): Promise<SchemaAction[]> {
   const bundles = await Promise.all(
     bundleNames.map((name) => fetchBundle(api, name)),
   );
+  const wantedKeys = new Set(componentKeys);
   const out: SchemaAction[] = [];
   const seen = new Set<string>();
   for (let i = 0; i < bundles.length; i++) {
     const bundle = bundles[i];
     if (!bundle) continue;
     for (const [componentName, component] of Object.entries(bundle)) {
+      if (!wantedKeys.has(componentName)) continue;
       const actions = (component as SchemaComponent | undefined)?.action;
       if (!actions) continue;
       for (const [actionName, cv] of Object.entries(actions)) {

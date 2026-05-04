@@ -249,7 +249,11 @@ describe("getActions", () => {
         return new Response(JSON.stringify(LIGHT_BUNDLE), { status: 200 });
       throw new Error(`unexpected fetch ${url}`);
     });
-    const actions = await getActions(makeApi() as never, ["logger", "light"]);
+    const actions = await getActions(
+      makeApi() as never,
+      ["logger", "light"],
+      ["logger", "light"],
+    );
     const keys = actions.map((a) => a.key).sort();
     expect(keys).toEqual([
       "light.turn_off",
@@ -267,14 +271,18 @@ describe("getActions", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(CORE_BUNDLE), { status: 200 });
     });
-    const actions = await getActions(makeApi() as never, ["core"]);
+    const actions = await getActions(makeApi() as never, ["core"], ["core"]);
     expect(actions.map((a) => a.key).sort()).toEqual(["delay", "if"]);
   });
 
   it("returns [] when every bundle fails to load (graceful degradation)", async () => {
     fetchSpy.mockRejectedValue(new TypeError("Failed to fetch"));
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const actions = await getActions(makeApi() as never, ["logger", "light"]);
+    const actions = await getActions(
+      makeApi() as never,
+      ["logger", "light"],
+      ["logger", "light"],
+    );
     expect(actions).toEqual([]);
     debugSpy.mockRestore();
   });
@@ -286,8 +294,42 @@ describe("getActions", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(LOGGER_BUNDLE), { status: 200 });
     });
-    const actions = await getActions(makeApi() as never, ["logger", "logger"]);
+    const actions = await getActions(
+      makeApi() as never,
+      ["logger", "logger"],
+      ["logger"],
+    );
     expect(actions.filter((a) => a.key === "logger.log").length).toBe(1);
+  });
+
+  it("filters out components not in the wanted-keys set", async () => {
+    // Bundle carries entries for both ``logger`` and ``ignored``;
+    // only ``logger`` is in the wanted set, so ``ignored.foo``
+    // should not appear. Mirrors the doc-scoped filtering the
+    // legacy editor used (only suggest actions from components
+    // actually present in the YAML).
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(
+        JSON.stringify({
+          ...LOGGER_BUNDLE,
+          ignored: {
+            action: { foo: { type: "schema" } },
+          },
+        }),
+        { status: 200 },
+      );
+    });
+    const actions = await getActions(
+      makeApi() as never,
+      ["logger"],
+      ["logger"],
+    );
+    expect(actions.map((a) => a.key)).not.toContain("ignored.foo");
+    expect(actions.map((a) => a.key).sort()).toEqual([
+      "logger.log",
+      "logger.set_level",
+    ]);
   });
 });
 
