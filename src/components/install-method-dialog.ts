@@ -188,74 +188,61 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
-      /* The OTA option is split into two click targets sharing
-         one bordered card: the row itself runs the default-
-         address OTA, and the trailing chevron expands the
-         address-override field below. e.stopPropagation in the
-         chevron's click handler keeps the row's default-OTA
-         from also firing on chevron clicks.
+      /* The chevron is a disclosure affordance on the OTA row —
+         click the row for default-address OTA, click the chevron
+         to expand the address-override form below. Always-on
+         pill background (not just on hover) so the chevron reads
+         as clickable at a glance; without it the bare icon was
+         hard to spot in the dark theme.
 
-         The chevron sits at the right edge with a left margin
-         of auto so it stays pinned regardless of the row's
-         text width. The 16px font-size matches the kebab menu's
-         icon scale rather than the option's 28px primary icon —
-         the chevron is a disclosure affordance, not a primary
-         action. */
-      .option-row {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-m);
-        flex: 1;
-        min-width: 0;
-      }
-
+         e.stopPropagation in the chevron's click handler keeps
+         the row's default-OTA from also firing on chevron clicks.
+         margin-left: auto pins it to the row's trailing edge
+         regardless of text width. */
       .chevron-btn {
         margin-left: auto;
-        padding: var(--wa-space-2xs);
-        background: transparent;
-        border: none;
-        border-radius: var(--wa-border-radius-s);
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        border: var(--wa-border-width-s) solid
+          color-mix(in srgb, var(--esphome-primary), transparent 70%);
+        border-radius: 999px;
         cursor: pointer;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: var(--wa-color-text-quiet);
-        transition: background 0.12s, color 0.12s;
+        color: var(--esphome-primary);
+        flex-shrink: 0;
+        transition: background 0.12s, border-color 0.12s, color 0.12s;
       }
 
       .chevron-btn:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
-        color: var(--esphome-primary);
+        background: color-mix(in srgb, var(--esphome-primary), transparent 75%);
+        border-color: var(--esphome-primary);
+      }
+
+      .chevron-btn:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 2px;
       }
 
       .chevron-btn wa-icon {
-        font-size: 16px;
+        font-size: 18px;
         color: inherit;
       }
 
-      /* The expanded address form sits inside the same option
-         card as the OTA row — same border + radius — so the
-         disclosure feels like a single grouped control rather
-         than a separate panel. A border-top divides the row
-         from the form without doubling up the outer border. */
-      .ota-option {
-        display: flex;
-        flex-direction: column;
-        padding: 0;
-      }
-
-      .ota-row {
-        padding: var(--wa-space-m);
-        cursor: pointer;
-      }
-
-      .ota-row.option--disabled {
-        cursor: not-allowed;
-      }
-
+      /* The expanded address form is a separate card directly
+         below the OTA row — same border-radius, slightly inset
+         on the left so it visually associates with the OTA row's
+         affordance without inheriting the .option class's
+         flex-row + align-items: center (which would re-center
+         the form's contents and clip its width). */
       .ota-form {
+        margin-left: 56px;
         padding: var(--wa-space-m);
-        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-l);
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-xs);
@@ -266,6 +253,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         font-size: var(--wa-font-size-2xs);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-quiet);
+      }
+
+      .ota-form input {
+        width: 100%;
+        box-sizing: border-box;
       }
 
       .ota-form .actions {
@@ -495,75 +487,73 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const trimmed = this._otaAddressValue.trim();
     const canSubmit = trimmed.length > 0 && trimmed !== "OTA";
     return html`
-      <div class="option ota-option">
-        <div
-          class="option-row ota-row ${!isOnline ? "option--disabled" : ""}"
-          @click=${isOnline ? () => this._selectMethod("ota") : undefined}
-        >
-          <wa-icon library="mdi" name="wifi"></wa-icon>
-          <div class="info">
-            <span class="title"
-              >${this._localize("dashboard.install_method_network")}</span
-            >
-            <span class="desc"
-              >${this._localize("dashboard.install_method_network_desc")}</span
-            >
-          </div>
-          <button
-            type="button"
-            class="chevron-btn"
-            aria-expanded=${expanded ? "true" : "false"}
-            aria-label=${this._localize(
-              "dashboard.install_method_network_address_toggle",
-            )}
-            @click=${this._onToggleOtaAddress}
+      <div
+        class="option ${!isOnline ? "option--disabled" : ""}"
+        @click=${isOnline ? () => this._selectMethod("ota") : undefined}
+      >
+        <wa-icon library="mdi" name="wifi"></wa-icon>
+        <div class="info">
+          <span class="title"
+            >${this._localize("dashboard.install_method_network")}</span
           >
-            <wa-icon
-              library="mdi"
-              name=${expanded ? "chevron-up" : "chevron-down"}
-            ></wa-icon>
-          </button>
+          <span class="desc"
+            >${this._localize("dashboard.install_method_network_desc")}</span
+          >
         </div>
-        ${expanded
-          ? html`
-              <div class="ota-form">
-                <label
-                  >${this._localize(
-                    "dashboard.install_method_network_address_label",
-                  )}</label
-                >
-                <input
-                  type="text"
-                  autocomplete="off"
-                  spellcheck="false"
-                  placeholder="192.168.1.42"
-                  .value=${this._otaAddressValue}
-                  @input=${(e: Event) => {
-                    this._otaAddressValue = (
-                      e.target as HTMLInputElement
-                    ).value;
-                  }}
-                  @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter" && canSubmit) {
-                      this._submitOtaAddress();
-                    }
-                  }}
-                />
-                <div class="actions">
-                  <button
-                    class="btn btn--primary"
-                    ?disabled=${!canSubmit}
-                    @click=${this._submitOtaAddress}
-                  >
-                    ${this._localize(
-                      "dashboard.install_method_network_address_submit",
-                    )}
-                  </button>
-                </div>
-              </div>
-            `
-          : nothing}
+        <button
+          type="button"
+          class="chevron-btn"
+          aria-expanded=${expanded ? "true" : "false"}
+          aria-label=${this._localize(
+            "dashboard.install_method_network_address_toggle",
+          )}
+          @click=${this._onToggleOtaAddress}
+        >
+          <wa-icon
+            library="mdi"
+            name=${expanded ? "chevron-up" : "chevron-down"}
+          ></wa-icon>
+        </button>
       </div>
+      ${expanded
+        ? html`
+            <div class="ota-form">
+              <label
+                >${this._localize(
+                  "dashboard.install_method_network_address_label",
+                )}</label
+              >
+              <input
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="192.168.1.42"
+                .value=${this._otaAddressValue}
+                @input=${(e: Event) => {
+                  this._otaAddressValue = (
+                    e.target as HTMLInputElement
+                  ).value;
+                }}
+                @keydown=${(e: KeyboardEvent) => {
+                  if (e.key === "Enter" && canSubmit) {
+                    this._submitOtaAddress();
+                  }
+                }}
+              />
+              <div class="actions">
+                <button
+                  class="btn btn--primary"
+                  ?disabled=${!canSubmit}
+                  @click=${this._submitOtaAddress}
+                >
+                  ${this._localize(
+                    "dashboard.install_method_network_address_submit",
+                  )}
+                </button>
+              </div>
+            </div>
+          `
+        : nothing}
     `;
   }
 
