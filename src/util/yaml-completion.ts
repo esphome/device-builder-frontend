@@ -662,13 +662,26 @@ function resolveCompletionContext(
   bundleCtx: ReturnType<typeof resolveBundleContext>;
 } {
   const bundleCtx = resolveBundleContext(state, pos);
+  // When the AST resolves ``bundleCtx`` it has read the cursor's
+  // structure end-to-end — including a deliberate
+  // ``platformValue: null`` for "cursor not inside a ``- platform:``
+  // list-item". Trust that answer and don't fall through to the
+  // regex walker (which can otherwise grab an unrelated
+  // ``- platform: …`` line elsewhere in the doc and synthesise a
+  // bogus context). The regex fallback fires only when the AST
+  // is silent (half-typed pair, partial parse). Same rule for
+  // ``topLevelKey``.
+  if (bundleCtx) {
+    return {
+      bundleCtx,
+      platformValue: bundleCtx.platformValue,
+      topLevelKey: bundleCtx.topLevelKey,
+    };
+  }
   return {
-    bundleCtx,
-    platformValue:
-      bundleCtx?.platformValue ??
-      readPlatformSibling(allLines, lineIdx, indent),
-    topLevelKey:
-      bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx),
+    bundleCtx: null,
+    platformValue: readPlatformSibling(allLines, lineIdx, indent),
+    topLevelKey: findTopLevelBlock(allLines, lineIdx),
   };
 }
 
