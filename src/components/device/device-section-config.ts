@@ -222,13 +222,22 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * surface the failure with a localised error instead of running
    * the splice with stale inputs.
    *
-   * `resolveCurrentFromLine` returns `null` for empty / unbound
-   * `this.yaml` AND for "section key no longer present in the
-   * live YAML" (user pasted away the section, cleared the editor,
-   * or the cached `fromLine` shifted past a now-removed key).
-   * All three collapse to the same user-facing error — clobbering
-   * config with an empty-string splice is structurally
-   * impossible when we don't proceed without a resolved line.
+   * `resolveCurrentFromLine` returns `undefined` for empty /
+   * unbound `this.yaml` AND for "section key no longer present
+   * in the live YAML" (user pasted away the section, cleared
+   * the editor, or the cached `fromLine` shifted past a
+   * now-removed key). All three collapse to the same
+   * user-facing error — clobbering config with an empty-string
+   * splice is structurally impossible when we don't proceed
+   * without a resolved line.
+   *
+   * Asymmetric on purpose with the read path (`_loadConfig`):
+   * the read path is reactive (driven by `reload()` from
+   * external yaml mutation, not user intent), so a popup error
+   * for "section vanished" would feel intrusive — it surfaces
+   * an empty form instead. The save / delete paths fire from
+   * an explicit user action so an error is the right
+   * acknowledgement.
    *
    * `notFoundErrorKey` is the localize key surfaced
    * (`device.save_error` / `device.section_delete_error`).
@@ -304,23 +313,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         image_url: component.image_url,
         entries: component.config_entries,
       };
-      // Resolve `fromLine` against the live YAML on the read
-      // path too — the cached `this.fromLine` can be stale by
-      // the time `reload()` fires (board-info debounces on
-      // yaml changes), and re-seeding from a stale line would
-      // populate the form with the wrong section's values.
-      // When the resolver can't find the section at all (key
-      // gone from yaml, empty pane), the parser is called with
-      // `undefined` so its column-0 scan won't match a dotted
-      // platform key — values come back `{}` and the form
-      // surfaces empty.
-      //
-      // Asymmetric with save / delete (which surface a
-      // localised error in the same case): the read path is
-      // reactive (`reload()` fires from external yaml mutation,
-      // not user intent) so a popup error would feel intrusive
-      // for what's just "the underlying section vanished — show
-      // an empty form until the user decides what to do".
+      // Resolve `fromLine` against the live YAML — see
+      // `_resolveSpliceContext` for the contract and the
+      // documented asymmetry between this read path
+      // (silent-empty on missing section) and the save / delete
+      // paths (localised error). When the resolver returns
+      // `undefined`, the parser's column-0 scan won't match a
+      // dotted platform key, so values come back `{}` and the
+      // form surfaces empty.
       const resolvedFromLine = resolveCurrentFromLine(
         yaml,
         this.sectionKey,

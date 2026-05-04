@@ -104,7 +104,18 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     // form.
     if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
       if (this._reloadTimer) clearTimeout(this._reloadTimer);
-      this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
+      // Initial-load transition (`""` → real yaml): reload
+      // immediately. The section editor renders with an empty
+      // form until the first reload, so a 1s gate would leave
+      // the user staring at a blank form on every page load
+      // when deep-linked to a selected section. Subsequent
+      // changes keep the debounce.
+      const prev = changedProperties.get("yaml") as string | undefined;
+      const delay = !prev && this.yaml ? 0 : 1000;
+      this._reloadTimer = setTimeout(
+        () => this._sectionConfig?.reload(),
+        delay,
+      );
     }
   }
 

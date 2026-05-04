@@ -304,11 +304,11 @@ describe("resolveCurrentFromLine", () => {
     expect(resolveCurrentFromLine(after, "wifi", /* stale */ 3)).toBe(7);
   });
 
-  it("returns null when the section no longer exists", () => {
+  it("returns undefined when the section no longer exists", () => {
     expect(resolveCurrentFromLine("esphome:\n  name: x\n", "wifi")).toBeUndefined();
   });
 
-  it("returns null on empty yaml or empty sectionKey", () => {
+  it("returns undefined on empty yaml or empty sectionKey", () => {
     expect(resolveCurrentFromLine("", "wifi")).toBeUndefined();
     expect(resolveCurrentFromLine("wifi:\n  ssid: x\n", "")).toBeUndefined();
   });
