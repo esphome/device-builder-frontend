@@ -41,43 +41,63 @@ export const ansiLogThemeLight = css`
        warnings even on the non-bold ANSI yellow path that
        PlatformIO uses for things like "Using Python 3.12.7 ..."
        informational notes. */
-    --ansi-fg-30: #1f1f1f;
-    --ansi-fg-31: #c01c28;
-    --ansi-fg-32: #2aa198;
-    --ansi-fg-33: #9a6700;
-    --ansi-fg-34: #0451a5;
-    --ansi-fg-35: #a31515;
-    --ansi-fg-36: #098658;
-    --ansi-fg-37: #555555;
-    --ansi-fg-90: #6e6e6e;
-    --ansi-fg-91: #cd3131;
-    --ansi-fg-92: #3d7a28;
-    --ansi-fg-93: #9a6700;
-    --ansi-fg-94: #074d8c;
-    --ansi-fg-95: #bc05bc;
-    --ansi-fg-96: #0598bc;
-    --ansi-fg-97: #1a1a1a;
+    --ansi-fg-30: #1f1f1f; /* black   */
+    --ansi-fg-31: #c01c28; /* red     */
+    --ansi-fg-32: #2aa198; /* green   */
+    --ansi-fg-33: #9a6700; /* yellow  — GitHub Light "warning amber" */
+    --ansi-fg-34: #0451a5; /* blue    */
+    --ansi-fg-35: #a31515; /* magenta */
+    --ansi-fg-36: #098658; /* cyan    */
+    --ansi-fg-37: #555555; /* white   — mid-grey on light surface;
+                              "white" is paradoxical on a near-white
+                              background, this is the contrast value */
+    --ansi-fg-90: #6e6e6e; /* bright black   (VERBOSE log level) */
+    --ansi-fg-91: #cd3131; /* bright red     */
+    --ansi-fg-92: #3d7a28; /* bright green   */
+    --ansi-fg-93: #9a6700; /* bright yellow  */
+    --ansi-fg-94: #074d8c; /* bright blue    */
+    --ansi-fg-95: #bc05bc; /* bright magenta */
+    --ansi-fg-96: #0598bc; /* bright cyan    */
+    --ansi-fg-97: #1a1a1a; /* bright white   — paradoxical on light
+                              surface; renders as near-black so the
+                              "high-emphasis" semantic survives */
 
     /* Background (codes 40-47 + bright 100-107). Saturated by
        intent: ANSI bg highlights are visual flags, not body text
        — keeping them bright preserves the highlight effect that
-       the legacy dashboard provides. */
-    --ansi-bg-40: #1f1f1f;
-    --ansi-bg-41: rgb(255, 0, 0);
-    --ansi-bg-42: rgb(0, 255, 0);
-    --ansi-bg-43: rgb(255, 255, 0);
-    --ansi-bg-44: rgb(0, 0, 255);
-    --ansi-bg-45: rgb(255, 0, 255);
-    --ansi-bg-46: rgb(0, 255, 255);
-    --ansi-bg-47: rgb(255, 255, 255);
-    --ansi-bg-100: rgb(128, 128, 128);
-    --ansi-bg-101: rgb(255, 0, 0);
-    --ansi-bg-102: rgb(0, 255, 0);
-    --ansi-bg-103: rgb(255, 255, 0);
-    --ansi-bg-104: rgb(0, 0, 255);
-    --ansi-bg-105: rgb(255, 0, 255);
-    --ansi-bg-106: rgb(0, 255, 255);
-    --ansi-bg-107: rgb(255, 255, 255);
+       the legacy dashboard provides.
+
+       Two cases need adjustment for the light surface, vs the
+       legacy palette they otherwise mirror:
+
+       - 40 (black) is now pure #000000 rather than #1f1f1f,
+         since --log-fg is also #1f1f1f. A bg-only \\x1b[40m
+         span uses the inherited --log-fg for text — same value
+         would render black-on-black.
+       - 47 / 107 (white / bright white) are mapped to neutral
+         greys instead of pure white. #ffffff against the
+         #f5f5f5 log surface is barely distinguishable from
+         "no highlight at all", which would silently swallow
+         the highlight. Greys preserve the visual flag. */
+    --ansi-bg-40: #000000; /* black   — pure black so it
+                                     contrasts with --log-fg #1f1f1f */
+    --ansi-bg-41: rgb(255, 0, 0); /* red     */
+    --ansi-bg-42: rgb(0, 255, 0); /* green   */
+    --ansi-bg-43: rgb(255, 255, 0); /* yellow  */
+    --ansi-bg-44: rgb(0, 0, 255); /* blue    */
+    --ansi-bg-45: rgb(255, 0, 255); /* magenta */
+    --ansi-bg-46: rgb(0, 255, 255); /* cyan    */
+    --ansi-bg-47: #bbbbbb; /* white   — light grey, would be
+                                     invisible against the #f5f5f5
+                                     log surface as pure white */
+    --ansi-bg-100: rgb(128, 128, 128); /* bright black   */
+    --ansi-bg-101: rgb(255, 0, 0); /* bright red     */
+    --ansi-bg-102: rgb(0, 255, 0); /* bright green   */
+    --ansi-bg-103: rgb(255, 255, 0); /* bright yellow  */
+    --ansi-bg-104: rgb(0, 0, 255); /* bright blue    */
+    --ansi-bg-105: rgb(255, 0, 255); /* bright magenta */
+    --ansi-bg-106: rgb(0, 255, 255); /* bright cyan    */
+    --ansi-bg-107: #d0d0d0; /* bright white  — same reason as 47 */
 
     /* VERY_VERBOSE: lighter grey than VERBOSE so it reads as
        "even less prominent" against the light surface (which on

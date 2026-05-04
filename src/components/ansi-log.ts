@@ -9,20 +9,19 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import { ansiLogThemes } from "../styles/ansi-log/index.js";
 
 /**
- * ANSI 4-bit color palette as CSS variable references — concrete
- * values are defined in this component's static styles, with the
- * dark frontend theme using a muted VS Code-style palette and the
- * light frontend theme falling back to the legacy ESPHome
- * dashboard's brighter pure-RGB palette (the colours users have
- * been looking at in ``esphome dashboard`` for years).
+ * ANSI 4-bit colour palette as CSS variable references. The
+ * concrete values live in ``../styles/ansi-log/{dark,light}.ts``
+ * — one file per theme, switched on automatically via the host's
+ * ``light`` attribute. Both themes use the same variable names
+ * (``--ansi-fg-30`` etc.); only the values differ.
  *
- * Why theme-aware via CSS vars rather than two static palettes:
- * the log container background is always dark (issue #145 — the
- * original dashboard does the same; muted-yellow ``#dcdcaa`` on
- * a light ``#f5f5f5`` was unreadable), but switching the surface
- * around the log between light and dark frontend themes lets the
- * palette inside the log adapt without re-parsing the line on
- * every theme change.
+ * Why CSS variables rather than two static records: a theme
+ * switch (host gains/loses the ``light`` attribute) re-resolves
+ * the variables via the cascade in place, no re-parse of any
+ * already-rendered log line. Adding a third theme (Solarized,
+ * Dracula, …) is just dropping another sibling file under
+ * ``../styles/ansi-log/`` — see that directory's index for the
+ * extension contract.
  */
 const ANSI_COLORS: Record<number, string> = {
   30: "var(--ansi-fg-30)",
