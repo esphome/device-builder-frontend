@@ -1,10 +1,11 @@
 name: Release
 
-# Tags the version, drafts release notes, builds the Python wheel
-# containing the prebuilt frontend, attaches the wheel + sdist to
-# the draft release, publishes the wheel to PyPI, then flips the
-# GitHub release to public, and finally opens / updates a single
-# bump PR on the backend repo so it picks up the new PyPI version.
+# Drafts release notes, builds the Python wheel containing the
+# prebuilt frontend, attaches the wheel + sdist to the draft
+# release, publishes the wheel to PyPI, then flips the GitHub
+# release to public (which creates the tag at the target SHA),
+# and finally opens / updates a single bump PR on the backend
+# repo so it picks up the new PyPI version.
 
 on:
   workflow_dispatch:
@@ -22,9 +23,17 @@ env:
 
 permissions: {}
 
+# Only one release run at a time, ever. A second run queues
+# behind the first rather than cancelling it — cancelling
+# mid-publish could leave PyPI and the GitHub release in
+# inconsistent states.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   create-release:
-    name: Tag and draft release
+    name: Draft release
     runs-on: ubuntu-latest
     steps:
       - name: Generate a token
@@ -39,12 +48,12 @@ jobs:
           fetch-depth: 0
           token: ${{ steps.generate-token.outputs.token }}
 
-      - name: Create and push tag
+      - name: Verify tag does not already exist
         run: |
-          git config user.name "esphome[bot]"
-          git config user.email "115708604+esphome[bot]@users.noreply.github.com"
-          git tag -a "${{ inputs.version }}" -m "Release ${{ inputs.version }}"
-          git push origin "${{ inputs.version }}"
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ inputs.version }}" >/dev/null 2>&1; then
+            echo "::error::Tag ${{ inputs.version }} already exists on origin. Bump the version or delete the existing tag."
+            exit 1
+          fi
 
       - name: Generate release notes
         uses: release-drafter/release-drafter@563bf132657a13ded0b01fcb723c5a58cdd824e2 # v7.2.1
@@ -52,6 +61,7 @@ jobs:
           config-name: release-drafter.yml
           version: ${{ inputs.version }}
           tag: ${{ inputs.version }}
+          commitish: ${{ github.sha }}
           publish: false
           prerelease: false
         env:
@@ -75,7 +85,10 @@ jobs:
 
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          ref: ${{ inputs.version }}
+          # Tag doesn't exist yet — it's created when the draft release
+          # is published. Build from the SHA the workflow ran on, which
+          # is also what release-drafter targets via commitish.
+          ref: ${{ github.sha }}
 
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
@@ -120,6 +133,19 @@ jobs:
         run: |
           rm -rf build *.egg-info
           python3 -m build --wheel --sdist
+
+      - name: Clear existing assets on draft release
+        # On a partial-failure rerun the draft release may already
+        # carry assets from the previous attempt. Strip them so the
+        # upload starts from a clean slate.
+        run: |
+          gh release view "${{ inputs.version }}" --json assets --jq '.assets[].name' \
+            | while IFS= read -r asset; do
+                [ -z "$asset" ] && continue
+                gh release delete-asset "${{ inputs.version }}" "$asset" --yes
+              done
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
 
       - name: Attach to release
         run: gh release upload "${{ inputs.version }}" dist/*.whl dist/*.tar.gz
