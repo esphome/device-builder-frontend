@@ -79,6 +79,11 @@ export function categorizeSections(sections: YamlSection[]): CategorizedSections
   return { core, components, automations };
 }
 
+function _isBlankOrComment(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed === "" || trimmed.startsWith("#");
+}
+
 /**
  * Extracts top-level YAML keys and their line ranges.
  * Top-level keys have no leading whitespace (e.g. `esphome:`, `wifi:`).
@@ -93,7 +98,21 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
     const match = lines[i].match(/^([a-zA-Z_][a-zA-Z0-9_]*):/);
     if (match) {
       if (rawSections.length > 0) {
-        rawSections[rawSections.length - 1].toLine = i;
+        // The previous section content ends one line before the new
+        // top-level key. Walk backward over trailing blank /
+        // comment-only lines: those typically decorate the upcoming
+        // section ("## Substitutions ##" sitting above
+        // ``substitutions:``) rather than belonging to the one
+        // ending. Without the trim, hovering ``runtime_stats`` in the
+        // navigator highlights the comment block that visually
+        // documents ``substitutions``.
+        const prev = rawSections[rawSections.length - 1];
+        const prevStart = prev.fromLine - 1; // 0-indexed
+        let endIdx = i - 1;
+        while (endIdx > prevStart && _isBlankOrComment(lines[endIdx])) {
+          endIdx--;
+        }
+        prev.toLine = endIdx + 1;
       }
       rawSections.push({
         key: match[1],
@@ -103,9 +122,21 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
     }
   }
 
-  // Trim the trailing empty line (yaml strings often end with \n)
-  if (rawSections.length > 0 && lines[lines.length - 1] === "") {
-    rawSections[rawSections.length - 1].toLine = lines.length - 1;
+  // Trim trailing blank / comment-only lines from the final section
+  // for the same reason as above — a comment block at the very end
+  // of the file (or right before EOF whitespace) shouldn't extend
+  // the last section's hover-highlight range.
+  if (rawSections.length > 0) {
+    const last = rawSections[rawSections.length - 1];
+    const lastStart = last.fromLine - 1; // 0-indexed
+    let endIdx = lines.length - 1;
+    // Drop the conventional trailing newline-empty-string before
+    // the trim loop so we don't double-count it.
+    if (endIdx >= 0 && lines[endIdx] === "") endIdx--;
+    while (endIdx > lastStart && _isBlankOrComment(lines[endIdx])) {
+      endIdx--;
+    }
+    last.toLine = endIdx + 1;
   }
 
   // Expand list items within each section

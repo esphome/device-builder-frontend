@@ -50,6 +50,69 @@ wifi:
     expect(sections[0].toLine).toBeLessThanOrEqual(3);
   });
 
+  it("does not include a comment block decorating the next section", () => {
+    // Real-world repro: a user's YAML uses banner comments to label
+    // each block. Hovering ``substitutions`` in the navigator was
+    // highlighting the ``## Board Configuration ##`` block that
+    // visually documents ``esphome:`` (the *next* section) — those
+    // lines belong to neither section's content.
+    //
+    //  1 substitutions:
+    //  2   device_friendly_name: WIFI Switch
+    //  3 ## ----------- ##
+    //  4 ## Board Config ##
+    //  5 ## ----------- ##
+    //  6 esphome:
+    //  7   name: x
+    const yaml = [
+      "substitutions:",
+      "  device_friendly_name: WIFI Switch",
+      "## ----------- ##",
+      "## Board Config ##",
+      "## ----------- ##",
+      "esphome:",
+      "  name: x",
+      "",
+    ].join("\n");
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections.map((s) => s.key)).toEqual(["substitutions", "esphome"]);
+    expect(sections[0].toLine).toBe(2);
+    expect(sections[1].fromLine).toBe(6);
+  });
+
+  it("trims trailing comment-only lines from the final section too", () => {
+    // The same trim has to fire for the file's last section, not
+    // just the inter-section seams — a banner at EOF would otherwise
+    // extend the last section's highlight range past its content.
+    const yaml = [
+      "esphome:",
+      "  name: x",
+      "## --- end of file --- ##",
+      "",
+    ].join("\n");
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].toLine).toBe(2);
+  });
+
+  it("preserves blank lines that fall mid-section", () => {
+    // Defensive: an internal blank or comment line shouldn't be
+    // mistaken for trailing decoration. Only blank/comment runs
+    // immediately preceding the next section / EOF get dropped.
+    const yaml = [
+      "esphome:",
+      "  name: x",
+      "",
+      "  # internal comment",
+      "  platform: ESP32",
+      "wifi:",
+      "  ssid: y",
+      "",
+    ].join("\n");
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections.map((s) => s.toLine)).toEqual([5, 7]);
+  });
+
   it("does not treat indented keys as top-level sections", () => {
     const yaml = `esphome:
   name: test
