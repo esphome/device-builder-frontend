@@ -590,14 +590,13 @@ export class ESPHomeDeviceCard extends LitElement {
                       `
                     : nothing}
                 ${
-                  // Collapse Logs to icon-only when the row is at risk
-                  // of cramming. Cramming only happens when *both* an
-                  // accent action (Install/Update) and a Visit-web-UI
-                  // tile are competing for space alongside Edit; if
-                  // there's no accent action, the row has plenty of
-                  // room and the Logs label should stay visible so the
-                  // affordance reads at a glance.
-                  this.webUrl && (this.hasPendingChanges || this.hasUpdateAvailable)
+                  // Collapse Logs to icon-only when an accent action
+                  // (Install/Update) is present — Edit + accent + Logs
+                  // + kebab overflows the 300px-min card in long-language
+                  // locales like Dutch ("Bewerken"/"Installeren"/"Logboek").
+                  // Logs collapses first since the console icon reads
+                  // clearly without a label.
+                  this.hasPendingChanges || this.hasUpdateAvailable
                     ? html`<button
                         class="action-btn action-btn--ghost action-btn--tile"
                         @click=${() => this._emit("open-logs")}

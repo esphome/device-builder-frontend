@@ -10,17 +10,24 @@ import {
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import {
+  fetchComponent,
+  getCachedComponent,
+  subscribeComponentCache,
+} from "../../util/component-name-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   type YamlSection,
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
+  sectionKeyOf,
 } from "../../util/yaml-sections.js";
 import type { HighlightRange } from "../yaml-editor.js";
 
@@ -47,6 +54,19 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: apiContext })
+  private _api?: ESPHomeAPI;
+
+  /**
+   * Bumped whenever a fresh entry lands in the component-name cache,
+   * which forces a re-render so resolved labels appear without
+   * needing the user to interact with the navigator.
+   */
+  @state()
+  private _cacheTick = 0;
+
+  private _unsubscribeCache?: () => void;
 
   @property({ attribute: false })
   openSections: Set<number> = new Set();
@@ -286,7 +306,30 @@ export class ESPHomeDeviceNavigator extends LitElement {
     `,
   ];
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Re-render when any other navigator (or this one on a previous
+    // mount) fills in a catalog entry we're showing — keeps labels
+    // live across device switches without a manual refresh.
+    this._unsubscribeCache = subscribeComponentCache(() => {
+      this._cacheTick++;
+    });
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unsubscribeCache?.();
+    this._unsubscribeCache = undefined;
+  }
+
   protected willUpdate(changedProperties: Map<string, unknown>) {
+    if (
+      (changedProperties.has("yaml") || changedProperties.has("platform")) &&
+      this.yaml
+    ) {
+      this._kickoffNameResolves();
+    }
+
     // Sync `_selectedLine`/`_selectedRange` whenever the externally-
     // controlled selection changes (URL restore, "go to component"
     // events from the dialog, YAML edits that shift line numbers).
@@ -313,17 +356,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
       // Try fromLine first (exact match), fall back to key/platform
       // match (handles the case where the YAML shifted under us, e.g.
       // the user just added a component before the selected one).
-      const matchByKey = (s: YamlSection) => {
-        if (!s.platform) return s.key === this.selectedKey;
-        const candidate = s.platform.startsWith(`${s.key}.`)
-          ? s.platform
-          : `${s.key}.${s.platform}`;
-        return candidate === this.selectedKey;
-      };
       const match =
         (this.selectedFromLine !== undefined
           ? allSections.find((s) => s.fromLine === this.selectedFromLine)
-          : undefined) ?? allSections.find(matchByKey);
+          : undefined) ??
+        allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
       if (match) {
         this._selectedLine = match.fromLine;
         this._selectedRange = {
@@ -518,34 +555,51 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   /**
-   * Decide what to show on the two lines of a nav item. Same shape
-   * for core, components, and automations:
+   * Fire-and-forget catalog lookups for any sections whose name we
+   * haven't cached yet. Resolved entries land in the shared cache;
+   * the subscription bumps `_cacheTick` to trigger a re-render.
+   * Automations are skipped — their keys are free-form strings
+   * (`<component> → on_press`), not catalog ids.
+   */
+  private _kickoffNameResolves(): void {
+    if (!this._api) return;
+    const sections = parseYamlTopLevelSections(this.yaml);
+    const { core, components } = categorizeSections(sections);
+    const platform = this.platform || undefined;
+    for (const item of [...core, ...components]) {
+      const id = sectionKeyOf(item);
+      if (getCachedComponent(id, platform) !== undefined) continue;
+      void fetchComponent(this._api, id, platform).catch(() => {
+        // Swallow — the navigator falls back to the raw id when no
+        // catalog entry is available, so a transient backend hiccup
+        // shouldn't surface as an error here.
+      });
+    }
+  }
+
+  /**
+   * Decide what to show on the two lines of a nav item.
    *
-   *   line 1 (primary)   <domain>.<platform> when this is a list
-   *                      item under a platform domain (e.g.
-   *                      `sensor.dht`, `time.homeassistant`),
-   *                      otherwise just the domain key (`wifi`,
-   *                      `api`, `uart`).
+   *   line 1 (primary)   the catalog's friendly name (e.g.
+   *                      "GPIO Binary Sensor") once resolved.
+   *                      Falls back to <domain>.<platform> (or just
+   *                      the domain for core keys like `wifi`) until
+   *                      the cache is populated, or when no catalog
+   *                      entry exists (typically: automations).
    *   line 2 (secondary) the user-supplied `name:` if present, else
    *                      the `id:`. Hidden when neither is set or
    *                      when it's identical to the primary.
-   *
-   * Putting the domain on the first line keeps the navigator scanable
-   * — you can tell at a glance what kind of thing each entry is —
-   * while the user-friendly label sits underneath as the personal
-   * identifier.
    */
   private _navItemLabels(
     item: YamlSection,
-    _category: "core" | "component" | "automation",
+    category: "core" | "component" | "automation",
   ): { primary: string; secondary?: string } {
-    let primary: string;
-    if (item.platform) {
-      primary = item.platform.startsWith(`${item.key}.`)
-        ? item.platform
-        : `${item.key}.${item.platform}`;
-    } else {
-      primary = item.key;
+    const raw = sectionKeyOf(item);
+
+    let primary = raw;
+    if (category !== "automation") {
+      const cached = getCachedComponent(raw, this.platform || undefined);
+      if (cached?.name) primary = cached.name;
     }
 
     const named = item.name || item.id;
@@ -566,20 +620,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   private _onItemClick(item: YamlSection) {
     const { fromLine, toLine } = item;
-    // Component IDs in the catalog are namespaced as `parent.platform` for
-    // platform-based components (e.g. `switch.template`, `binary_sensor.gpio`).
-    // Top-level components use just their key (e.g. `wifi`, `api`).
-    // Guard: if the platform value already starts with the parent key (e.g.
-    // a malformed YAML or a stale value), don't double-prefix it.
-    let sectionKey: string;
-    if (item.platform) {
-      const platform = item.platform;
-      sectionKey = platform.startsWith(`${item.key}.`)
-        ? platform
-        : `${item.key}.${platform}`;
-    } else {
-      sectionKey = item.key;
-    }
+    const sectionKey = sectionKeyOf(item);
 
     if (this._selectedLine === fromLine) {
       this.selectedKey = null;
