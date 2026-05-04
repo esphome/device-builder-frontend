@@ -171,11 +171,11 @@ export const dashboardStyles = css`
     color: var(--wa-color-brand-on-quiet);
   }
 
-  /* Ghost-text discovery caption (option (b)). Quiet, single-line,
-     only renders when the input is empty + device mode. The link
-     inside is the actual mode-switch button — the surrounding
-     copy is just framing. The toolbar's flex gap already handles
-     vertical spacing; no extra margin needed. */
+  /* Wrapper for the YAML-mode "Back to device search" link.
+     Single-line, quiet treatment so the affordance reads as a
+     subtle pointer back to the device-name search rather than a
+     primary action. The toolbar's flex gap handles vertical
+     spacing; no extra margin needed. */
   .search-discover-hint {
     display: block;
     color: var(--wa-color-text-quiet);

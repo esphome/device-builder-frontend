@@ -789,21 +789,6 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * Mode-context caption rendered below the toolbar row.
-   *
-   * Two states, always one of them visible:
-   *
-   * - device mode + empty input → the discoverability tip
-   *   ("Tip: type / for YAML to search across all configs").
-   * - YAML mode (any query) → an always-visible "Back to device
-   *   search" link so the user has an obvious way out even if
-   *   they don't remember which icon flips the mode.
-   *
-   * Lives outside the search-wrap; placing it inside made the
-   * search input taller than its toolbar-row siblings
-   * (select-toggle, view-toggle), breaking vertical alignment.
-   */
-  /**
    * In YAML mode, render a "Back to device search" link below
    * the search input so the user has an obvious one-click exit
    * even if they don't realise the segmented view-toggle
