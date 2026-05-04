@@ -134,6 +134,19 @@ jobs:
           rm -rf build *.egg-info
           python3 -m build --wheel --sdist
 
+      - name: Clear existing assets on draft release
+        # On a partial-failure rerun the draft release may already
+        # carry assets from the previous attempt. Strip them so the
+        # upload starts from a clean slate.
+        run: |
+          gh release view "${{ inputs.version }}" --json assets --jq '.assets[].name' \
+            | while IFS= read -r asset; do
+                [ -z "$asset" ] && continue
+                gh release delete-asset "${{ inputs.version }}" "$asset" --yes
+              done
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+
       - name: Attach to release
         run: gh release upload "${{ inputs.version }}" dist/*.whl dist/*.tar.gz
         env:
