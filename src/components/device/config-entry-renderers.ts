@@ -107,7 +107,14 @@ export function renderFloatWithUnitField(
   const canonicalUnit = unitOptions[0] ?? "";
   const rawValue = ctx.getAt(path);
   const parsed = parseFloatWithUnit(rawValue, unitOptions);
-  const numberValue = parsed.value === null ? "" : String(parsed.value);
+  // Prefer the in-progress edit buffer over the form value so
+  // intermediate typing states (`"-"`, `"1e"`, `"1."`) aren't
+  // clobbered by the dirty-check write that fires when the parser
+  // turns them into `null` / `""`. The buffer is cleared on blur
+  // and on `entries` change.
+  const editingText = ctx.getEditingMagnitude(path);
+  const numberValue =
+    editingText ?? (parsed.value === null ? "" : String(parsed.value));
   const unit = chooseDisplayUnit(
     rawValue,
     entry.default_value,
@@ -140,9 +147,14 @@ export function renderFloatWithUnitField(
           placeholder=${placeholder}
           @input=${(e: Event) => {
             const raw = (e.target as HTMLInputElement).value;
+            // Stash the raw text so an intermediate state (`"-"`,
+            // `"1e"`) survives the next re-render. The buffer is
+            // ignored once a blur event fires.
+            ctx.setEditingMagnitude(path, raw);
             const next = raw === "" ? null : Number(raw);
             emit({ value: Number.isFinite(next) ? next : null, unit });
           }}
+          @blur=${() => ctx.clearEditingMagnitude(path)}
         />
         ${unitOptions.length > 1
           ? html`

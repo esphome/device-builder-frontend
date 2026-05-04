@@ -145,6 +145,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _pendingUnits: Map<string, string> = new Map();
 
+  /**
+   * Transient raw-text buffer for FLOAT_WITH_UNIT magnitude inputs.
+   * `<input type="number">` reads `""` from `.value` while the user
+   * is mid-typing intermediate states (`"-"`, `"1e"`, `"1."`).
+   * Lit's `.value=` property binding then re-writes `""` over the
+   * partial text. The renderer reads from this buffer first so
+   * the in-progress typing survives until the user produces a
+   * parseable value (which lands in `this.values` normally and
+   * supersedes the buffer) or blurs the field.
+   */
+  private _editingMagnitudes: Map<string, string> = new Map();
+
   static styles = [espHomeStyles, inputStyles, configEntryFormStyles];
 
   /**
@@ -194,6 +206,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // shape so they don't bleed into unrelated paths.
     if (changed.has("entries") && changed.get("entries") !== undefined) {
       this._pendingUnits.clear();
+      this._editingMagnitudes.clear();
     }
   }
 
@@ -394,6 +407,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
         // Mutating the Map alone won't, since `_pendingUnits` isn't
         // a `@state`-tracked field.
         this.requestUpdate();
+      },
+      getEditingMagnitude: (path) => this._editingMagnitudes.get(path.join(".")),
+      setEditingMagnitude: (path, text) => {
+        // No requestUpdate — the @input handler that calls this
+        // also emits a value-change which re-renders us via the
+        // owner's normal value-prop update. Triggering here would
+        // double the work on every keystroke.
+        this._editingMagnitudes.set(path.join("."), text);
+      },
+      clearEditingMagnitude: (path) => {
+        this._editingMagnitudes.delete(path.join("."));
       },
       // Self-reference: assigned after object creation so the inner
       // renderer can recurse through the dispatch.

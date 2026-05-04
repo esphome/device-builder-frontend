@@ -75,6 +75,18 @@ export interface RenderCtx {
    */
   getPendingUnit: (path: string[]) => string | undefined;
   setPendingUnit: (path: string[], unit: string) => void;
+  /**
+   * FLOAT_WITH_UNIT-only: transient editing buffer for the numeric
+   * input. `<input type="number">` reads `""` from `.value` while
+   * the user is typing intermediate states (`"-"`, `"1e"`, `"1."`),
+   * which would round-trip through serialize and reset the field
+   * mid-typing. Renderers stash the raw text here and read it on
+   * the next paint so partial input survives until the user types a
+   * parseable value (or blurs the field).
+   */
+  getEditingMagnitude: (path: string[]) => string | undefined;
+  setEditingMagnitude: (path: string[], text: string) => void;
+  clearEditingMagnitude: (path: string[]) => void;
 }
 
 export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
