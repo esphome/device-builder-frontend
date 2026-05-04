@@ -48,6 +48,7 @@ import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import {
   labelFor,
   renderBooleanField,
+  renderFloatWithUnitField,
   renderIconField,
   renderIdReferenceField,
   renderMapField,
@@ -270,6 +271,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       case ConfigEntryType.INTEGER:
       case ConfigEntryType.FLOAT:
         return renderNumberField(entry, path, ctx);
+      case ConfigEntryType.FLOAT_WITH_UNIT:
+        return renderFloatWithUnitField(entry, path, ctx);
       case ConfigEntryType.PIN:
         return renderPinField(entry, path, ctx);
       case ConfigEntryType.COLOR:

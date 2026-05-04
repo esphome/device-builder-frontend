@@ -430,4 +430,27 @@ export const configEntryFormStyles = css`
   wa-select {
     width: 100%;
   }
+
+  .float-with-unit-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+  }
+
+  .float-with-unit-inputs > input[type="number"] {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .float-with-unit-inputs > wa-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 6rem;
+  }
+
+  .float-with-unit-suffix {
+    flex: 0 0 auto;
+    color: var(--wa-color-text-subtle);
+    font-size: var(--wa-font-size-s);
+  }
 `;

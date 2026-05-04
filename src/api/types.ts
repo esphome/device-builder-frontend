@@ -469,6 +469,16 @@ export interface ConfigEntry {
   allow_custom_value: boolean;
   /** Min/max bounds for INTEGER / FLOAT entries. */
   range: [number, number] | null;
+  /**
+   * Unit choices for `FLOAT_WITH_UNIT` entries. The frontend renders
+   * a unit picker populated from this list; each option's string is
+   * what the YAML serialization appends after the numeric value
+   * (e.g. `["Hz", "kHz", "MHz", "GHz"]` for `cv.frequency`). The
+   * first entry is the canonical unit — range bounds and any
+   * user-typed bare number default to it. Null for non-FLOAT_WITH_UNIT
+   * entries.
+   */
+  unit_options: string[] | null;
   /** When True the field accepts a list of values. */
   multi_value: boolean;
   /** When True accepts either a literal value OR a !lambda block. */
@@ -562,6 +572,15 @@ export enum ConfigEntryType {
   PIN = "pin",
   // Duration like "30s", "5min"
   TIME_PERIOD = "time_period",
+  // Numeric value carrying a unit: frequency ("50kHz"), data size
+  // ("500KB"), framerate ("10 fps"), voltage ("3.3V"), distance
+  // ("2m"), temperature ("4°C"). ESPHome's coercer multiplies by
+  // the unit at compile time, but the YAML shape is a string —
+  // frontend renders a number input + unit picker, round-trips the
+  // value as `<value><unit>`. Unit choices come from `unit_options`
+  // on the entry. TIME_PERIOD stays separate because its grammar
+  // (`1h30s`) is richer than this generic widget can express.
+  FLOAT_WITH_UNIT = "float_with_unit",
   // Material Design icon picker (mdi:foo)
   ICON = "icon",
   // Component ID reference

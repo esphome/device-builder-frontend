@@ -15,6 +15,10 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import {
+  parseFloatWithUnit,
+  serializeFloatWithUnit,
+} from "../../util/float-with-unit.js";
+import {
   effectiveDisabled,
   labelFor,
   renderFieldError,
@@ -70,6 +74,83 @@ export function renderNumberField(
           ctx.emitChange(path, raw === "" ? "" : Number(raw));
         }}
       />
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
+/**
+ * Number input + unit picker for FLOAT_WITH_UNIT entries.
+ *
+ * The YAML shape is a single string `"<value><unit>"`; we render the
+ * two halves as separate controls and serialize back on every change.
+ * Empty number -> empty string emitted (so optional entries get
+ * stripped from the payload by `_coerceFields`).
+ *
+ * `range` constrains the numeric part only — esphome's range bounds
+ * for `cv.frequency` etc. are post-coercion floats relative to the
+ * canonical unit, but the dashboard's input is the user-facing number
+ * so applying them directly only matches when the picked unit equals
+ * the canonical one. We omit the HTML range attributes when the unit
+ * isn't canonical to avoid spurious browser-level rejection on values
+ * that round-trip fine after multiplication.
+ */
+export function renderFloatWithUnitField(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+) {
+  const unitOptions = entry.unit_options ?? [];
+  const canonicalUnit = unitOptions[0] ?? "";
+  const parsed = parseFloatWithUnit(ctx.getAt(path), unitOptions);
+  const numberValue = parsed.value === null ? "" : String(parsed.value);
+  const unit = parsed.unit || canonicalUnit;
+  const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
+  const isCanonical = unit === canonicalUnit;
+  const min = entry.range && isCanonical ? String(entry.range[0]) : undefined;
+  const max = entry.range && isCanonical ? String(entry.range[1]) : undefined;
+  const emit = (next: { value: number | null; unit: string }) =>
+    ctx.emitChange(path, serializeFloatWithUnit(next));
+  return html`
+    <div class="field float-with-unit" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      <div class="float-with-unit-inputs">
+        <input
+          type="number"
+          class=${invalid ? "invalid" : ""}
+          .value=${numberValue}
+          ?disabled=${disabled}
+          min=${min ?? ""}
+          max=${max ?? ""}
+          step="any"
+          placeholder=${String(entry.default_value ?? "")}
+          @input=${(e: Event) => {
+            const raw = (e.target as HTMLInputElement).value;
+            const next = raw === "" ? null : Number(raw);
+            emit({ value: Number.isFinite(next) ? next : null, unit });
+          }}
+        />
+        ${unitOptions.length > 1
+          ? html`
+              <wa-select
+                ?disabled=${disabled}
+                @change=${(e: Event) => {
+                  const nextUnit = (e.target as HTMLSelectElement).value;
+                  emit({ value: parsed.value, unit: nextUnit });
+                }}
+              >
+                ${unitOptions.map(
+                  (option) => html`<wa-option
+                    value=${option}
+                    ?selected=${option === unit}
+                    >${option}</wa-option
+                  >`,
+                )}
+              </wa-select>
+            `
+          : html`<span class="float-with-unit-suffix">${unit}</span>`}
+      </div>
       ${renderFieldError(path, ctx)}
     </div>
   `;

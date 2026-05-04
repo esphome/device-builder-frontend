@@ -18,6 +18,7 @@ function makeEntry(overrides: Partial<ConfigEntry>): ConfigEntry {
     options: null,
     allow_custom_value: false,
     range: null,
+    unit_options: null,
     help_link: null,
     multi_value: false,
     hidden: false,
@@ -128,6 +129,42 @@ describe("validateEntry", () => {
   it("accepts floats on FLOAT fields", () => {
     const entry = makeEntry({ type: ConfigEntryType.FLOAT });
     expect(validateEntry(entry, 3.5)).toBeNull();
+  });
+
+  it("validates the numeric portion of FLOAT_WITH_UNIT entries", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      unit_options: ["Hz", "kHz", "MHz"],
+    });
+    expect(validateEntry(entry, "50kHz")).toBeNull();
+    expect(validateEntry(entry, "3.3 V")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "abckHz")?.code).toBe(
+      "validation.not_a_number",
+    );
+  });
+
+  it("applies range only when FLOAT_WITH_UNIT value is in canonical unit", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      unit_options: ["Hz", "kHz", "MHz"],
+      range: [10, 1_000_000],
+    });
+    // Canonical unit (Hz) — range bounds apply directly.
+    expect(validateEntry(entry, "5Hz")?.code).toBe("validation.min");
+    expect(validateEntry(entry, "100Hz")).toBeNull();
+    // Non-canonical unit — range bounds skipped (catalog ranges are
+    // post-coercion floats relative to the canonical unit).
+    expect(validateEntry(entry, "5kHz")).toBeNull();
+  });
+
+  it("does not flag empty optional FLOAT_WITH_UNIT entries", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      required: false,
+      unit_options: ["Hz", "kHz"],
+    });
+    expect(validateEntry(entry, "")).toBeNull();
+    expect(validateEntry(entry, undefined)).toBeNull();
   });
 
   it("rejects values not in options list", () => {
