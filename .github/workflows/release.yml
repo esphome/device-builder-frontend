@@ -253,62 +253,16 @@ jobs:
       contents: read    # GITHUB_TOKEN reads this repo's release body
     steps:
       - name: Wait for PyPI to index the new version
-        env:
-          PACKAGE: ${{ env.PACKAGE_NAME }}
-          VERSION: ${{ inputs.version }}
-        run: |
-          set -euo pipefail
-          # PyPI's index is eventually consistent — ``publish-pypi``
-          # returns success when the artifact lands on storage, but
-          # the JSON / simple index served to ``pip install`` lags
-          # by ~30s–3min behind. Without a gate, the backend bump
-          # PR's CI fires before PyPI is serving the pin and fails
-          # with ``ResolutionImpossible``, requiring a manual
-          # re-run ~2 minutes later.
-          #
-          # Probe both endpoints — ``pip install`` resolves through
-          # the simple index, but the JSON endpoint is the cheapest
-          # "metadata reached the CDN edge" sentinel. Require both
-          # to succeed before declaring ready, since the two
-          # indexes can lag each other by a few seconds.
-          # (Copilot-flagged: a 200 on JSON alone doesn't guarantee
-          # the simple index has caught up, which is what ``pip``
-          # actually reads.)
-          #
-          # Cap the loop on wall-clock elapsed (5 minutes) rather
-          # than attempt count, so a slow ``curl --max-time 10``
-          # response can't double the deadline. (Copilot-flagged:
-          # 30 attempts × (curl 10s + sleep 10s) was up to 10 min,
-          # not the advertised 5.)
-          #
-          # If the deadline expires (rare PyPI incident), open the
-          # PR anyway with a warning — backend CI re-run is cheap,
-          # blocking the release on a PyPI outage isn't worth it.
-          JSON_URL="https://pypi.org/pypi/$PACKAGE/$VERSION/json"
-          SIMPLE_URL="https://pypi.org/simple/$PACKAGE/"
-          # Wheel filenames PEP 503-normalise hyphens to underscores;
-          # sdist filenames keep hyphens. Match either form, then
-          # require the literal version substring delimited by
-          # ``-`` (wheel) or ``.`` (sdist) so a future version that
-          # is a prefix of an unrelated string (e.g. ``0.1.2`` vs
-          # ``0.1.27``) doesn't false-positive.
-          PKG_RE="${PACKAGE//-/[-_]}"
-          VER_RE="${VERSION//./\\.}"
-          DEADLINE_SECS=300
-          START=$SECONDS
-          ATTEMPT=0
-          while (( SECONDS - START < DEADLINE_SECS )); do
-            ATTEMPT=$((ATTEMPT + 1))
-            if curl -fsSL --max-time 10 -o /dev/null "$JSON_URL" 2>/dev/null \
-               && curl -fsSL --max-time 10 "$SIMPLE_URL" 2>/dev/null \
-                  | grep -qE -- "${PKG_RE}-${VER_RE}[-.]"; then
-              echo "PyPI serving $PACKAGE==$VERSION on JSON + simple indexes (after $ATTEMPT attempt(s), $((SECONDS - START))s)."
-              exit 0
-            fi
-            echo "PyPI not yet ready (attempt $ATTEMPT, $((SECONDS - START))s elapsed); sleeping 10s..."
-            sleep 10
-          done
-          echo "::warning::PyPI did not index $PACKAGE==$VERSION within ${DEADLINE_SECS}s — opening PR anyway; backend CI may need a manual re-run."
+        # PyPI's index is eventually consistent — ``publish-pypi``
+        # returns success when the artifact lands on storage, but
+        # the simple index that the backend's ``pip`` / ``uv``
+        # resolves through lags behind. Without a gate the backend
+        # bump PR's CI fires before the version is visible and
+        # fails with ``ResolutionImpossible``, requiring a manual
+        # re-run ~2 min later. Empirically a flat 90s sleep is
+        # enough for the index to propagate to the runner pool the
+        # backend's CI lands on.
+        run: sleep 90
 
       - name: Create backend app token
         id: app-token
