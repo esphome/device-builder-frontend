@@ -435,6 +435,21 @@ export class ESPHomeCommandDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
+    /* When a job ends, the success/error banner takes ~56px of flex
+       space below the log. The log container shrinks, scrollTop is
+       preserved, and the bottom of the log slides out of view —
+       which also trips ansi-log's _isUserScrolled latch and disables
+       auto-scroll for any trailing lines. Re-pin to the new bottom
+       and clear the latch on the running → terminal transition. */
+    if (changedProperties.has("_state")) {
+      const prev = changedProperties.get("_state") as CommandState | null;
+      if (
+        prev === "running" &&
+        (this._state === "success" || this._state === "error")
+      ) {
+        this._resetAnsiLogScroll();
+      }
+    }
   }
 
   public open(type: CommandType, options?: { port?: string }) {
