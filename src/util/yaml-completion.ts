@@ -42,6 +42,12 @@ import {
   isUnderThenItem,
   resolveBundleContext,
 } from "./yaml-ast.js";
+import {
+  findParentKey,
+  findTopLevelBlock,
+  RE_INLINE_COMMENT_BOUNDARY,
+  readPlatformSibling,
+} from "./yaml-line-walker.js";
 
 // ─── ``validFor`` regex constants ─────────────────────────────────────
 //
@@ -100,23 +106,11 @@ interface ValuePosition {
 // point for ``- platform: <value>`` completion under domain
 // blocks like ``binary_sensor:``.
 const RE_VALUE_POSITION = /^(\s*)(?:-\s+)?([A-Za-z0-9_]+)\s*:\s*(\S*)$/;
-// ``# comment`` boundary — must be at line start or after
-// whitespace. ``#RRGGBB`` colour values inside a scalar are
-// valid YAML, so the boundary check rules them out.
-const RE_INLINE_COMMENT_BOUNDARY = /(^|\s)#/;
-// Whole-line pair shape: optional list-item dash, key, ``:``,
-// optional value text. Used by parent / top-level walkers in
-// helper functions; the regex captures ``(key, restOfLine)``.
-const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_]+)\s*:\s*(.*)$/;
-// Column-0 pair: key starts at indent 0. Used to identify
-// top-level component blocks when walking up from the cursor.
-const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
-// ``platform: gpio`` sibling reader. Shape is identical to
-// RE_PAIR_LINE but constrains the key to literal ``platform``.
-const RE_PLATFORM_SIBLING =
-  /^\s*(?:-\s+)?platform\s*:\s*([A-Za-z0-9_]+)\s*$/;
 // Leading-whitespace counter — used when computing indents and
 // list-item lead text for the trigger / action apply snippets.
+// (``yaml-line-walker.ts`` carries the line-shape regexes used
+// by the multi-line walkers; this one only operates on the
+// current cursor line.)
 const RE_LEADING_WHITESPACE = /^( *)/;
 
 /**
@@ -179,72 +173,6 @@ function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
     return { components: [], byId: new Map(), byCategory: new Map() };
   });
   return catalogPromise;
-}
-
-// ─── YAML structural inspection (regex-based) ────────────────────────
-//
-// We don't parse the YAML — that would re-implement the lezer grammar.
-// Indentation + the "most recent key at a shallower indent" heuristic
-// is enough to know where the cursor is in the document hierarchy.
-//
-// Returns the indentation depth of `line` (count of leading spaces).
-function indentOf(line: string): number {
-  let i = 0;
-  while (i < line.length && line[i] === " ") i++;
-  return i;
-}
-
-/** Strip inline `# comment` and trailing whitespace. */
-function stripComment(line: string): string {
-  // Only treat `#` as a comment when it's preceded by whitespace or starts
-  // the line — `#RRGGBB` color values are valid YAML scalars.
-  const m = line.match(RE_INLINE_COMMENT_BOUNDARY);
-  if (!m) return line.trimEnd();
-  return line.slice(0, m.index! + m[0].length - 1).trimEnd();
-}
-
-/**
- * Walking up from `lineIdx`, return the nearest key-line whose indent is
- * strictly less than `belowIndent`. Used to find the parent block of the
- * current cursor position.
- */
-function findParentKey(
-  lines: string[],
-  lineIdx: number,
-  belowIndent: number,
-): { key: string; indent: number; lineIdx: number } | null {
-  for (let i = lineIdx - 1; i >= 0; i--) {
-    const raw = lines[i];
-    const stripped = stripComment(raw);
-    if (!stripped.trim()) continue;
-    const ind = indentOf(stripped);
-    if (ind >= belowIndent) continue;
-    // Match `<indent>key:` or `<indent>- key:` (list-of-mappings).
-    const keyMatch = stripped.match(RE_PAIR_LINE);
-    if (keyMatch) {
-      return { key: keyMatch[1], indent: ind, lineIdx: i };
-    }
-  }
-  return null;
-}
-
-/**
- * Walk up to find the *top-level* component block the cursor sits under
- * (the first key at column 0 above the cursor).
- */
-function findTopLevelBlock(
-  lines: string[],
-  lineIdx: number,
-): string | null {
-  for (let i = lineIdx - 1; i >= 0; i--) {
-    const raw = lines[i];
-    const stripped = stripComment(raw);
-    if (!stripped.trim()) continue;
-    if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(RE_TOP_LEVEL_KEY);
-    if (m) return m[1];
-  }
-  return null;
 }
 
 // ─── Completion building blocks ──────────────────────────────────────
@@ -860,40 +788,3 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
   };
 }
 
-/**
- * Look for a `platform:` sibling at the same indent level as the current
- * cursor. Walks up first to find the start of the current list item or
- * mapping, then scans both directions.
- */
-function readPlatformSibling(
-  lines: string[],
-  lineIdx: number,
-  indent: number,
-): string | null {
-  // Walk up while we're at the same indent — a new list item starts with
-  // `- ` at indent-2 (or wherever the parent's indent is).
-  let topOfBlock = lineIdx;
-  for (let i = lineIdx - 1; i >= 0; i--) {
-    const raw = lines[i];
-    const stripped = stripComment(raw);
-    if (!stripped.trim()) continue;
-    const ind = indentOf(stripped);
-    if (ind < indent) break;
-    if (ind === indent) {
-      topOfBlock = i;
-      // Stop when we hit a list-item dash — the item starts here.
-      if (/^\s*-\s/.test(raw)) break;
-    }
-  }
-  // Scan forward from topOfBlock until indent drops below `indent`.
-  for (let i = topOfBlock; i < lines.length; i++) {
-    const raw = lines[i];
-    const stripped = stripComment(raw);
-    if (!stripped.trim()) continue;
-    const ind = indentOf(stripped);
-    if (i !== topOfBlock && ind < indent) break;
-    const m = stripped.match(RE_PLATFORM_SIBLING);
-    if (m) return m[1];
-  }
-  return null;
-}
