@@ -48,14 +48,45 @@ import { ALWAYS_SENSITIVE_KEYS } from "./yaml-sensitive-scan.js";
  * matched here because we have no parent context for a single
  * search-hit line.
  */
+/**
+ * True when *key* names a credential whose value should never
+ * appear in a search-result label. Combines two sources:
+ *
+ * - The shared ``ALWAYS_SENSITIVE_KEYS`` allowlist from the
+ *   editor's mask scan (``password``/``ap_password`` etc).
+ * - A ``*_password`` / ``*_psk`` suffix heuristic so
+ *   user-defined substitution keys (``wifi_password:`` under a
+ *   top-level ``substitutions:`` block, or any other place
+ *   someone names their own credential field) are masked too.
+ *
+ * The single-line context here means we can't do parent-scope
+ * reasoning the way the editor's scan does — so the heuristic
+ * is deliberately a touch wider here. Over-masking a row is a
+ * cosmetic blemish; under-masking leaks a credential.
+ */
+function isSensitiveKey(key: string): boolean {
+  if (ALWAYS_SENSITIVE_KEYS.has(key)) return true;
+  return /_(password|psk)$/i.test(key);
+}
+
 function maskSensitiveLine(line: string): string {
-  const m = line.match(/^(\s*-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/);
+  // Optional ``#`` prefix matches commented-out credentials —
+  // ``# password: hunter2`` is just as much a leak as the live
+  // form. The leading-``#`` group is captured into ``prefix`` so
+  // the masked output preserves the comment marker.
+  const m = line.match(
+    /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/
+  );
   if (!m) return line;
   const [, prefix, key, valueRaw] = m;
-  if (!ALWAYS_SENSITIVE_KEYS.has(key)) return line;
+  if (!isSensitiveKey(key)) return line;
   const value = valueRaw.trim();
   if (!value || value.startsWith("#")) return line;
+  // Indirections aren't credentials — ``!secret <name>`` and
+  // ``${some_substitution}`` only carry the *name* of the
+  // value, not the value itself. Don't mask them.
   if (value.startsWith("!secret")) return line;
+  if (value.startsWith("${")) return line;
   return `${prefix}${key}: ••••••••`;
 }
 

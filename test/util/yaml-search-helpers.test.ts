@@ -59,6 +59,19 @@ describe("yamlHitLabel", () => {
     );
   });
 
+  it("does not mask ${substitution} references — same indirection rule", () => {
+    // ``substitutions:\n  wifi_password: ...`` followed by
+    // ``wifi:\n  password: ${wifi_password}`` is the ratgdo /
+    // package-config shape. The ``password`` line carries only
+    // the name of an indirection, not the credential itself —
+    // the credential lives in the substitutions block (which
+    // *is* masked, see the ``*_password`` suffix tests below).
+    const match = { line_number: 1, line_text: "  password: ${wifi_password}" };
+    expect(yamlHitLabel(HIT, match)).toBe(
+      "Kitchen Lamp — password: ${wifi_password}"
+    );
+  });
+
   it("does not mask non-sensitive keys", () => {
     const match = { line_number: 1, line_text: "  ssid: home_network" };
     expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — ssid: home_network");
@@ -72,6 +85,58 @@ describe("yamlHitLabel", () => {
     // commonly use ``key: <number>``) surfaces as a test failure.
     const match = { line_number: 1, line_text: "    key: 0xABCDEF12" };
     expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — key: 0xABCDEF12");
+  });
+
+  it.each([
+    // Commented-out credentials — leak just as easily as live
+    // values when surfaced in search results. Mask the value but
+    // preserve the leading ``#`` so the line still reads as a
+    // comment.
+    ['# password: "8f0e4ddd4bb7034d1f4165ab30d84b5e"', "# password: ••••••••"],
+    ["  # password: hunter2", "# password: ••••••••"],
+    ["#password: hunter2", "#password: ••••••••"],
+    ["## password: hunter2", "## password: ••••••••"],
+    ["# - ap_password: 42dfadc0c2", "# - ap_password: ••••••••"],
+  ])("masks credential value inside a YAML comment (%s)", (raw, expectedTrimmed) => {
+    const match = { line_number: 1, line_text: raw };
+    expect(yamlHitLabel(HIT, match)).toBe(`Kitchen Lamp — ${expectedTrimmed}`);
+  });
+
+  it.each([
+    // User-defined substitution keys (``substitutions: wifi_password: …``)
+    // wouldn't be in the editor's strict ``ALWAYS_SENSITIVE_KEYS`` list
+    // because the user names them. The search-time heuristic catches
+    // any ``*_password`` / ``*_psk`` suffix to defend against this.
+    ["wifi_password: yellow1@@", "wifi_password: ••••••••"],
+    ["  guest_psk: HFrhVdN37Bb6mTFm", "guest_psk: ••••••••"],
+    ['  WiFi_Password: "uppercase-key"', "WiFi_Password: ••••••••"],
+  ])("masks credential value for user-defined *_password / *_psk keys (%s)", (raw, expectedTrimmed) => {
+    const match = { line_number: 1, line_text: raw };
+    expect(yamlHitLabel(HIT, match)).toBe(`Kitchen Lamp — ${expectedTrimmed}`);
+  });
+
+  it.each([
+    // Don't over-mask: keys that contain ``password`` mid-name
+    // (``password_protected``) or unrelated keys aren't credentials.
+    "password_protected: true",
+    "max_passwords: 5",
+    "key_signed: 12345",
+  ])("does not mask non-credential keys (%s)", (raw) => {
+    const match = { line_number: 1, line_text: raw };
+    expect(yamlHitLabel(HIT, match)).toContain(raw.trim());
+  });
+
+  it("only masks in search results — editor's sensitive-scan keeps its own scope", () => {
+    // Pin that the search-side masker is independent of the
+    // editor's parent-scoped scan. The search-time mask is
+    // intentionally wider (handles commented credentials,
+    // user-named substitution keys); the editor's scan stays
+    // strict. Calling ``yamlHitLabel`` doesn't reach into
+    // ``findSensitiveValueRanges`` — verify by checking that
+    // the editor's scan-only path (``key`` under encryption) is
+    // *not* masked here.
+    const match = { line_number: 1, line_text: "    key: random-noise-here" };
+    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — key: random-noise-here");
   });
 });
 
