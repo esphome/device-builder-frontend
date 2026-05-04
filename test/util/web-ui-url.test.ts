@@ -111,4 +111,30 @@ describe("buildWebUiUrl", () => {
       "http://host:22",
     );
   });
+
+  it("brackets IPv6 hosts so the port suffix stays unambiguous", () => {
+    expect(
+      buildWebUiUrl(
+        _device({ web_port: 80, address: "", ip: "fe80::de54:75ff:fec7:cc0" }),
+      ),
+    ).toBe("http://[fe80::de54:75ff:fec7:cc0]");
+    expect(
+      buildWebUiUrl(
+        _device({
+          web_port: 8080,
+          address: "",
+          ip: "2001:470:59ca:991:de54:75ff:fec7:cc0",
+        }),
+      ),
+    ).toBe("http://[2001:470:59ca:991:de54:75ff:fec7:cc0]:8080");
+  });
+
+  it("leaves IPv4 and hostnames unbracketed", () => {
+    expect(
+      buildWebUiUrl(_device({ web_port: 8080, address: "", ip: "10.0.0.5" })),
+    ).toBe("http://10.0.0.5:8080");
+    expect(
+      buildWebUiUrl(_device({ web_port: 8080, address: "kitchen.local" })),
+    ).toBe("http://kitchen.local:8080");
+  });
 });
