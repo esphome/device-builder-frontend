@@ -591,7 +591,14 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const partialCouldBeTrigger =
       ctx.explicit || partial === "" || /^o(n(_[a-z0-9_]*)?)?$/i.test(partial);
     const [entries, triggers, actions] = await Promise.all([
-      resolveAvailableEntries(api, catalog, parent.key, platformValue),
+      // Skip the entries lookup inside an automation body — the
+      // parent walker would resolve ``then`` as the parent key
+      // and ``fetchComponent(api, "then")`` would 404 (and cache
+      // a useless entry). Action-registry completion is what
+      // populates that position; config-vars don't apply.
+      inAutomation
+        ? Promise.resolve([] as ConfigEntry[])
+        : resolveAvailableEntries(api, catalog, parent.key, platformValue),
       // Pull the typed schema's ``on_*`` triggers from
       // ``schema.esphome.io`` and stack them on top of the
       // catalog's config-vars. Returns ``[]`` on any failure
@@ -609,16 +616,18 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       })(),
       // Aggregate action-registry entries across components in
       // the doc when the cursor is inside a ``then:`` list-item.
-      // Component keys passed twice: as bundle names (one fetch
-      // per top-level component in the doc) AND as the filter set
-      // (so we only pull actions from those specific entries
-      // inside each fetched bundle, matching the legacy editor's
-      // ``getDocComponents`` scope). ``core`` is always included
-      // for ``delay`` / ``if`` / ``lambda``.
+      // ``esphome`` is always included as a bundle — that's where
+      // the schema host serves the ``core`` actions
+      // (``delay`` / ``if`` / ``lambda`` / ``repeat`` / ``while`` /
+      // ``wait_until``) under the bundle's ``core`` key. ``core``
+      // is always added to the wanted-keys filter so those core
+      // actions surface even when the doc only mentions one
+      // component.
       (async () => {
         if (!inAutomation) return [] as SchemaAction[];
         const tops = collectTopLevelKeys(state);
-        return getActions(api, tops, [...tops, "core"]);
+        const bundles = [...new Set([...tops, "esphome"])];
+        return getActions(api, bundles, [...tops, "core"]);
       })(),
     ]);
     if (

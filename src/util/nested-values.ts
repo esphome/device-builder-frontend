@@ -48,19 +48,28 @@ export function getIn(
 }
 
 /**
- * True when *value* is safely coercible to a string via
- * ``String(value)`` — i.e. a primitive (string / number / boolean)
- * or null / undefined.
+ * True when *value* is one of the scalar types ``wa-select`` can
+ * carry as its ``value`` attribute: ``string`` / ``number`` /
+ * ``boolean``, or ``null`` / ``undefined``.
  *
- * Plain objects with a normal prototype stringify to
- * ``"[object Object]"``, but null-prototype objects (which js-yaml
- * can produce for empty mappings during a partial edit) and any
- * object whose ``Symbol.toPrimitive`` returns non-primitive throw
- * "Cannot convert object to primitive value". Callers that fan
- * a YAML value into a primitive-only sink (e.g. ``wa-select``'s
- * ``value`` attribute) should gate on this predicate first and
- * skip the sync for non-primitive values rather than crashing
- * on a transient object.
+ * Narrower than the JS spec's "primitive" definition (which also
+ * includes ``bigint`` and ``symbol``). YAML doesn't surface those
+ * — js-yaml emits numbers for integer literals up to the safe
+ * range, strings for everything else — and ``wa-select``'s
+ * stringification path doesn't model them either, so the
+ * predicate intentionally rejects them along with the actual
+ * problem case (null-prototype objects, plain objects, arrays,
+ * Maps, Dates, …).
+ *
+ * Plain objects with a normal prototype would stringify to
+ * ``"[object Object]"``, but null-prototype objects (which
+ * js-yaml can produce for empty mappings during a partial edit)
+ * and any object whose ``Symbol.toPrimitive`` returns
+ * non-primitive throw "Cannot convert object to primitive
+ * value". Callers that fan a YAML value into a primitive-only
+ * sink should gate on this predicate first and skip the sync
+ * for non-scalar values rather than crashing on a transient
+ * object.
  */
 export function isPrimitiveOrNullish(
   value: unknown,
