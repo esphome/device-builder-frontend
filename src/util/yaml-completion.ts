@@ -414,6 +414,23 @@ function applyListBlockInsertion(
   startCompletion(view);
 }
 
+/** Insert a list-item completion's ``key: `` with a leading
+ *  dash if the cursor isn't already past one (``  - `` already
+ *  on the line). Shared by every list-item-shaped completion
+ *  (action registry, filter / condition / effect registries,
+ *  …). */
+function applyListItemEntry(
+  view: EditorView,
+  from: number,
+  to: number,
+  key: string,
+): void {
+  const line = view.state.doc.lineAt(from);
+  const before = line.text.slice(0, from - line.from);
+  const hasListDash = /^\s*-\s+$/.test(before);
+  applyInsertion(view, from, to, hasListDash ? `${key}: ` : `- ${key}: `);
+}
+
 /** Read the leading-whitespace prefix of the editor line that
  *  contains *from*. Used by completion ``apply`` callbacks that
  *  need to emit a multi-line snippet whose indent must match the
@@ -478,18 +495,8 @@ function triggerToCompletion(t: { key: string; docs?: string }): Completion {
 function actionToCompletion(a: SchemaAction): Completion {
   return {
     label: a.key,
-    apply: (view, _completion, from, to) => {
-      const line = view.state.doc.lineAt(from);
-      const before = line.text.slice(0, from - line.from);
-      // ``  - `` already present → just append ``key: ``.
-      const hasListDash = /^\s*-\s+$/.test(before);
-      applyInsertion(
-        view,
-        from,
-        to,
-        hasListDash ? `${a.key}: ` : `- ${a.key}: `,
-      );
-    },
+    apply: (view, _completion, from, to) =>
+      applyListItemEntry(view, from, to, a.key),
     type: "function",
     detail: "action",
     info: a.docs ?? undefined,
@@ -497,29 +504,18 @@ function actionToCompletion(a: SchemaAction): Completion {
 }
 
 /** Render a schema-registry entry (``calibrate_linear``,
- *  ``clamp``, …) as a list-item completion. Same dash-aware
- *  apply as ``actionToCompletion`` — both surface at list-item
- *  positions where the user may or may not have typed the dash
- *  yet. ``detail`` is the registry-key name itself
- *  (``filter`` / ``effects``) so the popup distinguishes
- *  filters from actions when both could apply. */
+ *  ``clamp``, …) as a list-item completion. ``detail`` is the
+ *  registry-key name itself (``filter`` / ``effects``) so the
+ *  popup distinguishes filters from actions when both could
+ *  apply. */
 function registryToCompletion(
   e: SchemaRegistryEntry,
   registryKey: string,
 ): Completion {
   return {
     label: e.key,
-    apply: (view, _completion, from, to) => {
-      const line = view.state.doc.lineAt(from);
-      const before = line.text.slice(0, from - line.from);
-      const hasListDash = /^\s*-\s+$/.test(before);
-      applyInsertion(
-        view,
-        from,
-        to,
-        hasListDash ? `${e.key}: ` : `- ${e.key}: `,
-      );
-    },
+    apply: (view, _completion, from, to) =>
+      applyListItemEntry(view, from, to, e.key),
     type: "function",
     detail: registryKey,
     info: e.docs ?? undefined,
@@ -838,198 +834,45 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const parent = findParentKey(allLines, lineInfo.number - 1, indent);
     if (!parent) return null;
 
-    const ctx2 = resolveCompletionContext(
+    const completionCtx = resolveCompletionContext(
       state,
       pos,
       allLines,
       lineInfo.number - 1,
       indent,
     );
-    const { bundleCtx, platformValue } = ctx2;
-    // Action-registry only fires at the list-item position under
-    // a ``then:`` block. AST-based: walk up the tree looking for
-    // an ``Item`` whose enclosing ``Pair`` has Key=``then``.
-    // Mirrors the legacy ``resolveTriggerInner`` →
-    // ``addRegistry({registry: "action"})`` shape; replaces the
-    // brittle indent-walking heuristic.
-    const inAutomation = isListItem && isUnderThenItem(state, pos);
-    // Only fetch trigger keys when the partial *could* match one
-    // — they all start with ``on_``. Saves a network round-trip
-    // (and the failure-mode log on CSP-blocked deployments) on
-    // every keystroke that obviously doesn't want a trigger.
-    // Explicit ctrl-space requests bypass the prefix gate so
-    // power users can still browse.
-    const partialCouldBeTrigger =
-      ctx.explicit || partial === "" || /^o(n(_[a-z0-9_]*)?)?$/i.test(partial);
-
-    // Skip the entries lookup inside an automation body — the
-    // parent walker would resolve ``then`` as the parent key and
-    // ``fetchComponent(api, "then")`` would 404 (and cache a
-    // useless entry). Action-registry completion is what
-    // populates that position; config-vars don't apply.
-    const fetchEntries = (): Promise<ConfigEntry[]> =>
-      inAutomation
-        ? Promise.resolve([])
-        : resolveAvailableEntries(
-            api,
-            catalog,
-            parent.key,
-            platformValue,
-            bundleCtx?.topLevelKey ?? null,
-          );
-
-    // Pull the typed schema's ``on_*`` triggers from
-    // ``schema.esphome.io`` and stack them on top of the
-    // catalog's config-vars. Returns ``[]`` on any failure (CSP /
-    // offline / missing bundle), so the catalog completions stay
-    // the floor — graceful degradation for when
-    // schema.esphome.io isn't reachable.
-    const fetchTriggers = async (): Promise<
-      { key: string; docs?: string }[]
-    > => {
-      // Triggers don't apply at action position — even if the
-      // user's partial happens to start with ``o`` (e.g.
-      // ``output.turn_on``), surfacing ``on_*`` triggers would
-      // be misleading and burns a network round-trip.
-      if (inAutomation) return [];
-      if (!partialCouldBeTrigger) return [];
-      if (!bundleCtx) return [];
-      const target = bundleFor(bundleCtx.topLevelKey, bundleCtx.platformValue);
-      return getTriggerKeys(api, target.bundle, target.componentKey);
+    const keyCtx: KeyPositionCtx = {
+      api,
+      catalog,
+      ctx,
+      state,
+      pos,
+      partial,
+      parent,
+      isListItem,
+      bundleCtx: completionCtx.bundleCtx,
+      platformValue: completionCtx.platformValue,
+      topLevelKey: completionCtx.topLevelKey,
+      // ``then:`` is the legacy automation entry point; cover-style
+      // ``*_action:`` bodies and other automation lists fall to the
+      // same provider when their parent.key resolves to an
+      // automation-shaped registry. Today we still gate on
+      // ``then:`` only — extending this is a follow-up.
+      inAutomation: isListItem && isUnderThenItem(state, pos),
+      // Triggers all start with ``on_``; gate the schema fetch on
+      // the partial's prefix so non-trigger keystrokes don't burn
+      // a round-trip.
+      partialCouldBeTrigger:
+        ctx.explicit ||
+        partial === "" ||
+        /^o(n(_[a-z0-9_]*)?)?$/i.test(partial),
     };
 
-    // Aggregate action-registry entries across components in the
-    // doc when the cursor is inside a ``then:`` list-item.
-    // ``esphome`` is always included as a bundle — that's where
-    // the schema host serves the ``core`` actions
-    // (``delay`` / ``if`` / ``lambda`` / ``repeat`` / ``while`` /
-    // ``wait_until``) under the bundle's ``core`` key. ``core``
-    // is always added to the wanted-keys filter so those core
-    // actions surface even when the doc only mentions one
-    // component.
-    const fetchActions = async (): Promise<SchemaAction[]> => {
-      if (!inAutomation) return [];
-      const tops = collectTopLevelKeys(state);
-      const bundles = [...new Set([...tops, "esphome"])];
-      return getActions(api, bundles, [...tops, "core"]);
-    };
-
-    // Filter / condition / effect registries — when the cursor
-    // sits at a list-item position whose parent key resolves to
-    // a ``type: "registry"`` config-var (``filters:``,
-    // ``effects:``, …), the entries to suggest are the registry
-    // members declared in the schema bundle (``sensor.filter`` →
-    // ``calibrate_linear`` / ``clamp`` / …). Distinct from
-    // ``inAutomation`` (``then:`` action-registry) which has its
-    // own legacy carve-out for cross-component aggregation.
-    const fetchRegistry = async (): Promise<SchemaRegistryEntry[]> => {
-      if (!isListItem || inAutomation) return [];
-      if (!ctx2.topLevelKey) return [];
-      const target = bundleFor(ctx2.topLevelKey, ctx2.platformValue);
-      const ref = await lookupRegistryRef(
-        api,
-        target.bundle,
-        target.componentKey,
-        parent.key,
-      );
-      if (!ref) return [];
-      return getRegistryEntries(api, ref);
-    };
-
-    const [entries, triggers, actions, registry] = await Promise.all([
-      fetchEntries(),
-      fetchTriggers(),
-      fetchActions(),
-      fetchRegistry(),
-    ]);
-    // Schema-bundle fallback for the platform-merged case.
-    // Some platform implementations (``sensor.uptime``,
-    // ``sensor.ads1118``, …) ship empty ``config_entries`` in
-    // the prebuilt catalog because the backend's schema
-    // generation doesn't fully expand ``cv.typed_schema`` plus
-    // ``extends`` chains. Fall back to fetching the raw schema
-    // bundle from ``schema.esphome.io`` when the catalog has
-    // nothing for us — mirrors the legacy dashboard's behaviour
-    // of reading the schema directly. Sequenced after
-    // ``fetchEntries`` so the network round-trip only fires when
-    // it's actually needed.
-    let schemaKeys: SchemaConfigVarKey[] = [];
-    if (entries.length === 0 && bundleCtx && !inAutomation) {
-      const target = bundleFor(bundleCtx.topLevelKey, bundleCtx.platformValue);
-      schemaKeys = await getConfigVarKeys(
-        api,
-        target.bundle,
-        target.componentKey,
-      );
-    }
-    // Platform-list fallback: when the cursor is at a list-item
-    // position (``  - |``) under a key that's a known platform
-    // domain (``ota:``, ``binary_sensor:``, ``sensor:``, …), the
-    // canonical first key is ``platform:``. The catalog only
-    // carries the dotted platform implementations
-    // (``ota.esphome``, ``binary_sensor.gpio``, …) so a bare
-    // ``platform`` key never appears in ``config_entries``.
-    // Surface it as a hardcoded suggestion when we know the
-    // parent block is a platform domain — i.e. the catalog has
-    // entries with this category.
-    const inPlatformList =
-      isListItem && catalog.byCategory.has(parent.key);
-    const platformKey: Completion[] = inPlatformList
-      ? [
-          {
-            label: "platform",
-            apply: (view, _completion, from, to) =>
-              applyKeyInsertion(view, from, to, "platform"),
-            type: "property",
-            detail: "platform domain",
-            boost: 5,
-          },
-        ]
-      : [];
-
-    // Trigger-body fallback: when the cursor is nested directly
-    // under a key that looks like an ``on_*`` trigger, every
-    // ESPHome trigger accepts a ``then:`` body even if the
-    // schema declares no explicit config-vars (most don't —
-    // ``on_press`` and friends have empty schemas). Surface
-    // ``then:`` as a hardcoded suggestion so the user typing
-    // ``th`` lands on the right key. Mirrors the legacy
-    // editor's "all triggers support then" special case.
-    const inTriggerBody =
-      !inAutomation && /^on_[a-z0-9_]*$/.test(parent.key);
-    const triggerBody: Completion[] = inTriggerBody
-      ? [
-          {
-            label: "then",
-            apply: (view, _completion, from, to) =>
-              applyListBlockInsertion(view, from, to, "then"),
-            type: "namespace",
-            detail: "trigger body",
-            boost: 5,
-          },
-        ]
-      : [];
-
-    if (
-      entries.length === 0 &&
-      triggers.length === 0 &&
-      actions.length === 0 &&
-      registry.length === 0 &&
-      schemaKeys.length === 0 &&
-      triggerBody.length === 0 &&
-      platformKey.length === 0
-    )
-      return null;
-
-    const options: Completion[] = [
-      ...entries.filter((e) => !e.hidden).map(entryToCompletion),
-      ...schemaKeys.map(schemaKeyToCompletion),
-      ...triggers.map(triggerToCompletion),
-      ...actions.map(actionToCompletion),
-      ...registry.map((e) => registryToCompletion(e, parent.key)),
-      ...triggerBody,
-      ...platformKey,
-    ];
+    const buckets = await Promise.all(
+      KEY_POSITION_PROVIDERS.map((p) => p.fetch(keyCtx)),
+    );
+    const options = buckets.flat();
+    if (options.length === 0) return null;
 
     // ``RE_KEY_OR_ACTION`` allows ``.`` because dotted action
     // labels (``logger.log``, ``light.turn_on``) are valid only
@@ -1038,7 +881,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     // valid continuation — keep the cached options "valid" only
     // while the partial stays a bare key, so typing a dot
     // re-runs the completion source instead of letting CodeMirror
-    // hold onto a stale list. (Copilot-flagged.)
+    // hold onto a stale list.
     return {
       from: keyFrom,
       options,
@@ -1046,4 +889,197 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     };
   };
 }
+
+// ─── Key-position completion providers ──────────────────────────────
+//
+// Each provider owns its structural gate and rendering.
+// ``fetch`` returns either an empty array (gate didn't match /
+// nothing to surface) or the rendered completions for that
+// position. The source assembles them via ``Promise.all`` so
+// independent network fetches run in parallel.
+//
+// Adding a new completion position (action arguments, ID
+// references, substitution vars, …) is a new entry in this list
+// rather than another ``if`` arm in the source closure.
+
+interface KeyPositionCtx {
+  api: ESPHomeAPI;
+  catalog: CatalogIndex;
+  ctx: CompletionContext;
+  state: EditorState;
+  pos: number;
+  partial: string;
+  parent: { key: string };
+  isListItem: boolean;
+  bundleCtx: { topLevelKey: string; platformValue: string | null } | null;
+  platformValue: string | null;
+  topLevelKey: string | null;
+  inAutomation: boolean;
+  partialCouldBeTrigger: boolean;
+}
+
+interface KeyPositionProvider {
+  /** Stable name — eyeball debugging only. */
+  name: string;
+  /** Run the provider; return an empty array to no-op. */
+  fetch: (k: KeyPositionCtx) => Promise<Completion[]>;
+}
+
+/** Catalog ``config_entries`` of the parent block, with platform-
+ *  merged sub_entries when the parent is a list-item header. */
+const catalogEntriesProvider: KeyPositionProvider = {
+  name: "catalog-entries",
+  fetch: async (k) => {
+    if (k.inAutomation) return [];
+    const entries = await resolveAvailableEntries(
+      k.api,
+      k.catalog,
+      k.parent.key,
+      k.platformValue,
+      k.bundleCtx?.topLevelKey ?? null,
+    );
+    return entries.filter((e) => !e.hidden).map(entryToCompletion);
+  },
+};
+
+/** Schema-bundle fallback when the catalog ships an empty
+ *  ``config_entries`` for a platform-merged id (``sensor.uptime``
+ *  is the canonical case — its prebuilt entry is empty because
+ *  the backend's schema sync doesn't expand the typed/extends
+ *  chain). Fires only when the catalog provider returned nothing,
+ *  so the cheaper path stays the default. */
+const schemaBundleKeyProvider: KeyPositionProvider = {
+  name: "schema-bundle-keys",
+  fetch: async (k) => {
+    if (k.inAutomation) return [];
+    if (!k.bundleCtx) return [];
+    // Sequenced via the catalog provider's own resolution — both
+    // share the in-memory cache so this is a free re-read.
+    const entries = await resolveAvailableEntries(
+      k.api,
+      k.catalog,
+      k.parent.key,
+      k.platformValue,
+      k.bundleCtx.topLevelKey,
+    );
+    if (entries.length > 0) return [];
+    const target = bundleFor(k.bundleCtx.topLevelKey, k.bundleCtx.platformValue);
+    const keys = await getConfigVarKeys(k.api, target.bundle, target.componentKey);
+    return keys.map(schemaKeyToCompletion);
+  },
+};
+
+/** Typed-schema ``on_*`` triggers (``on_boot``, ``on_press``, …)
+ *  from the schema bundle. Gated on the partial starting with
+ *  ``o`` so non-trigger keystrokes don't trigger the round-trip. */
+const triggerKeysProvider: KeyPositionProvider = {
+  name: "trigger-keys",
+  fetch: async (k) => {
+    if (k.inAutomation) return [];
+    if (!k.partialCouldBeTrigger) return [];
+    if (!k.bundleCtx) return [];
+    const target = bundleFor(k.bundleCtx.topLevelKey, k.bundleCtx.platformValue);
+    const triggers = await getTriggerKeys(
+      k.api,
+      target.bundle,
+      target.componentKey,
+    );
+    return triggers.map(triggerToCompletion);
+  },
+};
+
+/** Action-registry entries inside a ``then:`` automation body.
+ *  Aggregates across every top-level component in the doc so a
+ *  config that touches ``logger:`` and ``light:`` gets
+ *  ``logger.log`` and ``light.turn_on``. Always includes
+ *  ``esphome`` for the core actions (``delay`` / ``if`` /
+ *  ``lambda`` / …). */
+const actionRegistryProvider: KeyPositionProvider = {
+  name: "action-registry",
+  fetch: async (k) => {
+    if (!k.inAutomation) return [];
+    const tops = collectTopLevelKeys(k.state);
+    const bundles = [...new Set([...tops, "esphome"])];
+    const actions = await getActions(k.api, bundles, [...tops, "core"]);
+    return actions.map(actionToCompletion);
+  },
+};
+
+/** Filter / condition / effect registries — list-item position
+ *  whose parent key resolves to a ``type: "registry"``
+ *  config-var. Distinct from the action-registry provider which
+ *  has its own cross-component aggregation. */
+const filterRegistryProvider: KeyPositionProvider = {
+  name: "filter-registry",
+  fetch: async (k) => {
+    if (!k.isListItem || k.inAutomation) return [];
+    if (!k.topLevelKey) return [];
+    const target = bundleFor(k.topLevelKey, k.platformValue);
+    const ref = await lookupRegistryRef(
+      k.api,
+      target.bundle,
+      target.componentKey,
+      k.parent.key,
+    );
+    if (!ref) return [];
+    const entries = await getRegistryEntries(k.api, ref);
+    return entries.map((e) => registryToCompletion(e, k.parent.key));
+  },
+};
+
+/** Hardcoded ``platform:`` suggestion at list-item position
+ *  under a known platform domain (``ota:``, ``binary_sensor:``,
+ *  ``sensor:``, …). The catalog only carries dotted platform
+ *  implementations (``ota.esphome``, ``binary_sensor.gpio``, …)
+ *  so a bare ``platform`` key never appears in
+ *  ``config_entries`` — surface it from the catalog's
+ *  ``byCategory`` signal. */
+const platformKeyProvider: KeyPositionProvider = {
+  name: "platform-key",
+  fetch: async (k) => {
+    if (!k.isListItem || !k.catalog.byCategory.has(k.parent.key)) return [];
+    return [
+      {
+        label: "platform",
+        apply: (view, _completion, from, to) =>
+          applyKeyInsertion(view, from, to, "platform"),
+        type: "property",
+        detail: "platform domain",
+        boost: 5,
+      },
+    ];
+  },
+};
+
+/** Hardcoded ``then:`` suggestion when the cursor sits directly
+ *  under an ``on_*`` trigger key. Every ESPHome trigger accepts
+ *  a ``then:`` body even if its schema declares no config_vars
+ *  (most don't — ``on_press`` and friends have empty schemas). */
+const triggerBodyProvider: KeyPositionProvider = {
+  name: "trigger-body",
+  fetch: async (k) => {
+    if (k.inAutomation) return [];
+    if (!/^on_[a-z0-9_]*$/.test(k.parent.key)) return [];
+    return [
+      {
+        label: "then",
+        apply: (view, _completion, from, to) =>
+          applyListBlockInsertion(view, from, to, "then"),
+        type: "namespace",
+        detail: "trigger body",
+        boost: 5,
+      },
+    ];
+  },
+};
+
+const KEY_POSITION_PROVIDERS: KeyPositionProvider[] = [
+  catalogEntriesProvider,
+  schemaBundleKeyProvider,
+  triggerKeysProvider,
+  actionRegistryProvider,
+  filterRegistryProvider,
+  platformKeyProvider,
+  triggerBodyProvider,
+];
 

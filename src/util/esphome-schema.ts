@@ -165,6 +165,7 @@ let versionPromise: Promise<string> | null = null;
  */
 export function _resetSchemaCacheForTests() {
   cache.clear();
+  configVarKeysCache.clear();
   versionPromise = null;
 }
 
@@ -369,6 +370,12 @@ export interface SchemaConfigVarKey {
    *  instead of ``key: `` so the user lands ready to type the
    *  first list item. */
   isList?: boolean;
+  /** Dotted registry reference when the config-var declares
+   *  ``type: "registry"`` (e.g. ``sensor.filter`` for
+   *  ``filters:``). Lets ``lookupRegistryRef`` short-circuit
+   *  by reading the cached key list instead of re-walking the
+   *  schema chain. */
+  registry?: string;
 }
 
 /**
@@ -386,23 +393,35 @@ export interface SchemaConfigVarKey {
  * pick before committing to a type. The discriminator itself
  * (``typed_key``) is included as the first key.
  */
+/** Memoise resolved config-var key lists by ``<bundle>|<componentKey>``.
+ *  The result is a Promise so concurrent callers dedupe on the same
+ *  network round-trip. Cleared by ``_resetSchemaCacheForTests``. */
+const configVarKeysCache = new Map<string, Promise<SchemaConfigVarKey[]>>();
+
 export async function getConfigVarKeys(
   api: ESPHomeAPI,
   bundleName: string,
   componentKey: string,
 ): Promise<SchemaConfigVarKey[]> {
-  const out: SchemaConfigVarKey[] = [];
-  const seen = new Set<string>();
-  await collectConfigVars(
-    api,
-    bundleName,
-    componentKey,
-    "CONFIG_SCHEMA",
-    out,
-    seen,
-    new Set(),
-  );
-  return out;
+  const cacheKey = `${bundleName}|${componentKey}`;
+  const cached = configVarKeysCache.get(cacheKey);
+  if (cached) return cached;
+  const promise = (async () => {
+    const out: SchemaConfigVarKey[] = [];
+    const seen = new Set<string>();
+    await collectConfigVars(
+      api,
+      bundleName,
+      componentKey,
+      "CONFIG_SCHEMA",
+      out,
+      seen,
+      new Set(),
+    );
+    return out;
+  })();
+  configVarKeysCache.set(cacheKey, promise);
+  return promise;
 }
 
 /** Recursively collect config-var keys from a schema, descending
@@ -497,6 +516,7 @@ function pushConfigVars(
       docs: decl.docs,
       required: decl.key === "Required",
       isList: decl.is_list === true,
+      registry: decl.type === "registry" ? decl.registry : undefined,
     });
   }
 }
@@ -692,86 +712,14 @@ export async function lookupRegistryRef(
   componentKey: string,
   varKey: string,
 ): Promise<string | null> {
-  const out: { ref: string | null } = { ref: null };
-  await collectRegistryRef(
-    api,
-    bundleName,
-    componentKey,
-    "CONFIG_SCHEMA",
-    varKey,
-    out,
-    new Set(),
-  );
-  return out.ref;
-}
-
-async function collectRegistryRef(
-  api: ESPHomeAPI,
-  bundleName: string,
-  componentKey: string,
-  schemaName: string,
-  varKey: string,
-  out: { ref: string | null },
-  visited: Set<string>,
-): Promise<void> {
-  if (out.ref) return;
-  const cv = await loadSchemaCv(
-    api,
-    bundleName,
-    componentKey,
-    schemaName,
-    visited,
-  );
-  if (!cv) return;
-
-  const tryVars = (
-    vars: Record<string, SchemaConfigVar | undefined> | undefined,
-  ): boolean => {
-    const decl = vars?.[varKey];
-    if (!decl || decl.type !== "registry") return false;
-    out.ref = decl.registry;
-    return true;
-  };
-
-  if (cv.type === "typed") {
-    for (const variant of Object.values(cv.types ?? {})) {
-      if (!variant) continue;
-      if (tryVars(variant.config_vars)) return;
-      for (const ext of variant.extends ?? []) {
-        const ref = parseExtendsRef(ext);
-        if (!ref) continue;
-        await collectRegistryRef(
-          api,
-          ref.bundle,
-          ref.componentKey,
-          ref.schemaName,
-          varKey,
-          out,
-          visited,
-        );
-        if (out.ref) return;
-      }
-    }
-    return;
-  }
-
-  const schema = "schema" in cv ? cv.schema : undefined;
-  if (!schema) return;
-  if (tryVars(schema.config_vars)) return;
-  for (const ext of schema.extends ?? []) {
-    const ref = parseExtendsRef(ext);
-    if (!ref) continue;
-    await collectRegistryRef(
-      api,
-      ref.bundle,
-      ref.componentKey,
-      ref.schemaName,
-      varKey,
-      out,
-      visited,
-    );
-    if (out.ref) return;
-  }
+  // Read off the memoised key list — ``getConfigVarKeys`` walks
+  // the typed/extends chain once per ``<bundle>|<componentKey>``
+  // and the registry ref is recorded on the entry. Avoids
+  // re-walking the schema chain on every list-item keystroke
+  // when the answer is "this parent isn't a registry config-var"
+  // (the common case).
+  const keys = await getConfigVarKeys(api, bundleName, componentKey);
+  return keys.find((k) => k.key === varKey)?.registry ?? null;
 }
 
 /**
