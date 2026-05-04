@@ -13,15 +13,6 @@ on:
         description: "Version number (e.g. 0.2.0)"
         required: true
         type: string
-  workflow_call:
-    inputs:
-      version:
-        description: "Version number (e.g. 0.2.0)"
-        required: true
-        type: string
-    secrets:
-      ESPHOME_GITHUB_APP_PRIVATE_KEY:
-        required: true
 
 env:
   PYTHON_VERSION: "3.12"
@@ -70,6 +61,7 @@ jobs:
     name: Build wheel and attach to release
     needs: create-release
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
       id-token: write   # OIDC for PyPI Trusted Publishing
