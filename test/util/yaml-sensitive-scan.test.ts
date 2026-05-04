@@ -239,4 +239,45 @@ ota:
 `;
     expect(findSensitiveValueRanges(yaml)).toEqual([]);
   });
+
+  it("block-scalar in a list item terminates at sibling keys in the same item", () => {
+    // Regression for a list-item header `- password: |`: the block must
+    // end at the next sibling key (`other:`), not consume it. The
+    // sibling lives at `leading + dash` columns, so the terminator
+    // must use the effective indent — leading-only would let the
+    // sibling slip through as block content.
+    const yaml = `ota:
+  - platform: esphome
+    password: |
+      line-one
+      line-two
+    other: visible-sibling
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual(["line-one", "line-two"]);
+    // Explicitly assert `visible-sibling` was not masked.
+    expect(ranges.every((r) => r.line !== 6)).toBe(true);
+  });
+
+  it("recognises closing `\"` after an even number of backslashes", () => {
+    // `\\` is an escaped backslash; the `"` that follows is the real
+    // close of the scalar. A naive "preceded by `\\`?" check would
+    // run past it and lose the trailing comment-strip step.
+    const line = `  password: "ends with \\\\" # real comment`;
+    const yaml = `api:\n${line}\n`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([`"ends with \\\\"`]);
+  });
+
+  it("treats `\"` after an odd number of backslashes as escaped", () => {
+    // `\"` is an escaped quote inside the scalar; the next real `"`
+    // closes it.
+    const yaml = `api:
+  password: "with \\"escaped\\" inside" # comment
+`;
+    const ranges = findSensitiveValueRanges(yaml);
+    expect(valuesAt(yaml, ranges)).toEqual([
+      `"with \\"escaped\\" inside"`,
+    ]);
+  });
 });

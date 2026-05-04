@@ -58,7 +58,11 @@ const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
 /** Find the closing quote of a YAML scalar starting at `quoteStart`,
  *  honouring the (limited) escapes both quote styles allow:
  *    - single-quoted: `''` is a literal `'`
- *    - double-quoted: `\"` is a literal `"`
+ *    - double-quoted: `\"` is a literal `"`, but a `"` is only
+ *      escaped when preceded by an *odd* number of backslashes
+ *      (an even number means the backslashes themselves are paired
+ *      escapes and the quote actually closes the scalar — e.g.
+ *      `"ends with \\"` terminates at the final `"`).
  *  Returns the index of the closing quote, or -1 if the scalar runs
  *  past end-of-line (we treat that as "no comment can follow"). */
 function findClosingQuote(line: string, quoteStart: number): number {
@@ -70,9 +74,15 @@ function findClosingQuote(line: string, quoteStart: number): number {
         k += 2;
         continue;
       }
-      if (q === '"' && line[k - 1] === "\\") {
-        k++;
-        continue;
+      if (q === '"') {
+        let backslashes = 0;
+        for (let b = k - 1; b >= quoteStart + 1 && line[b] === "\\"; b--) {
+          backslashes++;
+        }
+        if (backslashes % 2 === 1) {
+          k++;
+          continue;
+        }
       }
       return k;
     }
@@ -158,7 +168,11 @@ export function findSensitiveValueRanges(yaml: string): SensitiveValueRange[] {
     // outer loop doesn't try to reinterpret content like `secret: x`
     // inside the block as YAML keys.
     if (BLOCK_SCALAR_HEADER.test(trimmedRest)) {
-      const headerIndent = leading.length;
+      // Use the *effective* indent (leading + dash) so a `- password: |`
+      // list item terminates the block at the next sibling key in the
+      // same item (which sits at `leading + dash` columns) instead of
+      // greedily eating it as block content.
+      const headerIndent = indent;
       let next = i + 1;
       while (next < lines.length) {
         const cont = lines[next];
