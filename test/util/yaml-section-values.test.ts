@@ -491,7 +491,41 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
       values,
       2,
     );
-    expect(after).toContain("    on_press:\n      - lambda: |-\n          some_code(1, 2);");
+    expect(after).toContain(
+      "    on_press:\n      - lambda: |-\n          some_code(1, 2);",
+    );
+    // Tighten the byte-stable contract: no duplicated section
+    // headers (regression check — early findSectionRange bug
+    // had on_press: appearing twice in the output).
+    expect(after.match(/on_press:/g)).toHaveLength(1);
+    expect(after.match(/lambda:/g)).toHaveLength(1);
+  });
+
+  it("overrides raw preservation when the form writes a new value to that key", () => {
+    // Contract pin: YamlRawValue is the parser's "I can't model
+    // this, paste it back unchanged" sentinel. If the form does
+    // get a real value into that key (a hypothetical edit field
+    // on `on_press`, or the user clearing the field), the
+    // form's value wins and serializer emits it normally —
+    // raw-preservation is a parser-side default, not a sticky
+    // protection.
+    const yaml = `button:
+  - platform: template
+    name: My Button
+    on_press:
+      - lambda: |-
+          some_code();
+`;
+    const values = parseYamlSectionValues(yaml, "button.template", 2);
+    // Form replaces the on_press value with a plain string
+    // (artificial — the real form doesn't expose on_press —
+    // but documents the override semantics).
+    (values as Record<string, unknown>).on_press = "new_value";
+    const after = updateSectionInYaml(yaml, "button.template", values, 2);
+    // Raw block is gone, replaced by the form's string.
+    expect(after).toContain("on_press: new_value");
+    expect(after).not.toContain("- lambda: |-");
+    expect(after).not.toContain("some_code()");
   });
 
   it("findSectionRange does not stop at a nested list inside a value", () => {
@@ -530,6 +564,79 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     expect(after).toContain("          - logger.log: pressed");
     expect(after).toContain("name: Door");
     expect(after).not.toContain('- "then:"');
+  });
+
+  it("preserves a direct block scalar (`lambda: |-`) on a top-level key", () => {
+    // Direct block scalar — value sits on the SAME line as the
+    // key, body underneath. Without raw-preservation the parser
+    // captured `raw = "|-"` as a literal string and dropped the
+    // body; the serializer then quoted `"|-"` (starts with `-`)
+    // producing `lambda: "|-"` and corrupting the field.
+    const yaml = `lambda:
+  lambda: |-
+    return some_value;
+  other_field: hello
+`;
+    // The fixture's first line `lambda:` is a top-level key whose
+    // value is a dict with a NESTED `lambda: |-` field.
+    const values = parseYamlSectionValues(yaml, "lambda");
+    // The nested block is preserved as YamlRawValue under the
+    // outer dict's `lambda` key.
+    expect(values.other_field).toBe("hello");
+    // Now save the section unchanged and verify the block scalar
+    // round-trips byte-for-byte.
+    const after = updateSectionInYaml(yaml, "lambda", values);
+    expect(after).toContain("lambda: |-");
+    expect(after).toContain("    return some_value;");
+    expect(after).not.toContain('lambda: "|-"');
+  });
+
+  it("preserves a direct block scalar at the top level of a list-item section", () => {
+    // The repro Copilot flagged: a list-item section whose body
+    // includes a direct block scalar field (not wrapped in a
+    // list under a key). Editing a sibling field on save would
+    // otherwise drop the block scalar's body.
+    const yaml = `script:
+  - id: my_script
+    then:
+      - logger.log: hello
+    inline_code: |-
+      some_function();
+      another_line;
+`;
+    const values = parseYamlSectionValues(yaml, "script", 2);
+    expect(values.id).toBe("my_script");
+    // Form-side: rename the script
+    (values as Record<string, unknown>).id = "renamed_script";
+    const after = updateSectionInYaml(yaml, "script", values, 2);
+    expect(after).toContain("inline_code: |-");
+    expect(after).toContain("      some_function();");
+    expect(after).toContain("      another_line;");
+    expect(after).toContain("id: renamed_script");
+    expect(after).not.toContain('inline_code: "|-"');
+  });
+
+  it("preserves dotted-key automation actions (`- logger.log:`, `- switch.turn_on:`)", () => {
+    // Pre-fix `LIST_ITEM_DICT_KEY_RE` only matched bare
+    // identifiers, so `- logger.log: pressed` was treated as a
+    // plain string and re-emitted as `- "logger.log: pressed"`,
+    // corrupting the automation.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - logger.log: pressed
+      - switch.turn_on: relay_id
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    (values as Record<string, unknown>).name = "Door";
+    const after = updateSectionInYaml(yaml, "binary_sensor.gpio", values, 2);
+    // Both dotted-key items survive without quoting
+    expect(after).toContain("- logger.log: pressed");
+    expect(after).toContain("- switch.turn_on: relay_id");
+    expect(after).not.toContain('- "logger.log: pressed"');
+    expect(after).not.toContain('- "switch.turn_on: relay_id"');
+    expect(after).toContain("name: Door");
   });
 
   it("multi-button list: edits to one item don't disturb siblings", () => {

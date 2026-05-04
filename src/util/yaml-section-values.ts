@@ -55,21 +55,44 @@ export const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
  * doesn't model block scalars; their presence is the canonical
  * "this value can't be round-tripped through `Record<string, unknown>`"
  * signal that triggers raw-line preservation.
+ *
+ * Anchored at the start with `^[^"']*:` so the `:` we match is the
+ * key/value delimiter, not a `:` sitting inside a quoted string
+ * value (`name: "weird: |"`). False positives are merely
+ * conservative (they over-trigger raw mode, which is lossless),
+ * but the anchor avoids the surprise of raw-mode kicking in on a
+ * value the parser could otherwise round-trip.
  */
-const BLOCK_SCALAR_RE = /:\s*[|>][-+]?\s*(?:#.*)?$/;
+const BLOCK_SCALAR_RE = /^[^"']*:\s*[|>][-+]?\s*(?:#.*)?$/;
+
+/**
+ * Match an inline block-scalar marker — the part AFTER the colon
+ * on a `key: |-` line, captured by the parser as `raw`. Used to
+ * detect the direct-block-scalar shape (a key whose value is a
+ * block scalar header rather than a list of items).
+ */
+const BLOCK_SCALAR_INLINE_RE = /^[|>][-+]?$/;
 
 /**
  * Match a list item whose value is a key-style sub-dict header
- * (`- then:`, `- lambda:`). The dash + key + colon shape is the
+ * (`- then:`, `- lambda:`, `- logger.log: pressed`,
+ * `- switch.turn_on: relay`). The dash + key + colon shape is the
  * other "complex list item" signal alongside block scalars — the
  * follow-up lines under such a header carry the actual content,
  * which the simple `string[]` representation would silently drop.
+ *
+ * Key allows dots (and digits / underscores after the leading
+ * letter) so dotted action names like `logger.log` /
+ * `switch.turn_on` register as dict-style items. The simpler
+ * bare-identifier form let those automations through as plain
+ * scalars, which the serializer then quoted (`- "logger.log:
+ * pressed"`), corrupting the YAML type.
  *
  * Allows zero trailing whitespace after the colon (header-only
  * line) AND content after it (`- lambda: |-`); both forms are
  * complex.
  */
-const LIST_ITEM_DICT_KEY_RE = /^\s+-\s+[a-zA-Z_][a-zA-Z0-9_]*:(?:\s|$)/;
+const LIST_ITEM_DICT_KEY_RE = /^\s+-\s+[a-zA-Z_][\w.]*:(?:\s|$)/;
 
 const childRegexFor = (indent: string) =>
   new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
@@ -124,59 +147,56 @@ const collectBlockListItems = (
 };
 
 /**
- * Scan forward from `startIdx` and return the 0-indexed line that
- * ends the value-block sitting underneath a key at `keyIndent`.
- * The block consists of every subsequent line that's either blank
- * or indented strictly deeper than `keyIndent`; the first
- * non-blank line at `keyIndent` (sibling key) or shallower
- * (back-out) terminates it. EOF is also a valid terminator.
- *
- * Used by the raw-preservation path so we know which slice of the
- * document to capture verbatim when a key's value contains a
- * block scalar or sub-dict list items the minimal parser can't
+ * Scan forward from `startIdx` once, returning both the 0-indexed
+ * line that ends the value-block under a key at `keyIndent` AND
+ * whether the block carries shapes the minimal parser can't
  * round-trip.
- */
-const _findValueBlockEnd = (
-  lines: string[],
-  startIdx: number,
-  keyIndent: string,
-): number => {
-  for (let i = startIdx; i < lines.length; i++) {
-    if (lines[i].trim() === "") continue;
-    const lead = lines[i].match(/^[ \t]*/)![0];
-    if (lead.length <= keyIndent.length) return i;
-  }
-  return lines.length;
-};
-
-/**
- * Detect whether the value-block in `[startIdx, endIdx)` carries
- * shapes the minimal parser can't round-trip. Two signals:
  *
+ * Block extent: every subsequent line that's either blank or
+ * indented strictly deeper than `keyIndent`. The first non-blank
+ * line at `keyIndent` (sibling key) or shallower (back-out)
+ * terminates it; EOF is also a valid terminator.
+ *
+ * Complexity signals:
  *   1. A block-scalar header (`key: |`, `key: >-`) on any line.
  *      Block scalars span multiple physical lines, and the
  *      `string` parser would only capture the header.
  *   2. A list-item whose first token is a key-style header
- *      (`- then:`, `- lambda:` without inline value). The
+ *      (`- then:`, `- lambda:`, `- logger.log: pressed`). The
  *      follow-up indented lines carry the actual content; the
  *      `string[]` parser would silently drop them.
- *
  * Either signal triggers raw-line preservation for the whole
- * block. False negatives here regress to the previous mangling
- * behaviour, so the regexes are deliberately permissive.
+ * block. False negatives regress to the previous mangling
+ * behaviour, so the regexes are deliberately permissive — false
+ * positives merely over-preserve.
+ *
+ * Indent comparison is on space-only leading whitespace. ESPHome's
+ * emitter never produces tabs and the parser's `LIST_ITEM_START_RE`
+ * / `childRegexFor` already assume spaces, so a tab here is a sign
+ * of YAML the rest of the parser also won't handle correctly.
+ *
+ * Single pass (rather than separate `_findValueBlockEnd` +
+ * `_isComplexBlock` walks) so a section with many top-level keys
+ * and 100+ line value-blocks doesn't pay 2x the line scans.
  */
-const _isComplexBlock = (
+const _scanValueBlock = (
   lines: string[],
   startIdx: number,
-  endIdx: number,
-): boolean => {
-  for (let i = startIdx; i < endIdx; i++) {
+  keyIndent: string,
+): { endIdx: number; isComplex: boolean } => {
+  let isComplex = false;
+  for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
-    if (BLOCK_SCALAR_RE.test(line)) return true;
-    if (LIST_ITEM_DICT_KEY_RE.test(line)) return true;
+    const lead = line.match(/^ */)![0];
+    if (lead.length <= keyIndent.length) return { endIdx: i, isComplex };
+    if (!isComplex) {
+      if (BLOCK_SCALAR_RE.test(line) || LIST_ITEM_DICT_KEY_RE.test(line)) {
+        isComplex = true;
+      }
+    }
   }
-  return false;
+  return { endIdx: lines.length, isComplex };
 };
 
 /**
@@ -273,6 +293,21 @@ export function parseYamlSectionValues(
     const key = match[1];
     const raw = match[2].trim();
 
+    // Direct block scalar: `key: |-` (or `|`, `>`, `>-`, `|+`,
+    // `>+`). The header sits on this line; the body lines are
+    // indented underneath. Without this branch the parser would
+    // store `raw` as a literal string `"|-"` and drop the body —
+    // the serializer would then quote `|-` (it starts with `-`)
+    // and emit `key: "|-"`, corrupting any inline lambda /
+    // multi-line scalar field. Capture the body lines as raw
+    // and replay the inline header on serialize.
+    if (BLOCK_SCALAR_INLINE_RE.test(raw)) {
+      const { endIdx } = _scanValueBlock(lines, i + 1, childIndent);
+      values[key] = new YamlRawValue(lines.slice(i + 1, endIdx), raw);
+      i = endIdx - 1;
+      continue;
+    }
+
     if (raw === "") {
       let peek = i + 1;
       while (peek < lines.length && lines[peek].trim() === "") peek++;
@@ -280,24 +315,26 @@ export function parseYamlSectionValues(
       const peekLine = lines[peek];
 
       if (peekLine.startsWith(listItemPrefix)) {
-        // Find the full extent of this key's value-block first
-        // (the slice that ends at the next sibling key at
-        // childIndent or back-out). Scanning the whole block is
-        // necessary because complexity can hide on a follow-up
-        // body line — `      - lambda: |-` looks parseable on
-        // its own; the next-line `          some_code();` body
-        // is what triggers raw-mode.
-        const blockEnd = _findValueBlockEnd(lines, i + 1, childIndent);
-        if (_isComplexBlock(lines, i + 1, blockEnd)) {
-          // Slice with `lines.slice(i + 1, blockEnd)` to capture
+        // Find the full extent of this key's value-block AND its
+        // complexity in a single forward scan. Complexity can
+        // hide on a follow-up body line — `      - lambda: |-`
+        // looks parseable on its own; the next-line
+        // `          some_code();` body is what triggers raw-mode.
+        const { endIdx, isComplex } = _scanValueBlock(
+          lines,
+          i + 1,
+          childIndent,
+        );
+        if (isComplex) {
+          // Slice with `lines.slice(i + 1, endIdx)` to capture
           // the lines verbatim (with trailing blank lines
-          // trimmed by `_findValueBlockEnd`'s "next non-blank
-          // line at keyIndent or shallower" terminator).
-          values[key] = new YamlRawValue(lines.slice(i + 1, blockEnd));
-          i = blockEnd - 1;
+          // trimmed by `_scanValueBlock`'s "next non-blank line
+          // at keyIndent or shallower" terminator).
+          values[key] = new YamlRawValue(lines.slice(i + 1, endIdx));
+          i = endIdx - 1;
           continue;
         }
-        const { items, endIdx } = collectBlockListItems(
+        const { items, endIdx: listEndIdx } = collectBlockListItems(
           lines,
           i + 1,
           listItemPrefix,
@@ -305,7 +342,7 @@ export function parseYamlSectionValues(
         );
         if (items.length > 0) {
           values[key] = items;
-          i = endIdx - 1;
+          i = listEndIdx - 1;
         }
         continue;
       }
@@ -360,6 +397,18 @@ function parseNestedBlock(
     const key = match[1];
     const raw = match[2].trim();
 
+    // Direct block scalar at nested indent (same shape as the
+    // top-level parser's branch — see comment there). A nested
+    // field written as `key: |-` followed by indented body has
+    // to round-trip via `YamlRawValue`; otherwise the body is
+    // dropped and `raw` survives as a stray `"|-"` string.
+    if (BLOCK_SCALAR_INLINE_RE.test(raw)) {
+      const { endIdx } = _scanValueBlock(lines, i + 1, indent);
+      values[key] = new YamlRawValue(lines.slice(i + 1, endIdx), raw);
+      i = endIdx;
+      continue;
+    }
+
     if (raw === "") {
       let peek = i + 1;
       while (peek < lines.length && lines[peek].trim() === "") peek++;
@@ -367,20 +416,20 @@ function parseNestedBlock(
         // Same complex-block detection as the top-level parser:
         // block scalars or sub-dict list items under a key get
         // captured raw rather than mangled into `string[]`.
-        const blockEnd = _findValueBlockEnd(lines, i + 1, indent);
-        if (_isComplexBlock(lines, i + 1, blockEnd)) {
-          values[key] = new YamlRawValue(lines.slice(i + 1, blockEnd));
-          i = blockEnd;
+        const { endIdx, isComplex } = _scanValueBlock(lines, i + 1, indent);
+        if (isComplex) {
+          values[key] = new YamlRawValue(lines.slice(i + 1, endIdx));
+          i = endIdx;
           continue;
         }
-        const { items, endIdx } = collectBlockListItems(
+        const { items, endIdx: listEndIdx } = collectBlockListItems(
           lines,
           i + 1,
           listItemPrefix,
           listItemRegex,
         );
         values[key] = items;
-        i = endIdx;
+        i = listEndIdx;
         continue;
       }
       const deeper = `${indent}  `;

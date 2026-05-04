@@ -20,12 +20,22 @@
  * shape that round-trips byte-for-byte but doesn't fit
  * `string | string[] | Record<string, unknown>`.
  *
- * The instance carries the original lines verbatim (with their
- * leading whitespace), and the serializer pastes them back under a
- * fresh `key:` header without trying to re-render the contents. This
- * lets the form edit fields it understands (a button's `name`,
- * `icon`, `device_class`) without mangling the automation block it
- * doesn't.
+ * The instance carries the original body lines verbatim (with their
+ * leading whitespace). The serializer pastes them back under the
+ * `key:` header — optionally suffixed with `inlineHeader` (the
+ * `|-` / `>+` marker that has to sit on the SAME line as `key:`,
+ * not on its own line). The form edits fields it understands (a
+ * button's `name`, `icon`, `device_class`) without mangling the
+ * automation block it doesn't.
+ *
+ * Two shapes:
+ *   1. List-rooted block (`on_press:` → `- lambda: ...` → body):
+ *      `inlineHeader` is undefined, `lines` includes the dash row
+ *      and everything underneath.
+ *   2. Direct block scalar (`lambda: |-` → body):
+ *      `inlineHeader = "|-"`, `lines` is the body only. The
+ *      serializer emits `key: |-` and then the body, preserving
+ *      the YAML's required header-on-same-line shape.
  *
  * Class identity (rather than a sentinel property) so a YAML key
  * called `__raw` or similar can't accidentally trigger raw-mode on
@@ -34,7 +44,10 @@
  * survives form mutations.
  */
 export class YamlRawValue {
-  constructor(public readonly lines: readonly string[]) {}
+  constructor(
+    public readonly lines: readonly string[],
+    public readonly inlineHeader?: string,
+  ) {}
 }
 
 /**
@@ -52,11 +65,13 @@ export function serializeYamlValues(
     if (val instanceof YamlRawValue) {
       // Raw block (block scalar, automation handler, …). Lines
       // already carry their original indentation — emit `key:`
-      // and paste them back unchanged. `instanceof` check before
+      // (with the inline `|-` / `>+` marker when present) and
+      // paste them back unchanged. `instanceof` check before
       // the generic `typeof === "object"` branch so the class
       // identity wins over the plain-object handling below.
-      if (val.lines.length === 0) continue;
-      lines.push(`${indent}${key}:`);
+      if (val.lines.length === 0 && !val.inlineHeader) continue;
+      const header = val.inlineHeader ? ` ${val.inlineHeader}` : "";
+      lines.push(`${indent}${key}:${header}`);
       lines.push(...val.lines);
       continue;
     }
