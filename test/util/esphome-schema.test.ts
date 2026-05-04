@@ -3,6 +3,7 @@ import {
   _resetSchemaCacheForTests,
   fetchBundle,
   getActions,
+  getConfigVarKeys,
   getTriggerKeys,
 } from "../../src/util/esphome-schema.js";
 
@@ -427,6 +428,159 @@ describe("getActions", () => {
       "logger.log",
       "logger.set_level",
     ]);
+  });
+});
+
+describe("getConfigVarKeys", () => {
+  // Scenario this exists for: ``sensor.uptime`` ships an empty
+  // ``config_entries`` list in the prebuilt catalog (the
+  // backend's schema sync doesn't fully expand
+  // ``cv.typed_schema`` + ``extends`` for these). The schema
+  // bundle on ``schema.esphome.io`` is the authoritative source
+  // — typing ``nam`` under ``- platform: uptime`` should still
+  // surface ``name``, ``device_class``, etc.
+  it("expands a cv.typed_schema and unions every variant's config_vars", async () => {
+    const UPTIME_BUNDLE = {
+      "uptime.sensor": {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "typed",
+            typed_key: "type",
+            types: {
+              seconds: {
+                config_vars: {
+                  accuracy_decimals: { default: "0" },
+                  update_interval: { default: "60s", key: "Optional" },
+                },
+                extends: ["sensor._SENSOR_SCHEMA"],
+              },
+              timestamp: {
+                config_vars: {
+                  time_id: { type: "use_id", key: "GeneratedID" },
+                },
+                extends: ["sensor._SENSOR_SCHEMA"],
+              },
+            },
+          },
+        },
+      },
+    };
+    const SENSOR_SCHEMA_BUNDLE = {
+      sensor: {
+        schemas: {
+          _SENSOR_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                name: { type: "string", key: "Required" },
+                icon: { type: "string", key: "Optional" },
+                device_class: { type: "enum", key: "Optional" },
+                unit_of_measurement: { type: "string", key: "Optional" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.includes("uptime.json"))
+        return new Response(JSON.stringify(UPTIME_BUNDLE), { status: 200 });
+      if (url.includes("sensor.json"))
+        return new Response(JSON.stringify(SENSOR_SCHEMA_BUNDLE), {
+          status: 200,
+        });
+      throw new Error(`unexpected ${url}`);
+    });
+    const keys = await getConfigVarKeys(
+      makeApi() as never,
+      "uptime",
+      "uptime.sensor",
+    );
+    const labels = keys.map((k) => k.key);
+    // Discriminator surfaces.
+    expect(labels).toContain("type");
+    // Variant-specific keys from both branches.
+    expect(labels).toContain("update_interval");
+    expect(labels).toContain("time_id");
+    // Inherited from the extended ``sensor._SENSOR_SCHEMA``.
+    expect(labels).toContain("name");
+    expect(labels).toContain("device_class");
+    expect(labels).toContain("icon");
+    expect(labels).toContain("unit_of_measurement");
+    // ``Required`` keys flag as such.
+    expect(keys.find((k) => k.key === "name")?.required).toBe(true);
+    expect(keys.find((k) => k.key === "icon")?.required).toBe(false);
+  });
+
+  it("walks a plain schema's extends chain", async () => {
+    const CHILD_BUNDLE = {
+      child: {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: {
+              extends: ["child._BASE"],
+              config_vars: { local: { type: "string" } },
+            },
+          },
+          _BASE: {
+            type: "schema",
+            schema: { config_vars: { inherited: { type: "string" } } },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(CHILD_BUNDLE), { status: 200 });
+    });
+    const keys = await getConfigVarKeys(
+      makeApi() as never,
+      "child",
+      "child",
+    );
+    expect(keys.map((k) => k.key).sort()).toEqual(["inherited", "local"]);
+  });
+
+  it("skips trigger config-vars (those are exposed by getTriggerKeys)", async () => {
+    const BUNDLE = {
+      thing: {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                name: { type: "string" },
+                on_press: { type: "trigger" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const keys = await getConfigVarKeys(
+      makeApi() as never,
+      "thing",
+      "thing",
+    );
+    expect(keys.map((k) => k.key)).toEqual(["name"]);
+  });
+
+  it("returns [] when the bundle fails to load", async () => {
+    fetchSpy.mockRejectedValue(new TypeError("Failed to fetch"));
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const keys = await getConfigVarKeys(
+      makeApi() as never,
+      "uptime",
+      "uptime.sensor",
+    );
+    expect(keys).toEqual([]);
+    debugSpy.mockRestore();
   });
 });
 

@@ -90,6 +90,45 @@ describe("resolveBundleContext", () => {
       platformValue: "gpio",
     });
   });
+
+  it("resolves bundle context with non-canonical 4-space indent", () => {
+    // User-reported case: typing ``nam`` under ``sensor: -
+    // platform: uptime`` with the dash at 4-space indent (body
+    // keys at 6 spaces). YAML accepts any consistent indent; the
+    // AST should resolve the same context regardless of whether
+    // the user picked 2- or 4-space style.
+    const yaml = [
+      "sensor:",
+      "    - platform: uptime",
+      "      nam",
+    ].join("\n");
+    const state = makeState(yaml);
+    const ctx = resolveBundleContext(state, yaml.length);
+    expect(ctx).toEqual({
+      topLevelKey: "sensor",
+      platformValue: "uptime",
+    });
+  });
+
+  it("resolves bundle context after a fully-typed sibling line", () => {
+    // ``device_clas`` typed on the third body line (after
+    // ``platform`` and ``name`` siblings already exist). Pin the
+    // resolution so the schema fallback fires for the right
+    // ``sensor.uptime`` target even when the cursor isn't on the
+    // line right under the list-item header.
+    const yaml = [
+      "sensor:",
+      "    - platform: uptime",
+      '      name: "bob"',
+      "      device_clas",
+    ].join("\n");
+    const state = makeState(yaml);
+    const ctx = resolveBundleContext(state, yaml.length);
+    expect(ctx).toEqual({
+      topLevelKey: "sensor",
+      platformValue: "uptime",
+    });
+  });
 });
 
 describe("getTopLevelKey", () => {

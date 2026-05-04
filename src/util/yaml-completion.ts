@@ -36,8 +36,10 @@ import { fetchComponent } from "./component-name-cache.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   getActions,
+  getConfigVarKeys,
   getTriggerKeys,
   type SchemaAction,
+  type SchemaConfigVarKey,
 } from "./esphome-schema.js";
 import {
   collectTopLevelKeys,
@@ -367,6 +369,26 @@ function applyInsertion(
     changes: { from, to, insert },
     selection: { anchor: from + insert.length },
   });
+}
+
+/**
+ * Render a schema-bundle config-var as a completion. Used as the
+ * fallback when the prebuilt catalog has no ``config_entries`` for
+ * the current parent (typically platform-merged ids whose schema
+ * generation didn't expand the typed/extends chain — e.g.
+ * ``sensor.uptime``). Apply text is ``key: `` so the cursor lands
+ * at the value position; the schema doesn't tell us whether the
+ * value is scalar or block-shaped, so leave the user to type ``\n``
+ * manually if they want a block.
+ */
+function schemaKeyToCompletion(k: SchemaConfigVarKey): Completion {
+  return {
+    label: k.key,
+    apply: `${k.key}: `,
+    type: "property",
+    detail: k.required ? "required" : undefined,
+    info: k.docs ?? undefined,
+  };
 }
 
 function triggerToCompletion(t: { key: string; docs?: string }): Completion {
@@ -776,6 +798,26 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       fetchTriggers(),
       fetchActions(),
     ]);
+    // Schema-bundle fallback for the platform-merged case.
+    // Some platform implementations (``sensor.uptime``,
+    // ``sensor.ads1118``, …) ship empty ``config_entries`` in
+    // the prebuilt catalog because the backend's schema
+    // generation doesn't fully expand ``cv.typed_schema`` plus
+    // ``extends`` chains. Fall back to fetching the raw schema
+    // bundle from ``schema.esphome.io`` when the catalog has
+    // nothing for us — mirrors the legacy dashboard's behaviour
+    // of reading the schema directly. Sequenced after
+    // ``fetchEntries`` so the network round-trip only fires when
+    // it's actually needed.
+    let schemaKeys: SchemaConfigVarKey[] = [];
+    if (entries.length === 0 && bundleCtx && !inAutomation) {
+      const target = bundleFor(bundleCtx.topLevelKey, bundleCtx.platformValue);
+      schemaKeys = await getConfigVarKeys(
+        api,
+        target.bundle,
+        target.componentKey,
+      );
+    }
     // Platform-list fallback: when the cursor is at a list-item
     // position (``  - |``) under a key that's a known platform
     // domain (``ota:``, ``binary_sensor:``, ``sensor:``, …), the
@@ -841,6 +883,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       entries.length === 0 &&
       triggers.length === 0 &&
       actions.length === 0 &&
+      schemaKeys.length === 0 &&
       triggerBody.length === 0 &&
       platformKey.length === 0
     )
@@ -848,6 +891,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
 
     const options: Completion[] = [
       ...entries.filter((e) => !e.hidden).map(entryToCompletion),
+      ...schemaKeys.map(schemaKeyToCompletion),
       ...triggers.map(triggerToCompletion),
       ...actions.map(actionToCompletion),
       ...triggerBody,

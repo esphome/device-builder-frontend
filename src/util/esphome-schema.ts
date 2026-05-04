@@ -54,7 +54,6 @@ export interface SchemaConfigVarRegistry extends SchemaConfigVarBase {
 export interface SchemaConfigVarOther extends SchemaConfigVarBase {
   type:
     | "enum"
-    | "typed"
     | "pin"
     | "boolean"
     | "string"
@@ -63,10 +62,24 @@ export interface SchemaConfigVarOther extends SchemaConfigVarBase {
   schema?: SchemaSchema;
 }
 
+/** ``cv.typed_schema`` — discriminated union keyed by ``typed_key``.
+ *  ``types`` maps each discriminator value to a ``SchemaSchema``
+ *  (its own ``config_vars`` + ``extends``). ``uptime.sensor`` uses
+ *  this with ``typed_key: "type"`` and ``types: { seconds: …,
+ *  timestamp: … }``. We expose the union of all variants' keys for
+ *  completion since the discriminator isn't necessarily set yet
+ *  while the user is typing. */
+export interface SchemaConfigVarTyped extends SchemaConfigVarBase {
+  type: "typed";
+  typed_key?: string;
+  types?: Record<string, SchemaSchema | undefined>;
+}
+
 export type SchemaConfigVar =
   | SchemaConfigVarTrigger
   | SchemaConfigVarSchema
   | SchemaConfigVarRegistry
+  | SchemaConfigVarTyped
   | SchemaConfigVarOther;
 
 export interface SchemaSchema {
@@ -302,6 +315,156 @@ async function collectTriggers(
       await collectTriggers(api, parts[0], parts[0], parts[1], out, seenKeys, visited);
     } else if (parts.length === 3) {
       await collectTriggers(
+        api,
+        parts[0],
+        `${parts[0]}.${parts[1]}`,
+        parts[2],
+        out,
+        seenKeys,
+        visited,
+      );
+    }
+  }
+}
+
+export interface SchemaConfigVarKey {
+  key: string;
+  docs?: string;
+  /** ``"Required"`` / ``"Optional"`` / ``"GeneratedID"`` etc. when
+   *  the schema declares it explicitly. Used to mark required
+   *  fields in completion details. */
+  required?: boolean;
+}
+
+/**
+ * Read every config-var key for a component, walking the
+ * ``extends`` chain and unioning ``cv.typed_schema`` variants.
+ * Used as the schema-bundle fallback when the prebuilt catalog
+ * has an empty ``config_entries`` for a platform-merged id —
+ * mirrors the legacy dashboard's behaviour of reading directly
+ * from ``schema.esphome.io``.
+ *
+ * Returns ``[]`` on any failure. Variant-specific keys from a
+ * ``typed_schema`` are unioned (rather than gated on the typed
+ * discriminator) because the user may not have written the
+ * discriminator yet — surfacing every variant's keys lets them
+ * pick before committing to a type. The discriminator itself
+ * (``typed_key``) is included as the first key.
+ */
+export async function getConfigVarKeys(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+): Promise<SchemaConfigVarKey[]> {
+  const out: SchemaConfigVarKey[] = [];
+  const seen = new Set<string>();
+  await collectConfigVars(
+    api,
+    bundleName,
+    componentKey,
+    "CONFIG_SCHEMA",
+    out,
+    seen,
+    new Set(),
+  );
+  return out;
+}
+
+/** Recursively collect config-var keys from a schema, descending
+ *  ``extends`` and unioning ``typed_schema`` variants. */
+async function collectConfigVars(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  schemaName: string,
+  out: SchemaConfigVarKey[],
+  seenKeys: Set<string>,
+  visited: Set<string>,
+): Promise<void> {
+  const visitKey = `${bundleName}|${componentKey}|${schemaName}`;
+  if (visited.has(visitKey)) return;
+  visited.add(visitKey);
+
+  const bundle = await fetchBundle(api, bundleName);
+  if (!bundle) return;
+  const component = bundle[componentKey];
+  if (!component) return;
+  const cv = (component as SchemaComponent).schemas?.[schemaName];
+  if (!cv || typeof cv !== "object") return;
+
+  // ``typed_schema`` — surface the discriminator key plus the
+  // union of every variant's config_vars.
+  if ((cv as SchemaConfigVar).type === "typed") {
+    const typed = cv as SchemaConfigVarTyped;
+    if (typed.typed_key && !seenKeys.has(typed.typed_key)) {
+      seenKeys.add(typed.typed_key);
+      out.push({ key: typed.typed_key, required: true });
+    }
+    for (const variant of Object.values(typed.types ?? {})) {
+      if (!variant) continue;
+      pushConfigVars(variant.config_vars, out, seenKeys);
+      await collectExtends(
+        api,
+        variant.extends,
+        out,
+        seenKeys,
+        visited,
+      );
+    }
+    return;
+  }
+
+  const schema = (cv as SchemaConfigVarSchema).schema;
+  if (!schema) return;
+  pushConfigVars(schema.config_vars, out, seenKeys);
+  await collectExtends(api, schema.extends, out, seenKeys, visited);
+}
+
+/** Push every key of *vars* into *out*, deduping via *seenKeys*. */
+function pushConfigVars(
+  vars: Record<string, SchemaConfigVar | undefined> | undefined,
+  out: SchemaConfigVarKey[],
+  seenKeys: Set<string>,
+): void {
+  if (!vars) return;
+  for (const [key, decl] of Object.entries(vars)) {
+    if (!decl) continue;
+    // Triggers are handled by ``getTriggerKeys``; skip them here
+    // so the merged result doesn't double-count ``on_*`` entries.
+    if (decl.type === "trigger") continue;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    out.push({
+      key,
+      docs: decl.docs,
+      required: decl.key === "Required",
+    });
+  }
+}
+
+/** Walk ``extends`` references, dispatching on the ``2-part`` /
+ *  ``3-part`` shapes (same parsing as ``collectTriggers``). */
+async function collectExtends(
+  api: ESPHomeAPI,
+  extendsList: string[] | undefined,
+  out: SchemaConfigVarKey[],
+  seenKeys: Set<string>,
+  visited: Set<string>,
+): Promise<void> {
+  for (const ext of extendsList ?? []) {
+    const parts = ext.split(".");
+    if (parts.length === 2) {
+      await collectConfigVars(
+        api,
+        parts[0],
+        parts[0],
+        parts[1],
+        out,
+        seenKeys,
+        visited,
+      );
+    } else if (parts.length === 3) {
+      await collectConfigVars(
         api,
         parts[0],
         `${parts[0]}.${parts[1]}`,

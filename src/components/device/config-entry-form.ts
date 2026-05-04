@@ -262,10 +262,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // edit — e.g. autocompletion just inserted ``then:\n  - ``
       // and js-yaml produced an empty mapping at this position),
       // ``String(value)`` can throw "Cannot convert object to
-      // primitive value" for null-prototype objects. Skip the
-      // sync for non-primitive values rather than crashing the
-      // updated() lifecycle.
-      if (!isPrimitiveOrNullish(value)) continue;
+      // primitive value" for null-prototype objects. Clear any
+      // stale selection rather than leaving the previous primitive
+      // displayed against a now-non-primitive YAML state.
+      if (!isPrimitiveOrNullish(value)) {
+        const current = Array.isArray(select.value)
+          ? select.value[0] ?? ""
+          : select.value ?? "";
+        if (current !== "") select.value = "";
+        continue;
+      }
       const raw = String(value ?? "");
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
