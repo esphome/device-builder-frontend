@@ -119,7 +119,21 @@ export function readPlatformSibling(
     const stripped = stripComment(raw);
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
-    if (ind < indent) break;
+    // The list-item-header line carries the dash at indent
+    // ``cursorIndent - 2`` (the body keys live one indent step
+    // deeper than the dash). When the walker hits a line whose
+    // indent is shallower than the cursor's AND it starts with
+    // a dash, that's the enclosing list-item header — read its
+    // ``platform:`` value directly. Without this, the walker
+    // breaks before parsing the dash line and the value-position
+    // completion misses the platform context entirely.
+    if (ind < indent) {
+      if (/^\s*-\s/.test(raw)) {
+        const m = stripped.match(RE_PLATFORM_SIBLING);
+        if (m) return m[1];
+      }
+      break;
+    }
     if (ind === indent) {
       topOfBlock = i;
       // Stop when we hit a list-item dash — the item starts here.

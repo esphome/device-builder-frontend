@@ -1,10 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { CompletionContext } from "@codemirror/autocomplete";
+import { EditorState } from "@codemirror/state";
 import {
   ComponentCategory,
   type ComponentCatalogEntry,
 } from "../../src/api/types.js";
+import { _resetSchemaCacheForTests } from "../../src/util/esphome-schema.js";
+import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
   buildTopLevelCompletions,
+  createYamlCompletionSource,
   matchKeyPosition,
   matchValuePosition,
   platformValueCompletion,
@@ -277,5 +282,121 @@ describe("matchValuePosition", () => {
       key: "ssid",
       partial: "",
     });
+  });
+});
+
+describe("createYamlCompletionSource (auto-fire at value position)", () => {
+  // User-reported: cursor sitting at ``device_class:`` (value
+  // typed but no partial yet) didn't open the enum popup until
+  // ctrl-space. Pin the new behaviour: the source returns a
+  // non-null result for the empty-partial case at value position
+  // even when ``explicit === false``, so CodeMirror's
+  // implicit-completion path opens the popup automatically.
+  beforeEach(() => {
+    _resetSchemaCacheForTests();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init?: RequestInit) => {
+        if (init?.method === "HEAD") return new Response(null, { status: 200 });
+        if (url.includes("uptime.json")) {
+          return new Response(
+            JSON.stringify({
+              "uptime.sensor": {
+                schemas: {
+                  CONFIG_SCHEMA: {
+                    type: "typed",
+                    typed_key: "type",
+                    types: {
+                      seconds: {
+                        config_vars: {},
+                        extends: ["sensor._SENSOR_SCHEMA"],
+                      },
+                    },
+                  },
+                },
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        if (url.includes("sensor.json")) {
+          return new Response(
+            JSON.stringify({
+              sensor: {
+                schemas: {
+                  _SENSOR_SCHEMA: {
+                    type: "schema",
+                    schema: {
+                      config_vars: {
+                        device_class: {
+                          type: "enum",
+                          values: {
+                            duration: { docs: "Time elapsed" },
+                            temperature: {},
+                            humidity: {},
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            }),
+            { status: 200 },
+          );
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      }),
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("opens the enum popup at ``device_class: `` without ctrl-space", async () => {
+    const yaml = [
+      "sensor:",
+      "  - platform: uptime",
+      "    name: zwave",
+      "    device_class: ",
+    ].join("\n");
+    const state = EditorState.create({
+      doc: yaml,
+      extensions: [esphomeYaml()],
+    });
+    const fakeApi = {
+      getComponents: async () => ({
+        components: [
+          {
+            id: "sensor.uptime",
+            name: "sensor.uptime",
+            description: "",
+            category: ComponentCategory.SENSOR,
+            docs_url: "",
+            image_url: "",
+            dependencies: [],
+            multi_conf: false,
+            supported_platforms: [],
+            config_entries: [],
+          },
+        ],
+      }),
+      getVersion: async () => ({
+        server_version: "0.0.0",
+        esphome_version: "2026.5.0",
+      }),
+      getComponent: async () => null,
+    } as never;
+    const source = createYamlCompletionSource(fakeApi);
+    // ``explicit: false`` is the implicit-typing path that
+    // previously bailed for the empty-partial case.
+    const ctx = new CompletionContext(state, yaml.length, false);
+    const result = await source(ctx);
+    expect(result).not.toBeNull();
+    const labels = (result?.options ?? []).map((o) => o.label).sort();
+    expect(labels).toContain("duration");
+    expect(labels).toContain("temperature");
+    expect(labels).toContain("humidity");
   });
 });

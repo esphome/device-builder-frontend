@@ -19,10 +19,11 @@
  *    - `platform:`     → component IDs whose category matches the parent
  *      block (e.g. inside `sensor:` we suggest sensor platforms).
  */
-import type {
-  Completion,
-  CompletionContext,
-  CompletionResult,
+import {
+  startCompletion,
+  type Completion,
+  type CompletionContext,
+  type CompletionResult,
 } from "@codemirror/autocomplete";
 import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
@@ -246,7 +247,8 @@ function entryToCompletion(entry: ConfigEntry): Completion {
   detailParts.push(entry.required ? "required" : entry.type);
   return {
     label: entry.key,
-    apply: `${entry.key}: `,
+    apply: (view, _completion, from, to) =>
+      applyKeyInsertion(view, from, to, entry.key),
     type: iconType(entry.type),
     detail: detailParts.join(" · "),
     info: buildEntryInfo(entry),
@@ -372,6 +374,22 @@ function applyInsertion(
   });
 }
 
+/** Insert ``key: `` and immediately re-open the completion popup
+ *  so the user lands at the value position with the next set of
+ *  suggestions visible (boolean / enum / schema-bundle fallback)
+ *  without having to ctrl-space again. Used by every key-insert
+ *  completion (catalog ``entryToCompletion`` and schema-bundle
+ *  ``schemaKeyToCompletion``). */
+function applyKeyInsertion(
+  view: EditorView,
+  from: number,
+  to: number,
+  key: string,
+): void {
+  applyInsertion(view, from, to, `${key}: `);
+  startCompletion(view);
+}
+
 /** Read the leading-whitespace prefix of the editor line that
  *  contains *from*. Used by completion ``apply`` callbacks that
  *  need to emit a multi-line snippet whose indent must match the
@@ -395,7 +413,8 @@ function readLineLead(view: EditorView, from: number): string {
 function schemaKeyToCompletion(k: SchemaConfigVarKey): Completion {
   return {
     label: k.key,
-    apply: `${k.key}: `,
+    apply: (view, _completion, from, to) =>
+      applyKeyInsertion(view, from, to, k.key),
     type: "property",
     detail: k.required ? "required" : undefined,
     info: k.docs ?? undefined,
@@ -700,10 +719,16 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // lookup. Walk ``schema.esphome.io`` (typed-schema variants
       // + extends chain) for an enum with this key. Mirrors the
       // legacy dashboard's enum-value lookup.
-      if (completionCtx.bundleCtx) {
+      //
+      // Use the regex-fallback ``topLevelKey`` / ``platformValue``
+      // here — the AST's ``bundleCtx`` is often ``null`` at a
+      // value-position cursor sitting on a half-typed pair
+      // (``device_class:``), since Lezer hasn't seen the value
+      // yet.
+      if (completionCtx.topLevelKey) {
         const target = bundleFor(
-          completionCtx.bundleCtx.topLevelKey,
-          completionCtx.bundleCtx.platformValue,
+          completionCtx.topLevelKey,
+          completionCtx.platformValue,
         );
         const enumValues = await getConfigVarValueOptions(
           api,
@@ -874,7 +899,8 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ? [
           {
             label: "platform",
-            apply: "platform: ",
+            apply: (view, _completion, from, to) =>
+              applyKeyInsertion(view, from, to, "platform"),
             type: "property",
             detail: "platform domain",
             boost: 5,

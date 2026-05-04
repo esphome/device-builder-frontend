@@ -95,22 +95,38 @@ describe("findTopLevelBlock", () => {
 
 describe("readPlatformSibling (regex fallback)", () => {
   // The AST-based ``resolveBundleContext`` (in ``yaml-ast.ts``) is
-  // the authoritative resolver — these tests pin the regex
-  // walker's known limitations so a future change documents the
-  // gap clearly.
+  // the authoritative resolver, but at value-position cursors on
+  // a half-typed pair (``device_class:`` with no value yet) Lezer
+  // hasn't finished the Pair so ``getTopLevelKey`` returns null
+  // and the regex walker is the only path that can answer. Pin
+  // the dash-column case so a future regex change can't drop it.
 
-  it("returns null for the list-item-header dash-column quirk", () => {
+  it("reads ``- platform: <value>`` even when the dash is at a shallower indent", () => {
     // ``- platform: template`` puts the dash at indent 2 and the
-    // body keys at indent 4. ``indentOf`` only counts leading
-    // spaces, so the dash line registers as indent 2. The walker
-    // breaks early when ind < cursor's indent (4). This is the
-    // exact case the AST exists to handle.
+    // body keys at indent 4. The walker now recognises the dash
+    // line as the enclosing list-item header and parses its
+    // ``platform:`` value directly instead of breaking on
+    // ``ind < cursorIndent``.
     const lines = [
       "binary_sensor:",
       "  - platform: template",
       "    name: hi",
     ];
-    expect(readPlatformSibling(lines, 2, 4)).toBeNull();
+    expect(readPlatformSibling(lines, 2, 4)).toBe("template");
+  });
+
+  it("reads platform sibling for a deeply-nested cursor (``device_class:`` user-reported case)", () => {
+    // User scenario: cursor sitting at ``device_class: `` (no
+    // value yet). Lezer hasn't finished the pair, so the AST is
+    // silent — the regex walker has to resolve the platform
+    // sibling for the schema-bundle enum-value lookup.
+    const lines = [
+      "sensor:",
+      "  - platform: uptime",
+      "    name: zwave",
+      "    device_class: ",
+    ];
+    expect(readPlatformSibling(lines, 3, 4)).toBe("uptime");
   });
 
   it("returns null when there's no platform sibling", () => {
