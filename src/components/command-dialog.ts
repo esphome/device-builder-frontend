@@ -107,6 +107,11 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() private _state: CommandState | null = null;
   @state() private _lines: string[] = [];
   @state() private _statusMessage = "";
+  /** Distinguishes "user clicked Stop" from "the backend job failed".
+   *  Both routes flip ``_state`` to ``"error"``, but only real
+   *  failures should surface the reset-build-env hint — a user-cancel
+   *  isn't a build problem. */
+  @state() private _userStopped = false;
   /** Show-secrets toggle for the validate path. Re-runs validation
    *  when flipped (the ``--show-secrets`` flag is set on the
    *  ``esphome config`` subprocess at spawn time, so toggling has
@@ -345,6 +350,39 @@ export class ESPHomeCommandDialog extends LitElement {
         color: var(--term-error);
       }
 
+      /* Reset-build-env suggestion — surfaced only on install/compile
+         failures. Sits between the error banner and the toolbar so the
+         user reads "what failed" first, then "what to try next". Visual
+         language is intentionally calmer than the banner (muted bg, no
+         red) — this is a hint, not a second error. The action is an
+         inline link inside the sentence rather than a separate button
+         so the CTA reads as part of the hint. */
+      .reset-suggestion {
+        padding: 10px 20px;
+        border-top: 1px solid var(--term-border);
+        background: var(--term-bg-alt);
+        font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+        font-size: 12px;
+        line-height: 1.5;
+        color: var(--term-fg-muted);
+      }
+      .reset-suggestion-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        color: var(--term-accent);
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .reset-suggestion-link:hover,
+      .reset-suggestion-link:focus-visible {
+        color: var(--term-accent);
+        text-decoration-thickness: 2px;
+        outline: none;
+      }
+
       .terminal-toolbar {
         flex-shrink: 0;
         display: flex;
@@ -435,6 +473,21 @@ export class ESPHomeCommandDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
+    /* When a job ends, the success/error banner takes ~56px of flex
+       space below the log. The log container shrinks, scrollTop is
+       preserved, and the bottom of the log slides out of view —
+       which also trips ansi-log's _isUserScrolled latch and disables
+       auto-scroll for any trailing lines. Re-pin to the new bottom
+       and clear the latch on the running → terminal transition. */
+    if (changedProperties.has("_state")) {
+      const prev = changedProperties.get("_state") as CommandState | null;
+      if (
+        prev === "running" &&
+        (this._state === "success" || this._state === "error")
+      ) {
+        this._resetAnsiLogScroll();
+      }
+    }
   }
 
   public open(type: CommandType, options?: { port?: string }) {
@@ -481,6 +534,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = "running";
     this._lines = [];
     this._statusMessage = "";
+    this._userStopped = false;
     /* Match ``open()``: every fresh attach is a fresh session, so
        reset the per-toggle defaults rather than letting the prior
        run's choice leak into this one. Most relevant for
@@ -589,7 +643,8 @@ export class ESPHomeCommandDialog extends LitElement {
             ></esphome-ansi-log>
             ${this._renderQueuedOverlay()}
           </div>
-          ${this._renderBanner()} ${this._renderToolbar()}
+          ${this._renderBanner()} ${this._renderResetSuggestion()}
+          ${this._renderToolbar()}
         </div>
       </wa-dialog>
     `;
@@ -670,6 +725,54 @@ export class ESPHomeCommandDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Hint shown after a failed install / compile pointing the user
+   *  at "Reset Build Environment". Build-env corruption is a common
+   *  cause of compile failures (stale toolchain, half-installed
+   *  platform/library); the legacy dashboard surfaced a Clean All
+   *  button at the top level for this reason. We keep the entry-
+   *  point in the kebab and contextually offer it here so users
+   *  don't have to dig for it after a failure. Limited to install /
+   *  compile because the other command types don't have a build
+   *  step that the reset would help with.
+   *
+   *  Rendered as an inline link inside the sentence rather than a
+   *  separate button so the call-to-action reads as part of the
+   *  hint ("try reset build environment") instead of a standalone
+   *  next-step. The translation puts the link text behind a
+   *  ``{action}`` marker so other locales can place it wherever
+   *  reads naturally. */
+  private _renderResetSuggestion() {
+    if (this._state !== "error") return nothing;
+    if (this._userStopped) return nothing;
+    if (this._commandType !== "install" && this._commandType !== "compile") {
+      return nothing;
+    }
+    const text = this._localize("command.try_reset_suggestion");
+    const [before, after = ""] = text.split("{action}");
+    return html`
+      <div class="reset-suggestion" role="status">
+        ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryResetBuildEnv}
+        >
+          ${this._localize("command.try_reset_button")}</button>${after}
+      </div>
+    `;
+  }
+
+  /** Hand off to the firmware-jobs-dialog's reset flow. We close the
+   *  current command dialog first so the user can see the confirm
+   *  prompt clearly — same pattern as ``_openFirmwareJobs`` above. */
+  private _tryResetBuildEnv = () => {
+    this.close();
+    this.dispatchEvent(
+      new CustomEvent("open-reset-build-env", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   private _renderToolbar() {
     return html`
@@ -871,6 +974,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = "running";
     this._lines = [];
     this._statusMessage = "";
+    this._userStopped = false;
 
     if (this._commandType === "validate") {
       this._startValidateStream();
@@ -1031,6 +1135,7 @@ export class ESPHomeCommandDialog extends LitElement {
       this._api.firmwareCancel(this._jobId).catch(() => {});
     }
     this._state = "error";
+    this._userStopped = true;
     this._statusMessage = this._localize("command.stopped");
     this._detachStream();
     this._jobId = "";

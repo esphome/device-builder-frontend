@@ -125,6 +125,28 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._stopTicker();
   }
 
+  /** Trigger the Reset Build Environment confirm flow without
+   *  needing the firmware-tasks dialog itself to be open. The
+   *  confirm-dialog and command-dialog instances live as siblings
+   *  of the wa-dialog inside this host's shadow DOM, so they work
+   *  even when the wa-dialog is closed — surfaces like the header
+   *  kebab and a failed install's error banner can entry-point
+   *  the same flow. */
+  openResetBuildEnv() {
+    this._confirmDialog.open();
+  }
+
+  /** Catch ``open-reset-build-env`` from the inner command-dialog so
+   *  the post-failure hint also works when the user is reviewing a
+   *  past failed install from the Firmware Tasks list. The app-shell
+   *  listener sits on ``<esphome-layout>``, but this dialog is a
+   *  sibling of the layout (both mounted under app-shell), so the
+   *  event would otherwise bubble past with nothing to handle it. */
+  private _onLocalResetEvent = (e: Event) => {
+    e.stopPropagation();
+    this.openResetBuildEnv();
+  };
+
   disconnectedCallback() {
     super.disconnectedCallback();
     this._stopTicker();
@@ -456,6 +478,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
           : this._renderEmpty()}
       </wa-dialog>
       <esphome-command-dialog
+        @open-reset-build-env=${this._onLocalResetEvent}
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
       ></esphome-command-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>

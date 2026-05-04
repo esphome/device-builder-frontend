@@ -152,6 +152,7 @@ export class ESPHomeDeviceTable extends LitElement {
 
   private _tableController = new TableController<DeviceRow>(this);
   private _rows: DeviceRow[] = [];
+  private _visibleConfigs: string[] = [];
   private _columns: ColumnDef<DeviceRow>[] = [];
   private _prevLocalize: LocalizeFunc | null = null;
 
@@ -293,6 +294,9 @@ export class ESPHomeDeviceTable extends LitElement {
     });
 
     const rows = table.getRowModel().rows;
+    this._visibleConfigs = table
+      .getFilteredRowModel()
+      .rows.map((r) => r.original.config);
     const pgState = table.getState().pagination;
     const toggleCols: ToggleableColumn[] = table
       .getAllColumns()
@@ -546,7 +550,8 @@ export class ESPHomeDeviceTable extends LitElement {
 
   private get _allSelected(): boolean {
     return (
-      this._rows.length > 0 && this._rows.every((r) => this.selectedDevices.has(r.config))
+      this._visibleConfigs.length > 0 &&
+      this._visibleConfigs.every((cfg) => this.selectedDevices.has(cfg))
     );
   }
 
@@ -559,6 +564,7 @@ export class ESPHomeDeviceTable extends LitElement {
   private _onToggleAll() {
     this.dispatchEvent(
       new CustomEvent(this._allSelected ? "deselect-all" : "select-all", {
+        detail: this._visibleConfigs.slice(),
         bubbles: true,
         composed: true,
       })
