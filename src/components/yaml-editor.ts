@@ -339,12 +339,15 @@ export class ESPHomeYamlEditor extends LitElement {
   }
 
   updated(changed: Map<string, unknown>) {
-    // Theme or API/configuration changes require a full editor rebuild —
-    // CodeMirror extensions are static once the state is built.
+    // Theme / API changes require a full editor rebuild — CodeMirror
+    // extensions are static once the state is built. The user may
+    // have unsaved edits in the view that the parent's `value` prop
+    // doesn't yet reflect (the parent only learns about edits via
+    // `yaml-change`, which it loops back as `value`), so preserve
+    // the current view content across the rebuild by writing it
+    // back into `this.value` before remounting.
     if (
-      (changed.has("_darkMode") ||
-        changed.has("_api") ||
-        changed.has("configuration")) &&
+      (changed.has("_darkMode") || changed.has("_api")) &&
       this._view
     ) {
       const doc = this._view.state.doc.toString();
@@ -355,10 +358,26 @@ export class ESPHomeYamlEditor extends LitElement {
       return;
     }
 
+    // Configuration change = different device. The `<esphome-
+    // yaml-editor>` instance is reused across route changes, so
+    // we have to actively reset the view (destroy + remount with
+    // the parent's new `value`); skipping this would either keep
+    // the previous device's content or run the same-document
+    // preservation path below, which would map the prior file's
+    // cursor offset onto the new file (very disorienting on
+    // cross-device navigation). New-device load = fresh state,
+    // cursor at 0, scroll at top.
+    if (changed.has("configuration") && this._view) {
+      this._view.destroy();
+      this._container.innerHTML = "";
+      this._mountEditor();
+      return;
+    }
+
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
       if (current !== this.value) {
-        // External update (section-editor save, fresh load, …).
+        // Same-document patch (section-editor save, …).
         // Replacing the whole document via a single `changes`
         // entry maps the existing selection through the
         // delete-and-insert range; for `from: 0, to: oldLen`
@@ -373,6 +392,9 @@ export class ESPHomeYamlEditor extends LitElement {
         // already reflects the restored position; doing it as a
         // second dispatch would briefly emit a `yaml-cursor-line`
         // for line 1, which fights the navigator's selection.
+        // Cross-device navigation skips this path via the
+        // `configuration`-change branch above, so we don't apply
+        // a stale cursor onto a freshly loaded YAML.
         const view = this._view;
         const headBefore = view.state.selection.main.head;
         const scrollTop = view.scrollDOM.scrollTop;
