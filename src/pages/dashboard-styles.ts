@@ -127,7 +127,7 @@ export const dashboardStyles = css`
   .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
     padding: var(--wa-space-l) var(--wa-space-l) 0;
     flex-shrink: 0;
   }
@@ -174,10 +174,10 @@ export const dashboardStyles = css`
   /* Ghost-text discovery caption (option (b)). Quiet, single-line,
      only renders when the input is empty + device mode. The link
      inside is the actual mode-switch button — the surrounding
-     copy is just framing. */
+     copy is just framing. The toolbar's flex gap already handles
+     vertical spacing; no extra margin needed. */
   .search-discover-hint {
     display: block;
-    margin-top: 4px;
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-xs);
   }
