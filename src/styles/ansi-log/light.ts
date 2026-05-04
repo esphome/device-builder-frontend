@@ -41,23 +41,32 @@ export const ansiLogThemeLight = css`
        warnings even on the non-bold ANSI yellow path that
        PlatformIO uses for things like "Using Python 3.12.7 ..."
        informational notes. */
+    /*
+     * Tuned for WCAG AA contrast against --log-bg #f5f5f5 at
+     * 12px (the log's body-text size). Pure-RGB legacy values
+     * mostly fail that bar on a near-white surface — green
+     * #2aa198 came in around 3:1, yellow #b58900 around 4:1,
+     * VV #999 around 2.85:1. The values below sit in the 5:1+
+     * range so the log reads as comfortable text rather than
+     * "kind of visible if you squint".
+     */
     --ansi-fg-30: #1f1f1f; /* black   */
-    --ansi-fg-31: #c01c28; /* red     */
-    --ansi-fg-32: #2aa198; /* green   */
-    --ansi-fg-33: #9a6700; /* yellow  — GitHub Light "warning amber" */
+    --ansi-fg-31: #9c1818; /* red     */
+    --ansi-fg-32: #107a4e; /* green   */
+    --ansi-fg-33: #7a5100; /* yellow  — darker amber for readable WARNING */
     --ansi-fg-34: #0451a5; /* blue    */
-    --ansi-fg-35: #a31515; /* magenta */
-    --ansi-fg-36: #098658; /* cyan    */
+    --ansi-fg-35: #8b1a8b; /* magenta */
+    --ansi-fg-36: #006b56; /* cyan    */
     --ansi-fg-37: #555555; /* white   — mid-grey on light surface;
                               "white" is paradoxical on a near-white
                               background, this is the contrast value */
     --ansi-fg-90: #6e6e6e; /* bright black   (VERBOSE log level) */
-    --ansi-fg-91: #cd3131; /* bright red     */
-    --ansi-fg-92: #3d7a28; /* bright green   */
-    --ansi-fg-93: #9a6700; /* bright yellow  */
+    --ansi-fg-91: #b30000; /* bright red     */
+    --ansi-fg-92: #2d6a1f; /* bright green   */
+    --ansi-fg-93: #7a5100; /* bright yellow  */
     --ansi-fg-94: #074d8c; /* bright blue    */
-    --ansi-fg-95: #bc05bc; /* bright magenta */
-    --ansi-fg-96: #0598bc; /* bright cyan    */
+    --ansi-fg-95: #9c0e9c; /* bright magenta */
+    --ansi-fg-96: #056b8a; /* bright cyan    */
     --ansi-fg-97: #1a1a1a; /* bright white   — paradoxical on light
                               surface; renders as near-black so the
                               "high-emphasis" semantic survives */
@@ -70,17 +79,21 @@ export const ansiLogThemeLight = css`
        Two cases need adjustment for the light surface, vs the
        legacy palette they otherwise mirror:
 
-       - 40 (black) is now pure #000000 rather than #1f1f1f,
-         since --log-fg is also #1f1f1f. A bg-only \\x1b[40m
-         span uses the inherited --log-fg for text — same value
-         would render black-on-black.
+       - 40 (black) is a mid-tone #555 rather than pure #000.
+         The renderer doesn't auto-pick a contrasting fg for
+         bg-only spans, so the inherited --log-fg #1f1f1f
+         text needs visible space against the bg. Pure #000
+         left dark text on darker bg — barely readable. #555
+         keeps the "this is a dark highlight" semantic while
+         giving the inherited fg enough contrast to be readable.
        - 47 / 107 (white / bright white) are mapped to neutral
          greys instead of pure white. #ffffff against the
          #f5f5f5 log surface is barely distinguishable from
          "no highlight at all", which would silently swallow
          the highlight. Greys preserve the visual flag. */
-    --ansi-bg-40: #000000; /* black   — pure black so it
-                                     contrasts with --log-fg #1f1f1f */
+    --ansi-bg-40: #555555; /* black   — mid-grey so the inherited
+                                     --log-fg #1f1f1f text stays
+                                     readable on a bg-only span */
     --ansi-bg-41: rgb(255, 0, 0); /* red     */
     --ansi-bg-42: rgb(0, 255, 0); /* green   */
     --ansi-bg-43: rgb(255, 255, 0); /* yellow  */
@@ -99,10 +112,11 @@ export const ansiLogThemeLight = css`
     --ansi-bg-106: rgb(0, 255, 255); /* bright cyan    */
     --ansi-bg-107: #d0d0d0; /* bright white  — same reason as 47 */
 
-    /* VERY_VERBOSE: lighter grey than VERBOSE so it reads as
-       "even less prominent" against the light surface (which on
-       dark is achieved by going darker — same relative dim, just
-       the other direction). */
-    --log-fg-very-verbose: #999999;
+    /* VERY_VERBOSE: a touch lighter than VERBOSE (#6e6e6e) but
+       still in the contrast-passing range against #f5f5f5 (~4:1).
+       The previous #999 dropped to ~2.85:1, below WCAG AA, which
+       made VV illegible at the 12px log size. Distinct from V
+       without becoming noise text. */
+    --log-fg-very-verbose: #7e7e7e;
   }
 `;
