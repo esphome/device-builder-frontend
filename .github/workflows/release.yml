@@ -55,10 +55,29 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          if gh api "repos/${{ github.repository }}/git/ref/tags/$VERSION" --silent 2>/dev/null; then
+          set -euo pipefail
+          # Capture both streams + exit code so we can distinguish a
+          # genuine "tag missing" 404 from any other failure (auth,
+          # rate limit, transient 5xx). A bare ``if gh api …`` would
+          # silently swallow those and let the workflow proceed.
+          set +e
+          output=$(gh api "repos/${{ github.repository }}/git/ref/tags/$VERSION" 2>&1)
+          status=$?
+          set -e
+
+          if [ "$status" -eq 0 ]; then
             echo "::error::Tag $VERSION already exists. Bump the version."
             exit 1
           fi
+
+          if grep -qi "HTTP 404\|Not Found" <<<"$output"; then
+            echo "Tag $VERSION does not exist; proceeding."
+            exit 0
+          fi
+
+          echo "::error::Failed to check whether tag $VERSION exists (gh api exit $status):"
+          echo "$output"
+          exit 1
 
   build:
     name: Build wheel and sdist
