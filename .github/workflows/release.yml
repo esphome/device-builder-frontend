@@ -64,6 +64,8 @@ jobs:
     name: Build wheel and sdist
     needs: validate
     runs-on: ubuntu-latest
+    permissions:
+      contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
@@ -127,6 +129,8 @@ jobs:
     name: Draft GitHub release and attach assets
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read    # actions/checkout uses the implicit GITHUB_TOKEN; release writes go via the app token
     steps:
       - name: Generate a token
         id: generate-token
@@ -208,6 +212,7 @@ jobs:
     environment:
       name: gh-release
       url: https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}
+    permissions: {}   # all GitHub writes go via the app token
     steps:
       - name: Generate a token
         id: generate-token
