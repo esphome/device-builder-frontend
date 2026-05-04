@@ -95,6 +95,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @property()
   sectionKey = "";
 
+  /**
+   * Cached `fromLine` from the navigator's emit at click time.
+   * Use `_resolvedFromLine` (re-resolved against the live YAML
+   * via `resolveCurrentFromLine`) for any actual operation —
+   * read, save, or delete. This value goes stale as soon as
+   * the YAML pane shifts, but is still useful as a "stale hint"
+   * to disambiguate same-key duplicates: a small shift maps
+   * the click back to the closest match.
+   */
   @property({ type: Number })
   fromLine?: number;
 
@@ -109,7 +118,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * `device-board-info`.
    *
    * Empty / unbound values are caught at the splice site by
-   * `resolveCurrentFromLine` returning `null` — the splice
+   * `resolveCurrentFromLine` returning `undefined` — the splice
    * never runs without a resolved `fromLine`, so an empty YAML
    * (user cleared the pane) and a missing prop binding both
    * surface as a localised section-not-found error rather than
@@ -235,7 +244,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this.sectionKey,
       this.fromLine,
     );
-    if (fromLine === null) {
+    if (fromLine === undefined) {
       this._error = this._localize(notFoundErrorKey);
       return null;
     }
@@ -301,14 +310,22 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       // yaml changes), and re-seeding from a stale line would
       // populate the form with the wrong section's values.
       // When the resolver can't find the section at all (key
-      // gone from yaml, empty pane), pass `undefined` so the
-      // parser falls back to its own column-0 scan (which
-      // won't match a dotted platform key, yielding `{}` —
-      // an empty form, the right outcome for a section that
-      // no longer exists).
-      const resolvedFromLine =
-        resolveCurrentFromLine(yaml, this.sectionKey, this.fromLine) ??
-        undefined;
+      // gone from yaml, empty pane), the parser is called with
+      // `undefined` so its column-0 scan won't match a dotted
+      // platform key — values come back `{}` and the form
+      // surfaces empty.
+      //
+      // Asymmetric with save / delete (which surface a
+      // localised error in the same case): the read path is
+      // reactive (`reload()` fires from external yaml mutation,
+      // not user intent) so a popup error would feel intrusive
+      // for what's just "the underlying section vanished — show
+      // an empty form until the user decides what to do".
+      const resolvedFromLine = resolveCurrentFromLine(
+        yaml,
+        this.sectionKey,
+        this.fromLine,
+      );
       this._values = parseYamlSectionValues(
         yaml,
         this.sectionKey,

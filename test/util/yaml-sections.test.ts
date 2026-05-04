@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseYamlSectionValues } from "../../src/util/yaml-section-values.js";
 import {
   categorizeSections,
   parseYamlAutomations,
@@ -304,12 +305,12 @@ describe("resolveCurrentFromLine", () => {
   });
 
   it("returns null when the section no longer exists", () => {
-    expect(resolveCurrentFromLine("esphome:\n  name: x\n", "wifi")).toBeNull();
+    expect(resolveCurrentFromLine("esphome:\n  name: x\n", "wifi")).toBeUndefined();
   });
 
   it("returns null on empty yaml or empty sectionKey", () => {
-    expect(resolveCurrentFromLine("", "wifi")).toBeNull();
-    expect(resolveCurrentFromLine("wifi:\n  ssid: x\n", "")).toBeNull();
+    expect(resolveCurrentFromLine("", "wifi")).toBeUndefined();
+    expect(resolveCurrentFromLine("wifi:\n  ssid: x\n", "")).toBeUndefined();
   });
 
   it("disambiguates duplicate keys by closest stale line", () => {
@@ -351,10 +352,7 @@ describe("resolveCurrentFromLine", () => {
   // cached line (passed as the `staleFromLine` hint) produces
   // values from the *right* section after the YAML has shifted.
 
-  it("read-path round-trip: stale line + shifted yaml seeds the right section", async () => {
-    const { parseYamlSectionValues } = await import(
-      "../../src/util/yaml-section-values.js"
-    );
+  it("read-path round-trip: stale line + shifted yaml seeds the right section", () => {
     // Pre-paste yaml: a single OTA item.
     // Post-paste yaml: a leading top-level block pushed it down.
     const yamlAfterPaste = [
@@ -383,7 +381,7 @@ describe("resolveCurrentFromLine", () => {
     expect(values).toEqual({ platform: "esphome", password: "secret" });
   });
 
-  it("read-path round-trip: missing section yields empty values", async () => {
+  it("read-path round-trip: missing section yields empty values", () => {
     // The section the editor is trying to load no longer
     // exists in the yaml (user deleted it via the YAML pane).
     // Resolver returns null; passing `undefined` to the parser
@@ -391,16 +389,13 @@ describe("resolveCurrentFromLine", () => {
     // platform-qualified key like `ota.esphome` no top-level
     // line matches, so values come back empty. The form
     // surfaces an empty section, the right outcome.
-    const { parseYamlSectionValues } = await import(
-      "../../src/util/yaml-section-values.js"
-    );
     const yaml = "esphome:\n  name: x\n";
     const resolved = resolveCurrentFromLine(yaml, "ota.esphome", 5);
-    expect(resolved).toBeNull();
+    expect(resolved).toBeUndefined();
     const values = parseYamlSectionValues(
       yaml,
       "ota.esphome",
-      resolved ?? undefined,
+      resolved,
     );
     expect(values).toEqual({});
   });

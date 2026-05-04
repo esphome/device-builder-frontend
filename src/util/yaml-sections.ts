@@ -391,11 +391,15 @@ export function sectionKeyOf(section: YamlSection): string {
  * on the right line.
  *
  * Returns the matching section's 1-indexed `fromLine`, or
- * `null` when no section in `yaml` matches `sectionKey` —
+ * `undefined` when no section in `yaml` matches `sectionKey` —
  * callers surface that as an explicit error rather than running
  * a wrong-line splice. Empty `yaml` or empty `sectionKey` also
- * return `null` so an unbound prop and a cleared editor pane
- * collapse into the same caller-visible failure.
+ * return `undefined` so an unbound prop and a cleared editor
+ * pane collapse into the same caller-visible failure.
+ *
+ * `undefined` (rather than `null`) so the result drops cleanly
+ * into `parseYamlSectionValues`'s optional `fromLine?` parameter
+ * without a `?? undefined` conversion at every call site.
  *
  * Same-key duplicates (two `ota.esphome` items — pathological
  * but legal YAML): closest-match is a heuristic, strictly
@@ -413,12 +417,12 @@ export function resolveCurrentFromLine(
   yaml: string,
   sectionKey: string,
   staleFromLine?: number,
-): number | null {
-  if (!yaml || !sectionKey) return null;
+): number | undefined {
+  if (!yaml || !sectionKey) return undefined;
   const matches = parseYamlTopLevelSections(yaml).filter(
     (s) => sectionKeyOf(s) === sectionKey,
   );
-  if (matches.length === 0) return null;
+  if (matches.length === 0) return undefined;
   if (matches.length === 1 || staleFromLine === undefined) {
     return matches[0].fromLine;
   }
