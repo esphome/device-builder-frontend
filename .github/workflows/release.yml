@@ -23,6 +23,14 @@ env:
 
 permissions: {}
 
+# Only one release run at a time, ever. A second run queues
+# behind the first rather than cancelling it — cancelling
+# mid-publish could leave PyPI and the GitHub release in
+# inconsistent states.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   create-release:
     name: Draft release
