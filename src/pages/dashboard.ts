@@ -1283,6 +1283,8 @@ export class ESPHomePageDashboard extends LitElement {
         this._firmwareDialog.installWebSerial(device);
       } else if (method === "web-download") {
         this._firmwareDialog.installWebDownload(device);
+      } else if (method === "binary-download") {
+        this._firmwareDialog.installBinaryDownload(device);
       }
     }
   }

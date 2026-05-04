@@ -74,6 +74,8 @@ export class DeviceInstallController implements ReactiveController {
       this._host.firmwareDialog?.installWebSerial(device);
     } else if (method === "web-download") {
       this._host.firmwareDialog?.installWebDownload(device);
+    } else if (method === "binary-download") {
+      this._host.firmwareDialog?.installBinaryDownload(device);
     }
   };
 

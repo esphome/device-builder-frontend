@@ -94,9 +94,17 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() private _showLogsAfterInstall = true;
   /** Which entry point opened the dialog. ``web-serial`` shows the
    *  show-logs-after-install toggle and dispatches the auto-flip on
-   *  success; ``web-download`` doesn't connect to a device so the
-   *  toggle is hidden and there's nothing to flip to. */
-  @state() private _installer: "web-serial" | "web-download" | null = null;
+   *  success; ``web-download`` and ``binary-download`` don't connect
+   *  to a device so the toggle is hidden and there's nothing to flip
+   *  to. The two download paths share most of the compile + save flow
+   *  but differ in the success-screen wording and footer (web-download
+   *  routes the user to web.esphome.io; binary-download leaves the
+   *  flashing tool to the user). */
+  @state() private _installer:
+    | "web-serial"
+    | "web-download"
+    | "binary-download"
+    | null = null;
 
   private _device: ConfiguredDevice | null = null;
   private _jobId = "";
@@ -147,7 +155,22 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
     this._dialog.open = true;
-    this._startWebDownload();
+    this._startDownload();
+  }
+
+  /**
+   * Compile + download the binary and hand it off to the user without
+   * any opinion on how to flash it. Always available from the install
+   * picker so users can plug into esptool.py / picotool / a UF2 mass-
+   * storage flow without going through the web.esphome.io route.
+   */
+  installBinaryDownload(device: ConfiguredDevice) {
+    this._init(device);
+    this._installer = "binary-download";
+    this._step = "queued";
+    this._statusMessage = this._localize("firmware.status_queued");
+    this._dialog.open = true;
+    this._startDownload();
   }
 
   /**
@@ -515,6 +538,25 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     }
     if (this._step === "download-ready") {
       const filename = this._downloadedFilename;
+      // Manual binary download: just acknowledge the file and let the
+      // user flash it however they like — no web.esphome.io checklist.
+      if (this._installer === "binary-download") {
+        return html`
+          <div class="status">
+            <wa-icon
+              class="status-icon status-icon--success"
+              library="mdi"
+              name="check-circle"
+            ></wa-icon>
+            <span class="status-text"
+              >${this._localize("firmware.binary_download_done_title")}</span
+            >
+            <span class="status-detail"
+              >${this._localize("firmware.binary_download_done_body", { filename })}</span
+            >
+          </div>
+        `;
+      }
       return html`
         <div class="status">
           <wa-icon
@@ -679,6 +721,16 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       `;
     }
     if (this._step === "download-ready") {
+      // Manual binary download has no follow-up tool — just close.
+      if (this._installer === "binary-download") {
+        return html`
+          <div class="footer">
+            <button class="btn btn--primary" @click=${this._close}>
+              ${this._localize("command.close")}
+            </button>
+          </div>
+        `;
+      }
       return html`
         <div class="footer">
           <button class="btn btn--ghost" @click=${this._close}>
@@ -921,11 +973,21 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (handled) this._dialog.open = false;
   }
 
-  // ─── Web Download (compile + save .bin for web.esphome.io) ─────
+  // ─── Download flows (compile + save binary) ────────────────────
 
-  private async _startWebDownload() {
+  /**
+   * Shared compile + save path for both the web.esphome.io route and
+   * the manual binary download. Differs only in which binaries are
+   * eligible: web.esphome.io needs a self-contained image it can
+   * flash at 0x0 (ESP32 ``firmware.factory.bin`` or ESP8266
+   * ``firmware.bin``), while the manual route just gives the user
+   * whatever artefact the build produced — including .uf2 files for
+   * RP2040 / nrf52 / libretiny that the web flasher cannot handle.
+   */
+  private async _startDownload() {
     const device = this._device;
     if (!device) return;
+    const isWebFlasher = this._installer === "web-download";
 
     try {
       await this._compileAndWait(device.configuration);
@@ -938,16 +1000,17 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_downloading");
     try {
       const binaries = await this._api.firmwareGetBinaries(device.configuration);
-      // web.esphome.io flashes the uploaded file at 0x0, so we need a
-      // self-contained image. Per ESPHome's get_download_types(): ESP32
-      // returns "firmware.factory.bin" (bootloader + partitions + app);
-      // ESP8266 returns just "firmware.bin" which is itself the full
-      // image (no bootloader/partition split on ESP8266). RP2040 / nrf52
-      // / libretiny return .uf2 files which web.esphome.io can't flash —
-      // reject those with a clear error.
+      // Per ESPHome's get_download_types(): ESP32 returns
+      // "firmware.factory.bin" (bootloader + partitions + app); ESP8266
+      // returns just "firmware.bin" which is itself the full image (no
+      // bootloader/partition split on ESP8266). For the web flasher we
+      // require one of those — anything else (UF2) is unusable. For the
+      // manual route we fall back to the first available binary so
+      // non-ESP platforms still get something flashable.
       const flashable =
         binaries.find((b) => b.file === "firmware.factory.bin") ??
-        binaries.find((b) => b.file === "firmware.bin");
+        binaries.find((b) => b.file === "firmware.bin") ??
+        (isWebFlasher ? undefined : binaries[0]);
       if (!flashable) {
         this._fail(this._localize("firmware.no_flashable_binary"));
         return;

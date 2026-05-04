@@ -4,6 +4,7 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiCloudDownload,
+  mdiDownload,
   mdiSerialPort,
   mdiUsb,
   mdiWifi,
@@ -31,6 +32,7 @@ registerMdiIcons({
   usb: mdiUsb,
   "serial-port": mdiSerialPort,
   "cloud-download": mdiCloudDownload,
+  download: mdiDownload,
 });
 
 type DialogView = "method" | "port-select";
@@ -330,6 +332,21 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         color: var(--wa-color-text-normal);
       }
 
+      /* Inline link inside an option's title (used by the web.esphome.io
+         row to render the host name as a clickable link). stopPropagation
+         on the link's click handler keeps the row's "start install" from
+         firing when the user just wants to preview the destination. */
+      .title .inline-link {
+        color: var(--esphome-primary);
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .title .inline-link:hover,
+      .title .inline-link:focus-visible {
+        text-decoration-thickness: 2px;
+        outline: none;
+      }
+
       .desc {
         font-size: var(--wa-font-size-2xs);
         color: var(--wa-color-text-quiet);
@@ -400,28 +417,17 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   private _renderMethodList() {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
-    const showWebDownload =
+    // Web-download replaces (rather than supplements) the local USB row
+    // when the user can't use Web Serial here AND can't use OTA — the
+    // same situation that disabled the USB row before. Keeps the list
+    // short by not showing two USB options where only one is reachable.
+    const swapInWebDownload =
       this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
 
     return html`
       <div class="list">
         ${this._renderOtaOption(isOnline)}
-        <div
-          class="option ${!hasWebSerial ? "option--disabled" : ""}"
-          @click=${hasWebSerial ? () => this._selectMethod("web-serial") : undefined}
-        >
-          <wa-icon library="mdi" name="usb"></wa-icon>
-          <div class="info">
-            <span class="title"
-              >${this._localize("dashboard.install_method_usb_local")}</span
-            >
-            <span class="desc"
-              >${hasWebSerial
-                ? this._localize("dashboard.install_method_usb_local_desc")
-                : this._localize("dashboard.install_method_usb_local_unsupported")}</span
-            >
-          </div>
-        </div>
+        ${swapInWebDownload ? this._renderWebDownloadOption() : this._renderWebSerialOption(hasWebSerial)}
         <div class="option" @click=${this._onServerSerial}>
           <wa-icon library="mdi" name="serial-port"></wa-icon>
           <div class="info">
@@ -433,21 +439,88 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             >
           </div>
         </div>
-        ${showWebDownload
-          ? html`
-              <div class="option" @click=${() => this._selectMethod("web-download")}>
-                <wa-icon library="mdi" name="cloud-download"></wa-icon>
-                <div class="info">
-                  <span class="title"
-                    >${this._localize("dashboard.install_method_web_download")}</span
-                  >
-                  <span class="desc"
-                    >${this._localize("dashboard.install_method_web_download_desc")}</span
-                  >
-                </div>
-              </div>
-            `
-          : nothing}
+        ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
+      </div>
+    `;
+  }
+
+  private _renderWebSerialOption(hasWebSerial: boolean) {
+    return html`
+      <div
+        class="option ${!hasWebSerial ? "option--disabled" : ""}"
+        @click=${hasWebSerial ? () => this._selectMethod("web-serial") : undefined}
+      >
+        <wa-icon library="mdi" name="usb"></wa-icon>
+        <div class="info">
+          <span class="title"
+            >${this._localize("dashboard.install_method_usb_local")}</span
+          >
+          <span class="desc"
+            >${hasWebSerial
+              ? this._localize("dashboard.install_method_usb_local_desc")
+              : this._localize("dashboard.install_method_usb_local_unsupported")}</span
+          >
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * web.esphome.io fallback row. Renders the host name as an inline
+   * link inside the title so users can preview / right-click open the
+   * destination before committing to the compile + download. The link
+   * stops click propagation so opening it doesn't double-fire as a
+   * "start install" on the parent row.
+   *
+   * Translation splits on the ``{link}`` marker so other locales can
+   * place the URL anywhere within the sentence.
+   */
+  private _renderWebDownloadOption() {
+    const titleTemplate = this._localize("dashboard.install_method_web_download");
+    const linkText = this._localize("dashboard.install_method_web_download_link");
+    const [before, after = ""] = titleTemplate.split("{link}");
+    return html`
+      <div class="option" @click=${() => this._selectMethod("web-download")}>
+        <wa-icon library="mdi" name="cloud-download"></wa-icon>
+        <div class="info">
+          <span class="title"
+            >${before}<a
+              class="inline-link"
+              href="https://web.esphome.io"
+              target="_blank"
+              rel="noopener noreferrer"
+              @click=${(e: MouseEvent) => e.stopPropagation()}
+              >${linkText}</a
+            >${after}</span
+          >
+          <span class="desc"
+            >${this._localize("dashboard.install_method_web_download_desc")}</span
+          >
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Manual binary download — always offered in install mode. Compiles
+   * here, hands the user the resulting binary, and leaves flashing to
+   * whatever tool they prefer (esptool.py, picotool, copy-to-MSC for
+   * UF2 platforms, etc). Distinct from the web-download row, which
+   * specifically routes the user through web.esphome.io and is gated
+   * to ESP32 / ESP8266.
+   */
+  private _renderManualDownloadOption() {
+    return html`
+      <div class="option" @click=${() => this._selectMethod("binary-download")}>
+        <wa-icon library="mdi" name="download"></wa-icon>
+        <div class="info">
+          <span class="title"
+            >${this._localize("dashboard.install_method_manual_download")}</span
+          >
+          <span class="desc"
+            >${this._localize("dashboard.install_method_manual_download_desc")}</span
+          >
+        </div>
       </div>
     `;
   }
