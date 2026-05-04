@@ -29,6 +29,23 @@ import { syntaxTree } from "@codemirror/language";
 import type { EditorState } from "@codemirror/state";
 import type { SyntaxNode } from "@lezer/common";
 
+/**
+ * Slice the literal text of a ``Literal`` / ``QuotedLiteral`` node
+ * and strip the surrounding quotes if any. Shared between the
+ * ``Key`` reader and the ``platform:`` value reader (both want the
+ * same shape: text with quotes peeled).
+ */
+function readLiteralText(state: EditorState, node: SyntaxNode): string {
+  let text = state.doc.sliceString(node.from, node.to);
+  if (node.name === "QuotedLiteral" && text.length >= 2) {
+    const q = text[0];
+    if ((q === '"' || q === "'") && text[text.length - 1] === q) {
+      text = text.slice(1, -1);
+    }
+  }
+  return text;
+}
+
 /** Read the textual value of a ``Key`` node, stripping surrounding
  *  quotes if it wraps a ``QuotedLiteral``. Returns ``null`` for
  *  non-scalar keys (block-mapping / sequence keys are valid YAML
@@ -53,14 +70,7 @@ export function readKeyText(
   }
   if (!inner) return null;
   if (inner.name !== "Literal" && inner.name !== "QuotedLiteral") return null;
-  let text = state.doc.sliceString(inner.from, inner.to);
-  if (inner.name === "QuotedLiteral" && text.length >= 2) {
-    const q = text[0];
-    if ((q === '"' || q === "'") && text[text.length - 1] === q) {
-      text = text.slice(1, -1);
-    }
-  }
-  return text;
+  return readLiteralText(state, inner);
 }
 
 /** Walk up from any node to the nearest enclosing ``Pair``. */
@@ -176,16 +186,7 @@ export function resolveBundleContext(
           ) {
             v = v.prevSibling;
           }
-          if (v) {
-            let text = state.doc.sliceString(v.from, v.to);
-            if (v.name === "QuotedLiteral" && text.length >= 2) {
-              const q = text[0];
-              if ((q === '"' || q === "'") && text[text.length - 1] === q) {
-                text = text.slice(1, -1);
-              }
-            }
-            platformValue = text;
-          }
+          if (v) platformValue = readLiteralText(state, v);
           break;
         }
       }
