@@ -271,6 +271,14 @@ export function updateSectionInYaml(
     // settings (`- platform: esphome\n    platform: esphome`).
     // Drop the inline key from the values before serializing so
     // only the dash line carries it.
+    //
+    // The regex matches a single ESPHome-shape inline key
+    // (`[a-zA-Z_][a-zA-Z0-9_]*`) — same alphabet
+    // `parseYamlSectionValues` reads on the dash line, so the
+    // two stay in lockstep. Multi-key inline-flow YAML
+    // (`- platform: esphome, password: secret`) isn't valid for
+    // any ESPHome list-item schema we serve, so we don't try to
+    // dedupe past the first inline key.
     const inlineMatch = lines[start].match(
       /^\s+-\s+([a-zA-Z_][a-zA-Z0-9_]*):/,
     );

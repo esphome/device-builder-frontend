@@ -10,6 +10,7 @@ import { html, nothing } from "lit";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { PasswordInputValueChange } from "./password-input.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -209,7 +210,7 @@ export function renderStringField(
           .invalid=${invalid}
           .disabled=${disabled}
           .placeholder=${placeholder}
-          @input=${(e: CustomEvent<{ value: string }>) =>
+          @value-change=${(e: CustomEvent<PasswordInputValueChange>) =>
             ctx.emitChange(path, e.detail.value)}
         ></esphome-password-input>
         ${renderSecretHint(value, ctx)} ${renderFieldError(path, ctx)}

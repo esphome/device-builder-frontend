@@ -26,6 +26,15 @@ registerMdiIcons({
   "eye-off": mdiEyeOff,
 });
 
+/**
+ * Detail shape of the `value-change` event this component fires
+ * when the user types. Re-exported so consumers can type their
+ * `@value-change` listener without redeclaring the shape.
+ */
+export interface PasswordInputValueChange {
+  value: string;
+}
+
 @customElement("esphome-password-input")
 export class ESPHomePasswordInput extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -141,19 +150,18 @@ export class ESPHomePasswordInput extends LitElement {
   }
 
   private _onInput(e: Event) {
-    // Stop the native input event from continuing to bubble. We
-    // re-fire the same event name as a `CustomEvent` with a
-    // `{value}` detail so consumers can use the shorter property
-    // access; if the native event were also allowed through, the
-    // host's `@input` listener would run twice — once with our
-    // detail, once with the native event whose `detail` is the
-    // numeric default `0` — and the second run would overwrite
-    // the just-typed value with `undefined`.
-    e.stopPropagation();
+    // Fire under a distinct event name (`value-change`, not
+    // `input`) so the native InputEvent that bubbles out of the
+    // inner `<input>` can never collide with our synthesized
+    // event on a consumer's host-level listener. An earlier
+    // version re-fired as `input` and the host saw both events
+    // back-to-back: ours with `{value}` detail, then the native
+    // one with `detail = 0`, whose `(0).value` read as
+    // `undefined` and wiped the just-typed value.
     const next = (e.target as HTMLInputElement).value;
     this.value = next;
     this.dispatchEvent(
-      new CustomEvent("input", {
+      new CustomEvent<PasswordInputValueChange>("value-change", {
         detail: { value: next },
         bubbles: true,
         composed: true,
