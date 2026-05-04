@@ -17,6 +17,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: read
+
 jobs:
   pr_labels:
     name: Verify
