@@ -114,14 +114,18 @@ export class ESPHomePageDevice extends LitElement {
    * Live device YAML, fed down through `device-editor` →
    * `device-board-info` to the section editor and the YAML pane.
    *
-   * Reference identity is load-bearing: the section editor's
-   * scan memos in `util/config-entry-yaml-scan.ts` (per-keystroke
-   * pin / id-reference lookups) cache by `yaml === yaml`. Only
-   * reassign this field when the content actually changes —
-   * never via a template literal, `String(...)`, or any path
-   * that constructs a new string. Doing so silently demotes the
-   * memos to a no-op (every render becomes a cache miss) and
-   * the per-keystroke scans regress to O(N) on the full YAML.
+   * The section editor's scan memos
+   * (`util/config-entry-yaml-scan.ts`) cache per-keystroke
+   * pin / id-reference lookups by content (`a.yaml === b.yaml`,
+   * value equality on primitive strings). Reassigning to the
+   * same string instance hits the V8 pointer-equality fast path
+   * for an O(1) cache hit; reconstructing a fresh string with
+   * identical content (template literal, `String(...)`, JSON
+   * round-trip) still hits but pays a single byte-compare on
+   * the first call after the rebuild. A content change always
+   * misses and re-scans. Avoid per-render rebuilds when you can
+   * — they don't break correctness but they do cost the fast
+   * path.
    */
   @state()
   private _yaml = "";

@@ -24,32 +24,38 @@
  * already in use.
  */
 /**
- * Single-entry memo with reference-equality keys. The hot path
- * is the form re-rendering on every keystroke into the YAML
- * pane: the live `yaml` prop is a dependency of the pin and
+ * Single-entry memo for the YAML scans. The hot path is the
+ * form re-rendering on every keystroke into the YAML pane:
+ * the live `yaml` prop is a dependency of the pin and
  * id-reference renderers, and the section editor's exclude
  * range / domain are stable across that same edit window — so
- * a paste-then-type workflow gets cache hits on every keystroke.
+ * a paste-then-type workflow gets cache hits on every
+ * keystroke.
  *
- * Reference equality on `yaml` rather than a composite-string
- * key: the parent (`pages/device.ts::_yaml`) only reassigns
- * the string when the user types, so identical reads share
- * the same identity. A composite-string key would itself be
- * O(N) to build on every call — defeating most of the point.
+ * Key comparison uses `a.yaml === b.yaml` directly, which on
+ * primitive strings is value equality, not reference identity.
+ * In practice the parent (`pages/device.ts::_yaml`) hands us
+ * the same string instance until the user types, so V8's
+ * `===` short-circuits via pointer equality — O(1) on the
+ * cache-hit path. When the content differs, length / hash
+ * checks short-circuit before any byte-compare. Only an
+ * unusual shape (two distinct strings with identical content)
+ * would force the O(N) byte-compare; the typical render cycle
+ * doesn't produce that.
  *
- * **Load-bearing:** `pages/device.ts` must keep `_yaml`'s
- * string identity stable across renders that don't change the
- * content. If a future refactor reconstructs the string each
- * render (template literal, `String(...)`, JSON round-trip),
- * every call becomes a cache miss and the optimisation
- * silently degrades to a no-op.
+ * The cache is content-keyed: a refactor that constructs a
+ * fresh string per render with the same content still hits
+ * (modulo the byte-compare cost noted above), and a content
+ * change misses regardless of identity. So the contract
+ * here is "same content → same cached result", and consumers
+ * of `_yaml` don't need to preserve string identity for
+ * correctness — only for the O(1) fast path.
  *
  * Wrapping the state in a small factory keeps the reset list
- * (`_clearScanMemos`) single-source — adding a third memo just
- * means a new `createScanMemo<K, V>()` line, not editing two
- * places.
- */
-/**
+ * (`_clearScanMemos`) single-source — adding a third memo
+ * just means a new `createScanMemo<K, V>(equals)` line, not
+ * editing two places.
+ *
  * `equals` is bound at factory time, not per-call: a single
  * `pinMemo` always uses one key-equality contract, so a future
  * caller can't silently flip cache semantics by passing a
@@ -61,6 +67,8 @@
  * as a legitimate cache key, which is fine because both memos
  * here use object keys; primitive-keyed memos that wanted to
  * cache `undefined` would need a different shape.
+ */
+/**
  */
 function createScanMemo<K, V>(equals: (a: K, b: K) => boolean) {
   let key: K | undefined;

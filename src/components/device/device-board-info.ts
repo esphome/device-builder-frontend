@@ -111,9 +111,15 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     // to run anyway — no extra paint, no recursion. A separate
     // `requestAnimationFrame` would just delay the effect.
     if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
-      if (this._reloadTimer) clearTimeout(this._reloadTimer);
+      if (this._reloadTimer) {
+        clearTimeout(this._reloadTimer);
+        this._reloadTimer = null;
+      }
       const prev = changedProperties.get("yaml") as string | undefined;
       if (isEmptyToPopulatedYamlChange(prev, this.yaml)) {
+        // Synchronous bypass: no timer to track, leave
+        // `_reloadTimer` at its just-cleared `null` so the
+        // "null means no timer" invariant holds.
         this._sectionConfig.reload();
       } else {
         this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
