@@ -200,6 +200,103 @@ describe("getTriggerKeys", () => {
     const triggers = await getTriggerKeys(makeApi() as never, "plain", "plain");
     expect(triggers).toEqual([]);
   });
+
+  it("follows the extends chain into a sibling bundle", async () => {
+    // Mirrors the live shape: ``gpio.binary_sensor.CONFIG_SCHEMA``
+    // extends ``binary_sensor._BINARY_SENSOR_SCHEMA``, where the
+    // shared triggers (``on_press`` / ``on_release`` / etc.)
+    // actually live. ``getTriggerKeys`` should follow that chain
+    // and surface the triggers even though they're not local to
+    // ``gpio.binary_sensor``.
+    const GPIO_BUNDLE = {
+      "gpio.binary_sensor": {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: {
+              extends: ["binary_sensor._BINARY_SENSOR_SCHEMA"],
+              config_vars: { pin: { type: "pin" } },
+            },
+          },
+        },
+      },
+    };
+    const BINARY_SENSOR_BUNDLE = {
+      binary_sensor: {
+        schemas: {
+          _BINARY_SENSOR_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                on_press: { type: "trigger", docs: "Pressed" },
+                on_release: { type: "trigger" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.includes("gpio.json"))
+        return new Response(JSON.stringify(GPIO_BUNDLE), { status: 200 });
+      if (url.includes("binary_sensor.json"))
+        return new Response(JSON.stringify(BINARY_SENSOR_BUNDLE), {
+          status: 200,
+        });
+      throw new Error(`unexpected ${url}`);
+    });
+    const triggers = await getTriggerKeys(
+      makeApi() as never,
+      "gpio",
+      "gpio.binary_sensor",
+    );
+    expect(triggers.map((t) => t.key).sort()).toEqual([
+      "on_press",
+      "on_release",
+    ]);
+    expect(triggers.find((t) => t.key === "on_press")?.docs).toBe("Pressed");
+  });
+
+  it("dedupes triggers across the extends chain", async () => {
+    // Local override + parent schema both declare ``on_state``;
+    // surface only one entry (local wins, since we add it first).
+    const BUNDLE = {
+      child: {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: {
+              extends: ["child._BASE"],
+              config_vars: {
+                on_state: { type: "trigger", docs: "child" },
+              },
+            },
+          },
+          _BASE: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                on_state: { type: "trigger", docs: "parent" },
+                on_value: { type: "trigger" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const triggers = await getTriggerKeys(
+      makeApi() as never,
+      "child",
+      "child",
+    );
+    expect(triggers.map((t) => t.key).sort()).toEqual(["on_state", "on_value"]);
+    expect(triggers.find((t) => t.key === "on_state")?.docs).toBe("child");
+  });
 });
 
 const LOGGER_BUNDLE = {

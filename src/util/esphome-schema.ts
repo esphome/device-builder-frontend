@@ -226,28 +226,92 @@ export function fetchBundle(
 }
 
 /**
- * Read the trigger keys (``on_boot``, ``on_press``, …) declared on
- * a component's ``CONFIG_SCHEMA``. Returns an empty array if the
- * schema fails to load or the component has no trigger config-vars.
+ * Read the trigger keys (``on_boot``, ``on_press``, …) for a
+ * component. Walks the schema's ``extends`` chain so triggers
+ * inherited from a shared parent schema (e.g.
+ * ``binary_sensor._BINARY_SENSOR_SCHEMA``, where the GPIO/template/
+ * etc. binary_sensor implementations all pick up ``on_press`` /
+ * ``on_release`` / etc. from) are surfaced too.
+ *
+ * Returns an empty array if every fetch fails or no triggers are
+ * found.
  */
 export async function getTriggerKeys(
   api: ESPHomeAPI,
   bundleName: string,
   componentKey: string,
 ): Promise<{ key: string; docs?: string }[]> {
-  const bundle = await fetchBundle(api, bundleName);
-  if (!bundle) return [];
-  const component = bundle[componentKey];
-  if (!component) return [];
-  const schema = (component as SchemaComponent).schemas?.CONFIG_SCHEMA?.schema;
-  if (!schema?.config_vars) return [];
   const out: { key: string; docs?: string }[] = [];
-  for (const [key, cv] of Object.entries(schema.config_vars)) {
-    if (cv && cv.type === "trigger") {
-      out.push({ key, docs: cv.docs });
+  const seen = new Set<string>();
+  await collectTriggers(
+    api,
+    bundleName,
+    componentKey,
+    "CONFIG_SCHEMA",
+    out,
+    seen,
+    new Set(),
+  );
+  return out;
+}
+
+/**
+ * Recursive trigger collector. ``visited`` short-circuits cycles
+ * (mutual ``extends``) and shared parents reached more than once.
+ * ``seenKeys`` dedupes triggers by name across the whole walk so
+ * a child that overrides a parent's ``on_state`` doesn't yield it
+ * twice.
+ */
+async function collectTriggers(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  schemaName: string,
+  out: { key: string; docs?: string }[],
+  seenKeys: Set<string>,
+  visited: Set<string>,
+): Promise<void> {
+  const visitKey = `${bundleName}|${componentKey}|${schemaName}`;
+  if (visited.has(visitKey)) return;
+  visited.add(visitKey);
+
+  const bundle = await fetchBundle(api, bundleName);
+  if (!bundle) return;
+  const component = bundle[componentKey];
+  if (!component) return;
+  const cv = (component as SchemaComponent).schemas?.[schemaName];
+  if (!cv || typeof cv !== "object") return;
+  const schema = (cv as SchemaConfigVarSchema).schema;
+  if (!schema) return;
+
+  for (const [key, varDecl] of Object.entries(schema.config_vars ?? {})) {
+    if (varDecl?.type === "trigger" && !seenKeys.has(key)) {
+      seenKeys.add(key);
+      out.push({ key, docs: varDecl.docs });
     }
   }
-  return out;
+
+  // ``extends`` references take two shapes:
+  //   ``<bundle>.<schemaName>``   — e.g. ``binary_sensor._BINARY_SENSOR_SCHEMA``
+  //   ``<bundle>.<comp>.<schemaName>`` — e.g.
+  //                                ``gpio.binary_sensor.SOMETHING``
+  // The legacy ``getExtendedConfigVar`` parses them by part-count.
+  for (const ext of schema.extends ?? []) {
+    const parts = ext.split(".");
+    if (parts.length === 2) {
+      await collectTriggers(api, parts[0], parts[0], parts[1], out, seenKeys, visited);
+    } else if (parts.length === 3) {
+      await collectTriggers(
+        api,
+        parts[0],
+        `${parts[0]}.${parts[1]}`,
+        parts[2],
+        out,
+        seenKeys,
+        visited,
+      );
+    }
+  }
 }
 
 export interface SchemaAction {

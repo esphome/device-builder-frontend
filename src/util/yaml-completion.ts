@@ -371,15 +371,19 @@ function actionToCompletion(a: SchemaAction): Completion {
  * ``platform: gpio`` sibling, …) to the schema-bundle filename and
  * the component key inside that bundle.
  *
- * The earlier version rejected anything not in the local catalog
- * to avoid 404 storms — but the catalog doesn't always carry
- * bare-domain entries (``binary_sensor`` itself isn't a
- * platform), and rejecting them here meant trigger lookup never
- * fired for legitimate platform-style blocks. With the AST giving
- * us a structurally-correct ``topLevelKey`` (no more
- * ``platform``-keyword false-positives) and the schema fetcher
- * permanent-caching 404s, it's safe to attempt every name and
- * let the host say yes/no — once.
+ * The schema host's bundle layout is *implementation-keyed*, not
+ * domain-keyed:
+ *   - ``binary_sensor.json`` carries only ``binary_sensor`` (the
+ *     domain — its shared ``_BINARY_SENSOR_SCHEMA`` plus the
+ *     condition / filter registries).
+ *   - ``gpio.json`` carries the per-domain implementations:
+ *     ``gpio.binary_sensor``, ``gpio.switch``, ``gpio.output``…
+ *
+ * So the correct lookup for ``binary_sensor: - platform: gpio``
+ * is bundle ``gpio``, component ``gpio.binary_sensor``. Domain-
+ * shared triggers (``on_press``, ``on_release``, …) live inside
+ * the ``_BINARY_SENSOR_SCHEMA`` referenced by the platform's
+ * ``extends`` chain — ``getTriggerKeys`` follows that chain.
  */
 function bundleFor(
   topLevelKey: string,
@@ -387,8 +391,8 @@ function bundleFor(
 ): { bundle: string; componentKey: string } {
   return platformValue
     ? {
-        bundle: topLevelKey,
-        componentKey: `${topLevelKey}.${platformValue}`,
+        bundle: platformValue,
+        componentKey: `${platformValue}.${topLevelKey}`,
       }
     : { bundle: topLevelKey, componentKey: topLevelKey };
 }
@@ -541,11 +545,19 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
 
     const catalog = await loadCatalog(api);
 
-    // Top-level (column 0) → component IDs.
+    // Top-level (column 0) → bare domain / component names. The
+    // catalog carries every platform implementation as a dotted id
+    // (``binary_sensor.gpio``, ``binary_sensor.apds9960``, …); those
+    // belong INSIDE a ``binary_sensor:`` block as platform values,
+    // not as top-level YAML keys. Filter to non-dotted ids so the
+    // top-level completion shows ``binary_sensor`` / ``wifi`` /
+    // ``logger`` / … only.
     if (indent === 0) {
       return {
         from: keyFrom,
-        options: catalog.components.map(componentToCompletion),
+        options: catalog.components
+          .filter((c) => !c.id.includes("."))
+          .map(componentToCompletion),
         validFor: RE_KEY,
       };
     }
