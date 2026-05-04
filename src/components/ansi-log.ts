@@ -6,7 +6,7 @@
  */
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import { ansiLogTheme } from "../styles/ansi-log-theme.js";
+import { ansiLogThemes } from "../styles/ansi-log/index.js";
 
 /**
  * ANSI 4-bit color palette as CSS variable references — concrete
@@ -237,10 +237,11 @@ export class ESPHomeAnsiLog extends LitElement {
   private _container!: HTMLDivElement;
 
   static styles = [
-    /* Theme-aware ANSI palette + log surface variables — see
-       ../styles/ansi-log-theme.ts for the full palette and the
-       light-vs-dark rationale. */
-    ansiLogTheme,
+    /* Theme-aware ANSI palette + log surface variables. Each theme
+       lives in its own sibling file under ../styles/ansi-log/ —
+       add `<theme>.ts` + a host-attribute property to extend.
+       Dark must come first; light/etc. override its baseline. */
+    ...ansiLogThemes,
     css`
       :host {
         display: block;
