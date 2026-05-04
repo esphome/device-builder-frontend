@@ -366,6 +366,32 @@ export class ESPHomePageDashboard extends LitElement {
     return sorted;
   }
 
+  /** Configurations currently visible to the user given the active
+   *  view and search query. Card view applies the filter inline; table
+   *  view delegates so the broader column-aware filter is honored. The
+   *  floating select-bar uses this so "Select all" matches what's on
+   *  screen instead of selecting filtered-out devices. */
+  private _currentlyVisibleConfigurations(): string[] {
+    if (this._view === DashboardView.TABLE) {
+      const table = this.shadowRoot?.querySelector("esphome-device-table") as
+        | (HTMLElement & { getVisibleConfigurations?: () => string[] })
+        | null;
+      if (table?.getVisibleConfigurations) {
+        return table.getVisibleConfigurations();
+      }
+    }
+    const q = this._search.trim().toLowerCase();
+    const sorted = this._sortedDevices;
+    const filtered = q
+      ? sorted.filter(
+          (d) =>
+            (d.friendly_name || d.name).toLowerCase().includes(q) ||
+            d.configuration.toLowerCase().includes(q)
+        )
+      : sorted;
+    return filtered.map((d) => d.configuration);
+  }
+
   private get _visibleImportableDevices(): AdoptableDevice[] {
     /* Hide ignored discoveries by default — the user already said
        "don't show me this", so a fresh page load shouldn't put them
@@ -614,8 +640,8 @@ export class ESPHomePageDashboard extends LitElement {
         @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
           this._showJobProgress(e.detail)}
         @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
-        @select-all=${() => {
-          this._selectedDevices = new Set(this._devices.map((d) => d.configuration));
+        @select-all=${(e: CustomEvent<string[]>) => {
+          this._selectedDevices = new Set(e.detail);
         }}
         @deselect-all=${() => {
           this._selectedDevices = new Set();
@@ -736,7 +762,7 @@ export class ESPHomePageDashboard extends LitElement {
           selected-count=${this._selectedDevices.size}
           total-count=${this._devices.length}
           @select-all=${() => {
-            this._selectedDevices = new Set(this._devices.map((d) => d.configuration));
+            this._selectedDevices = new Set(this._currentlyVisibleConfigurations());
           }}
           @deselect-all=${() => {
             this._selectedDevices = new Set();
