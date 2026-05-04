@@ -7,21 +7,31 @@ import {
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
 
-/** 1-indexed line of the first list-item dash following
+/** 1-indexed line of the *n*th (1-based) list-item dash following
  *  `parent:` in `yaml`. Section-editor callers pass that line as
- *  `fromLine`; resolving it here keeps the tests robust to
- *  layout edits (e.g. a leading comment line shifting
- *  positions). Reuses the parser's `LIST_ITEM_START_RE` directly
- *  so a future tightening there can't silently let the test
- *  helper drift to a different definition of "list item". */
-function firstListItemLine(yaml: string, parent: string): number {
+ *  `fromLine`; resolving it here keeps tests robust to layout
+ *  edits. Reuses the parser's `LIST_ITEM_START_RE` directly so
+ *  a future tightening there can't silently let the test helper
+ *  drift to a different definition of "list item". */
+function nthListItemLine(
+  yaml: string,
+  parent: string,
+  n: number,
+): number {
   const lines = yaml.split("\n");
   const start = findSectionStart(lines, parent);
+  let count = 0;
   for (let i = start + 1; i < lines.length; i++) {
-    if (LIST_ITEM_START_RE.test(lines[i])) return i + 1;
+    if (LIST_ITEM_START_RE.test(lines[i])) {
+      count++;
+      if (count === n) return i + 1;
+    }
   }
-  throw new Error(`no list-item dash under ${parent}: in test fixture`);
+  throw new Error(`fewer than ${n} list-item dashes under ${parent}: in fixture`);
 }
+
+const firstListItemLine = (yaml: string, parent: string): number =>
+  nthListItemLine(yaml, parent, 1);
 
 describe("parseYamlSectionValues — prototype pollution defense", () => {
   // YAML keys like `__proto__` / `constructor` / `prototype`
@@ -351,24 +361,10 @@ describe("removeSectionFromYaml — multi-item list", () => {
     // leave `ota.esphome` alone. The pre-fix code path
     // routed through a stale yaml fetch and clipped the
     // wrong item.
-    const lines = multiItemOta.split("\n");
-    const start = findSectionStart(lines, "ota");
-    let secondDashIdx = -1;
-    let dashCount = 0;
-    for (let i = start + 1; i < lines.length; i++) {
-      if (LIST_ITEM_START_RE.test(lines[i])) {
-        dashCount++;
-        if (dashCount === 2) {
-          secondDashIdx = i;
-          break;
-        }
-      }
-    }
-    expect(secondDashIdx).toBeGreaterThan(0);
     const after = removeSectionFromYaml(
       multiItemOta,
       "ota.web_server",
-      secondDashIdx + 1, // 1-indexed
+      nthListItemLine(multiItemOta, "ota", 2),
     );
     expect(after).not.toContain("- platform: web_server");
     // The first item and its sibling field survive.
@@ -382,8 +378,10 @@ describe("removeSectionFromYaml — multi-item list", () => {
     const after = removeSectionFromYaml(before, "ota.esphome", fromLine);
     // Empty-parent cleanup kicks in: the bare `ota:` left
     // behind would be invalid ESPHome, so the parent goes
-    // too.
-    expect(after).not.toContain("ota");
+    // too. Anchor `ota:` to the line start so a fixture that
+    // happened to mention `ota` elsewhere (e.g. inside a
+    // value or comment) wouldn't trip a false positive.
+    expect(after).not.toMatch(/^ota:/m);
     expect(after).not.toContain("platform: esphome");
   });
 });

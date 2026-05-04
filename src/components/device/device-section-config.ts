@@ -194,10 +194,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   /** Reload config from the live YAML if the form has no unsaved
-   *  changes. `device-board-info` debounces this against `yaml`
-   *  prop changes so paste / external mutations re-seed a clean
-   *  form (and skip mid-edit reloads to avoid clobbering unsaved
-   *  field changes). */
+   *  changes. The canonical caller is `device-board-info`'s
+   *  `updated()` hook (`device-board-info.ts`, `_reloadTimer`),
+   *  which debounces this against `yaml` prop changes so paste /
+   *  external mutations re-seed a clean form. The dirty-check
+   *  here keeps mid-edit reloads from clobbering unsaved field
+   *  changes — board-info delegates the gating to us. */
   public reload() {
     if (!this._dirty && this.sectionKey && this.configuration) {
       this._loadConfig();
@@ -430,8 +432,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     if (!this._config) return;
     // Defensive: same rationale as `_onSave` — without `this.yaml`
     // the splice produces `""` and the parent would commit empty
-    // YAML, clobbering the entire config.
-    if (!this.yaml) return;
+    // YAML, clobbering the entire config. Surface the failure
+    // rather than silently no-op'ing.
+    if (!this.yaml) {
+      this._error = "Internal error: section editor missing yaml prop";
+      return;
+    }
     this._deleting = true;
     this._error = "";
     const title = this._config.title;
@@ -542,8 +548,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // Defensive: bail early if the parent forgot to wire the
     // `yaml` prop. Without this, `updateSectionInYaml("", ...)`
     // would emit `""` and the parent's `updateConfig` call would
-    // silently clobber the device's entire config.
-    if (!this.yaml) return;
+    // silently clobber the device's entire config. Surface a
+    // visible error too so the failure isn't a silent no-op
+    // when a future parent regresses.
+    if (!this.yaml) {
+      this._error = "Internal error: section editor missing yaml prop";
+      return;
+    }
     const errors = validateEntries(
       this._config.entries,
       this._values,

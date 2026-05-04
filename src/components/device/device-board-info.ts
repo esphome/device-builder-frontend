@@ -97,8 +97,12 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   private _reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   updated(changedProperties: Map<string, unknown>) {
+    // Canonical yaml-watcher for the section editor. Debounce so
+    // typing in the YAML editor pane doesn't spam the schema
+    // fetch every keystroke; section-config's `reload()` itself
+    // gates on `!_dirty` so mid-edit pastes don't clobber the
+    // form.
     if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
-      // Debounce reload so typing in the YAML editor doesn't spam the API
       if (this._reloadTimer) clearTimeout(this._reloadTimer);
       this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
     }
