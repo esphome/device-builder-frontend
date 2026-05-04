@@ -233,20 +233,22 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       }
 
       /* The expanded address form is a separate card directly
-         below the OTA row — same border-radius, slightly inset
-         on the left so it visually associates with the OTA row's
-         affordance without inheriting the .option class's
-         flex-row + align-items: center (which would re-center
-         the form's contents and clip its width). */
+         below the OTA row, sized to match it: full row width
+         (no left-inset) and the same default surface background
+         so the dialog reads as a uniform list of options + the
+         option's own expanded panel. Same border + radius as
+         the .option rule to preserve the visual rhythm.
+         A standalone wrapper rather than reusing the .option
+         class so we don't inherit .option's flex-row +
+         align-items: center, which would re-center the form's
+         contents and clip its width. */
       .ota-form {
-        margin-left: 56px;
         padding: var(--wa-space-m);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-l);
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-xs);
-        background: var(--wa-color-surface-lowered);
       }
 
       .ota-form label {
