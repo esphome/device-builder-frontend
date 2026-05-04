@@ -79,9 +79,24 @@ export function categorizeSections(sections: YamlSection[]): CategorizedSections
   return { core, components, automations };
 }
 
-function _isBlankOrComment(line: string): boolean {
-  const trimmed = line.trim();
-  return trimmed === "" || trimmed.startsWith("#");
+/**
+ * Trim predicate: true for blank lines and unindented (top-level)
+ * comments that act as banners between sections. INDENTED comments
+ * are treated as content of the surrounding section — a config like
+ *
+ *     wifi:
+ *       ssid: x
+ *       # password set via secrets
+ *
+ * has the trailing comment as part of `wifi:`, so dropping it from
+ * the section's range would mis-locate the user-visible content.
+ * Only top-level `#` lines decorate the next section.
+ */
+function _isBlankOrBannerComment(line: string): boolean {
+  if (line.trim() === "") return true;
+  // A banner comment starts at column 0 — any leading whitespace
+  // means it belongs to the surrounding indented block.
+  return line.startsWith("#");
 }
 
 /**
@@ -109,7 +124,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
         const prev = rawSections[rawSections.length - 1];
         const prevStart = prev.fromLine - 1; // 0-indexed
         let endIdx = i - 1;
-        while (endIdx > prevStart && _isBlankOrComment(lines[endIdx])) {
+        while (endIdx > prevStart && _isBlankOrBannerComment(lines[endIdx])) {
           endIdx--;
         }
         prev.toLine = endIdx + 1;
@@ -133,7 +148,7 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
     // Drop the conventional trailing newline-empty-string before
     // the trim loop so we don't double-count it.
     if (endIdx >= 0 && lines[endIdx] === "") endIdx--;
-    while (endIdx > lastStart && _isBlankOrComment(lines[endIdx])) {
+    while (endIdx > lastStart && _isBlankOrBannerComment(lines[endIdx])) {
       endIdx--;
     }
     last.toLine = endIdx + 1;

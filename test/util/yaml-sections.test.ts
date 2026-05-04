@@ -95,6 +95,37 @@ wifi:
     expect(sections[0].toLine).toBe(2);
   });
 
+  it("keeps indented trailing comments as part of the section", () => {
+    // An indented comment after a section's last setting is content
+    // for that section (`# password via secrets` documenting the
+    // wifi block); only top-level banner comments decorate the
+    // *next* section. Without this distinction the trim would chop
+    // the explanatory comment off `wifi:` and the navigator would
+    // mis-locate the user-visible content.
+    const yaml = [
+      "wifi:",
+      "  ssid: x",
+      "  # password set via secrets",
+      "esphome:",
+      "  name: y",
+      "",
+    ].join("\n");
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections.map((s) => s.toLine)).toEqual([3, 5]);
+  });
+
+  it("keeps indented trailing comments as part of the final section", () => {
+    const yaml = [
+      "wifi:",
+      "  ssid: x",
+      "  # last note",
+      "",
+    ].join("\n");
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].toLine).toBe(3);
+  });
+
   it("preserves blank lines that fall mid-section", () => {
     // Defensive: an internal blank or comment line shouldn't be
     // mistaken for trailing decoration. Only blank/comment runs
