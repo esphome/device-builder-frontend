@@ -374,13 +374,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   private _onComponentSelected(e: CustomEvent<{ component: ComponentCatalogEntry }>) {
-    console.log(
-      "[ADD-DEBUG] _onComponentSelected",
-      "newComp:", e.detail.component?.id,
-      "wasSelected:", this._selected?.id,
-      "returnTo:", this._returnTo?.id,
-      "bundleQueueLen:", this._bundleQueue.length,
-    );
     e.stopPropagation();
     this._selected = e.detail.component;
     this._submitError = "";
@@ -477,12 +470,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
    * finish adding the dependency.
    */
   private async _onNavigateToDep(e: CustomEvent<{ domain: string }>) {
-    console.log(
-      "[ADD-DEBUG] _onNavigateToDep",
-      "domain:", e.detail.domain,
-      "wasSelected:", this._selected?.id,
-      "submitting:", this._submitting,
-    );
     e.stopPropagation();
     if (this._submitting) return;
     const { domain } = e.detail;
@@ -497,40 +484,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   private async _onFormSubmit(e: CustomEvent<{ fields: Record<string, unknown> }>) {
-    console.log(
-      "[ADD-DEBUG] dialog._onFormSubmit ENTER",
-      "selected:", this._selected?.id,
-      "config:", JSON.stringify(this.configuration),
-      "submitting:", this._submitting,
-      "returnTo:", this._returnTo?.id,
-      "bundleQueueLen:", this._bundleQueue.length,
-      "fields:", JSON.stringify(e.detail.fields),
-    );
     e.stopPropagation();
-    if (!this._selected || !this.configuration || this._submitting) {
-      console.warn(
-        "[ADD-DEBUG] dialog._onFormSubmit BAIL on guard",
-        "selected:", this._selected,
-        "configuration:", this.configuration,
-        "submitting:", this._submitting,
-      );
-      return;
-    }
+    if (!this._selected || !this.configuration || this._submitting) return;
     this._submitting = true;
     this._submitError = "";
     try {
-      console.log(
-        "[ADD-DEBUG] calling api.addComponent",
-        "configuration:", this.configuration,
-        "component_id:", this._selected.id,
-      );
       const { yaml } = await this._api.addComponent(this.configuration, {
         component_id: this._selected.id,
         fields: e.detail.fields,
       });
-      console.log(
-        "[ADD-DEBUG] api.addComponent RESOLVED, yamlLen:", yaml?.length,
-      );
 
       // Notify the host so the page re-fetches / re-renders with the
       // new YAML. We dispatch this BEFORE deciding whether to close —
@@ -645,27 +607,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this._resetDetourState();
       }
     } catch (err) {
-      console.error(
-        "[ADD-DEBUG] dialog._onFormSubmit CAUGHT error",
-        "name:", (err as Error)?.name,
-        "message:", (err as Error)?.message,
-        "stack:", (err as Error)?.stack,
-        "raw:", err,
-      );
       this._submitError = err instanceof Error
         ? err.message
         : this._localize("device.add_component_error");
-      console.log(
-        "[ADD-DEBUG] dialog._submitError set to:",
-        JSON.stringify(this._submitError),
-      );
     } finally {
-      console.log(
-        "[ADD-DEBUG] dialog._onFormSubmit FINALLY",
-        "submitError:", JSON.stringify(this._submitError),
-        "selected:", this._selected?.id,
-        "returnTo:", this._returnTo?.id,
-      );
       this._submitting = false;
     }
   }

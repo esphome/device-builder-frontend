@@ -685,31 +685,10 @@ export class ESPHomeAPI {
       fields?: Record<string, unknown>;
     }
   ): Promise<AddComponentResponse> {
-    console.log(
-      "[ADD-DEBUG] api.addComponent ENTER",
-      "configuration:", configuration,
-      "component_id:", args.component_id,
-      "fields:", JSON.stringify(args.fields),
-    );
-    try {
-      const r = await this.sendCommand<AddComponentResponse>(
-        "devices/add_component",
-        { configuration, ...args },
-      );
-      console.log(
-        "[ADD-DEBUG] api.addComponent OK",
-        "yamlLen:", r.yaml?.length,
-      );
-      return r;
-    } catch (err) {
-      console.error(
-        "[ADD-DEBUG] api.addComponent THREW",
-        "name:", (err as Error)?.name,
-        "message:", (err as Error)?.message,
-        "raw:", err,
-      );
-      throw err;
-    }
+    return this.sendCommand<AddComponentResponse>("devices/add_component", {
+      configuration,
+      ...args,
+    });
   }
 
   /** Import/adopt a discovered device. */

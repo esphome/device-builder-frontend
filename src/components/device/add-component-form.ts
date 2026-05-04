@@ -161,16 +161,6 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
-    if (changedProperties.size > 0) {
-      console.log(
-        "[ADD-DEBUG] form.willUpdate",
-        "changed:", [...changedProperties.keys()],
-        "comp:", this.component?.id,
-        "submitting:", this.submitting,
-        "prefill:", this.prefillReference,
-        "initialized:", this._initialized,
-      );
-    }
     // Initialize the form values once we have both `component` and
     // (if applicable) `prefillReference` set. We can't do this in
     // `connectedCallback` because Lit applies property bindings as
@@ -182,10 +172,6 @@ export class ESPHomeAddComponentForm extends LitElement {
       if (this.component) {
         this._initialized = true;
         this._initValues();
-        console.log(
-          "[ADD-DEBUG] form._initValues done",
-          "values:", JSON.stringify(this._values),
-        );
         // Reset block message on retarget — without this, a "submit
         // bailed" notice from the previous component (in the dep-flow
         // detour the form gets reused for) would leak into the next
@@ -599,45 +585,27 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onSubmit() {
-    console.log(
-      "[ADD-DEBUG] form._onSubmit ENTER",
-      "comp:", this.component?.id,
-      "deps:", this.component?.dependencies,
-      "values:", JSON.stringify(this._values),
-      "yamlLen:", this.yaml?.length,
-      "submitting:", this.submitting,
-      "errorsBefore:", [...this._errors.entries()],
-    );
     // Reset the local block message at the top of every submit
     // attempt so a stale notice from a previous click can't render
     // alongside a fresh result. Both bail paths below set their
     // own message; the success path leaves it cleared.
     this._localBlockMessage = "";
     const presentComponents = parseTopLevelComponents(this.yaml);
-    console.log(
-      "[ADD-DEBUG] presentComponents:",
-      [...presentComponents],
-    );
     // Block submit when there are missing top-level dependencies.
     // The button should already be disabled in that case, but defend
     // here too in case the YAML changed under us between renders.
     const missingDeps = (this.component.dependencies ?? []).filter(
       (d) => !presentComponents.has(d),
     );
-    console.log("[ADD-DEBUG] missingDeps:", missingDeps);
     if (missingDeps.length > 0) {
-      console.warn(
-        "[ADD-DEBUG] BAIL: missingDeps non-empty",
-        missingDeps,
-      );
       // Should be unreachable — the button-disabled predicate uses the
       // same check. If we get here, the YAML changed under us between
-      // renders. Surface a visible message instead of returning silently
-      // so the user (and #issues) can identify the dead-button state.
-      this._localBlockMessage = this._localize(
+      // renders. Surface a visible message that names the missing
+      // domain(s) so the user can act, instead of returning silently.
+      this._localBlockMessage = `${this._localize(
         "device.missing_dependencies_title",
         { name: this.component.name },
-      );
+      )} (${missingDeps.join(", ")})`;
       return;
     }
 
@@ -648,67 +616,22 @@ export class ESPHomeAddComponentForm extends LitElement {
       this._values,
       presentComponents,
     );
-    const errorList = [...errors.entries()].map(([k, e]) => ({
-      key: k,
-      code: e.code,
-      params: e.params,
-    }));
-    console.log(
-      "[ADD-DEBUG] validation errors size=", errors.size,
-      "list:", JSON.stringify(errorList),
-    );
     if (errors.size > 0) {
       this._errors = errors;
       const visible = this._anyErrorIsVisible(errors, presentComponents);
-      // Also log the rendered-paths set so we can see what the
-      // visibility heuristic considered "renderable".
-      const rendered = new Set<string>();
-      this._collectRenderedPaths(
-        this.component.config_entries,
-        this._values,
-        presentComponents,
-        [],
-        rendered,
-      );
-      console.warn(
-        "[ADD-DEBUG] BAIL: validation errors",
-        "errors:", JSON.stringify(errorList),
-        "renderedPaths:", JSON.stringify([...rendered]),
-        "anyVisible:", visible,
-      );
-      // Per-error breakdown: which entry (and its required/advanced/
-      // hidden flags) the error key matches in the schema.
-      for (const errKey of errors.keys()) {
-        const top = errKey.split(".")[0];
-        const entry = this.component.config_entries.find(
-          (e) => e.key === top,
-        );
-        console.warn(
-          "[ADD-DEBUG]   error",
-          "key:", errKey,
-          "topEntry:", entry
-            ? {
-                key: entry.key,
-                type: entry.type,
-                required: entry.required,
-                hidden: entry.hidden,
-                advanced: entry.advanced,
-                depends_on: entry.depends_on,
-                depends_on_component: entry.depends_on_component,
-                default_value: entry.default_value,
-              }
-            : "<not found in top-level entries>",
-        );
-      }
       if (!visible) {
-        // Name the offending field(s) + each one's validation code so
-        // the user can act on it instead of seeing a generic "Failed
-        // to add component" with no actionable detail.
+        // Hidden-validation case: every error key lands on an entry
+        // the user can't see in required-only mode (advanced or
+        // optional leaf). Use a dedicated locale key — distinct from
+        // the API-failure ``add_component_error`` so #issues triage
+        // can tell client-side validation blocks from server-side
+        // failures — and append the offending field names so the
+        // user can recover (e.g. report the field for a catalog fix).
         const summary = [...errors.entries()]
           .map(([key, err]) => `${key}: ${err.code}`)
           .join("; ");
         this._localBlockMessage = `${this._localize(
-          "device.add_component_error",
+          "device.add_component_hidden_validation_error",
         )} (${summary})`;
       }
       return;
@@ -720,10 +643,6 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.component.config_entries,
       this._values,
     );
-    console.log(
-      "[ADD-DEBUG] DISPATCHING form-submit",
-      "fields:", JSON.stringify(fields),
-    );
 
     this.dispatchEvent(
       new CustomEvent("form-submit", {
@@ -732,7 +651,6 @@ export class ESPHomeAddComponentForm extends LitElement {
         composed: true,
       }),
     );
-    console.log("[ADD-DEBUG] form._onSubmit returned (dispatch done)");
   }
 
   /**
