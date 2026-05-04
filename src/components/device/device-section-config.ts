@@ -305,13 +305,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       if (!component) {
         // Custom / external component the backend doesn't know
         // about. Synthesise a config with no entries so the
-        // existing YAML-only notice fires — the section-header's
-        // subtitle surfaces the `domain.platform` so the user
-        // knows which key the fallback applies to.
+        // existing YAML-only notice fires. We deliberately store
+        // `sectionKey` as the title rather than a localised
+        // "Custom component" label: the title flows into the
+        // delete confirm dialog and toast, so a generic label
+        // would make every prompt read the same when a device
+        // has multiple unknown sections. The header itself is
+        // re-localised live in render() — see _isUnknown branch.
         this._config = {
           section_key: this.sectionKey,
           section_type: "core",
-          title: this._localize("device.custom_component_title"),
+          title: this.sectionKey,
           description: "",
           docs_url: "",
           icon: "",
@@ -404,7 +408,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       <div class="section-header">
         <div class="section-header-info">
           <div class="section-header-title-row">
-            <h3 class="section-title">${this._config.title}</h3>
+            <h3 class="section-title">
+              ${this._isUnknown
+                ? this._localize("device.custom_component_title")
+                : this._config.title}
+            </h3>
             ${this._config.docs_url
               ? html`<a
                   class="docs-link"
