@@ -523,26 +523,37 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   /**
-   * Successful-install hand-off: hide this dialog (preserving the
-   * line buffer + success banner so the user can return via the
-   * logs dialog's Back button) and ask the host to open the logs
-   * dialog tailing the same configuration. The install ``port``
-   * carries through so server-serial installs become server-serial
-   * logs and OTA installs become network logs. */
-  private _flipToLogs() {
-    this._dialog.open = false;
-    this.dispatchEvent(
-      new CustomEvent("request-show-logs-after-install", {
-        bubbles: true,
-        composed: true,
-        detail: {
-          configuration: this.configuration,
-          name: this.name,
-          port: this._port,
-        },
-      })
-    );
-  }
+   * Successful-install hand-off: ask the host to open the logs
+   * dialog tailing the same configuration, and (only if a host
+   * acknowledged the request via ``preventDefault()``) hide this
+   * dialog so the logs dialog has the screen to itself. The
+   * install ``port`` carries through so server-serial installs
+   * become server-serial logs and OTA installs become network
+   * logs.
+   *
+   * The event is cancelable: contexts that don't mount a
+   * ``<esphome-logs-dialog>`` (e.g. ``firmware-jobs-dialog``,
+   * which mounts its own ``<esphome-command-dialog>`` for past
+   * job output but no logs viewer) leave the command dialog
+   * open instead of vanishing into nothing. Pages that DO wire
+   * the handoff call ``e.preventDefault()`` from
+   * ``handlePostInstallShowLogs`` to claim it. */
+  private _flipToLogs = () => {
+    const event = new CustomEvent("request-show-logs-after-install", {
+      bubbles: true,
+      composed: true,
+      cancelable: true,
+      detail: {
+        configuration: this.configuration,
+        name: this.name,
+        port: this._port,
+      },
+    });
+    /* ``dispatchEvent`` returns ``false`` iff a listener called
+       ``preventDefault()`` — i.e. a host claimed the handoff. */
+    const handled = !this.dispatchEvent(event);
+    if (handled) this._dialog.open = false;
+  };
 
   /**
    * Tear down the active stream subscription, both client-side

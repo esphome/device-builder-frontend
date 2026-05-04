@@ -15,6 +15,11 @@ export function handlePostInstallShowLogs(
   e: CustomEvent<{ configuration: string; name: string; port: string }>,
   logsDialog: ESPHomeLogsDialog
 ) {
+  /* Claim the cancelable handoff event — without this the source
+     command-dialog won't hide itself, which is the right default
+     for hosts that don't mount a logs dialog (firmware-jobs-dialog
+     etc.) but the wrong outcome here where we ARE handling it. */
+  e.preventDefault();
   const { configuration, name, port } = e.detail;
   logsDialog.configuration = configuration;
   logsDialog.name = name;

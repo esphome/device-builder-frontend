@@ -630,10 +630,15 @@ export class ESPHomeLogsDialog extends LitElement {
    * is set (post-install hand-off). Stops the live stream, closes
    * this dialog, and dispatches ``back-to-install`` so the host
    * can re-show the install dialog with its preserved buffer.
-   * The next time the user wants live logs they can re-open from
-   * the install dialog or the device card. */
-  private _onBackToInstall = () => {
-    this._stopStreaming();
+   *
+   * Awaits ``_stopStreaming`` so the backend log subprocess has
+   * actually torn down before the host can spawn a fresh logs
+   * stream from the same dialog. Without the await, a fast
+   * ``Back → Logs → Back → Logs`` toggle by the user could leave
+   * two backend log subscriptions running briefly, both pumping
+   * lines into the same buffer. */
+  private _onBackToInstall = async () => {
+    await this._stopStreaming();
     this._backToInstall = false;
     this._dialog.open = false;
     this.dispatchEvent(

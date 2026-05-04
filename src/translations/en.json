@@ -248,7 +248,7 @@
     "show_secrets_tooltip": "Reveal resolved !secret values in the validate output",
     "hide_secrets_tooltip": "Redact resolved !secret values back to <removed>",
     "show_logs_after_install": "Logs after",
-    "show_logs_after_install_tooltip": "After a successful install, automatically open device logs (like esphome run)",
+    "show_logs_after_install_tooltip": "Toggle whether to open device logs automatically after a successful install (like esphome run)",
     "show_logs": "Logs",
     "clean_success": "Build files cleaned.",
     "clean_failed": "Clean failed.",
