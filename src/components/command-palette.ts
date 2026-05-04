@@ -26,8 +26,8 @@ import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { TrailingEdgeDispatcher } from "../util/trailing-edge-dispatcher.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
+import { YamlSearchController } from "./yaml-search-controller.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -94,40 +94,18 @@ export class ESPHomeCommandPalette extends LitElement {
   @state() private _selectedId = "";
 
   /**
-   * Live YAML-content search results, fetched against
-   * ``yaml/search`` and re-fetched as the user types. ``null``
-   * means "haven't fetched yet for the current query"; an empty
-   * array means "fetched, no hits". The two states render
-   * differently in the dropdown.
+   * YAML-content search controller. Owns the hits / debounce
+   * timer / sequence number / TrailingEdgeDispatcher in one
+   * place so this class doesn't have to keep them in sync. The
+   * palette only ever reads ``_yamlSearch.hits`` and calls
+   * ``scheduleQuery`` / ``clear``.
+   *
+   * ``getApi`` is a callback so the ``@consume``-injected
+   * ``_api`` is read at call time — Lit fills that field after
+   * the initial property setup, so capturing it eagerly in the
+   * constructor would freeze a ``null`` reference.
    */
-  @state() private _yamlHits: YamlSearchHit[] | null = null;
-  /**
-   * Debounce timer for the ``yaml/search`` WS call. The user can
-   * type fast — debouncing collapses runs of keystrokes into a
-   * single round trip per pause. Long enough to skip every
-   * intermediate keystroke, short enough that a typed-and-paused
-   * query feels instant.
-   */
-  private _yamlSearchTimer: number | null = null;
-  /**
-   * Race-guard — only the most recent in-flight query gets to
-   * write back. Without this, a slow query that landed before a
-   * faster newer one could clobber the newer results when its
-   * promise finally resolved.
-   */
-  private _yamlSearchSeq = 0;
-  /**
-   * Concurrency-of-1 dispatcher with trailing-edge replay. The
-   * Python ``async with self._lock`` equivalent for the WS
-   * round-trip: at most one ``yaml/search`` runs at a time, and
-   * only the latest typed input survives across an in-flight
-   * window (so a typing storm collapses to "first + last" rather
-   * than "every keystroke"). Hides the running / pending
-   * bookkeeping behind a single ``dispatch(query)`` call.
-   */
-  private _yamlSearchDispatcher = new TrailingEdgeDispatcher<string>((q) =>
-    this._runYamlSearch(q)
-  );
+  private _yamlSearch = new YamlSearchController(this, () => this._api);
 
   @query(".search-input")
   private _searchInput?: HTMLInputElement;
@@ -169,7 +147,7 @@ export class ESPHomeCommandPalette extends LitElement {
     this._open = true;
     this._query = "";
     this._selectedId = "";
-    this._clearYamlSearchState();
+    this._yamlSearch.clear();
     requestAnimationFrame(() => this._searchInput?.focus());
   }
 
@@ -322,11 +300,12 @@ export class ESPHomeCommandPalette extends LitElement {
    * existing highlight machinery.
    */
   private _yamlHitActions(): CommandAction[] {
-    if (!this._yamlHits || this._yamlHits.length === 0) return [];
+    const hits = this._yamlSearch.hits;
+    if (!hits || hits.length === 0) return [];
     const t = this._localize;
     const groupName = t("command_palette.group_yaml_matches");
     const actions: CommandAction[] = [];
-    for (const hit of this._yamlHits) {
+    for (const hit of hits) {
       const label = hit.friendly_name || hit.device_name || hit.configuration;
       for (const match of hit.matches) {
         actions.push({
@@ -427,9 +406,7 @@ export class ESPHomeCommandPalette extends LitElement {
         </div>
         <div class="list" role="listbox">
           ${items.length === 0
-            ? html`<div class="empty">
-                ${this._localize("command_palette.no_results")}
-              </div>`
+            ? html`<div class="empty">${this._renderEmptyMessage()}</div>`
             : groups.map(
                 (g) => html`
                   <div class="group">
@@ -455,6 +432,29 @@ export class ESPHomeCommandPalette extends LitElement {
     `;
   }
 
+  /**
+   * Pick the right empty-state copy. Three cases:
+   *
+   * 1. YAML mode + non-empty query + ``_yamlSearch.hits === null`` →
+   *    "Searching…" — either the debounce hasn't fired yet or
+   *    a request is in flight, no results to show but more are
+   *    coming.
+   * 2. YAML mode + non-empty query + ``_yamlSearch.hits === []`` →
+   *    "No matches" — fetched, nothing matched the query.
+   * 3. Otherwise (command mode with a non-matching query, or
+   *    YAML mode with an empty body) → fall back to the generic
+   *    "No results found" copy.
+   */
+  private _renderEmptyMessage() {
+    if (this._isYamlMode && this._yamlQuery) {
+      if (this._yamlSearch.hits === null) {
+        return this._localize("command_palette.yaml_searching");
+      }
+      return this._localize("command_palette.yaml_no_matches");
+    }
+    return this._localize("command_palette.no_results");
+  }
+
   private _renderItem(item: CommandAction) {
     const selected = item.id === this._selectedId;
     return html`
@@ -473,7 +473,7 @@ export class ESPHomeCommandPalette extends LitElement {
 
   private _onQueryInput(e: Event) {
     this._query = (e.target as HTMLInputElement).value;
-    this._scheduleYamlSearch();
+    this._syncYamlSearch();
   }
 
   /**
@@ -491,73 +491,30 @@ export class ESPHomeCommandPalette extends LitElement {
     this._query = this._isYamlMode
       ? stripped
       : `${ESPHomeCommandPalette._YAML_PREFIX}${stripped}`;
-    this._scheduleYamlSearch();
+    this._syncYamlSearch();
     requestAnimationFrame(() => this._searchInput?.focus());
   };
 
   /**
-   * Debounce + fire a YAML-content search.
+   * Bridge the current query to the ``YamlSearchController``.
    *
-   * Only fires when the user explicitly requests YAML mode by
-   * prefixing the query with ``/``. The bare-query path stays a
-   * pure client-side filter so a typed-storm against the palette
-   * stays free of backend round trips.
-   *
-   * Empty / no-prefix / leading-slash-only queries clear the
-   * result list without round-tripping. Non-empty YAML queries
-   * fire after a short pause so the typed-and-paused case feels
-   * instant while a sustained typing storm only sends one search
-   * at the end.
+   * Called from every place ``_query`` mutates: typed input and
+   * the mode-toggle button. Out-of-mode and empty-body queries
+   * collapse to ``clear()``; non-empty YAML queries hand off to
+   * ``scheduleQuery``, which owns the 150ms debounce and the
+   * seq-guarded dispatch.
    */
-  private _scheduleYamlSearch() {
-    if (this._yamlSearchTimer !== null) {
-      window.clearTimeout(this._yamlSearchTimer);
-      this._yamlSearchTimer = null;
-    }
+  private _syncYamlSearch() {
     if (!this._isYamlMode) {
-      this._clearYamlSearchState();
+      this._yamlSearch.clear();
       return;
     }
     const body = this._yamlQuery;
     if (!body) {
-      this._clearYamlSearchState();
+      this._yamlSearch.clear();
       return;
     }
-    this._yamlSearchTimer = window.setTimeout(() => {
-      this._yamlSearchTimer = null;
-      this._yamlSearchDispatcher.dispatch(body);
-    }, 150);
-  }
-
-  /**
-   * Clear the YAML-search state — hits + pending input + bump the
-   * seq so any in-flight call no-ops on resolve. Called when the
-   * user drops out of YAML mode, clears the body of the YAML
-   * query, or reopens the palette. Doesn't cancel an already-
-   * running fetch (we can't abort the WS), but the seq-guard +
-   * dispatcher ``cancelPending`` ensure neither writes back into
-   * the cleared state.
-   */
-  private _clearYamlSearchState() {
-    this._yamlHits = null;
-    this._yamlSearchSeq++;
-    this._yamlSearchDispatcher.cancelPending();
-  }
-
-  private async _runYamlSearch(query: string) {
-    const seq = ++this._yamlSearchSeq;
-    try {
-      const hits = await this._api.searchYaml({ query });
-      // Drop stale responses — a slower in-flight call against
-      // an older query must not clobber newer results.
-      if (seq !== this._yamlSearchSeq) return;
-      this._yamlHits = hits;
-    } catch {
-      // Swallow: the dropdown shouldn't error-toast on a YAML
-      // search failure (transient WS hiccup, rejected request,
-      // whatever) — fall back to "no YAML hits" rendering.
-      if (seq === this._yamlSearchSeq) this._yamlHits = [];
-    }
+    this._yamlSearch.scheduleQuery(body);
   }
 
   private _onInputKeyDown(e: KeyboardEvent) {
