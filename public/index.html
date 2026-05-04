@@ -36,28 +36,37 @@
           worst-case loosening is letting an XSS load tracking
           pixels - acceptable for a local dashboard.
         * font-src data: - same data:-URI shape as the icons.
-        * connect-src 'self' ws: wss: data: - explicit connect-src
-          governs fetch / XHR / WebSocket / EventSource / Beacon
-          (default-src is NOT consulted once connect-src is set).
-          The dashboard's WS is always built same-origin
-          (api/esphome-api.ts: `${protocol}//${location.host}/ws`),
-          so 'self' alone would cover the default deployments
-          (port-6052 direct, ESPHome Desktop, HA add-on via
-          Ingress, single-hostname nginx reverse proxy). The
-          ws: / wss: openers are a deliberate compromise to keep
-          split-hostname proxy setups (ws.api.example.com +
-          dash.example.com) working without operator intervention -
-          those have been a recurring pain point on the legacy
-          dashboard. Trade-off: an XSS in our bundle could
-          exfiltrate via a WebSocket to an attacker origin. fetch
-          and XHR over http(s) stay restricted to 'self' by the
-          same connect-src rule (the ws:/wss:/data: scheme openers
-          don't widen the http(s) origin allowlist). data: is
-          needed because WebAwesome's icon resolver fetches MDI
-          path SVGs we register at runtime via fetch() against a
-          data: URI we build ourselves. Loud injection paths
-          stay blocked - script-src falls back to default-src
+        * connect-src 'self' ws: wss: data: https://schema.esphome.io
+          - explicit connect-src governs fetch / XHR / WebSocket /
+          EventSource / Beacon (default-src is NOT consulted once
+          connect-src is set). The dashboard's WS is always built
+          same-origin (api/esphome-api.ts:
+          `${protocol}//${location.host}/ws`), so 'self' alone would
+          cover the default deployments (port-6052 direct, ESPHome
+          Desktop, HA add-on via Ingress, single-hostname nginx
+          reverse proxy). The ws: / wss: openers are a deliberate
+          compromise to keep split-hostname proxy setups
+          (ws.api.example.com + dash.example.com) working without
+          operator intervention - those have been a recurring pain
+          point on the legacy dashboard. Trade-off: an XSS in our
+          bundle could exfiltrate via a WebSocket to an attacker
+          origin. fetch and XHR over http(s) stay restricted to
+          'self' by the same connect-src rule (the ws:/wss:/data:
+          scheme openers don't widen the http(s) origin allowlist).
+          data: is needed because WebAwesome's icon resolver
+          fetches MDI path SVGs we register at runtime via fetch()
+          against a data: URI we build ourselves. Loud injection
+          paths stay blocked - script-src falls back to default-src
           'self' so <script src="https://evil.com/..."> can't load.
+          https://schema.esphome.io is the *typed* schema bundle
+          the YAML editor's autocompletion fetches lazily for
+          ``on_*`` triggers and the per-component action /
+          condition / filter / effects registries that
+          ``components.json`` flattens away. Read-only JSON; no
+          credentials or upload paths. Failures gracefully degrade
+          to the catalog-only completion - util/esphome-schema.ts
+          treats every error path as ``null`` and the editor still
+          completes config-vars from the dashboard's own catalog.
         * No frame-ancestors directive - HA Ingress iframes us from
           a different origin (homeassistant.local), so locking
           framing would break the add-on. Browser default (allow
@@ -67,7 +76,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ws: wss: data:; object-src 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ws: wss: data: https://schema.esphome.io; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>ESPHome</title>
     <link rel="icon" type="image/svg+xml" href="/assets/logo/esphome.svg" />

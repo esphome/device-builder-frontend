@@ -34,7 +34,7 @@ import {
   type ValidationError,
 } from "../../util/config-validation.js";
 import { filterRenderable } from "./config-entry-render-filter.js";
-import { getIn } from "../../util/nested-values.js";
+import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
@@ -256,7 +256,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const key = field.getAttribute("data-field-key");
       if (!key) continue;
       const path = key.split(".");
-      const raw = String(getIn(this.values, path) ?? "");
+      const value = getIn(this.values, path);
+      // ``wa-select`` only carries primitive values; if the YAML
+      // path resolves to an object (transient state from a partial
+      // edit — e.g. autocompletion just inserted ``then:\n  - ``
+      // and js-yaml produced an empty mapping at this position),
+      // ``String(value)`` can throw "Cannot convert object to
+      // primitive value" for null-prototype objects. Clear any
+      // stale selection rather than leaving the previous primitive
+      // displayed against a now-non-primitive YAML state.
+      if (!isPrimitiveOrNullish(value)) {
+        const current = Array.isArray(select.value)
+          ? select.value[0] ?? ""
+          : select.value ?? "";
+        if (current !== "") select.value = "";
+        continue;
+      }
+      const raw = String(value ?? "");
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
       // would silently drop the value. Look up the matching option

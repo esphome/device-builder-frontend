@@ -46,3 +46,35 @@ export function getIn(
   }
   return cur;
 }
+
+/**
+ * True when *value* is one of the scalar types ``wa-select`` can
+ * carry as its ``value`` attribute: ``string`` / ``number`` /
+ * ``boolean``, or ``null`` / ``undefined``.
+ *
+ * Narrower than the JS spec's "primitive" definition (which also
+ * includes ``bigint`` and ``symbol``). YAML doesn't surface those
+ * — js-yaml emits numbers for integer literals up to the safe
+ * range, strings for everything else — and ``wa-select``'s
+ * stringification path doesn't model them either, so the
+ * predicate intentionally rejects them along with the actual
+ * problem case (null-prototype objects, plain objects, arrays,
+ * Maps, Dates, …).
+ *
+ * Plain objects with a normal prototype would stringify to
+ * ``"[object Object]"``, but null-prototype objects (which
+ * js-yaml can produce for empty mappings during a partial edit)
+ * and any object whose ``Symbol.toPrimitive`` returns
+ * non-primitive throw "Cannot convert object to primitive
+ * value". Callers that fan a YAML value into a primitive-only
+ * sink should gate on this predicate first and skip the sync
+ * for non-scalar values rather than crashing on a transient
+ * object.
+ */
+export function isPrimitiveOrNullish(
+  value: unknown,
+): value is string | number | boolean | null | undefined {
+  if (value === null || value === undefined) return true;
+  const t = typeof value;
+  return t === "string" || t === "number" || t === "boolean";
+}

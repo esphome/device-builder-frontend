@@ -3,6 +3,7 @@ import {
   mdiArchiveOutline,
   mdiCheck,
   mdiCog,
+  mdiCogRefresh,
   mdiDotsVertical,
   mdiEyeOutline,
   mdiKeyVariant,
@@ -25,6 +26,7 @@ registerMdiIcons({
   "archive-outline": mdiArchiveOutline,
   check: mdiCheck,
   cog: mdiCog,
+  "cog-refresh": mdiCogRefresh,
   "dots-vertical": mdiDotsVertical,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
@@ -358,6 +360,16 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="archive-outline"></wa-icon>
                 ${this._localize("layout.archived_devices")}
               </div>
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openResetBuildEnv}
+                @keydown=${this._onMenuItemKeydown}
+              >
+                <wa-icon library="mdi" name="cog-refresh"></wa-icon>
+                ${this._localize("layout.reset_build_env")}
+              </div>
               <div class="menu-divider menu-divider--inline" role="separator"></div>
               <div
                 class="menu-item menu-item--inline"
@@ -455,6 +467,16 @@ export class ESPHomeHeaderActions extends LitElement {
     this._close();
     this.dispatchEvent(
       new CustomEvent("open-firmware-jobs", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _openResetBuildEnv() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-reset-build-env", {
         bubbles: true,
         composed: true,
       }),

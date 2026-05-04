@@ -20,8 +20,12 @@ export class ESPHomeSelectBar extends LitElement {
   @property({ type: Number, attribute: "selected-count" })
   selectedCount = 0;
 
-  @property({ type: Number, attribute: "total-count" })
-  totalCount = 0;
+  /** True when every currently-visible (filtered) device is in the
+   *  parent's selection. Drives the toggle button between "Select all"
+   *  and "Deselect all" so it reflects the filtered scope rather than
+   *  the full device list. */
+  @property({ type: Boolean, attribute: "all-visible-selected" })
+  allVisibleSelected = false;
 
 
   static styles = [
@@ -144,8 +148,7 @@ export class ESPHomeSelectBar extends LitElement {
   ];
 
   protected render() {
-    const allSelected =
-      this.selectedCount === this.totalCount && this.totalCount > 0;
+    const allSelected = this.allVisibleSelected;
 
     return html`
       <div class="select-bar">

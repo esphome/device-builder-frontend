@@ -73,6 +73,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() private _title = "";
   @state() private _statusMessage = "";
   @state() private _errorMessage = "";
+  /** Did this run fail during the server-side compile? Drives the
+   *  reset-build-env suggestion strip — only build failures benefit
+   *  from clearing the toolchain cache, so we don't dangle the hint
+   *  in front of users on chip-mismatch / Web Serial connection
+   *  errors where it can't help. */
+  @state() private _failedDuringCompile = false;
   @state() private _logLines: string[] = [];
   @state() private _logsExpanded = false;
   @state() private _logsFullHeight = false;
@@ -179,6 +185,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._downloadedFilename = "";
     this._showLogsAfterInstall = true;
     this._installer = null;
+    this._failedDuringCompile = false;
     // ``_jobId`` is already cleared by ``_detachStream`` above; same
     // for ``_streamId`` and ``_compileReject``.
     this._detected = null;
@@ -302,6 +309,40 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         max-width: 380px;
         line-height: 1.5;
+      }
+
+      /* Reset-build-env suggestion — shown only after a compile-step
+         failure (see _failedDuringCompile in the host). Sits below
+         the error status icon as a calm, secondary hint with the
+         action rendered as an inline link inside the sentence so
+         the CTA reads as part of the hint, not a second next-step
+         button. Visual language deliberately quieter than the red
+         error so users read the failure first. */
+      .reset-suggestion {
+        padding: var(--wa-space-s) var(--wa-space-m);
+        margin: var(--wa-space-m) auto 0;
+        max-width: 480px;
+        border-radius: var(--wa-border-radius-m);
+        background: var(--wa-color-surface-lowered);
+        font-size: var(--wa-font-size-xs);
+        line-height: 1.5;
+        color: var(--wa-color-text-normal);
+        text-align: center;
+      }
+      .reset-suggestion-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        color: var(--esphome-primary);
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .reset-suggestion-link:hover,
+      .reset-suggestion-link:focus-visible {
+        text-decoration-thickness: 2px;
+        outline: none;
       }
 
       .instructions {
@@ -506,6 +547,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           <span class="status-text">${this._statusMessage}</span>
           <span class="status-detail">${this._errorMessage}</span>
         </div>
+        ${this._renderResetSuggestion()}
       `;
     }
     return html`
@@ -515,6 +557,44 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Hint shown after a compile-step failure pointing the user at
+   *  "Reset Build Environment". Only surfaced for failures during
+   *  the server-side compile (see ``_failedDuringCompile``) — chip
+   *  mismatch / Web Serial connection / flash errors don't benefit
+   *  from clearing the toolchain cache.
+   *
+   *  Inline-link rendering: the action is a clickable link inside
+   *  the sentence so the CTA reads as part of the hint. The
+   *  translation puts the link text behind a ``{action}`` marker so
+   *  other locales can place it wherever reads naturally. */
+  private _renderResetSuggestion() {
+    if (!this._failedDuringCompile) return nothing;
+    const text = this._localize("command.try_reset_suggestion");
+    const [before, after = ""] = text.split("{action}");
+    return html`
+      <div class="reset-suggestion" role="status">
+        ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryResetBuildEnv}
+        >
+          ${this._localize("command.try_reset_button")}</button>${after}
+      </div>
+    `;
+  }
+
+  /** Hand off to the firmware-jobs-dialog's reset flow. Closes the
+   *  current install dialog first so the confirm prompt isn't
+   *  obscured by an unrelated error surface. */
+  private _tryResetBuildEnv = () => {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-reset-build-env", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   private _renderProgress() {
     if (this._step !== "flashing") return nothing;
@@ -737,6 +817,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     try {
       await this._compileAndWait(device.configuration);
     } catch {
+      this._failedDuringCompile = true;
       this._fail(this._localize("firmware.compile_failed"));
       return;
     }
@@ -849,6 +930,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     try {
       await this._compileAndWait(device.configuration);
     } catch {
+      this._failedDuringCompile = true;
       this._fail(this._localize("firmware.compile_failed"));
       return;
     }
