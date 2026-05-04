@@ -1,19 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   findSectionStart,
+  LIST_ITEM_START_RE,
   parseYamlSectionValues,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
 
-/** 1-indexed line of the first list-item dash following `parent:`
- *  in `yaml`. Section-editor callers pass that line as `fromLine`;
- *  resolving it here keeps the tests robust to layout edits
- *  (e.g. a leading comment line shifting positions). */
-function listItemLine(yaml: string, parent: string): number {
+/** 1-indexed line of the first list-item dash following
+ *  `parent:` in `yaml`. Section-editor callers pass that line as
+ *  `fromLine`; resolving it here keeps the tests robust to
+ *  layout edits (e.g. a leading comment line shifting
+ *  positions). Reuses the parser's `LIST_ITEM_START_RE` directly
+ *  so a future tightening there can't silently let the test
+ *  helper drift to a different definition of "list item". */
+function firstListItemLine(yaml: string, parent: string): number {
   const lines = yaml.split("\n");
   const start = findSectionStart(lines, parent);
   for (let i = start + 1; i < lines.length; i++) {
-    if (/^\s+-(\s|$)/.test(lines[i])) return i + 1;
+    if (LIST_ITEM_START_RE.test(lines[i])) return i + 1;
   }
   throw new Error(`no list-item dash under ${parent}: in test fixture`);
 }
@@ -186,7 +190,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // once (under its own line), preserving the no-duplicate
     // contract regardless of value type.
     const before = "wrap:\n  - platform: x\n";
-    const fromLine = listItemLine(before, "wrap");
+    const fromLine = firstListItemLine(before, "wrap");
     const after = updateSectionInYaml(
       before,
       "wrap.x",
@@ -204,7 +208,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // Round-trip closes the loop on whether the parser walks
     // children correctly under a bare-dash list-item head when
     // the body is a non-scalar nested mapping.
-    const afterFromLine = listItemLine(after, "wrap");
+    const afterFromLine = firstListItemLine(after, "wrap");
     const reparsed = parseYamlSectionValues(after, "wrap.x", afterFromLine);
     expect(reparsed).toEqual({ platform: { complex: "object" } });
   });
@@ -216,7 +220,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // serializer skips null/empty values; net result is just
     // the bare `-` with whatever else the form holds.
     const before = "ota:\n  - platform: esphome\n";
-    const fromLine = listItemLine(before, "ota");
+    const fromLine = firstListItemLine(before, "ota");
     const after = updateSectionInYaml(
       before,
       "ota.esphome",
@@ -230,7 +234,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // Round-trip: the bare-`-` shape parses back to the same
     // values the form holds (minus the null, which the
     // serializer drops).
-    const afterFromLine = listItemLine(after, "ota");
+    const afterFromLine = firstListItemLine(after, "ota");
     const reparsed = parseYamlSectionValues(
       after,
       "ota.esphome",

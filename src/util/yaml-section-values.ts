@@ -43,7 +43,7 @@ const LIST_ITEM_INLINE_KEY_RE = new RegExp(
  * own YAML output never produces a bare-`-` outside that
  * round-trip path, so this is the only realistic source.
  */
-const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
+export const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
 
 const childRegexFor = (indent: string) =>
   new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
@@ -366,16 +366,14 @@ export function updateSectionInYaml(
         // the rewrite path needs, and the indent alone is what
         // the bare-dash path needs.
         //
-        // Group 2 (trailing whitespace) only exists because we
-        // hit this branch from `LIST_ITEM_INLINE_KEY_RE`, which
-        // already required `\s+` between `-` and the inline
-        // key. The `?? " "` fallback is theoretical defense — a
-        // bare-dash line wouldn't reach here because it
-        // wouldn't have matched `LIST_ITEM_INLINE_KEY_RE` in
-        // the first place.
-        const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/);
-        const dashIndent = dashPrefixMatch?.[1] ?? "  ";
-        const dashPrefix = `${dashIndent}-${dashPrefixMatch?.[2] ?? " "}`;
+        // The match always succeeds in this branch: we entered
+        // it via `LIST_ITEM_INLINE_KEY_RE`, which requires `\s+`
+        // both before and after the dash, so `\s+-\s+` is
+        // already true of `dashLine`. The non-null assertion
+        // makes that invariant local.
+        const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/)!;
+        const dashIndent = dashPrefixMatch[1];
+        const dashPrefix = `${dashIndent}-${dashPrefixMatch[2]}`;
         if (_isInlinableScalar(values[inlineKey])) {
           dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(
             values[inlineKey],
