@@ -1,4 +1,4 @@
-/**
+/*
  * YAML scanning helpers used by the ConfigEntry form to (a) detect pin
  * conflicts between sections and (b) discover ID references for the
  * id-reference picker. These are deliberately tiny, line-based scans —
@@ -7,21 +7,14 @@
  *
  * The form re-renders on every keystroke (live `yaml` prop is a
  * dependency of pin / id pickers), so both scans are memoised
- * single-entry by `yaml` reference. Re-renders that don't change the
- * yaml return cached results; an actual yaml change re-scans once.
- * Linear scans on the typical config (<200 lines) are sub-millisecond
- * even without the cache, but memoisation collapses the worst case
- * (paste a multi-thousand-line config, type into a field) from
- * O(N) per keystroke to O(1).
- */
-
-/**
- * Map every `GPIO<n>` reference in the YAML to the top-level domain
- * that owns it (e.g. `{ 4: "switch", 5: "binary_sensor" }`). When
- * `excludeFromLine`/`excludeToLine` are provided the lines in that
- * (inclusive) 1-indexed range are skipped — used by the section
- * editor so a pin selector doesn't flag the user's *own* pin as
- * already in use.
+ * single-entry on `(yaml, ...key)` via value equality (`a.yaml ===
+ * b.yaml` on primitive strings, with the engine's pointer-equality
+ * fast path on the typical render cycle). Re-renders that don't
+ * change the yaml return cached results; an actual yaml change
+ * re-scans once. Linear scans on the typical config (<200 lines)
+ * are sub-millisecond even without the cache, but memoisation
+ * collapses the worst case (paste a multi-thousand-line config,
+ * type into a field) from O(N) per keystroke to O(1).
  */
 /**
  * Single-entry memo for the YAML scans. The hot path is the
@@ -105,6 +98,14 @@ const pinKeyEquals = (a: PinKey, b: PinKey) =>
   a.excludeToLine === b.excludeToLine;
 const pinMemo = createScanMemo<PinKey, Map<number, string>>(pinKeyEquals);
 
+/**
+ * Map every `GPIO<n>` reference in the YAML to the top-level
+ * domain that owns it (e.g. `{ 4: "switch", 5: "binary_sensor" }`).
+ * When `excludeFromLine` / `excludeToLine` are provided the lines
+ * in that (inclusive) 1-indexed range are skipped — used by the
+ * section editor so a pin selector doesn't flag the user's *own*
+ * pin as already in use.
+ */
 export function findUsedPins(
   yaml: string,
   excludeFromLine?: number,
