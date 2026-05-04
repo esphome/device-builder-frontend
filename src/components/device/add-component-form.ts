@@ -13,7 +13,6 @@ import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
-  isEntryVisible,
   validateEntries,
   type ValidationError,
 } from "../../util/config-validation.js";
@@ -26,9 +25,9 @@ import {
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
-import { ALWAYS_SHOWN_KEYS } from "./config-entry-form.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
+import { collectRenderablePaths } from "./config-entry-render-filter.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -232,7 +231,6 @@ export class ESPHomeAddComponentForm extends LitElement {
 
     this._values = next;
   }
-
 
   /**
    * Walk the schema recursively to find the path of the first entry
@@ -473,90 +471,50 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
+   * User-facing label for an error key. Walks the schema for a
+   * top-level entry whose ``key`` matches the first path segment;
+   * returns the entry's ``label`` (e.g. ``"Frequency"``) when found,
+   * the raw key as a last-resort fallback. Keeps the
+   * hidden-validation message readable even when the schema lookup
+   * misses on a deeply-nested path.
+   */
+  private _labelForErrorKey(errKey: string): string {
+    const top = errKey.split(".")[0];
+    const entry = this.component.config_entries.find((e) => e.key === top);
+    return entry?.label || top;
+  }
+
+  /**
    * True when at least one error in the map lands on an entry the
-   * shared ``esphome-config-entry-form`` actually renders. Mirrors
-   * its ``_filterRenderable`` logic exactly so an invisible error
-   * (advanced, non-required leaf in required-only mode, hidden by
-   * ``isEntryVisible`` predicates, or a NESTED group whose only
-   * children are themselves filtered out) flips us into the
-   * top-level message lane instead of the dead-button state
-   * MasterOfNone reported.
+   * shared ``esphome-config-entry-form`` actually renders. Built on
+   * ``collectRenderablePaths`` so the visibility check stays in
+   * lockstep with the form's render filter — any divergence would
+   * reintroduce the silent-button regression MasterOfNone reported
+   * (validation error on a hidden field → form bails on submit
+   * with no red ring anywhere).
    *
-   * Walks the schema recursively building the set of rendered
-   * paths, then checks each error key against that set.
+   * The add-component form passes ``required-only`` and never
+   * exposes a show-advanced toggle, so we always pass
+   * ``showAdvanced: false`` here.
    */
   private _anyErrorIsVisible(
     errors: Map<string, ValidationError>,
     presentComponents: Set<string>,
   ): boolean {
     if (errors.size === 0) return false;
-    const renderedPaths = new Set<string>();
-    this._collectRenderedPaths(
+    const renderedPaths = collectRenderablePaths(
       this.component.config_entries,
       this._values,
-      presentComponents,
-      [],
-      renderedPaths,
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+        presentComponents,
+      },
     );
     for (const key of errors.keys()) {
       if (renderedPaths.has(key)) return true;
     }
     return false;
-  }
-
-  /**
-   * Mirror of ``ESPHomeConfigEntryForm._filterRenderable`` — every
-   * entry key written here is one the user can actually see (so a
-   * validation error on it shows a red ring). Any divergence from
-   * the rendering filter reintroduces the silent-button regression
-   * this whole helper exists to prevent. Keep them in lockstep.
-   *
-   * Reads ``isEntryVisible`` for the cross-component +
-   * ``depends_on`` checks, drops advanced entries when the user
-   * hasn't toggled "show advanced", drops non-required leaves in
-   * required-only mode (always the case for the add-component
-   * form), and recurses into NESTED groups — emitting the group
-   * key only when at least one child is renderable, matching the
-   * shared form's "skip empty groups" rule.
-   */
-  private _collectRenderedPaths(
-    entries: ConfigEntry[],
-    values: Record<string, unknown>,
-    presentComponents: Set<string>,
-    pathPrefix: string[],
-    out: Set<string>,
-  ): void {
-    for (const entry of entries) {
-      if (!isEntryVisible(entry, values, presentComponents)) continue;
-      // ``advanced`` is a hard hide in the add-component form: the
-      // form passes ``required-only`` and never exposes a
-      // show-advanced toggle, so an advanced field is always
-      // filtered out here.
-      if (entry.advanced) continue;
-      if (entry.type === ConfigEntryType.NESTED) {
-        const child = values[entry.key];
-        const childValues =
-          child !== null && typeof child === "object" && !Array.isArray(child)
-            ? (child as Record<string, unknown>)
-            : {};
-        const before = out.size;
-        this._collectRenderedPaths(
-          entry.config_entries ?? [],
-          childValues,
-          presentComponents,
-          [...pathPrefix, entry.key],
-          out,
-        );
-        if (out.size > before) {
-          out.add([...pathPrefix, entry.key].join("."));
-        }
-        continue;
-      }
-      // Required-only mode: keep required leaves + the always-shown
-      // allowlist (``name``); drop everything else.
-      if (!entry.required && !ALWAYS_SHOWN_KEYS.has(entry.key)) continue;
-      out.add([...pathPrefix, entry.key].join("."));
-    }
   }
 
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
@@ -625,10 +583,15 @@ export class ESPHomeAddComponentForm extends LitElement {
         // optional leaf). Use a dedicated locale key — distinct from
         // the API-failure ``add_component_error`` so #issues triage
         // can tell client-side validation blocks from server-side
-        // failures — and append the offending field names so the
-        // user can recover (e.g. report the field for a catalog fix).
+        // failures — and append a per-error breakdown using each
+        // entry's user-facing label and the localized code reason
+        // (e.g. ``Frequency: Must be a number``). Falls back to
+        // ``key: code`` when the schema lookup misses (defensive
+        // against nested paths the heuristic can't follow).
         const summary = [...errors.entries()]
-          .map(([key, err]) => `${key}: ${err.code}`)
+          .map(([key, err]) =>
+            `${this._labelForErrorKey(key)}: ${this._localize(err.code, err.params)}`,
+          )
           .join("; ");
         this._localBlockMessage = `${this._localize(
           "device.add_component_hidden_validation_error",

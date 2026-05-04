@@ -31,9 +31,9 @@ import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
-  isEntryVisible,
   type ValidationError,
 } from "../../util/config-validation.js";
+import { filterRenderable } from "./config-entry-render-filter.js";
 import { getIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -75,15 +75,6 @@ export interface ConfigEntryValueChange {
   path: string[];
   value: unknown;
 }
-
-/**
- * Entry keys that the form keeps visible even when `requiredOnly` is
- * on. `name` becomes the entity's friendly name in Home Assistant, so
- * even though most schemas mark it optional we want to ask for it
- * up-front when the user is creating something — fewer trips back to
- * the section editor for a label they always want.
- */
-export const ALWAYS_SHOWN_KEYS: ReadonlySet<string> = new Set(["name"]);
 
 @customElement("esphome-config-entry-form")
 export class ESPHomeConfigEntryForm extends LitElement {
@@ -145,39 +136,20 @@ export class ESPHomeConfigEntryForm extends LitElement {
   static styles = [espHomeStyles, inputStyles, configEntryFormStyles];
 
   /**
-   * Filter `entries` for rendering: hidden + dependency-failing entries
-   * always go away; advanced entries go away unless `showAdvanced` is
-   * on; in `requiredOnly` mode, non-required leaves go away too. NESTED
-   * entries stay only if anything inside them is renderable, so an
-   * empty header never sits in the form.
+   * Filter `entries` for rendering. Delegates to the shared
+   * ``filterRenderable`` helper so the add-component form's
+   * "is this error visible?" check (which mirrors the same rules)
+   * can never drift from what's actually painted.
    */
   private _filterRenderable = (
     entries: ConfigEntry[],
     values: Record<string, unknown>,
-  ): ConfigEntry[] => {
-    const out: ConfigEntry[] = [];
-    for (const entry of entries) {
-      if (!isEntryVisible(entry, values, this.presentComponents)) continue;
-      if (entry.advanced && !this.showAdvanced) continue;
-      if (entry.type === ConfigEntryType.NESTED) {
-        const childList = entry.config_entries ?? [];
-        const childValues = this._scopeValues([entry.key]);
-        const renderableChildren = this._filterRenderable(childList, childValues);
-        if (renderableChildren.length === 0) continue;
-      } else if (
-        this.requiredOnly &&
-        !entry.required &&
-        !ALWAYS_SHOWN_KEYS.has(entry.key)
-      ) {
-        // In required-only mode, drop optional leaves outright unless
-        // they're on the always-shown allowlist (e.g. `name`, which is
-        // optional but worth asking up-front for sensors/switches/lights).
-        continue;
-      }
-      out.push(entry);
-    }
-    return out;
-  };
+  ): ConfigEntry[] =>
+    filterRenderable(entries, values, {
+      requiredOnly: this.requiredOnly,
+      showAdvanced: this.showAdvanced,
+      presentComponents: this.presentComponents,
+    });
 
   protected render() {
     const ctx = this._buildCtx();
