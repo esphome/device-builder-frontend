@@ -584,6 +584,50 @@ describe("getConfigVarKeys", () => {
   });
 });
 
+describe("resolveVersion (probe failure handling)", () => {
+  it("evicts the cached version when the probe returns a transient 5xx", async () => {
+    // Copilot-flagged: ``probe.ok ? esphome_version : "dev"`` made
+    // any non-2xx (including 5xx) silently downgrade to ``dev`` for
+    // the page lifetime. Pin the new behaviour: 5xx evicts the
+    // cached version so a later caller can retry once conditions
+    // recover.
+    let probeAttempts = 0;
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") {
+        probeAttempts += 1;
+        if (probeAttempts === 1) return new Response(null, { status: 503 });
+        return new Response(null, { status: 200 });
+      }
+      if (url.includes("/2026.5.0/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      throw new Error(`unexpected ${url}`);
+    });
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const first = await fetchBundle(makeApi() as never, "esphome");
+    expect(first).toBeNull();
+    const second = await fetchBundle(makeApi() as never, "esphome");
+    expect(second).not.toBeNull();
+    expect(probeAttempts).toBe(2);
+    debugSpy.mockRestore();
+  });
+
+  it("treats a 404 probe as a stable 'dev' signal (no retries)", async () => {
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 404 });
+      if (url.includes("/dev/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      throw new Error(`unexpected ${url}`);
+    });
+    const bundle = await fetchBundle(makeApi() as never, "esphome");
+    expect(bundle).not.toBeNull();
+    await fetchBundle(makeApi() as never, "esphome");
+    const heads = fetchSpy.mock.calls.filter(
+      (c) => (c[1] as RequestInit | undefined)?.method === "HEAD",
+    );
+    expect(heads.length).toBe(1);
+  });
+});
+
 describe("fetchBundle (negative cache eviction)", () => {
   it("evicts a failed lookup so the next caller retries", async () => {
     let attempt = 0;

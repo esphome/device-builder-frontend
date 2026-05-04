@@ -162,7 +162,19 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
       `${SCHEMA_HOST}/${esphome_version}/esphome.json`,
       { method: "HEAD" },
     );
-    return probe.ok ? esphome_version : "dev";
+    if (probe.ok) return esphome_version;
+    // Only fall back to ``dev`` for a definitive
+    // "this version isn't published" answer (404). Transient
+    // failures (5xx, gateway errors) shouldn't permanently lock
+    // the session onto ``dev`` — throw so the catch below evicts
+    // ``versionPromise`` and the next caller retries when
+    // conditions recover. (Copilot-flagged: a 5xx during the
+    // probe used to silently downgrade to ``dev`` for the page
+    // lifetime.)
+    if (probe.status === 404) return "dev";
+    throw new Error(
+      `schema-host probe returned ${probe.status} for ${esphome_version}`,
+    );
   })();
   versionPromise = promise;
   // Evict on failure so subsequent calls retry. A successful
@@ -389,32 +401,28 @@ async function collectConfigVars(
   if (!bundle) return;
   const component = bundle[componentKey];
   if (!component) return;
-  const cv = (component as SchemaComponent).schemas?.[schemaName];
+  const cv: SchemaConfigVar | undefined = (component as SchemaComponent)
+    .schemas?.[schemaName];
   if (!cv || typeof cv !== "object") return;
 
-  // ``typed_schema`` — surface the discriminator key plus the
-  // union of every variant's config_vars.
-  if ((cv as SchemaConfigVar).type === "typed") {
-    const typed = cv as SchemaConfigVarTyped;
-    if (typed.typed_key && !seenKeys.has(typed.typed_key)) {
-      seenKeys.add(typed.typed_key);
-      out.push({ key: typed.typed_key, required: true });
+  // Discriminated union narrows on ``cv.type``.
+  if (cv.type === "typed") {
+    if (cv.typed_key && !seenKeys.has(cv.typed_key)) {
+      seenKeys.add(cv.typed_key);
+      out.push({ key: cv.typed_key, required: true });
     }
-    for (const variant of Object.values(typed.types ?? {})) {
+    for (const variant of Object.values(cv.types ?? {})) {
       if (!variant) continue;
       pushConfigVars(variant.config_vars, out, seenKeys);
-      await collectExtends(
-        api,
-        variant.extends,
-        out,
-        seenKeys,
-        visited,
-      );
+      await collectExtends(api, variant.extends, out, seenKeys, visited);
     }
     return;
   }
 
-  const schema = (cv as SchemaConfigVarSchema).schema;
+  // Trigger/schema/other carry an optional or required ``schema``;
+  // registry has none. Read the field if it's there, otherwise
+  // there's nothing to walk.
+  const schema = "schema" in cv ? cv.schema : undefined;
   if (!schema) return;
   pushConfigVars(schema.config_vars, out, seenKeys);
   await collectExtends(api, schema.extends, out, seenKeys, visited);

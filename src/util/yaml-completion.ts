@@ -898,10 +898,18 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ...platformKey,
     ];
 
+    // ``RE_KEY_OR_ACTION`` allows ``.`` because dotted action
+    // labels (``logger.log``, ``light.turn_on``) are valid only
+    // at the list-item position inside an automation body. For
+    // plain key positions (``  partial``), a ``.`` is never a
+    // valid continuation — keep the cached options "valid" only
+    // while the partial stays a bare key, so typing a dot
+    // re-runs the completion source instead of letting CodeMirror
+    // hold onto a stale list. (Copilot-flagged.)
     return {
       from: keyFrom,
       options,
-      validFor: RE_KEY_OR_ACTION,
+      validFor: isListItem ? RE_KEY_OR_ACTION : RE_KEY,
     };
   };
 }
