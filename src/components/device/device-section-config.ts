@@ -10,6 +10,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
+import { fetchComponent } from "../../util/component-name-cache.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -291,7 +292,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
     try {
       const platform = this.board?.esphome.platform;
-      const component = await this._api.getComponent(this.sectionKey, platform);
+      // Route through the session-scoped component cache so a
+      // section that re-loads on every keystroke (e.g. driven by
+      // ``editor/validate_yaml``'s post-render refresh) doesn't
+      // re-issue the same backend round-trip per change. Cache
+      // entries are immutable for the page's lifetime — the
+      // catalog is read from a static JSON on the server.
+      const component = await fetchComponent(this._api, this.sectionKey, platform);
 
       if (id !== this._loadId) return;
 

@@ -30,6 +30,7 @@ import {
   type ComponentCatalogEntry,
   type ConfigEntry,
 } from "../api/types.js";
+import { fetchComponent } from "./component-name-cache.js";
 import {
   getActions,
   getTriggerKeys,
@@ -433,10 +434,13 @@ async function resolveAvailableEntries(
     }
     return directHit.config_entries;
   }
-  // No direct hit — try fetching the component (handles aliases the catalog
-  // list call doesn't return). Tolerate failures silently.
+  // No direct hit — try fetching the component (handles aliases the
+  // catalog list call doesn't return). Routes through the session-
+  // scoped component cache so the same parent on every keystroke
+  // doesn't re-issue the backend round-trip. Tolerate failures
+  // silently.
   try {
-    const comp = await api.getComponent(parentKey);
+    const comp = await fetchComponent(api, parentKey);
     if (comp) return comp.config_entries;
   } catch {
     /* ignore */
