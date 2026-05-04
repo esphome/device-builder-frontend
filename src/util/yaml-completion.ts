@@ -998,12 +998,18 @@ interface KeyPositionProvider {
 async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> {
   if (k.inAutomation) return [];
   if (!k._cachedCatalogEntries) {
+    // Pass the AST-with-regex-fallback ``topLevelKey`` so the
+    // ``parentKey === "platform"`` carve-out in
+    // ``resolveAvailableEntries`` can do its dotted-id lookup
+    // (``${topLevelKey}.${platformValue}``) even at half-typed
+    // pairs where the AST is silent. (Copilot-flagged: passing
+    // ``bundleCtx?.topLevelKey`` discarded the regex fallback.)
     k._cachedCatalogEntries = resolveAvailableEntries(
       k.api,
       k.catalog,
       k.parent.key,
       k.platformValue,
-      k.bundleCtx?.topLevelKey ?? null,
+      k.topLevelKey,
     );
   }
   return k._cachedCatalogEntries;
@@ -1122,33 +1128,35 @@ const platformKeyProvider: KeyPositionProvider = {
 
 /** Action / filter / condition argument completion. Fires when
  *  ``parent.key`` is a dotted label (``globals.set``,
- *  ``logger.log``, ``binary_sensor.is_on``) — the cursor is
- *  inside the action's argument mapping and the entries to
- *  surface are the action's own ``config_vars``. Probes both
- *  the ``action`` and ``filter`` / ``condition`` registry slots
- *  in the schema bundle (we don't know which a-priori; the
- *  schema does and one of them will match). Returns nothing
- *  when the parent isn't dotted — guarding the network round-
- *  trip at every nested-mapping keystroke. */
+ *  ``logger.log``, ``binary_sensor.is_on``) or a bare core-action
+ *  label (``delay``, ``if``, ``lambda``) — the cursor is inside
+ *  the action's argument mapping and the entries to surface are
+ *  the action's own ``config_vars``. ``parseRegistryLabel`` returns
+ *  the ``(bundleName, componentName, entryName)`` triple;
+ *  ``getRegistryEntryKeys`` probes each registry slot (``action``
+ *  / ``condition`` / ``filter`` / ``effects``) until one matches.
+ *  Skipped when the parent isn't a known label shape. */
 const registryEntryArgsProvider: KeyPositionProvider = {
   name: "registry-entry-args",
   fetch: async (k) => {
-    if (!k.parent.key.includes(".")) return [];
+    // Dotted label, OR the parent is one of the core actions.
+    // Core action labels are bare (``delay``, ``if``, …) so we
+    // can't distinguish them from arbitrary parent keys without
+    // a probe — but ``getRegistryEntryKeys`` returns ``[]`` on
+    // a miss and the bundle cache absorbs the cost. Gate on a
+    // dotted label OR a bare-but-known automation context to
+    // avoid probing every nested-mapping keystroke.
+    const isDotted = k.parent.key.includes(".");
+    if (!isDotted && !k.inAutomation) return [];
     const ref = parseRegistryLabel(k.parent.key);
     if (!ref) return [];
-    // Try every registry slot in turn — actions are commonest,
-    // then conditions / filters / effects. The bundle is cached
-    // so the loop is local after the first hit.
-    const slots = ["action", "condition", "filter", "effects"];
-    for (const slot of slots) {
-      const keys = await getRegistryEntryKeys(
-        k.api,
-        `${ref.componentName}.${slot}`,
-        ref.entryName,
-      );
-      if (keys.length > 0) return keys.map(schemaKeyToCompletion);
-    }
-    return [];
+    const keys = await getRegistryEntryKeys(
+      k.api,
+      ref.bundleName,
+      ref.componentName,
+      ref.entryName,
+    );
+    return keys.map(schemaKeyToCompletion);
   },
 };
 

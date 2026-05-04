@@ -149,6 +149,17 @@ describe("readPlatformSibling (regex fallback)", () => {
     expect(readPlatformSibling(lines, 4, 6)).toBe("uptime");
   });
 
+  it("strips quotes from quoted platform values", () => {
+    // Schema-host JSON uses bare names, but configs in the wild
+    // commonly quote platforms (``platform: "dht"``). The regex
+    // walker has to accept both forms and return the unquoted
+    // string so the schema-bundle lookup succeeds.
+    const dq = ["sensor:", '  - platform: "dht"', "    pin: 5"];
+    expect(readPlatformSibling(dq, 2, 4)).toBe("dht");
+    const sq = ["sensor:", "  - platform: 'dht'", "    pin: 5"];
+    expect(readPlatformSibling(sq, 2, 4)).toBe("dht");
+  });
+
   it("returns null when there's no platform sibling", () => {
     const lines = ["wifi:", "  ssid: x", "  password: y"];
     expect(readPlatformSibling(lines, 2, 2)).toBeNull();

@@ -705,33 +705,46 @@ export interface SchemaRegistryEntry {
  * the action's own arguments (``id`` / ``value`` for
  * ``globals.set``).
  *
- * *registryRef* is ``<bundle>.<registry>`` (e.g.
- * ``globals.action`` for actions on the globals component).
- * *entryName* is the action / filter / condition name. Mirrors
- * the legacy dashboard's ``getActionSchema`` walk.
+ * *bundleName* is the schema-bundle file (``globals.json``,
+ * ``light.json``, ``esphome.json`` for core actions). *componentName*
+ * is the key inside that bundle (``globals`` / ``light`` / ``core``
+ * — usually equal to ``bundleName`` except for core actions which
+ * live at ``esphome.json[core]``). *entryName* is the action /
+ * filter / condition name.
+ *
+ * Probes each registry slot (``action`` / ``condition`` /
+ * ``filter`` / ``effects``) until one carries an entry with
+ * *entryName*. Returns the entry's schema config-vars (with
+ * extends walked so inherited fields like
+ * ``light.LIGHT_ACTION_SCHEMA`` surface). Mirrors the legacy
+ * dashboard's ``getActionSchema``.
  */
 export async function getRegistryEntryKeys(
   api: ESPHomeAPI,
-  registryRef: string,
+  bundleName: string,
+  componentName: string,
   entryName: string,
 ): Promise<SchemaConfigVarKey[]> {
-  const dot = registryRef.indexOf(".");
-  if (dot < 0) return [];
-  const bundleName = registryRef.slice(0, dot);
-  const registryKey = registryRef.slice(dot + 1);
-  if (!isRegistryKey(registryKey)) return [];
   const bundle = await fetchBundle(api, bundleName);
   if (!bundle) return [];
-  const component = bundle[bundleName];
+  const component = bundle[componentName] as SchemaComponent | undefined;
   if (!component) return [];
-  const entry = (component as SchemaComponent | undefined)?.[registryKey]?.[
-    entryName
-  ];
-  if (!entry || typeof entry !== "object") return [];
-  // Action / filter / etc. entries are normal ``ConfigVar``
-  // shapes; recurse via the existing extends walker so inherited
-  // shared fields (e.g. ``light.LIGHT_ACTION_SCHEMA``) surface
-  // too.
+  for (const slot of SCHEMA_REGISTRY_KEYS) {
+    const entry = component[slot]?.[entryName];
+    if (!entry || typeof entry !== "object") continue;
+    return readRegistryEntrySchema(api, entry);
+  }
+  return [];
+}
+
+/** Read the config-vars off a registry-entry ``ConfigVar`` —
+ *  walks ``cv.typed_schema`` variants and the ``extends`` chain
+ *  the same way ``collectConfigVars`` does for top-level
+ *  schemas. Shared between every registry-entry path. */
+async function readRegistryEntrySchema(
+  api: ESPHomeAPI,
+  entry: SchemaConfigVar,
+): Promise<SchemaConfigVarKey[]> {
   const out: SchemaConfigVarKey[] = [];
   const seen = new Set<string>();
   if (entry.type === "typed") {
@@ -759,29 +772,48 @@ export async function getRegistryEntryKeys(
   return out;
 }
 
-/** Reverse-parse a dotted action / filter / condition label
- *  (``globals.set``, ``logger.log``, ``binary_sensor.is_on``)
- *  into the ``(componentName, entryName)`` pair the schema
- *  bundle keys by. ``getActions`` emits keys via
- *  ``componentName.split(".").reverse().join(".") + "." +
- *  actionName``; reversing it gets us back to the bundle's
- *  storage shape. Core actions (``delay``, ``if``, ``lambda``,
- *  …) carry no dot — they live under ``core.action.<name>``.
+/** Reverse-parse a dotted action / filter / condition label into
+ *  the ``(bundleName, componentName, entryName)`` triple the
+ *  schema bundle keys by. ``getActions`` emits dotted labels via
+ *  ``componentName.split(".").reverse().join(".") + "." + actionName``;
+ *  reversing it gets us back to the bundle's storage shape:
+ *
+ *    ``globals.set``         → bundle ``globals``, component ``globals``,        entry ``set``
+ *    ``logger.log``          → bundle ``logger``,  component ``logger``,         entry ``log``
+ *    ``binary_sensor.is_on`` → bundle ``binary_sensor``, component ``binary_sensor``, entry ``is_on``
+ *    ``light.turn_on``       → bundle ``light``,   component ``light``,          entry ``turn_on``
+ *
+ *  Core actions (``delay``, ``if``, ``lambda``, …) carry no dot
+ *  and live under ``esphome.json[core].action.<name>`` —
+ *  ``getRegistryEntryKeys`` is bundle-keyed, so the bundle name
+ *  and the component-key inside the bundle differ here. Returning
+ *  the triple lets callers pass the right pair to the fetcher.
+ *  (Copilot-flagged: previous shape returned ``componentName:
+ *  "core"`` which couldn't be passed to ``getRegistryEntryKeys``
+ *  — the registry-args provider would have to special-case core
+ *  actions just to translate ``"core" → bundle "esphome"``.)
  */
 export function parseRegistryLabel(
   label: string,
-): { componentName: string; entryName: string } | null {
+): { bundleName: string; componentName: string; entryName: string } | null {
   const parts = label.split(".");
   if (parts.length === 1) {
-    return { componentName: "core", entryName: parts[0] };
+    return {
+      bundleName: "esphome",
+      componentName: "core",
+      entryName: parts[0],
+    };
   }
   if (parts.length < 2) return null;
   // Last part is the entry; everything before reverses to the
-  // dotted component name (``binary_sensor`` /
-  // ``light.turn_on`` → ``light`` reversed pieces).
+  // dotted component name. The bundle is the *first* dotted
+  // piece of the component name (e.g. component ``light`` →
+  // bundle ``light``; component ``binary_sensor.gpio`` → bundle
+  // ``gpio`` per the schema host's storage convention).
   const entryName = parts[parts.length - 1];
   const componentName = parts.slice(0, -1).reverse().join(".");
-  return { componentName, entryName };
+  const bundleName = componentName.split(".")[0];
+  return { bundleName, componentName, entryName };
 }
 
 /**

@@ -859,27 +859,36 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
 });
 
 describe("parseRegistryLabel", () => {
-  it("reverses dotted action labels back to (component, entry)", () => {
+  it("reverses dotted action labels back to (bundle, component, entry)", () => {
     expect(parseRegistryLabel("globals.set")).toEqual({
+      bundleName: "globals",
       componentName: "globals",
       entryName: "set",
     });
     expect(parseRegistryLabel("logger.log")).toEqual({
+      bundleName: "logger",
       componentName: "logger",
       entryName: "log",
     });
     expect(parseRegistryLabel("binary_sensor.is_on")).toEqual({
+      bundleName: "binary_sensor",
       componentName: "binary_sensor",
       entryName: "is_on",
     });
   });
 
-  it("treats undotted labels as core actions", () => {
+  it("treats undotted labels as core actions in the esphome bundle", () => {
+    // Core actions (``delay``, ``if``, ``lambda``) live at
+    // ``esphome.json[core]``: bundle ``esphome``, component ``core``.
+    // ``getRegistryEntryKeys`` is bundle-keyed so the triple has
+    // to distinguish them.
     expect(parseRegistryLabel("delay")).toEqual({
+      bundleName: "esphome",
       componentName: "core",
       entryName: "delay",
     });
     expect(parseRegistryLabel("if")).toEqual({
+      bundleName: "esphome",
       componentName: "core",
       entryName: "if",
     });
@@ -917,7 +926,8 @@ describe("getRegistryEntryKeys", () => {
     });
     const keys = await getRegistryEntryKeys(
       makeApi() as never,
-      "globals.action",
+      "globals",
+      "globals",
       "set",
     );
     expect(keys.map((k) => k.key).sort()).toEqual(["id", "value"]);
@@ -955,7 +965,8 @@ describe("getRegistryEntryKeys", () => {
     });
     const keys = await getRegistryEntryKeys(
       makeApi() as never,
-      "light.action",
+      "light",
+      "light",
       "turn_on",
     );
     expect(keys.map((k) => k.key).sort()).toEqual([
@@ -973,19 +984,38 @@ describe("getRegistryEntryKeys", () => {
     });
     const keys = await getRegistryEntryKeys(
       makeApi() as never,
-      "thing.action",
+      "thing",
+      "thing",
       "missing",
     );
     expect(keys).toEqual([]);
   });
 
-  it("returns [] for a malformed registry slot", async () => {
+  it("reads core actions from the esphome bundle's core slot", async () => {
+    // Core actions (``delay``, ``if``, ``lambda``, …) live at
+    // ``esphome.json[core].action.<name>`` — bundle and component
+    // differ. The fetcher must take both separately.
+    const ESPHOME_BUNDLE = {
+      core: {
+        action: {
+          delay: {
+            type: "schema",
+            schema: { config_vars: { time: { type: "string" } } },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+    });
     const keys = await getRegistryEntryKeys(
       makeApi() as never,
-      "thing.bogus",
-      "x",
+      "esphome",
+      "core",
+      "delay",
     );
-    expect(keys).toEqual([]);
+    expect(keys.map((k) => k.key)).toEqual(["time"]);
   });
 });
 

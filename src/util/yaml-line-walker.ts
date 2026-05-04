@@ -34,9 +34,16 @@ export const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_.]+)\s*:\s*(.*)$/;
 export const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
 
 /** ``platform: gpio`` sibling reader. Same shape as
- *  ``RE_PAIR_LINE`` but constrains the key to literal ``platform``. */
+ *  ``RE_PAIR_LINE`` but constrains the key to literal
+ *  ``platform``. Accepts unquoted (``platform: gpio``),
+ *  double-quoted (``platform: "dht"``) and single-quoted
+ *  (``platform: 'dht'``) forms — the AST handles quotes via
+ *  Lezer's ``QuotedLiteral`` node, but at half-typed pairs the
+ *  regex walker is the only path and writers commonly quote
+ *  platform names. ``readPlatformSibling`` strips the quotes
+ *  before returning. */
 export const RE_PLATFORM_SIBLING =
-  /^\s*(?:-\s+)?platform\s*:\s*([A-Za-z0-9_]+)\s*$/;
+  /^\s*(?:-\s+)?platform\s*:\s*("[^"]*"|'[^']*'|[A-Za-z0-9_]+)\s*$/;
 
 // ─── Single-line helpers ─────────────────────────────────────────────
 
@@ -133,7 +140,7 @@ export function readPlatformSibling(
     if (ind >= indent) continue;
     if (!/^\s*-\s/.test(raw)) continue;
     const m = stripped.match(RE_PLATFORM_SIBLING);
-    if (m) return m[1];
+    if (m) return unquote(m[1]);
   }
   // Second pass: same-indent list-item header (``- platform:
   // gpio`` then siblings on the lines below). Walk up to the
@@ -156,7 +163,19 @@ export function readPlatformSibling(
     const ind = indentOf(stripped);
     if (i !== topOfBlock && ind < indent) break;
     const m = stripped.match(RE_PLATFORM_SIBLING);
-    if (m) return m[1];
+    if (m) return unquote(m[1]);
   }
   return null;
+}
+
+/** Strip a single layer of matched single or double quotes from
+ *  *value*. Mirrors the AST's ``readLiteralText`` so the regex
+ *  walker and the AST agree on the user-facing string. */
+function unquote(value: string): string {
+  if (value.length < 2) return value;
+  const q = value[0];
+  if ((q === '"' || q === "'") && value[value.length - 1] === q) {
+    return value.slice(1, -1);
+  }
+  return value;
 }
