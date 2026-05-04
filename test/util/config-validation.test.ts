@@ -238,31 +238,21 @@ describe("validateEntries", () => {
   // need the fallback so a required-without-input entry that's been
   // pre-defaulted by the catalog doesn't surface as ``required``.
 
-  it("does not validate optional numeric entries against unit-suffixed defaults", () => {
-    // Reproduces the i2c.frequency case verbatim: optional FLOAT
-    // entry with a string default like ``"50kHz"``.
+  it("does not validate optional entries against their default_value", () => {
+    // Optional defaults aren't sent to the backend — ``_coerceFields``
+    // strips empty optional values from the API payload — so
+    // validating against them is wrong by design. Pin the
+    // optional-skip so a regression that re-adds the unconditional
+    // fallback would re-introduce the silent-Add-button class of
+    // bug for any optional entry whose default is invalid for its
+    // type (e.g. a catalog-typing miss where a string default lives
+    // on a FLOAT-typed entry).
     const entries = [
       makeEntry({
         key: "frequency",
         type: ConfigEntryType.FLOAT,
         required: false,
         default_value: "50kHz",
-      }),
-    ];
-    // User never touched the field — no value in the dict.
-    expect(validateEntries(entries, {}).size).toBe(0);
-    // User explicitly set a unit-suffixed string — also accepted
-    // (the upstream ``cv.frequency`` / ``cv.time_period`` shape).
-    expect(validateEntries(entries, { frequency: "100kHz" }).size).toBe(0);
-  });
-
-  it("does not validate optional time-period entries against unit-suffixed defaults", () => {
-    const entries = [
-      makeEntry({
-        key: "timeout",
-        type: ConfigEntryType.FLOAT,
-        required: false,
-        default_value: "10s",
       }),
     ];
     expect(validateEntries(entries, {}).size).toBe(0);
@@ -284,60 +274,6 @@ describe("validateEntries", () => {
       }),
     ];
     expect(validateEntries(entries, {}).size).toBe(0);
-  });
-
-  it("accepts unit-suffixed strings on FLOAT/INTEGER required defaults", () => {
-    // The MasterOfNone case in reverse: when the catalog default
-    // for a numeric entry is a unit-suffixed string (``"50kHz"``,
-    // ``"10s"``, ``"100ms"``) — which is the actual upstream
-    // ``cv.frequency`` / ``cv.time_period`` shape — the validator
-    // must accept it as the seeded value, not reject it as
-    // ``validation.not_a_number``.
-    const entries = [
-      makeEntry({
-        key: "frequency",
-        type: ConfigEntryType.FLOAT,
-        required: true,
-        default_value: "50kHz",
-      }),
-    ];
-    // Required + default_value="50kHz" + values empty → fallback
-    // kicks in → "50kHz" is parsed numerically as 50 → no error.
-    expect(validateEntries(entries, {}).size).toBe(0);
-    // User-set unit-suffixed string also accepted.
-    expect(validateEntries(entries, { frequency: "1.5MHz" }).size).toBe(0);
-    // Range checks apply to the numeric prefix.
-    const ranged = [
-      makeEntry({
-        key: "frequency",
-        type: ConfigEntryType.FLOAT,
-        required: true,
-        default_value: "50kHz",
-        range: [10, 100],
-      }),
-    ];
-    // 5kHz < 10 → range error on the parsed prefix.
-    expect(validateEntries(ranged, { frequency: "5kHz" }).get("frequency")?.code)
-      .toBe("validation.min");
-    // 200kHz > 100 → max error.
-    expect(validateEntries(ranged, { frequency: "200kHz" }).get("frequency")?.code)
-      .toBe("validation.max");
-  });
-
-  it("rejects strings with no parseable numeric prefix on FLOAT/INTEGER", () => {
-    // Defensive: even with the unit-suffix relaxation, a string
-    // that has no numeric prefix at all is still nonsense.
-    const entries = [
-      makeEntry({
-        key: "frequency",
-        type: ConfigEntryType.FLOAT,
-        required: true,
-      }),
-    ];
-    expect(validateEntries(entries, { frequency: "abc" }).get("frequency")?.code)
-      .toBe("validation.not_a_number");
-    expect(validateEntries(entries, { frequency: "kHz" }).get("frequency")?.code)
-      .toBe("validation.not_a_number");
   });
 
   it("validates user-set values on optional numeric entries", () => {

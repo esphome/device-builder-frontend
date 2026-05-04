@@ -471,17 +471,31 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
-   * User-facing label for an error key. Walks the schema for a
-   * top-level entry whose ``key`` matches the first path segment;
-   * returns the entry's ``label`` (e.g. ``"Frequency"``) when found,
-   * the raw key as a last-resort fallback. Keeps the
-   * hidden-validation message readable even when the schema lookup
-   * misses on a deeply-nested path.
+   * User-facing label for an error key. Walks the schema following
+   * each dotted segment of the key (``auth.password`` → walk into
+   * the ``auth`` NESTED group, then find ``password``) and returns
+   * the leaf entry's ``label``. Falls back to the raw key when the
+   * schema lookup misses (defensive against MAP entries or future
+   * structural shapes the walker doesn't model).
+   *
+   * The hidden-validation message lane is the bug-report flow, so
+   * a precise leaf label speeds triage — ``Password: This field is
+   * required`` is more useful than ``Auth: This field is required``.
    */
   private _labelForErrorKey(errKey: string): string {
-    const top = errKey.split(".")[0];
-    const entry = this.component.config_entries.find((e) => e.key === top);
-    return entry?.label || top;
+    const segments = errKey.split(".");
+    let entries: ConfigEntry[] | null = this.component.config_entries;
+    let entry: ConfigEntry | undefined;
+    for (const seg of segments) {
+      if (!entries) break;
+      entry = entries.find((e) => e.key === seg);
+      if (!entry) break;
+      entries =
+        entry.type === ConfigEntryType.NESTED
+          ? entry.config_entries ?? []
+          : null;
+    }
+    return entry?.label || errKey;
   }
 
   /**
@@ -524,13 +538,17 @@ export class ESPHomeAddComponentForm extends LitElement {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
     // Clear any error on the path the user just edited so the
-    // red ring disappears as they type.
+    // red ring disappears as they type. Same for the
+    // hidden-validation block message: any user input is a fresh
+    // signal that supersedes the previous bail; the next submit
+    // attempt re-evaluates from scratch.
     const errKey = path.join(".");
     if (this._errors.has(errKey)) {
       const next = new Map(this._errors);
       next.delete(errKey);
       this._errors = next;
     }
+    if (this._localBlockMessage) this._localBlockMessage = "";
   }
 
   private _generateYamlPreview(): string {

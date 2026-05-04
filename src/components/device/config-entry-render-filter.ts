@@ -92,6 +92,13 @@ export function filterRenderable(
  *
  * Same filter rules as :func:`filterRenderable` — built on top of
  * it so the two surfaces can never drift.
+ *
+ * Emits BOTH leaf paths AND surviving NESTED group paths
+ * (``"auth"`` alongside ``"auth.username"``, ``"auth.password"``).
+ * The validator never emits errors keyed on the bare group, so
+ * ``_anyErrorIsVisible`` doesn't care, but a future caller treating
+ * the result as "leaves only" should filter for paths whose key
+ * isn't also a NESTED entry's key.
  */
 export function collectRenderablePaths(
   entries: ConfigEntry[],

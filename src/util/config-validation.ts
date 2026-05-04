@@ -108,23 +108,7 @@ export function validateEntry(
   if (isEmpty) return null;
 
   if (entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT) {
-    let num: number;
-    if (typeof raw === "number") {
-      num = raw;
-    } else {
-      const str = String(raw);
-      // ESPHome catalog entries marked FLOAT / INTEGER routinely
-      // accept unit-suffixed strings — ``frequency: "50kHz"``,
-      // ``timeout: "10s"``, ``update_interval: "60s"`` — because
-      // upstream's schema is ``cv.frequency`` / ``cv.time_period``,
-      // which the catalog-sync flattens into our numeric types.
-      // Match a leading numeric portion (``"50kHz"`` → ``50``,
-      // ``"1.5MHz"`` → ``1.5``); reject the value only when no
-      // numeric prefix is parseable. Range / integer checks then
-      // apply to the numeric portion.
-      const numericPrefix = str.match(/^\s*(-?\d+(?:\.\d+)?)/);
-      num = numericPrefix ? Number(numericPrefix[1]) : Number(str);
-    }
+    const num = typeof raw === "number" ? raw : Number(String(raw));
     if (Number.isNaN(num)) {
       return { key: entry.key, code: "validation.not_a_number" };
     }
@@ -238,14 +222,6 @@ function _validateEntriesRecursive(
     // for required entries, where an unset value would otherwise
     // surface as ``validation.required`` even though the catalog
     // pre-supplies a valid value.
-    //
-    // The original symptom — ``Add
-    // ES7210 → Add i2c → blue Add does nothing`` — was the
-    // unconditional fallback hitting i2c's optional ``frequency:
-    // "50kHz"`` and tripping ``validation.not_a_number``. Pin the
-    // optional-skip here AND teach ``validateEntry`` to accept
-    // unit-suffixed numeric strings (the actual upstream shape of
-    // ``cv.frequency`` / ``cv.time_period`` after catalog-sync).
     const raw = entry.required
       ? values[entry.key] ?? entry.default_value
       : values[entry.key];
