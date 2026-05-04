@@ -384,7 +384,7 @@ describe("resolveCurrentFromLine", () => {
   it("read-path round-trip: missing section yields empty values", () => {
     // The section the editor is trying to load no longer
     // exists in the yaml (user deleted it via the YAML pane).
-    // Resolver returns null; passing `undefined` to the parser
+    // Resolver returns undefined; passing it through to the parser
     // makes it scan for `sectionKey:` at column 0 — for a
     // platform-qualified key like `ota.esphome` no top-level
     // line matches, so values come back empty. The form

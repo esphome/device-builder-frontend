@@ -23,36 +23,73 @@
  * editor so a pin selector doesn't flag the user's *own* pin as
  * already in use.
  */
-/** Single-entry memo: caches the full pin map for a `yaml` +
- *  exclude-range combination. The form re-renders on every keystroke
- *  into the YAML pane (the live `yaml` prop is a pin-renderer
- *  dependency); the section editor's exclude range is stable across
- *  that same edit window, so a paste-then-type workflow gets cache
- *  hits on every keystroke.
+/**
+ * Single-entry memo with reference-equality keys. The hot path
+ * is the form re-rendering on every keystroke into the YAML
+ * pane: the live `yaml` prop is a dependency of the pin and
+ * id-reference renderers, and the section editor's exclude
+ * range / domain are stable across that same edit window — so
+ * a paste-then-type workflow gets cache hits on every keystroke.
  *
- *  Reference equality on `yaml` rather than a composite-string key:
- *  the parent (`pages/device.ts::_yaml`) only reassigns the string
- *  when the user types, so identical reads share the same identity.
- *  A composite-string key would itself be O(N) to build on every
- *  call — defeating most of the point. */
-let _pinMemoYaml: string | null = null;
-let _pinMemoFrom: number | undefined;
-let _pinMemoTo: number | undefined;
-let _pinMemoValue: Map<number, string> | null = null;
+ * Reference equality on `yaml` rather than a composite-string
+ * key: the parent (`pages/device.ts::_yaml`) only reassigns
+ * the string when the user types, so identical reads share
+ * the same identity. A composite-string key would itself be
+ * O(N) to build on every call — defeating most of the point.
+ *
+ * **Load-bearing:** `pages/device.ts` must keep `_yaml`'s
+ * string identity stable across renders that don't change the
+ * content. If a future refactor reconstructs the string each
+ * render (template literal, `String(...)`, JSON round-trip),
+ * every call becomes a cache miss and the optimisation
+ * silently degrades to a no-op.
+ *
+ * Wrapping the state in a small factory keeps the reset list
+ * (`_clearScanMemos`) single-source — adding a third memo just
+ * means a new `createScanMemo<K, V>()` line, not editing two
+ * places.
+ */
+function createScanMemo<K, V>() {
+  let key: K | undefined;
+  let value: V | undefined;
+  return {
+    get(probe: K, equals: (a: K, b: K) => boolean): V | undefined {
+      if (key !== undefined && equals(probe, key)) return value;
+      return undefined;
+    },
+    set(probe: K, v: V) {
+      key = probe;
+      value = v;
+    },
+    clear() {
+      key = undefined;
+      value = undefined;
+    },
+  };
+}
+
+interface PinKey {
+  yaml: string;
+  // Note: the cache distinguishes `undefined` (no exclude range)
+  // from `0` exactly via `Object.is`, so a future caller that
+  // passes `0` won't collide with the unset state.
+  excludeFromLine: number | undefined;
+  excludeToLine: number | undefined;
+}
+const pinMemo = createScanMemo<PinKey, Map<number, string>>();
+const pinKeyEquals = (a: PinKey, b: PinKey) =>
+  a.yaml === b.yaml &&
+  a.excludeFromLine === b.excludeFromLine &&
+  a.excludeToLine === b.excludeToLine;
 
 export function findUsedPins(
   yaml: string,
   excludeFromLine?: number,
   excludeToLine?: number,
 ): Map<number, string> {
-  if (
-    yaml === _pinMemoYaml &&
-    excludeFromLine === _pinMemoFrom &&
-    excludeToLine === _pinMemoTo &&
-    _pinMemoValue
-  ) {
-    return _pinMemoValue;
-  }
+  const probe: PinKey = { yaml, excludeFromLine, excludeToLine };
+  const cached = pinMemo.get(probe, pinKeyEquals);
+  if (cached) return cached;
   const used = new Map<number, string>();
   if (!yaml) {
     // Don't cache the empty-yaml early return: a future
@@ -87,10 +124,7 @@ export function findUsedPins(
       }
     }
   }
-  _pinMemoYaml = yaml;
-  _pinMemoFrom = excludeFromLine;
-  _pinMemoTo = excludeToLine;
-  _pinMemoValue = used;
+  pinMemo.set(probe, used);
   return used;
 }
 
@@ -118,25 +152,22 @@ export function sectionEndLine(
  * inside the given top-level domain. Block-list items reset the cursor
  * so each list element produces its own `{ id, name }` record.
  */
-/** Single-entry memo for the id-reference scan, keyed by
- *  (yaml, domain) — reference equality on `yaml`, same rationale
- *  as `findUsedPins`'s memo. */
-let _refMemoYaml: string | null = null;
-let _refMemoDomain: string | null = null;
-let _refMemoValue: Array<{ id: string; name: string }> | null = null;
+interface RefKey {
+  yaml: string;
+  domain: string;
+}
+const refMemo = createScanMemo<RefKey, Array<{ id: string; name: string }>>();
+const refKeyEquals = (a: RefKey, b: RefKey) =>
+  a.yaml === b.yaml && a.domain === b.domain;
 
 export function findReferencedComponents(
   yaml: string,
   domain: string,
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
-  if (
-    yaml === _refMemoYaml &&
-    domain === _refMemoDomain &&
-    _refMemoValue
-  ) {
-    return _refMemoValue;
-  }
+  const probe: RefKey = { yaml, domain };
+  const cached = refMemo.get(probe, refKeyEquals);
+  if (cached) return cached;
   const lines = yaml.split("\n");
   const result: Array<{ id: string; name: string }> = [];
   let inSection = false;
@@ -169,9 +200,7 @@ export function findReferencedComponents(
     }
   }
   flush();
-  _refMemoYaml = yaml;
-  _refMemoDomain = domain;
-  _refMemoValue = result;
+  refMemo.set(probe, result);
   return result;
 }
 
@@ -183,11 +212,6 @@ export function findReferencedComponents(
  * slate.
  */
 export function _clearScanMemos(): void {
-  _pinMemoYaml = null;
-  _pinMemoFrom = undefined;
-  _pinMemoTo = undefined;
-  _pinMemoValue = null;
-  _refMemoYaml = null;
-  _refMemoDomain = null;
-  _refMemoValue = null;
+  pinMemo.clear();
+  refMemo.clear();
 }

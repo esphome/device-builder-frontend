@@ -110,6 +110,19 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _navCollapsed = false;
 
+  /**
+   * Live device YAML, fed down through `device-editor` →
+   * `device-board-info` to the section editor and the YAML pane.
+   *
+   * Reference identity is load-bearing: the section editor's
+   * scan memos in `util/config-entry-yaml-scan.ts` (per-keystroke
+   * pin / id-reference lookups) cache by `yaml === yaml`. Only
+   * reassign this field when the content actually changes —
+   * never via a template literal, `String(...)`, or any path
+   * that constructs a new string. Doing so silently demotes the
+   * memos to a no-op (every render becomes a cache miss) and
+   * the per-keystroke scans regress to O(N) on the full YAML.
+   */
   @state()
   private _yaml = "";
 
