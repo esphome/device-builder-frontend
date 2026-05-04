@@ -213,11 +213,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // would silently drop the value. Look up the matching option
       // case-insensitively and feed wa-select the option's verbatim
       // value so the lookup succeeds.
+      //
+      // Pin entries are a second mismatch: the seeded YAML value is
+      // a bare int (`9`, from `seedBoardPinDefaults` reading the
+      // board manifest's pin features) or a string alias (`"SCL"`),
+      // but the option values are always `"GPIOn"`. Normalise both
+      // into the bare GPIO number for comparison so a freshly seeded
+      // i2c bus on ESP32-C3 lands on the right option instead of
+      // showing an empty select.
       const options = Array.from(
         select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
       );
+      const rawGpio = raw.match(/^\s*(?:GPIO)?(\d+)\s*$/i)?.[1];
+      const findByValue = (v: string) =>
+        options.find((o) => o.value?.toLowerCase() === v.toLowerCase());
       const matched = raw
-        ? options.find((o) => o.value?.toLowerCase() === raw.toLowerCase())
+        ? (findByValue(raw) ??
+            (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
         : null;
       const desired = matched?.value ?? raw;
       const current = Array.isArray(select.value)
