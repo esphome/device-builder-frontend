@@ -216,4 +216,116 @@ describe("validateEntries", () => {
     });
     expect(partial.get("auth.password")?.code).toBe("validation.required");
   });
+
+  // ---------------------------------------------------------------------
+  // Optional default_value fallback regression — MasterOfNone bug
+  // ---------------------------------------------------------------------
+  //
+  // ESPHome catalog entries often carry unit-suffixed defaults
+  // (``frequency: "50kHz"``, ``timeout: "10s"``, ``update_interval:
+  // "60s"``) on numeric / time-period entries. The validator used to
+  // fall back to ``default_value`` for ALL entries, which made
+  // ``Number("50kHz") = NaN`` for every untouched optional numeric
+  // field — flagging ``validation.not_a_number`` for fields the user
+  // can't see in ``required-only`` mode.
+  //
+  // The form's submit guard then bailed silently on the validation
+  // error and the user reported the symptom as
+  // ``Add ES7210 → Add i2c → blue Add does nothing``.
+  //
+  // Pin: optional entries with unit-suffixed defaults must validate
+  // clean when the user hasn't touched them. Required entries still
+  // need the fallback so a required-without-input entry that's been
+  // pre-defaulted by the catalog doesn't surface as ``required``.
+
+  it("does not validate optional numeric entries against unit-suffixed defaults", () => {
+    // Reproduces the i2c.frequency case verbatim: optional FLOAT
+    // entry with a string default like ``"50kHz"``.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        required: false,
+        default_value: "50kHz",
+      }),
+    ];
+    // User never touched the field — no value in the dict.
+    expect(validateEntries(entries, {}).size).toBe(0);
+  });
+
+  it("does not validate optional time-period entries against unit-suffixed defaults", () => {
+    const entries = [
+      makeEntry({
+        key: "timeout",
+        type: ConfigEntryType.FLOAT,
+        required: false,
+        default_value: "10s",
+      }),
+    ];
+    expect(validateEntries(entries, {}).size).toBe(0);
+  });
+
+  it("validates required entries against default_value (regression boundary)", () => {
+    // Required entry with a unit-suffixed default still validates —
+    // a regression that dropped the fallback for required entries
+    // would let an unset required field through where the catalog
+    // had pre-supplied a default.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        required: true,
+        default_value: "50kHz",
+      }),
+    ];
+    const errors = validateEntries(entries, {});
+    expect(errors.get("frequency")?.code).toBe("validation.not_a_number");
+  });
+
+  it("validates user-set values on optional numeric entries", () => {
+    // Once the user types something, validate it normally — even on
+    // optional entries. A regression that skipped optional entries
+    // entirely would let bad user input through.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.INTEGER,
+        required: false,
+        default_value: null,
+      }),
+    ];
+    expect(validateEntries(entries, { frequency: "abc" }).get("frequency")?.code)
+      .toBe("validation.not_a_number");
+    expect(validateEntries(entries, { frequency: 100 }).size).toBe(0);
+  });
+
+  it("does not validate the i2c bus shape end-to-end", () => {
+    // End-to-end shape of the i2c bus catalog entry (the original
+    // MasterOfNone repro): id + several optional numeric / boolean
+    // entries, every numeric one carrying a unit-suffixed default.
+    const i2cEntries = [
+      makeEntry({ key: "scl", type: ConfigEntryType.PIN, default_value: "SCL" }),
+      makeEntry({ key: "sda", type: ConfigEntryType.PIN, default_value: "SDA" }),
+      makeEntry({ key: "id", type: ConfigEntryType.ID }),
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        default_value: "50kHz",
+      }),
+      makeEntry({
+        key: "scan",
+        type: ConfigEntryType.BOOLEAN,
+        default_value: true,
+      }),
+      makeEntry({
+        key: "timeout",
+        type: ConfigEntryType.FLOAT,
+        default_value: "10ms",
+      }),
+    ];
+    // Form's _initValues for non-featured components seeds nothing
+    // for non-required entries and auto-generates the id.
+    const values = { id: "i2c_1" };
+    expect(validateEntries(i2cEntries, values).size).toBe(0);
+  });
 });
