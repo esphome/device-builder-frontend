@@ -7,7 +7,11 @@
  * read and write — not as a general YAML parser.
  */
 
-import { formatYamlScalar, serializeYamlValues } from "./yaml-serialize.js";
+import {
+  YamlRawValue,
+  formatYamlScalar,
+  serializeYamlValues,
+} from "./yaml-serialize.js";
 
 /**
  * Identifier alphabet ESPHome accepts for top-level / nested config
@@ -44,6 +48,28 @@ const LIST_ITEM_INLINE_KEY_RE = new RegExp(
  * round-trip path, so this is the only realistic source.
  */
 export const LIST_ITEM_START_RE = /^\s+-(\s|$)/;
+
+/**
+ * Block-scalar header on a YAML line: `key: |`, `key: |-`, `key: >`,
+ * `key: >+`, optionally followed by a comment. The minimal parser
+ * doesn't model block scalars; their presence is the canonical
+ * "this value can't be round-tripped through `Record<string, unknown>`"
+ * signal that triggers raw-line preservation.
+ */
+const BLOCK_SCALAR_RE = /:\s*[|>][-+]?\s*(?:#.*)?$/;
+
+/**
+ * Match a list item whose value is a key-style sub-dict header
+ * (`- then:`, `- lambda:`). The dash + key + colon shape is the
+ * other "complex list item" signal alongside block scalars — the
+ * follow-up lines under such a header carry the actual content,
+ * which the simple `string[]` representation would silently drop.
+ *
+ * Allows zero trailing whitespace after the colon (header-only
+ * line) AND content after it (`- lambda: |-`); both forms are
+ * complex.
+ */
+const LIST_ITEM_DICT_KEY_RE = /^\s+-\s+[a-zA-Z_][a-zA-Z0-9_]*:(?:\s|$)/;
 
 const childRegexFor = (indent: string) =>
   new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
@@ -95,6 +121,62 @@ const collectBlockListItems = (
     items.push(stripQuotes(m[1].trim()));
   }
   return { items, endIdx: j };
+};
+
+/**
+ * Scan forward from `startIdx` and return the 0-indexed line that
+ * ends the value-block sitting underneath a key at `keyIndent`.
+ * The block consists of every subsequent line that's either blank
+ * or indented strictly deeper than `keyIndent`; the first
+ * non-blank line at `keyIndent` (sibling key) or shallower
+ * (back-out) terminates it. EOF is also a valid terminator.
+ *
+ * Used by the raw-preservation path so we know which slice of the
+ * document to capture verbatim when a key's value contains a
+ * block scalar or sub-dict list items the minimal parser can't
+ * round-trip.
+ */
+const _findValueBlockEnd = (
+  lines: string[],
+  startIdx: number,
+  keyIndent: string,
+): number => {
+  for (let i = startIdx; i < lines.length; i++) {
+    if (lines[i].trim() === "") continue;
+    const lead = lines[i].match(/^[ \t]*/)![0];
+    if (lead.length <= keyIndent.length) return i;
+  }
+  return lines.length;
+};
+
+/**
+ * Detect whether the value-block in `[startIdx, endIdx)` carries
+ * shapes the minimal parser can't round-trip. Two signals:
+ *
+ *   1. A block-scalar header (`key: |`, `key: >-`) on any line.
+ *      Block scalars span multiple physical lines, and the
+ *      `string` parser would only capture the header.
+ *   2. A list-item whose first token is a key-style header
+ *      (`- then:`, `- lambda:` without inline value). The
+ *      follow-up indented lines carry the actual content; the
+ *      `string[]` parser would silently drop them.
+ *
+ * Either signal triggers raw-line preservation for the whole
+ * block. False negatives here regress to the previous mangling
+ * behaviour, so the regexes are deliberately permissive.
+ */
+const _isComplexBlock = (
+  lines: string[],
+  startIdx: number,
+  endIdx: number,
+): boolean => {
+  for (let i = startIdx; i < endIdx; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    if (BLOCK_SCALAR_RE.test(line)) return true;
+    if (LIST_ITEM_DICT_KEY_RE.test(line)) return true;
+  }
+  return false;
 };
 
 /**
@@ -164,12 +246,24 @@ export function parseYamlSectionValues(
 
   const listItemPrefix = `${childIndent}  - `;
   const listItemRegex = listItemRegexFor(childIndent);
+  // For list-item-rooted sections: only sibling dashes at the
+  // SAME indentation as the leading dash terminate the section.
+  // A nested list inside a value (`on_press:` → `      - lambda:`)
+  // has a deeper dash indent — treating it as a sibling would
+  // cut the section short and leave the nested content stranded
+  // outside the splice range, which is what mangled saves of
+  // template-button automations.
+  const siblingDashIndent = isListItem
+    ? (lines[startIdx].match(/^(\s*)-/) ?? ["", ""])[1].length
+    : -1;
 
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
     if (isListItem) {
-      if (LIST_ITEM_START_RE.test(line) || /^[a-zA-Z]/.test(line)) break;
+      const dashMatch = line.match(/^(\s*)-(\s|$)/);
+      if (dashMatch && dashMatch[1].length === siblingDashIndent) break;
+      if (/^[a-zA-Z]/.test(line)) break;
     } else if (/^[a-zA-Z]/.test(line)) {
       break;
     }
@@ -186,6 +280,23 @@ export function parseYamlSectionValues(
       const peekLine = lines[peek];
 
       if (peekLine.startsWith(listItemPrefix)) {
+        // Find the full extent of this key's value-block first
+        // (the slice that ends at the next sibling key at
+        // childIndent or back-out). Scanning the whole block is
+        // necessary because complexity can hide on a follow-up
+        // body line — `      - lambda: |-` looks parseable on
+        // its own; the next-line `          some_code();` body
+        // is what triggers raw-mode.
+        const blockEnd = _findValueBlockEnd(lines, i + 1, childIndent);
+        if (_isComplexBlock(lines, i + 1, blockEnd)) {
+          // Slice with `lines.slice(i + 1, blockEnd)` to capture
+          // the lines verbatim (with trailing blank lines
+          // trimmed by `_findValueBlockEnd`'s "next non-blank
+          // line at keyIndent or shallower" terminator).
+          values[key] = new YamlRawValue(lines.slice(i + 1, blockEnd));
+          i = blockEnd - 1;
+          continue;
+        }
         const { items, endIdx } = collectBlockListItems(
           lines,
           i + 1,
@@ -253,6 +364,15 @@ function parseNestedBlock(
       let peek = i + 1;
       while (peek < lines.length && lines[peek].trim() === "") peek++;
       if (peek < lines.length && lines[peek].startsWith(listItemPrefix)) {
+        // Same complex-block detection as the top-level parser:
+        // block scalars or sub-dict list items under a key get
+        // captured raw rather than mangled into `string[]`.
+        const blockEnd = _findValueBlockEnd(lines, i + 1, indent);
+        if (_isComplexBlock(lines, i + 1, blockEnd)) {
+          values[key] = new YamlRawValue(lines.slice(i + 1, blockEnd));
+          i = blockEnd;
+          continue;
+        }
         const { items, endIdx } = collectBlockListItems(
           lines,
           i + 1,
@@ -284,7 +404,21 @@ function parseNestedBlock(
   return { values, endIdx: i };
 }
 
-/** Find the 0-indexed line range [start, end) for a section. */
+/**
+ * Find the 0-indexed line range [start, end) for a section.
+ *
+ * For list-item-rooted sections, termination is on a sibling dash
+ * at the SAME indent as the leading dash (or a top-level key) —
+ * NOT just any indented dash. A nested list inside the section's
+ * value (e.g. an automation list under `on_press:` whose dashes
+ * sit deeper than the section's leading dash) is part of the
+ * section, not a sibling, and clipping the range there leaves the
+ * nested content outside the splice — which then survives the
+ * save and re-appears as duplicate stale lines under the new
+ * serialized output. That regression was visible as a template
+ * button's `on_press` lambda body persisting verbatim after the
+ * form-side save mangled the on_press header.
+ */
 export function findSectionRange(
   lines: string[],
   sectionKey: string,
@@ -294,10 +428,18 @@ export function findSectionRange(
   if (start < 0) return { start: -1, end: -1 };
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
+  const siblingDashIndent = isListItem
+    ? (lines[start].match(/^(\s*)-/) ?? ["", ""])[1].length
+    : -1;
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
     if (isListItem) {
-      if (LIST_ITEM_START_RE.test(lines[i]) || /^[a-zA-Z]/.test(lines[i])) {
+      const dashMatch = lines[i].match(/^(\s*)-(\s|$)/);
+      if (dashMatch && dashMatch[1].length === siblingDashIndent) {
+        end = i;
+        break;
+      }
+      if (/^[a-zA-Z]/.test(lines[i])) {
         end = i;
         break;
       }

@@ -4,13 +4,38 @@
  * `serializeYamlValues` is used by the section editor (to write a
  * section back into the device YAML) and by the add-component dialog
  * (to render a live preview). It handles scalars, arrays of scalars,
- * and nested objects; empty/null/undefined values are skipped.
+ * nested objects, and `YamlRawValue` opaque blocks; empty/null/undefined
+ * values are skipped.
  *
  * `parseTopLevelComponents` walks the YAML to find every top-level
  * key (e.g. `wifi:`, `mqtt:`, `output:`). Both forms use it to
  * evaluate `depends_on_component` predicates and component-level
  * dependency checks against the user's current configuration.
  */
+
+/**
+ * Opaque wrapper for a section-value block the parser couldn't fully
+ * model — block scalars (`lambda: |-`), automation handlers with
+ * sub-dict list items (`on_press:` → `- then:` → ...), or any other
+ * shape that round-trips byte-for-byte but doesn't fit
+ * `string | string[] | Record<string, unknown>`.
+ *
+ * The instance carries the original lines verbatim (with their
+ * leading whitespace), and the serializer pastes them back under a
+ * fresh `key:` header without trying to re-render the contents. This
+ * lets the form edit fields it understands (a button's `name`,
+ * `icon`, `device_class`) without mangling the automation block it
+ * doesn't.
+ *
+ * Class identity (rather than a sentinel property) so a YAML key
+ * called `__raw` or similar can't accidentally trigger raw-mode on
+ * round-trip. ``setIn`` (used by the form) copies values by
+ * reference through ``{...obj}`` spread, so the class identity
+ * survives form mutations.
+ */
+export class YamlRawValue {
+  constructor(public readonly lines: readonly string[]) {}
+}
 
 /**
  * Serialize a values dict as YAML lines at the given indent.
@@ -24,6 +49,17 @@ export function serializeYamlValues(
   const lines: string[] = [];
   for (const [key, val] of Object.entries(values)) {
     if (val === undefined || val === null || val === "") continue;
+    if (val instanceof YamlRawValue) {
+      // Raw block (block scalar, automation handler, …). Lines
+      // already carry their original indentation — emit `key:`
+      // and paste them back unchanged. `instanceof` check before
+      // the generic `typeof === "object"` branch so the class
+      // identity wins over the plain-object handling below.
+      if (val.lines.length === 0) continue;
+      lines.push(`${indent}${key}:`);
+      lines.push(...val.lines);
+      continue;
+    }
     if (Array.isArray(val)) {
       if (val.length === 0) continue;
       lines.push(`${indent}${key}:`);
