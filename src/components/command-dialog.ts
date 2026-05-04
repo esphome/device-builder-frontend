@@ -761,6 +761,22 @@ export class ESPHomeCommandDialog extends LitElement {
   private _renderShowLogsAfterInstallToggle() {
     if (this._commandType !== "install") return nothing;
     if (this._state === "success" || this._state === "error") return nothing;
+    /* ``followJob()`` can attach to a job that's already terminal
+       — the user reopened a finished install from the dashboard's
+       activity list to review its output. ``_followJob``'s
+       ``wasLiveAtAttach`` guard suppresses the auto-flip in that
+       case (we never saw the QUEUED/RUNNING → COMPLETED
+       transition), so the toggle would be wired to a path that
+       has already had its chance to fire. Hide it; the post-
+       success "Logs" action button takes over once ``onResult``
+       resolves a beat later. (issue #139) */
+    if (
+      this._jobStatus === JobStatus.COMPLETED ||
+      this._jobStatus === JobStatus.FAILED ||
+      this._jobStatus === JobStatus.CANCELLED
+    ) {
+      return nothing;
+    }
     return this._renderToolbarToggle({
       active: this._showLogsAfterInstall,
       onClick: this._toggleShowLogsAfterInstall,
