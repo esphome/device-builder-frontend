@@ -24,6 +24,7 @@ import type {
   CompletionContext,
   CompletionResult,
 } from "@codemirror/autocomplete";
+import type { EditorState } from "@codemirror/state";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
   ConfigEntryType,
@@ -574,6 +575,40 @@ export async function resolveAvailableEntries(
   return [];
 }
 
+/**
+ * Resolve the cursor's structural context for completion lookups,
+ * preferring the AST when it can answer and falling back to the
+ * indent-text walkers otherwise.
+ *
+ * The AST handles list-item indent quirks the regex walkers miss
+ * — specifically, ``readPlatformSibling`` breaks at the dash
+ * column and never sees a ``platform:`` sibling sitting at the
+ * list-item-body indent. The regex walkers stay as the fallback
+ * for cases the AST can't answer (e.g. partial input that
+ * doesn't parse cleanly).
+ */
+function resolveCompletionContext(
+  state: EditorState,
+  pos: number,
+  allLines: string[],
+  lineIdx: number,
+  indent: number,
+): {
+  platformValue: string | null;
+  topLevelKey: string | null;
+  bundleCtx: ReturnType<typeof resolveBundleContext>;
+} {
+  const bundleCtx = resolveBundleContext(state, pos);
+  return {
+    bundleCtx,
+    platformValue:
+      bundleCtx?.platformValue ??
+      readPlatformSibling(allLines, lineIdx, indent),
+    topLevelKey:
+      bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx),
+  };
+}
+
 // ─── The completion source ───────────────────────────────────────────
 
 /**
@@ -633,15 +668,19 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       const parent = findParentKey(allLines, lineInfo.number - 1, indent);
       let entries: ConfigEntry[] = [];
       if (parent) {
-        // Look up the platform sibling (sibling key on the same indent).
-        const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-        const topLevelBlock = findTopLevelBlock(allLines, lineInfo.number - 1);
+        const ctx = resolveCompletionContext(
+          state,
+          pos,
+          allLines,
+          lineInfo.number - 1,
+          indent,
+        );
         entries = await resolveAvailableEntries(
           api,
           catalog,
           parent.key,
-          platformValue,
-          topLevelBlock,
+          ctx.platformValue,
+          ctx.topLevelKey,
         );
       } else {
         // We're in a top-level value (rare — most top-level values are
@@ -707,15 +746,14 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const parent = findParentKey(allLines, lineInfo.number - 1, indent);
     if (!parent) return null;
 
-    const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-    // Resolve the schema-bundle context structurally from the
-    // Lezer parse tree. This is the AST equivalent of "find the
-    // top-level component the cursor lives under, plus the
-    // platform sibling if any". More robust than walking text
-    // lines because the tree handles block scalars, quoted
-    // keys, and partial / invalid input via Lezer's error
-    // recovery.
-    const bundleCtx = resolveBundleContext(state, pos);
+    const ctx2 = resolveCompletionContext(
+      state,
+      pos,
+      allLines,
+      lineInfo.number - 1,
+      indent,
+    );
+    const { bundleCtx, platformValue } = ctx2;
     // Action-registry only fires at the list-item position under
     // a ``then:`` block. AST-based: walk up the tree looking for
     // an ``Item`` whose enclosing ``Pair`` has Key=``then``.

@@ -71,6 +71,23 @@ describe("resolveBundleContext", () => {
       platformValue: "gpio",
     });
   });
+
+  it("resolves bundle context immediately after the list-item header", () => {
+    // User-reported case: typing ``pi`` on the line right after
+    // ``- platform: gpio``. The regex walker
+    // (``readPlatformSibling``) breaks at the dash column and
+    // misses the ``platform:`` sibling — the AST is what makes
+    // this work. Pin the resolution at exactly that position.
+    const yaml = ["binary_sensor:", "  - platform: gpio", "    pi"].join(
+      "\n",
+    );
+    const state = makeState(yaml);
+    const ctx = resolveBundleContext(state, yaml.length);
+    expect(ctx).toEqual({
+      topLevelKey: "binary_sensor",
+      platformValue: "gpio",
+    });
+  });
 });
 
 describe("isUnderThenItem", () => {
