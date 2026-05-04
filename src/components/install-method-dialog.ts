@@ -530,6 +530,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
           type="button"
           class="chevron-btn"
           aria-expanded=${expanded ? "true" : "false"}
+          aria-controls=${expanded ? "ota-address-form" : nothing}
           aria-label=${this._localize(
             "dashboard.install_method_network_address_toggle",
           )}
@@ -543,7 +544,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       </div>
       ${expanded
         ? html`
-            <div class="ota-form">
+            <div id="ota-address-form" class="ota-form">
               <label for="ota-address-input"
                 >${this._localize(
                   "dashboard.install_method_network_address_label",
