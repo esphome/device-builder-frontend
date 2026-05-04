@@ -101,25 +101,32 @@ export const esphomeYamlLanguage = LRLanguage.define({
  * indent to 0.
  */
 const yamlIndentService = indentService.of((context, pos) => {
+  // ``context.unit`` is the editor's configured indent width (the
+  // ``indentUnit`` facet, in columns). Deriving the step from it
+  // means the service tracks any future change to the editor's
+  // indent configuration instead of hard-coding ``+ 2``. The dash
+  // continuation also uses ``unit`` because YAML's ``- key`` is
+  // exactly one indent step deeper than the dash's column.
+  const step = context.unit;
   const currentLineNumber = context.state.doc.lineAt(pos).number;
   for (let n = currentLineNumber - 1; n >= 1; n--) {
     const text = context.state.doc.line(n).text;
     if (!text.trim()) continue;
     // A line of the form ``  - <something>``: the natural
-    // continuation column is the dash's position + 2 (one space
-    // for the dash, one for the gap), not the dash's leading
-    // whitespace. Without this, a continuation under
-    // ``  - platform: gpio`` would land at column 2 instead of 4.
+    // continuation column is one indent step past the dash's column,
+    // not the dash's leading whitespace. Without this, a
+    // continuation under ``  - platform: gpio`` would land at
+    // column 2 instead of 4.
     const dashMatch = text.match(/^( *)-\s/);
     const baseIndent = dashMatch
-      ? dashMatch[1].length + 2
+      ? dashMatch[1].length + step
       : (text.match(/^( *)/)?.[1].length ?? 0);
     // Trailing-colon line opens a child block. Strip a trailing
     // ``# comment`` first so ``key:  # note`` still triggers
     // (ESPHome configs sprinkle inline comments freely).
     const noComment = text.replace(/\s+#.*$/, "");
     if (/:\s*$/.test(noComment)) {
-      return baseIndent + 2;
+      return baseIndent + step;
     }
     return baseIndent;
   }

@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
-import {
-  IndentContext,
-  getIndentation,
-  indentService,
-  syntaxTree,
-} from "@codemirror/language";
+import { getIndentation } from "@codemirror/language";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 
 /**
@@ -101,11 +96,3 @@ describe("esphome-yaml language extension shape", () => {
   });
 });
 
-// Suppress unused-import lint: the imports are part of the public
-// CM6 API surface and exercising them via getIndentation keeps this
-// test honest. ``IndentContext`` / ``indentService`` / ``syntaxTree``
-// are referenced at type level in case a future test wants to inspect
-// them more directly.
-void IndentContext;
-void indentService;
-void syntaxTree;
