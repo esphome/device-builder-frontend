@@ -15,6 +15,7 @@ export interface DeviceRow {
   friendly_name: string;
   address: string;
   ip: string;
+  ip_addresses: string[];
   platform: string;
   version: string;
   comment: string;

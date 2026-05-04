@@ -527,19 +527,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   }
 
   /**
-   * Render the device's IP address(es) — IPv4 + IPv6 when the backend
-   * provides ``ip_addresses``, falling back to the legacy single
-   * ``ip`` string when it doesn't. The label switches between
-   * singular and plural based on what we have to show, and the
-   * en-dash placeholder still renders when the device has never
-   * been online so the row stays diagnostic.
+   * Render every resolved IP address for the device — IPv4 + IPv6 in
+   * the order the backend reported them. The label switches between
+   * singular and plural based on the list length, and an en-dash
+   * placeholder renders when the device has never been online so the
+   * row stays diagnostic.
    */
   private _renderIpAddressRow(d: ConfiguredDevice) {
-    const list = d.ip_addresses && d.ip_addresses.length > 0
-      ? d.ip_addresses
-      : d.ip
-        ? [d.ip]
-        : [];
+    const list = d.ip_addresses;
     const labelKey = list.length > 1
       ? "dashboard.drawer_ip_addresses"
       : "dashboard.drawer_ip_address";

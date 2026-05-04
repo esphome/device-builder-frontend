@@ -215,7 +215,7 @@ export class ESPHomeDeviceTable extends LitElement {
       (d.friendly_name || d.name).toLowerCase().includes(q) ||
       d.config.toLowerCase().includes(q) ||
       d.address.toLowerCase().includes(q) ||
-      d.ip.toLowerCase().includes(q) ||
+      d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
       d.platform.toLowerCase().includes(q)
     );
   };
@@ -251,6 +251,7 @@ export class ESPHomeDeviceTable extends LitElement {
         friendly_name: d.friendly_name,
         address: d.address || "",
         ip: d.ip || "",
+        ip_addresses: d.ip_addresses,
         platform: d.target_platform || "",
         version: d.current_version || "",
         comment: d.comment || "",

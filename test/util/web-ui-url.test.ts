@@ -12,6 +12,7 @@ const _baseDevice = {
   target_platform: "esp32",
   address: "kitchen.local",
   ip: "",
+  ip_addresses: [],
   web_port: null,
   current_version: "",
   deployed_version: "",
