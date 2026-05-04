@@ -827,19 +827,28 @@ export class ESPHomeCommandDialog extends LitElement {
               </button>`;
       case "success":
         /* Surface a "Show logs" action on a successful install so
-           the user has a one-click path back to the live logs dialog
-           after they've clicked its "Back to install" button. The
-           same auto-flip path is reused so server-serial installs
-           open server-serial logs and OTA installs open network
-           logs. Other command types (compile / clean) don't have a
-           sensible logs follow-up, so we only surface it for
-           install. Every surface that mounts this command-dialog
-           also wires ``@request-show-logs-after-install`` to a
-           logs-dialog (dashboard, device editor,
-           firmware-tasks dialog), so the button works regardless
-           of whether the user came in fresh or reattached. */
+           the user has a one-click path back to the live logs
+           dialog after they've clicked its "Back to install"
+           button. The same auto-flip path is reused so
+           server-serial installs open server-serial logs and OTA
+           installs open network logs. Other command types
+           (compile / clean) don't have a sensible logs follow-up,
+           so we only surface it for install.
+
+           Hosts that mount this dialog are expected to wire
+           ``@request-show-logs-after-install`` to their logs-
+           dialog; if a host neglects to, the click no-ops rather
+           than misbehaving.
+
+           Rendered as a ghost button (not ``term-btn--start``) on
+           purpose — the toolbar's "Logs after" toggle was
+           previously shown with the blue accent palette while the
+           install ran, and reusing that styling here would make
+           the post-success "Logs" button look like the toggle
+           "stayed on" rather than collapsing into a regular
+           action. */
         return this._commandType === "install"
-          ? html`<button class="term-btn term-btn--start" @click=${this._flipToLogs}>
+          ? html`<button class="term-btn term-btn--ghost" @click=${this._flipToLogs}>
                 <wa-icon library="mdi" name="console"></wa-icon>
                 ${this._localize("command.show_logs")}
               </button>
