@@ -61,6 +61,7 @@ jobs:
     name: Build wheel and attach to release
     needs: create-release
     runs-on: ubuntu-latest
+    environment: pypi
     permissions:
       contents: read    # actions/checkout uses the implicit GITHUB_TOKEN
       id-token: write   # OIDC for PyPI Trusted Publishing
