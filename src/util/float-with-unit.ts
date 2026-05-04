@@ -111,3 +111,35 @@ export function defaultUnitForFloatWithUnit(
   }
   return unitOptions[0] ?? "";
 }
+
+/**
+ * Compute the unit shown in the picker, layering four sources in
+ * priority order:
+ *
+ * 1. The current YAML value's unit (e.g. `"50kHz"` → `"kHz"`),
+ *    when the field has a value.
+ * 2. The user's transient unit pick — they changed the picker on
+ *    an empty field; serializing `{value:null, unit}` would emit
+ *    `""` and the next render's default-fallback would snap the
+ *    picker back to canonical, so the form stashes the choice
+ *    out-of-band and reads it here.
+ * 3. The unit half of the catalog default.
+ * 4. The canonical (first) option, then empty.
+ *
+ * Pure for testability — the renderer wires in `getPendingUnit` and
+ * `getAt` against the form's state.
+ */
+export function chooseDisplayUnit(
+  rawValue: unknown,
+  defaultValue: unknown,
+  pendingUnit: string | undefined,
+  unitOptions: readonly string[],
+): string {
+  const canonicalUnit = unitOptions[0] ?? "";
+  const hasValue =
+    rawValue !== null && rawValue !== undefined && rawValue !== "";
+  if (hasValue) {
+    return parseFloatWithUnit(rawValue, unitOptions).unit || canonicalUnit;
+  }
+  return pendingUnit ?? defaultUnitForFloatWithUnit(defaultValue, unitOptions);
+}

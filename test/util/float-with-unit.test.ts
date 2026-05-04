@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  chooseDisplayUnit,
   defaultUnitForFloatWithUnit,
   parseFloatWithUnit,
   placeholderForFloatWithUnit,
@@ -161,6 +162,48 @@ describe("defaultUnitForFloatWithUnit", () => {
   it("returns empty when unit_options is empty", () => {
     expect(defaultUnitForFloatWithUnit(null, [])).toBe("");
     expect(defaultUnitForFloatWithUnit(50, [])).toBe("");
+  });
+});
+
+describe("chooseDisplayUnit", () => {
+  it("uses the parsed unit when the value is non-empty", () => {
+    expect(
+      chooseDisplayUnit("50kHz", "10MHz", undefined, FREQUENCY_UNITS),
+    ).toBe("kHz");
+  });
+
+  it("ignores the pending unit when the value is non-empty", () => {
+    // Once the user has typed a number, the picker reflects the
+    // value's unit — pending state from before they typed is
+    // superseded.
+    expect(
+      chooseDisplayUnit("50kHz", "10MHz", "GHz", FREQUENCY_UNITS),
+    ).toBe("kHz");
+  });
+
+  it("uses the pending unit when the value is empty", () => {
+    // The user picked a unit on an empty field; the picker must
+    // reflect that choice on the next render — without this the
+    // picker snaps back to the catalog default and the user's
+    // pick is lost on every keystroke that re-renders.
+    expect(chooseDisplayUnit("", "50kHz", "GHz", FREQUENCY_UNITS)).toBe("GHz");
+    expect(chooseDisplayUnit(null, null, "MHz", FREQUENCY_UNITS)).toBe("MHz");
+  });
+
+  it("falls back to the catalog default's unit when no pending pick", () => {
+    expect(
+      chooseDisplayUnit("", "50kHz", undefined, FREQUENCY_UNITS),
+    ).toBe("kHz");
+  });
+
+  it("falls back to the canonical option when nothing else is set", () => {
+    expect(
+      chooseDisplayUnit("", null, undefined, FREQUENCY_UNITS),
+    ).toBe("Hz");
+  });
+
+  it("returns empty when unit_options is empty", () => {
+    expect(chooseDisplayUnit("", null, undefined, [])).toBe("");
   });
 });
 

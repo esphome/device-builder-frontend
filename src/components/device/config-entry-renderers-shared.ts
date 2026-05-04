@@ -66,6 +66,15 @@ export interface RenderCtx {
     values: Record<string, unknown>
   ) => ConfigEntry[];
   renderEntry: (entry: ConfigEntry, path: string[]) => unknown;
+  /**
+   * FLOAT_WITH_UNIT-only: stash a unit choice that the user picked
+   * before typing a numeric value. The form doesn't serialize the
+   * choice as YAML (a unit-only string isn't a valid value); instead
+   * the renderer reads it on next paint so the picker stays on the
+   * user's selection until they enter a number.
+   */
+  getPendingUnit: (path: string[]) => string | undefined;
+  setPendingUnit: (path: string[], unit: string) => void;
 }
 
 export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {

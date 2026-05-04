@@ -16,7 +16,7 @@ import { ifDefined } from "lit/directives/if-defined.js";
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import {
-  defaultUnitForFloatWithUnit,
+  chooseDisplayUnit,
   parseFloatWithUnit,
   placeholderForFloatWithUnit,
   serializeFloatWithUnit,
@@ -108,14 +108,12 @@ export function renderFloatWithUnitField(
   const rawValue = ctx.getAt(path);
   const parsed = parseFloatWithUnit(rawValue, unitOptions);
   const numberValue = parsed.value === null ? "" : String(parsed.value);
-  // When the field has no current value, the picker still needs a unit
-  // pre-selected — fall back to the unit half of the catalog default
-  // (`"50kHz"` → `"kHz"`) before the canonical option. Without this the
-  // unit picker renders blank for an untouched optional field.
-  const unit =
-    rawValue !== null && rawValue !== undefined && rawValue !== ""
-      ? parsed.unit || canonicalUnit
-      : defaultUnitForFloatWithUnit(entry.default_value, unitOptions);
+  const unit = chooseDisplayUnit(
+    rawValue,
+    entry.default_value,
+    ctx.getPendingUnit(path),
+    unitOptions,
+  );
   const placeholder = placeholderForFloatWithUnit(
     entry.default_value,
     unitOptions,
@@ -153,7 +151,16 @@ export function renderFloatWithUnitField(
                 ?disabled=${disabled}
                 @change=${(e: Event) => {
                   const nextUnit = (e.target as HTMLSelectElement).value;
-                  emit({ value: parsed.value, unit: nextUnit });
+                  if (parsed.value === null) {
+                    // No numeric value yet — stash the unit so the
+                    // picker stays on the user's pick. Serializing
+                    // ``{value:null, unit}`` would emit `""` and the
+                    // next render's default-fallback would snap the
+                    // picker back to canonical.
+                    ctx.setPendingUnit(path, nextUnit);
+                  } else {
+                    emit({ value: parsed.value, unit: nextUnit });
+                  }
                 }}
               >
                 ${unitOptions.map(

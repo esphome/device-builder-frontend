@@ -134,6 +134,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @state()
   private _nestedOpenSections: Set<string> = new Set();
 
+  /**
+   * Transient unit choice for FLOAT_WITH_UNIT entries the user
+   * picked before typing a numeric value. Keyed by the dotted
+   * path; cleared once the field's value lands in `this.values`.
+   * Stored in a private map (not `@state`) so a unit-only pick
+   * doesn't trip a re-render — the renderer reads it on the
+   * next paint that's already coming from the form's normal
+   * value-change cycle.
+   */
+  private _pendingUnits: Map<string, string> = new Map();
+
   static styles = [espHomeStyles, inputStyles, configEntryFormStyles];
 
   /**
@@ -176,6 +187,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * wa-select's own initial value resolution and the displayed label
    * stays blank.
    */
+  protected willUpdate(changed: PropertyValues) {
+    // A different entry list means the form was re-targeted to a
+    // different component (e.g. the dep-flow detour swapping
+    // ES7210 for i2c). Drop transient unit picks from the previous
+    // shape so they don't bleed into unrelated paths.
+    if (changed.has("entries") && changed.get("entries") !== undefined) {
+      this._pendingUnits.clear();
+    }
+  }
+
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
@@ -366,6 +387,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
+      getPendingUnit: (path) => this._pendingUnits.get(path.join(".")),
+      setPendingUnit: (path, unit) => {
+        this._pendingUnits.set(path.join("."), unit);
+        // Trigger a re-render so the picker reflects the stash.
+        // Mutating the Map alone won't, since `_pendingUnits` isn't
+        // a `@state`-tracked field.
+        this.requestUpdate();
+      },
       // Self-reference: assigned after object creation so the inner
       // renderer can recurse through the dispatch.
       renderEntry: () => nothing,
