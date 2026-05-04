@@ -479,6 +479,14 @@ export class ESPHomeCommandDialog extends LitElement {
     this._state = "running";
     this._lines = [];
     this._statusMessage = "";
+    /* Match ``open()``: every fresh attach is a fresh session, so
+       reset the per-toggle defaults rather than letting the prior
+       run's choice leak into this one. Most relevant for
+       ``_showLogsAfterInstall`` because a user who flipped the
+       toggle off on a prior install would otherwise see this re-
+       attached install silently inherit that opt-out. */
+    this._showSecrets = false;
+    this._showLogsAfterInstall = true;
     this._jobId = job.job_id;
     /* Prime from the job we were handed so the queued overlay can
        render on the very first paint instead of after the next
