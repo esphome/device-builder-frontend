@@ -10,7 +10,11 @@
  */
 import { parser as yamlParser } from "@lezer/yaml";
 import { cppLanguage } from "@codemirror/lang-cpp";
-import { LRLanguage, LanguageSupport } from "@codemirror/language";
+import {
+  LRLanguage,
+  LanguageSupport,
+  indentService,
+} from "@codemirror/language";
 import { parseMixed } from "@lezer/common";
 import type { SyntaxNodeRef, Input } from "@lezer/common";
 
@@ -80,8 +84,51 @@ export const esphomeYamlLanguage = LRLanguage.define({
 });
 
 /**
+ * YAML auto-indent service. Mirrors the legacy esphome dashboard's
+ * Monaco rule (``beforeText: /:\s*$/`` → ``IndentAction.Indent``)
+ * plus list-item continuation handling: pressing Enter under a
+ * line that ends with ``:`` opens a child block (indent + 2), and
+ * continuation lines inside a ``- item`` list are aligned to the
+ * dash's content column (``dash + 2``) so siblings of the first
+ * key in a list item land at the right depth automatically.
+ *
+ * Without this the new editor required the user to manually
+ * Tab/space every nested line — a real regression from the
+ * legacy editor (issue #134).
+ *
+ * Walks back over blank lines to find the nearest non-blank
+ * predecessor so a stray blank between sections doesn't reset
+ * indent to 0.
+ */
+const yamlIndentService = indentService.of((context, pos) => {
+  const currentLineNumber = context.state.doc.lineAt(pos).number;
+  for (let n = currentLineNumber - 1; n >= 1; n--) {
+    const text = context.state.doc.line(n).text;
+    if (!text.trim()) continue;
+    // A line of the form ``  - <something>``: the natural
+    // continuation column is the dash's position + 2 (one space
+    // for the dash, one for the gap), not the dash's leading
+    // whitespace. Without this, a continuation under
+    // ``  - platform: gpio`` would land at column 2 instead of 4.
+    const dashMatch = text.match(/^( *)-\s/);
+    const baseIndent = dashMatch
+      ? dashMatch[1].length + 2
+      : (text.match(/^( *)/)?.[1].length ?? 0);
+    // Trailing-colon line opens a child block. Strip a trailing
+    // ``# comment`` first so ``key:  # note`` still triggers
+    // (ESPHome configs sprinkle inline comments freely).
+    const noComment = text.replace(/\s+#.*$/, "");
+    if (/:\s*$/.test(noComment)) {
+      return baseIndent + 2;
+    }
+    return baseIndent;
+  }
+  return null;
+});
+
+/**
  * Language support bundle for ESPHome YAML.
  */
 export function esphomeYaml(): LanguageSupport {
-  return new LanguageSupport(esphomeYamlLanguage);
+  return new LanguageSupport(esphomeYamlLanguage, [yamlIndentService]);
 }
