@@ -66,14 +66,53 @@ export interface RenderCtx {
     values: Record<string, unknown>
   ) => ConfigEntry[];
   renderEntry: (entry: ConfigEntry, path: string[]) => unknown;
+  /**
+   * FLOAT_WITH_UNIT-only: stash a unit choice that the user picked
+   * before typing a numeric value. The form doesn't serialize the
+   * choice as YAML (a unit-only string isn't a valid value); instead
+   * the renderer reads it on next paint so the picker stays on the
+   * user's selection until they enter a number.
+   */
+  getPendingUnit: (path: string[]) => string | undefined;
+  setPendingUnit: (path: string[], unit: string) => void;
+  /**
+   * FLOAT_WITH_UNIT-only: transient editing buffer for the numeric
+   * input. `<input type="number">` reads `""` from `.value` while
+   * the user is typing intermediate states (`"-"`, `"1e"`, `"1."`),
+   * which would round-trip through serialize and reset the field
+   * mid-typing. Renderers stash the raw text here and read it on
+   * the next paint so partial input survives until the user types a
+   * parseable value (or blurs the field).
+   */
+  getEditingMagnitude: (path: string[]) => string | undefined;
+  setEditingMagnitude: (path: string[], text: string) => void;
+  clearEditingMagnitude: (path: string[]) => void;
 }
 
-export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
+/**
+ * Resolve the user-visible label for *entry* given a `localize`
+ * function. Three-layer fallback:
+ *
+ * 1. `translation_key` resolved via `localize` (ignored when
+ *    `localize` echoes the key back unchanged — the convention
+ *    for "no translation registered").
+ * 2. The catalog's English `entry.label`.
+ * 3. The entry's `key`, prettified — `"update_interval"` →
+ *    `"Update Interval"`.
+ *
+ * Pulled out of `labelFor()` so callers without a full
+ * `RenderCtx` (e.g. the add-component dialog's hidden-validation
+ * summary) can share the same chain.
+ */
+export function resolveEntryLabel(
+  entry: ConfigEntry,
+  localize: LocalizeFunc,
+): string {
   if (entry.translation_key) {
     const params = (entry.translation_params || undefined) as
       | Record<string, string | number>
       | undefined;
-    const translated = ctx.localize(entry.translation_key, params);
+    const translated = localize(entry.translation_key, params);
     if (translated && translated !== entry.translation_key) return translated;
   }
   if (entry.label) return entry.label;
@@ -81,6 +120,10 @@ export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
     .split("_")
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
     .join(" ");
+}
+
+export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
+  return resolveEntryLabel(entry, ctx.localize);
 }
 
 export function renderHelpLink(entry: ConfigEntry, ctx: RenderCtx) {

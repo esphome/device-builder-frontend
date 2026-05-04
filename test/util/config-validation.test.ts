@@ -1,44 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
+import { ConfigEntryType } from "../../src/api/types.js";
 import {
   getDeviceNameWarning,
   validateDeviceName,
   validateEntries,
   validateEntry,
 } from "../../src/util/config-validation.js";
-
-function makeEntry(overrides: Partial<ConfigEntry>): ConfigEntry {
-  return {
-    key: "foo",
-    type: ConfigEntryType.STRING,
-    label: "Foo",
-    default_value: null,
-    required: false,
-    description: null,
-    options: null,
-    allow_custom_value: false,
-    range: null,
-    help_link: null,
-    multi_value: false,
-    hidden: false,
-    advanced: false,
-    translation_key: null,
-    translation_params: null,
-    templatable: false,
-    depends_on: null,
-    depends_on_value: null,
-    depends_on_value_not: null,
-    depends_on_component: null,
-    references_component: null,
-    pin_features: [],
-    pin_mode: null,
-    locked: false,
-    suggestions: null,
-    config_entries: null,
-    platform_type: null,
-    ...overrides,
-  };
-}
+import { makeConfigEntry as makeEntry } from "./_make-config-entry.js";
 
 describe("validateDeviceName", () => {
   it("accepts valid slug", () => {
@@ -130,6 +98,42 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, 3.5)).toBeNull();
   });
 
+  it("validates the numeric portion of FLOAT_WITH_UNIT entries", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      unit_options: ["Hz", "kHz", "MHz"],
+    });
+    expect(validateEntry(entry, "50kHz")).toBeNull();
+    expect(validateEntry(entry, "3.3 V")?.code).toBe("validation.not_a_number");
+    expect(validateEntry(entry, "abckHz")?.code).toBe(
+      "validation.not_a_number",
+    );
+  });
+
+  it("applies range only when FLOAT_WITH_UNIT value is in canonical unit", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      unit_options: ["Hz", "kHz", "MHz"],
+      range: [10, 1_000_000],
+    });
+    // Canonical unit (Hz) — range bounds apply directly.
+    expect(validateEntry(entry, "5Hz")?.code).toBe("validation.min");
+    expect(validateEntry(entry, "100Hz")).toBeNull();
+    // Non-canonical unit — range bounds skipped (catalog ranges are
+    // post-coercion floats relative to the canonical unit).
+    expect(validateEntry(entry, "5kHz")).toBeNull();
+  });
+
+  it("does not flag empty optional FLOAT_WITH_UNIT entries", () => {
+    const entry = makeEntry({
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      required: false,
+      unit_options: ["Hz", "kHz"],
+    });
+    expect(validateEntry(entry, "")).toBeNull();
+    expect(validateEntry(entry, undefined)).toBeNull();
+  });
+
   it("rejects values not in options list", () => {
     const entry = makeEntry({
       type: ConfigEntryType.SELECT,
@@ -215,5 +219,98 @@ describe("validateEntries", () => {
       auth: { username: "admin" },
     });
     expect(partial.get("auth.password")?.code).toBe("validation.required");
+  });
+
+  // ---------------------------------------------------------------------
+  // Optional default_value fallback
+  // ---------------------------------------------------------------------
+  //
+  // ESPHome catalog entries can carry unit-suffixed string defaults
+  // on numeric / time-period entries (``frequency: "50kHz"``,
+  // ``timeout: "10s"``, ``update_interval: "60s"``). Optional entries
+  // must validate clean when the user hasn't touched them — the
+  // backend never sees the default, so validating against it is
+  // wrong by design. Required entries still need the fallback so a
+  // required-without-input entry that's been pre-defaulted by the
+  // catalog doesn't surface as ``required``.
+
+  it("does not validate optional entries against their default_value", () => {
+    // Optional defaults aren't sent to the backend — ``_coerceFields``
+    // strips empty optional values from the API payload — so
+    // validating against them is wrong by design.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        required: false,
+        default_value: "50kHz",
+      }),
+    ];
+    expect(validateEntries(entries, {}).size).toBe(0);
+  });
+
+  it("falls back to default_value for required entries", () => {
+    // Mirrors ``modbus_controller.address`` (the one required
+    // entry with a default in the catalog). When the value isn't
+    // explicitly set, the validator falls back to the catalog
+    // default — which the form's ``_seedDefaults`` pre-seeds
+    // into ``_values`` anyway, so this is mostly defensive for
+    // callers (e.g. section editor) that don't pre-seed.
+    const entries = [
+      makeEntry({
+        key: "address",
+        type: ConfigEntryType.INTEGER,
+        required: true,
+        default_value: "1",
+      }),
+    ];
+    expect(validateEntries(entries, {}).size).toBe(0);
+  });
+
+  it("validates user-set values on optional numeric entries", () => {
+    // Once the user types something, validate it normally — even on
+    // optional entries. A regression that skipped optional entries
+    // entirely would let bad user input through.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.INTEGER,
+        required: false,
+        default_value: null,
+      }),
+    ];
+    expect(validateEntries(entries, { frequency: "abc" }).get("frequency")?.code)
+      .toBe("validation.not_a_number");
+    expect(validateEntries(entries, { frequency: 100 }).size).toBe(0);
+  });
+
+  it("validates the i2c bus shape cleanly end-to-end", () => {
+    // End-to-end shape of the i2c bus catalog entry: id + several
+    // optional numeric / boolean entries, every numeric one
+    // carrying a unit-suffixed default.
+    const i2cEntries = [
+      makeEntry({ key: "scl", type: ConfigEntryType.PIN, default_value: "SCL" }),
+      makeEntry({ key: "sda", type: ConfigEntryType.PIN, default_value: "SDA" }),
+      makeEntry({ key: "id", type: ConfigEntryType.ID }),
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        default_value: "50kHz",
+      }),
+      makeEntry({
+        key: "scan",
+        type: ConfigEntryType.BOOLEAN,
+        default_value: true,
+      }),
+      makeEntry({
+        key: "timeout",
+        type: ConfigEntryType.FLOAT,
+        default_value: "10ms",
+      }),
+    ];
+    // Form's _initValues for non-featured components seeds nothing
+    // for non-required entries and auto-generates the id.
+    const values = { id: "i2c_1" };
+    expect(validateEntries(i2cEntries, values).size).toBe(0);
   });
 });

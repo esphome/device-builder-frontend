@@ -12,8 +12,15 @@
  */
 
 import { html, nothing } from "lit";
+import { ifDefined } from "lit/directives/if-defined.js";
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
+import {
+  chooseDisplayUnit,
+  parseFloatWithUnit,
+  placeholderForFloatWithUnit,
+  serializeFloatWithUnit,
+} from "../../util/float-with-unit.js";
 import {
   effectiveDisabled,
   labelFor,
@@ -70,6 +77,123 @@ export function renderNumberField(
           ctx.emitChange(path, raw === "" ? "" : Number(raw));
         }}
       />
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
+/**
+ * Number input + unit picker for FLOAT_WITH_UNIT entries.
+ *
+ * The YAML shape is a single string `"<value><unit>"`; we render the
+ * two halves as separate controls and serialize back on every change.
+ * Empty number -> empty string emitted (so optional entries get
+ * stripped from the payload by `_coerceFields`).
+ *
+ * `range` constrains the numeric part only — esphome's range bounds
+ * for `cv.frequency` etc. are post-coercion floats relative to the
+ * canonical unit, but the dashboard's input is the user-facing number
+ * so applying them directly only matches when the picked unit equals
+ * the canonical one. We omit the HTML range attributes when the unit
+ * isn't canonical to avoid spurious browser-level rejection on values
+ * that round-trip fine after multiplication.
+ */
+export function renderFloatWithUnitField(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+) {
+  const unitOptions = entry.unit_options ?? [];
+  const canonicalUnit = unitOptions[0] ?? "";
+  const rawValue = ctx.getAt(path);
+  const parsed = parseFloatWithUnit(rawValue, unitOptions);
+  // Prefer the in-progress edit buffer over the form value so
+  // intermediate typing states (`"-"`, `"1e"`, `"1."`) aren't
+  // clobbered by the dirty-check write that fires when the parser
+  // turns them into `null` / `""`. The buffer is cleared on blur
+  // and on `entries` change.
+  const editingText = ctx.getEditingMagnitude(path);
+  const numberValue =
+    editingText ?? (parsed.value === null ? "" : String(parsed.value));
+  const unit = chooseDisplayUnit(
+    rawValue,
+    entry.default_value,
+    ctx.getPendingUnit(path),
+    unitOptions,
+  );
+  const placeholder = placeholderForFloatWithUnit(
+    entry.default_value,
+    unitOptions,
+  );
+  const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
+  const isCanonical = unit === canonicalUnit;
+  const min = entry.range && isCanonical ? String(entry.range[0]) : undefined;
+  const max = entry.range && isCanonical ? String(entry.range[1]) : undefined;
+  const emit = (next: { value: number | null; unit: string }) =>
+    ctx.emitChange(path, serializeFloatWithUnit(next));
+  return html`
+    <div class="field float-with-unit" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      <div class="float-with-unit-inputs">
+        <input
+          type="number"
+          class=${invalid ? "invalid" : ""}
+          .value=${numberValue}
+          ?disabled=${disabled}
+          min=${ifDefined(min)}
+          max=${ifDefined(max)}
+          step="any"
+          placeholder=${placeholder}
+          @input=${(e: Event) => {
+            const raw = (e.target as HTMLInputElement).value;
+            // Stash the raw text so an intermediate state (`"-"`,
+            // `"1e"`) survives the next re-render. The buffer is
+            // ignored once a blur event fires.
+            ctx.setEditingMagnitude(path, raw);
+            // Clearing the magnitude drops the unit from the YAML
+            // value (`{null, kHz}` serializes to `""`), so stash
+            // the current unit too — otherwise the next render's
+            // fallback chain snaps the picker back to the catalog
+            // default and the user's earlier pick is lost.
+            if (raw === "") {
+              ctx.setPendingUnit(path, unit);
+            }
+            const next = raw === "" ? null : Number(raw);
+            emit({ value: Number.isFinite(next) ? next : null, unit });
+          }}
+          @blur=${() => ctx.clearEditingMagnitude(path)}
+        />
+        ${unitOptions.length > 1
+          ? html`
+              <wa-select
+                data-no-value-sync
+                ?disabled=${disabled}
+                @change=${(e: Event) => {
+                  const nextUnit = (e.target as HTMLSelectElement).value;
+                  if (parsed.value === null) {
+                    // No numeric value yet — stash the unit so the
+                    // picker stays on the user's pick. Serializing
+                    // ``{value:null, unit}`` would emit `""` and the
+                    // next render's default-fallback would snap the
+                    // picker back to canonical.
+                    ctx.setPendingUnit(path, nextUnit);
+                  } else {
+                    emit({ value: parsed.value, unit: nextUnit });
+                  }
+                }}
+              >
+                ${unitOptions.map(
+                  (option) => html`<wa-option
+                    value=${option}
+                    ?selected=${option === unit}
+                    >${option}</wa-option
+                  >`,
+                )}
+              </wa-select>
+            `
+          : html`<span class="float-with-unit-suffix">${unit}</span>`}
+      </div>
       ${renderFieldError(path, ctx)}
     </div>
   `;

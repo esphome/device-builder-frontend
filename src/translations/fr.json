@@ -405,6 +405,7 @@
     "save_error": "Échec de l'enregistrement",
     "section_saved_toast": "\"{title}\" enregistré",
     "add_component_error": "Échec de l'ajout du composant",
+    "add_component_hidden_validation_error": "Impossible d'ajouter ce composant : un champ masqué a une saisie invalide. Veuillez signaler les champs listés ci-dessous — ils devraient être visibles.",
     "add_automation_error": "Échec de l'ajout de l'automatisation",
     "add_automation_unavailable": "Le support des automatisations n'est pas encore disponible",
     "add_config_error": "Échec de l'ajout de la section de configuration",

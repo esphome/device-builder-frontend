@@ -405,6 +405,7 @@
     "save_error": "Opslaan mislukt",
     "section_saved_toast": "\"{title}\" opgeslagen",
     "add_component_error": "Toevoegen van component mislukt",
+    "add_component_hidden_validation_error": "Kan dit component niet toevoegen: een verborgen veld heeft ongeldige invoer. Meld de hieronder vermelde velden — ze zouden zichtbaar moeten zijn.",
     "add_automation_error": "Toevoegen van automatisering mislukt",
     "add_automation_unavailable": "Ondersteuning voor automatiseringen is nog niet beschikbaar",
     "add_config_error": "Toevoegen van configuratiesectie mislukt",

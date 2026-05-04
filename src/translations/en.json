@@ -490,6 +490,7 @@
     "save_error": "Failed to save",
     "section_saved_toast": "\"{title}\" saved",
     "add_component_error": "Failed to add component",
+    "add_component_hidden_validation_error": "Can't add this component: a hidden field has invalid input. Please report the fields listed below — they should be visible.",
     "missing_dependencies_title": "{name} requires other components",
     "missing_dependencies_body": "Configure these first, then come back to add this one:",
     "missing_dependencies_add": "Add {domain}",

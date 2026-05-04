@@ -31,9 +31,9 @@ import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
-  isEntryVisible,
   type ValidationError,
 } from "../../util/config-validation.js";
+import { filterRenderable } from "./config-entry-render-filter.js";
 import { getIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -48,6 +48,7 @@ import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import {
   labelFor,
   renderBooleanField,
+  renderFloatWithUnitField,
   renderIconField,
   renderIdReferenceField,
   renderMapField,
@@ -75,15 +76,6 @@ export interface ConfigEntryValueChange {
   path: string[];
   value: unknown;
 }
-
-/**
- * Entry keys that the form keeps visible even when `requiredOnly` is
- * on. `name` becomes the entity's friendly name in Home Assistant, so
- * even though most schemas mark it optional we want to ask for it
- * up-front when the user is creating something — fewer trips back to
- * the section editor for a label they always want.
- */
-const ALWAYS_SHOWN_KEYS: Set<string> = new Set(["name"]);
 
 @customElement("esphome-config-entry-form")
 export class ESPHomeConfigEntryForm extends LitElement {
@@ -142,42 +134,51 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @state()
   private _nestedOpenSections: Set<string> = new Set();
 
+  /**
+   * Transient unit choice for FLOAT_WITH_UNIT entries the user
+   * picked before typing a numeric value. Keyed by dotted path.
+   * `chooseDisplayUnit` reads this layer before falling back to
+   * the catalog default, so the picker survives a rerender even
+   * when the form value is still `""`.
+   *
+   * The setter (in `_buildCtx`) calls `requestUpdate()` because
+   * a unit-only pick doesn't reach the form's value-change cycle
+   * — no `emit()` happens — so Lit needs the explicit nudge.
+   *
+   * Cleared on `entries` change so a different component's picks
+   * don't bleed across; otherwise superseded once a non-empty
+   * `parsed.unit` from the form value beats the pending layer.
+   */
+  private _pendingUnits: Map<string, string> = new Map();
+
+  /**
+   * Transient raw-text buffer for FLOAT_WITH_UNIT magnitude inputs.
+   * `<input type="number">` reads `""` from `.value` for
+   * mid-typing intermediates (`"-"`, `"1e"`, `"1."`); Lit's
+   * `.value=` property binding then re-writes `""` over the
+   * partial text. The renderer reads from this buffer first so
+   * partial input survives until the user produces a parseable
+   * value (which lands in `this.values` normally) or blurs.
+   */
+  private _editingMagnitudes: Map<string, string> = new Map();
+
   static styles = [espHomeStyles, inputStyles, configEntryFormStyles];
 
   /**
-   * Filter `entries` for rendering: hidden + dependency-failing entries
-   * always go away; advanced entries go away unless `showAdvanced` is
-   * on; in `requiredOnly` mode, non-required leaves go away too. NESTED
-   * entries stay only if anything inside them is renderable, so an
-   * empty header never sits in the form.
+   * Filter `entries` for rendering. Delegates to the shared
+   * ``filterRenderable`` helper so the add-component form's
+   * "is this error visible?" check (which mirrors the same rules)
+   * can never drift from what's actually painted.
    */
   private _filterRenderable = (
     entries: ConfigEntry[],
     values: Record<string, unknown>,
-  ): ConfigEntry[] => {
-    const out: ConfigEntry[] = [];
-    for (const entry of entries) {
-      if (!isEntryVisible(entry, values, this.presentComponents)) continue;
-      if (entry.advanced && !this.showAdvanced) continue;
-      if (entry.type === ConfigEntryType.NESTED) {
-        const childList = entry.config_entries ?? [];
-        const childValues = this._scopeValues([entry.key]);
-        const renderableChildren = this._filterRenderable(childList, childValues);
-        if (renderableChildren.length === 0) continue;
-      } else if (
-        this.requiredOnly &&
-        !entry.required &&
-        !ALWAYS_SHOWN_KEYS.has(entry.key)
-      ) {
-        // In required-only mode, drop optional leaves outright unless
-        // they're on the always-shown allowlist (e.g. `name`, which is
-        // optional but worth asking up-front for sensors/switches/lights).
-        continue;
-      }
-      out.push(entry);
-    }
-    return out;
-  };
+  ): ConfigEntry[] =>
+    filterRenderable(entries, values, {
+      requiredOnly: this.requiredOnly,
+      showAdvanced: this.showAdvanced,
+      presentComponents: this.presentComponents,
+    });
 
   protected render() {
     const ctx = this._buildCtx();
@@ -203,6 +204,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * wa-select's own initial value resolution and the displayed label
    * stays blank.
    */
+  protected willUpdate(changed: PropertyValues) {
+    // A different entry list means the form was re-targeted to a
+    // different component (e.g. the dep-flow detour swapping
+    // ES7210 for i2c). Drop transient unit picks from the previous
+    // shape so they don't bleed into unrelated paths.
+    if (changed.has("entries") && changed.get("entries") !== undefined) {
+      this._pendingUnits.clear();
+      this._editingMagnitudes.clear();
+    }
+  }
+
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
@@ -221,6 +233,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
           })
         | null;
       if (!select) continue;
+      // FLOAT_WITH_UNIT widgets carry a wa-select for the unit picker
+      // alongside a number input. The select's value is the unit half
+      // of the combined YAML string, not the path's value — let the
+      // renderer's `?selected` decide and sync the unit imperatively
+      // (wa-select drops `?selected` set by Lit if its first paint
+      // beats the slot connection).
+      if (select.hasAttribute("data-no-value-sync")) {
+        await this._syncSelectedAttr(select);
+        continue;
+      }
       // Let wa-select finish its own initial update before we set
       // anything — otherwise its post-render selectionChanged
       // overwrites whatever we wrote.
@@ -240,11 +262,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // would silently drop the value. Look up the matching option
       // case-insensitively and feed wa-select the option's verbatim
       // value so the lookup succeeds.
+      //
+      // Pin entries are a second mismatch: the seeded YAML value is
+      // a bare int (`9`, from `seedBoardPinDefaults` reading the
+      // board manifest's pin features) or a string alias (`"SCL"`),
+      // but the option values are always `"GPIOn"`. Normalise both
+      // into the bare GPIO number for comparison so a freshly seeded
+      // i2c bus on ESP32-C3 lands on the right option instead of
+      // showing an empty select.
       const options = Array.from(
         select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
       );
+      const rawGpio = raw.match(/^\s*(?:GPIO)?(\d+)\s*$/i)?.[1];
+      const findByValue = (v: string) =>
+        options.find((o) => o.value?.toLowerCase() === v.toLowerCase());
       const matched = raw
-        ? options.find((o) => o.value?.toLowerCase() === raw.toLowerCase())
+        ? (findByValue(raw) ??
+            (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
         : null;
       const desired = matched?.value ?? raw;
       const current = Array.isArray(select.value)
@@ -253,6 +287,39 @@ export class ESPHomeConfigEntryForm extends LitElement {
       if (current !== desired) {
         select.value = desired;
       }
+    }
+  }
+
+  /**
+   * Push the option marked `selected` onto `select.value` after
+   * wa-select's first paint. Used for selects whose value isn't
+   * bound to the form's path (FLOAT_WITH_UNIT's unit picker), where
+   * the `?selected` Lit binding loses the race against wa-select's
+   * own selectionChanged hook.
+   */
+  private async _syncSelectedAttr(
+    select: HTMLElement & {
+      value: string | string[] | null;
+      updateComplete?: Promise<unknown>;
+    },
+  ) {
+    if (select.updateComplete) {
+      try {
+        await select.updateComplete;
+      } catch {
+        // ignore
+      }
+    }
+    const selectedOption = select.querySelector<
+      HTMLElement & { value: string }
+    >("wa-option[selected]");
+    const desired = selectedOption?.value ?? "";
+    if (!desired) return;
+    const current = Array.isArray(select.value)
+      ? select.value[0] ?? ""
+      : select.value ?? "";
+    if (current !== desired) {
+      select.value = desired;
     }
   }
 
@@ -298,6 +365,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       case ConfigEntryType.INTEGER:
       case ConfigEntryType.FLOAT:
         return renderNumberField(entry, path, ctx);
+      case ConfigEntryType.FLOAT_WITH_UNIT:
+        return renderFloatWithUnitField(entry, path, ctx);
       case ConfigEntryType.PIN:
         return renderPinField(entry, path, ctx);
       case ConfigEntryType.COLOR:
@@ -336,6 +405,25 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
+      getPendingUnit: (path) => this._pendingUnits.get(path.join(".")),
+      setPendingUnit: (path, unit) => {
+        this._pendingUnits.set(path.join("."), unit);
+        // Trigger a re-render so the picker reflects the stash.
+        // Mutating the Map alone won't, since `_pendingUnits` isn't
+        // a `@state`-tracked field.
+        this.requestUpdate();
+      },
+      getEditingMagnitude: (path) => this._editingMagnitudes.get(path.join(".")),
+      setEditingMagnitude: (path, text) => {
+        // No requestUpdate — the @input handler that calls this
+        // also emits a value-change which re-renders us via the
+        // owner's normal value-prop update. Triggering here would
+        // double the work on every keystroke.
+        this._editingMagnitudes.set(path.join("."), text);
+      },
+      clearEditingMagnitude: (path) => {
+        this._editingMagnitudes.delete(path.join("."));
+      },
       // Self-reference: assigned after object creation so the inner
       // renderer can recurse through the dispatch.
       renderEntry: () => nothing,

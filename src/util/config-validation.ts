@@ -1,5 +1,6 @@
 import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
+import { parseFloatWithUnit } from "./float-with-unit.js";
 
 /**
  * Determine if a config entry is currently visible.
@@ -126,6 +127,29 @@ export function validateEntry(
     }
   }
 
+  if (entry.type === ConfigEntryType.FLOAT_WITH_UNIT) {
+    // Validate the numeric portion of the unit-suffixed string. Range
+    // checks only apply when the value is in the canonical unit — the
+    // catalog's `range` for `cv.frequency` etc. is post-coercion and
+    // a user picking `mHz` for a frequency in `Hz` produces a number
+    // outside the canonical bounds even when the YAML round-trips
+    // fine.
+    const parsed = parseFloatWithUnit(raw, entry.unit_options ?? []);
+    if (parsed.value === null) {
+      return { key: entry.key, code: "validation.not_a_number" };
+    }
+    const canonicalUnit = entry.unit_options?.[0] ?? "";
+    if (entry.range && parsed.unit === canonicalUnit) {
+      const [min, max] = entry.range;
+      if (parsed.value < min) {
+        return { key: entry.key, code: "validation.min", params: { min } };
+      }
+      if (parsed.value > max) {
+        return { key: entry.key, code: "validation.max", params: { max } };
+      }
+    }
+  }
+
   // Validate against the option list when present — but skip the check
   // for fields that opt into custom values (combobox-style entries treat
   // `options` as suggestions, not a fixed set).
@@ -216,7 +240,15 @@ function _validateEntriesRecursive(
       continue;
     }
 
-    const raw = values[entry.key] ?? entry.default_value;
+    // Optional defaults aren't sent to the backend (``_coerceFields``
+    // strips empties from the API payload), so validating against
+    // them is wrong by design — only fall back to ``default_value``
+    // for required entries, where an unset value would otherwise
+    // surface as ``validation.required`` even though the catalog
+    // pre-supplies a valid value.
+    const raw = entry.required
+      ? values[entry.key] ?? entry.default_value
+      : values[entry.key];
     const err = validateEntry(entry, raw);
     if (err) {
       const fullPath = [...pathPrefix, entry.key].join(".");
