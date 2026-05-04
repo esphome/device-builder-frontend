@@ -29,6 +29,7 @@ import { setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
+import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
 import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -403,21 +404,20 @@ export class ESPHomePageDevice extends LitElement {
    * the scroll-into-view dispatch in CodeMirror.
    */
   private _maybeResolveLineFromUrl() {
-    if (this._selectedFromLine === undefined) return;
-    if (this._selectedSection !== null) return;
-    if (!this._yaml) return;
-    const match = sectionAtLine(this._yaml, this._selectedFromLine);
-    if (!match) return;
-    this._selectedSection = sectionKeyOf(match);
-    // Set the highlight directly. ``_highlightRange`` is what
-    // the editor reads to drive scroll-into-view; in the
-    // user-click path it's set via ``_onYamlHighlight`` from the
-    // navigator's ``yaml-highlight`` event, but the navigator's
-    // update-from-prop-change path doesn't emit, so URL-only
-    // arrivals would otherwise mount the editor without ever
-    // scrolling. Pin both so the YAML hit click lands on the
-    // target line in CodeMirror.
-    this._highlightRange = { fromLine: match.fromLine, toLine: match.toLine };
+    const resolved = resolveSectionForUrlLine(
+      this._yaml,
+      this._selectedFromLine,
+      this._selectedSection
+    );
+    if (!resolved) return;
+    this._selectedSection = resolved.sectionKey;
+    // ``_highlightRange`` is what the editor reads to drive
+    // scroll-into-view; the user-click path sets it via
+    // ``_onYamlHighlight`` from the navigator's ``yaml-highlight``
+    // event, but the navigator's update-from-prop-change path
+    // doesn't emit, so URL-only arrivals would otherwise mount
+    // the editor without ever scrolling.
+    this._highlightRange = resolved.range;
     this._scrollToHighlight = true;
   }
 

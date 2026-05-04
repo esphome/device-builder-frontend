@@ -1,0 +1,56 @@
+/**
+ * Resolve a ``?line=N`` URL parameter to a concrete editor
+ * highlight + section once the YAML has loaded.
+ *
+ * Used by the device page when the user arrives via a YAML hit
+ * click from the dashboard search — the URL carries only
+ * ``?line=N`` (no ``?section=``), and the navigator's highlight
+ * + scroll path keys off ``selectedSection``. Without this
+ * resolver the editor mounts but never scrolls.
+ *
+ * Pure function so the device page's call site stays a thin
+ * wrapper that just assigns the resolved values; behaviour is
+ * unit-testable without spinning up Lit / CodeMirror.
+ */
+
+import { sectionAtLine, sectionKeyOf } from "./yaml-sections.js";
+
+export interface ResolvedUrlLine {
+  /** Section key (e.g. ``"esphome"``, ``"sensor.dht"``) the line falls within. */
+  sectionKey: string;
+  /** Highlight range to feed the YAML editor — covers the full section block. */
+  range: { fromLine: number; toLine: number };
+}
+
+/**
+ * Resolve *line* (1-indexed) inside *yaml* to its containing
+ * top-level section, or ``null`` when:
+ *
+ * - ``line`` is undefined (no ``?line=`` param);
+ * - ``yaml`` is empty (still loading — caller should retry
+ *   when the YAML lands);
+ * - ``currentSection`` is already set (user already picked a
+ *   section, don't overwrite their selection);
+ * - the line falls outside any parsed section (line points at
+ *   leading comments / blank lines before the first key).
+ *
+ * The caller assigns the returned ``sectionKey`` to its
+ * ``selectedSection`` and ``range`` to its ``highlightRange``;
+ * combined with ``scrollToHighlight = true``, that drives the
+ * editor's scroll-into-view dispatch.
+ */
+export function resolveSectionForUrlLine(
+  yaml: string,
+  line: number | undefined,
+  currentSection: string | null
+): ResolvedUrlLine | null {
+  if (line === undefined) return null;
+  if (currentSection !== null) return null;
+  if (!yaml) return null;
+  const match = sectionAtLine(yaml, line);
+  if (!match) return null;
+  return {
+    sectionKey: sectionKeyOf(match),
+    range: { fromLine: match.fromLine, toLine: match.toLine },
+  };
+}

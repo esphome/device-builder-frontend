@@ -140,6 +140,8 @@
     "install_method_back": "Back",
     "table_columns": "Columns",
     "table_toggle_columns": "Toggle columns",
+    "view_cards": "Card view",
+    "view_table": "List view",
     "table_col_status": "Status",
     "table_col_name": "Name",
     "table_col_address": "Address",

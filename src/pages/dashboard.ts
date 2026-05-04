@@ -34,6 +34,7 @@ import {
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
+import { matchesDeviceName } from "../util/device-search.js";
 import {
   forEachYamlMatch,
   yamlEmptyMessageKey,
@@ -371,27 +372,6 @@ export class ESPHomePageDashboard extends LitElement {
     return !this._yamlMode && this._devicesLoaded;
   }
 
-  /**
-   * Predicate for the device-name search filter.
-   *
-   * One source of truth for "does this device match the search
-   * query" — used by ``render()`` to filter the displayed list,
-   * by ``_currentlyVisibleConfigurations`` for select-all
-   * scoping, and by ``_maybeFireEmptyStatePreview`` to decide
-   * whether to fire a YAML preview. ``query`` must already be
-   * lower-cased; the caller pre-lowers once outside the loop.
-   */
-  private static _matchesDeviceName(
-    device: ConfiguredDevice,
-    loweredQuery: string
-  ): boolean {
-    const name = (device.friendly_name || device.name).toLowerCase();
-    return (
-      name.includes(loweredQuery) ||
-      device.configuration.toLowerCase().includes(loweredQuery)
-    );
-  }
-
   protected render() {
     if (!this._devicesLoaded) {
       return this._view === DashboardView.TABLE
@@ -414,7 +394,7 @@ export class ESPHomePageDashboard extends LitElement {
     const q = this._search.trim().toLowerCase();
     const sorted = this._sortedDevices;
     const filtered = q
-      ? sorted.filter((d) => ESPHomePageDashboard._matchesDeviceName(d, q))
+      ? sorted.filter((d) => matchesDeviceName(d, q))
       : sorted;
 
     return html`
@@ -551,7 +531,7 @@ export class ESPHomePageDashboard extends LitElement {
     const isTable = this._view === DashboardView.TABLE;
     return sorted
       .filter((d) => {
-        if (ESPHomePageDashboard._matchesDeviceName(d, q)) return true;
+        if (matchesDeviceName(d, q)) return true;
         if (!isTable) return false;
         return (
           d.address.toLowerCase().includes(q) ||
@@ -666,22 +646,60 @@ export class ESPHomePageDashboard extends LitElement {
 
   private _renderViewToggle() {
     const view = this._view;
+    const yaml = this._yamlMode;
+    const cardsLabel = this._localize("dashboard.view_cards");
+    const tableLabel = this._localize("dashboard.view_table");
+    const yamlLabel = this._localize("yaml_search.switch_to_yaml");
+    // Three-way segmented control: device-list view (cards or
+    // table) plus a YAML-content-search mode. Only one button
+    // shows ``active`` at a time. Clicking cards / table while
+    // in YAML mode flips out of YAML and sets the chosen view;
+    // clicking ``{}`` flips into YAML mode and the underlying
+    // ``_view`` is preserved for when the user returns.
     return html`
-      <div class="view-toggle">
+      <div class="view-toggle" role="group" aria-label=${cardsLabel}>
         <button
-          class="view-toggle-btn ${view === DashboardView.CARDS ? "active" : ""}"
-          @click=${() => this._setView(DashboardView.CARDS)}
+          class="view-toggle-btn ${!yaml && view === DashboardView.CARDS ? "active" : ""}"
+          type="button"
+          title=${cardsLabel}
+          aria-label=${cardsLabel}
+          aria-pressed=${!yaml && view === DashboardView.CARDS ? "true" : "false"}
+          @click=${() => this._enterDeviceView(DashboardView.CARDS)}
         >
           <wa-icon library="mdi" name="view-grid"></wa-icon>
         </button>
         <button
-          class="view-toggle-btn ${view === DashboardView.TABLE ? "active" : ""}"
-          @click=${() => this._setView(DashboardView.TABLE)}
+          class="view-toggle-btn ${!yaml && view === DashboardView.TABLE ? "active" : ""}"
+          type="button"
+          title=${tableLabel}
+          aria-label=${tableLabel}
+          aria-pressed=${!yaml && view === DashboardView.TABLE ? "true" : "false"}
+          @click=${() => this._enterDeviceView(DashboardView.TABLE)}
         >
           <wa-icon library="mdi" name="table"></wa-icon>
         </button>
+        <button
+          class="view-toggle-btn ${yaml ? "active" : ""}"
+          type="button"
+          title=${yamlLabel}
+          aria-label=${yamlLabel}
+          aria-pressed=${yaml ? "true" : "false"}
+          @click=${() => this._setSearchMode(true)}
+        >
+          <wa-icon library="mdi" name="code-braces"></wa-icon>
+        </button>
       </div>
     `;
+  }
+
+  /**
+   * Click on a device-view segment (cards or table). If the
+   * user was in YAML mode, drop the YAML search and return to
+   * the picked device view; otherwise just switch the view.
+   */
+  private _enterDeviceView(view: DashboardView) {
+    if (this._yamlMode) this._setSearchMode(false, "");
+    this._setView(view);
   }
 
   private _renderSelectToggle() {
@@ -780,36 +798,28 @@ export class ESPHomePageDashboard extends LitElement {
    * search input taller than its toolbar-row siblings
    * (select-toggle, view-toggle), breaking vertical alignment.
    */
+  /**
+   * In YAML mode, render a "Back to device search" link below
+   * the search input so the user has an obvious one-click exit
+   * even if they don't realise the segmented view-toggle
+   * affords the same.
+   *
+   * Device-mode discovery is handled by the always-visible
+   * ``{}`` segment in the view toggle, so no caption is needed
+   * there — keeping the toolbar uncluttered.
+   */
   private _renderDiscoveryHint() {
-    let body;
-    if (this._yamlMode) {
-      // Plain text-link styling for the back affordance — it's a
-      // navigation action, not a keystroke hint.
-      body = html`<button
+    if (!this._yamlMode) return "";
+    return html`<small class="search-discover-hint">
+      <button
         type="button"
         class="search-discover-back"
         @click=${this._toggleSearchMode}
       >
         <wa-icon library="mdi" name="arrow-left"></wa-icon>
         ${this._localize("yaml_search.back_to_devices")}
-      </button>`;
-    } else if (this._search === "") {
-      // The ``/`` is a keystroke shortcut — render as a kbd cap so
-      // the user reads it as "press this key" rather than as a
-      // text link.
-      body = html`${this._localize("yaml_search.discover_prefix")}
-        <button
-          type="button"
-          class="search-discover-key"
-          @click=${this._toggleSearchMode}
-        >
-          ${this._localize("yaml_search.discover_link")}
-        </button>
-        ${this._localize("yaml_search.discover_suffix")}`;
-    } else {
-      return "";
-    }
-    return html`<small class="search-discover-hint">${body}</small>`;
+      </button>
+    </small>`;
   }
 
   /**
@@ -1004,7 +1014,7 @@ export class ESPHomePageDashboard extends LitElement {
     const q = this._search.trim().toLowerCase();
     if (!q) return "";
     const anyDeviceMatches = this._sortedDevices.some((d) =>
-      ESPHomePageDashboard._matchesDeviceName(d, q)
+      matchesDeviceName(d, q)
     );
     if (anyDeviceMatches) return "";
     const pivot = this._renderYamlPreviewPivot();
@@ -1467,7 +1477,7 @@ export class ESPHomePageDashboard extends LitElement {
     }
     const lowered = trimmed.toLowerCase();
     const anyDeviceMatches = this._sortedDevices.some((d) =>
-      ESPHomePageDashboard._matchesDeviceName(d, lowered)
+      matchesDeviceName(d, lowered)
     );
     if (anyDeviceMatches) {
       // Device-name search produced rows — no empty state to fill,
