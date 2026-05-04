@@ -17,12 +17,19 @@ import { css } from "lit";
 
 export const ansiLogThemeLight = css`
   :host([light]) {
-    /* Foreground. */
+    /* Foreground. Pure-RGB legacy palette EXCEPT for blue (codes
+       34 / 94): Copilot review on #146 flagged that pure
+       rgb(0, 0, 255) is famously hard to read against a dark
+       surface — dark blue on a dark background is a long-standing
+       terminal-readability issue. Bump foreground blue to a
+       brighter saturated shade; backgrounds (44 / 104) keep the
+       pure value because text-on-blue-bg uses contrasting text
+       and the readability concern is foreground-side. */
     --ansi-fg-30: rgb(128, 128, 128);
     --ansi-fg-31: rgb(255, 0, 0);
     --ansi-fg-32: rgb(0, 255, 0);
     --ansi-fg-33: rgb(255, 255, 0);
-    --ansi-fg-34: rgb(0, 0, 255);
+    --ansi-fg-34: rgb(80, 130, 255);
     --ansi-fg-35: rgb(255, 0, 255);
     --ansi-fg-36: rgb(0, 255, 255);
     --ansi-fg-37: rgb(187, 187, 187);
@@ -30,7 +37,7 @@ export const ansiLogThemeLight = css`
     --ansi-fg-91: rgb(255, 0, 0);
     --ansi-fg-92: rgb(0, 255, 0);
     --ansi-fg-93: rgb(255, 255, 0);
-    --ansi-fg-94: rgb(0, 0, 255);
+    --ansi-fg-94: rgb(80, 130, 255);
     --ansi-fg-95: rgb(255, 0, 255);
     --ansi-fg-96: rgb(0, 255, 255);
     --ansi-fg-97: rgb(255, 255, 255);
@@ -53,6 +60,10 @@ export const ansiLogThemeLight = css`
     --ansi-bg-106: rgb(0, 255, 255);
     --ansi-bg-107: rgb(255, 255, 255);
 
-    --log-fg-very-verbose: rgb(128, 128, 128);
+    /* VERY_VERBOSE must stay distinct from VERBOSE (--ansi-fg-90,
+       which is rgb(128, 128, 128) in this theme). Use a darker
+       gray so VV reads as "even less prominent than V" — same
+       relative dim that the dark theme uses (#666666 vs #808080). */
+    --log-fg-very-verbose: rgb(96, 96, 96);
   }
 `;
