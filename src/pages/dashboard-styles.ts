@@ -182,9 +182,12 @@ export const dashboardStyles = css`
     font-size: var(--wa-font-size-xs);
   }
   .search-discover-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+    /* Plain inline (not inline-flex) so the link flows on the
+       same baseline as the surrounding "Tip: type … to search
+       across all configs" text. inline-flex would create its own
+       baseline from the icon's centred bbox, which sat ~2px
+       above the surrounding text. */
+    display: inline;
     padding: 0;
     background: transparent;
     border: none;
@@ -206,6 +209,11 @@ export const dashboardStyles = css`
   }
   .search-discover-link wa-icon {
     font-size: var(--wa-font-size-s);
+    /* vertical-align: middle keeps the icon aligned with the
+       lowercase x-height so it sits flush with the surrounding
+       text rather than perched above the baseline. */
+    vertical-align: middle;
+    margin-right: 2px;
   }
 
   /* Empty-device-search YAML pivot (option (d)) — sits between
