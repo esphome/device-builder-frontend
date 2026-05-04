@@ -259,6 +259,19 @@ export class ESPHomeYamlEditor extends LitElement {
         },
       }),
       EditorView.updateListener.of((update) => {
+        // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
+        // before `yaml-cursor-line` within a single update.
+        // The page's `_onYamlChange` writes `_yaml` from the
+        // detail; its `_onYamlCursorLine` then reads `_yaml` to
+        // map the cursor's line to a section. A user pressing
+        // Enter at end-of-line fires both branches in one
+        // transaction (docChanged AND selectionSet) — if cursor
+        // ran first, it would parse a stale `_yaml` that
+        // doesn't yet contain the new line, and the section
+        // attribution would either miss or pick the wrong
+        // section. Don't reorder these `if` blocks. (See
+        // `pages/device.ts:_onYamlCursorLine` for the
+        // matching mention of this invariant.)
         if (update.docChanged) {
           this.dispatchEvent(
             new CustomEvent("yaml-change", {
@@ -295,10 +308,21 @@ export class ESPHomeYamlEditor extends LitElement {
       // the cursor is over without switching the left-pane
       // section editor. The page wires it to the navigator's
       // hover slot only.
+      //
+      // `posAtCoords({...}, false)` — the second arg is the
+      // `precise` flag, which defaults to `true`. With the
+      // default, CodeMirror returns `null` when the cursor sits
+      // in the vertical padding between two lines (the gap
+      // between font-size and line-height) — and the mouse
+      // passes through that gap constantly while moving, which
+      // killed the dispatch path entirely. Passing `false` gets
+      // us the nearest line even when the pointer is on a
+      // boundary or in the empty area below the last line of
+      // content, which matches the user's mental model of "this
+      // is the line I'm hovering."
       EditorView.domEventHandlers({
         mousemove: (e, view) => {
-          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-          if (pos === null) return;
+          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }, false);
           const line = view.state.doc.lineAt(pos).number;
           if (line === this._lastReportedHoverLine) return;
           this._lastReportedHoverLine = line;
@@ -383,9 +407,30 @@ export class ESPHomeYamlEditor extends LitElement {
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
       if (current !== this.value) {
-        this._view.dispatch({
+        // External update (section-editor save, fresh load, …).
+        // Replacing the whole document via a single `changes`
+        // entry maps the existing selection through the
+        // delete-and-insert range; for `from: 0, to: oldLen`
+        // that maps the cursor to 0 (the left side of the
+        // deletion's `assoc=-1` default) and CodeMirror also
+        // re-anchors `scrollTop` to keep the cursor visible —
+        // both of which together throw the user back to the top
+        // of the YAML pane after a section-editor save. We
+        // capture the cursor offset and scroll position before
+        // the change and pass an explicit `selection` in the
+        // SAME dispatch so the transaction's `selectionSet`
+        // already reflects the restored position; doing it as a
+        // second dispatch would briefly emit a `yaml-cursor-line`
+        // for line 1, which fights the navigator's selection.
+        const view = this._view;
+        const headBefore = view.state.selection.main.head;
+        const scrollTop = view.scrollDOM.scrollTop;
+        const head = Math.min(headBefore, this.value.length);
+        view.dispatch({
           changes: { from: 0, to: current.length, insert: this.value },
+          selection: { anchor: head, head },
         });
+        view.scrollDOM.scrollTop = scrollTop;
       }
     }
 

@@ -30,10 +30,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import {
-  parseYamlTopLevelSections,
-  sectionKeyOf,
-} from "../util/yaml-sections.js";
+import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -605,18 +602,23 @@ export class ESPHomePageDevice extends LitElement {
    * "scrolling through configured fields highlights them; cursor
    * resting in interstitial whitespace doesn't unhighlight what
    * was last clicked."
+   *
+   * Load-bearing event ordering: this handler reads `this._yaml`
+   * to map the line to a section, but `this._yaml` is only
+   * advanced when `_onYamlChange` runs. The editor's
+   * `updateListener` dispatches `yaml-change` *before*
+   * `yaml-cursor-line` within a single CM transaction (the
+   * `update.docChanged` branch is checked first), so when the
+   * user types Enter at end-of-line, this handler sees the
+   * updated `_yaml` and the new line maps correctly. Swapping
+   * the dispatch order in the editor would silently break the
+   * cursor-follows-section path on every line-creating
+   * keystroke — re-validate this assumption if you reorder the
+   * `if` blocks in `yaml-editor.ts:_buildExtensions`'s
+   * `updateListener`.
    */
   private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
-    const line = e.detail.line;
-    const sections = parseYamlTopLevelSections(this._yaml);
-    // Pick the most-specific match: list-item entries are emitted
-    // alongside their parent's range (parent isn't included in the
-    // expansion, but expanded items have narrower fromLine/toLine
-    // than the implicit parent). `find` is fine — sections are in
-    // file order and ranges don't overlap.
-    const match = sections.find(
-      (s) => line >= s.fromLine && line <= s.toLine,
-    );
+    const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
     const sectionKey = sectionKeyOf(match);
     if (
@@ -643,10 +645,7 @@ export class ESPHomePageDevice extends LitElement {
       if (this._hoveredFromLine !== null) this._hoveredFromLine = null;
       return;
     }
-    const sections = parseYamlTopLevelSections(this._yaml);
-    const match = sections.find(
-      (s) => line >= s.fromLine && line <= s.toLine,
-    );
+    const match = sectionAtLine(this._yaml, line);
     const next = match ? match.fromLine : null;
     if (next !== this._hoveredFromLine) this._hoveredFromLine = next;
   }
