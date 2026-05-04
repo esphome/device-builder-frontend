@@ -401,30 +401,63 @@ export class ESPHomeYamlEditor extends LitElement {
       const current = this._view.state.doc.toString();
       if (current !== this.value) {
         // Same-document patch (section-editor save, …).
-        // Replacing the whole document via a single `changes`
-        // entry maps the existing selection through the
-        // delete-and-insert range; for `from: 0, to: oldLen`
-        // that maps the cursor to 0 (the left side of the
-        // deletion's `assoc=-1` default) and CodeMirror also
-        // re-anchors `scrollTop` to keep the cursor visible —
-        // both of which together throw the user back to the top
-        // of the YAML pane after a section-editor save. We
-        // capture the cursor offset and scroll position before
-        // the change and pass an explicit `selection` in the
-        // SAME dispatch so the transaction's `selectionSet`
-        // already reflects the restored position; doing it as a
-        // second dispatch would briefly emit a `yaml-cursor-line`
-        // for line 1, which fights the navigator's selection.
+        //
+        // The naive `from: 0, to: oldLen, insert: newText`
+        // reframes the entire doc as one giant replace, which
+        // (a) destroys CodeMirror's natural selection mapping
+        // (the cursor maps to offset 0 — the left side of the
+        // deletion's `assoc=-1` default) and (b) re-anchors
+        // `scrollTop` to keep the cursor visible, throwing the
+        // user back to the top of the YAML pane after a
+        // section-editor save.
+        //
+        // Compute a minimal change instead: shave the longest
+        // common prefix and suffix off both buffers and dispatch
+        // only the middle slice. CodeMirror's transaction then
+        // automatically maps the existing selection through that
+        // change — a cursor *before* the change sticks to the
+        // same offset (same line, same column); a cursor
+        // *after* shifts by (insert.length - delete.length),
+        // landing on the same logical line/column even when the
+        // save inserts or removes lines above. Offset-only
+        // preservation didn't have this property: a
+        // section-editor save above the cursor would land the
+        // caret on a different line in the new document.
+        //
+        // Scroll preservation stays separate — even with a
+        // minimal change, CodeMirror can re-anchor scroll if
+        // the selection mapping ends up "near" the visible
+        // viewport edge, so we snapshot `scrollTop` and write
+        // it back after the dispatch.
+        //
         // Cross-device navigation skips this path via the
-        // `configuration`-change branch above, so we don't apply
-        // a stale cursor onto a freshly loaded YAML.
+        // `configuration`-change branch above, so the
+        // common-prefix logic only ever runs against doc pairs
+        // that share most of their content (typical
+        // section-save: one block changed, prefix+suffix
+        // untouched).
         const view = this._view;
-        const headBefore = view.state.selection.main.head;
         const scrollTop = view.scrollDOM.scrollTop;
-        const head = Math.min(headBefore, this.value.length);
+        const oldLen = current.length;
+        const newLen = this.value.length;
+        const minLen = Math.min(oldLen, newLen);
+        let prefix = 0;
+        while (prefix < minLen && current[prefix] === this.value[prefix]) {
+          prefix++;
+        }
+        let suffix = 0;
+        while (
+          suffix < minLen - prefix &&
+          current[oldLen - 1 - suffix] === this.value[newLen - 1 - suffix]
+        ) {
+          suffix++;
+        }
         view.dispatch({
-          changes: { from: 0, to: current.length, insert: this.value },
-          selection: { anchor: head, head },
+          changes: {
+            from: prefix,
+            to: oldLen - suffix,
+            insert: this.value.slice(prefix, newLen - suffix),
+          },
         });
         view.scrollDOM.scrollTop = scrollTop;
       }
