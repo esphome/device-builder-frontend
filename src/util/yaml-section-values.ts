@@ -347,12 +347,15 @@ export function updateSectionInYaml(
     //      picked a different value), and trailing-comment
     //      (`- platform: # ...`) cases uniformly.
     //   3. form value is non-scalar (object / array / null /
-    //      undefined): collapse the dash to bare `-` and emit
-    //      the full body — including the inline key — at the
-    //      child indent. The dash can't represent a
-    //      multi-line value, so demoting to a bare list-item
-    //      head and letting the serializer handle it is the
-    //      only way to keep the inline key from appearing twice.
+    //      undefined): collapse the dash to bare `-` and let
+    //      the body serializer emit the inline key at the
+    //      child indent. The dash can't represent a multi-line
+    //      value, so demoting to a bare list-item head is the
+    //      only way to keep the inline key from appearing
+    //      twice. For object / array values that produces an
+    //      inline-key block under the dash; for null /
+    //      undefined the serializer drops the key entirely
+    //      (the "zero times" arm of the contract above).
     //
     // Same regex `parseYamlSectionValues` reads so the two
     // sides stay in lockstep on what counts as an inline key.

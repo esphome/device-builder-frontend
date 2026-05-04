@@ -10,17 +10,17 @@
  */
 
 /**
- * Detail shape of the `value-change` event the password input
- * fires when the user types. Re-exported from `password-input.ts`
- * so consumers can keep a single import path for the component +
- * its event type.
+ * Detail shape of the `password-input-change` event the password
+ * input fires when the user types. Re-exported from
+ * `password-input.ts` so consumers can keep a single import path
+ * for the component + its event type.
  */
 export interface PasswordInputValueChange {
   value: string;
 }
 
 /**
- * Wire name for the value-change event the password input emits.
+ * Wire name for the change event the password input emits.
  * Pinned in the test so a rename here trips the contract check
  * instead of silently leaving consumer `@password-input-change`
  * listeners with no firing event.

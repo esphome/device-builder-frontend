@@ -155,11 +155,13 @@ export class ESPHomePasswordInput extends LitElement {
   }
 
   private _onInput(e: Event) {
-    // Deliberately fire `value-change` (not `input`) so the
-    // native InputEvent that bubbles out of the inner `<input>`
-    // can never collide with our synthesised event on a
-    // consumer's host-level listener — `@value-change` sees only
-    // ours, `@input` sees only the native one.
+    // Deliberately fire `password-input-change` (not `input`) so
+    // the native InputEvent that bubbles out of the inner
+    // `<input>` can never collide with our synthesised event on
+    // a consumer's host-level listener — `@password-input-change`
+    // sees only ours, `@input` sees only the native one. The
+    // form already uses `value-change` for its own (different-
+    // shape) event, so a distinct name keeps that channel free.
     const next = (e.target as HTMLInputElement).value;
     this.value = next;
     this.dispatchEvent(buildPasswordValueChangeEvent(next));
