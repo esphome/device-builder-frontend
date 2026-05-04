@@ -26,7 +26,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
-import { handlePostInstallShowLogs } from "../util/post-install-logs.js";
+import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { devicePageStyles } from "./device-styles.js";
@@ -152,9 +152,9 @@ export class ESPHomePageDevice extends LitElement {
   @query("esphome-logs-dialog")
   private _logsDialog!: ESPHomeLogsDialog;
 
-  private _onPostInstallShowLogs = (
-    e: CustomEvent<import("../util/post-install-logs.js").PostInstallShowLogsDetail>
-  ) => handlePostInstallShowLogs(e, this._logsDialog);
+  private _onPostInstallShowLogs = postInstallShowLogsHandler(
+    () => this._logsDialog,
+  );
 
   private _installCtrl = this._createInstallController();
 

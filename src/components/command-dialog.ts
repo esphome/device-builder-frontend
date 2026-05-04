@@ -30,6 +30,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -907,15 +908,28 @@ export class ESPHomeCommandDialog extends LitElement {
               </button>`;
       case "success":
         /* Surface a "Show logs" action on a successful install so
-           the user has a one-click path back to the live logs dialog
-           after they've clicked its "Back to install" button. The
-           same auto-flip path is reused so server-serial installs
-           open server-serial logs and OTA installs open network
-           logs. Other command types (compile / clean) don't have a
-           sensible logs follow-up, so we only surface it for
-           install. */
+           the user has a one-click path back to the live logs
+           dialog after they've clicked its "Back to install"
+           button. The same auto-flip path is reused so
+           server-serial installs open server-serial logs and OTA
+           installs open network logs. Other command types
+           (compile / clean) don't have a sensible logs follow-up,
+           so we only surface it for install.
+
+           Hosts that mount this dialog are expected to wire
+           ``@request-show-logs-after-install`` to their logs-
+           dialog; if a host neglects to, the click no-ops rather
+           than misbehaving.
+
+           Rendered as a ghost button (not ``term-btn--start``) on
+           purpose — the toolbar's "Logs after" toggle was
+           previously shown with the blue accent palette while the
+           install ran, and reusing that styling here would make
+           the post-success "Logs" button look like the toggle
+           "stayed on" rather than collapsing into a regular
+           action. */
         return this._commandType === "install"
-          ? html`<button class="term-btn term-btn--start" @click=${this._flipToLogs}>
+          ? html`<button class="term-btn term-btn--ghost" @click=${this._flipToLogs}>
                 <wa-icon library="mdi" name="console"></wa-icon>
                 ${this._localize("command.show_logs")}
               </button>
@@ -1048,16 +1062,15 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Attach to a job's output stream. Works for queued, running, or finished jobs. */
   private _followJob(jobId: string) {
-    /* Capture the pre-attach status so we can tell whether this
-       session saw a live transition (QUEUED/RUNNING → COMPLETED)
-       or just replayed a job that was already terminal at attach
-       time. The latter is what happens when the user clicks a
-       finished install in firmware-jobs-dialog to review its
-       output — auto-flipping to logs there would be surprising
-       (the user wanted to read the past install output, not start
-       tailing the device). */
-    const wasLiveAtAttach =
-      this._jobStatus === JobStatus.QUEUED || this._jobStatus === JobStatus.RUNNING;
+    /* Snapshot whether this attach saw the job live (QUEUED /
+       RUNNING) — captured locally so the closure below can gate
+       the auto-flip on it. Reattaching to a job that's already
+       terminal is a review path: yanking the user to logs after
+       they opened firmware-tasks specifically to read the past
+       install output is the surprise behaviour. The toolbar
+       toggle and the post-success "Logs" button stay unconditional
+       — those are user-initiated, not automatic. */
+    const wasLiveAtAttach = !isTerminalJobStatus(this._jobStatus);
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];

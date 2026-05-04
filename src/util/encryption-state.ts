@@ -111,3 +111,24 @@ export function getEncryptionVisual(
 ): EncryptionVisual | null {
   return state === "none" ? null : VISUALS[state];
 }
+
+/**
+ * Compact-view variant of :func:`getEncryptionVisual` for the
+ * dashboard table rows and device cards. Returns ``null`` for the
+ * confirmed-encrypted-by-mDNS case (truthy ``api_encryption_active``
+ * combined with ``"active"`` state) — that's the steady state on
+ * a healthy fleet, and repeating a green lock on every row / card
+ * drowns out the rows / cards that need attention. The
+ * unconfirmed-but-YAML-says-encrypted case (``api_encryption_active``
+ * null/undefined) keeps its icon so "waiting / unknown" stays
+ * visible. Use the full :func:`getEncryptionVisual` in
+ * single-device contexts (drawer / details pane) where confirmation
+ * is useful. (issue #141)
+ */
+export function getCompactEncryptionVisual(
+  d: EncryptionInputs,
+): EncryptionVisual | null {
+  const state = getEncryptionState(d);
+  if (state === "active" && d.api_encryption_active) return null;
+  return getEncryptionVisual(state);
+}

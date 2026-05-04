@@ -6,44 +6,59 @@
  */
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import { ansiLogThemes } from "../styles/ansi-log/index.js";
 
-/** ANSI 4-bit color palette (standard 8 + bright 8). */
+/**
+ * ANSI 4-bit colour palette as CSS variable references. The
+ * concrete values live in ``../styles/ansi-log/{dark,light}.ts``
+ * — one file per theme, switched on automatically via the host's
+ * ``light`` attribute. Both themes use the same variable names
+ * (``--ansi-fg-30`` etc.); only the values differ.
+ *
+ * Why CSS variables rather than two static records: a theme
+ * switch (host gains/loses the ``light`` attribute) re-resolves
+ * the variables via the cascade in place, no re-parse of any
+ * already-rendered log line. Adding a third theme (Solarized,
+ * Dracula, …) is just dropping another sibling file under
+ * ``../styles/ansi-log/`` — see that directory's index for the
+ * extension contract.
+ */
 const ANSI_COLORS: Record<number, string> = {
-  30: "#c0c0c0", // default/gray for dark bg
-  31: "#f44747", // red
-  32: "#6a9955", // green
-  33: "#dcdcaa", // yellow
-  34: "#569cd6", // blue
-  35: "#c586c0", // magenta
-  36: "#4ec9b0", // cyan
-  37: "#d4d4d4", // white
-  90: "#808080", // bright black (gray)
-  91: "#f44747", // bright red
-  92: "#6a9955", // bright green
-  93: "#dcdcaa", // bright yellow
-  94: "#569cd6", // bright blue
-  95: "#c586c0", // bright magenta
-  96: "#4ec9b0", // bright cyan
-  97: "#ffffff", // bright white
+  30: "var(--ansi-fg-30)",
+  31: "var(--ansi-fg-31)",
+  32: "var(--ansi-fg-32)",
+  33: "var(--ansi-fg-33)",
+  34: "var(--ansi-fg-34)",
+  35: "var(--ansi-fg-35)",
+  36: "var(--ansi-fg-36)",
+  37: "var(--ansi-fg-37)",
+  90: "var(--ansi-fg-90)",
+  91: "var(--ansi-fg-91)",
+  92: "var(--ansi-fg-92)",
+  93: "var(--ansi-fg-93)",
+  94: "var(--ansi-fg-94)",
+  95: "var(--ansi-fg-95)",
+  96: "var(--ansi-fg-96)",
+  97: "var(--ansi-fg-97)",
 };
 
 const ANSI_BG_COLORS: Record<number, string> = {
-  40: "#1e1e1e",
-  41: "#f44747",
-  42: "#6a9955",
-  43: "#dcdcaa",
-  44: "#569cd6",
-  45: "#c586c0",
-  46: "#4ec9b0",
-  47: "#d4d4d4",
-  100: "#808080",
-  101: "#f44747",
-  102: "#6a9955",
-  103: "#dcdcaa",
-  104: "#569cd6",
-  105: "#c586c0",
-  106: "#4ec9b0",
-  107: "#ffffff",
+  40: "var(--ansi-bg-40)",
+  41: "var(--ansi-bg-41)",
+  42: "var(--ansi-bg-42)",
+  43: "var(--ansi-bg-43)",
+  44: "var(--ansi-bg-44)",
+  45: "var(--ansi-bg-45)",
+  46: "var(--ansi-bg-46)",
+  47: "var(--ansi-bg-47)",
+  100: "var(--ansi-bg-100)",
+  101: "var(--ansi-bg-101)",
+  102: "var(--ansi-bg-102)",
+  103: "var(--ansi-bg-103)",
+  104: "var(--ansi-bg-104)",
+  105: "var(--ansi-bg-105)",
+  106: "var(--ansi-bg-106)",
+  107: "var(--ansi-bg-107)",
 };
 
 interface AnsiSpan {
@@ -57,15 +72,16 @@ interface AnsiSpan {
 /**
  * ESPHome log level colors.
  * Applied when a line matches `[timestamp][LEVEL][component:]` but has no ANSI codes.
+ * Uses the same theme-aware CSS-variable palette as the ANSI codes.
  */
 const LOG_LEVEL_COLORS: Record<string, string> = {
-  E: "#f44747", // ERROR — red
-  W: "#dcdcaa", // WARNING — yellow
-  I: "#6a9955", // INFO — green
-  C: "#4ec9b0", // CONFIG — cyan
-  D: "#569cd6", // DEBUG — blue
-  V: "#808080", // VERBOSE — gray
-  VV: "#666666", // VERY_VERBOSE — dark gray
+  E: "var(--ansi-fg-31)", // ERROR — red
+  W: "var(--ansi-fg-33)", // WARNING — yellow
+  I: "var(--ansi-fg-32)", // INFO — green
+  C: "var(--ansi-fg-36)", // CONFIG — cyan
+  D: "var(--ansi-fg-34)", // DEBUG — blue
+  V: "var(--ansi-fg-90)", // VERBOSE — gray
+  VV: "var(--log-fg-very-verbose)", // VERY_VERBOSE — dark gray
 };
 
 /** Detect ESPHome log level from a line like `[22:40:23.513][C][component:123]: text` */
@@ -148,9 +164,7 @@ function parseAnsiLine(line: string, state: AnsiState): AnsiSpan[] {
       // `\033` text — slice from after the `[` (not a fixed offset)
       // to the byte before the trailing `m`.
       const params = match[0].slice(match[0].indexOf("[") + 1, -1);
-      const codes = params
-        .split(";")
-        .map((p) => (p === "" ? 0 : Number(p)));
+      const codes = params.split(";").map((p) => (p === "" ? 0 : Number(p)));
       for (const code of codes) {
         if (code === 0) {
           state.color = undefined;
@@ -221,39 +235,36 @@ export class ESPHomeAnsiLog extends LitElement {
   @query(".log-container")
   private _container!: HTMLDivElement;
 
-  static styles = css`
-    :host {
-      display: block;
-      height: var(--log-height, 400px);
-      --log-bg: #1e1e1e;
-      --log-fg: #d4d4d4;
-      --log-hover: rgba(255, 255, 255, 0.04);
-      --log-placeholder: #666;
-    }
+  static styles = [
+    /* Theme-aware ANSI palette + log surface variables. Each theme
+       lives in its own sibling file under ../styles/ansi-log/ —
+       add `<theme>.ts` + a host-attribute property to extend.
+       Dark must come first; light/etc. override its baseline. */
+    ...ansiLogThemes,
+    css`
+      :host {
+        display: block;
+        height: var(--log-height, 400px);
+      }
 
-    :host([light]) {
-      --log-bg: #f5f5f5;
-      --log-fg: #1e1e1e;
-      --log-hover: rgba(0, 0, 0, 0.04);
-      --log-placeholder: #999;
-    }
+      .log-container {
+        background: var(--log-bg);
+        color: var(--log-fg);
+        font-family:
+          ui-monospace, "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", Menlo,
+          Consolas, monospace;
+        font-size: 12px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        height: 100%;
+        overflow-y: auto;
+        overflow-x: auto;
+        line-height: 18px;
+        box-sizing: border-box;
+        tab-size: 4;
+      }
 
-    .log-container {
-      background: var(--log-bg);
-      color: var(--log-fg);
-      font-family: ui-monospace, "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", Menlo, Consolas, monospace;
-      font-size: 12px;
-      padding: 8px 12px;
-      border-radius: 8px;
-      height: 100%;
-      overflow-y: auto;
-      overflow-x: auto;
-      line-height: 18px;
-      box-sizing: border-box;
-      tab-size: 4;
-    }
-
-    /* white-space: pre-wrap lives on the line, not the container. On
+      /* white-space: pre-wrap lives on the line, not the container. On
        the container Lit's html-template inter-element text nodes
        (whitespace between <div> and the interpolated children) render
        as visible blank lines above the first real log line.
@@ -267,33 +278,34 @@ export class ESPHomeAnsiLog extends LitElement {
        yaml-diff.ts uses — Safari historically honoured the former
        earlier than the latter, so keeping both ensures unbroken
        tokens (URLs, paths) wrap consistently across engines. */
-    .log-line {
-      margin: 0;
-      padding: 0;
-      border-radius: 2px;
-      line-height: 18px;
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: anywhere;
-    }
+      .log-line {
+        margin: 0;
+        padding: 0;
+        border-radius: 2px;
+        line-height: 18px;
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }
 
-    .log-line:hover {
-      background: var(--log-hover);
-    }
+      .log-line:hover {
+        background: var(--log-hover);
+      }
 
-    .placeholder {
-      color: var(--log-placeholder);
-      font-style: italic;
-    }
+      .placeholder {
+        color: var(--log-placeholder);
+        font-style: italic;
+      }
 
-    .bold {
-      font-weight: 700;
-    }
+      .bold {
+        font-weight: 700;
+      }
 
-    .dim {
-      opacity: 0.6;
-    }
-  `;
+      .dim {
+        opacity: 0.6;
+      }
+    `,
+  ];
 
   protected updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("lines") && this.autoScroll && !this._isUserScrolled) {
@@ -364,7 +376,7 @@ export class ESPHomeAnsiLog extends LitElement {
     return line
       .replace(
         /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
-        "",
+        ""
       )
       .replace(/\s+$/, "");
   }
@@ -381,23 +393,34 @@ export class ESPHomeAnsiLog extends LitElement {
       }
     }
 
-    return html`<div class="log-line">${spans.map((span) => {
-        const style = [
-          span.color ? `color:${span.color}` : "",
-          span.bgColor ? `background:${span.bgColor}` : "",
-        ]
-          .filter(Boolean)
-          .join(";");
-
-        const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
-          .filter(Boolean)
-          .join(" ");
-
-        if (style || classes) {
-          return html`<span class=${classes || nothing} style=${style || nothing}>${span.text}</span>`;
-        }
-        return span.text;
-      })}</div>`;
+    // The ``<div class="log-line">`` opening tag, the ``${spans.map(...)}``
+    // children, and the closing ``</div>`` MUST stay on one logical line:
+    // ``.log-line`` has ``white-space: pre-wrap`` (preserves runs of
+    // newlines and leading spaces in the log text), so inter-tag
+    // whitespace from a multi-line template literal renders as a
+    // visible blank row + leading-space indent on every log line.
+    // Prettier reformatting will silently re-introduce the bug — keep
+    // the prettier-ignore directive here. The same shape applies to
+    // the per-span ``<span ...>`` template below.
+    /* prettier-ignore */
+    const children = spans.map((span) => {
+      const style = [
+        span.color ? `color:${span.color}` : "",
+        span.bgColor ? `background:${span.bgColor}` : "",
+      ]
+        .filter(Boolean)
+        .join(";");
+      const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
+        .filter(Boolean)
+        .join(" ");
+      if (style || classes) {
+        // prettier-ignore
+        return html`<span class=${classes || nothing} style=${style || nothing}>${span.text}</span>`;
+      }
+      return span.text;
+    });
+    // prettier-ignore
+    return html`<div class="log-line">${children}</div>`;
   }
 
   private _ignoreNextScroll = false;

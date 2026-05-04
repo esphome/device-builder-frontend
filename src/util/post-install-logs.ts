@@ -57,6 +57,26 @@ export function dispatchShowLogsAfterInstall(
  * contexts that DON'T mount a logs dialog (e.g. firmware-jobs-dialog
  * for past-job replay) leave the source open instead of vanishing.
  */
+/**
+ * Bound-handler factory for the install → logs hand-off. Hosts that
+ * mount an install dialog and a logs-dialog (dashboard, device
+ * editor, firmware-tasks dialog) all reduce to the same one-liner:
+ *
+ *     private _onPostInstallShowLogs = postInstallShowLogsHandler(
+ *       () => this._logsDialog,
+ *     );
+ *
+ * The getter is deferred so the host's ``@query`` decorator can
+ * resolve the logs-dialog at event-fire time (after first render),
+ * not at field-initialisation time when the shadow DOM hasn't been
+ * rendered yet.
+ */
+export function postInstallShowLogsHandler(
+  getLogsDialog: () => ESPHomeLogsDialog,
+): (e: CustomEvent<PostInstallShowLogsDetail>) => Promise<void> {
+  return (e) => handlePostInstallShowLogs(e, getLogsDialog());
+}
+
 export async function handlePostInstallShowLogs(
   e: CustomEvent<PostInstallShowLogsDetail>,
   logsDialog: ESPHomeLogsDialog

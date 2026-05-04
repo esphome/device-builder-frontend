@@ -32,6 +32,8 @@ import {
   formatRelativeTime,
 } from "../util/format-job-time.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
+import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -40,6 +42,8 @@ import "./command-dialog.js";
 import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import "./logs-dialog.js";
+import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 
 registerMdiIcons({
   broom: mdiBroom,
@@ -65,16 +69,6 @@ const TYPE_ICONS: Record<JobType, string> = {
   [JobType.RENAME]: "rename-outline",
 };
 
-const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
-  JobStatus.COMPLETED,
-  JobStatus.FAILED,
-  JobStatus.CANCELLED,
-]);
-
-function isTerminal(job: FirmwareJob): boolean {
-  return TERMINAL_STATUSES.has(job.status);
-}
-
 @customElement("esphome-firmware-jobs-dialog")
 export class ESPHomeFirmwareJobsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -97,6 +91,18 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   @query("esphome-command-dialog")
   private _commandDialog!: ESPHomeCommandDialog;
+
+  /** Logs dialog for the post-install hand-off when reattaching to
+   *  a job from this surface. Without one, the
+   *  ``request-show-logs-after-install`` event the nested command
+   *  dialog dispatches has no listener — both the auto-flip and the
+   *  post-success "Logs" button no-op. (issue #139) */
+  @query("esphome-logs-dialog")
+  private _logsDialog!: ESPHomeLogsDialog;
+
+  private _onPostInstallShowLogs = postInstallShowLogsHandler(
+    () => this._logsDialog,
+  );
 
   @query("esphome-confirm-dialog")
   private _confirmDialog!: ESPHomeConfirmDialog;
@@ -473,7 +479,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       </wa-dialog>
       <esphome-command-dialog
         @open-reset-build-env=${this._onLocalResetEvent}
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
       ></esphome-command-dialog>
+      <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-confirm-dialog
         heading=${this._localize("firmware_jobs.reset_confirm_title")}
         confirm-label=${this._localize("firmware_jobs.reset_confirm_button")}
