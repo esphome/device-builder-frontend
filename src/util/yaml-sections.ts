@@ -371,9 +371,65 @@ export function findAddedSection(
  * platform list items, that's `<parent>.<platform>` (de-duplicating
  * if the platform is already namespaced); otherwise just `key`.
  */
-function sectionKeyOf(section: YamlSection): string {
+export function sectionKeyOf(section: YamlSection): string {
   if (!section.platform) return section.key;
   return section.platform.startsWith(`${section.key}.`)
     ? section.platform
     : `${section.key}.${section.platform}`;
+}
+
+/**
+ * Resolve the current `fromLine` for `sectionKey` in `yaml`,
+ * preferring the section closest to `staleFromLine` when the
+ * section key matches multiple list items.
+ *
+ * The navigator emits `fromLine` at click time; if the YAML
+ * shifts afterwards (paste / external edit added or removed
+ * lines above the section), the cached number is stale and a
+ * splice keyed on it would clip the wrong section. This helper
+ * re-resolves against the current YAML so save / delete operate
+ * on the right line.
+ *
+ * Returns the matching section's 1-indexed `fromLine`, or
+ * `undefined` when no section in `yaml` matches `sectionKey` —
+ * callers surface that as an explicit error rather than running
+ * a wrong-line splice. Empty `yaml` or empty `sectionKey` also
+ * return `undefined` so an unbound prop and a cleared editor
+ * pane collapse into the same caller-visible failure.
+ *
+ * `undefined` (rather than `null`) so the result drops cleanly
+ * into `parseYamlSectionValues`'s optional `fromLine?` parameter
+ * without a `?? undefined` conversion at every call site.
+ *
+ * Same-key duplicates (two `ota.esphome` items — pathological
+ * but legal YAML): closest-match is a heuristic, strictly
+ * better than ignoring `staleFromLine` but not guaranteed
+ * correct. If the user originally clicked the first of two
+ * duplicates and a subsequent paste shifted line numbers far
+ * enough that the stale line is now closer to the second
+ * duplicate, the resolver picks the second. There's no oracle
+ * once the array is reshuffled; a re-click is the expected
+ * recovery for that case. Equidistant ties prefer the first
+ * match (the test pins this; `reduce` with `<` keeps the
+ * accumulator on ties).
+ */
+export function resolveCurrentFromLine(
+  yaml: string,
+  sectionKey: string,
+  staleFromLine?: number,
+): number | undefined {
+  if (!yaml || !sectionKey) return undefined;
+  const matches = parseYamlTopLevelSections(yaml).filter(
+    (s) => sectionKeyOf(s) === sectionKey,
+  );
+  if (matches.length === 0) return undefined;
+  if (matches.length === 1 || staleFromLine === undefined) {
+    return matches[0].fromLine;
+  }
+  return matches.reduce((best, candidate) =>
+    Math.abs(candidate.fromLine - staleFromLine) <
+    Math.abs(best.fromLine - staleFromLine)
+      ? candidate
+      : best,
+  ).fromLine;
 }

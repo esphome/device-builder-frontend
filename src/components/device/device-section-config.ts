@@ -30,6 +30,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../util/yaml-section-values.js";
+import { resolveCurrentFromLine } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -94,8 +95,37 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @property()
   sectionKey = "";
 
+  /**
+   * Cached `fromLine` from the navigator's emit at click time.
+   * Use `_resolvedFromLine` (re-resolved against the live YAML
+   * via `resolveCurrentFromLine`) for any actual operation —
+   * read, save, or delete. This value goes stale as soon as
+   * the YAML pane shifts, but is still useful as a "stale hint"
+   * to disambiguate same-key duplicates: a small shift maps
+   * the click back to the closest match.
+   */
   @property({ type: Number })
   fromLine?: number;
+
+  /**
+   * Live YAML for the device — the same string the YAML pane on
+   * the right shows, including any unsaved edits. Save and delete
+   * operate on this rather than re-fetching from the server: the
+   * navigator emits `fromLine` relative to the *live* YAML, so an
+   * out-of-sync saved version would point the splice at the
+   * wrong line and clobber a different section. The page that
+   * owns this state (`pages/device.ts`) feeds it through
+   * `device-board-info`.
+   *
+   * Empty / unbound values are caught at the splice site by
+   * `resolveCurrentFromLine` returning `undefined` — the splice
+   * never runs without a resolved `fromLine`, so an empty YAML
+   * (user cleared the pane) and a missing prop binding both
+   * surface as a localised section-not-found error rather than
+   * an empty-string clobber.
+   */
+  @property()
+  yaml = "";
 
   /** Whether the device editor's YAML pane is currently visible.
    *  When it isn't, the YAML-only notice grows a "Show YAML editor"
@@ -151,9 +181,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _presentComponents: Set<string> = new Set();
 
-  /** Full YAML — needed by the embedded form for ID / pin lookups. */
+  /** Section's resolved `fromLine` against the *current* yaml,
+   *  recomputed each `_loadConfig`. Forwarded to the embedded
+   *  form so its conflict-detection (which skips the user's
+   *  own pin via `fromLine`) stays aligned with what the read
+   *  + write paths see. `undefined` when the section can't be
+   *  located in the live yaml — the form treats that as "no
+   *  exclusion" which is the right call for a not-found
+   *  section. */
   @state()
-  private _yaml = "";
+  private _resolvedFromLine?: number;
 
   @query("esphome-config-entry-form")
   private _form?: ESPHomeConfigEntryForm;
@@ -178,7 +215,57 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   }
 
-  /** Reload config from backend if the form has no unsaved changes. */
+  /**
+   * Resolve the splice context for save / delete — the live YAML
+   * and a current, validated `fromLine`. Sets `_error` and
+   * returns `null` when the section can't be located so callers
+   * surface the failure with a localised error instead of running
+   * the splice with stale inputs.
+   *
+   * `resolveCurrentFromLine` returns `undefined` for empty /
+   * unbound `this.yaml` AND for "section key no longer present
+   * in the live YAML" (user pasted away the section, cleared
+   * the editor, or the cached `fromLine` shifted past a
+   * now-removed key). All three collapse to the same
+   * user-facing error — clobbering config with an empty-string
+   * splice is structurally impossible when we don't proceed
+   * without a resolved line.
+   *
+   * Asymmetric on purpose with the read / load path: that path
+   * is reactive (driven by external yaml mutation, not user
+   * intent), so a popup error for "section vanished" would feel
+   * intrusive — it surfaces an empty form instead. Save / delete
+   * fire from an explicit user action, so an error is the right
+   * acknowledgement.
+   *
+   * `notFoundErrorKey` is the localize key surfaced
+   * (`device.save_error` / `device.section_delete_error`).
+   */
+  private _resolveSpliceContext(
+    // Closed union so a typo at the call site (the only two
+    // surfacing paths) fails to compile rather than silently
+    // resolving to the locale key as English.
+    notFoundErrorKey: "device.save_error" | "device.section_delete_error",
+  ): { yaml: string; fromLine: number } | null {
+    const fromLine = resolveCurrentFromLine(
+      this.yaml,
+      this.sectionKey,
+      this.fromLine,
+    );
+    if (fromLine === undefined) {
+      this._error = this._localize(notFoundErrorKey);
+      return null;
+    }
+    return { yaml: this.yaml, fromLine };
+  }
+
+  /** Reload config from the live YAML if the form has no unsaved
+   *  changes. The canonical caller is `device-board-info`'s
+   *  `updated()` hook (`device-board-info.ts`, `_reloadTimer`),
+   *  which debounces this against `yaml` prop changes so paste /
+   *  external mutations re-seed a clean form. The dirty-check
+   *  here keeps mid-edit reloads from clobbering unsaved field
+   *  changes — board-info delegates the gating to us. */
   public reload() {
     if (!this._dirty && this.sectionKey && this.configuration) {
       this._loadConfig();
@@ -206,7 +293,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         return;
       }
 
-      const yaml = await this._api.getConfig(this.configuration);
+      // Use the live YAML the parent passes in; `fromLine` is
+      // relative to that. A `_api.getConfig` re-fetch would
+      // disagree with the user-visible YAML when the editor
+      // pane has unsaved edits and seed the form from a
+      // different section than the one they clicked.
+      const yaml = this.yaml;
 
       if (id !== this._loadId) return;
 
@@ -220,13 +312,26 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         image_url: component.image_url,
         entries: component.config_entries,
       };
-      this._values = parseYamlSectionValues(
+      // Resolve `fromLine` against the live YAML — see
+      // `_resolveSpliceContext` for the contract and the
+      // documented asymmetry between this read path
+      // (silent-empty on missing section) and the save / delete
+      // paths (localised error). When the resolver returns
+      // `undefined`, the parser's column-0 scan won't match a
+      // dotted platform key, so values come back `{}` and the
+      // form surfaces empty.
+      const resolvedFromLine = resolveCurrentFromLine(
         yaml,
         this.sectionKey,
         this.fromLine,
       );
+      this._values = parseYamlSectionValues(
+        yaml,
+        this.sectionKey,
+        resolvedFromLine,
+      );
+      this._resolvedFromLine = resolvedFromLine;
       this._presentComponents = parseTopLevelComponents(yaml);
-      this._yaml = yaml;
     } catch (e) {
       if (id !== this._loadId) return;
       const msg = e instanceof Error ? e.message : "";
@@ -333,8 +438,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .values=${this._values}
               .errors=${this._fieldErrors}
               .board=${this.board}
-              .yaml=${this._yaml}
-              .fromLine=${this.fromLine}
+              .yaml=${this.yaml}
+              .fromLine=${this._resolvedFromLine}
               .presentComponents=${this._presentComponents}
               ?disabled=${this._saving}
               ?show-advanced=${showAdvanced}
@@ -405,17 +510,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onDeleteConfirmed() {
     if (!this._config) return;
+    const ctx = this._resolveSpliceContext("device.section_delete_error");
+    if (!ctx) return;
     this._deleting = true;
     this._error = "";
     const title = this._config.title;
     try {
-      const yaml = await this._api.getConfig(this.configuration);
       const newYaml = removeSectionFromYaml(
-        yaml,
+        ctx.yaml,
         this.sectionKey,
-        this.fromLine,
+        ctx.fromLine,
       );
-      if (newYaml === yaml) {
+      if (newYaml === ctx.yaml) {
         this._error = this._localize("device.section_delete_error");
         return;
       }
@@ -521,15 +627,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       return;
     }
     this._fieldErrors = new Map();
+    const ctx = this._resolveSpliceContext("device.save_error");
+    if (!ctx) return;
     this._saving = true;
     this._error = "";
     try {
-      const yaml = await this._api.getConfig(this.configuration);
       const newYaml = updateSectionInYaml(
-        yaml,
+        ctx.yaml,
         this.sectionKey,
         this._values,
-        this.fromLine,
+        ctx.fromLine,
       );
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {

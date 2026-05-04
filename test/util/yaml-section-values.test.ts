@@ -3,24 +3,64 @@ import {
   findSectionStart,
   LIST_ITEM_START_RE,
   parseYamlSectionValues,
+  removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
 
-/** 1-indexed line of the first list-item dash following
+/** 1-indexed line of the *n*th (1-based) list-item dash following
  *  `parent:` in `yaml`. Section-editor callers pass that line as
- *  `fromLine`; resolving it here keeps the tests robust to
- *  layout edits (e.g. a leading comment line shifting
- *  positions). Reuses the parser's `LIST_ITEM_START_RE` directly
- *  so a future tightening there can't silently let the test
- *  helper drift to a different definition of "list item". */
-function firstListItemLine(yaml: string, parent: string): number {
+ *  `fromLine`; resolving it here keeps tests robust to layout
+ *  edits. Reuses the parser's `LIST_ITEM_START_RE` directly so
+ *  a future tightening there can't silently let the test helper
+ *  drift to a different definition of "list item". */
+function nthListItemLine(
+  yaml: string,
+  parent: string,
+  n: number,
+): number {
   const lines = yaml.split("\n");
   const start = findSectionStart(lines, parent);
-  for (let i = start + 1; i < lines.length; i++) {
-    if (LIST_ITEM_START_RE.test(lines[i])) return i + 1;
+  if (start === -1) {
+    // Without this guard the loop would walk from index 0 and
+    // could count list items belonging to a different section,
+    // producing a misleading "found" line for a fixture that
+    // doesn't actually contain `parent:`. Fail loud instead.
+    throw new Error(`section ${parent}: not found in fixture`);
   }
-  throw new Error(`no list-item dash under ${parent}: in test fixture`);
+  let count = 0;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (LIST_ITEM_START_RE.test(lines[i])) {
+      count++;
+      if (count === n) return i + 1;
+    }
+  }
+  throw new Error(`fewer than ${n} list-item dashes under ${parent}: in fixture`);
 }
+
+const firstListItemLine = (yaml: string, parent: string): number =>
+  nthListItemLine(yaml, parent, 1);
+
+describe("test helper: nthListItemLine", () => {
+  it("throws when the parent section isn't in the fixture", () => {
+    // Without an explicit guard, `findSectionStart` returning
+    // -1 would let the loop walk from index 0 and count
+    // list-item dashes belonging to a different section,
+    // producing a misleading "found" line. Failing loud means
+    // a typo in a test fixture surfaces immediately rather
+    // than as a confusing wrong-line assertion downstream.
+    const yaml = "esphome:\n  name: x\n";
+    expect(() => nthListItemLine(yaml, "ota", 1)).toThrow(
+      /section ota: not found/,
+    );
+  });
+
+  it("throws when there are fewer dashes than requested", () => {
+    const yaml = "ota:\n  - platform: esphome\n";
+    expect(() => nthListItemLine(yaml, "ota", 2)).toThrow(
+      /fewer than 2 list-item dashes/,
+    );
+  });
+});
 
 describe("parseYamlSectionValues — prototype pollution defense", () => {
   // YAML keys like `__proto__` / `constructor` / `prototype`
@@ -312,5 +352,65 @@ describe("updateSectionInYaml — list item with inline key", () => {
     });
     expect(after).toContain("ssid: x");
     expect(after).toContain("password: secret");
+  });
+});
+
+describe("removeSectionFromYaml — multi-item list", () => {
+  // Pins the splice contract that surfaced the
+  // wrong-section-deleted bug. The bug itself was at the
+  // integration boundary (section editor was passing the
+  // server's stale YAML instead of the live one), so the
+  // splice was being asked to operate on a yaml the
+  // navigator's `fromLine` didn't match.
+  //
+  // The unit-level guarantee these tests pin: given the live
+  // YAML + a `fromLine` pointing at the right list item, the
+  // splice removes that item and only that item.
+
+  const multiItemOta = [
+    "ota:",
+    "  - platform: esphome",
+    "    password: foo",
+    "  - platform: web_server",
+    "",
+  ].join("\n");
+
+  it("removes the FIRST OTA list item when fromLine points at it", () => {
+    const fromLine = firstListItemLine(multiItemOta, "ota");
+    const after = removeSectionFromYaml(multiItemOta, "ota.esphome", fromLine);
+    expect(after).not.toContain("platform: esphome");
+    expect(after).not.toContain("password: foo");
+    // The other list item survives untouched.
+    expect(after).toContain("- platform: web_server");
+  });
+
+  it("removes the SECOND OTA list item when fromLine points at it", () => {
+    // Direct repro of the bug-report shape: deleting
+    // `ota.web_server` (the second item) must hit it and
+    // leave `ota.esphome` alone. The pre-fix code path
+    // routed through a stale yaml fetch and clipped the
+    // wrong item.
+    const after = removeSectionFromYaml(
+      multiItemOta,
+      "ota.web_server",
+      nthListItemLine(multiItemOta, "ota", 2),
+    );
+    expect(after).not.toContain("- platform: web_server");
+    // The first item and its sibling field survive.
+    expect(after).toContain("- platform: esphome");
+    expect(after).toContain("password: foo");
+  });
+
+  it("drops the parent block when removing the only list item", () => {
+    const before = "ota:\n  - platform: esphome\n";
+    const fromLine = firstListItemLine(before, "ota");
+    const after = removeSectionFromYaml(before, "ota.esphome", fromLine);
+    // Empty-parent cleanup kicks in: the bare `ota:` left
+    // behind would be invalid ESPHome, so the parent goes
+    // too. Anchor `ota:` to the line start so a fixture that
+    // happened to mention `ota` elsewhere (e.g. inside a
+    // value or comment) wouldn't trip a false positive.
+    expect(after).not.toMatch(/^ota:/m);
+    expect(after).not.toContain("platform: esphome");
   });
 });

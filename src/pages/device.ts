@@ -110,6 +110,30 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _navCollapsed = false;
 
+  /**
+   * Live device YAML, fed down through `device-editor` →
+   * `device-board-info` to the section editor and the YAML pane.
+   *
+   * The section editor's scan memos
+   * (`util/config-entry-yaml-scan.ts`) cache per-keystroke
+   * pin / id-reference lookups by content (`a.yaml === b.yaml`,
+   * value equality on primitive strings). Reassigning to the
+   * same string instance hits the engine's pointer-equality
+   * fast path; reconstructing a fresh string with identical
+   * content still hits but pays a byte-compare on the first
+   * call after the rebuild. A content change always misses
+   * and re-scans.
+   *
+   * Patterns that produce a fresh string per render (and so
+   * cost the byte-compare without breaking correctness):
+   * template literals (``` `${value}` ```), `String(value)`,
+   * `value.toString()`, `JSON.stringify(JSON.parse(value))`.
+   * The current code path doesn't do any of these — `_yaml`
+   * is only reassigned on user yaml-change events, save
+   * events, or initial fetch — but a future refactor that
+   * introduces them would silently demote the fast path.
+   * Avoid when you can.
+   */
   @state()
   private _yaml = "";
 

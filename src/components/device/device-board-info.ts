@@ -14,6 +14,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
 
@@ -97,10 +98,32 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   private _reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   updated(changedProperties: Map<string, unknown>) {
+    // Coalesce typing in the YAML editor pane to one
+    // `reload()` per debounce window, but bypass the debounce
+    // on the empty-to-populated transition (page-load arrival,
+    // user cleared the pane and pasted new content) so the
+    // section editor's empty-form window is bounded by the
+    // next render frame rather than a full coalesce window.
+    //
+    // Calling `reload()` synchronously from `updated()` is the
+    // right shape here: `reload()` mutates the child's `@state`,
+    // which Lit batches into the same render pass that's about
+    // to run anyway — no extra paint, no recursion. A separate
+    // `requestAnimationFrame` would just delay the effect.
     if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
-      // Debounce reload so typing in the YAML editor doesn't spam the API
-      if (this._reloadTimer) clearTimeout(this._reloadTimer);
-      this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
+      if (this._reloadTimer) {
+        clearTimeout(this._reloadTimer);
+        this._reloadTimer = null;
+      }
+      const prev = changedProperties.get("yaml") as string | undefined;
+      if (isEmptyToPopulatedYamlChange(prev, this.yaml)) {
+        // Synchronous bypass: no timer to track, leave
+        // `_reloadTimer` at its just-cleared `null` so the
+        // "null means no timer" invariant holds.
+        this._sectionConfig.reload();
+      } else {
+        this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
+      }
     }
   }
 
@@ -378,6 +401,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
               .configuration=${this.configuration}
               .sectionKey=${this.selectedSection}
               .fromLine=${this.selectedFromLine}
+              .yaml=${this.yaml}
               .board=${this.board}
               ?yamlPaneVisible=${this.yamlPaneVisible}
             ></esphome-device-section-config>
