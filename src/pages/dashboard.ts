@@ -840,8 +840,27 @@ export class ESPHomePageDashboard extends LitElement {
   @query(".search-input")
   private _searchInputEl?: HTMLElement & { focus: () => void };
 
+  /**
+   * Land the cursor in the search box.
+   *
+   * ``wa-input``'s host-level ``.focus()`` doesn't reliably
+   * delegate to its inner native input across all browsers, so
+   * also reach into the host's shadow DOM and focus the
+   * ``<input>`` directly. RAF-deferred so the call lands after
+   * Lit has flushed any in-progress re-render (e.g. from a
+   * concurrent ``_yamlMode`` flip that's swapping placeholder /
+   * class on the wa-input).
+   */
   private _refocusSearchInput() {
-    requestAnimationFrame(() => this._searchInputEl?.focus());
+    requestAnimationFrame(() => {
+      const wrap = this._searchInputEl;
+      if (!wrap) return;
+      wrap.focus();
+      const inner = (
+        wrap as HTMLElement & { shadowRoot?: ShadowRoot | null }
+      ).shadowRoot?.querySelector<HTMLInputElement>("input");
+      inner?.focus();
+    });
   }
 
   /**

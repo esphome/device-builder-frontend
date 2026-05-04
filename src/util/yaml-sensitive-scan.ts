@@ -34,7 +34,14 @@ export interface SensitiveValueRange {
 // appear in the document. These names are stable across the ESPHome
 // catalog (api/ota/mqtt/wifi/web_server/http_request all spell their
 // credential fields the same way).
-const ALWAYS_SENSITIVE_KEYS = new Set([
+/**
+ * Keys whose values are always credentials regardless of where
+ * they appear in the document. Exported so single-line maskers
+ * (``yaml-search-helpers.ts``) can share the same source of
+ * truth — adding a key here lights it up in every consumer
+ * automatically rather than drifting between copies.
+ */
+export const ALWAYS_SENSITIVE_KEYS: ReadonlySet<string> = new Set([
   "password",
   "ap_password",
   "ota_password",

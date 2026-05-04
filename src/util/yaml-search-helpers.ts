@@ -18,17 +18,7 @@
 
 import type { LocalizeFunc } from "../common/localize.js";
 import type { YamlSearchHit, YamlSearchMatch } from "../api/types.js";
-
-/**
- * Inline credential keys that ESPHome treats as always-sensitive
- * (mirrors ``ALWAYS_SENSITIVE_KEYS`` in ``yaml-sensitive-scan``).
- * Parent-scoped keys like ``encryption.key`` aren't included
- * here — without the parent context we'd only have the line
- * itself, and ``key:`` is reused for non-sensitive purposes
- * elsewhere (remote_receiver button codes etc). The
- * always-sensitive set is unambiguous regardless of context.
- */
-const ALWAYS_SENSITIVE_KEYS = new Set(["password", "ap_password", "ota_password", "psk"]);
+import { ALWAYS_SENSITIVE_KEYS } from "./yaml-sensitive-scan.js";
 
 /**
  * Strip the inline credential value from a line of YAML so it
@@ -41,9 +31,22 @@ const ALWAYS_SENSITIVE_KEYS = new Set(["password", "ap_password", "ota_password"
  *
  * Only keys whose values are unambiguously credentials
  * regardless of context (no parent-scoped check needed) are
- * masked. ``!secret <name>`` references are *not* masked —
- * they carry only the name of an indirection, not the
- * credential itself.
+ * masked — uses the shared ``ALWAYS_SENSITIVE_KEYS`` set
+ * imported from the upstream sensitive-scan module so adding a
+ * key there lights it up here automatically, no drift.
+ *
+ * ``line`` must be a single line of YAML (the regex anchors to
+ * ``^``/``$`` and won't match across newlines). The caller
+ * passes ``match.line_text`` from a ``YamlSearchHit`` which is
+ * single-line by construction; if a future caller fans out to
+ * multi-line input it'll silently no-op rather than mask, so
+ * keep the contract single-line.
+ *
+ * ``!secret <name>`` references are *not* masked — they carry
+ * only the name of an indirection, not the credential itself.
+ * Parent-scoped keys (``key:`` under ``encryption:``) aren't
+ * matched here because we have no parent context for a single
+ * search-hit line.
  */
 function maskSensitiveLine(line: string): string {
   const m = line.match(/^(\s*-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/);
