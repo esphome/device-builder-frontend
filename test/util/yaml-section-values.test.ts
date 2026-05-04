@@ -62,6 +62,10 @@ describe("parseYamlSectionValues — prototype pollution defense", () => {
     >;
     expect(nested.key).toBe("value");
     expect(nested.arr).toEqual(["a", "b"]);
+    // Every block in the chain is null-prototyped — pin both
+    // levels so a future refactor that only null-prototypes the
+    // leaves trips here.
+    expect(Object.getPrototypeOf(values.level1)).toBeNull();
     expect(Object.getPrototypeOf(nested)).toBeNull();
     expect(JSON.stringify(values)).toContain('"key":"value"');
   });
@@ -177,6 +181,10 @@ describe("updateSectionInYaml — list item with inline key", () => {
     expect(after.match(/platform:/g)).toHaveLength(1);
     expect(after).not.toContain("- platform: x");
     expect(after).toContain("complex: object");
+    // Pin the dash actually stayed — a regression that turned
+    // the list item into a plain dict (no leading `-`) would
+    // otherwise pass the not-contains assertions silently.
+    expect(after).toMatch(/^\s+-\s*$/m);
   });
 
   it("collapses dash to bare `-` when the form's value is null", () => {
@@ -194,6 +202,14 @@ describe("updateSectionInYaml — list item with inline key", () => {
     );
     expect(after).not.toContain("- platform: esphome");
     expect(after).toContain("password: secret");
+    expect(after).toMatch(/^\s+-\s*$/m);
+
+    // Round-trip: the bare-`-` shape parses back to the same
+    // values the form holds (minus the null, which the
+    // serializer drops). Closes the loop on whether ESPHome's
+    // YAML reader handles the unusual but valid list-item shape.
+    const reparsed = parseYamlSectionValues(after, "ota.esphome", 2);
+    expect(reparsed).toEqual({ password: "secret" });
   });
 
   it("handles inline keys with the full identifier alphabet", () => {

@@ -129,7 +129,7 @@ export function parseYamlSectionValues(
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) return values;
 
-  const isListItem = /^\s+-\s/.test(lines[startIdx]);
+  const isListItem = /^\s+-(\s|$)/.test(lines[startIdx]);
   const childIndent = isListItem ? "    " : "  ";
   const childRegex = childRegexFor(childIndent);
 
@@ -150,7 +150,7 @@ export function parseYamlSectionValues(
     const line = lines[i];
     if (line.trim() === "") continue;
     if (isListItem) {
-      if (/^\s+-\s/.test(line) || /^[a-zA-Z]/.test(line)) break;
+      if (/^\s+-(\s|$)/.test(line) || /^[a-zA-Z]/.test(line)) break;
     } else if (/^[a-zA-Z]/.test(line)) {
       break;
     }
@@ -274,11 +274,11 @@ export function findSectionRange(
   const start = findSectionStart(lines, sectionKey, fromLine);
   if (start < 0) return { start: -1, end: -1 };
 
-  const isListItem = /^\s+-\s/.test(lines[start]);
+  const isListItem = /^\s+-(\s|$)/.test(lines[start]);
   let end = lines.length;
   for (let i = start + 1; i < lines.length; i++) {
     if (isListItem) {
-      if (/^\s+-\s/.test(lines[i]) || /^[a-zA-Z]/.test(lines[i])) {
+      if (/^\s+-(\s|$)/.test(lines[i]) || /^[a-zA-Z]/.test(lines[i])) {
         end = i;
         break;
       }
@@ -301,7 +301,7 @@ export function updateSectionInYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
-  const isListItem = /^\s+-\s/.test(lines[start]);
+  const isListItem = /^\s+-(\s|$)/.test(lines[start]);
   const childIndent = isListItem ? "    " : "  ";
   let toSerialize = values;
   let dashLine = lines[start];
@@ -341,8 +341,14 @@ export function updateSectionInYaml(
     if (inlineMatch) {
       const inlineKey = inlineMatch[1];
       if (inlineKey in values) {
-        const dashPrefix = dashLine.match(/^(\s+-\s+)/)?.[1] ?? "  - ";
-        const dashIndent = dashLine.match(/^(\s+)-/)?.[1] ?? "  ";
+        // Single regex captures both the indentation up to the
+        // dash and the trailing whitespace before the inline
+        // key — `dashPrefix` (with the trailing space) is what
+        // the rewrite path needs, and the indent alone is what
+        // the bare-dash path needs.
+        const dashPrefixMatch = dashLine.match(/^(\s+)-(\s+)/);
+        const dashIndent = dashPrefixMatch?.[1] ?? "  ";
+        const dashPrefix = `${dashIndent}-${dashPrefixMatch?.[2] ?? " "}`;
         if (_isInlinableScalar(values[inlineKey])) {
           dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(
             values[inlineKey],
@@ -390,7 +396,7 @@ export function removeSectionFromYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
-  const isListItem = /^\s+-\s/.test(lines[start]);
+  const isListItem = /^\s+-(\s|$)/.test(lines[start]);
   lines.splice(start, end - start);
 
   if (isListItem) {
