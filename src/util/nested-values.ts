@@ -46,3 +46,26 @@ export function getIn(
   }
   return cur;
 }
+
+/**
+ * True when *value* is safely coercible to a string via
+ * ``String(value)`` — i.e. a primitive (string / number / boolean)
+ * or null / undefined.
+ *
+ * Plain objects with a normal prototype stringify to
+ * ``"[object Object]"``, but null-prototype objects (which js-yaml
+ * can produce for empty mappings during a partial edit) and any
+ * object whose ``Symbol.toPrimitive`` returns non-primitive throw
+ * "Cannot convert object to primitive value". Callers that fan
+ * a YAML value into a primitive-only sink (e.g. ``wa-select``'s
+ * ``value`` attribute) should gate on this predicate first and
+ * skip the sync for non-primitive values rather than crashing
+ * on a transient object.
+ */
+export function isPrimitiveOrNullish(
+  value: unknown,
+): value is string | number | boolean | null | undefined {
+  if (value === null || value === undefined) return true;
+  const t = typeof value;
+  return t === "string" || t === "number" || t === "boolean";
+}

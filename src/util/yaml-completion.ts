@@ -49,6 +49,37 @@ import {
 // component names (``wifi``, ``logger``) and config-var keys
 // (``name``, ``ssid``).
 const RE_KEY = /^[A-Za-z0-9_]*$/;
+// Cursor-position matchers. ``plain`` covers ordinary nested-key
+// editing (``  partial``); ``list`` covers list-item position
+// (``  - partial``) — the entry point for action-registry
+// completion inside ``then:``. The list form accepts ``.`` in
+// the partial because actions are dotted (``logger.log``).
+const RE_KEY_POSITION_PLAIN = /^(\s*)([A-Za-z0-9_]*)$/;
+const RE_KEY_POSITION_LIST = /^(\s*)-\s+([A-Za-z0-9_.]*)$/;
+
+interface KeyPosition {
+  leading: string;
+  partial: string;
+  /** True when the user typed (or is starting) a list-item dash
+   *  before the partial. Drives action-registry vs. plain-key
+   *  completion paths. */
+  isListItem: boolean;
+}
+
+/**
+ * Match the text before the cursor against the two key-position
+ * shapes and return the canonicalised pieces, or ``null`` if the
+ * cursor isn't in a key-position at all (e.g. mid-value or
+ * inside a comment). One callsite, one return shape — keeps the
+ * completion source readable.
+ */
+function matchKeyPosition(before: string): KeyPosition | null {
+  const plain = before.match(RE_KEY_POSITION_PLAIN);
+  if (plain) return { leading: plain[1], partial: plain[2], isListItem: false };
+  const list = before.match(RE_KEY_POSITION_LIST);
+  if (list) return { leading: list[1], partial: list[2], isListItem: true };
+  return null;
+}
 // Boolean-value typing — only ``true`` / ``false`` matter, so any
 // further character drops the popup.
 const RE_BOOLEAN_VALUE = /^[A-Za-z]*$/;
@@ -181,27 +212,42 @@ function collectTopLevelComponents(lines: string[]): string[] {
 }
 
 /**
- * True when the cursor is inside an automation body — i.e. it's
- * a list item directly under a ``then:`` (``-`` at indent that
- * matches a ``then:`` ancestor's indent + 2). Loose match: we
- * don't try to validate that the ``then:`` lives under a real
- * trigger config-var. Triggers are the canonical shape but
- * ``script:`` and a few others also accept a ``then:`` body, and
- * mistaking a non-automation ``then:`` for one is harmless — the
- * worst case is a few extra completion entries.
+ * True when the cursor is a list item directly under a
+ * ``then:`` block — the position where action-registry
+ * completion should fire. Strict indent check: the ``then:``
+ * line must sit at exactly the cursor's indent minus two (i.e.
+ * the canonical list-item under a key). That avoids matching
+ * deeply-nested keys that *happen* to live somewhere under a
+ * ``then:`` ancestor — those are action arguments, not new
+ * action slots.
+ *
+ * Loose on which ``then:`` we trust: triggers are the canonical
+ * parent but ``script:`` and a few others also accept a ``then:``
+ * body. Mistaking those is harmless — the worst case is a few
+ * extra completion entries the user can ignore.
  */
-function isInAutomationBody(lines: string[], lineIdx: number): boolean {
-  // The user typed a list-item indent; walk up looking for ``then:``
-  // at exactly two columns shallower (``  then:`` → list-item at
-  // column 4).
+function isInAutomationBody(
+  lines: string[],
+  lineIdx: number,
+  cursorIndent: number,
+): boolean {
+  // Walk up from the cursor's line looking for the right
+  // ``then:`` candidate. Stop early if indentation drops below
+  // ``cursorIndent - 2`` (we've left the candidate ``then:``
+  // block) or below 0.
+  const wantedThenIndent = cursorIndent - 2;
+  if (wantedThenIndent < 0) return false;
   for (let i = lineIdx - 1; i >= 0; i--) {
     const raw = lines[i];
     const stripped = stripComment(raw);
     if (!stripped.trim()) continue;
-    if (/^(\s*)then\s*:\s*$/.test(stripped)) return true;
-    // Stop ascent at any line at column 0 that isn't ``then:`` —
-    // we've left the automation context.
-    if (indentOf(stripped) === 0) return false;
+    const ind = indentOf(stripped);
+    // Found a ``then:`` at exactly the right indent? Match.
+    const m = stripped.match(/^(\s*)then\s*:\s*$/);
+    if (m && ind === wantedThenIndent) return true;
+    // Anything else at or below ``wantedThenIndent`` means we've
+    // left the candidate block — bail.
+    if (ind <= wantedThenIndent) return false;
   }
   return false;
 }
@@ -375,25 +421,39 @@ function actionToCompletion(a: SchemaAction): Completion {
  * Map a YAML parent block (``esphome``, ``binary_sensor`` plus a
  * ``platform: gpio`` sibling, …) to the schema-bundle filename and
  * the component key inside that bundle. Returns ``null`` when the
- * parent isn't a component the schema would carry triggers for —
- * the catalog lookup that came before us already filtered to
- * recognised components, so ``null`` here just means "no schema
- * lookup to attempt".
+ * parent doesn't name a component the schema host carries —
+ * critically, when the regex picked up a YAML keyword from a
+ * list-item header (``- platform: gpio`` → key ``platform``), we'd
+ * otherwise fetch ``platform.json`` and 404 on every keystroke.
+ * The catalog is loaded by this point so we use it as the
+ * recognised-component filter.
  */
 function bundleFor(
+  catalog: CatalogIndex,
   parentKey: string,
   platformValue: string | null,
 ): { bundle: string; componentKey: string } | null {
+  // ``parent.key`` may be the literal YAML keyword ``platform``
+  // when the cursor is nested under ``- platform: gpio`` —
+  // ``findParentKey``'s regex matches the first key on the
+  // list-item header. There's no ``platform.json`` bundle, so
+  // skip the lookup. The resolution we want for that case
+  // (``binary_sensor.gpio``) reaches us as the *outer* block via
+  // ``findTopLevelBlock`` — handled below.
+  if (parentKey === "platform") return null;
   // Platform-style block: ``binary_sensor: - platform: gpio`` →
   // bundle ``binary_sensor``, component ``binary_sensor.gpio``.
   if (platformValue) {
+    if (!catalog.byId.has(parentKey)) return null;
     return {
       bundle: parentKey,
       componentKey: `${parentKey}.${platformValue}`,
     };
   }
   // Plain component: ``esphome:`` / ``wifi:`` / ``logger:`` →
-  // bundle and component name match.
+  // bundle and component name match. Only attempt when the
+  // catalog actually knows this name.
+  if (!catalog.byId.has(parentKey)) return null;
   return { bundle: parentKey, componentKey: parentKey };
 }
 
@@ -527,11 +587,14 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       return null;
     }
 
-    // ── Key position: the user is typing a key (just whitespace + word so far).
-    const keyMatch = before.match(/^(\s*)([A-Za-z0-9_]*)$/);
-    if (!keyMatch) return null;
-
-    const [, leading, partial] = keyMatch;
+    // ── Key position: handles plain (``  partial``) and list-item
+    // (``  - partial``) shapes. The dash form is the entry point
+    // for action-registry suggestions inside automation bodies
+    // (``then: - <here>``); without matching it we'd never fire
+    // the completion in that position.
+    const kp = matchKeyPosition(before);
+    if (!kp) return null;
+    const { leading, partial, isListItem } = kp;
     const indent = leading.length;
     const keyFrom = pos - partial.length;
 
@@ -553,13 +616,20 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     if (!parent) return null;
 
     const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-    // Action-registry inside an automation body
-    // (``then: \n  - <here>``) — list-items in a ``then:`` block
-    // get cross-component action suggestions. Detect from the
-    // structural shape (we *know* the cursor is inside ``then:``
-    // because of ``isInAutomationBody``), not from the partial
-    // text — the user has already typed ``-`` to land here.
-    const inAutomation = isInAutomationBody(allLines, lineInfo.number - 1);
+    // For schema-bundle lookups we want the *top-level* block
+    // name (``binary_sensor``, ``esphome``), not whatever the
+    // parent walker found (which can be the literal ``platform``
+    // keyword from a list-item header). Mirrors the legacy
+    // dashboard's path-based lookup which walked back to the
+    // top-level component for the schema fetch.
+    const topLevelBlock = findTopLevelBlock(allLines, lineInfo.number - 1);
+    // Action-registry only fires at the list-item position under
+    // a ``then:`` block. Mirrors the legacy ``resolveTriggerInner``
+    // → ``addRegistry({registry: "action"})`` path: cursor must
+    // be the dash position itself (``- <partial>``), and the
+    // ``then:`` ancestor must sit at exactly the right indent.
+    const inAutomation =
+      isListItem && isInAutomationBody(allLines, lineInfo.number - 1, indent);
     // Only fetch trigger keys when the partial *could* match one
     // — they all start with ``on_``. Saves a network round-trip
     // (and the failure-mode log on CSP-blocked deployments) on
@@ -578,13 +648,13 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // when schema.esphome.io isn't reachable.
       (async () => {
         if (!partialCouldBeTrigger) return [];
-        const target = bundleFor(parent.key, platformValue);
+        if (!topLevelBlock) return [];
+        const target = bundleFor(catalog, topLevelBlock, platformValue);
         if (!target) return [];
         return getTriggerKeys(api, target.bundle, target.componentKey);
       })(),
       // Aggregate action-registry entries across components in
-      // the doc when the cursor is inside ``then:``. Same null-
-      // safe pattern as triggers.
+      // the doc when the cursor is inside a ``then:`` list-item.
       (async () => {
         if (!inAutomation) return [] as SchemaAction[];
         return getActions(api, collectTopLevelComponents(allLines));

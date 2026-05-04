@@ -34,7 +34,7 @@ import {
   type ValidationError,
 } from "../../util/config-validation.js";
 import { filterRenderable } from "./config-entry-render-filter.js";
-import { getIn } from "../../util/nested-values.js";
+import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
@@ -265,16 +265,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // primitive value" for null-prototype objects. Skip the
       // sync for non-primitive values rather than crashing the
       // updated() lifecycle.
-      const valueType = typeof value;
-      if (
-        value !== null &&
-        value !== undefined &&
-        valueType !== "string" &&
-        valueType !== "number" &&
-        valueType !== "boolean"
-      ) {
-        continue;
-      }
+      if (!isPrimitiveOrNullish(value)) continue;
       const raw = String(value ?? "");
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog

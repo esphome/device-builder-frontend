@@ -166,10 +166,22 @@ export function fetchBundle(
 ): Promise<SchemaBundle | null> {
   const cached = cache.get(name);
   if (cached) return cached;
+  // ``transient`` flips to false when we get a definitive
+  // "this bundle doesn't exist" answer (404). Transient failures
+  // (thrown — CSP / DNS / offline — or 5xx) stay evictable so the
+  // next caller can retry when conditions change; permanent
+  // failures stay cached so we don't retry-storm against a URL
+  // that's never going to resolve (e.g. a YAML keyword the parent
+  // walker mistook for a component name).
+  let transient = true;
   const promise = (async () => {
     try {
       const version = await resolveVersion(api);
       const res = await fetch(`${SCHEMA_HOST}/${version}/${name}.json`);
+      if (res.status === 404) {
+        transient = false;
+        return null;
+      }
       if (!res.ok) return null;
       const data = (await res.json()) as SchemaBundle;
       return data;
@@ -179,12 +191,8 @@ export function fetchBundle(
     }
   })();
   cache.set(name, promise);
-  // Evict failed lookups so a transient outage / CSP toggle / network
-  // hiccup doesn't poison the cache for the lifetime of the page —
-  // the next caller retries. Successful entries stay cached for the
-  // session (the schema host serves the same bundle per version).
   promise.then((value) => {
-    if (value === null && cache.get(name) === promise) {
+    if (value === null && transient && cache.get(name) === promise) {
       cache.delete(name);
     }
   });
