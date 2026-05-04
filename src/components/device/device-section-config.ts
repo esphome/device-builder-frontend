@@ -106,6 +106,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * wrong line and clobber a different section. The page that
    * owns this state (`pages/device.ts`) feeds it through
    * `device-board-info`.
+   *
+   * Default `""` keeps the property optional for the (currently
+   * single) consumer; `_onSave` and `_onDeleteConfirmed` bail
+   * defensively when `this.yaml === ""` so a forgotten binding
+   * in a future parent can't silently clobber the device's
+   * config with an empty splice.
    */
   @property()
   yaml = "";
@@ -164,10 +170,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _presentComponents: Set<string> = new Set();
 
-  /** Full YAML — needed by the embedded form for ID / pin lookups. */
-  @state()
-  private _yaml = "";
-
   @query("esphome-config-entry-form")
   private _form?: ESPHomeConfigEntryForm;
 
@@ -191,7 +193,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   }
 
-  /** Reload config from backend if the form has no unsaved changes. */
+  /** Reload config from the live YAML if the form has no unsaved
+   *  changes. `device-board-info` debounces this against `yaml`
+   *  prop changes so paste / external mutations re-seed a clean
+   *  form (and skip mid-edit reloads to avoid clobbering unsaved
+   *  field changes). */
   public reload() {
     if (!this._dirty && this.sectionKey && this.configuration) {
       this._loadConfig();
@@ -244,7 +250,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         this.fromLine,
       );
       this._presentComponents = parseTopLevelComponents(yaml);
-      this._yaml = yaml;
     } catch (e) {
       if (id !== this._loadId) return;
       const msg = e instanceof Error ? e.message : "";
@@ -351,7 +356,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .values=${this._values}
               .errors=${this._fieldErrors}
               .board=${this.board}
-              .yaml=${this._yaml}
+              .yaml=${this.yaml}
               .fromLine=${this.fromLine}
               .presentComponents=${this._presentComponents}
               ?disabled=${this._saving}
@@ -423,6 +428,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onDeleteConfirmed() {
     if (!this._config) return;
+    // Defensive: same rationale as `_onSave` — without `this.yaml`
+    // the splice produces `""` and the parent would commit empty
+    // YAML, clobbering the entire config.
+    if (!this.yaml) return;
     this._deleting = true;
     this._error = "";
     const title = this._config.title;
@@ -530,6 +539,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onSave() {
     if (!this._config) return;
+    // Defensive: bail early if the parent forgot to wire the
+    // `yaml` prop. Without this, `updateSectionInYaml("", ...)`
+    // would emit `""` and the parent's `updateConfig` call would
+    // silently clobber the device's entire config.
+    if (!this.yaml) return;
     const errors = validateEntries(
       this._config.entries,
       this._values,

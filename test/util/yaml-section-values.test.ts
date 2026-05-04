@@ -3,6 +3,7 @@ import {
   findSectionStart,
   LIST_ITEM_START_RE,
   parseYamlSectionValues,
+  removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
 
@@ -312,5 +313,77 @@ describe("updateSectionInYaml — list item with inline key", () => {
     });
     expect(after).toContain("ssid: x");
     expect(after).toContain("password: secret");
+  });
+});
+
+describe("removeSectionFromYaml — multi-item list", () => {
+  // Pins the splice contract that surfaced the
+  // wrong-section-deleted bug. The bug itself was at the
+  // integration boundary (section editor was passing the
+  // server's stale YAML instead of the live one), so the
+  // splice was being asked to operate on a yaml the
+  // navigator's `fromLine` didn't match.
+  //
+  // The unit-level guarantee these tests pin: given the live
+  // YAML + a `fromLine` pointing at the right list item, the
+  // splice removes that item and only that item.
+
+  const multiItemOta = [
+    "ota:",
+    "  - platform: esphome",
+    "    password: foo",
+    "  - platform: web_server",
+    "",
+  ].join("\n");
+
+  it("removes the FIRST OTA list item when fromLine points at it", () => {
+    const fromLine = firstListItemLine(multiItemOta, "ota");
+    const after = removeSectionFromYaml(multiItemOta, "ota.esphome", fromLine);
+    expect(after).not.toContain("platform: esphome");
+    expect(after).not.toContain("password: foo");
+    // The other list item survives untouched.
+    expect(after).toContain("- platform: web_server");
+  });
+
+  it("removes the SECOND OTA list item when fromLine points at it", () => {
+    // Direct repro of the bug-report shape: deleting
+    // `ota.web_server` (the second item) must hit it and
+    // leave `ota.esphome` alone. The pre-fix code path
+    // routed through a stale yaml fetch and clipped the
+    // wrong item.
+    const lines = multiItemOta.split("\n");
+    const start = findSectionStart(lines, "ota");
+    let secondDashIdx = -1;
+    let dashCount = 0;
+    for (let i = start + 1; i < lines.length; i++) {
+      if (LIST_ITEM_START_RE.test(lines[i])) {
+        dashCount++;
+        if (dashCount === 2) {
+          secondDashIdx = i;
+          break;
+        }
+      }
+    }
+    expect(secondDashIdx).toBeGreaterThan(0);
+    const after = removeSectionFromYaml(
+      multiItemOta,
+      "ota.web_server",
+      secondDashIdx + 1, // 1-indexed
+    );
+    expect(after).not.toContain("- platform: web_server");
+    // The first item and its sibling field survive.
+    expect(after).toContain("- platform: esphome");
+    expect(after).toContain("password: foo");
+  });
+
+  it("drops the parent block when removing the only list item", () => {
+    const before = "ota:\n  - platform: esphome\n";
+    const fromLine = firstListItemLine(before, "ota");
+    const after = removeSectionFromYaml(before, "ota.esphome", fromLine);
+    // Empty-parent cleanup kicks in: the bare `ota:` left
+    // behind would be invalid ESPHome, so the parent goes
+    // too.
+    expect(after).not.toContain("ota");
+    expect(after).not.toContain("platform: esphome");
   });
 });
