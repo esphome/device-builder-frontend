@@ -55,6 +55,13 @@ export function resolveSectionForUrlLine(
   currentSection: string | null
 ): ResolvedUrlLine | null {
   if (line === undefined) return null;
+  // ``line`` came from a URL param via ``Number(raw)`` so it
+  // can be ``NaN``, fractional (``?line=7.5``), zero, or
+  // negative. CodeMirror's ``doc.line(n)`` (the eventual
+  // consumer of ``range.fromLine``) wants a 1-indexed integer
+  // and throws on out-of-range; ``sectionAtLine`` likewise
+  // expects a positive integer. Reject anything that isn't.
+  if (!Number.isInteger(line) || line < 1) return null;
   if (currentSection !== null) return null;
   if (!yaml) return null;
   const match = sectionAtLine(yaml, line);

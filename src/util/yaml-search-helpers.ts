@@ -21,34 +21,6 @@ import type { YamlSearchHit, YamlSearchMatch } from "../api/types.js";
 import { ALWAYS_SENSITIVE_KEYS } from "./yaml-sensitive-scan.js";
 
 /**
- * Strip the inline credential value from a line of YAML so it
- * can be safely shown in a search-result label.
- *
- * The YAML editor masks credentials via
- * ``sensitiveValueMaskExtension``; the search-results dropdown
- * has to render the raw matched line, which would otherwise
- * leak ``password: hunter2`` into the palette / dashboard.
- *
- * Only keys whose values are unambiguously credentials
- * regardless of context (no parent-scoped check needed) are
- * masked — uses the shared ``ALWAYS_SENSITIVE_KEYS`` set
- * imported from the upstream sensitive-scan module so adding a
- * key there lights it up here automatically, no drift.
- *
- * ``line`` must be a single line of YAML (the regex anchors to
- * ``^``/``$`` and won't match across newlines). The caller
- * passes ``match.line_text`` from a ``YamlSearchHit`` which is
- * single-line by construction; if a future caller fans out to
- * multi-line input it'll silently no-op rather than mask, so
- * keep the contract single-line.
- *
- * ``!secret <name>`` references are *not* masked — they carry
- * only the name of an indirection, not the credential itself.
- * Parent-scoped keys (``key:`` under ``encryption:``) aren't
- * matched here because we have no parent context for a single
- * search-hit line.
- */
-/**
  * True when *key* names a credential whose value should never
  * appear in a search-result label. Combines two sources:
  *
@@ -69,6 +41,28 @@ function isSensitiveKey(key: string): boolean {
   return /_(password|psk)$/i.test(key);
 }
 
+/**
+ * Strip the inline credential value from a line of YAML so it
+ * can be safely shown in a search-result label.
+ *
+ * The YAML editor masks credentials via
+ * ``sensitiveValueMaskExtension``; the search-results dropdown
+ * has to render the raw matched line, which would otherwise
+ * leak ``password: hunter2`` into the palette / dashboard.
+ *
+ * Only keys flagged by ``isSensitiveKey`` are masked. ``line``
+ * must be a single line of YAML (the regex anchors to ``^`` /
+ * ``$`` and won't match across newlines). The caller passes
+ * ``match.line_text`` from a ``YamlSearchHit`` which is
+ * single-line by construction; a future multi-line caller
+ * would silently no-op rather than mask.
+ *
+ * ``!secret <name>`` and ``${substitution}`` values are *not*
+ * masked — both carry only the name of an indirection, not the
+ * credential itself. Parent-scoped keys (``key:`` under
+ * ``encryption:``) aren't matched here because we have no
+ * parent context for a single search-hit line.
+ */
 function maskSensitiveLine(line: string): string {
   // Optional ``#`` prefix matches commented-out credentials —
   // ``# password: hunter2`` is just as much a leak as the live
