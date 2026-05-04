@@ -73,11 +73,6 @@ export class ESPHomeYamlEditor extends LitElement {
    *  movement inside the same line doesn't churn the page state. */
   private _lastReportedCursorLine = 0;
 
-  /** Last 1-indexed line we emitted as `yaml-hover-line`. Same
-   *  throttle as the cursor path: only emit when the hover crosses
-   *  a line boundary so mousemove within a line is a no-op. */
-  private _lastReportedHoverLine = 0;
-
   static styles = css`
     :host {
       display: block;
@@ -301,50 +296,6 @@ export class ESPHomeYamlEditor extends LitElement {
             );
           }
         }
-      }),
-      // Hover path: drive the navigator's hover highlight from
-      // the editor's pointer position. Different intent from
-      // `yaml-cursor-line`: hover just *previews* which section
-      // the cursor is over without switching the left-pane
-      // section editor. The page wires it to the navigator's
-      // hover slot only.
-      //
-      // `posAtCoords({...}, false)` — the second arg is the
-      // `precise` flag, which defaults to `true`. With the
-      // default, CodeMirror returns `null` when the cursor sits
-      // in the vertical padding between two lines (the gap
-      // between font-size and line-height) — and the mouse
-      // passes through that gap constantly while moving, which
-      // killed the dispatch path entirely. Passing `false` gets
-      // us the nearest line even when the pointer is on a
-      // boundary or in the empty area below the last line of
-      // content, which matches the user's mental model of "this
-      // is the line I'm hovering."
-      EditorView.domEventHandlers({
-        mousemove: (e, view) => {
-          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY }, false);
-          const line = view.state.doc.lineAt(pos).number;
-          if (line === this._lastReportedHoverLine) return;
-          this._lastReportedHoverLine = line;
-          this.dispatchEvent(
-            new CustomEvent("yaml-hover-line", {
-              detail: { line },
-              bubbles: true,
-              composed: true,
-            }),
-          );
-        },
-        mouseleave: () => {
-          if (this._lastReportedHoverLine === 0) return;
-          this._lastReportedHoverLine = 0;
-          this.dispatchEvent(
-            new CustomEvent("yaml-hover-line", {
-              detail: { line: null },
-              bubbles: true,
-              composed: true,
-            }),
-          );
-        },
       }),
       ...(this._darkMode ? [oneDark] : []),
     ];
