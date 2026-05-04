@@ -586,9 +586,9 @@
     "switch_to_yaml": "Search YAML content",
     "switch_to_devices": "Search devices",
     "placeholder": "Search YAML content…",
-    "discover_prefix": "Tip: type",
-    "discover_link": "/ for YAML",
-    "discover_suffix": "to search across all configs",
+    "discover_prefix": "Tip: press",
+    "discover_link": "/",
+    "discover_suffix": "to search YAML content across all configs",
     "back_to_devices": "Back to device search",
     "no_match_yaml_preview": "Try YAML search — found {count} match across your configs",
     "no_match_yaml_preview_plural": "Try YAML search — found {count} matches across your configs"

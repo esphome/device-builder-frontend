@@ -181,39 +181,34 @@ export const dashboardStyles = css`
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-xs);
   }
+  /* Style the link like a keyboard-key cap so the user reads it
+     as "press this key" rather than as plain hyperlink text.
+     Monospace font + light border + small padding gives the
+     usual <kbd> look while keeping <button> semantics for the
+     click-to-toggle. */
   .search-discover-link {
-    /* Plain inline (not inline-flex) so the link flows on the
-       same baseline as the surrounding "Tip: type … to search
-       across all configs" text. inline-flex would create its own
-       baseline from the icon's centred bbox, which sat ~2px
-       above the surrounding text. */
-    display: inline;
-    padding: 0;
+    display: inline-block;
+    padding: 0 5px;
     background: transparent;
-    border: none;
+    border: 1px solid var(--wa-color-text-quieter, currentColor);
+    border-radius: 3px;
     color: var(--wa-color-text-quiet);
-    font: inherit;
+    font-family: var(--wa-font-family-code, ui-monospace, monospace);
+    font-size: var(--wa-font-size-xs);
+    line-height: 1.4;
     cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: var(--wa-color-text-quieter, transparent);
-    text-underline-offset: 2px;
     transition:
       color 0.15s ease,
-      text-decoration-color 0.15s ease;
+      border-color 0.15s ease,
+      background-color 0.15s ease;
+    vertical-align: baseline;
   }
   .search-discover-link:hover,
   .search-discover-link:focus-visible {
     color: var(--wa-color-brand-on-quiet);
-    text-decoration-color: currentColor;
+    border-color: currentColor;
+    background: var(--wa-color-surface-raised);
     outline: none;
-  }
-  .search-discover-link wa-icon {
-    font-size: var(--wa-font-size-s);
-    /* vertical-align: middle keeps the icon aligned with the
-       lowercase x-height so it sits flush with the surrounding
-       text rather than perched above the baseline. */
-    vertical-align: middle;
-    margin-right: 2px;
   }
 
   /* Empty-device-search YAML pivot (option (d)) — sits between

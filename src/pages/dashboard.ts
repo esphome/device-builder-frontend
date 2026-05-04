@@ -806,7 +806,6 @@ export class ESPHomePageDashboard extends LitElement {
         class="search-discover-link"
         @click=${this._toggleSearchMode}
       >
-        <wa-icon library="mdi" name="code-braces"></wa-icon>
         ${this._localize("yaml_search.discover_link")}
       </button>
       ${this._localize("yaml_search.discover_suffix")}
@@ -871,6 +870,10 @@ export class ESPHomePageDashboard extends LitElement {
   private _toggleSearchMode = () => {
     this._yamlMode = !this._yamlMode;
     this._syncYamlSearch();
+    // Land the cursor in the search input — every entry point
+    // here (icon click, Tip link click, mode toggle from the
+    // YAML-preview pivot) wants the user to be ready to type.
+    this._refocusSearchInput();
   };
 
   private _renderToolbar(matchCount: number, total: number) {
