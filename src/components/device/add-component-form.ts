@@ -685,9 +685,15 @@ export class ESPHomeAddComponentForm extends LitElement {
         );
       }
       if (!visible) {
-        this._localBlockMessage = this._localize(
+        // Name the offending field(s) + each one's validation code so
+        // the user can act on it instead of seeing a generic "Failed
+        // to add component" with no actionable detail.
+        const summary = [...errors.entries()]
+          .map(([key, err]) => `${key}: ${err.code}`)
+          .join("; ");
+        this._localBlockMessage = `${this._localize(
           "device.add_component_error",
-        );
+        )} (${summary})`;
       }
       return;
     }

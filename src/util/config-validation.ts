@@ -216,7 +216,22 @@ function _validateEntriesRecursive(
       continue;
     }
 
-    const raw = values[entry.key] ?? entry.default_value;
+    // Only fall back to ``default_value`` for required entries.
+    // For optional entries, an absent value means "use the backend's
+    // own default" — ``_coerceFields`` strips empty optional values
+    // from the API payload, so the backend never sees the frontend's
+    // catalog ``default_value``. Validating against it backfires when
+    // the default is a unit-suffixed string (e.g. ``frequency:
+    // "50kHz"``, ``timeout: "10s"``) on a numeric entry: ``Number()``
+    // returns ``NaN`` and the form rejects the submit with
+    // ``validation.not_a_number`` for a field the user can't see in
+    // ``required-only`` mode. Pin the original symptom from
+    // MasterOfNone (#issues): ``Add ES7210 → Add i2c → blue Add does
+    // nothing`` — i2c's optional ``frequency`` default was tripping
+    // this fallback.
+    const raw = entry.required
+      ? values[entry.key] ?? entry.default_value
+      : values[entry.key];
     const err = validateEntry(entry, raw);
     if (err) {
       const fullPath = [...pathPrefix, entry.key].join(".");
