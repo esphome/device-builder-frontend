@@ -71,6 +71,14 @@ export class ESPHomeAddComponentForm extends LitElement {
   @state()
   private _errors: Map<string, ValidationError> = new Map();
 
+  /** Surface text for the rare path where ``_onSubmit`` would return
+   * silently (validation errors on entries hidden from the rendered
+   * form, or a defensive missing-deps fallback). The dialog's
+   * ``submitError`` is reserved for API failures — this is the
+   * pre-API "the form refused to submit and here's why" lane. */
+  @state()
+  private _localBlockMessage = "";
+
   @state()
   private _showYaml = false;
 
@@ -358,6 +366,9 @@ export class ESPHomeAddComponentForm extends LitElement {
         ${this.submitError
           ? html`<p class="error">${this.submitError}</p>`
           : nothing}
+        ${this._localBlockMessage
+          ? html`<p class="error">${this._localBlockMessage}</p>`
+          : nothing}
         <div class="actions">
           <button
             class="btn btn-secondary"
@@ -438,6 +449,44 @@ export class ESPHomeAddComponentForm extends LitElement {
     return false;
   }
 
+  /**
+   * True when at least one error key matches an entry that's actually
+   * rendered (i.e. the user can see the red ring). The shared form
+   * filters by ``required-only`` plus the advanced toggle, so a
+   * validation error on an optional / advanced entry is invisible
+   * unless we surface a top-level message — that's the symptom
+   * MasterOfNone reported as the "blue Add button does nothing"
+   * dead-button state.
+   *
+   * Conservative heuristic: an error key's top-level segment is
+   * "visible" when the matching entry is required, NESTED (groups
+   * always render when they have content), or named ``name`` (the
+   * one always-shown leaf in required-only mode). Anything else is
+   * filtered out by the shared form and the user can't see it.
+   */
+  private _anyErrorIsVisible(
+    errors: Map<string, ValidationError>,
+    _presentComponents: Set<string>,
+  ): boolean {
+    const renderedKeys = new Set<string>();
+    for (const entry of this.component.config_entries) {
+      const isAlwaysShown = entry.key === "name";
+      if (
+        !entry.required &&
+        !isAlwaysShown &&
+        entry.type !== ConfigEntryType.NESTED
+      ) {
+        continue;
+      }
+      renderedKeys.add(entry.key);
+    }
+    for (const key of errors.keys()) {
+      const top = key.split(".")[0];
+      if (renderedKeys.has(top)) return true;
+    }
+    return false;
+  }
+
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
@@ -471,7 +520,17 @@ export class ESPHomeAddComponentForm extends LitElement {
     const missingDeps = (this.component.dependencies ?? []).filter(
       (d) => !presentComponents.has(d),
     );
-    if (missingDeps.length > 0) return;
+    if (missingDeps.length > 0) {
+      // Should be unreachable — the button-disabled predicate uses the
+      // same check. If we get here, the YAML changed under us between
+      // renders. Surface a visible message instead of returning silently
+      // so the user (and #issues) can identify the dead-button state.
+      this._localBlockMessage = this._localize(
+        "device.missing_dependencies_title",
+        { name: this.component.name },
+      );
+      return;
+    }
 
     // Validate the entire schema. If anything fails, surface the
     // errors inline (the shared form will pick them up by path).
@@ -482,9 +541,21 @@ export class ESPHomeAddComponentForm extends LitElement {
     );
     if (errors.size > 0) {
       this._errors = errors;
+      // If every error key maps to an entry that's currently filtered
+      // out of the rendered form (advanced + non-required leaves are
+      // hidden by ``required-only`` mode), the user has no way to
+      // SEE the red ring. Surface a top-level message so the
+      // "blue Add does nothing" symptom doesn't reappear with the
+      // root cause invisible.
+      if (!this._anyErrorIsVisible(errors, presentComponents)) {
+        this._localBlockMessage = this._localize(
+          "device.add_component_error",
+        );
+      }
       return;
     }
     this._errors = new Map();
+    this._localBlockMessage = "";
 
     // Coerce the values dict for the API: strip empties so we don't
     // send blank optional fields, and recurse through nested objects
