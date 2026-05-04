@@ -119,6 +119,17 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._stopTicker();
   }
 
+  /** Trigger the Reset Build Environment confirm flow without
+   *  needing the firmware-tasks dialog itself to be open. The
+   *  confirm-dialog and command-dialog instances live as siblings
+   *  of the wa-dialog inside this host's shadow DOM, so they work
+   *  even when the wa-dialog is closed — surfaces like the header
+   *  kebab and a failed install's error banner can entry-point
+   *  the same flow. */
+  openResetBuildEnv() {
+    this._confirmDialog.open();
+  }
+
   disconnectedCallback() {
     super.disconnectedCallback();
     this._stopTicker();

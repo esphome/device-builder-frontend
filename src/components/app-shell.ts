@@ -731,6 +731,7 @@ export class ESPHomeApp extends LitElement {
         @set-language=${this._onSetLanguage}
         @open-settings=${this._onOpenSettings}
         @open-firmware-jobs=${this._onOpenFirmwareJobs}
+        @open-reset-build-env=${this._onOpenResetBuildEnv}
       >
         ${this._router.outlet()}
       </esphome-layout>
@@ -836,6 +837,10 @@ export class ESPHomeApp extends LitElement {
 
   private _onOpenFirmwareJobs() {
     this._firmwareJobsDialog?.open();
+  }
+
+  private _onOpenResetBuildEnv() {
+    this._firmwareJobsDialog?.openResetBuildEnv();
   }
 
   /** Prune retained terminal jobs locally after the user clears
