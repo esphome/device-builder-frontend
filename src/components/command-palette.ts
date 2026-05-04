@@ -317,7 +317,11 @@ export class ESPHomeCommandPalette extends LitElement {
       group: groupName,
       label: yamlHitLabel(hit, match),
       icon: "code-braces",
-      keywords: [hit.configuration, hit.device_name, match.line_text],
+      // No ``keywords`` — YAML mode bypasses ``_filtered()``'s
+      // keyword search entirely (the backend already did the
+      // matching) so an unused keywords array would just retain
+      // raw YAML line text — including potentially-sensitive
+      // values — in memory for nothing.
       run: () => navigate(yamlHitHref(hit, match)),
     }));
   }

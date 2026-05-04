@@ -98,11 +98,12 @@ export class YamlSearchController implements ReactiveController {
    * bypass the empty-body short-circuit.
    */
   sync(active: boolean, body: string): void {
-    if (!active || !body) {
+    const trimmed = body.trim();
+    if (!active || !trimmed) {
       this.clear();
       return;
     }
-    this.scheduleQuery(body);
+    this.scheduleQuery(trimmed);
   }
 
   /**

@@ -248,6 +248,29 @@ describe("YamlSearchController", () => {
     expect(ctrl.hits).toBeNull();
   });
 
+  it("sync() treats whitespace-only as empty and clears", async () => {
+    const host = new FakeHost();
+    const api = makeApi(async () => [HIT]);
+    const ctrl = new YamlSearchController(host, () => api);
+
+    ctrl.sync(true, "   \t\n  ");
+    await vi.runAllTimersAsync();
+
+    expect(api.searchYaml).not.toHaveBeenCalled();
+    expect(ctrl.hits).toBeNull();
+  });
+
+  it("sync() trims surrounding whitespace before scheduling", async () => {
+    const host = new FakeHost();
+    const api = makeApi(async () => [HIT]);
+    const ctrl = new YamlSearchController(host, () => api);
+
+    ctrl.sync(true, "  wifi  ");
+    await vi.runAllTimersAsync();
+
+    expect(api.searchYaml).toHaveBeenCalledWith({ query: "wifi" });
+  });
+
   it("reads the API lazily so a late-bound api wiring is honoured", async () => {
     const host = new FakeHost();
     let api: ESPHomeAPI | null = null;
