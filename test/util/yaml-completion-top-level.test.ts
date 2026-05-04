@@ -114,6 +114,20 @@ describe("buildTopLevelCompletions", () => {
   it("returns [] for an empty catalog", () => {
     expect(buildTopLevelCompletions(catalog([]))).toEqual([]);
   });
+
+  it("derives umbrellas from id prefixes too (defensive against missing category)", () => {
+    // ``ota.esphome`` and ``update.http_request`` carry their
+    // own categories (OTA / UPDATE) but the regex-derived
+    // ``id.split(".")[0]`` belt-and-braces also surfaces the
+    // umbrella name in case the category enum drifts.
+    const c = catalog([
+      entry("ota.esphome", ComponentCategory.OTA),
+      entry("update.http_request", ComponentCategory.UPDATE),
+    ]);
+    const labels = buildTopLevelCompletions(c).map((o) => o.label);
+    expect(labels).toContain("ota");
+    expect(labels).toContain("update");
+  });
 });
 
 describe("resolveAvailableEntries (platform-merged)", () => {

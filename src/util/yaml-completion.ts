@@ -301,10 +301,19 @@ export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
   if (cached) return cached;
   const out: Completion[] = [];
   const seen = new Set<string>();
-  // Collect domain umbrellas (categories that have dotted entries).
+  // Collect domain umbrellas from two sources, then dedupe via
+  // ``seen`` — both the entry's ``category`` AND the dotted-id
+  // prefix (``ota.esphome`` → ``ota``). Belt and braces:
+  //   - ``category`` is the canonical signal but some umbrellas
+  //     (e.g. ``ota``, ``update``) carry no standalone catalog
+  //     entry, only platform variants.
+  //   - The id prefix catches cases where the category enum
+  //     hasn't been updated to mirror a new platform domain.
   const domains = new Set<string>();
   for (const c of catalog.components) {
-    if (c.id.includes(".")) domains.add(c.category);
+    if (!c.id.includes(".")) continue;
+    domains.add(c.category);
+    domains.add(c.id.slice(0, c.id.indexOf(".")));
   }
   for (const domain of domains) {
     if (seen.has(domain)) continue;
@@ -784,7 +793,17 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ? [
           {
             label: "then",
-            apply: "then:\n  - ",
+            apply: (view, _completion, from, to) => {
+              // ``then:`` is at the same indent as the current
+              // partial; the action list-item ``-`` lives one
+              // indent step deeper. Read the current line's
+              // leading whitespace so the snippet stays valid
+              // YAML at any nesting depth.
+              const line = view.state.doc.lineAt(from);
+              const lead =
+                line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
+              applyInsertion(view, from, to, `then:\n${lead}  - `);
+            },
             type: "namespace",
             detail: "trigger body",
             boost: 5,
