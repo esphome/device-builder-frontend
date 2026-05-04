@@ -24,12 +24,20 @@
  * already in use.
  */
 /** Single-entry memo: caches the full pin map for a `yaml` +
- *  `excludeFromLine:excludeToLine` combination. The form re-renders
- *  on every keystroke into the YAML pane (the live `yaml` prop is a
- *  pin-renderer dependency); the section editor's exclude range is
- *  stable across that same edit window, so a paste-then-type
- *  workflow gets cache hits on every keystroke. */
-let _pinMemoKey = "";
+ *  exclude-range combination. The form re-renders on every keystroke
+ *  into the YAML pane (the live `yaml` prop is a pin-renderer
+ *  dependency); the section editor's exclude range is stable across
+ *  that same edit window, so a paste-then-type workflow gets cache
+ *  hits on every keystroke.
+ *
+ *  Reference equality on `yaml` rather than a composite-string key:
+ *  the parent (`pages/device.ts::_yaml`) only reassigns the string
+ *  when the user types, so identical reads share the same identity.
+ *  A composite-string key would itself be O(N) to build on every
+ *  call — defeating most of the point. */
+let _pinMemoYaml: string | null = null;
+let _pinMemoFrom: number | undefined;
+let _pinMemoTo: number | undefined;
 let _pinMemoValue: Map<number, string> | null = null;
 
 export function findUsedPins(
@@ -37,12 +45,21 @@ export function findUsedPins(
   excludeFromLine?: number,
   excludeToLine?: number,
 ): Map<number, string> {
-  const key = `${excludeFromLine ?? "_"}:${excludeToLine ?? "_"}${yaml}`;
-  if (key === _pinMemoKey && _pinMemoValue) return _pinMemoValue;
+  if (
+    yaml === _pinMemoYaml &&
+    excludeFromLine === _pinMemoFrom &&
+    excludeToLine === _pinMemoTo &&
+    _pinMemoValue
+  ) {
+    return _pinMemoValue;
+  }
   const used = new Map<number, string>();
   if (!yaml) {
-    _pinMemoKey = key;
-    _pinMemoValue = used;
+    // Don't cache the empty-yaml early return: a future
+    // regression that needs to do exclude-range work even on
+    // empty input would be silently masked by a cached empty
+    // Map. Empty input is also rare on the hot path (the form
+    // doesn't render its pin selectors until yaml has loaded).
     return used;
   }
   const lines = yaml.split("\n");
@@ -70,7 +87,9 @@ export function findUsedPins(
       }
     }
   }
-  _pinMemoKey = key;
+  _pinMemoYaml = yaml;
+  _pinMemoFrom = excludeFromLine;
+  _pinMemoTo = excludeToLine;
   _pinMemoValue = used;
   return used;
 }
@@ -100,10 +119,10 @@ export function sectionEndLine(
  * so each list element produces its own `{ id, name }` record.
  */
 /** Single-entry memo for the id-reference scan, keyed by
- *  (yaml, domain). Same rationale as `findUsedPins`'s memo —
- *  the form's id-reference picker re-renders on every keystroke;
- *  domain is stable across that window. */
-let _refMemoKey = "";
+ *  (yaml, domain) — reference equality on `yaml`, same rationale
+ *  as `findUsedPins`'s memo. */
+let _refMemoYaml: string | null = null;
+let _refMemoDomain: string | null = null;
 let _refMemoValue: Array<{ id: string; name: string }> | null = null;
 
 export function findReferencedComponents(
@@ -111,8 +130,13 @@ export function findReferencedComponents(
   domain: string,
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
-  const key = `${domain}:${yaml}`;
-  if (key === _refMemoKey && _refMemoValue) return _refMemoValue;
+  if (
+    yaml === _refMemoYaml &&
+    domain === _refMemoDomain &&
+    _refMemoValue
+  ) {
+    return _refMemoValue;
+  }
   const lines = yaml.split("\n");
   const result: Array<{ id: string; name: string }> = [];
   let inSection = false;
@@ -145,7 +169,25 @@ export function findReferencedComponents(
     }
   }
   flush();
-  _refMemoKey = key;
+  _refMemoYaml = yaml;
+  _refMemoDomain = domain;
   _refMemoValue = result;
   return result;
+}
+
+/**
+ * Test-only: clear both memos so cache state can't leak between
+ * cases. Production callers don't need this — within an editor
+ * session the memo's eviction-on-key-change is the right
+ * semantics — but tests asserting cache identity want a clean
+ * slate.
+ */
+export function _clearScanMemos(): void {
+  _pinMemoYaml = null;
+  _pinMemoFrom = undefined;
+  _pinMemoTo = undefined;
+  _pinMemoValue = null;
+  _refMemoYaml = null;
+  _refMemoDomain = null;
+  _refMemoValue = null;
 }
