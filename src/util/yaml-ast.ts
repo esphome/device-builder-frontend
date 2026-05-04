@@ -146,55 +146,67 @@ export function isUnderThenItem(state: EditorState, pos: number): boolean {
 }
 
 /**
+ * Read the top-level component name the cursor lives under
+ * (``binary_sensor``, ``esphome``, …). Returns ``null`` when the
+ * cursor isn't nested under a top-level mapping pair (e.g.
+ * cursor at the very top of an empty doc).
+ */
+export function getTopLevelKey(
+  state: EditorState,
+  pos: number,
+): string | null {
+  const node = syntaxTree(state).resolveInner(pos, -1);
+  const top = findTopLevelPair(node);
+  if (!top) return null;
+  return getPairKey(state, top);
+}
+
+/**
+ * Read the ``platform:`` value of the enclosing list-item, if any
+ * (``binary_sensor: - platform: gpio`` → ``"gpio"``). Returns
+ * ``null`` when the cursor isn't inside a list-item that declares
+ * a ``platform:`` sibling.
+ */
+export function getPlatformValue(
+  state: EditorState,
+  pos: number,
+): string | null {
+  const node = syntaxTree(state).resolveInner(pos, -1);
+  // Walk up to the enclosing Item.
+  let cur: SyntaxNode | null = node;
+  while (cur && cur.name !== "Item") cur = cur.parent;
+  if (!cur) return null;
+  // Item's value should be a BlockMapping (list of mappings).
+  const map = cur.firstChild;
+  if (map?.name !== "BlockMapping") return null;
+  // Find the ``platform`` pair and read its scalar value.
+  for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
+    if (pair.name !== "Pair") continue;
+    if (getPairKey(state, pair) !== "platform") continue;
+    let v: SyntaxNode | null = pair.lastChild;
+    while (v && v.name !== "Literal" && v.name !== "QuotedLiteral") {
+      v = v.prevSibling;
+    }
+    return v ? readLiteralText(state, v) : null;
+  }
+  return null;
+}
+
+/**
  * Resolve the bundle context for a cursor position: the top-level
- * component name (``binary_sensor``, ``esphome``, …) plus the
- * ``platform:`` value if the cursor sits inside a list-item that
- * declares one (``binary_sensor: - platform: gpio``). Returns
- * ``null`` for "no top-level pair on the way up" (e.g. cursor at
- * the very top of an empty doc).
+ * component name plus the ``platform:`` value if the cursor sits
+ * inside a list-item that declares one. Thin combinator over
+ * ``getTopLevelKey`` and ``getPlatformValue`` — kept for the
+ * common "I want both" callsite. Returns ``null`` for "no
+ * top-level pair on the way up".
  */
 export function resolveBundleContext(
   state: EditorState,
   pos: number,
 ): { topLevelKey: string; platformValue: string | null } | null {
-  const node = syntaxTree(state).resolveInner(pos, -1);
-  const top = findTopLevelPair(node);
-  if (!top) return null;
-  const topKey = getPairKey(state, top);
-  if (!topKey) return null;
-  // Look for an enclosing list-item with a sibling ``platform: <x>``.
-  let platformValue: string | null = null;
-  let cur: SyntaxNode | null = node;
-  while (cur && cur !== top) {
-    if (cur.name === "Item") {
-      // The Item's value should be a BlockMapping (list of mappings).
-      const map = cur.firstChild;
-      if (map?.name === "BlockMapping") {
-        for (
-          let pair = map.firstChild;
-          pair;
-          pair = pair.nextSibling
-        ) {
-          if (pair.name !== "Pair") continue;
-          if (getPairKey(state, pair) !== "platform") continue;
-          // Read the value — the Pair's last Literal/QuotedLiteral child.
-          let v: SyntaxNode | null = pair.lastChild;
-          while (
-            v &&
-            v.name !== "Literal" &&
-            v.name !== "QuotedLiteral"
-          ) {
-            v = v.prevSibling;
-          }
-          if (v) platformValue = readLiteralText(state, v);
-          break;
-        }
-      }
-      break;
-    }
-    cur = cur.parent;
-  }
-  return { topLevelKey: topKey, platformValue };
+  const topLevelKey = getTopLevelKey(state, pos);
+  if (!topLevelKey) return null;
+  return { topLevelKey, platformValue: getPlatformValue(state, pos) };
 }
 
 /** Memoise top-level-key collection by Lezer ``Tree`` identity.

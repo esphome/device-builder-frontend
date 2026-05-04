@@ -3,6 +3,8 @@ import { EditorState } from "@codemirror/state";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
   collectTopLevelKeys,
+  getPlatformValue,
+  getTopLevelKey,
   isUnderThenItem,
   resolveBundleContext,
 } from "../../src/util/yaml-ast.js";
@@ -87,6 +89,45 @@ describe("resolveBundleContext", () => {
       topLevelKey: "binary_sensor",
       platformValue: "gpio",
     });
+  });
+});
+
+describe("getTopLevelKey", () => {
+  it("returns the column-0 ancestor key", () => {
+    const yaml = "esphome:\n  name: test\nbinary_sensor:\n  - platform: gpio\n    pin: 5\n";
+    const state = makeState(yaml);
+    expect(getTopLevelKey(state, posAt(yaml, 2, 5))).toBe("esphome");
+    expect(getTopLevelKey(state, posAt(yaml, 5, 5))).toBe("binary_sensor");
+  });
+
+  it("returns null at the top of an empty doc", () => {
+    expect(getTopLevelKey(makeState(""), 0)).toBeNull();
+  });
+});
+
+describe("getPlatformValue", () => {
+  it("returns the platform sibling for list-of-mappings blocks", () => {
+    const yaml = "binary_sensor:\n  - platform: gpio\n    pin: 5\n";
+    const state = makeState(yaml);
+    expect(getPlatformValue(state, posAt(yaml, 3, 5))).toBe("gpio");
+  });
+
+  it("strips quotes from QuotedLiteral platform values", () => {
+    const yaml = 'sensor:\n  - platform: "dht"\n    pin: 5\n';
+    const state = makeState(yaml);
+    expect(getPlatformValue(state, posAt(yaml, 3, 5))).toBe("dht");
+  });
+
+  it("returns null when the cursor isn't inside a list-item", () => {
+    const yaml = "esphome:\n  name: test\n";
+    const state = makeState(yaml);
+    expect(getPlatformValue(state, posAt(yaml, 2, 5))).toBeNull();
+  });
+
+  it("returns null when the list-item has no platform sibling", () => {
+    const yaml = "switch:\n  - id: foo\n    name: bar\n";
+    const state = makeState(yaml);
+    expect(getPlatformValue(state, posAt(yaml, 3, 5))).toBeNull();
   });
 });
 
