@@ -777,10 +777,33 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         return getActions(api, bundles, [...tops, "core"]);
       })(),
     ]);
+    // Trigger-body fallback: when the cursor is nested directly
+    // under a key that looks like an ``on_*`` trigger, every
+    // ESPHome trigger accepts a ``then:`` body even if the
+    // schema declares no explicit config-vars (most don't —
+    // ``on_press`` and friends have empty schemas). Surface
+    // ``then:`` as a hardcoded suggestion so the user typing
+    // ``th`` lands on the right key. Mirrors the legacy
+    // editor's "all triggers support then" special case.
+    const inTriggerBody =
+      !inAutomation && /^on_[a-z0-9_]*$/.test(parent.key);
+    const triggerBody: Completion[] = inTriggerBody
+      ? [
+          {
+            label: "then",
+            apply: "then:\n  - ",
+            type: "namespace",
+            detail: "trigger body",
+            boost: 5,
+          },
+        ]
+      : [];
+
     if (
       entries.length === 0 &&
       triggers.length === 0 &&
-      actions.length === 0
+      actions.length === 0 &&
+      triggerBody.length === 0
     )
       return null;
 
@@ -788,6 +811,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ...entries.filter((e) => !e.hidden).map(entryToCompletion),
       ...triggers.map(triggerToCompletion),
       ...actions.map(actionToCompletion),
+      ...triggerBody,
     ];
 
     return {
