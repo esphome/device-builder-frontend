@@ -32,6 +32,7 @@ import {
   formatRelativeTime,
 } from "../util/format-job-time.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -64,16 +65,6 @@ const TYPE_ICONS: Record<JobType, string> = {
   [JobType.RESET_BUILD_ENV]: "cog-refresh",
   [JobType.RENAME]: "rename-outline",
 };
-
-const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
-  JobStatus.COMPLETED,
-  JobStatus.FAILED,
-  JobStatus.CANCELLED,
-]);
-
-function isTerminal(job: FirmwareJob): boolean {
-  return TERMINAL_STATUSES.has(job.status);
-}
 
 @customElement("esphome-firmware-jobs-dialog")
 export class ESPHomeFirmwareJobsDialog extends LitElement {

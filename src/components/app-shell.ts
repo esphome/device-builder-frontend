@@ -56,6 +56,7 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 
 // Mirrors the backend's `_PRIMARY_JOB_TYPES` retention pool — these
 // are the job types deduplicated to one terminal entry per device.
@@ -63,12 +64,6 @@ const PRIMARY_JOB_TYPES: ReadonlySet<JobType> = new Set([
   JobType.COMPILE,
   JobType.UPLOAD,
   JobType.INSTALL,
-]);
-
-const TERMINAL_STATUSES: ReadonlySet<JobStatus> = new Set([
-  JobStatus.COMPLETED,
-  JobStatus.FAILED,
-  JobStatus.CANCELLED,
 ]);
 
 /** Extra ``_activeJobs`` keys to mirror this job under, beyond the
@@ -522,7 +517,7 @@ export class ESPHomeApp extends LitElement {
     // Snapshots replay terminal jobs too — those belong only in the
     // history map. Treating them as active leaves the spinner stuck on
     // the device after a reconnect.
-    if (TERMINAL_STATUSES.has(job.status)) return;
+    if (isTerminalJobStatus(job.status)) return;
     const active = new Map(this._activeJobs);
     active.set(job.configuration, job);
     /* RENAME writes a *new* YAML during the job — the new device card
@@ -550,7 +545,7 @@ export class ESPHomeApp extends LitElement {
         (j) =>
           j.job_id !== job.job_id &&
           j.configuration === job.configuration &&
-          !TERMINAL_STATUSES.has(j.status),
+          !isTerminalJobStatus(j.status),
       );
       if (supersededByActive) {
         const next = new Map(this._firmwareJobs);
@@ -567,7 +562,7 @@ export class ESPHomeApp extends LitElement {
         if (
           PRIMARY_JOB_TYPES.has(existing.job_type) &&
           existing.configuration === job.configuration &&
-          TERMINAL_STATUSES.has(existing.status)
+          isTerminalJobStatus(existing.status)
         ) {
           next.delete(id);
         }
@@ -843,7 +838,7 @@ export class ESPHomeApp extends LitElement {
   private _onFirmwareHistoryCleared() {
     const next = new Map<string, FirmwareJob>();
     for (const [id, job] of this._firmwareJobs) {
-      if (!TERMINAL_STATUSES.has(job.status)) {
+      if (!isTerminalJobStatus(job.status)) {
         next.set(id, job);
       }
     }

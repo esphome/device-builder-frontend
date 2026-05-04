@@ -30,6 +30,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -121,6 +122,23 @@ export class ESPHomeCommandDialog extends LitElement {
    *  install finishes. Reset to default per ``open()`` so an opt-out
    *  on one run doesn't silently persist into unrelated future runs. */
   @state() private _showLogsAfterInstall = true;
+  /** True when this dialog session attached to the job while it
+   *  was still live (QUEUED / RUNNING), so the host that opened it
+   *  is the same surface that wired the
+   *  ``request-show-logs-after-install`` listener. False when
+   *  ``followJob()`` re-attached to a job that was already
+   *  terminal — typically the firmware-tasks dialog clicking into
+   *  a finished install for review.
+   *
+   *  Drives the visibility of every "go to logs after install"
+   *  affordance: the toolbar's "Logs after" toggle, the post-
+   *  success "Logs" action button, and the auto-flip in
+   *  ``_followJob``'s ``onResult``. Without this, the review
+   *  surface offered controls that fire an event no nearby
+   *  listener handles (the firmware-tasks dialog mounts its own
+   *  command-dialog without a logs-dialog handoff, so the event
+   *  bubbles past everything and dies). (issue #139) */
+  @state() private _wasLiveAtAttach = true;
   /** Guard against re-entrancy on the show-secrets toggle.
    *  ``_detachStream`` clears ``_streamId`` synchronously and only
    *  awaits the backend stop afterwards; without this flag a fast
@@ -450,6 +468,11 @@ export class ESPHomeCommandDialog extends LitElement {
        state. */
     this._showSecrets = false;
     this._showLogsAfterInstall = true;
+    /* Fresh install starts in the QUEUED/RUNNING flow, so the
+       host that opened us is also the one wiring the logs
+       handoff. The followJob() path will narrow this down for
+       the review surfaces. */
+    this._wasLiveAtAttach = true;
     this._detachStream();
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -488,6 +511,15 @@ export class ESPHomeCommandDialog extends LitElement {
        attached install silently inherit that opt-out. */
     this._showSecrets = false;
     this._showLogsAfterInstall = true;
+    /* The "go to logs" affordances only make sense when the host
+       that opened us is the same surface wiring the
+       ``request-show-logs-after-install`` listener. That's true
+       when the job is still live at attach (QUEUED / RUNNING) —
+       the firmware-tasks dialog only auto-attaches running jobs.
+       A terminal-status attach means we're in the review path and
+       no host listener is guaranteed; suppress the affordances
+       entirely so the user doesn't click into dead UI. */
+    this._wasLiveAtAttach = !isTerminalJobStatus(job.status);
     this._jobId = job.job_id;
     /* Prime from the job we were handed so the queued overlay can
        render on the very first paint instead of after the next
@@ -761,22 +793,13 @@ export class ESPHomeCommandDialog extends LitElement {
   private _renderShowLogsAfterInstallToggle() {
     if (this._commandType !== "install") return nothing;
     if (this._state === "success" || this._state === "error") return nothing;
-    /* ``followJob()`` can attach to a job that's already terminal
-       — the user reopened a finished install from the dashboard's
-       activity list to review its output. ``_followJob``'s
-       ``wasLiveAtAttach`` guard suppresses the auto-flip in that
-       case (we never saw the QUEUED/RUNNING → COMPLETED
-       transition), so the toggle would be wired to a path that
-       has already had its chance to fire. Hide it; the post-
-       success "Logs" action button takes over once ``onResult``
-       resolves a beat later. (issue #139) */
-    if (
-      this._jobStatus === JobStatus.COMPLETED ||
-      this._jobStatus === JobStatus.FAILED ||
-      this._jobStatus === JobStatus.CANCELLED
-    ) {
-      return nothing;
-    }
+    /* Suppress on the review path. ``_wasLiveAtAttach`` is false
+       when ``followJob()`` re-attached to an already-terminal
+       job — typically the firmware-tasks dialog clicking into a
+       finished install. There's no host wiring the logs handoff
+       in that surface, so the toggle would be dead UI. (issue
+       #139) */
+    if (!this._wasLiveAtAttach) return nothing;
     return this._renderToolbarToggle({
       active: this._showLogsAfterInstall,
       onClick: this._toggleShowLogsAfterInstall,
@@ -848,8 +871,15 @@ export class ESPHomeCommandDialog extends LitElement {
            open server-serial logs and OTA installs open network
            logs. Other command types (compile / clean) don't have a
            sensible logs follow-up, so we only surface it for
-           install. */
-        return this._commandType === "install"
+           install.
+
+           Only show the button when the dialog observed the job
+           live (``_wasLiveAtAttach``). On the review path the
+           ``request-show-logs-after-install`` event has no
+           guaranteed listener (firmware-tasks dialog mounts its
+           own command-dialog without a logs-dialog handoff), so
+           the click would be a no-op. (issue #139) */
+        return this._commandType === "install" && this._wasLiveAtAttach
           ? html`<button class="term-btn term-btn--start" @click=${this._flipToLogs}>
                 <wa-icon library="mdi" name="console"></wa-icon>
                 ${this._localize("command.show_logs")}
@@ -983,16 +1013,12 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Attach to a job's output stream. Works for queued, running, or finished jobs. */
   private _followJob(jobId: string) {
-    /* Capture the pre-attach status so we can tell whether this
-       session saw a live transition (QUEUED/RUNNING → COMPLETED)
-       or just replayed a job that was already terminal at attach
-       time. The latter is what happens when the user clicks a
-       finished install in firmware-jobs-dialog to review its
-       output — auto-flipping to logs there would be surprising
-       (the user wanted to read the past install output, not start
-       tailing the device). */
-    const wasLiveAtAttach =
-      this._jobStatus === JobStatus.QUEUED || this._jobStatus === JobStatus.RUNNING;
+    /* ``_wasLiveAtAttach`` is set by ``open()`` (always true for
+       fresh installs) or by ``followJob()`` from the job's
+       initial status. When false, the dialog is on the review
+       path and the auto-flip to logs would be surprising (the
+       user wanted to read past output, not start tailing the
+       device). */
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];
@@ -1010,7 +1036,7 @@ export class ESPHomeCommandDialog extends LitElement {
         this._jobId = "";
         if (
           success &&
-          wasLiveAtAttach &&
+          this._wasLiveAtAttach &&
           this._commandType === "install" &&
           this._showLogsAfterInstall
         ) {
