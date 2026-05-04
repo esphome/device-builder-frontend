@@ -781,35 +781,35 @@ export class ESPHomePageDashboard extends LitElement {
    * (select-toggle, view-toggle), breaking vertical alignment.
    */
   private _renderDiscoveryHint() {
+    let body;
     if (this._yamlMode) {
       // Plain text-link styling for the back affordance — it's a
       // navigation action, not a keystroke hint.
-      return html`<small class="search-discover-hint">
-        <button
-          type="button"
-          class="search-discover-back"
-          @click=${this._toggleSearchMode}
-        >
-          <wa-icon library="mdi" name="arrow-left"></wa-icon>
-          ${this._localize("yaml_search.back_to_devices")}
-        </button>
-      </small>`;
-    }
-    if (this._search !== "") return "";
-    // The ``/`` here is a keystroke shortcut — render as a kbd
-    // cap so the user reads it as "press this key" rather than
-    // as a text link.
-    return html`<small class="search-discover-hint">
-      ${this._localize("yaml_search.discover_prefix")}
-      <button
+      body = html`<button
         type="button"
-        class="search-discover-key"
+        class="search-discover-back"
         @click=${this._toggleSearchMode}
       >
-        ${this._localize("yaml_search.discover_link")}
-      </button>
-      ${this._localize("yaml_search.discover_suffix")}
-    </small>`;
+        <wa-icon library="mdi" name="arrow-left"></wa-icon>
+        ${this._localize("yaml_search.back_to_devices")}
+      </button>`;
+    } else if (this._search === "") {
+      // The ``/`` is a keystroke shortcut — render as a kbd cap so
+      // the user reads it as "press this key" rather than as a
+      // text link.
+      body = html`${this._localize("yaml_search.discover_prefix")}
+        <button
+          type="button"
+          class="search-discover-key"
+          @click=${this._toggleSearchMode}
+        >
+          ${this._localize("yaml_search.discover_link")}
+        </button>
+        ${this._localize("yaml_search.discover_suffix")}`;
+    } else {
+      return "";
+    }
+    return html`<small class="search-discover-hint">${body}</small>`;
   }
 
   /**
@@ -834,10 +834,7 @@ export class ESPHomePageDashboard extends LitElement {
   private _onSearchKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Escape" && this._yamlMode) {
       e.preventDefault();
-      this._yamlMode = false;
-      this._search = "";
-      this._syncYamlSearch();
-      this._refocusSearchInput();
+      this._setSearchMode(false, "");
       return;
     }
     if (e.key !== "/") return;
@@ -845,9 +842,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (this._search !== "") return;
     if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
     e.preventDefault();
-    this._yamlMode = true;
-    this._syncYamlSearch();
-    this._refocusSearchInput();
+    this._setSearchMode(true);
   };
 
   @query(".search-input")
@@ -899,13 +894,27 @@ export class ESPHomePageDashboard extends LitElement {
     this._yamlSearch.scheduleQuery(body);
   }
 
-  private _toggleSearchMode = () => {
-    this._yamlMode = !this._yamlMode;
+  /**
+   * Set the search mode + (optionally) the query, then sync the
+   * controller and refocus the input.
+   *
+   * One source of truth for "user did something that changes
+   * the active search mode" — toggle button, ``/`` keystroke,
+   * Escape key, YAML-preview pivot all funnel through here so
+   * none of them can drift on the must-do list (sync the
+   * controller; land the cursor back in the input). When
+   * ``search`` is omitted the existing query is preserved
+   * (toggle case); pass ``""`` explicitly to reset (Escape case).
+   */
+  private _setSearchMode(yamlMode: boolean, search?: string) {
+    this._yamlMode = yamlMode;
+    if (search !== undefined) this._search = search;
     this._syncYamlSearch();
-    // Land the cursor in the search input — every entry point
-    // here (icon click, Tip link click, mode toggle from the
-    // YAML-preview pivot) wants the user to be ready to type.
     this._refocusSearchInput();
+  }
+
+  private _toggleSearchMode = () => {
+    this._setSearchMode(!this._yamlMode);
   };
 
   private _renderToolbar(matchCount: number, total: number) {
@@ -970,10 +979,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (previewCount === 0) return "";
     return html`<button
       class="empty-search-yaml-pivot"
-      @click=${() => {
-        this._yamlMode = true;
-        this._syncYamlSearch();
-      }}
+      @click=${() => this._setSearchMode(true)}
     >
       <wa-icon library="mdi" name="code-braces"></wa-icon>
       ${this._localize(
@@ -1444,8 +1450,8 @@ export class ESPHomePageDashboard extends LitElement {
    * real count. The controller's debounce + seq guards keep this
    * from thrashing per keystroke. Skipped in YAML mode (the
    * regular ``_syncYamlSearch`` path already drives the
-   * controller) and in table view (no empty-search render path
-   * there).
+   * controller). Runs in both card *and* table view — the table-
+   * view banner above the table consumes the same preview hits.
    */
   private _maybeFireEmptyStatePreview(changed: PropertyValues) {
     if (!changed.has("_search") && !changed.has("_yamlMode") && !changed.has("_devices"))
