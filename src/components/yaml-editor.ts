@@ -68,6 +68,16 @@ export class ESPHomeYamlEditor extends LitElement {
 
   private _view: EditorView | null = null;
 
+  /** Last 1-indexed cursor line we emitted as `yaml-cursor-line`.
+   *  We only emit on line transitions so a horizontal mouse / arrow
+   *  movement inside the same line doesn't churn the page state. */
+  private _lastReportedCursorLine = 0;
+
+  /** Last 1-indexed line we emitted as `yaml-hover-line`. Same
+   *  throttle as the cursor path: only emit when the hover crosses
+   *  a line boundary so mousemove within a line is a no-op. */
+  private _lastReportedHoverLine = 0;
+
   static styles = css`
     :host {
       display: block;
@@ -258,6 +268,59 @@ export class ESPHomeYamlEditor extends LitElement {
             }),
           );
         }
+        // Cursor moved (click, arrow keys, find-jump). Emit the
+        // 1-indexed line so the page can switch the visual
+        // section editor to match. Throttle to line transitions:
+        // moving within the same line is irrelevant for section
+        // attribution, and emitting on every column change would
+        // churn page state.
+        if (update.selectionSet) {
+          const head = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(head).number;
+          if (line !== this._lastReportedCursorLine) {
+            this._lastReportedCursorLine = line;
+            this.dispatchEvent(
+              new CustomEvent("yaml-cursor-line", {
+                detail: { line },
+                bubbles: true,
+                composed: true,
+              }),
+            );
+          }
+        }
+      }),
+      // Hover path: drive the navigator's hover highlight from
+      // the editor's pointer position. Different intent from
+      // `yaml-cursor-line`: hover just *previews* which section
+      // the cursor is over without switching the left-pane
+      // section editor. The page wires it to the navigator's
+      // hover slot only.
+      EditorView.domEventHandlers({
+        mousemove: (e, view) => {
+          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
+          if (pos === null) return;
+          const line = view.state.doc.lineAt(pos).number;
+          if (line === this._lastReportedHoverLine) return;
+          this._lastReportedHoverLine = line;
+          this.dispatchEvent(
+            new CustomEvent("yaml-hover-line", {
+              detail: { line },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        },
+        mouseleave: () => {
+          if (this._lastReportedHoverLine === 0) return;
+          this._lastReportedHoverLine = 0;
+          this.dispatchEvent(
+            new CustomEvent("yaml-hover-line", {
+              detail: { line: null },
+              bubbles: true,
+              composed: true,
+            }),
+          );
+        },
       }),
       ...(this._darkMode ? [oneDark] : []),
     ];

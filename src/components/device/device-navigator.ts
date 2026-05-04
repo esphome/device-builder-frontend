@@ -85,6 +85,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property({ attribute: false })
   selectedFromLine?: number;
 
+  /**
+   * External-hover input: when the user hovers over the YAML
+   * pane (right side), the page maps the cursor line to a
+   * section's `fromLine` and forwards it here. The nav item
+   * with that `fromLine` paints its hovered style — a preview
+   * of the section the cursor is over without actually
+   * selecting it. The `_hoveredLine` state field merges this
+   * with local pointer-enter/leave hovers from the nav itself.
+   */
+  @property({ attribute: false })
+  hoveredFromLine: number | null = null;
+
   @state()
   private _selectedLine: number | null = null;
 
@@ -448,11 +460,20 @@ export class ESPHomeDeviceNavigator extends LitElement {
                             ${items.map((item) => {
                               const { primary, secondary } =
                                 this._navItemLabels(item, category);
+                              // Local pointer hover wins over the
+                              // external `hoveredFromLine` prop —
+                              // if the user is moving the mouse on
+                              // the nav itself, that's the source
+                              // of truth; the YAML-pane preview
+                              // fills in only when no local hover
+                              // is active.
+                              const effectiveHover =
+                                this._hoveredLine ?? this.hoveredFromLine;
                               return html`
                                 <div
                                   class="nav-item ${this._selectedLine === item.fromLine
                                     ? "nav-item--selected"
-                                    : ""} ${this._hoveredLine === item.fromLine
+                                    : ""} ${effectiveHover === item.fromLine
                                     ? "nav-item--hovered"
                                     : ""}"
                                   @mouseenter=${() =>

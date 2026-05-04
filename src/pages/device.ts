@@ -30,6 +30,10 @@ import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import {
+  parseYamlTopLevelSections,
+  sectionKeyOf,
+} from "../util/yaml-sections.js";
 import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -103,6 +107,17 @@ export class ESPHomePageDevice extends LitElement {
 
   @state()
   private _selectedFromLine?: number = this._readUrlLine();
+
+  /**
+   * Hover-tracking line driven by the YAML pane's mouse position.
+   * Forwarded to the navigator as `.hoveredFromLine` so the
+   * matching nav item highlights as a preview without switching
+   * the visual section editor (which the click / cursor path does
+   * via `_selectedSection`). `null` when the cursor is outside
+   * the editor or in the gap between sections.
+   */
+  @state()
+  private _hoveredFromLine: number | null = null;
 
   @state()
   private _drawerOpen = false;
@@ -418,17 +433,7 @@ export class ESPHomePageDevice extends LitElement {
         @section-select=${this._onSectionSelect}
         @yaml-highlight=${this._onYamlHighlight}
       >
-        <esphome-device-navigator
-          class="drawer-nav"
-          .openSections=${this._openSections}
-          .yaml=${this._yaml}
-          .board=${this._board}
-          .boardName=${this._board?.name ?? ""}
-          .configuration=${this.id}
-          .platform=${this._board?.esphome.platform ?? ""}
-          .selectedKey=${this._selectedSection}
-          .selectedFromLine=${this._selectedFromLine}
-        ></esphome-device-navigator>
+        ${this._renderNavigator("drawer-nav")}
       </div>
 
       <div class="page">
@@ -437,6 +442,8 @@ export class ESPHomePageDevice extends LitElement {
           @section-toggle=${this._onSectionToggle}
           @layout-change=${this._onLayoutChange}
           @yaml-change=${this._onYamlChange}
+          @yaml-cursor-line=${this._onYamlCursorLine}
+          @yaml-hover-line=${this._onYamlHoverLine}
           @yaml-highlight=${this._onYamlHighlight}
           @yaml-updated=${this._onYamlUpdated}
           @section-select=${this._onSectionSelect}
@@ -445,17 +452,7 @@ export class ESPHomePageDevice extends LitElement {
           @install-device=${this._installCtrl.onInstall}
           @update-device=${this._installCtrl.onUpdate}
         >
-          <esphome-device-navigator
-            class="desktop-nav"
-            .openSections=${this._openSections}
-            .yaml=${this._yaml}
-            .board=${this._board}
-            .boardName=${this._board?.name ?? ""}
-            .configuration=${this.id}
-            .platform=${this._board?.esphome.platform ?? ""}
-            .selectedKey=${this._selectedSection}
-            .selectedFromLine=${this._selectedFromLine}
-          ></esphome-device-navigator>
+          ${this._renderNavigator("desktop-nav")}
           <esphome-device-editor
             .yaml=${this._yaml}
             .savedYaml=${this._savedYaml}
@@ -568,8 +565,90 @@ export class ESPHomePageDevice extends LitElement {
     localStorage.setItem("esphome-editor-layout", e.detail);
   }
 
+  /**
+   * Both nav instances (drawer + desktop) share the same prop set
+   * — only their CSS class differs. Pulled into a render helper
+   * so adding a prop (`.hoveredFromLine` here, future ones too)
+   * touches one place instead of drifting across two copies.
+   */
+  private _renderNavigator(className: "drawer-nav" | "desktop-nav") {
+    return html`<esphome-device-navigator
+      class=${className}
+      .openSections=${this._openSections}
+      .yaml=${this._yaml}
+      .board=${this._board}
+      .boardName=${this._board?.name ?? ""}
+      .configuration=${this.id}
+      .platform=${this._board?.esphome.platform ?? ""}
+      .selectedKey=${this._selectedSection}
+      .selectedFromLine=${this._selectedFromLine}
+      .hoveredFromLine=${this._hoveredFromLine}
+    ></esphome-device-navigator>`;
+  }
+
   private _onYamlChange(e: CustomEvent<{ value: string }>) {
     this._yaml = e.detail.value;
+  }
+
+  /**
+   * Cursor moved to a new line in the YAML pane. Find the section
+   * that owns that line and select it so the navigator's
+   * highlight follows the user's cursor (and the visual editor
+   * loads the same section). Throttled to line transitions by
+   * the editor itself; this handler runs once per traversed
+   * section.
+   *
+   * Lines that fall in the gap between sections (a comment block,
+   * a blank line, the file header above the first section) don't
+   * match any range — leave the current selection alone in that
+   * case rather than clearing it. The user-visible behaviour is
+   * "scrolling through configured fields highlights them; cursor
+   * resting in interstitial whitespace doesn't unhighlight what
+   * was last clicked."
+   */
+  private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
+    const line = e.detail.line;
+    const sections = parseYamlTopLevelSections(this._yaml);
+    // Pick the most-specific match: list-item entries are emitted
+    // alongside their parent's range (parent isn't included in the
+    // expansion, but expanded items have narrower fromLine/toLine
+    // than the implicit parent). `find` is fine — sections are in
+    // file order and ranges don't overlap.
+    const match = sections.find(
+      (s) => line >= s.fromLine && line <= s.toLine,
+    );
+    if (!match) return;
+    const sectionKey = sectionKeyOf(match);
+    if (
+      sectionKey === this._selectedSection &&
+      match.fromLine === this._selectedFromLine
+    ) {
+      return;
+    }
+    this._selectedSection = sectionKey;
+    this._selectedFromLine = match.fromLine;
+    this._updateUrl();
+  }
+
+  /**
+   * Mouse moved over the YAML pane. Find the section under the
+   * pointer and forward that section's `fromLine` to the
+   * navigator's hover slot — preview-only, no section switch.
+   * `line: null` clears (mouse left the pane / sits in the gap
+   * between sections).
+   */
+  private _onYamlHoverLine(e: CustomEvent<{ line: number | null }>) {
+    const line = e.detail.line;
+    if (line === null) {
+      if (this._hoveredFromLine !== null) this._hoveredFromLine = null;
+      return;
+    }
+    const sections = parseYamlTopLevelSections(this._yaml);
+    const match = sections.find(
+      (s) => line >= s.fromLine && line <= s.toLine,
+    );
+    const next = match ? match.fromLine : null;
+    if (next !== this._hoveredFromLine) this._hoveredFromLine = next;
   }
 
   private _onYamlHighlight(
