@@ -174,8 +174,19 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       }
 
       .option--disabled {
-        opacity: 0.45;
         cursor: not-allowed;
+      }
+
+      /* Fade only the row's content (icon + title/desc) on
+         disabled — NOT the container — so a child like
+         .chevron-btn (the OTA row's address-override disclosure,
+         which works regardless of online state) can override
+         back to full opacity. opacity on the container would
+         cascade to every descendant regardless of child rules;
+         targeted children let exceptions exist. */
+      .option--disabled > wa-icon,
+      .option--disabled .info {
+        opacity: 0.45;
       }
 
       .option wa-icon {
@@ -184,7 +195,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         flex-shrink: 0;
       }
 
-      .option--disabled wa-icon {
+      .option--disabled > wa-icon {
         color: var(--wa-color-text-quiet);
       }
 
@@ -230,6 +241,19 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       .chevron-btn wa-icon {
         font-size: 18px;
         color: inherit;
+      }
+
+      /* When the OTA row is disabled (device not online), the row's
+         click handler is suppressed and the icon + info fade. The
+         chevron-driven address override is the path that's MOST
+         useful in that case — typing an IP doesn't depend on the
+         dashboard having resolved the device — so explicitly
+         restore the chevron's pointer cursor on top of the parent
+         .option--disabled's not-allowed default. (Opacity doesn't
+         need overriding here because the disabled rule targets
+         icon + info only, not the chevron.) */
+      .option--disabled .chevron-btn {
+        cursor: pointer;
       }
 
       /* The expanded address form is a separate card directly
@@ -520,12 +544,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       ${expanded
         ? html`
             <div class="ota-form">
-              <label
+              <label for="ota-address-input"
                 >${this._localize(
                   "dashboard.install_method_network_address_label",
                 )}</label
               >
               <input
+                id="ota-address-input"
                 type="text"
                 autocomplete="off"
                 spellcheck="false"
