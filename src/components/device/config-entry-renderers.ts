@@ -151,6 +151,14 @@ export function renderFloatWithUnitField(
             // `"1e"`) survives the next re-render. The buffer is
             // ignored once a blur event fires.
             ctx.setEditingMagnitude(path, raw);
+            // Clearing the magnitude drops the unit from the YAML
+            // value (`{null, kHz}` serializes to `""`), so stash
+            // the current unit too — otherwise the next render's
+            // fallback chain snaps the picker back to the catalog
+            // default and the user's earlier pick is lost.
+            if (raw === "") {
+              ctx.setPendingUnit(path, unit);
+            }
             const next = raw === "" ? null : Number(raw);
             emit({ value: Number.isFinite(next) ? next : null, unit });
           }}

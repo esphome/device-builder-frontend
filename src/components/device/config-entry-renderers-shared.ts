@@ -89,12 +89,30 @@ export interface RenderCtx {
   clearEditingMagnitude: (path: string[]) => void;
 }
 
-export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
+/**
+ * Resolve the user-visible label for *entry* given a `localize`
+ * function. Three-layer fallback:
+ *
+ * 1. `translation_key` resolved via `localize` (ignored when
+ *    `localize` echoes the key back unchanged — the convention
+ *    for "no translation registered").
+ * 2. The catalog's English `entry.label`.
+ * 3. The entry's `key`, prettified — `"update_interval"` →
+ *    `"Update Interval"`.
+ *
+ * Pulled out of `labelFor()` so callers without a full
+ * `RenderCtx` (e.g. the add-component dialog's hidden-validation
+ * summary) can share the same chain.
+ */
+export function resolveEntryLabel(
+  entry: ConfigEntry,
+  localize: LocalizeFunc,
+): string {
   if (entry.translation_key) {
     const params = (entry.translation_params || undefined) as
       | Record<string, string | number>
       | undefined;
-    const translated = ctx.localize(entry.translation_key, params);
+    const translated = localize(entry.translation_key, params);
     if (translated && translated !== entry.translation_key) return translated;
   }
   if (entry.label) return entry.label;
@@ -102,6 +120,10 @@ export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
     .split("_")
     .map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w))
     .join(" ");
+}
+
+export function labelFor(entry: ConfigEntry, ctx: RenderCtx): string {
+  return resolveEntryLabel(entry, ctx.localize);
 }
 
 export function renderHelpLink(entry: ConfigEntry, ctx: RenderCtx) {

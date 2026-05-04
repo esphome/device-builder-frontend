@@ -137,11 +137,22 @@ export class ESPHomeConfigEntryForm extends LitElement {
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
    * picked before typing a numeric value. Keyed by the dotted
-   * path; cleared once the field's value lands in `this.values`.
-   * Stored in a private map (not `@state`) so a unit-only pick
-   * doesn't trip a re-render — the renderer reads it on the
-   * next paint that's already coming from the form's normal
-   * value-change cycle.
+   * path. The renderer's `chooseDisplayUnit` reads this layer
+   * before falling back to the catalog default's unit, so a
+   * pick survives the rerender cycle even though the form value
+   * is still empty (`""`).
+   *
+   * Stored as a private map rather than `@state`, but the setter
+   * (in `_buildCtx`) calls `requestUpdate()` so a unit-only pick
+   * still trips a rerender — the form's normal value-change cycle
+   * isn't entered when there's no magnitude yet (no `emit()`
+   * happens), so we have to nudge Lit ourselves.
+   *
+   * Cleared on `entries` change (different component shape) so a
+   * dep-flow detour doesn't bleed picks across; otherwise an
+   * entry's pick is naturally superseded once a non-empty
+   * `parsed.unit` from the form value beats the pending layer in
+   * `chooseDisplayUnit`'s precedence.
    */
   private _pendingUnits: Map<string, string> = new Map();
 

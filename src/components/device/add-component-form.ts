@@ -28,6 +28,7 @@ import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { collectRenderablePaths } from "./config-entry-render-filter.js";
+import { resolveEntryLabel } from "./config-entry-renderers-shared.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -495,7 +496,7 @@ export class ESPHomeAddComponentForm extends LitElement {
           ? entry.config_entries ?? []
           : null;
     }
-    return entry?.label || errKey;
+    return entry ? resolveEntryLabel(entry, this._localize) : errKey;
   }
 
   /**

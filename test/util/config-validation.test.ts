@@ -297,7 +297,7 @@ describe("validateEntries", () => {
     expect(validateEntries(entries, { frequency: 100 }).size).toBe(0);
   });
 
-  it("does not validate the i2c bus shape end-to-end", () => {
+  it("validates the i2c bus shape cleanly end-to-end", () => {
     // End-to-end shape of the i2c bus catalog entry (the original
     // MasterOfNone repro): id + several optional numeric / boolean
     // entries, every numeric one carrying a unit-suffixed default.
