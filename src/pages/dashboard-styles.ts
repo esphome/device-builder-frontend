@@ -237,6 +237,17 @@ export const dashboardStyles = css`
     transform: translateY(1px);
   }
 
+  /* Table-view banner that surfaces the YAML pivot above the
+     table when the device-name search yields zero matches.
+     The table component shows its own empty row inside its
+     chrome; this lifts the same pivot-to-yaml affordance to
+     dashboard level so list-view users discover it too. */
+  .yaml-preview-banner {
+    display: flex;
+    justify-content: center;
+    padding: var(--wa-space-m) var(--wa-space-l) 0;
+  }
+
   /* ─── YAML mode hit list ─── */
 
   .yaml-hits {

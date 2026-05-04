@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiArrowLeft,
   mdiCheckboxMultipleMarkedOutline,
   mdiClipboardTextSearchOutline,
   mdiCodeBraces,
@@ -91,6 +92,7 @@ import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 
 registerMdiIcons({
+  "arrow-left": mdiArrowLeft,
   "checkbox-multiple-marked-outline": mdiCheckboxMultipleMarkedOutline,
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
   "code-braces": mdiCodeBraces,
@@ -357,6 +359,39 @@ export class ESPHomePageDashboard extends LitElement {
 
   static styles = [espHomeStyles, dashboardStyles];
 
+  /**
+   * True when device-name search is the active filter — i.e.
+   * the user is *not* in YAML mode and the device list has
+   * loaded. View-agnostic on purpose: the YAML-content preview
+   * is meaningful in both cards and table view (the user can
+   * be searching from either), so the eligibility gate should
+   * not gate on ``_view``.
+   */
+  private get _isDeviceSearchActive(): boolean {
+    return !this._yamlMode && this._devicesLoaded;
+  }
+
+  /**
+   * Predicate for the device-name search filter.
+   *
+   * One source of truth for "does this device match the search
+   * query" — used by ``render()`` to filter the displayed list,
+   * by ``_currentlyVisibleConfigurations`` for select-all
+   * scoping, and by ``_maybeFireEmptyStatePreview`` to decide
+   * whether to fire a YAML preview. ``query`` must already be
+   * lower-cased; the caller pre-lowers once outside the loop.
+   */
+  private static _matchesDeviceName(
+    device: ConfiguredDevice,
+    loweredQuery: string
+  ): boolean {
+    const name = (device.friendly_name || device.name).toLowerCase();
+    return (
+      name.includes(loweredQuery) ||
+      device.configuration.toLowerCase().includes(loweredQuery)
+    );
+  }
+
   protected render() {
     if (!this._devicesLoaded) {
       return this._view === DashboardView.TABLE
@@ -379,11 +414,7 @@ export class ESPHomePageDashboard extends LitElement {
     const q = this._search.trim().toLowerCase();
     const sorted = this._sortedDevices;
     const filtered = q
-      ? sorted.filter(
-          (d) =>
-            (d.friendly_name || d.name).toLowerCase().includes(q) ||
-            d.configuration.toLowerCase().includes(q)
-        )
+      ? sorted.filter((d) => ESPHomePageDashboard._matchesDeviceName(d, q))
       : sorted;
 
     return html`
@@ -394,6 +425,7 @@ export class ESPHomePageDashboard extends LitElement {
       ${filtered.length === 0 && q && this._view === DashboardView.CARDS
         ? this._renderEmptySearch()
         : ""}
+      ${this._renderYamlPreviewBanner()}
       ${this._view === DashboardView.CARDS
         ? this._renderCardGrid(filtered)
         : this._renderTable()}
@@ -421,6 +453,7 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       <div class="toolbar">
         <div class="toolbar-row">${this._renderSearchInput()}</div>
+        ${this._renderDiscoveryHint()}
         ${matchCount !== null
           ? html`<span class="device-count"
               ><strong>${matchCount}</strong> ${unit}</span
@@ -518,9 +551,7 @@ export class ESPHomePageDashboard extends LitElement {
     const isTable = this._view === DashboardView.TABLE;
     return sorted
       .filter((d) => {
-        const name = d.friendly_name || d.name;
-        if (name.toLowerCase().includes(q)) return true;
-        if (d.configuration.toLowerCase().includes(q)) return true;
+        if (ESPHomePageDashboard._matchesDeviceName(d, q)) return true;
         if (!isTable) return false;
         return (
           d.address.toLowerCase().includes(q) ||
@@ -736,21 +767,50 @@ export class ESPHomePageDashboard extends LitElement {
           }}
         ></wa-icon>
       </wa-input>
-      ${showDiscoveryHint
-        ? html`<small class="search-discover-hint">
-            ${this._localize("yaml_search.discover_prefix")}
-            <button
-              type="button"
-              class="search-discover-link"
-              @click=${this._toggleSearchMode}
-            >
-              <wa-icon library="mdi" name="code-braces"></wa-icon>
-              ${this._localize("yaml_search.discover_link")}
-            </button>
-            ${this._localize("yaml_search.discover_suffix")}
-          </small>`
-        : ""}
     </div>`;
+  }
+
+  /**
+   * Mode-context caption rendered below the toolbar row.
+   *
+   * Two states, always one of them visible:
+   *
+   * - device mode + empty input → the discoverability tip
+   *   ("Tip: type / for YAML to search across all configs").
+   * - YAML mode (any query) → an always-visible "Back to device
+   *   search" link so the user has an obvious way out even if
+   *   they don't remember which icon flips the mode.
+   *
+   * Lives outside the search-wrap; placing it inside made the
+   * search input taller than its toolbar-row siblings
+   * (select-toggle, view-toggle), breaking vertical alignment.
+   */
+  private _renderDiscoveryHint() {
+    if (this._yamlMode) {
+      return html`<small class="search-discover-hint">
+        <button
+          type="button"
+          class="search-discover-link"
+          @click=${this._toggleSearchMode}
+        >
+          <wa-icon library="mdi" name="arrow-left"></wa-icon>
+          ${this._localize("yaml_search.back_to_devices")}
+        </button>
+      </small>`;
+    }
+    if (this._search !== "") return "";
+    return html`<small class="search-discover-hint">
+      ${this._localize("yaml_search.discover_prefix")}
+      <button
+        type="button"
+        class="search-discover-link"
+        @click=${this._toggleSearchMode}
+      >
+        <wa-icon library="mdi" name="code-braces"></wa-icon>
+        ${this._localize("yaml_search.discover_link")}
+      </button>
+      ${this._localize("yaml_search.discover_suffix")}
+    </small>`;
   }
 
   /**
@@ -762,6 +822,10 @@ export class ESPHomePageDashboard extends LitElement {
    * literal ``/`` key with no modifier — typing ``/`` mid-string
    * stays a literal slash, and an already-yaml-mode user typing
    * ``/`` searches for a slash in their YAML.
+   *
+   * Refocuses the input after the mode flip so the user can
+   * keep typing — wa-input's attribute changes (placeholder,
+   * class) may bounce focus on some browsers.
    */
   private _onSearchKeyDown = (e: KeyboardEvent) => {
     if (e.key !== "/") return;
@@ -771,7 +835,15 @@ export class ESPHomePageDashboard extends LitElement {
     e.preventDefault();
     this._yamlMode = true;
     this._syncYamlSearch();
+    this._refocusSearchInput();
   };
+
+  @query(".search-input")
+  private _searchInputEl?: HTMLElement & { focus: () => void };
+
+  private _refocusSearchInput() {
+    requestAnimationFrame(() => this._searchInputEl?.focus());
+  }
 
   /**
    * Bridge the current query to the YAML-search controller.
@@ -814,23 +886,13 @@ export class ESPHomePageDashboard extends LitElement {
           ${this._renderSearchInput()} ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
         </div>
+        ${this._renderDiscoveryHint()}
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
       </div>
     `;
   }
 
   private _renderEmptySearch() {
-    // (d) YAML-search preview — when the device-name search misses,
-    // surface the live YAML-content match count for the same query
-    // so the user can pivot directly to the tool that would find
-    // it. Hits are populated by ``updated()`` via the shared
-    // controller; null here means the debounce hasn't fired or the
-    // first call is still in flight, render the count line only
-    // once we have a real number to show.
-    const previewHits = this._yamlSearch.hits;
-    const previewCount = previewHits
-      ? previewHits.reduce((sum, hit) => sum + hit.matches.length, 0)
-      : 0;
     return html`
       <div class="empty-search">
         <wa-icon class="empty-search-icon" library="mdi" name="magnify"></wa-icon>
@@ -840,23 +902,7 @@ export class ESPHomePageDashboard extends LitElement {
         <p class="empty-search-desc">
           ${this._localize("dashboard.no_results_desc", { query: this._search.trim() })}
         </p>
-        ${previewHits !== null && previewCount > 0
-          ? html`<button
-              class="empty-search-yaml-pivot"
-              @click=${() => {
-                this._yamlMode = true;
-                this._syncYamlSearch();
-              }}
-            >
-              <wa-icon library="mdi" name="code-braces"></wa-icon>
-              ${this._localize(
-                previewCount === 1
-                  ? "yaml_search.no_match_yaml_preview"
-                  : "yaml_search.no_match_yaml_preview_plural",
-                { count: previewCount }
-              )}
-            </button>`
-          : ""}
+        ${this._renderYamlPreviewPivot()}
         <button
           class="empty-search-clear"
           @click=${() => {
@@ -867,6 +913,62 @@ export class ESPHomePageDashboard extends LitElement {
         </button>
       </div>
     `;
+  }
+
+  /**
+   * Render the "Try YAML search — N matches" pivot button.
+   *
+   * Same component used by the cards-view empty-search tile and
+   * the table-view banner (see ``_renderYamlPreviewBanner``).
+   * Returns empty when the controller hasn't returned hits yet
+   * (debounce / in-flight) or when the count is zero — only
+   * surface the pivot when we have a real number to show, the
+   * proof-of-usefulness for the user.
+   */
+  private _renderYamlPreviewPivot() {
+    const previewHits = this._yamlSearch.hits;
+    if (!previewHits || previewHits.length === 0) return "";
+    const previewCount = previewHits.reduce(
+      (sum, hit) => sum + hit.matches.length,
+      0
+    );
+    if (previewCount === 0) return "";
+    return html`<button
+      class="empty-search-yaml-pivot"
+      @click=${() => {
+        this._yamlMode = true;
+        this._syncYamlSearch();
+      }}
+    >
+      <wa-icon library="mdi" name="code-braces"></wa-icon>
+      ${this._localize(
+        previewCount === 1
+          ? "yaml_search.no_match_yaml_preview"
+          : "yaml_search.no_match_yaml_preview_plural",
+        { count: previewCount }
+      )}
+    </button>`;
+  }
+
+  /**
+   * Banner shown above the table view when the device-name
+   * search yields zero matches (the table renders its own empty
+   * row inside its chrome — we surface the YAML pivot at the
+   * dashboard level so the affordance reaches list-view users
+   * the same as cards-view users).
+   */
+  private _renderYamlPreviewBanner() {
+    if (this._view !== DashboardView.TABLE) return "";
+    if (!this._isDeviceSearchActive) return "";
+    const q = this._search.trim().toLowerCase();
+    if (!q) return "";
+    const anyDeviceMatches = this._sortedDevices.some((d) =>
+      ESPHomePageDashboard._matchesDeviceName(d, q)
+    );
+    if (anyDeviceMatches) return "";
+    const pivot = this._renderYamlPreviewPivot();
+    if (!pivot) return "";
+    return html`<div class="yaml-preview-banner">${pivot}</div>`;
   }
 
   private _renderCardGrid(filtered: ConfiguredDevice[]) {
@@ -960,9 +1062,12 @@ export class ESPHomePageDashboard extends LitElement {
         @enter-select-mode=${(e: CustomEvent<string>) =>
           this._onEnterSelectMode(e.detail)}
       >
-        <div slot="toolbar" class="toolbar-row">
-          ${this._renderSearchInput()} ${this._renderSelectToggle()}
-          ${this._renderViewToggle()}
+        <div slot="toolbar" class="toolbar-stack">
+          <div class="toolbar-row">
+            ${this._renderSearchInput()} ${this._renderSelectToggle()}
+            ${this._renderViewToggle()}
+          </div>
+          ${this._renderDiscoveryHint()}
         </div>
         <button
           slot="actions"
@@ -1310,18 +1415,19 @@ export class ESPHomePageDashboard extends LitElement {
   private _maybeFireEmptyStatePreview(changed: PropertyValues) {
     if (!changed.has("_search") && !changed.has("_yamlMode") && !changed.has("_devices"))
       return;
-    if (this._yamlMode || this._view !== DashboardView.CARDS || !this._devicesLoaded)
-      return;
+    // YAML mode: the controller is being driven by ``_syncYamlSearch``
+    // for the actual user-facing search; this preview path must not
+    // clear or overwrite. Pre-load: nothing to filter against yet.
+    if (!this._isDeviceSearchActive) return;
     const trimmed = this._search.trim();
     if (!trimmed) {
       this._yamlSearch.clear();
       return;
     }
     const lowered = trimmed.toLowerCase();
-    const anyDeviceMatches = this._sortedDevices.some((d) => {
-      const name = (d.friendly_name || d.name).toLowerCase();
-      return name.includes(lowered) || d.configuration.toLowerCase().includes(lowered);
-    });
+    const anyDeviceMatches = this._sortedDevices.some((d) =>
+      ESPHomePageDashboard._matchesDeviceName(d, lowered)
+    );
     if (anyDeviceMatches) {
       // Device-name search produced rows — no empty state to fill,
       // drop any in-flight preview so it doesn't keep firing.

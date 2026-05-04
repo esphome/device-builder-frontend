@@ -101,6 +101,49 @@ describe("TrailingEdgeDispatcher", () => {
     expect(d.isRunning).toBe(false);
   });
 
+  it("releases the running flag when the runner throws synchronously", async () => {
+    // Sync throws (TypeError before the runner returns a promise)
+    // need the same defence as async rejections — without the
+    // try/catch around the call, ``.catch`` on the returned
+    // promise wouldn't ever be evaluated and the throw would
+    // become an unhandled rejection.
+    const fn = vi.fn(() => {
+      throw new Error("sync boom");
+    });
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const d = new TrailingEdgeDispatcher<string>(fn as unknown as (i: string) => Promise<void>);
+
+    d.dispatch("a");
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(d.isRunning).toBe(false);
+    expect(debugSpy).toHaveBeenCalled();
+    debugSpy.mockRestore();
+  });
+
+  it("logs a debug breadcrumb when the runner throws", async () => {
+    // Pin the swallow-and-log shape: a real runner bug shouldn't
+    // surface as an unhandled rejection (the dispatcher is a
+    // fire-and-forget call site) but a developer chasing
+    // "popup never opens" needs *some* breadcrumb.
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const err = new Error("boom");
+    const fn = vi.fn().mockRejectedValue(err);
+    const d = new TrailingEdgeDispatcher<string>(fn);
+
+    d.dispatch("a");
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(debugSpy).toHaveBeenCalledWith(
+      expect.stringContaining("TrailingEdgeDispatcher"),
+      err
+    );
+    debugSpy.mockRestore();
+  });
+
   it("cancelPending drops the queued input without firing", async () => {
     const harness = deferredRunner();
     const d = new TrailingEdgeDispatcher<string>(harness.runner);

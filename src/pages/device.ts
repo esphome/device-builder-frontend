@@ -383,9 +383,36 @@ export class ESPHomePageDevice extends LitElement {
       const yaml = await this._api.getConfig(this.id);
       this._yaml = yaml;
       this._savedYaml = yaml;
+      this._maybeResolveLineFromUrl();
     } catch (e) {
       console.error("Failed to load YAML:", e);
     }
+  }
+
+  /**
+   * Resolve a ``?line=N`` URL parameter to a concrete section
+   * once the YAML has loaded.
+   *
+   * Direct-link arrivals from the dashboard's YAML hit list
+   * carry only ``?line=N`` (not ``?section=``); the navigator's
+   * highlight + scroll path keys off ``_selectedSection``, so
+   * without a section the editor mounts but never scrolls. Walk
+   * the just-loaded YAML to find the section that contains line
+   * N and pin both ``_selectedSection`` and ``_scrollToHighlight``
+   * — the navigator's existing emit-on-update logic then fires
+   * the scroll-into-view dispatch in CodeMirror.
+   */
+  private _maybeResolveLineFromUrl() {
+    if (this._selectedFromLine === undefined) return;
+    if (this._selectedSection !== null) return;
+    if (!this._yaml) return;
+    const match = sectionAtLine(this._yaml, this._selectedFromLine);
+    if (!match) return;
+    this._selectedSection = sectionKeyOf(match);
+    // Override the default ``false`` so the editor's
+    // ``updated()`` actually scrolls — the YAML hit click is
+    // explicitly asking for "land on this line".
+    this._scrollToHighlight = true;
   }
 
   private _saveYaml() {

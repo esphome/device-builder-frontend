@@ -41,6 +41,38 @@ describe("yamlHitLabel", () => {
     const match = { line_number: 3, line_text: "    wifi:    " };
     expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — wifi:");
   });
+
+  it.each([
+    ["password: hunter2", "password: ••••••••"],
+    ["  ap_password: 42dfadc0c2", "ap_password: ••••••••"],
+    ["  - ota_password: yellow1@@", "- ota_password: ••••••••"],
+    ["psk: 0123456789abcdef", "psk: ••••••••"],
+  ])("masks inline credential value in %s", (raw, expectedTrimmed) => {
+    const match = { line_number: 1, line_text: raw };
+    expect(yamlHitLabel(HIT, match)).toBe(`Kitchen Lamp — ${expectedTrimmed}`);
+  });
+
+  it("does not mask !secret references — those are indirections, not credentials", () => {
+    const match = { line_number: 1, line_text: "  password: !secret wifi_password" };
+    expect(yamlHitLabel(HIT, match)).toBe(
+      "Kitchen Lamp — password: !secret wifi_password"
+    );
+  });
+
+  it("does not mask non-sensitive keys", () => {
+    const match = { line_number: 1, line_text: "  ssid: home_network" };
+    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — ssid: home_network");
+  });
+
+  it("does not mask key: under ESPHome contexts where it's a button code, not a credential", () => {
+    // ``key:`` is parent-scoped sensitive (only under encryption);
+    // without the parent context we deliberately don't mask it
+    // here. Pin the don't-mask behaviour so a future change that
+    // over-masks button codes (remote_receiver / remote_transmitter
+    // commonly use ``key: <number>``) surfaces as a test failure.
+    const match = { line_number: 1, line_text: "    key: 0xABCDEF12" };
+    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — key: 0xABCDEF12");
+  });
 });
 
 describe("yamlHitHref", () => {

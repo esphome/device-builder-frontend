@@ -20,17 +20,56 @@ import type { LocalizeFunc } from "../common/localize.js";
 import type { YamlSearchHit, YamlSearchMatch } from "../api/types.js";
 
 /**
+ * Inline credential keys that ESPHome treats as always-sensitive
+ * (mirrors ``ALWAYS_SENSITIVE_KEYS`` in ``yaml-sensitive-scan``).
+ * Parent-scoped keys like ``encryption.key`` aren't included
+ * here — without the parent context we'd only have the line
+ * itself, and ``key:`` is reused for non-sensitive purposes
+ * elsewhere (remote_receiver button codes etc). The
+ * always-sensitive set is unambiguous regardless of context.
+ */
+const ALWAYS_SENSITIVE_KEYS = new Set(["password", "ap_password", "ota_password", "psk"]);
+
+/**
+ * Strip the inline credential value from a line of YAML so it
+ * can be safely shown in a search-result label.
+ *
+ * The YAML editor masks credentials via
+ * ``sensitiveValueMaskExtension``; the search-results dropdown
+ * has to render the raw matched line, which would otherwise
+ * leak ``password: hunter2`` into the palette / dashboard.
+ *
+ * Only keys whose values are unambiguously credentials
+ * regardless of context (no parent-scoped check needed) are
+ * masked. ``!secret <name>`` references are *not* masked —
+ * they carry only the name of an indirection, not the
+ * credential itself.
+ */
+function maskSensitiveLine(line: string): string {
+  const m = line.match(/^(\s*-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/);
+  if (!m) return line;
+  const [, prefix, key, valueRaw] = m;
+  if (!ALWAYS_SENSITIVE_KEYS.has(key)) return line;
+  const value = valueRaw.trim();
+  if (!value || value.startsWith("#")) return line;
+  if (value.startsWith("!secret")) return line;
+  return `${prefix}${key}: ••••••••`;
+}
+
+/**
  * Display label for a single match row.
  *
  * Format: ``<device label> — <line text>`` where the device
  * label falls back ``friendly_name`` → ``device_name`` →
  * ``configuration``, and the line text falls back to ``line N``
  * when the matched line is just whitespace (a query like
- * ``": "`` against an empty struct value).
+ * ``": "`` against an empty struct value). Sensitive credentials
+ * (``password:`` etc) are masked before rendering.
  */
 export function yamlHitLabel(hit: YamlSearchHit, match: YamlSearchMatch): string {
   const deviceLabel = hit.friendly_name || hit.device_name || hit.configuration;
-  const trimmed = match.line_text.trim();
+  const masked = maskSensitiveLine(match.line_text);
+  const trimmed = masked.trim();
   const lineLabel = trimmed || `line ${match.line_number}`;
   return `${deviceLabel} — ${lineLabel}`;
 }

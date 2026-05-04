@@ -589,6 +589,7 @@
     "discover_prefix": "Tip: type",
     "discover_link": "/ for YAML",
     "discover_suffix": "to search across all configs",
+    "back_to_devices": "Back to device search",
     "no_match_yaml_preview": "Try YAML search — found {count} match across your configs",
     "no_match_yaml_preview_plural": "Try YAML search — found {count} matches across your configs"
   },

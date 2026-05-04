@@ -75,10 +75,21 @@ export class TrailingEdgeDispatcher<T> {
       // breadcrumb, then swallow — the ``void this._run(...)``
       // fire-and-forget call site would otherwise surface the
       // throw as an unhandled rejection.
-      await this._runner(input).catch((err) => {
+      //
+      // ``try/catch`` around the call (not ``.catch`` on its
+      // returned promise) so a *synchronous* throw inside the
+      // runner — a TypeError before the function ever gets to
+      // ``return``ing a promise — is also caught. ``.catch``
+      // alone would miss those: the expression
+      // ``this._runner(input)`` would throw before ``.catch`` is
+      // ever reached, propagating up as an unhandled rejection
+      // of this async function.
+      try {
+        await this._runner(input);
+      } catch (err) {
         // eslint-disable-next-line no-console
         console.debug("TrailingEdgeDispatcher: runner threw", err);
-      });
+      }
     } finally {
       this._running = false;
       if (this._hasPending) {
