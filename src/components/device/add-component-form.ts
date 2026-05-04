@@ -632,14 +632,58 @@ export class ESPHomeAddComponentForm extends LitElement {
       this._values,
       presentComponents,
     );
-    console.log("[ADD-DEBUG] validation errors:", [...errors.entries()]);
+    const errorList = [...errors.entries()].map(([k, e]) => ({
+      key: k,
+      code: e.code,
+      params: e.params,
+    }));
+    console.log(
+      "[ADD-DEBUG] validation errors size=", errors.size,
+      "list:", JSON.stringify(errorList),
+    );
     if (errors.size > 0) {
       this._errors = errors;
       const visible = this._anyErrorIsVisible(errors, presentComponents);
+      // Also log the rendered-paths set so we can see what the
+      // visibility heuristic considered "renderable".
+      const rendered = new Set<string>();
+      this._collectRenderedPaths(
+        this.component.config_entries,
+        this._values,
+        presentComponents,
+        [],
+        rendered,
+      );
       console.warn(
-        "[ADD-DEBUG] BAIL: validation errors size=", errors.size,
+        "[ADD-DEBUG] BAIL: validation errors",
+        "errors:", JSON.stringify(errorList),
+        "renderedPaths:", JSON.stringify([...rendered]),
         "anyVisible:", visible,
       );
+      // Per-error breakdown: which entry (and its required/advanced/
+      // hidden flags) the error key matches in the schema.
+      for (const errKey of errors.keys()) {
+        const top = errKey.split(".")[0];
+        const entry = this.component.config_entries.find(
+          (e) => e.key === top,
+        );
+        console.warn(
+          "[ADD-DEBUG]   error",
+          "key:", errKey,
+          "topEntry:", entry
+            ? {
+                key: entry.key,
+                type: entry.type,
+                required: entry.required,
+                hidden: entry.hidden,
+                advanced: entry.advanced,
+                depends_on: entry.depends_on,
+                depends_on_component: entry.depends_on_component,
+                default_value: entry.default_value,
+              }
+            : "<not found in top-level entries>",
+        );
+      }
       if (!visible) {
         this._localBlockMessage = this._localize(
           "device.add_component_error",
