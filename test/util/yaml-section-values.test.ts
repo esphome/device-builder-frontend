@@ -20,6 +20,13 @@ function nthListItemLine(
 ): number {
   const lines = yaml.split("\n");
   const start = findSectionStart(lines, parent);
+  if (start === -1) {
+    // Without this guard the loop would walk from index 0 and
+    // could count list items belonging to a different section,
+    // producing a misleading "found" line for a fixture that
+    // doesn't actually contain `parent:`. Fail loud instead.
+    throw new Error(`section ${parent}: not found in fixture`);
+  }
   let count = 0;
   for (let i = start + 1; i < lines.length; i++) {
     if (LIST_ITEM_START_RE.test(lines[i])) {
@@ -32,6 +39,28 @@ function nthListItemLine(
 
 const firstListItemLine = (yaml: string, parent: string): number =>
   nthListItemLine(yaml, parent, 1);
+
+describe("test helper: nthListItemLine", () => {
+  it("throws when the parent section isn't in the fixture", () => {
+    // Without an explicit guard, `findSectionStart` returning
+    // -1 would let the loop walk from index 0 and count
+    // list-item dashes belonging to a different section,
+    // producing a misleading "found" line. Failing loud means
+    // a typo in a test fixture surfaces immediately rather
+    // than as a confusing wrong-line assertion downstream.
+    const yaml = "esphome:\n  name: x\n";
+    expect(() => nthListItemLine(yaml, "ota", 1)).toThrow(
+      /section ota: not found/,
+    );
+  });
+
+  it("throws when there are fewer dashes than requested", () => {
+    const yaml = "ota:\n  - platform: esphome\n";
+    expect(() => nthListItemLine(yaml, "ota", 2)).toThrow(
+      /fewer than 2 list-item dashes/,
+    );
+  });
+});
 
 describe("parseYamlSectionValues — prototype pollution defense", () => {
   // YAML keys like `__proto__` / `constructor` / `prototype`

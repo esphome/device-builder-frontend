@@ -4,6 +4,15 @@
  * id-reference picker. These are deliberately tiny, line-based scans —
  * a full YAML parse is overkill for the few keys we care about, and the
  * source is the user's working YAML which may be mid-edit.
+ *
+ * The form re-renders on every keystroke (live `yaml` prop is a
+ * dependency of pin / id pickers), so both scans are memoised
+ * single-entry by `yaml` reference. Re-renders that don't change the
+ * yaml return cached results; an actual yaml change re-scans once.
+ * Linear scans on the typical config (<200 lines) are sub-millisecond
+ * even without the cache, but memoisation collapses the worst case
+ * (paste a multi-thousand-line config, type into a field) from
+ * O(N) per keystroke to O(1).
  */
 
 /**
@@ -14,13 +23,28 @@
  * editor so a pin selector doesn't flag the user's *own* pin as
  * already in use.
  */
+/** Single-entry memo: caches the full pin map for a `yaml` +
+ *  `excludeFromLine:excludeToLine` combination. The form re-renders
+ *  on every keystroke into the YAML pane (the live `yaml` prop is a
+ *  pin-renderer dependency); the section editor's exclude range is
+ *  stable across that same edit window, so a paste-then-type
+ *  workflow gets cache hits on every keystroke. */
+let _pinMemoKey = "";
+let _pinMemoValue: Map<number, string> | null = null;
+
 export function findUsedPins(
   yaml: string,
   excludeFromLine?: number,
   excludeToLine?: number,
 ): Map<number, string> {
+  const key = `${excludeFromLine ?? "_"}:${excludeToLine ?? "_"}${yaml}`;
+  if (key === _pinMemoKey && _pinMemoValue) return _pinMemoValue;
   const used = new Map<number, string>();
-  if (!yaml) return used;
+  if (!yaml) {
+    _pinMemoKey = key;
+    _pinMemoValue = used;
+    return used;
+  }
   const lines = yaml.split("\n");
   let currentDomain = "";
   for (let i = 0; i < lines.length; i++) {
@@ -46,6 +70,8 @@ export function findUsedPins(
       }
     }
   }
+  _pinMemoKey = key;
+  _pinMemoValue = used;
   return used;
 }
 
@@ -73,11 +99,20 @@ export function sectionEndLine(
  * inside the given top-level domain. Block-list items reset the cursor
  * so each list element produces its own `{ id, name }` record.
  */
+/** Single-entry memo for the id-reference scan, keyed by
+ *  (yaml, domain). Same rationale as `findUsedPins`'s memo —
+ *  the form's id-reference picker re-renders on every keystroke;
+ *  domain is stable across that window. */
+let _refMemoKey = "";
+let _refMemoValue: Array<{ id: string; name: string }> | null = null;
+
 export function findReferencedComponents(
   yaml: string,
   domain: string,
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
+  const key = `${domain}:${yaml}`;
+  if (key === _refMemoKey && _refMemoValue) return _refMemoValue;
   const lines = yaml.split("\n");
   const result: Array<{ id: string; name: string }> = [];
   let inSection = false;
@@ -110,5 +145,7 @@ export function findReferencedComponents(
     }
   }
   flush();
+  _refMemoKey = key;
+  _refMemoValue = result;
   return result;
 }
