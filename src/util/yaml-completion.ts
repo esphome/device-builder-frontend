@@ -717,51 +717,58 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     // power users can still browse.
     const partialCouldBeTrigger =
       ctx.explicit || partial === "" || /^o(n(_[a-z0-9_]*)?)?$/i.test(partial);
-    const [entries, triggers, actions] = await Promise.all([
-      // Skip the entries lookup inside an automation body — the
-      // parent walker would resolve ``then`` as the parent key
-      // and ``fetchComponent(api, "then")`` would 404 (and cache
-      // a useless entry). Action-registry completion is what
-      // populates that position; config-vars don't apply.
+
+    // Skip the entries lookup inside an automation body — the
+    // parent walker would resolve ``then`` as the parent key and
+    // ``fetchComponent(api, "then")`` would 404 (and cache a
+    // useless entry). Action-registry completion is what
+    // populates that position; config-vars don't apply.
+    const fetchEntries = (): Promise<ConfigEntry[]> =>
       inAutomation
-        ? Promise.resolve([] as ConfigEntry[])
+        ? Promise.resolve([])
         : resolveAvailableEntries(
             api,
             catalog,
             parent.key,
             platformValue,
             bundleCtx?.topLevelKey ?? null,
-          ),
-      // Pull the typed schema's ``on_*`` triggers from
-      // ``schema.esphome.io`` and stack them on top of the
-      // catalog's config-vars. Returns ``[]`` on any failure
-      // (CSP / offline / missing bundle), so the catalog
-      // completions stay the floor — graceful degradation for
-      // when schema.esphome.io isn't reachable.
-      (async () => {
-        if (!partialCouldBeTrigger) return [];
-        if (!bundleCtx) return [];
-        const target = bundleFor(
-          bundleCtx.topLevelKey,
-          bundleCtx.platformValue,
-        );
-        return getTriggerKeys(api, target.bundle, target.componentKey);
-      })(),
-      // Aggregate action-registry entries across components in
-      // the doc when the cursor is inside a ``then:`` list-item.
-      // ``esphome`` is always included as a bundle — that's where
-      // the schema host serves the ``core`` actions
-      // (``delay`` / ``if`` / ``lambda`` / ``repeat`` / ``while`` /
-      // ``wait_until``) under the bundle's ``core`` key. ``core``
-      // is always added to the wanted-keys filter so those core
-      // actions surface even when the doc only mentions one
-      // component.
-      (async () => {
-        if (!inAutomation) return [] as SchemaAction[];
-        const tops = collectTopLevelKeys(state);
-        const bundles = [...new Set([...tops, "esphome"])];
-        return getActions(api, bundles, [...tops, "core"]);
-      })(),
+          );
+
+    // Pull the typed schema's ``on_*`` triggers from
+    // ``schema.esphome.io`` and stack them on top of the
+    // catalog's config-vars. Returns ``[]`` on any failure (CSP /
+    // offline / missing bundle), so the catalog completions stay
+    // the floor — graceful degradation for when
+    // schema.esphome.io isn't reachable.
+    const fetchTriggers = async (): Promise<
+      { key: string; docs?: string }[]
+    > => {
+      if (!partialCouldBeTrigger) return [];
+      if (!bundleCtx) return [];
+      const target = bundleFor(bundleCtx.topLevelKey, bundleCtx.platformValue);
+      return getTriggerKeys(api, target.bundle, target.componentKey);
+    };
+
+    // Aggregate action-registry entries across components in the
+    // doc when the cursor is inside a ``then:`` list-item.
+    // ``esphome`` is always included as a bundle — that's where
+    // the schema host serves the ``core`` actions
+    // (``delay`` / ``if`` / ``lambda`` / ``repeat`` / ``while`` /
+    // ``wait_until``) under the bundle's ``core`` key. ``core``
+    // is always added to the wanted-keys filter so those core
+    // actions surface even when the doc only mentions one
+    // component.
+    const fetchActions = async (): Promise<SchemaAction[]> => {
+      if (!inAutomation) return [];
+      const tops = collectTopLevelKeys(state);
+      const bundles = [...new Set([...tops, "esphome"])];
+      return getActions(api, bundles, [...tops, "core"]);
+    };
+
+    const [entries, triggers, actions] = await Promise.all([
+      fetchEntries(),
+      fetchTriggers(),
+      fetchActions(),
     ]);
     // Trigger-body fallback: when the cursor is nested directly
     // under a key that looks like an ``on_*`` trigger, every
