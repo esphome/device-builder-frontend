@@ -75,3 +75,44 @@ export function serializeFloatWithUnit(parsed: FloatWithUnit): string {
   if (parsed.value === null) return "";
   return `${parsed.value}${parsed.unit}`;
 }
+
+/**
+ * Compute the numeric placeholder shown in the FLOAT_WITH_UNIT
+ * field's number input from the catalog's `default_value`.
+ *
+ * The catalog's default for an `i2c.frequency` entry is the YAML
+ * string the user would type (`"50kHz"`); the number input wants
+ * just the magnitude (`"50"`). Strip the unit so the placeholder
+ * reads naturally next to the unit picker — otherwise the user
+ * sees `"50kHz"` echoed inside a number input, which is misleading
+ * (the input doesn't accept letters).
+ *
+ * The unit half of the default seeds the picker via
+ * `defaultUnitForFloatWithUnit` so a user who never touches the
+ * field still sees the right unit pre-selected.
+ */
+export function placeholderForFloatWithUnit(
+  defaultValue: unknown,
+  unitOptions: readonly string[],
+): string {
+  if (defaultValue === null || defaultValue === undefined) return "";
+  const parsed = parseFloatWithUnit(defaultValue, unitOptions);
+  if (parsed.value === null) return "";
+  return String(parsed.value);
+}
+
+/**
+ * Pick the unit shown in the picker when the field has no current
+ * value. Falls back to the catalog default's unit, then to the
+ * canonical (first) option, then to empty.
+ */
+export function defaultUnitForFloatWithUnit(
+  defaultValue: unknown,
+  unitOptions: readonly string[],
+): string {
+  if (defaultValue !== null && defaultValue !== undefined) {
+    const parsed = parseFloatWithUnit(defaultValue, unitOptions);
+    if (parsed.unit) return parsed.unit;
+  }
+  return unitOptions[0] ?? "";
+}

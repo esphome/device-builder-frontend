@@ -15,7 +15,9 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import {
+  defaultUnitForFloatWithUnit,
   parseFloatWithUnit,
+  placeholderForFloatWithUnit,
   serializeFloatWithUnit,
 } from "../../util/float-with-unit.js";
 import {
@@ -102,9 +104,21 @@ export function renderFloatWithUnitField(
 ) {
   const unitOptions = entry.unit_options ?? [];
   const canonicalUnit = unitOptions[0] ?? "";
-  const parsed = parseFloatWithUnit(ctx.getAt(path), unitOptions);
+  const rawValue = ctx.getAt(path);
+  const parsed = parseFloatWithUnit(rawValue, unitOptions);
   const numberValue = parsed.value === null ? "" : String(parsed.value);
-  const unit = parsed.unit || canonicalUnit;
+  // When the field has no current value, the picker still needs a unit
+  // pre-selected — fall back to the unit half of the catalog default
+  // (`"50kHz"` → `"kHz"`) before the canonical option. Without this the
+  // unit picker renders blank for an untouched optional field.
+  const unit =
+    rawValue !== null && rawValue !== undefined && rawValue !== ""
+      ? parsed.unit || canonicalUnit
+      : defaultUnitForFloatWithUnit(entry.default_value, unitOptions);
+  const placeholder = placeholderForFloatWithUnit(
+    entry.default_value,
+    unitOptions,
+  );
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const isCanonical = unit === canonicalUnit;
@@ -124,7 +138,7 @@ export function renderFloatWithUnitField(
           min=${min ?? ""}
           max=${max ?? ""}
           step="any"
-          placeholder=${String(entry.default_value ?? "")}
+          placeholder=${placeholder}
           @input=${(e: Event) => {
             const raw = (e.target as HTMLInputElement).value;
             const next = raw === "" ? null : Number(raw);
@@ -134,6 +148,7 @@ export function renderFloatWithUnitField(
         ${unitOptions.length > 1
           ? html`
               <wa-select
+                data-no-value-sync
                 ?disabled=${disabled}
                 @change=${(e: Event) => {
                   const nextUnit = (e.target as HTMLSelectElement).value;

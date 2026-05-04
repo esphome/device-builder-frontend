@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultUnitForFloatWithUnit,
   parseFloatWithUnit,
+  placeholderForFloatWithUnit,
   serializeFloatWithUnit,
 } from "../../src/util/float-with-unit.js";
 
@@ -72,6 +74,54 @@ describe("parseFloatWithUnit", () => {
 
   it("falls back to empty unit when unit_options is empty", () => {
     expect(parseFloatWithUnit("42", [])).toEqual({ value: 42, unit: "" });
+  });
+});
+
+describe("placeholderForFloatWithUnit", () => {
+  it("strips the unit from a unit-suffixed default", () => {
+    // The catalog's default for cv.frequency entries is the literal
+    // YAML string the user would type ("50kHz"). The number input
+    // wants just the magnitude — the unit lives in the picker next
+    // to it, so the placeholder must drop the suffix or the user
+    // sees confusing text in a number-only input.
+    expect(placeholderForFloatWithUnit("50kHz", FREQUENCY_UNITS)).toBe("50");
+    expect(placeholderForFloatWithUnit("3.3V", ["V", "mV", "kV"])).toBe("3.3");
+  });
+
+  it("returns the bare number form when default has no unit", () => {
+    expect(placeholderForFloatWithUnit(60, FREQUENCY_UNITS)).toBe("60");
+    expect(placeholderForFloatWithUnit("60", FREQUENCY_UNITS)).toBe("60");
+  });
+
+  it("returns empty for null/undefined defaults", () => {
+    expect(placeholderForFloatWithUnit(null, FREQUENCY_UNITS)).toBe("");
+    expect(placeholderForFloatWithUnit(undefined, FREQUENCY_UNITS)).toBe("");
+  });
+
+  it("returns empty when the default has no parseable numeric part", () => {
+    expect(placeholderForFloatWithUnit("kHz", FREQUENCY_UNITS)).toBe("");
+  });
+});
+
+describe("defaultUnitForFloatWithUnit", () => {
+  it("uses the unit from the catalog default when present", () => {
+    expect(defaultUnitForFloatWithUnit("50kHz", FREQUENCY_UNITS)).toBe("kHz");
+    expect(defaultUnitForFloatWithUnit("-40°C", TEMPERATURE_UNITS)).toBe("°C");
+  });
+
+  it("falls back to the canonical option when default has no unit", () => {
+    expect(defaultUnitForFloatWithUnit(60, FREQUENCY_UNITS)).toBe("Hz");
+    expect(defaultUnitForFloatWithUnit("", FREQUENCY_UNITS)).toBe("Hz");
+  });
+
+  it("falls back to the canonical option when default is null", () => {
+    expect(defaultUnitForFloatWithUnit(null, FREQUENCY_UNITS)).toBe("Hz");
+    expect(defaultUnitForFloatWithUnit(undefined, FREQUENCY_UNITS)).toBe("Hz");
+  });
+
+  it("returns empty when unit_options is empty", () => {
+    expect(defaultUnitForFloatWithUnit(null, [])).toBe("");
+    expect(defaultUnitForFloatWithUnit(50, [])).toBe("");
   });
 });
 

@@ -194,6 +194,16 @@ export class ESPHomeConfigEntryForm extends LitElement {
           })
         | null;
       if (!select) continue;
+      // FLOAT_WITH_UNIT widgets carry a wa-select for the unit picker
+      // alongside a number input. The select's value is the unit half
+      // of the combined YAML string, not the path's value — let the
+      // renderer's `?selected` decide and sync the unit imperatively
+      // (wa-select drops `?selected` set by Lit if its first paint
+      // beats the slot connection).
+      if (select.hasAttribute("data-no-value-sync")) {
+        await this._syncSelectedAttr(select);
+        continue;
+      }
       // Let wa-select finish its own initial update before we set
       // anything — otherwise its post-render selectionChanged
       // overwrites whatever we wrote.
@@ -238,6 +248,39 @@ export class ESPHomeConfigEntryForm extends LitElement {
       if (current !== desired) {
         select.value = desired;
       }
+    }
+  }
+
+  /**
+   * Push the option marked `selected` onto `select.value` after
+   * wa-select's first paint. Used for selects whose value isn't
+   * bound to the form's path (FLOAT_WITH_UNIT's unit picker), where
+   * the `?selected` Lit binding loses the race against wa-select's
+   * own selectionChanged hook.
+   */
+  private async _syncSelectedAttr(
+    select: HTMLElement & {
+      value: string | string[] | null;
+      updateComplete?: Promise<unknown>;
+    },
+  ) {
+    if (select.updateComplete) {
+      try {
+        await select.updateComplete;
+      } catch {
+        // ignore
+      }
+    }
+    const selectedOption = select.querySelector<
+      HTMLElement & { value: string }
+    >("wa-option[selected]");
+    const desired = selectedOption?.value ?? "";
+    if (!desired) return;
+    const current = Array.isArray(select.value)
+      ? select.value[0] ?? ""
+      : select.value ?? "";
+    if (current !== desired) {
+      select.value = desired;
     }
   }
 
