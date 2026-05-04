@@ -408,7 +408,6 @@ export class ESPHomePageDashboard extends LitElement {
       ${this._view === DashboardView.CARDS
         ? this._renderCardGrid(filtered)
         : this._renderTable()}
-      ${this._renderYamlPreviewBanner()}
       ${this._renderDrawer()} ${this._renderSelectBarOrFab()} ${this._renderDialogs()}
     `;
   }
@@ -972,8 +971,9 @@ export class ESPHomePageDashboard extends LitElement {
   /**
    * Render the "Try YAML search — N matches" pivot button.
    *
-   * Same component used by the cards-view empty-search tile and
-   * the table-view banner (see ``_renderYamlPreviewBanner``).
+   * One renderer drives both the cards-view empty-search tile
+   * (inlined directly) and the table-view no-results slot (via
+   * ``_renderYamlPreviewPivotInline``).
    * Returns empty when the controller hasn't returned hits yet
    * (debounce / in-flight) or when the count is zero — only
    * surface the pivot when we have a real number to show, the
@@ -999,27 +999,6 @@ export class ESPHomePageDashboard extends LitElement {
         { count: previewCount }
       )}
     </button>`;
-  }
-
-  /**
-   * Banner shown *below* the table view when the device-name
-   * search yields zero matches. Sits under the table's own
-   * "No results found" empty row so the YAML pivot reads as a
-   * follow-up affordance to the no-match message rather than as
-   * disruptive content above the table chrome.
-   */
-  private _renderYamlPreviewBanner() {
-    if (this._view !== DashboardView.TABLE) return "";
-    if (!this._isDeviceSearchActive) return "";
-    const q = this._search.trim().toLowerCase();
-    if (!q) return "";
-    const anyDeviceMatches = this._sortedDevices.some((d) =>
-      matchesDeviceName(d, q)
-    );
-    if (anyDeviceMatches) return "";
-    const pivot = this._renderYamlPreviewPivot();
-    if (!pivot) return "";
-    return html`<div class="yaml-preview-banner">${pivot}</div>`;
   }
 
   private _renderCardGrid(filtered: ConfiguredDevice[]) {
@@ -1128,8 +1107,26 @@ export class ESPHomePageDashboard extends LitElement {
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("dashboard.create_device")}
         </button>
+        ${this._renderYamlPreviewPivotInline()}
       </esphome-device-table>
     `;
+  }
+
+  /**
+   * Slot the YAML-search pivot into the table's no-results
+   * empty cell so it appears on the same line as
+   * "No results found." instead of below the table chrome.
+   * Slot is rendered unconditionally (not gated on whether the
+   * table is empty) — the pivot itself returns ``""`` until the
+   * preview controller has hits, and the slot only paints when
+   * the table is showing its no-results row.
+   */
+  private _renderYamlPreviewPivotInline() {
+    const pivot = this._renderYamlPreviewPivot();
+    if (!pivot) return "";
+    return html`<div slot="no-results-extra" class="yaml-preview-banner">
+      ${pivot}
+    </div>`;
   }
 
   private _renderDrawer() {

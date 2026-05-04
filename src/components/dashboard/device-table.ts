@@ -539,6 +539,7 @@ export class ESPHomeDeviceTable extends LitElement {
                   class="no-results"
                 >
                   ${this._localize("dashboard.table_no_results")}
+                  <slot name="no-results-extra"></slot>
                 </td>
               </tr>
             `}

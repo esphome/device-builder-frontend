@@ -269,15 +269,14 @@ export const dashboardStyles = css`
     transform: translateY(1px);
   }
 
-  /* Table-view banner that surfaces the YAML pivot under the
-     table's own "No results found" empty row when the
-     device-name search yields zero matches. Reads as a
-     follow-up to the no-match message rather than as disruptive
-     content above the table chrome. */
+  /* Wrapper around the YAML pivot when slotted into the table's
+     no-results-extra slot — gives a small top margin so the
+     pivot sits under the "No results found." text without
+     looking glued to it. */
   .yaml-preview-banner {
     display: flex;
     justify-content: center;
-    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    margin-top: var(--wa-space-s);
   }
 
   /* ─── YAML mode hit list ─── */
