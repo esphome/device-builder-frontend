@@ -175,6 +175,27 @@ export interface DevicesResponse {
   importable: AdoptableDevice[];
 }
 
+/** A single matching line within a YAML file. */
+export interface YamlSearchMatch {
+  line_number: number;
+  line_text: string;
+}
+
+/**
+ * One entry in the response from `yaml/search`.
+ *
+ * Each entry represents a device that has at least one matching
+ * line. Matches are capped per-file (5 by default on the backend)
+ * so a chatty match doesn't crowd out hits in other devices, and
+ * the total number of entries is capped by `max_results`.
+ */
+export interface YamlSearchHit {
+  configuration: string;
+  device_name: string;
+  friendly_name: string;
+  matches: YamlSearchMatch[];
+}
+
 /** Response from devices/create. */
 export interface WizardResponse {
   configuration: string;

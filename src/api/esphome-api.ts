@@ -7,11 +7,7 @@
  * EventMessages with "output" and "result" events.
  */
 import { APIError } from "./api-error.js";
-import {
-  clearStoredToken,
-  getStoredToken,
-  setStoredToken,
-} from "../util/auth-token.js";
+import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
 import type {
   AddComponentResponse,
   ArchivedDevice,
@@ -36,6 +32,7 @@ import type {
   UpdateDeviceResponse,
   UserPreferences,
   WizardResponse,
+  YamlSearchHit,
 } from "./types.js";
 
 interface AuthLoginResult {
@@ -469,12 +466,12 @@ export class ESPHomeAPI {
    * window passes or the network recovers.
    */
   async login(
-    credentials: { username: string; password: string } | { token: string },
+    credentials: { username: string; password: string } | { token: string }
   ): Promise<AuthLoginResult> {
     try {
       const result = await this.sendCommand<AuthLoginResult>(
         "auth/login",
-        credentials as unknown as Record<string, unknown>,
+        credentials as unknown as Record<string, unknown>
       );
       this._authToken = result.token;
       setStoredToken(result.token, result.expires_at);
@@ -550,6 +547,25 @@ export class ESPHomeAPI {
     return this.sendCommand("devices/get_states");
   }
 
+  /**
+   * Substring-search every configured device's raw YAML file.
+   *
+   * Backed by the backend's ``yaml/search`` command. Returns one
+   * entry per matching device with up to 5 matches per file
+   * (backend cap) and at most ``max_results`` total matches across
+   * the fleet. Empty / whitespace queries return ``[]`` without
+   * round-tripping to the backend's iteration loop, but we still
+   * call through so the request shape stays a simple round trip
+   * the dropdown can debounce.
+   */
+  async searchYaml(args: {
+    query: string;
+    max_results?: number;
+    case_sensitive?: boolean;
+  }): Promise<YamlSearchHit[]> {
+    return this.sendCommand<YamlSearchHit[]>("yaml/search", args);
+  }
+
   /** Create a new device configuration. */
   async createDevice(args: {
     name: string;
@@ -585,12 +601,12 @@ export class ESPHomeAPI {
    */
   async renameDevice(
     configuration: string,
-    newName: string,
+    newName: string
   ): Promise<{ configuration: string; job: FirmwareJob | null }> {
     return this.sendCommand<{ configuration: string; job: FirmwareJob | null }>(
       "devices/rename",
       { configuration, new_name: newName },
-      60000,
+      60000
     );
   }
 
@@ -665,10 +681,9 @@ export class ESPHomeAPI {
     // the dialog's string-only assumptions and surface as a runtime
     // crash. The empty string is the same "no key here" signal the
     // backend already produces for unencrypted / unparseable configs.
-    const result = await this.sendCommand<{ key: unknown }>(
-      "devices/get_api_key",
-      { configuration },
-    );
+    const result = await this.sendCommand<{ key: unknown }>("devices/get_api_key", {
+      configuration,
+    });
     return typeof result?.key === "string" ? result.key : "";
   }
 
@@ -721,7 +736,7 @@ export class ESPHomeAPI {
   validate(
     configuration: string,
     callbacks: StreamCallbacks,
-    options: { showSecrets?: boolean } = {},
+    options: { showSecrets?: boolean } = {}
   ): string {
     const payload: Record<string, unknown> = { configuration };
     if (options.showSecrets) {
@@ -735,7 +750,7 @@ export class ESPHomeAPI {
     configuration: string,
     port: string,
     callbacks: StreamCallbacks,
-    options: { noStates?: boolean } = {},
+    options: { noStates?: boolean } = {}
   ): string {
     const payload: Record<string, unknown> = { configuration, port };
     if (options.noStates) {
@@ -781,10 +796,7 @@ export class ESPHomeAPI {
    *  - `job_output` — `{ job_id, line }`.
    *  - `job_progress` — `{ job_id, progress }`.
    */
-  firmwareFollowJobs(
-    callback: EventSubscriptionCallback,
-    snapshot = true
-  ): string {
+  firmwareFollowJobs(callback: EventSubscriptionCallback, snapshot = true): string {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
     }
@@ -962,14 +974,8 @@ export class ESPHomeAPI {
    * safe to spread into a context without further validation.
    */
   async getIntegrationDocs(): Promise<Record<string, string>> {
-    const raw = await this.sendCommand<unknown>(
-      "components/get_integration_docs",
-    );
-    if (
-      raw === null ||
-      typeof raw !== "object" ||
-      Array.isArray(raw)
-    ) {
+    const raw = await this.sendCommand<unknown>("components/get_integration_docs");
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
       return {};
     }
     const result: Record<string, string> = {};

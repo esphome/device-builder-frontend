@@ -1,6 +1,7 @@
 import { consume } from "@lit/context";
 import {
   mdiChip,
+  mdiCodeBraces,
   mdiHome,
   mdiKeyVariant,
   mdiMagnify,
@@ -12,9 +13,11 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
-import type { ConfiguredDevice } from "../api/types.js";
+import type { ESPHomeAPI } from "../api/index.js";
+import type { ConfiguredDevice, YamlSearchHit } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
 import {
+  apiContext,
   devicesContext,
   localizeContext,
   yamlDiffButtonContext,
@@ -29,6 +32,7 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   chip: mdiChip,
+  "code-braces": mdiCodeBraces,
   home: mdiHome,
   "key-variant": mdiKeyVariant,
   magnify: mdiMagnify,
@@ -81,9 +85,36 @@ export class ESPHomeCommandPalette extends LitElement {
   @state()
   private _yamlDiffEnabled = false;
 
+  @consume({ context: apiContext })
+  private _api!: ESPHomeAPI;
+
   @state() private _open = false;
   @state() private _query = "";
   @state() private _selectedId = "";
+
+  /**
+   * Live YAML-content search results, fetched against
+   * ``yaml/search`` and re-fetched as the user types. ``null``
+   * means "haven't fetched yet for the current query"; an empty
+   * array means "fetched, no hits". The two states render
+   * differently in the dropdown.
+   */
+  @state() private _yamlHits: YamlSearchHit[] | null = null;
+  /**
+   * Debounce timer for the ``yaml/search`` WS call. The user can
+   * type fast — debouncing collapses runs of keystrokes into a
+   * single round trip per pause. Long enough to skip every
+   * intermediate keystroke, short enough that a typed-and-paused
+   * query feels instant.
+   */
+  private _yamlSearchTimer: number | null = null;
+  /**
+   * Race-guard — only the most recent in-flight query gets to
+   * write back. Without this, a slow query that landed before a
+   * faster newer one could clobber the newer results when its
+   * promise finally resolved.
+   */
+  private _yamlSearchSeq = 0;
 
   @query(".search-input")
   private _searchInput?: HTMLInputElement;
@@ -226,13 +257,49 @@ export class ESPHomeCommandPalette extends LitElement {
   private _filtered(): CommandAction[] {
     const q = this._query.trim().toLowerCase();
     const all = this._allCommands();
-    if (!q) return all;
-    return all.filter((cmd) => {
-      const haystack = [cmd.label, cmd.group, ...(cmd.keywords ?? [])]
-        .join(" ")
-        .toLowerCase();
-      return haystack.includes(q);
-    });
+    const filtered = !q
+      ? all
+      : all.filter((cmd) => {
+          const haystack = [cmd.label, cmd.group, ...(cmd.keywords ?? [])]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(q);
+        });
+    return [...filtered, ...this._yamlHitActions()];
+  }
+
+  /**
+   * Materialise the live YAML-content hits as ``CommandAction``s
+   * so the existing render + keyboard-nav code handles them
+   * without a parallel branch. Each match becomes its own row
+   * (one device with three matches → three rows) so the user can
+   * pick the specific line they want to land on. Click → navigate
+   * to ``/device/<configuration>?line=<n>``; the editor's
+   * ``_readUrlLine`` already wires that param to scroll-to + the
+   * existing highlight machinery.
+   */
+  private _yamlHitActions(): CommandAction[] {
+    if (!this._yamlHits || this._yamlHits.length === 0) return [];
+    const t = this._localize;
+    const groupName = t("command_palette.group_yaml_matches");
+    const actions: CommandAction[] = [];
+    for (const hit of this._yamlHits) {
+      const label = hit.friendly_name || hit.device_name || hit.configuration;
+      for (const match of hit.matches) {
+        actions.push({
+          id: `yaml.${hit.configuration}:${match.line_number}`,
+          group: groupName,
+          label: `${label} — ${match.line_text.trim() || `line ${match.line_number}`}`,
+          icon: "code-braces",
+          keywords: [hit.configuration, hit.device_name, match.line_text],
+          run: () =>
+            navigate(
+              `/device/${encodeURIComponent(hit.configuration)}?line=${match.line_number}`
+            ),
+        });
+      }
+    }
+    return actions;
   }
 
   protected willUpdate(changed: Map<string, unknown>) {
@@ -280,7 +347,9 @@ export class ESPHomeCommandPalette extends LitElement {
         </div>
         <div class="list" role="listbox">
           ${items.length === 0
-            ? html`<div class="empty">${this._localize("command_palette.no_results")}</div>`
+            ? html`<div class="empty">
+                ${this._localize("command_palette.no_results")}
+              </div>`
             : groups.map(
                 (g) => html`
                   <div class="group">
@@ -291,7 +360,11 @@ export class ESPHomeCommandPalette extends LitElement {
               )}
         </div>
         <div class="footer">
-          <span><kbd>↑</kbd><kbd>↓</kbd> ${this._localize("command_palette.navigate_hint")}</span>
+          <span
+            ><kbd>↑</kbd><kbd>↓</kbd> ${this._localize(
+              "command_palette.navigate_hint"
+            )}</span
+          >
           <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
           <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
         </div>
@@ -309,9 +382,7 @@ export class ESPHomeCommandPalette extends LitElement {
         @click=${() => this._run(item)}
         @mouseenter=${() => (this._selectedId = item.id)}
       >
-        ${item.icon
-          ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>`
-          : nothing}
+        ${item.icon ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>` : nothing}
         <span class="item-label">${item.label}</span>
       </div>
     `;
@@ -319,6 +390,50 @@ export class ESPHomeCommandPalette extends LitElement {
 
   private _onQueryInput(e: Event) {
     this._query = (e.target as HTMLInputElement).value;
+    this._scheduleYamlSearch();
+  }
+
+  /**
+   * Debounce + fire a YAML-content search.
+   *
+   * Empty / whitespace queries clear the result list without
+   * round-tripping (the backend short-circuits empty queries
+   * anyway, but skipping the WS call entirely keeps the
+   * keystroke-storm path quiet). Non-empty queries fire after a
+   * short pause so the typed-and-paused case feels instant
+   * while a sustained typing storm only sends one search at the
+   * end.
+   */
+  private _scheduleYamlSearch() {
+    if (this._yamlSearchTimer !== null) {
+      window.clearTimeout(this._yamlSearchTimer);
+      this._yamlSearchTimer = null;
+    }
+    const trimmed = this._query.trim();
+    if (!trimmed) {
+      this._yamlHits = null;
+      return;
+    }
+    this._yamlSearchTimer = window.setTimeout(() => {
+      this._yamlSearchTimer = null;
+      void this._runYamlSearch(trimmed);
+    }, 150);
+  }
+
+  private async _runYamlSearch(query: string) {
+    const seq = ++this._yamlSearchSeq;
+    try {
+      const hits = await this._api.searchYaml({ query });
+      // Drop stale responses — a slower in-flight call against
+      // an older query must not clobber newer results.
+      if (seq !== this._yamlSearchSeq) return;
+      this._yamlHits = hits;
+    } catch {
+      // Swallow: the dropdown shouldn't error-toast on a YAML
+      // search failure (transient WS hiccup, rejected request,
+      // whatever) — fall back to "no YAML hits" rendering.
+      if (seq === this._yamlSearchSeq) this._yamlHits = [];
+    }
   }
 
   private _onInputKeyDown(e: KeyboardEvent) {

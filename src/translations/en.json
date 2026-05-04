@@ -559,10 +559,11 @@
     "more_options_with_count": "More options ({count} firmware task(s) active)"
   },
   "command_palette": {
-    "placeholder": "Type a command or search…",
+    "placeholder": "Type a command or search YAML…",
     "no_results": "No results found",
     "group_navigation": "Navigation",
     "group_devices": "Devices",
+    "group_yaml_matches": "YAML matches",
     "go_dashboard": "Go to dashboard",
     "group_language": "Language",
     "show_yaml_diff_button": "Show YAML diff button",
