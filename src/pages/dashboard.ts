@@ -726,11 +726,6 @@ export class ESPHomePageDashboard extends LitElement {
     const toggleLabel = this._localize(
       this._yamlMode ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml"
     );
-    // Show the ghost-text discovery caption only in device mode
-    // with an empty input — once the user starts typing it'd
-    // crowd their content, and in YAML mode the active state
-    // already communicates the mode.
-    const showDiscoveryHint = !this._yamlMode && this._search === "";
     return html`<div class="search-wrap">
       <wa-input
         class="search-input ${this._yamlMode ? "search-input--yaml" : ""}"
@@ -787,10 +782,12 @@ export class ESPHomePageDashboard extends LitElement {
    */
   private _renderDiscoveryHint() {
     if (this._yamlMode) {
+      // Plain text-link styling for the back affordance — it's a
+      // navigation action, not a keystroke hint.
       return html`<small class="search-discover-hint">
         <button
           type="button"
-          class="search-discover-link"
+          class="search-discover-back"
           @click=${this._toggleSearchMode}
         >
           <wa-icon library="mdi" name="arrow-left"></wa-icon>
@@ -799,11 +796,14 @@ export class ESPHomePageDashboard extends LitElement {
       </small>`;
     }
     if (this._search !== "") return "";
+    // The ``/`` here is a keystroke shortcut — render as a kbd
+    // cap so the user reads it as "press this key" rather than
+    // as a text link.
     return html`<small class="search-discover-hint">
       ${this._localize("yaml_search.discover_prefix")}
       <button
         type="button"
-        class="search-discover-link"
+        class="search-discover-key"
         @click=${this._toggleSearchMode}
       >
         ${this._localize("yaml_search.discover_link")}
@@ -813,20 +813,33 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * Trap a leading ``/`` keystroke as a YAML-mode shortcut.
+   * Search-input keyboard shortcuts:
    *
-   * Mirrors the command palette's prefix gate so the two
-   * surfaces feel coherent for power users who already know the
-   * shortcut. Only fires on an empty input + device mode + the
-   * literal ``/`` key with no modifier — typing ``/`` mid-string
-   * stays a literal slash, and an already-yaml-mode user typing
-   * ``/`` searches for a slash in their YAML.
+   * - ``/`` on an empty input in device mode → flip into YAML
+   *   mode (mirrors the command palette's prefix gate).
+   * - ``Escape`` in YAML mode → flip back to device search and
+   *   clear the query, so the user has a one-key exit that
+   *   matches the same Esc-cancels intuition as the rest of the
+   *   app's dialogs / dropdowns.
    *
-   * Refocuses the input after the mode flip so the user can
-   * keep typing — wa-input's attribute changes (placeholder,
-   * class) may bounce focus on some browsers.
+   * The ``/`` shortcut only fires with no modifier on an empty
+   * input — typing ``/`` mid-string stays a literal slash, and
+   * an already-yaml-mode user typing ``/`` searches for a slash
+   * in their YAML.
+   *
+   * Both paths refocus the input afterwards so the user can keep
+   * typing — wa-input's attribute changes (placeholder, class)
+   * may bounce focus on some browsers.
    */
   private _onSearchKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Escape" && this._yamlMode) {
+      e.preventDefault();
+      this._yamlMode = false;
+      this._search = "";
+      this._syncYamlSearch();
+      this._refocusSearchInput();
+      return;
+    }
     if (e.key !== "/") return;
     if (this._yamlMode) return;
     if (this._search !== "") return;

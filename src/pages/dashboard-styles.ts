@@ -181,12 +181,10 @@ export const dashboardStyles = css`
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-xs);
   }
-  /* Style the link like a keyboard-key cap so the user reads it
-     as "press this key" rather than as plain hyperlink text.
-     Monospace font + light border + small padding gives the
-     usual <kbd> look while keeping <button> semantics for the
-     click-to-toggle. */
-  .search-discover-link {
+  /* Keystroke hint cap (Tip: press / to search…). Monospace
+     font + light border + small padding gives the usual <kbd>
+     look while keeping <button> semantics for the click. */
+  .search-discover-key {
     display: inline-block;
     padding: 0 5px;
     background: transparent;
@@ -203,12 +201,43 @@ export const dashboardStyles = css`
       background-color 0.15s ease;
     vertical-align: baseline;
   }
-  .search-discover-link:hover,
-  .search-discover-link:focus-visible {
+  .search-discover-key:hover,
+  .search-discover-key:focus-visible {
     color: var(--wa-color-brand-on-quiet);
     border-color: currentColor;
     background: var(--wa-color-surface-raised);
     outline: none;
+  }
+
+  /* Back-to-device-search link in YAML mode. A regular text
+     link — not a kbd cap — because the action is "navigate
+     back", not "press this key". Plain inline so it flows on
+     the same baseline as any leading icon. */
+  .search-discover-back {
+    display: inline;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--wa-color-text-quiet);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--wa-color-text-quieter, transparent);
+    text-underline-offset: 2px;
+    transition:
+      color 0.15s ease,
+      text-decoration-color 0.15s ease;
+  }
+  .search-discover-back:hover,
+  .search-discover-back:focus-visible {
+    color: var(--wa-color-brand-on-quiet);
+    text-decoration-color: currentColor;
+    outline: none;
+  }
+  .search-discover-back wa-icon {
+    font-size: var(--wa-font-size-s);
+    vertical-align: middle;
+    margin-right: 2px;
   }
 
   /* Empty-device-search YAML pivot (option (d)) — sits between

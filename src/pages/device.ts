@@ -409,9 +409,15 @@ export class ESPHomePageDevice extends LitElement {
     const match = sectionAtLine(this._yaml, this._selectedFromLine);
     if (!match) return;
     this._selectedSection = sectionKeyOf(match);
-    // Override the default ``false`` so the editor's
-    // ``updated()`` actually scrolls — the YAML hit click is
-    // explicitly asking for "land on this line".
+    // Set the highlight directly. ``_highlightRange`` is what
+    // the editor reads to drive scroll-into-view; in the
+    // user-click path it's set via ``_onYamlHighlight`` from the
+    // navigator's ``yaml-highlight`` event, but the navigator's
+    // update-from-prop-change path doesn't emit, so URL-only
+    // arrivals would otherwise mount the editor without ever
+    // scrolling. Pin both so the YAML hit click lands on the
+    // target line in CodeMirror.
+    this._highlightRange = { fromLine: match.fromLine, toLine: match.toLine };
     this._scrollToHighlight = true;
   }
 
