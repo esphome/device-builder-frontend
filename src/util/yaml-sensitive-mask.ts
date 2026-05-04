@@ -36,7 +36,14 @@ const sensitiveMark = Decoration.mark({ class: "cm-esphome-sensitive-value" });
 function computeDecorations(state: EditorState, revealed: boolean): DecorationSet {
   if (revealed) return Decoration.none;
   const doc = state.doc;
-  const ranges = findSensitiveValueRanges(doc.toString());
+  // Pass ``EditorState.doc`` (CodeMirror's ``Text``) directly to
+  // the scanner — it iterates lines via ``doc.line(n).text`` rather
+  // than calling ``doc.toString().split("\n")``. Avoids a full-
+  // document string allocation and the split on every keystroke;
+  // the editor's update listener already pays one ``toString()``
+  // for the ``yaml-change`` dispatch and we don't want to double
+  // that just to compute mask decorations.
+  const ranges = findSensitiveValueRanges(doc);
   if (ranges.length === 0) return Decoration.none;
   const built: Range<Decoration>[] = [];
   for (const r of ranges) {

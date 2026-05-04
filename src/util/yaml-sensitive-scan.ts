@@ -91,11 +91,37 @@ function findClosingQuote(line: string, quoteStart: number): number {
   return -1;
 }
 
-export function findSensitiveValueRanges(yaml: string): SensitiveValueRange[] {
-  const ranges: SensitiveValueRange[] = [];
-  if (!yaml) return ranges;
+/**
+ * Minimal subset of CodeMirror's ``Text`` we need: 1-indexed line
+ * access + total line count. Accepting the structural type instead
+ * of a ``string`` lets the masking extension feed
+ * ``EditorState.doc`` directly — no full-document stringify, no
+ * ``split("\n")`` allocation per keystroke. The string overload is
+ * kept for unit tests and any caller outside the editor (where
+ * passing the raw YAML is the natural shape).
+ */
+interface LineSource {
+  readonly lines: number;
+  line(n: number): { readonly text: string };
+}
 
-  const lines = yaml.split("\n");
+function isLineSource(value: string | LineSource): value is LineSource {
+  return typeof value !== "string";
+}
+
+export function findSensitiveValueRanges(
+  yaml: string | LineSource,
+): SensitiveValueRange[] {
+  const ranges: SensitiveValueRange[] = [];
+  let lines: string[];
+  if (isLineSource(yaml)) {
+    if (yaml.lines === 0) return ranges;
+    lines = new Array<string>(yaml.lines);
+    for (let n = 1; n <= yaml.lines; n++) lines[n - 1] = yaml.line(n).text;
+  } else {
+    if (!yaml) return ranges;
+    lines = yaml.split("\n");
+  }
 
   // Stack of (indent, key) entries representing the current ancestor
   // chain. When we encounter a key at indent N, every entry with
