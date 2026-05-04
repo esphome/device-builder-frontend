@@ -552,18 +552,16 @@ export class ESPHomeAPI {
    *
    * Backed by the backend's ``yaml/search`` command. Returns one
    * entry per matching device with up to 5 matches per file
-   * (backend cap) and at most ``max_results`` total matches across
-   * the fleet. Empty / whitespace queries are short-circuited by
-   * the backend (returns ``[]`` before walking the fleet); the
-   * caller is expected to filter them out before calling so the
-   * request shape stays a simple round trip the dropdown can
-   * debounce.
+   * (backend cap) and a backend default of 50 total matches
+   * across the fleet. Empty / whitespace queries are
+   * short-circuited by the backend (returns ``[]`` before walking
+   * the fleet); the caller is expected to filter them out before
+   * calling so the request shape stays a simple round trip the
+   * dropdown can debounce. ``max_results`` and ``case_sensitive``
+   * are server-controlled defaults — add them back to this
+   * wrapper when a UI surface needs to override.
    */
-  async searchYaml(args: {
-    query: string;
-    max_results?: number;
-    case_sensitive?: boolean;
-  }): Promise<YamlSearchHit[]> {
+  async searchYaml(args: { query: string }): Promise<YamlSearchHit[]> {
     return this.sendCommand<YamlSearchHit[]>("yaml/search", args);
   }
 

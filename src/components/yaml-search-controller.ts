@@ -86,6 +86,26 @@ export class YamlSearchController implements ReactiveController {
   }
 
   /**
+   * Bridge a host-owned ``(active, body)`` pair to the controller.
+   *
+   * Convenience for hosts that own the mode flag externally
+   * (the command palette's ``/`` prefix gate, the dashboard's
+   * search-icon toggle) and want a single call site for "user
+   * typed / toggled mode": when inactive or body is
+   * empty/whitespace, drops state via ``clear``; otherwise
+   * debounces via ``scheduleQuery``. Hosts can still call
+   * ``clear`` / ``scheduleQuery`` directly when they want to
+   * bypass the empty-body short-circuit.
+   */
+  sync(active: boolean, body: string): void {
+    if (!active || !body) {
+      this.clear();
+      return;
+    }
+    this.scheduleQuery(body);
+  }
+
+  /**
    * Drop all state — pending timer, queued input, current hits.
    *
    * Called when the palette closes, when the user drops out of

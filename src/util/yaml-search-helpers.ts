@@ -72,5 +72,30 @@ export function yamlEmptyMessage(
   hits: YamlSearchHit[] | null
 ): string {
   const key = yamlEmptyMessageKey(hits);
-  return key ? localize(key) : "";
+  if (key) return localize(key);
+  return "";
+}
+
+/**
+ * Walk every (hit, match) pair across a result list.
+ *
+ * Both consumers (palette → ``CommandAction`` rows, dashboard
+ * → ``<a>`` link cards) iterate ``hits → matches`` to produce
+ * one row per matching line. Centralising the traversal means
+ * a future shape change (e.g. grouping rows by device) lands
+ * in one place. Returns the mapped values flattened in
+ * file → match order. ``null``/empty hits → empty array.
+ */
+export function forEachYamlMatch<T>(
+  hits: YamlSearchHit[] | null,
+  fn: (hit: YamlSearchHit, match: YamlSearchMatch) => T
+): T[] {
+  if (!hits) return [];
+  const out: T[] = [];
+  for (const hit of hits) {
+    for (const match of hit.matches) {
+      out.push(fn(hit, match));
+    }
+  }
+  return out;
 }

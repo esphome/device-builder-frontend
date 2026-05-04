@@ -211,6 +211,43 @@ describe("YamlSearchController", () => {
     expect(api.searchYaml).not.toHaveBeenCalled();
   });
 
+  it("sync() schedules when active + non-empty body", async () => {
+    const host = new FakeHost();
+    const api = makeApi(async () => [HIT]);
+    const ctrl = new YamlSearchController(host, () => api);
+
+    ctrl.sync(true, "wifi");
+    await vi.runAllTimersAsync();
+
+    expect(api.searchYaml).toHaveBeenCalledTimes(1);
+    expect(api.searchYaml).toHaveBeenCalledWith({ query: "wifi" });
+  });
+
+  it("sync() clears when inactive", async () => {
+    const host = new FakeHost();
+    const api = makeApi(async () => [HIT]);
+    const ctrl = new YamlSearchController(host, () => api);
+
+    ctrl.scheduleQuery("wifi");
+    ctrl.sync(false, "wifi"); // mode flipped off — drop everything
+    await vi.runAllTimersAsync();
+
+    expect(api.searchYaml).not.toHaveBeenCalled();
+    expect(ctrl.hits).toBeNull();
+  });
+
+  it("sync() clears when active but body is empty", async () => {
+    const host = new FakeHost();
+    const api = makeApi(async () => [HIT]);
+    const ctrl = new YamlSearchController(host, () => api);
+
+    ctrl.sync(true, "");
+    await vi.runAllTimersAsync();
+
+    expect(api.searchYaml).not.toHaveBeenCalled();
+    expect(ctrl.hits).toBeNull();
+  });
+
   it("reads the API lazily so a late-bound api wiring is honoured", async () => {
     const host = new FakeHost();
     let api: ESPHomeAPI | null = null;

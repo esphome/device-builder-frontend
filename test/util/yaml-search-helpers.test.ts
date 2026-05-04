@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { YamlSearchHit, YamlSearchMatch } from "../../src/api/types.js";
 import {
+  forEachYamlMatch,
   yamlEmptyMessage,
   yamlEmptyMessageKey,
   yamlHitHref,
@@ -79,5 +80,53 @@ describe("yamlEmptyMessage", () => {
 
   it("returns empty string when there are hits (caller renders rows)", () => {
     expect(yamlEmptyMessage(passthroughLocalize, [HIT])).toBe("");
+  });
+});
+
+describe("forEachYamlMatch", () => {
+  it("returns [] for null hits", () => {
+    expect(forEachYamlMatch(null, () => 1)).toEqual([]);
+  });
+
+  it("returns [] for empty hits", () => {
+    expect(forEachYamlMatch([], () => 1)).toEqual([]);
+  });
+
+  it("walks each (hit, match) pair in file → match order", () => {
+    const hits: YamlSearchHit[] = [
+      {
+        configuration: "a.yaml",
+        device_name: "a",
+        friendly_name: "A",
+        matches: [
+          { line_number: 1, line_text: "wifi:" },
+          { line_number: 5, line_text: "  ssid: home" },
+        ],
+      },
+      {
+        configuration: "b.yaml",
+        device_name: "b",
+        friendly_name: "B",
+        matches: [{ line_number: 3, line_text: "wifi:" }],
+      },
+    ];
+    const fn = vi.fn((hit, match) => `${hit.device_name}:${match.line_number}`);
+    expect(forEachYamlMatch(hits, fn)).toEqual(["a:1", "a:5", "b:3"]);
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+
+  it("preserves typing — caller's return type flows through", () => {
+    const hits: YamlSearchHit[] = [
+      {
+        configuration: "a.yaml",
+        device_name: "a",
+        friendly_name: "A",
+        matches: [{ line_number: 1, line_text: "x" }],
+      },
+    ];
+    const out = forEachYamlMatch<{ id: string }>(hits, (hit, match) => ({
+      id: `${hit.configuration}:${match.line_number}`,
+    }));
+    expect(out).toEqual([{ id: "a.yaml:1" }]);
   });
 });

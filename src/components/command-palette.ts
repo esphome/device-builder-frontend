@@ -26,7 +26,12 @@ import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { yamlEmptyMessageKey, yamlHitHref, yamlHitLabel } from "../util/yaml-search-helpers.js";
+import {
+  forEachYamlMatch,
+  yamlEmptyMessageKey,
+  yamlHitHref,
+  yamlHitLabel,
+} from "../util/yaml-search-helpers.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
 import { YamlSearchController } from "./yaml-search-controller.js";
 
@@ -306,23 +311,15 @@ export class ESPHomeCommandPalette extends LitElement {
    * existing highlight machinery.
    */
   private _yamlHitActions(): CommandAction[] {
-    const hits = this._yamlSearch.hits;
-    if (!hits || hits.length === 0) return [];
     const groupName = this._localize("command_palette.group_yaml_matches");
-    const actions: CommandAction[] = [];
-    for (const hit of hits) {
-      for (const match of hit.matches) {
-        actions.push({
-          id: `yaml.${hit.configuration}:${match.line_number}`,
-          group: groupName,
-          label: yamlHitLabel(hit, match),
-          icon: "code-braces",
-          keywords: [hit.configuration, hit.device_name, match.line_text],
-          run: () => navigate(yamlHitHref(hit, match)),
-        });
-      }
-    }
-    return actions;
+    return forEachYamlMatch(this._yamlSearch.hits, (hit, match) => ({
+      id: `yaml.${hit.configuration}:${match.line_number}`,
+      group: groupName,
+      label: yamlHitLabel(hit, match),
+      icon: "code-braces",
+      keywords: [hit.configuration, hit.device_name, match.line_text],
+      run: () => navigate(yamlHitHref(hit, match)),
+    }));
   }
 
   protected willUpdate(changed: Map<string, unknown>) {
@@ -504,22 +501,11 @@ export class ESPHomeCommandPalette extends LitElement {
    * Bridge the current query to the ``YamlSearchController``.
    *
    * Called from every place ``_query`` mutates: typed input and
-   * the mode-toggle button. Out-of-mode and empty-body queries
-   * collapse to ``clear()``; non-empty YAML queries hand off to
-   * ``scheduleQuery``, which owns the 150ms debounce and the
-   * seq-guarded dispatch.
+   * the mode-toggle button. The controller's ``sync`` owns the
+   * out-of-mode + empty-body collapse-to-``clear`` rules.
    */
   private _syncYamlSearch() {
-    if (!this._isYamlMode) {
-      this._yamlSearch.clear();
-      return;
-    }
-    const body = this._yamlQuery;
-    if (!body) {
-      this._yamlSearch.clear();
-      return;
-    }
-    this._yamlSearch.scheduleQuery(body);
+    this._yamlSearch.sync(this._isYamlMode, this._yamlQuery);
   }
 
   private _onInputKeyDown(e: KeyboardEvent) {

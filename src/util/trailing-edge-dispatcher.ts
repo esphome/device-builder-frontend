@@ -70,12 +70,14 @@ export class TrailingEdgeDispatcher<T> {
     try {
       // Runners are expected to handle their own errors (a
       // palette search hides WS hiccups behind an empty result
-      // list, etc.), but a throw still reaches us. Swallow here
-      // so the ``void this._run(...)`` fire-and-forget call site
-      // doesn't surface the throw as an unhandled rejection.
-      await this._runner(input).catch(() => {
-        /* runner-internal failure already handled or expected;
-           dispatcher's only job is the running/pending state */
+      // list, etc.), but a throw still reaches us. Log at debug
+      // so a developer chasing "popup never opens" has a
+      // breadcrumb, then swallow — the ``void this._run(...)``
+      // fire-and-forget call site would otherwise surface the
+      // throw as an unhandled rejection.
+      await this._runner(input).catch((err) => {
+        // eslint-disable-next-line no-console
+        console.debug("TrailingEdgeDispatcher: runner threw", err);
       });
     } finally {
       this._running = false;

@@ -148,24 +148,20 @@ export const dashboardStyles = css`
     --font-size-medium: var(--wa-font-size-s);
   }
 
-  /* The leading icon doubles as the YAML-mode toggle. Reset
-     button defaults so it visually matches the static icon it
-     replaces, then add a subtle hover so users discover it. */
+  /* The leading wa-icon doubles as the YAML-mode toggle —
+     role=button + tabindex makes it accessible without wrapping
+     it in an HTML button element, which would break wa-input's
+     internal slot=start sizing/centering. Just add a cursor +
+     hover affordance + colour shift when pressed. */
   .search-mode-toggle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    padding: 0;
-    margin: 0;
     cursor: pointer;
-    color: inherit;
     border-radius: 4px;
-    transition: background-color 0.15s ease;
+    transition:
+      color 0.15s ease,
+      background-color 0.15s ease;
   }
   .search-mode-toggle:hover {
-    background: var(--wa-color-surface-raised);
+    color: var(--wa-color-brand-on-quiet);
   }
   .search-mode-toggle:focus-visible {
     outline: 2px solid var(--wa-color-brand-on-quiet);
@@ -173,6 +169,72 @@ export const dashboardStyles = css`
   }
   .search-mode-toggle[aria-pressed="true"] {
     color: var(--wa-color-brand-on-quiet);
+  }
+
+  /* Ghost-text discovery caption (option (b)). Quiet, single-line,
+     only renders when the input is empty + device mode. The link
+     inside is the actual mode-switch button — the surrounding
+     copy is just framing. */
+  .search-discover-hint {
+    display: block;
+    margin-top: 4px;
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-xs);
+  }
+  .search-discover-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    color: var(--wa-color-text-quiet);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+    text-decoration-color: var(--wa-color-text-quieter, transparent);
+    text-underline-offset: 2px;
+    transition:
+      color 0.15s ease,
+      text-decoration-color 0.15s ease;
+  }
+  .search-discover-link:hover,
+  .search-discover-link:focus-visible {
+    color: var(--wa-color-brand-on-quiet);
+    text-decoration-color: currentColor;
+    outline: none;
+  }
+  .search-discover-link wa-icon {
+    font-size: var(--wa-font-size-s);
+  }
+
+  /* Empty-device-search YAML pivot (option (d)) — sits between
+     the "no devices found" copy and the Clear-search button.
+     Filled brand-tinted button so it reads as the primary
+     forward action rather than a secondary muted hint. */
+  .empty-search-yaml-pivot {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin-top: 4px;
+    background: var(--wa-color-brand-fill-quiet);
+    color: var(--wa-color-brand-on-quiet);
+    border: 1px solid var(--wa-color-brand-on-quiet);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-action, 500);
+    transition:
+      background-color 0.15s ease,
+      transform 0.05s ease;
+  }
+  .empty-search-yaml-pivot:hover {
+    background: var(--wa-color-brand-fill-loud);
+    color: var(--wa-color-brand-on-loud);
+  }
+  .empty-search-yaml-pivot:active {
+    transform: translateY(1px);
   }
 
   /* ─── YAML mode hit list ─── */
