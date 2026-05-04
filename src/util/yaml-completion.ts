@@ -40,8 +40,10 @@ import {
   getConfigVarKeys,
   getConfigVarValueOptions,
   getRegistryEntries,
+  getRegistryEntryKeys,
   getTriggerKeys,
   lookupRegistryRef,
+  parseRegistryLabel,
   type SchemaAction,
   type SchemaConfigVarKey,
   type SchemaRegistryEntry,
@@ -1105,6 +1107,38 @@ const platformKeyProvider: KeyPositionProvider = {
   },
 };
 
+/** Action / filter / condition argument completion. Fires when
+ *  ``parent.key`` is a dotted label (``globals.set``,
+ *  ``logger.log``, ``binary_sensor.is_on``) — the cursor is
+ *  inside the action's argument mapping and the entries to
+ *  surface are the action's own ``config_vars``. Probes both
+ *  the ``action`` and ``filter`` / ``condition`` registry slots
+ *  in the schema bundle (we don't know which a-priori; the
+ *  schema does and one of them will match). Returns nothing
+ *  when the parent isn't dotted — guarding the network round-
+ *  trip at every nested-mapping keystroke. */
+const registryEntryArgsProvider: KeyPositionProvider = {
+  name: "registry-entry-args",
+  fetch: async (k) => {
+    if (!k.parent.key.includes(".")) return [];
+    const ref = parseRegistryLabel(k.parent.key);
+    if (!ref) return [];
+    // Try every registry slot in turn — actions are commonest,
+    // then conditions / filters / effects. The bundle is cached
+    // so the loop is local after the first hit.
+    const slots = ["action", "condition", "filter", "effects"];
+    for (const slot of slots) {
+      const keys = await getRegistryEntryKeys(
+        k.api,
+        `${ref.componentName}.${slot}`,
+        ref.entryName,
+      );
+      if (keys.length > 0) return keys.map(schemaKeyToCompletion);
+    }
+    return [];
+  },
+};
+
 /** Hardcoded ``then:`` suggestion when the cursor sits directly
  *  under an ``on_*`` trigger key. Every ESPHome trigger accepts
  *  a ``then:`` body even if its schema declares no config_vars
@@ -1133,6 +1167,7 @@ const KEY_POSITION_PROVIDERS: KeyPositionProvider[] = [
   triggerKeysProvider,
   actionRegistryProvider,
   filterRegistryProvider,
+  registryEntryArgsProvider,
   platformKeyProvider,
   triggerBodyProvider,
 ];

@@ -698,6 +698,93 @@ export interface SchemaRegistryEntry {
 }
 
 /**
+ * Look up a single registry entry's schema config-vars. Used by
+ * action-argument completion — after the user picks
+ * ``- globals.set:`` from the action registry, the next keystroke
+ * is at the body of the action's mapping, where the entries are
+ * the action's own arguments (``id`` / ``value`` for
+ * ``globals.set``).
+ *
+ * *registryRef* is ``<bundle>.<registry>`` (e.g.
+ * ``globals.action`` for actions on the globals component).
+ * *entryName* is the action / filter / condition name. Mirrors
+ * the legacy dashboard's ``getActionSchema`` walk.
+ */
+export async function getRegistryEntryKeys(
+  api: ESPHomeAPI,
+  registryRef: string,
+  entryName: string,
+): Promise<SchemaConfigVarKey[]> {
+  const dot = registryRef.indexOf(".");
+  if (dot < 0) return [];
+  const bundleName = registryRef.slice(0, dot);
+  const registryKey = registryRef.slice(dot + 1);
+  if (!isRegistryKey(registryKey)) return [];
+  const bundle = await fetchBundle(api, bundleName);
+  if (!bundle) return [];
+  const component = bundle[bundleName];
+  if (!component) return [];
+  const entry = (component as SchemaComponent | undefined)?.[registryKey]?.[
+    entryName
+  ];
+  if (!entry || typeof entry !== "object") return [];
+  // Action / filter / etc. entries are normal ``ConfigVar``
+  // shapes; recurse via the existing extends walker so inherited
+  // shared fields (e.g. ``light.LIGHT_ACTION_SCHEMA``) surface
+  // too.
+  const out: SchemaConfigVarKey[] = [];
+  const seen = new Set<string>();
+  if (entry.type === "typed") {
+    if (entry.typed_key && !seen.has(entry.typed_key)) {
+      seen.add(entry.typed_key);
+      out.push({ key: entry.typed_key, required: true });
+    }
+    for (const variant of Object.values(entry.types ?? {})) {
+      if (!variant) continue;
+      pushConfigVars(variant.config_vars, out, seen);
+      await walkConfigVarExtends(
+        api,
+        variant.extends,
+        out,
+        seen,
+        new Set(),
+      );
+    }
+    return out;
+  }
+  const schema = "schema" in entry ? entry.schema : undefined;
+  if (!schema) return [];
+  pushConfigVars(schema.config_vars, out, seen);
+  await walkConfigVarExtends(api, schema.extends, out, seen, new Set());
+  return out;
+}
+
+/** Reverse-parse a dotted action / filter / condition label
+ *  (``globals.set``, ``logger.log``, ``binary_sensor.is_on``)
+ *  into the ``(componentName, entryName)`` pair the schema
+ *  bundle keys by. ``getActions`` emits keys via
+ *  ``componentName.split(".").reverse().join(".") + "." +
+ *  actionName``; reversing it gets us back to the bundle's
+ *  storage shape. Core actions (``delay``, ``if``, ``lambda``,
+ *  …) carry no dot — they live under ``core.action.<name>``.
+ */
+export function parseRegistryLabel(
+  label: string,
+): { componentName: string; entryName: string } | null {
+  const parts = label.split(".");
+  if (parts.length === 1) {
+    return { componentName: "core", entryName: parts[0] };
+  }
+  if (parts.length < 2) return null;
+  // Last part is the entry; everything before reverses to the
+  // dotted component name (``binary_sensor`` /
+  // ``light.turn_on`` → ``light`` reversed pieces).
+  const entryName = parts[parts.length - 1];
+  const componentName = parts.slice(0, -1).reverse().join(".");
+  return { componentName, entryName };
+}
+
+/**
  * Walk the schema for *componentKey* (typed-schema variants +
  * extends) looking for a config-var named *varKey* with
  * ``type: "registry"``. Returns the dotted registry reference

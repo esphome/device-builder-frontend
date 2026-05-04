@@ -6,8 +6,10 @@ import {
   getConfigVarKeys,
   getConfigVarValueOptions,
   getRegistryEntries,
+  getRegistryEntryKeys,
   getTriggerKeys,
   lookupRegistryRef,
+  parseRegistryLabel,
 } from "../../src/util/esphome-schema.js";
 
 interface ApiStub {
@@ -853,6 +855,137 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
   it("returns [] for a malformed registry ref (no dot)", async () => {
     const entries = await getRegistryEntries(makeApi() as never, "broken");
     expect(entries).toEqual([]);
+  });
+});
+
+describe("parseRegistryLabel", () => {
+  it("reverses dotted action labels back to (component, entry)", () => {
+    expect(parseRegistryLabel("globals.set")).toEqual({
+      componentName: "globals",
+      entryName: "set",
+    });
+    expect(parseRegistryLabel("logger.log")).toEqual({
+      componentName: "logger",
+      entryName: "log",
+    });
+    expect(parseRegistryLabel("binary_sensor.is_on")).toEqual({
+      componentName: "binary_sensor",
+      entryName: "is_on",
+    });
+  });
+
+  it("treats undotted labels as core actions", () => {
+    expect(parseRegistryLabel("delay")).toEqual({
+      componentName: "core",
+      entryName: "delay",
+    });
+    expect(parseRegistryLabel("if")).toEqual({
+      componentName: "core",
+      entryName: "if",
+    });
+  });
+});
+
+describe("getRegistryEntryKeys", () => {
+  // Scenario: cursor is at the body of ``- globals.set:`` —
+  // the entries we want to suggest are the action's own
+  // ``id`` / ``value`` config-vars, declared on the schema
+  // bundle's ``action.set`` slot.
+  it("reads config-vars from a registry entry's schema", async () => {
+    const GLOBALS_BUNDLE = {
+      globals: {
+        action: {
+          set: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                id: {
+                  type: "use_id",
+                  key: "Required",
+                  use_id_type: "globals::GlobalsComponent",
+                },
+                value: { type: "string", key: "Required" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(GLOBALS_BUNDLE), { status: 200 });
+    });
+    const keys = await getRegistryEntryKeys(
+      makeApi() as never,
+      "globals.action",
+      "set",
+    );
+    expect(keys.map((k) => k.key).sort()).toEqual(["id", "value"]);
+    expect(keys.find((k) => k.key === "id")?.required).toBe(true);
+  });
+
+  it("walks the extends chain on a registry entry's schema", async () => {
+    const BUNDLE = {
+      light: {
+        action: {
+          turn_on: {
+            type: "schema",
+            schema: {
+              extends: ["light.LIGHT_ACTION_SCHEMA"],
+              config_vars: { brightness: { type: "integer" } },
+            },
+          },
+        },
+        schemas: {
+          LIGHT_ACTION_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                id: { type: "use_id", key: "Required" },
+                transition_length: { type: "string" },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const keys = await getRegistryEntryKeys(
+      makeApi() as never,
+      "light.action",
+      "turn_on",
+    );
+    expect(keys.map((k) => k.key).sort()).toEqual([
+      "brightness",
+      "id",
+      "transition_length",
+    ]);
+  });
+
+  it("returns [] for a missing registry entry", async () => {
+    const BUNDLE = { thing: { action: {} } };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const keys = await getRegistryEntryKeys(
+      makeApi() as never,
+      "thing.action",
+      "missing",
+    );
+    expect(keys).toEqual([]);
+  });
+
+  it("returns [] for a malformed registry slot", async () => {
+    const keys = await getRegistryEntryKeys(
+      makeApi() as never,
+      "thing.bogus",
+      "x",
+    );
+    expect(keys).toEqual([]);
   });
 });
 

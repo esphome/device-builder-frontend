@@ -21,8 +21,13 @@
 export const RE_INLINE_COMMENT_BOUNDARY = /(^|\s)#/;
 
 /** Whole-line pair shape: optional list-item dash, key, ``:``,
- *  optional value text. Captures ``(key, restOfLine)``. */
-export const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_]+)\s*:\s*(.*)$/;
+ *  optional value text. Captures ``(key, restOfLine)``. The key
+ *  accepts ``.`` so dotted action / filter / condition labels
+ *  (``globals.set``, ``logger.log``, ``binary_sensor.is_on``) are
+ *  recognised as parent keys when the cursor is inside their
+ *  argument mapping — without that, ``findParentKey`` walks past
+ *  the action and the action-arg completion can't fire. */
+export const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_.]+)\s*:\s*(.*)$/;
 
 /** Column-0 pair: key starts at indent 0. Used to identify
  *  top-level component blocks when walking up from the cursor. */
