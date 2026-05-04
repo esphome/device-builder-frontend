@@ -90,7 +90,17 @@ export function subscribeComponentCache(listener: () => void): () => void {
 }
 
 function _notify(): void {
-  for (const listener of _listeners) listener();
+  // Isolate each listener: a throwing subscriber would otherwise
+  // reject `fetchComponent`'s promise (the cache is already populated
+  // at this point, so the rejection is misleading) and skip later
+  // listeners that haven't been notified yet.
+  for (const listener of _listeners) {
+    try {
+      listener();
+    } catch (err) {
+      console.error("component-name-cache listener threw", err);
+    }
+  }
 }
 
 /** Test-only: drop all cached entries and pending promises. */

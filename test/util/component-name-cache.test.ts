@@ -118,6 +118,28 @@ describe("component-name-cache", () => {
     expect(second?.name).toBe("WiFi");
   });
 
+  it("isolates listener exceptions from the fetch promise and other listeners", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const goodA = vi.fn();
+    const goodB = vi.fn();
+    const bad = vi.fn(() => {
+      throw new Error("subscriber blew up");
+    });
+    subscribeComponentCache(goodA);
+    subscribeComponentCache(bad);
+    subscribeComponentCache(goodB);
+
+    const { api } = mockApi(() => entry("wifi", "WiFi"));
+    const result = await fetchComponent(api, "wifi");
+
+    expect(result?.name).toBe("WiFi");
+    expect(goodA).toHaveBeenCalledTimes(1);
+    expect(goodB).toHaveBeenCalledTimes(1);
+    expect(bad).toHaveBeenCalledTimes(1);
+    expect(errSpy).toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
   it("notifies subscribers exactly once per fresh entry", async () => {
     const listener = vi.fn();
     const unsubscribe = subscribeComponentCache(listener);
