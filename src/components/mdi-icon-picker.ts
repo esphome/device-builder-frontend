@@ -387,6 +387,13 @@ export class ESPHomeMdiIconPicker extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
+    // When the picker is mounted (or assigned a value) with an icon
+    // already selected, kick off the catalog load so the trigger button
+    // can render the SVG. Otherwise the form would open showing only a
+    // placeholder until the user clicks the dropdown.
+    if (changed.has("value") && !this._loaded && normalizeName(this.value)) {
+      void this._ensureCatalogLoaded();
+    }
   }
 
   /* Esc binds to ``document`` (not ``window``) and the callback uses
@@ -421,12 +428,15 @@ export class ESPHomeMdiIconPicker extends LitElement {
   private async _openPanel() {
     this._open = true;
     this.setAttribute("open", "");
-    if (!this._loaded) {
-      this._catalog = await loadCatalog();
-      this._loaded = true;
-    }
+    await this._ensureCatalogLoaded();
     await this.updateComplete;
     this._searchInput?.focus();
+  }
+
+  private async _ensureCatalogLoaded() {
+    if (this._loaded) return;
+    this._catalog = await loadCatalog();
+    this._loaded = true;
   }
 
   private _close() {
