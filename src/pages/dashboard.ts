@@ -405,10 +405,10 @@ export class ESPHomePageDashboard extends LitElement {
       ${filtered.length === 0 && q && this._view === DashboardView.CARDS
         ? this._renderEmptySearch()
         : ""}
-      ${this._renderYamlPreviewBanner()}
       ${this._view === DashboardView.CARDS
         ? this._renderCardGrid(filtered)
         : this._renderTable()}
+      ${this._renderYamlPreviewBanner()}
       ${this._renderDrawer()} ${this._renderSelectBarOrFab()} ${this._renderDialogs()}
     `;
   }
@@ -1002,11 +1002,11 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * Banner shown above the table view when the device-name
-   * search yields zero matches (the table renders its own empty
-   * row inside its chrome — we surface the YAML pivot at the
-   * dashboard level so the affordance reaches list-view users
-   * the same as cards-view users).
+   * Banner shown *below* the table view when the device-name
+   * search yields zero matches. Sits under the table's own
+   * "No results found" empty row so the YAML pivot reads as a
+   * follow-up affordance to the no-match message rather than as
+   * disruptive content above the table chrome.
    */
   private _renderYamlPreviewBanner() {
     if (this._view !== DashboardView.TABLE) return "";

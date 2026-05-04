@@ -269,15 +269,15 @@ export const dashboardStyles = css`
     transform: translateY(1px);
   }
 
-  /* Table-view banner that surfaces the YAML pivot above the
-     table when the device-name search yields zero matches.
-     The table component shows its own empty row inside its
-     chrome; this lifts the same pivot-to-yaml affordance to
-     dashboard level so list-view users discover it too. */
+  /* Table-view banner that surfaces the YAML pivot under the
+     table's own "No results found" empty row when the
+     device-name search yields zero matches. Reads as a
+     follow-up to the no-match message rather than as disruptive
+     content above the table chrome. */
   .yaml-preview-banner {
     display: flex;
     justify-content: center;
-    padding: var(--wa-space-m) var(--wa-space-l) 0;
+    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
   }
 
   /* ─── YAML mode hit list ─── */
