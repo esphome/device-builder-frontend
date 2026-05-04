@@ -156,6 +156,7 @@ export class ESPHomeCommandPalette extends LitElement {
     this._open = true;
     this._query = "";
     this._selectedId = "";
+    this._yamlHits = null;
     requestAnimationFrame(() => this._searchInput?.focus());
   }
 
@@ -254,18 +255,47 @@ export class ESPHomeCommandPalette extends LitElement {
     return [...nav, ...devices, ...themes, ...languages, ...editor];
   }
 
+  /**
+   * YAML search is gated behind a leading slash (``/wifi``,
+   * ``/i2c``, ...) so the default palette query stays a pure
+   * client-side filter — typing "themes" or a device name
+   * mustn't fire a backend round trip on every keystroke. The
+   * slash trigger is mnemonic for "search content" and matches
+   * VS Code's "type \\? to search" pattern; users who don't
+   * know about it never pay the WS cost.
+   */
+  private static readonly _YAML_PREFIX = "/";
+
+  /** True when the current query is in YAML-search mode. */
+  private get _isYamlMode(): boolean {
+    return this._query.trimStart().startsWith(ESPHomeCommandPalette._YAML_PREFIX);
+  }
+
+  /** The YAML query body — i.e. the input minus the leading ``/``. */
+  private get _yamlQuery(): string {
+    if (!this._isYamlMode) return "";
+    return this._query
+      .trimStart()
+      .slice(ESPHomeCommandPalette._YAML_PREFIX.length)
+      .trim();
+  }
+
   private _filtered(): CommandAction[] {
+    if (this._isYamlMode) {
+      // YAML mode skips the command list entirely — the user
+      // explicitly asked for content search, mixing themes /
+      // language entries underneath would be noise.
+      return this._yamlHitActions();
+    }
     const q = this._query.trim().toLowerCase();
     const all = this._allCommands();
-    const filtered = !q
-      ? all
-      : all.filter((cmd) => {
-          const haystack = [cmd.label, cmd.group, ...(cmd.keywords ?? [])]
-            .join(" ")
-            .toLowerCase();
-          return haystack.includes(q);
-        });
-    return [...filtered, ...this._yamlHitActions()];
+    if (!q) return all;
+    return all.filter((cmd) => {
+      const haystack = [cmd.label, cmd.group, ...(cmd.keywords ?? [])]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(q);
+    });
   }
 
   /**
@@ -329,11 +359,19 @@ export class ESPHomeCommandPalette extends LitElement {
       groups[groups.length - 1].items.push(item);
     }
 
+    /* Visual mode-switch feedback: the leading-icon flips from
+       the generic magnify to the "code braces" YAML icon as soon
+       as the query starts with the YAML prefix. Combined with
+       the always-on ``/ search YAML content`` hint in the footer
+       below, this is what makes the otherwise-hidden mode
+       discoverable from the UI rather than only via docs. */
+    const inYamlMode = this._isYamlMode;
+    const searchIcon = inYamlMode ? "code-braces" : "magnify";
     return html`
       <div class="backdrop" @click=${this.close}></div>
       <div class="dialog" role="dialog" aria-modal="true">
         <div class="search">
-          <wa-icon library="mdi" name="magnify"></wa-icon>
+          <wa-icon library="mdi" name=${searchIcon}></wa-icon>
           <input
             class="search-input"
             type="text"
@@ -344,6 +382,35 @@ export class ESPHomeCommandPalette extends LitElement {
             autocomplete="off"
             spellcheck="false"
           />
+          <!--
+            Mode toggle: explicit switch-to-YAML / switch-to-commands
+            button next to the input. Same effect as typing or removing
+            the leading slash but discoverable for users who haven't
+            seen the prefix shortcut. The tooltip names the destination
+            mode so the affordance reads as an action rather than a
+            status badge.
+          -->
+          <button
+            class="mode-toggle ${inYamlMode ? "mode-toggle--yaml" : ""}"
+            type="button"
+            title=${this._localize(
+              inYamlMode
+                ? "command_palette.switch_to_commands"
+                : "command_palette.switch_to_yaml"
+            )}
+            aria-label=${this._localize(
+              inYamlMode
+                ? "command_palette.switch_to_commands"
+                : "command_palette.switch_to_yaml"
+            )}
+            aria-pressed=${inYamlMode ? "true" : "false"}
+            @click=${this._onToggleMode}
+          >
+            <wa-icon
+              library="mdi"
+              name=${inYamlMode ? "magnify" : "code-braces"}
+            ></wa-icon>
+          </button>
         </div>
         <div class="list" role="listbox">
           ${items.length === 0
@@ -367,6 +434,9 @@ export class ESPHomeCommandPalette extends LitElement {
           >
           <span><kbd>↵</kbd> ${this._localize("command_palette.select_hint")}</span>
           <span><kbd>esc</kbd> ${this._localize("command_palette.close_hint")}</span>
+          <span class="yaml-hint">
+            <kbd>/</kbd> ${this._localize("command_palette.yaml_search_hint")}
+          </span>
         </div>
       </div>
     `;
@@ -394,29 +464,55 @@ export class ESPHomeCommandPalette extends LitElement {
   }
 
   /**
+   * Flip the leading ``/`` prefix on or off, preserving the rest
+   * of the query so a user mid-typing can switch modes without
+   * losing their text. Same observable effect as manually typing
+   * or deleting the slash, but exposed as a clickable affordance
+   * for users who haven't picked up the prefix shortcut.
+   *
+   * After toggling we refocus the input so keyboard nav (↑↓↵) on
+   * the freshly-filtered list still works without a tab back.
+   */
+  private _onToggleMode = () => {
+    const stripped = this._query.replace(/^\s*\/+\s*/, "");
+    this._query = this._isYamlMode
+      ? stripped
+      : `${ESPHomeCommandPalette._YAML_PREFIX}${stripped}`;
+    this._scheduleYamlSearch();
+    requestAnimationFrame(() => this._searchInput?.focus());
+  };
+
+  /**
    * Debounce + fire a YAML-content search.
    *
-   * Empty / whitespace queries clear the result list without
-   * round-tripping (the backend short-circuits empty queries
-   * anyway, but skipping the WS call entirely keeps the
-   * keystroke-storm path quiet). Non-empty queries fire after a
-   * short pause so the typed-and-paused case feels instant
-   * while a sustained typing storm only sends one search at the
-   * end.
+   * Only fires when the user explicitly requests YAML mode by
+   * prefixing the query with ``/``. The bare-query path stays a
+   * pure client-side filter so a typed-storm against the palette
+   * stays free of backend round trips.
+   *
+   * Empty / no-prefix / leading-slash-only queries clear the
+   * result list without round-tripping. Non-empty YAML queries
+   * fire after a short pause so the typed-and-paused case feels
+   * instant while a sustained typing storm only sends one search
+   * at the end.
    */
   private _scheduleYamlSearch() {
     if (this._yamlSearchTimer !== null) {
       window.clearTimeout(this._yamlSearchTimer);
       this._yamlSearchTimer = null;
     }
-    const trimmed = this._query.trim();
-    if (!trimmed) {
+    if (!this._isYamlMode) {
+      this._yamlHits = null;
+      return;
+    }
+    const body = this._yamlQuery;
+    if (!body) {
       this._yamlHits = null;
       return;
     }
     this._yamlSearchTimer = window.setTimeout(() => {
       this._yamlSearchTimer = null;
-      void this._runYamlSearch(trimmed);
+      void this._runYamlSearch(body);
     }, 150);
   }
 

@@ -40,13 +40,23 @@ export const commandPaletteStyles = css`
   }
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes pop-in {
-    from { opacity: 0; transform: translate(-50%, -8px) scale(0.98); }
-    to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+    from {
+      opacity: 0;
+      transform: translate(-50%, -8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translate(-50%, 0) scale(1);
+    }
   }
 
   .search {
@@ -74,6 +84,48 @@ export const commandPaletteStyles = css`
 
   .search-input::placeholder {
     color: var(--wa-color-text-quiet);
+  }
+
+  .mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    cursor: pointer;
+    transition:
+      background 0.12s,
+      color 0.12s,
+      border-color 0.12s;
+  }
+
+  .mode-toggle wa-icon {
+    font-size: 16px;
+  }
+
+  .mode-toggle:hover,
+  .mode-toggle:focus-visible {
+    background: var(--esphome-surface-hover);
+    color: var(--wa-color-text-normal);
+    border-color: var(--esphome-primary);
+    outline: none;
+  }
+
+  /* Active state when the user is in YAML mode — same accent
+     palette the rest of the app uses for "this is on" toggles
+     (logs-dialog "States", command-dialog "Logs after"). Reads
+     as "currently in YAML search" without changing icon meaning
+     (the icon already swaps to magnify as the "switch to"
+     destination). */
+  .mode-toggle--yaml {
+    background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+    color: var(--esphome-primary);
+    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
   }
 
   .list {

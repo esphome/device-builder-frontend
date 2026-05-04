@@ -559,7 +559,7 @@
     "more_options_with_count": "More options ({count} firmware task(s) active)"
   },
   "command_palette": {
-    "placeholder": "Type a command or search YAML…",
+    "placeholder": "Type a command — or / to search YAML content",
     "no_results": "No results found",
     "group_navigation": "Navigation",
     "group_devices": "Devices",
@@ -570,7 +570,10 @@
     "hide_yaml_diff_button": "Hide YAML diff button",
     "navigate_hint": "to navigate",
     "select_hint": "to select",
-    "close_hint": "to close"
+    "close_hint": "to close",
+    "yaml_search_hint": "search YAML content",
+    "switch_to_yaml": "Switch to YAML content search",
+    "switch_to_commands": "Switch to command search"
   },
   "settings": {
     "title": "Settings",
