@@ -115,6 +115,18 @@ export class ESPHomeCommandPalette extends LitElement {
    * promise finally resolved.
    */
   private _yamlSearchSeq = 0;
+  /**
+   * Concurrency-of-1 gate. ``yaml/search`` is I/O-bound on the
+   * backend (one ``stat`` per device + reads on cache misses);
+   * letting the WS queue fill with N parallel requests just
+   * doubles the disk pressure without helping latency. While a
+   * search is in flight we stash the latest desired query in
+   * ``_yamlPendingQuery`` and fire it only when the in-flight
+   * call resolves — trailing-edge dispatch, so the user always
+   * sees the result for what they last typed.
+   */
+  private _yamlSearchInflight = false;
+  private _yamlPendingQuery: string | null = null;
 
   @query(".search-input")
   private _searchInput?: HTMLInputElement;
@@ -157,6 +169,12 @@ export class ESPHomeCommandPalette extends LitElement {
     this._query = "";
     this._selectedId = "";
     this._yamlHits = null;
+    // Bump the seq so a pre-close in-flight search can't write
+    // back into the freshly-opened palette. ``_yamlSearchInflight``
+    // is left as-is — a still-running call from the previous
+    // open will resolve, find its seq stale, and noop.
+    this._yamlSearchSeq++;
+    this._yamlPendingQuery = null;
     requestAnimationFrame(() => this._searchInput?.focus());
   }
 
@@ -503,21 +521,45 @@ export class ESPHomeCommandPalette extends LitElement {
     }
     if (!this._isYamlMode) {
       this._yamlHits = null;
+      // Bump the seq so an already-in-flight call can't repopulate
+      // hits when its response lands after the user dropped out
+      // of YAML mode.
+      this._yamlSearchSeq++;
+      this._yamlPendingQuery = null;
       return;
     }
     const body = this._yamlQuery;
     if (!body) {
       this._yamlHits = null;
+      this._yamlSearchSeq++;
+      this._yamlPendingQuery = null;
       return;
     }
     this._yamlSearchTimer = window.setTimeout(() => {
       this._yamlSearchTimer = null;
-      void this._runYamlSearch(body);
+      this._dispatchYamlSearch(body);
     }, 150);
+  }
+
+  /**
+   * Either fire the search now or, if one's in flight, stash the
+   * desired query so the trailing edge picks it up. Concurrency-
+   * of-1: the backend's per-search walk is I/O-bound and
+   * serialised by a controller-level lock; queuing N parallel
+   * requests just makes the WS round-trip the bottleneck without
+   * helping anyone.
+   */
+  private _dispatchYamlSearch(query: string) {
+    if (this._yamlSearchInflight) {
+      this._yamlPendingQuery = query;
+      return;
+    }
+    void this._runYamlSearch(query);
   }
 
   private async _runYamlSearch(query: string) {
     const seq = ++this._yamlSearchSeq;
+    this._yamlSearchInflight = true;
     try {
       const hits = await this._api.searchYaml({ query });
       // Drop stale responses — a slower in-flight call against
@@ -529,6 +571,18 @@ export class ESPHomeCommandPalette extends LitElement {
       // search failure (transient WS hiccup, rejected request,
       // whatever) — fall back to "no YAML hits" rendering.
       if (seq === this._yamlSearchSeq) this._yamlHits = [];
+    } finally {
+      this._yamlSearchInflight = false;
+      // Trailing-edge dispatch: if the user typed more characters
+      // while we were in flight, fire the latest pending query
+      // now. The seq-guard above still ensures only the newest
+      // result writes back if even-later input lands during this
+      // refire.
+      const pending = this._yamlPendingQuery;
+      this._yamlPendingQuery = null;
+      if (pending !== null) {
+        void this._runYamlSearch(pending);
+      }
     }
   }
 
