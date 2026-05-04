@@ -33,6 +33,7 @@ import {
   type ConfigEntry,
 } from "../api/types.js";
 import { fetchComponent } from "./component-name-cache.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   getActions,
   getTriggerKeys,
@@ -50,18 +51,8 @@ import {
   readPlatformSibling,
 } from "./yaml-line-walker.js";
 
-// ─── ``validFor`` regex constants ─────────────────────────────────────
-//
-// CodeMirror calls the completion source once per "word boundary"
-// transition, then re-uses the returned ``options`` for subsequent
-// keystrokes as long as the typed text still matches ``validFor``.
-// Using one regex consistently per completion shape (plain key /
-// boolean / enum / dotted-action) keeps the live-filter behaviour
-// honest without forcing a re-run on every keypress.
-//
-// ``[A-Za-z0-9_]`` — the YAML key character class. Used for plain
-// component names (``wifi``, ``logger``) and config-var keys
-// (``name``, ``ssid``).
+// ``validFor`` regex constants — consumed by CodeMirror to decide
+// whether cached completion options stay valid as the user types.
 const RE_KEY = /^[A-Za-z0-9_]*$/;
 // Cursor-position matchers. ``plain`` covers ordinary nested-key
 // editing (``  partial``); ``list`` covers list-item position
@@ -263,7 +254,7 @@ function entryToCompletion(entry: ConfigEntry): Completion {
 function componentToCompletion(c: ComponentCatalogEntry): Completion {
   return {
     label: c.id,
-    apply: `${c.id}:\n  `,
+    apply: `${c.id}:\n${ESPHOME_YAML_INDENT}`,
     type: "class",
     detail: c.category,
     info: buildComponentInfo(c),
@@ -320,7 +311,7 @@ export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
     seen.add(domain);
     out.push({
       label: domain,
-      apply: `${domain}:\n  `,
+      apply: `${domain}:\n${ESPHOME_YAML_INDENT}`,
       type: "class",
       detail: "platform domain",
     });
@@ -366,12 +357,6 @@ export function platformValueCompletion(
  * ``then:`` / ``-`` at the right depth instead of hard-coding two
  * and four spaces. (Copilot-flagged on the fixed-snippet version.)
  */
-/**
- * Replace ``[from, to)`` with *insert* and place the cursor at the
- * end of the inserted text. Used by every completion that builds
- * its insert text dynamically (snippet shape depends on the
- * current line's indent or list-item state).
- */
 function applyInsertion(
   view: EditorView,
   from: number,
@@ -394,7 +379,7 @@ function triggerToCompletion(t: { key: string; docs?: string }): Completion {
         view,
         from,
         to,
-        `${t.key}:\n${lead}  then:\n${lead}    - `,
+        `${t.key}:\n${lead}${ESPHOME_YAML_INDENT}then:\n${lead}${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}- `,
       );
     },
     type: "namespace",
@@ -493,9 +478,16 @@ export async function resolveAvailableEntries(
   // (``- platform: template`` → parentKey="platform"). The form
   // fields the user wants live on the dotted catalog id
   // ``<domain>.<platformValue>`` (e.g. ``binary_sensor.template``).
-  if (parentKey === "platform" && topLevelKey && platformValue) {
+  // Short-circuit either way — even on a miss, falling through
+  // would call ``fetchComponent(api, "platform")`` which 404s
+  // and poisons the session-scoped cache for the lifetime of
+  // the page (unlikely to matter today, but the failure mode
+  // would be silent if a real ``platform`` component ever
+  // shipped).
+  if (parentKey === "platform") {
+    if (!topLevelKey || !platformValue) return [];
     const dotted = catalog.byId.get(`${topLevelKey}.${platformValue}`);
-    if (dotted) return dotted.config_entries;
+    return dotted ? dotted.config_entries : [];
   }
   const directHit = catalog.byId.get(parentKey);
   if (directHit) {
@@ -625,7 +617,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       const parent = findParentKey(allLines, lineInfo.number - 1, indent);
       let entries: ConfigEntry[] = [];
       if (parent) {
-        const ctx = resolveCompletionContext(
+        const completionCtx = resolveCompletionContext(
           state,
           pos,
           allLines,
@@ -636,8 +628,8 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
           api,
           catalog,
           parent.key,
-          ctx.platformValue,
-          ctx.topLevelKey,
+          completionCtx.platformValue,
+          completionCtx.topLevelKey,
         );
       } else {
         // We're in a top-level value (rare — most top-level values are
@@ -752,6 +744,11 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const fetchTriggers = async (): Promise<
       { key: string; docs?: string }[]
     > => {
+      // Triggers don't apply at action position — even if the
+      // user's partial happens to start with ``o`` (e.g.
+      // ``output.turn_on``), surfacing ``on_*`` triggers would
+      // be misleading and burns a network round-trip.
+      if (inAutomation) return [];
       if (!partialCouldBeTrigger) return [];
       if (!bundleCtx) return [];
       const target = bundleFor(bundleCtx.topLevelKey, bundleCtx.platformValue);
@@ -779,6 +776,30 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       fetchTriggers(),
       fetchActions(),
     ]);
+    // Platform-list fallback: when the cursor is at a list-item
+    // position (``  - |``) under a key that's a known platform
+    // domain (``ota:``, ``binary_sensor:``, ``sensor:``, …), the
+    // canonical first key is ``platform:``. The catalog only
+    // carries the dotted platform implementations
+    // (``ota.esphome``, ``binary_sensor.gpio``, …) so a bare
+    // ``platform`` key never appears in ``config_entries``.
+    // Surface it as a hardcoded suggestion when we know the
+    // parent block is a platform domain — i.e. the catalog has
+    // entries with this category.
+    const inPlatformList =
+      isListItem && catalog.byCategory.has(parent.key);
+    const platformKey: Completion[] = inPlatformList
+      ? [
+          {
+            label: "platform",
+            apply: "platform: ",
+            type: "property",
+            detail: "platform domain",
+            boost: 5,
+          },
+        ]
+      : [];
+
     // Trigger-body fallback: when the cursor is nested directly
     // under a key that looks like an ``on_*`` trigger, every
     // ESPHome trigger accepts a ``then:`` body even if the
@@ -802,7 +823,12 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
               const line = view.state.doc.lineAt(from);
               const lead =
                 line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
-              applyInsertion(view, from, to, `then:\n${lead}  - `);
+              applyInsertion(
+                view,
+                from,
+                to,
+                `then:\n${lead}${ESPHOME_YAML_INDENT}- `,
+              );
             },
             type: "namespace",
             detail: "trigger body",
@@ -815,7 +841,8 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       entries.length === 0 &&
       triggers.length === 0 &&
       actions.length === 0 &&
-      triggerBody.length === 0
+      triggerBody.length === 0 &&
+      platformKey.length === 0
     )
       return null;
 
@@ -824,6 +851,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       ...triggers.map(triggerToCompletion),
       ...actions.map(actionToCompletion),
       ...triggerBody,
+      ...platformKey,
     ];
 
     return {

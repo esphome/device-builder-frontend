@@ -130,6 +130,29 @@ describe("buildTopLevelCompletions", () => {
   });
 });
 
+describe("platform-list fallback", () => {
+  // Hardcoded ``platform:`` suggestion at list-item position
+  // under a known platform domain. The catalog never carries a
+  // bare ``platform`` key on these domains' config_entries —
+  // only the dotted platform implementations
+  // (``ota.esphome`` / ``binary_sensor.gpio`` / …) — so the
+  // completion source synthesises the suggestion from the
+  // ``catalog.byCategory.has(parent.key)`` signal.
+  it("recognises domain umbrellas via byCategory", () => {
+    const c = catalog([
+      entry("ota.esphome", ComponentCategory.OTA),
+      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+      entry("sensor.dht", ComponentCategory.SENSOR),
+    ]);
+    expect(c.byCategory.has("ota")).toBe(true);
+    expect(c.byCategory.has("binary_sensor")).toBe(true);
+    expect(c.byCategory.has("sensor")).toBe(true);
+    // ``catalog.byCategory.has(parent.key)`` is the signal the
+    // completion source uses to decide whether to surface
+    // ``platform:`` at a list-item position.
+  });
+});
+
 describe("resolveAvailableEntries (platform-merged)", () => {
   // Re-import here so the test is self-contained when this file
   // is read in isolation.
