@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JobStatus } from "../../src/api/types.js";
+import { JobStatus, JobType } from "../../src/api/types.js";
 import type { FirmwareJob } from "../../src/api/types.js";
 import {
   TERMINAL_JOB_STATUSES,
@@ -7,22 +7,29 @@ import {
   isTerminalJobStatus,
 } from "../../src/util/firmware-job-status.js";
 
+/**
+ * Build a structurally-accurate ``FirmwareJob`` for tests. Mirrors
+ * the wire shape so a future rename / addition to the interface
+ * makes the test fail to compile rather than silently drift behind
+ * a forced cast.
+ */
 function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
   return {
     job_id: "job-1",
-    job_type: "install" as FirmwareJob["job_type"],
     configuration: "test.yaml",
+    job_type: JobType.INSTALL,
     status: JobStatus.QUEUED,
-    progress: null,
-    queued_at: 0,
+    created_at: "2026-05-04T12:00:00Z",
     started_at: null,
-    finished_at: null,
+    completed_at: null,
     exit_code: null,
-    port: null,
-    new_name: null,
+    output: [],
     error: null,
+    port: "",
+    new_name: "",
+    progress: null,
     ...overrides,
-  } as FirmwareJob;
+  };
 }
 
 describe("TERMINAL_JOB_STATUSES", () => {
