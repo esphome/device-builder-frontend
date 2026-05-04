@@ -53,31 +53,20 @@ jobs:
       - name: Verify tag does not already exist
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
-          # Capture both streams + exit code so we can distinguish a
-          # genuine "tag missing" 404 from any other failure (auth,
-          # rate limit, transient 5xx). A bare ``if gh api …`` would
-          # silently swallow those and let the workflow proceed.
-          set +e
-          output=$(gh api "repos/${{ github.repository }}/git/ref/tags/$VERSION" 2>&1)
-          status=$?
-          set -e
-
-          if [ "$status" -eq 0 ]; then
-            echo "::error::Tag $VERSION already exists. Bump the version."
+          # `gh api` exits 0 on 2xx and non-zero on any other outcome
+          # (HTTP error or transport failure), so a bare exit-code check
+          # can't tell "tag doesn't exist" apart from "the network ate
+          # the request". Capture stderr and require an HTTP 404 before
+          # treating the tag as absent — anything else fails loudly.
+          if err=$(gh api "repos/${{ github.repository }}/git/refs/tags/${{ inputs.version }}" --silent 2>&1); then
+            echo "::error::Tag '${{ inputs.version }}' already exists. Pick a new version."
+            exit 1
+          elif ! grep -q "HTTP 404" <<<"$err"; then
+            echo "::error::Failed to check whether tag '${{ inputs.version }}' exists: $err"
             exit 1
           fi
-
-          if grep -qi "HTTP 404\|Not Found" <<<"$output"; then
-            echo "Tag $VERSION does not exist; proceeding."
-            exit 0
-          fi
-
-          echo "::error::Failed to check whether tag $VERSION exists (gh api exit $status):"
-          echo "$output"
-          exit 1
 
   build:
     name: Build wheel and sdist
