@@ -625,8 +625,13 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       const indent = leading.length;
       const valueFrom = pos - partial.length;
 
-      // Trigger only when the user has typed something OR pressed ctrl-space.
-      if (!ctx.explicit && partial.length === 0) return null;
+      // ``key:`` with no partial is a deliberate value position
+      // — typing the colon is itself the signal that the user
+      // wants a value suggestion (especially for fixed-set enums
+      // like ``device_class:``). Fire the completion source so
+      // the popup opens automatically without forcing ctrl-space.
+      // (User-requested: empty-partial gate was too strict at
+      // value position.)
 
       const catalog = await loadCatalog(api);
 
