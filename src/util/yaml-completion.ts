@@ -295,6 +295,62 @@ function componentToCompletion(c: ComponentCatalogEntry): Completion {
   };
 }
 
+/**
+ * Build the top-level YAML keys the user can type at column 0:
+ *
+ *   - Each unique platform domain (``binary_sensor``, ``sensor``,
+ *     ``switch``, …). The catalog represents these only as
+ *     dotted ids (``binary_sensor.gpio``, ``sensor.dht``, …) —
+ *     the bare domain name comes from the category.
+ *   - Each standalone component the catalog carries as a
+ *     non-dotted id (``wifi``, ``logger``, ``esphome``, …).
+ *
+ * The catalog mixes both shapes; this helper splits them so a
+ * top-level completion offers ``binary_sensor`` (the YAML key the
+ * user actually wants to type) and not ``binary_sensor.apds9960``
+ * (a platform value that belongs INSIDE the ``binary_sensor:``
+ * block, not at the top level).
+ */
+/** Per-catalog memo for the top-level completion list. The
+ *  catalog is loaded once per session and never mutates; the
+ *  helper iterates every entry to derive domain umbrellas plus
+ *  standalone components, so caching by ``CatalogIndex`` identity
+ *  keeps a column-0 keystroke from re-walking ~1k entries on
+ *  every fire. ``WeakMap`` so a stale catalog (e.g. between
+ *  hypothetical session resets) gets garbage-collected with its
+ *  memo. */
+const topLevelMemo = new WeakMap<CatalogIndex, Completion[]>();
+
+export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
+  const cached = topLevelMemo.get(catalog);
+  if (cached) return cached;
+  const out: Completion[] = [];
+  const seen = new Set<string>();
+  // Collect domain umbrellas (categories that have dotted entries).
+  const domains = new Set<string>();
+  for (const c of catalog.components) {
+    if (c.id.includes(".")) domains.add(c.category);
+  }
+  for (const domain of domains) {
+    if (seen.has(domain)) continue;
+    seen.add(domain);
+    out.push({
+      label: domain,
+      apply: `${domain}:\n  `,
+      type: "class",
+      detail: "platform domain",
+    });
+  }
+  // Add standalone (non-dotted) components.
+  for (const c of catalog.components) {
+    if (c.id.includes(".") || seen.has(c.id)) continue;
+    seen.add(c.id);
+    out.push(componentToCompletion(c));
+  }
+  topLevelMemo.set(catalog, out);
+  return out;
+}
+
 function platformValueCompletion(c: ComponentCatalogEntry): Completion {
   return {
     label: c.id,
@@ -545,19 +601,14 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
 
     const catalog = await loadCatalog(api);
 
-    // Top-level (column 0) → bare domain / component names. The
-    // catalog carries every platform implementation as a dotted id
-    // (``binary_sensor.gpio``, ``binary_sensor.apds9960``, …); those
-    // belong INSIDE a ``binary_sensor:`` block as platform values,
-    // not as top-level YAML keys. Filter to non-dotted ids so the
-    // top-level completion shows ``binary_sensor`` / ``wifi`` /
-    // ``logger`` / … only.
+    // Top-level (column 0) → platform-domain umbrellas (extracted
+    // from each catalog entry's category) plus standalone
+    // components (catalog entries whose id has no dot). See
+    // ``buildTopLevelCompletions`` for the rationale.
     if (indent === 0) {
       return {
         from: keyFrom,
-        options: catalog.components
-          .filter((c) => !c.id.includes("."))
-          .map(componentToCompletion),
+        options: buildTopLevelCompletions(catalog),
         validFor: RE_KEY,
       };
     }

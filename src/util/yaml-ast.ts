@@ -196,6 +196,14 @@ export function resolveBundleContext(
   return { topLevelKey: topKey, platformValue };
 }
 
+/** Memoise top-level-key collection by Lezer ``Tree`` identity.
+ *  Lezer's incremental parsing reuses the same ``Tree`` object
+ *  across edits that don't touch the relevant subtree, so a
+ *  ``WeakMap`` keyed by tree avoids re-walking the document's
+ *  top-level mapping on every keystroke. The list is small
+ *  (handful of entries) so storing the resolved array is cheap. */
+const topLevelKeysMemo = new WeakMap<object, string[]>();
+
 /**
  * Collect the keys of all top-level ``Pair``s in the document.
  * Used by the action-registry walker to know which schema bundles
@@ -205,13 +213,21 @@ export function resolveBundleContext(
  */
 export function collectTopLevelKeys(state: EditorState): string[] {
   const tree = syntaxTree(state);
+  const cached = topLevelKeysMemo.get(tree);
+  if (cached) return cached;
   const out: string[] = [];
   const seen = new Set<string>();
   // Stream → Document → BlockMapping → Pair*
   const doc = tree.topNode.getChild("Document");
-  if (!doc) return out;
+  if (!doc) {
+    topLevelKeysMemo.set(tree, out);
+    return out;
+  }
   const map = doc.getChild("BlockMapping");
-  if (!map) return out;
+  if (!map) {
+    topLevelKeysMemo.set(tree, out);
+    return out;
+  }
   for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
     if (pair.name !== "Pair") continue;
     const k = getPairKey(state, pair);
@@ -220,5 +236,6 @@ export function collectTopLevelKeys(state: EditorState): string[] {
       out.push(k);
     }
   }
+  topLevelKeysMemo.set(tree, out);
   return out;
 }
