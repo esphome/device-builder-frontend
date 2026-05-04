@@ -571,13 +571,6 @@ export class ESPHomeDeviceTable extends LitElement {
     );
   }
 
-  /** Configurations currently visible in the table after applying the
-   *  active search filter (across all pages). Used by the dashboard's
-   *  floating select-bar so "Select all" honors the search. */
-  public getVisibleConfigurations(): string[] {
-    return this._visibleConfigs.slice();
-  }
-
   /** Scroll the row matching *configuration* into view.
    *
    *  Exposed so the dashboard can highlight a freshly-adopted device

@@ -367,29 +367,55 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /** Configurations currently visible to the user given the active
-   *  view and search query. Card view applies the filter inline; table
-   *  view delegates so the broader column-aware filter is honored. The
-   *  floating select-bar uses this so "Select all" matches what's on
-   *  screen instead of selecting filtered-out devices. */
+   *  view and search query. Card view searches name + configuration;
+   *  table view also matches address / IP / platform to mirror the
+   *  device-table's global filter. Used so "Select all" — header
+   *  checkbox or floating select-bar — only ever touches devices the
+   *  user can actually see. */
   private _currentlyVisibleConfigurations(): string[] {
-    if (this._view === DashboardView.TABLE) {
-      const table = this.shadowRoot?.querySelector("esphome-device-table") as
-        | (HTMLElement & { getVisibleConfigurations?: () => string[] })
-        | null;
-      if (table?.getVisibleConfigurations) {
-        return table.getVisibleConfigurations();
-      }
-    }
     const q = this._search.trim().toLowerCase();
     const sorted = this._sortedDevices;
-    const filtered = q
-      ? sorted.filter(
-          (d) =>
-            (d.friendly_name || d.name).toLowerCase().includes(q) ||
-            d.configuration.toLowerCase().includes(q)
-        )
-      : sorted;
-    return filtered.map((d) => d.configuration);
+    if (!q) return sorted.map((d) => d.configuration);
+    const isTable = this._view === DashboardView.TABLE;
+    return sorted
+      .filter((d) => {
+        const name = d.friendly_name || d.name;
+        if (name.toLowerCase().includes(q)) return true;
+        if (d.configuration.toLowerCase().includes(q)) return true;
+        if (!isTable) return false;
+        return (
+          d.address.toLowerCase().includes(q) ||
+          d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
+          d.target_platform.toLowerCase().includes(q)
+        );
+      })
+      .map((d) => d.configuration);
+  }
+
+  private get _allVisibleSelected(): boolean {
+    const visible = this._currentlyVisibleConfigurations();
+    return (
+      visible.length > 0 && visible.every((c) => this._selectedDevices.has(c))
+    );
+  }
+
+  /** Add the given configurations to the current selection without
+   *  touching unrelated entries — preserves picks the user made under
+   *  a previous filter. Empty input is a no-op. */
+  private _addToSelection(configurations: string[]) {
+    if (configurations.length === 0) return;
+    const next = new Set(this._selectedDevices);
+    for (const c of configurations) next.add(c);
+    this._selectedDevices = next;
+  }
+
+  /** Remove the given configurations from the current selection
+   *  without touching the rest. Empty input is a no-op. */
+  private _removeFromSelection(configurations: string[]) {
+    if (configurations.length === 0) return;
+    const next = new Set(this._selectedDevices);
+    for (const c of configurations) next.delete(c);
+    this._selectedDevices = next;
   }
 
   private get _visibleImportableDevices(): AdoptableDevice[] {
@@ -640,12 +666,10 @@ export class ESPHomePageDashboard extends LitElement {
         @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
           this._showJobProgress(e.detail)}
         @toggle-select=${(e: CustomEvent<string>) => this._toggleDevice(e.detail)}
-        @select-all=${(e: CustomEvent<string[]>) => {
-          this._selectedDevices = new Set(e.detail);
-        }}
-        @deselect-all=${() => {
-          this._selectedDevices = new Set();
-        }}
+        @select-all=${(e: CustomEvent<string[]>) =>
+          this._addToSelection(e.detail)}
+        @deselect-all=${(e: CustomEvent<string[]>) =>
+          this._removeFromSelection(e.detail)}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
         @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "install")}
@@ -760,13 +784,11 @@ export class ESPHomePageDashboard extends LitElement {
       return html`
         <esphome-select-bar
           selected-count=${this._selectedDevices.size}
-          total-count=${this._devices.length}
-          @select-all=${() => {
-            this._selectedDevices = new Set(this._currentlyVisibleConfigurations());
-          }}
-          @deselect-all=${() => {
-            this._selectedDevices = new Set();
-          }}
+          ?all-visible-selected=${this._allVisibleSelected}
+          @select-all=${() =>
+            this._addToSelection(this._currentlyVisibleConfigurations())}
+          @deselect-all=${() =>
+            this._removeFromSelection(this._currentlyVisibleConfigurations())}
           @cancel=${() => {
             this._selectMode = false;
             this._selectedDevices = new Set();
