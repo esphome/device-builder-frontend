@@ -67,8 +67,6 @@ import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
-import "../components/install-address-dialog.js";
-import type { ESPHomeInstallAddressDialog } from "../components/install-address-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
@@ -311,7 +309,6 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   @query("esphome-firmware-install-dialog") private _firmwareDialog!: ESPHomeFirmwareInstallDialog;
-  @query("esphome-install-address-dialog") private _installAddressDialog!: ESPHomeInstallAddressDialog;
   @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
 
   /** Device currently targeted by rename/api-key actions. */
@@ -594,7 +591,6 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
-        @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
         @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
@@ -634,8 +630,6 @@ export class ESPHomePageDashboard extends LitElement {
         .device=${this._cardContextDevice}
         .position=${this._cardContextPosition}
         card-mode
-        ?has-pending=${this._cardContextDevice?.has_pending_changes === true}
-        ?has-update=${this._cardContextDevice?.update_available === true}
         ?busy=${this._cardContextDevice ? this._activeJobs.has(this._cardContextDevice.configuration) : false}
         @menu-close=${() => { this._cardContextDevice = null; this._cardContextPosition = null; }}
         @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
@@ -647,7 +641,6 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) => downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) => this._openCommand(e.detail, "clean")}
-        @install-to-address=${(e: CustomEvent<ConfiguredDevice>) => this._openInstallToAddress(e.detail)}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) => this._downloadFirmware(e.detail)}
         @archive-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmArchive(e.detail)}
         @delete-device=${(e: CustomEvent<ConfiguredDevice>) => this._confirmDeleteSingle(e.detail)}
@@ -763,13 +756,13 @@ export class ESPHomePageDashboard extends LitElement {
         ?open=${this._installMethodOpen}
         .deviceState=${this._installMethodDevice?.state ?? DeviceState.UNKNOWN}
         .deviceTargetPlatform=${this._installMethodDevice?.target_platform ?? ""}
+        .deviceCurrentAddress=${this._installMethodDevice?.ip ||
+        this._installMethodDevice?.address ||
+        ""}
         .mode=${this._installMethodMode}
         @close=${() => { this._installMethodOpen = false; }}
         @select-method=${this._onInstallMethodSelect}
       ></esphome-install-method-dialog>
-      <esphome-install-address-dialog
-        @install-to-address=${this._onInstallToAddress}
-      ></esphome-install-address-dialog>
       <esphome-archived-devices-dialog
         @unarchive=${(e: CustomEvent<ArchivedDevice>) => this._unarchiveDevice(e.detail)}
         @delete-archived=${(e: CustomEvent<ArchivedDevice>) => this._confirmDeleteArchived(e.detail)}
@@ -1091,33 +1084,6 @@ export class ESPHomePageDashboard extends LitElement {
     this._installMethodOpen = true;
   }
 
-  /**
-   * Open the advanced "Install to Specific Address" dialog.
-   *
-   * Surfaced from the per-device kebab menu only on devices whose
-   * loaded_integrations include ``api`` — the override only makes
-   * sense for OTA-capable devices. Pre-fills with the device's
-   * resolved IP (or fallback to the configured address) so the
-   * user typically just edits an octet rather than retyping the
-   * whole address.
-   */
-  private _openInstallToAddress(device: ConfiguredDevice) {
-    this._installAddressDialog.open({
-      deviceName: device.friendly_name || device.name,
-      configuration: device.configuration,
-      currentAddress: device.ip || device.address || "",
-    });
-  }
-
-  private _onInstallToAddress(
-    e: CustomEvent<{ configuration: string; port: string }>,
-  ) {
-    const { configuration, port } = e.detail;
-    const device = this._devices.find((d) => d.configuration === configuration);
-    if (!device) return;
-    this._openCommand(device, "install", port);
-  }
-
   private _onInstallMethodSelect(e: CustomEvent<{ method: string; port?: string }>) {
     const device = this._installMethodDevice;
     this._installMethodOpen = false;
@@ -1128,7 +1094,12 @@ export class ESPHomePageDashboard extends LitElement {
       this._openLogsWithMethod(device, method, port);
     } else {
       if (method === "ota") {
-        this._openCommand(device, "install", "OTA");
+        // ``port`` is set when the user typed an explicit
+        // address into the OTA option's chevron-expanded form
+        // — pass it through so the CLI flashes against that
+        // override. Falling back to the literal "OTA" sentinel
+        // keeps the default-address path identical to before.
+        this._openCommand(device, "install", port ?? "OTA");
       } else if (method === "server-serial") {
         this._openCommand(device, "install", port!);
       } else if (method === "web-serial") {

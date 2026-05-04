@@ -328,8 +328,6 @@ export class ESPHomeDeviceTable extends LitElement {
         .device=${this._contextMenuDevice}
         .position=${this._contextMenuPos}
         ?anchor-right=${this._contextMenuAnchorRight}
-        ?has-pending=${this._contextMenuDevice?.has_pending_changes === true}
-        ?has-update=${this._contextMenuDevice?.update_available === true}
         ?busy=${this._contextMenuDevice ? this.activeJobs.has(this._contextMenuDevice.configuration) : false}
         @menu-close=${this._closeContextMenu}
         @edit-device=${(e: CustomEvent) => {

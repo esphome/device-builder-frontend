@@ -33,6 +33,10 @@ export class DeviceInstallController implements ReactiveController {
     return this._host.device?.target_platform ?? "";
   }
 
+  get deviceCurrentAddress(): string {
+    return this._host.device?.ip || this._host.device?.address || "";
+  }
+
   /** "Install" entry point — opens the install-method picker. */
   onInstall = () => {
     if (!this._host.device) return;
@@ -59,7 +63,11 @@ export class DeviceInstallController implements ReactiveController {
     if (!device) return;
     const { method, port } = e.detail;
     if (method === "ota") {
-      this._openCommand(device, "install", "OTA");
+      // ``port`` is set when the user typed an explicit address
+      // into the OTA option's chevron-expanded form — pass it
+      // through so the CLI flashes against that override. The
+      // literal "OTA" sentinel is the default-address path.
+      this._openCommand(device, "install", port ?? "OTA");
     } else if (method === "server-serial") {
       this._openCommand(device, "install", port!);
     } else if (method === "web-serial") {
