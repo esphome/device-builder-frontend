@@ -124,8 +124,21 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         // the rows that need attention. Hide it in the table; the
         // drawer keeps the full tri-state for single-device
         // inspection. (issue #141)
+        //
+        // ``getEncryptionState`` returns "active" in two cases:
+        // (a) mDNS reported the device is *actually* running
+        // encryption (truthy ``api_encryption_active``), and
+        // (b) mDNS hasn't been seen yet but the YAML enables
+        // encryption — we trust the YAML pending broadcast
+        // (``api_encryption_active == null``). The issue is
+        // explicit that case (b) — "waiting / unknown" — should
+        // *keep* showing the icon, so gate on the broadcast
+        // value, not just on ``encState``.
+        const mdnsConfirmedEncrypted = !!row.api_encryption_active;
         const encVisual =
-          encState === "active" ? null : getEncryptionVisual(encState);
+          encState === "active" && mdnsConfirmedEncrypted
+            ? null
+            : getEncryptionVisual(encState);
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
