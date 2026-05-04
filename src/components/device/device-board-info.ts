@@ -14,6 +14,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
 
@@ -97,25 +98,19 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   private _reloadTimer: ReturnType<typeof setTimeout> | null = null;
 
   updated(changedProperties: Map<string, unknown>) {
-    // Canonical yaml-watcher for the section editor. Debounce so
-    // typing in the YAML editor pane doesn't spam the schema
-    // fetch every keystroke; section-config's `reload()` itself
-    // gates on `!_dirty` so mid-edit pastes don't clobber the
-    // form.
+    // Coalesce typing in the YAML editor pane to one
+    // `reload()` per debounce window, but bypass the debounce
+    // on the empty-to-populated transition (page-load arrival,
+    // user cleared the pane and pasted new content) so the
+    // section editor's empty-form window is a render-frame
     if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
       if (this._reloadTimer) clearTimeout(this._reloadTimer);
-      // Initial-load transition (`""` → real yaml): reload
-      // immediately. The section editor renders with an empty
-      // form until the first reload, so a 1s gate would leave
-      // the user staring at a blank form on every page load
-      // when deep-linked to a selected section. Subsequent
-      // changes keep the debounce.
       const prev = changedProperties.get("yaml") as string | undefined;
-      const delay = !prev && this.yaml ? 0 : 1000;
-      this._reloadTimer = setTimeout(
-        () => this._sectionConfig?.reload(),
-        delay,
-      );
+      if (isEmptyToPopulatedYamlChange(prev, this.yaml)) {
+        this._sectionConfig.reload();
+      } else {
+        this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
+      }
     }
   }
 

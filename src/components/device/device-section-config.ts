@@ -231,12 +231,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * splice is structurally impossible when we don't proceed
    * without a resolved line.
    *
-   * Asymmetric on purpose with the read path (`_loadConfig`):
-   * the read path is reactive (driven by `reload()` from
-   * external yaml mutation, not user intent), so a popup error
-   * for "section vanished" would feel intrusive — it surfaces
-   * an empty form instead. The save / delete paths fire from
-   * an explicit user action so an error is the right
+   * Asymmetric on purpose with the read / load path: that path
+   * is reactive (driven by external yaml mutation, not user
+   * intent), so a popup error for "section vanished" would feel
+   * intrusive — it surfaces an empty form instead. Save / delete
+   * fire from an explicit user action, so an error is the right
    * acknowledgement.
    *
    * `notFoundErrorKey` is the localize key surfaced
