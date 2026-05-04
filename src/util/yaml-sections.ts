@@ -371,9 +371,51 @@ export function findAddedSection(
  * platform list items, that's `<parent>.<platform>` (de-duplicating
  * if the platform is already namespaced); otherwise just `key`.
  */
-function sectionKeyOf(section: YamlSection): string {
+export function sectionKeyOf(section: YamlSection): string {
   if (!section.platform) return section.key;
   return section.platform.startsWith(`${section.key}.`)
     ? section.platform
     : `${section.key}.${section.platform}`;
+}
+
+/**
+ * Resolve the current `fromLine` for `sectionKey` in `yaml`,
+ * preferring the section closest to `staleFromLine` when the
+ * section key matches multiple list items.
+ *
+ * The navigator emits `fromLine` at click time; if the YAML
+ * shifts afterwards (paste / external edit added or removed
+ * lines above the section), the cached number is stale and a
+ * splice keyed on it would clip the wrong section. This helper
+ * re-resolves against the current YAML so save / delete operate
+ * on the right line.
+ *
+ * Returns the matching section's 1-indexed `fromLine`, or
+ * `null` when no section in `yaml` matches `sectionKey` —
+ * callers surface that as an explicit error rather than running
+ * a wrong-line splice.
+ */
+export function resolveCurrentFromLine(
+  yaml: string,
+  sectionKey: string,
+  staleFromLine?: number,
+): number | null {
+  if (!yaml || !sectionKey) return null;
+  const matches = parseYamlTopLevelSections(yaml).filter(
+    (s) => sectionKeyOf(s) === sectionKey,
+  );
+  if (matches.length === 0) return null;
+  if (matches.length === 1 || staleFromLine === undefined) {
+    return matches[0].fromLine;
+  }
+  // Disambiguate: pick the candidate closest to the stale line.
+  // Same-key duplicates (two `ota.esphome` items) are
+  // pathological but legal in YAML; closest-match keeps a small
+  // shift mapped to the same item the user clicked.
+  return matches.reduce((best, candidate) =>
+    Math.abs(candidate.fromLine - staleFromLine) <
+    Math.abs(best.fromLine - staleFromLine)
+      ? candidate
+      : best,
+  ).fromLine;
 }

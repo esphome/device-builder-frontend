@@ -30,6 +30,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../util/yaml-section-values.js";
+import { resolveCurrentFromLine } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -191,6 +192,45 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     ) {
       this._loadConfig();
     }
+  }
+
+  /**
+   * Resolve the splice context for save / delete — the live YAML
+   * and a current, validated `fromLine`. Sets `_error` and
+   * returns `null` when either is missing so callers surface the
+   * failure instead of running the splice with stale inputs.
+   *
+   * Empty `this.yaml` means a parent forgot to wire the prop;
+   * without the guard, `updateSectionInYaml("", ...)` would emit
+   * `""` and the parent's `updateConfig` call would silently
+   * clobber the device's entire config. Stale `this.fromLine`
+   * happens when the YAML pane shifted after section selection
+   * (paste / external edit) — `resolveCurrentFromLine` re-finds
+   * the section by key against the live YAML.
+   *
+   * `notFoundErrorKey` is the localize key surfaced on the
+   * section-not-found path (`device.save_error` /
+   * `device.section_delete_error`). The empty-prop case uses a
+   * fixed dev-facing string because that branch should never
+   * reach a real user.
+   */
+  private _resolveSpliceContext(
+    notFoundErrorKey: string,
+  ): { yaml: string; fromLine: number } | null {
+    if (!this.yaml) {
+      this._error = "Internal error: section editor missing yaml prop";
+      return null;
+    }
+    const fromLine = resolveCurrentFromLine(
+      this.yaml,
+      this.sectionKey,
+      this.fromLine,
+    );
+    if (fromLine === null) {
+      this._error = this._localize(notFoundErrorKey);
+      return null;
+    }
+    return { yaml: this.yaml, fromLine };
   }
 
   /** Reload config from the live YAML if the form has no unsaved
@@ -430,28 +470,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onDeleteConfirmed() {
     if (!this._config) return;
-    // Defensive: same rationale as `_onSave` — without `this.yaml`
-    // the splice produces `""` and the parent would commit empty
-    // YAML, clobbering the entire config. Surface the failure
-    // rather than silently no-op'ing.
-    if (!this.yaml) {
-      this._error = "Internal error: section editor missing yaml prop";
-      return;
-    }
+    const ctx = this._resolveSpliceContext("device.section_delete_error");
+    if (!ctx) return;
     this._deleting = true;
     this._error = "";
     const title = this._config.title;
     try {
-      // Same rationale as `_onSave`: operate on the live YAML the
-      // page passes in, not a re-fetch — `this.fromLine` is
-      // relative to the live YAML the navigator most recently
-      // parsed.
       const newYaml = removeSectionFromYaml(
-        this.yaml,
+        ctx.yaml,
         this.sectionKey,
-        this.fromLine,
+        ctx.fromLine,
       );
-      if (newYaml === this.yaml) {
+      if (newYaml === ctx.yaml) {
         this._error = this._localize("device.section_delete_error");
         return;
       }
@@ -545,16 +575,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onSave() {
     if (!this._config) return;
-    // Defensive: bail early if the parent forgot to wire the
-    // `yaml` prop. Without this, `updateSectionInYaml("", ...)`
-    // would emit `""` and the parent's `updateConfig` call would
-    // silently clobber the device's entire config. Surface a
-    // visible error too so the failure isn't a silent no-op
-    // when a future parent regresses.
-    if (!this.yaml) {
-      this._error = "Internal error: section editor missing yaml prop";
-      return;
-    }
     const errors = validateEntries(
       this._config.entries,
       this._values,
@@ -567,19 +587,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       return;
     }
     this._fieldErrors = new Map();
+    const ctx = this._resolveSpliceContext("device.save_error");
+    if (!ctx) return;
     this._saving = true;
     this._error = "";
     try {
-      // Operate on the live YAML the page hands us — `this.fromLine`
-      // is relative to whatever the navigator most recently parsed,
-      // and that's the live YAML, not the server's. Re-fetching
-      // would mismatch line numbers when the YAML pane has unsaved
-      // edits and write the wrong section.
       const newYaml = updateSectionInYaml(
-        this.yaml,
+        ctx.yaml,
         this.sectionKey,
         this._values,
-        this.fromLine,
+        ctx.fromLine,
       );
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {

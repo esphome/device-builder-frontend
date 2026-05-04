@@ -3,6 +3,7 @@ import {
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
+  resolveCurrentFromLine,
   type YamlSection,
 } from "../../src/util/yaml-sections.js";
 
@@ -251,5 +252,92 @@ describe("parseYamlAutomations", () => {
 `;
     const [entry] = parseYamlAutomations(yaml);
     expect(entry.key).toBe("on_boot");
+  });
+});
+
+describe("resolveCurrentFromLine", () => {
+  // Pinned the section editor's stale-fromLine resolution, the
+  // root cause of the wrong-section-deleted bug fixed in this
+  // PR. The navigator emits `fromLine` at click time; subsequent
+  // YAML mutations (paste, external edit) shift line positions.
+  // The resolver re-finds the section by key against the current
+  // YAML so save / delete operate on the right line.
+
+  const otaWithBoth = [
+    "ota:",
+    "  - platform: esphome",
+    "    password: foo",
+    "  - platform: web_server",
+    "",
+  ].join("\n");
+
+  it("returns the matching section's current line for a top-level key", () => {
+    const yaml = "esphome:\n  name: x\nwifi:\n  ssid: y\n";
+    expect(resolveCurrentFromLine(yaml, "esphome")).toBe(1);
+    expect(resolveCurrentFromLine(yaml, "wifi")).toBe(3);
+  });
+
+  it("returns the platform-qualified list-item dash line", () => {
+    expect(resolveCurrentFromLine(otaWithBoth, "ota.esphome")).toBe(2);
+    expect(resolveCurrentFromLine(otaWithBoth, "ota.web_server")).toBe(4);
+  });
+
+  it("re-finds the section after the YAML shifts above it", () => {
+    // Repro of the bug-report shape. The navigator's last-known
+    // `fromLine` for `wifi:` was 3 (in a small YAML); the user
+    // pasted bigger YAML that pushed `wifi:` down to line 7.
+    // Stale `fromLine` = 3 would point at the WRONG section
+    // ("logger:" in the new layout) — the resolver finds wifi
+    // at its current line.
+    const after = [
+      "esphome:",
+      "  name: x",
+      "logger:",
+      "api:",
+      "  encryption:",
+      "    key: \"...\"",
+      "wifi:",
+      "  ssid: y",
+      "",
+    ].join("\n");
+    expect(resolveCurrentFromLine(after, "wifi", /* stale */ 3)).toBe(7);
+  });
+
+  it("returns null when the section no longer exists", () => {
+    expect(resolveCurrentFromLine("esphome:\n  name: x\n", "wifi")).toBeNull();
+  });
+
+  it("returns null on empty yaml or empty sectionKey", () => {
+    expect(resolveCurrentFromLine("", "wifi")).toBeNull();
+    expect(resolveCurrentFromLine("wifi:\n  ssid: x\n", "")).toBeNull();
+  });
+
+  it("disambiguates duplicate keys by closest stale line", () => {
+    // Pathological-but-legal: two `ota.esphome` entries (same
+    // key, two list items). When the stale fromLine is 3, the
+    // resolver picks the closest match (the dash on line 2),
+    // not the second one on line 4.
+    const dup = [
+      "ota:",
+      "  - platform: esphome",
+      "    password: a",
+      "  - platform: esphome",
+      "    password: b",
+      "",
+    ].join("\n");
+    expect(resolveCurrentFromLine(dup, "ota.esphome", 2)).toBe(2);
+    expect(resolveCurrentFromLine(dup, "ota.esphome", 4)).toBe(4);
+    // Equidistant tie: reduce keeps the first.
+    expect(resolveCurrentFromLine(dup, "ota.esphome", 3)).toBe(2);
+  });
+
+  it("returns the first match when no stale line is provided", () => {
+    const dup = [
+      "ota:",
+      "  - platform: esphome",
+      "  - platform: esphome",
+      "",
+    ].join("\n");
+    expect(resolveCurrentFromLine(dup, "ota.esphome")).toBe(2);
   });
 });
