@@ -247,7 +247,9 @@ export const dashboardStyles = css`
      looking glued to it. */
   .yaml-preview-banner {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--wa-space-s);
     margin-top: var(--wa-space-s);
   }
 

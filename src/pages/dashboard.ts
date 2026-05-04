@@ -155,6 +155,19 @@ export class ESPHomePageDashboard extends LitElement {
    *     ``/`` prefix shortcut.
    */
   @state() private _yamlMode = false;
+
+  /**
+   * Sticky count of YAML-content hits for the empty-state
+   * "Try YAML search — N matches" affordance.
+   *
+   * Latched: only updates when ``_yamlSearch.hits`` arrives as a
+   * non-null array, so the pivot doesn't flicker as the
+   * controller invalidates ``hits = null`` on each keystroke
+   * during the 150ms debounce window. Reset to ``0`` only on
+   * genuine "preview is gone" transitions (empty query, devices
+   * suddenly match the query) — not on per-keystroke debounce.
+   */
+  @state() private _yamlPreviewCount = 0;
   /**
    * The trailing-edge ``YamlSearchController`` powering YAML
    * mode. ``getApi`` is a callback so the ``@consume``-injected
@@ -986,12 +999,13 @@ export class ESPHomePageDashboard extends LitElement {
    * proof-of-usefulness for the user.
    */
   private _renderYamlPreviewPivot() {
-    const previewHits = this._yamlSearch.hits;
-    if (!previewHits || previewHits.length === 0) return "";
-    const previewCount = previewHits.reduce(
-      (sum, hit) => sum + hit.matches.length,
-      0
-    );
+    // Read the *sticky* count, not the live controller hits —
+    // the controller invalidates ``hits = null`` on every
+    // keystroke for the ~150ms debounce, which would make the
+    // pivot blink in/out as the user types. ``_yamlPreviewCount``
+    // is latched in ``updated()`` and only resets on real
+    // "preview gone" transitions.
+    const previewCount = this._yamlPreviewCount;
     if (previewCount === 0) return "";
     return html`<button
       class="empty-search-yaml-pivot"
@@ -1437,6 +1451,16 @@ export class ESPHomePageDashboard extends LitElement {
       this._scheduleScrollIntoView(target);
     }
     this._maybeFireEmptyStatePreview(changed);
+    // Latch the YAML preview count whenever the controller has
+    // a non-null result. ``hits === null`` (debounce / in-flight)
+    // doesn't update the count, so the pivot button keeps the
+    // last-known number visible across keystrokes instead of
+    // blinking in and out.
+    const hits = this._yamlSearch.hits;
+    if (hits !== null) {
+      const next = hits.reduce((sum, h) => sum + h.matches.length, 0);
+      if (next !== this._yamlPreviewCount) this._yamlPreviewCount = next;
+    }
   }
 
   /**
