@@ -483,7 +483,7 @@
     "automation_action_label": "Then do",
     "adding": "Adding…",
     "saving": "Saving…",
-    "unknown_section": "Unknown section: {key}",
+    "custom_component_title": "Custom component",
     "load_config_error": "Failed to load section config",
     "yaml_only_section": "This section doesn't have a structured editor — edit it directly in the YAML pane on the right.",
     "show_yaml_editor": "Show YAML editor",

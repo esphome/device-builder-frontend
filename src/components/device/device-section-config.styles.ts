@@ -66,6 +66,13 @@ export const deviceSectionConfigStyles = css`
     color: var(--wa-color-text-normal);
   }
 
+  .section-subtitle {
+    margin: 0;
+    font-family: var(--wa-font-family-code);
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
+  }
+
   .section-desc {
     margin: 0;
     font-size: var(--wa-font-size-xs);

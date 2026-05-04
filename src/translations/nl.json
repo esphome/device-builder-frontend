@@ -398,7 +398,7 @@
     "automation_action_label": "Dan doen",
     "adding": "Toevoegen…",
     "saving": "Opslaan…",
-    "unknown_section": "Onbekende sectie: {key}",
+    "custom_component_title": "Aangepast component",
     "load_config_error": "Laden van sectieconfiguratie mislukt",
     "yaml_only_section": "Deze sectie heeft geen gestructureerde editor — bewerk het rechts in de YAML-editor.",
     "show_yaml_editor": "YAML-editor tonen",

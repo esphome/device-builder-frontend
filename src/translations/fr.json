@@ -398,7 +398,7 @@
     "automation_action_label": "Alors faire",
     "adding": "Ajout…",
     "saving": "Enregistrement…",
-    "unknown_section": "Section inconnue : {key}",
+    "custom_component_title": "Composant personnalisé",
     "load_config_error": "Échec du chargement de la configuration",
     "yaml_only_section": "Cette section n'a pas d'éditeur structuré — modifiez-la directement dans le volet YAML à droite.",
     "show_yaml_editor": "Afficher l'éditeur YAML",
