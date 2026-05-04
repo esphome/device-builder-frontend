@@ -116,6 +116,56 @@ describe("buildTopLevelCompletions", () => {
   });
 });
 
+describe("resolveAvailableEntries (platform-merged)", () => {
+  // Re-import here so the test is self-contained when this file
+  // is read in isolation.
+  it("looks up the dotted id when parentKey is the literal 'platform' keyword", async () => {
+    // User scenario: cursor is at ``    nam`` under
+    // ``binary_sensor:\n  - platform: template\n``. The indent
+    // walker pulls ``platform`` as ``parent.key``; the AST
+    // supplies the real top-level block ``binary_sensor``. The
+    // catalog keys this implementation as ``binary_sensor.template``.
+    const { resolveAvailableEntries } = await import(
+      "../../src/util/yaml-completion.js"
+    );
+    const platformEntry: ComponentCatalogEntry = {
+      ...entry("binary_sensor.template", ComponentCategory.BINARY_SENSOR),
+      config_entries: [
+        {
+          key: "name",
+          type: "string" as never,
+          label: "Name",
+          description: null,
+          required: true,
+          advanced: false,
+          hidden: false,
+          options: null,
+          default_value: null,
+          range: null,
+          unit_of_measurement: null,
+          references_component: null,
+          id_type: null,
+          use_id_type: null,
+          inline: false,
+          sub_entries: null,
+        } as never,
+      ],
+    };
+    const c = catalog([platformEntry]);
+    const fakeApi = {
+      getComponent: async () => null,
+    } as never;
+    const out = await (resolveAvailableEntries as unknown as Function)(
+      fakeApi,
+      c,
+      "platform", // parentKey from indent walker
+      "template", // platformValue from sibling
+      "binary_sensor", // topLevelKey from AST
+    );
+    expect(out.map((e: { key: string }) => e.key)).toContain("name");
+  });
+});
+
 describe("matchKeyPosition", () => {
   it("matches plain key partials", () => {
     expect(matchKeyPosition("  on")).toEqual({

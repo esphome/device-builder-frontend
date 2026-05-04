@@ -514,13 +514,31 @@ function bundleFor(
  * (sensor/binary_sensor/switch/...) and the current item declares a
  * `platform: <id>`, merge the platform component's config entries with
  * any matching sub_entries from the parent.
+ *
+ * The catalog keys per-platform implementations as ``<domain>.<stem>``
+ * (e.g. ``binary_sensor.template``). When the indent walker hands us
+ * a literal ``platform`` key (which is what ``- platform: template``
+ * looks like to a regex), we'd otherwise fail to find any
+ * config_entries for the form fields the user is actually typing.
+ * Recognise that case and fall back to the dotted lookup using the
+ * top-level domain — covered by the AST-supplied ``topLevelKey``
+ * passed alongside the regex-derived ``parentKey``.
  */
-async function resolveAvailableEntries(
+export async function resolveAvailableEntries(
   api: ESPHomeAPI,
   catalog: CatalogIndex,
   parentKey: string,
   platformValue: string | null,
+  topLevelKey: string | null,
 ): Promise<ConfigEntry[]> {
+  // Special case: cursor is nested under a list-item header
+  // (``- platform: template`` → parentKey="platform"). The form
+  // fields the user wants live on the dotted catalog id
+  // ``<domain>.<platformValue>`` (e.g. ``binary_sensor.template``).
+  if (parentKey === "platform" && topLevelKey && platformValue) {
+    const dotted = catalog.byId.get(`${topLevelKey}.${platformValue}`);
+    if (dotted) return dotted.config_entries;
+  }
   const directHit = catalog.byId.get(parentKey);
   if (directHit) {
     // We have a top-level component directly. If it categorizes platforms
@@ -530,6 +548,14 @@ async function resolveAvailableEntries(
       const platformComp = catalog.byId.get(platformValue);
       if (platformComp) {
         return [...directHit.config_entries, ...platformComp.config_entries];
+      }
+      // Try the dotted lookup — the catalog keys per-platform
+      // entries as ``<domain>.<stem>``.
+      if (topLevelKey) {
+        const dotted = catalog.byId.get(`${topLevelKey}.${platformValue}`);
+        if (dotted) {
+          return [...directHit.config_entries, ...dotted.config_entries];
+        }
       }
     }
     return directHit.config_entries;
@@ -609,7 +635,14 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       if (parent) {
         // Look up the platform sibling (sibling key on the same indent).
         const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-        entries = await resolveAvailableEntries(api, catalog, parent.key, platformValue);
+        const topLevelBlock = findTopLevelBlock(allLines, lineInfo.number - 1);
+        entries = await resolveAvailableEntries(
+          api,
+          catalog,
+          parent.key,
+          platformValue,
+          topLevelBlock,
+        );
       } else {
         // We're in a top-level value (rare — most top-level values are
         // mappings). Bail.
@@ -706,7 +739,13 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // populates that position; config-vars don't apply.
       inAutomation
         ? Promise.resolve([] as ConfigEntry[])
-        : resolveAvailableEntries(api, catalog, parent.key, platformValue),
+        : resolveAvailableEntries(
+            api,
+            catalog,
+            parent.key,
+            platformValue,
+            bundleCtx?.topLevelKey ?? null,
+          ),
       // Pull the typed schema's ``on_*`` triggers from
       // ``schema.esphome.io`` and stack them on top of the
       // catalog's config-vars. Returns ``[]`` on any failure
