@@ -294,8 +294,15 @@ export function updateSectionInYaml(
     // only the dash line carries it. Uses the same regex
     // `parseYamlSectionValues` reads on the dash line so the two
     // sides can't drift on what counts as an inline key.
+    //
+    // Only dedupe when the dash line carries a non-empty inline
+    // value — `parseYamlSectionValues` mirrors this guard
+    // (`raw !== ""` before adding to the values map). A dash line
+    // with no value (`- platform:`) means the form value lives
+    // *only* in `values`; stripping it would keep the empty dash
+    // verbatim and lose the user's input on save.
     const inlineMatch = lines[start].match(LIST_ITEM_INLINE_KEY_RE);
-    if (inlineMatch) {
+    if (inlineMatch && inlineMatch[2].trim() !== "") {
       const inlineKey = inlineMatch[1];
       if (inlineKey in values) {
         const { [inlineKey]: _omit, ...rest } = values;

@@ -68,6 +68,23 @@ describe("updateSectionInYaml — list item with inline key", () => {
     expect(after.match(/platform:/g)).toHaveLength(1);
   });
 
+  it("does not strip the inline key when the dash line has no value", () => {
+    // `- platform:` (no inline value) means the form value lives
+    // only in `values` — `parseYamlSectionValues` skips empty
+    // inline values (`raw !== ""`). If the dedupe fired
+    // unconditionally we'd strip `platform` from the body too
+    // and the user's pick would be lost on save.
+    const before = "ota:\n  - platform:\n";
+    const after = updateSectionInYaml(
+      before,
+      "ota.esphome",
+      { platform: "esphome", password: "secret" },
+      2,
+    );
+    expect(after).toContain("platform: esphome");
+    expect(after).toContain("password: secret");
+  });
+
   it("still serializes regular non-list-item sections normally", () => {
     // Defensive: the inline-dedupe only fires on the list-item
     // branch; a top-level dict section must still emit every
