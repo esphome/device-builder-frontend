@@ -252,6 +252,35 @@ jobs:
     permissions:
       contents: read    # GITHUB_TOKEN reads this repo's release body
     steps:
+      - name: Wait for PyPI to index the new version
+        env:
+          PACKAGE: ${{ env.PACKAGE_NAME }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          # PyPI's index is eventually consistent — ``publish-pypi``
+          # returns success when the artifact lands on storage, but
+          # the JSON / simple index served to ``pip install`` lags
+          # by ~30s–3min behind. Without a gate, the backend bump
+          # PR's CI fires before PyPI is serving the pin and fails
+          # with ``ResolutionImpossible``, requiring a manual
+          # re-run ~2 minutes later. Poll the JSON endpoint until
+          # the version is reachable.
+          #
+          # If the cap expires (rare PyPI incident), open the PR
+          # anyway with a warning — backend CI re-run is cheap, and
+          # blocking the release on a PyPI outage isn't worth it.
+          URL="https://pypi.org/pypi/$PACKAGE/$VERSION/json"
+          for i in $(seq 1 30); do
+            if curl -fsSL --max-time 10 -o /dev/null "$URL"; then
+              echo "PyPI is serving $PACKAGE==$VERSION (after $i attempt(s))."
+              exit 0
+            fi
+            echo "PyPI not yet serving $PACKAGE==$VERSION (attempt $i/30); sleeping 10s..."
+            sleep 10
+          done
+          echo "::warning::PyPI did not index $PACKAGE==$VERSION within 5 minutes — opening PR anyway; backend CI may need a manual re-run."
+
       - name: Create backend app token
         id: app-token
         uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
