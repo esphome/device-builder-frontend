@@ -31,14 +31,24 @@ describe("parseYamlSectionValues — prototype pollution defense", () => {
   // as plain own properties without escalating.
 
   it("does not pollute Object.prototype via a __proto__ key", () => {
-    const yaml = "wrap:\n  __proto__: hacked\n";
+    // Use a NESTED mapping — that's the actual pollution vector.
+    // A scalar `__proto__: hacked` is a no-op on a plain object
+    // (the `__proto__` setter only mutates when assigned an
+    // object), so a passing test there wouldn't actually exercise
+    // the defense. With a nested mapping, the prototype-chain
+    // setter would assign `{polluted: true}` as the prototype on
+    // a regular object — the null-prototype root keeps it as a
+    // plain own property instead.
+    const yaml = "wrap:\n  __proto__:\n    polluted: true\n";
     const values = parseYamlSectionValues(yaml, "wrap");
-    // Property is captured as data on the values map…
-    expect(values.__proto__).toBe("hacked");
-    // …without touching the prototype of bystanders.
+    // Captured as data on the values map…
+    expect(values.__proto__).toEqual({ polluted: true });
+    // …without polluting bystanders or `Object.prototype`.
     const bystander: Record<string, unknown> = {};
     expect(bystander.polluted).toBeUndefined();
-    expect((Object.prototype as { hacked?: unknown }).hacked).toBeUndefined();
+    expect(
+      (Object.prototype as { polluted?: unknown }).polluted,
+    ).toBeUndefined();
   });
 
   it("captures constructor / prototype keys as plain data", () => {
@@ -267,6 +277,28 @@ describe("updateSectionInYaml — list item with inline key", () => {
       expect(after).toContain(`- ${key}: b`);
       expect(after).toContain("extra: y");
     }
+  });
+
+  it("does not rewrite the dash from inherited Object.prototype keys", () => {
+    // Form values often arrive as regular `{}` objects from
+    // spread / `setIn` paths, so `"constructor" in values` is
+    // `true` because every plain object inherits it. The
+    // dedupe must use an own-property check, not `in`, or the
+    // dash line gets rewritten from an inherited value and the
+    // YAML's actual inline content is lost.
+    const before = "wrap:\n  - constructor: foo\n";
+    const fromLine = firstListItemLine(before, "wrap");
+    // Plain object with no own `constructor` property — but
+    // `"constructor" in values` is still true via the prototype.
+    const formValues: Record<string, unknown> = { extra: "y" };
+    const after = updateSectionInYaml(
+      before,
+      "wrap.constructor",
+      formValues,
+      fromLine,
+    );
+    expect(after).toContain("- constructor: foo");
+    expect(after).toContain("extra: y");
   });
 
   it("still serializes regular non-list-item sections normally", () => {

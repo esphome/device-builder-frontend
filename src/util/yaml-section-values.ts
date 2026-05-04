@@ -362,7 +362,15 @@ export function updateSectionInYaml(
     const inlineMatch = dashLine.match(LIST_ITEM_INLINE_KEY_RE);
     if (inlineMatch) {
       const inlineKey = inlineMatch[1];
-      if (inlineKey in values) {
+      // Own-property check, not `in`: callers can hand us a
+      // regular `{}` from form-side spreads / `setIn`, where
+      // `"constructor" in values` is `true` because every plain
+      // object inherits from `Object.prototype`. Treating that as
+      // "form set the key" would rewrite the dash from a
+      // prototype-inherited value and lose the YAML's actual
+      // inline content. (`Object.prototype.hasOwnProperty.call`
+      // rather than `Object.hasOwn` for tsconfig-target reach.)
+      if (Object.prototype.hasOwnProperty.call(values, inlineKey)) {
         // Single regex captures both the indentation up to the
         // dash and the trailing whitespace before the inline
         // key — `dashPrefix` (with the trailing space) is what
