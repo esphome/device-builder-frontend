@@ -147,6 +147,67 @@ export const dashboardStyles = css`
        set the font size so it tracks the rest of the toolbar. */
     --font-size-medium: var(--wa-font-size-s);
   }
+
+  /* The leading icon doubles as the YAML-mode toggle. Reset
+     button defaults so it visually matches the static icon it
+     replaces, then add a subtle hover so users discover it. */
+  .search-mode-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
+    cursor: pointer;
+    color: inherit;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+  }
+  .search-mode-toggle:hover {
+    background: var(--wa-color-surface-raised);
+  }
+  .search-mode-toggle:focus-visible {
+    outline: 2px solid var(--wa-color-brand-on-quiet);
+    outline-offset: 1px;
+  }
+  .search-mode-toggle[aria-pressed="true"] {
+    color: var(--wa-color-brand-on-quiet);
+  }
+
+  /* ─── YAML mode hit list ─── */
+
+  .yaml-hits {
+    display: flex;
+    flex-direction: column;
+    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    gap: 2px;
+  }
+  .yaml-hit {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--wa-space-s);
+    border-radius: 6px;
+    color: var(--wa-color-text-normal);
+    text-decoration: none;
+    font-size: var(--wa-font-size-s);
+    transition: background-color 0.1s ease;
+  }
+  .yaml-hit:hover,
+  .yaml-hit:focus-visible {
+    background: var(--wa-color-surface-raised);
+    outline: none;
+  }
+  .yaml-hit-label {
+    /* Single line, ellipsis on overflow — long YAML lines
+       (lambdas, comments) can run wide. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    font-family: var(--wa-font-family-code, ui-monospace, monospace);
+  }
   .device-count {
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);

@@ -576,9 +576,16 @@
     "close_hint": "to close",
     "yaml_search_hint": "search YAML content",
     "switch_to_yaml": "Switch to YAML content search",
-    "switch_to_commands": "Switch to command search",
-    "yaml_searching": "Searching…",
-    "yaml_no_matches": "No matches"
+    "switch_to_commands": "Switch to command search"
+  },
+  "yaml_search": {
+    "searching": "Searching…",
+    "no_matches": "No matches",
+    "match_count_singular": "match",
+    "match_count_plural": "matches",
+    "switch_to_yaml": "Search YAML content",
+    "switch_to_devices": "Search devices",
+    "placeholder": "Search YAML content…"
   },
   "settings": {
     "title": "Settings",

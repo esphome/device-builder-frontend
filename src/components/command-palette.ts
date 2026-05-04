@@ -26,6 +26,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { yamlEmptyMessageKey, yamlHitHref, yamlHitLabel } from "../util/yaml-search-helpers.js";
 import { commandPaletteStyles } from "./command-palette.styles.js";
 import { YamlSearchController } from "./yaml-search-controller.js";
 
@@ -307,22 +308,17 @@ export class ESPHomeCommandPalette extends LitElement {
   private _yamlHitActions(): CommandAction[] {
     const hits = this._yamlSearch.hits;
     if (!hits || hits.length === 0) return [];
-    const t = this._localize;
-    const groupName = t("command_palette.group_yaml_matches");
+    const groupName = this._localize("command_palette.group_yaml_matches");
     const actions: CommandAction[] = [];
     for (const hit of hits) {
-      const label = hit.friendly_name || hit.device_name || hit.configuration;
       for (const match of hit.matches) {
         actions.push({
           id: `yaml.${hit.configuration}:${match.line_number}`,
           group: groupName,
-          label: `${label} — ${match.line_text.trim() || `line ${match.line_number}`}`,
+          label: yamlHitLabel(hit, match),
           icon: "code-braces",
           keywords: [hit.configuration, hit.device_name, match.line_text],
-          run: () =>
-            navigate(
-              `/device/${encodeURIComponent(hit.configuration)}?line=${match.line_number}`
-            ),
+          run: () => navigate(yamlHitHref(hit, match)),
         });
       }
     }
@@ -452,10 +448,8 @@ export class ESPHomeCommandPalette extends LitElement {
    */
   private _renderEmptyMessage() {
     if (this._isYamlMode && this._yamlQuery) {
-      if (this._yamlSearch.hits === null) {
-        return this._localize("command_palette.yaml_searching");
-      }
-      return this._localize("command_palette.yaml_no_matches");
+      const key = yamlEmptyMessageKey(this._yamlSearch.hits);
+      if (key) return this._localize(key);
     }
     return this._localize("command_palette.no_results");
   }
