@@ -53,8 +53,12 @@ export interface RenderFilterOptions {
  * True when ``entry`` carries a value the user has set (typically
  * loaded from YAML). For leaves, any non-``undefined`` value counts
  * — the YAML parser only adds a key to ``values`` when it's
- * actually present in the document, and the serializer drops empty
- * scalars on save, so the round-trip stays consistent.
+ * actually present in the document, so "present in ``values``"
+ * is the visibility signal we want. Note this is a visibility
+ * predicate, not a serialization predicate: an explicit empty
+ * scalar (``key: ""``) or null may render once and then be
+ * dropped on save by ``serializeYamlValues``, which is fine —
+ * the next reload will hide the field.
  *
  * For NESTED entries, recurse into the sub-dict and report true if
  * any descendant leaf is set; an advanced group with at least one
