@@ -83,9 +83,10 @@ export class ESPHomeTableRowMenu extends LitElement {
   hasPending = false;
 
   /** Mirrors ``ConfiguredDevice.update_available`` for the open
-   *  device. The inline Update button takes precedence over Install
-   *  when this is true; the kebab's Install entry hides for the same
-   *  reason as ``hasPending``. */
+   *  device. The inline button takes the "Update" shape when this
+   *  is true (forces an OTA push); the kebab's Install entry stays
+   *  visible in that case so the user can still pick serial / web-
+   *  flasher path even though OTA is offered inline. */
   @property({ type: Boolean, attribute: "has-update", reflect: true })
   hasUpdate = false;
 
@@ -195,18 +196,24 @@ export class ESPHomeTableRowMenu extends LitElement {
          pairing is obvious at a glance; breakpoints are off-by-one
          from the inline rules so the transition pixel never has both
          copies hidden:
-           menu-item--install  (only when has-pending)  inline > 820px
+           menu-item--install  (when has-pending and NOT has-update)
+                                                        inline > 820px
            menu-item--logs                              inline > 920px
-           menu-item--visit-web                         inline > 1024px */
+           menu-item--visit-web                         inline > 1024px
+
+         When 'has-update' is set the inline button shows "Update"
+         (forces an OTA push). The kebab Install entry stays visible
+         in that case — it's the alternate "install via serial /
+         web-flasher" path the user reaches when their device is
+         tethered for boot-log capture, etc. — so the dedupe rule
+         only fires on 'has-pending' without 'has-update'. */
       :host([card-mode]) .menu-item--logs,
       :host([card-mode]) .menu-item--visit-web,
-      :host([card-mode][has-pending]) .menu-item--install,
-      :host([card-mode][has-update]) .menu-item--install {
+      :host([card-mode][has-pending]:not([has-update])) .menu-item--install {
         display: none;
       }
       @media (min-width: 821px) {
-        :host(:not([card-mode])[has-pending]) .menu-item--install,
-        :host(:not([card-mode])[has-update]) .menu-item--install {
+        :host(:not([card-mode])[has-pending]:not([has-update])) .menu-item--install {
           display: none;
         }
       }
@@ -236,21 +243,13 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
         </div>
-        ${this.hasUpdate
-          ? html`<div
-              class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
-              @click=${this.busy ? undefined : () => this._emit("update-device")}
-            >
-              <wa-icon library="mdi" name="upload"></wa-icon>
-              ${this._localize("dashboard.update")}
-            </div>`
-          : html`<div
-              class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
-              @click=${this.busy ? undefined : () => this._emit("install-device")}
-            >
-              <wa-icon library="mdi" name="upload"></wa-icon>
-              ${this._localize("dashboard.action_install")}
-            </div>`}
+        <div
+          class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("install-device")}
+        >
+          <wa-icon library="mdi" name="upload"></wa-icon>
+          ${this._localize("dashboard.action_install")}
+        </div>
         <div class="menu-item menu-item--logs" @click=${() => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
