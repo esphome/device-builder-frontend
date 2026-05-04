@@ -25,6 +25,7 @@ import type {
   CompletionResult,
 } from "@codemirror/autocomplete";
 import type { EditorState } from "@codemirror/state";
+import type { EditorView } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
   ConfigEntryType,
@@ -356,18 +357,36 @@ export function platformValueCompletion(
  * ``then:`` / ``-`` at the right depth instead of hard-coding two
  * and four spaces. (Copilot-flagged on the fixed-snippet version.)
  */
+/**
+ * Replace ``[from, to)`` with *insert* and place the cursor at the
+ * end of the inserted text. Used by every completion that builds
+ * its insert text dynamically (snippet shape depends on the
+ * current line's indent or list-item state).
+ */
+function applyInsertion(
+  view: EditorView,
+  from: number,
+  to: number,
+  insert: string,
+): void {
+  view.dispatch({
+    changes: { from, to, insert },
+    selection: { anchor: from + insert.length },
+  });
+}
+
 function triggerToCompletion(t: { key: string; docs?: string }): Completion {
   return {
     label: t.key,
     apply: (view, _completion, from, to) => {
       const line = view.state.doc.lineAt(from);
       const lead = line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
-      const insert =
-        `${t.key}:\n${lead}  then:\n${lead}    - `;
-      view.dispatch({
-        changes: { from, to, insert },
-        selection: { anchor: from + insert.length },
-      });
+      applyInsertion(
+        view,
+        from,
+        to,
+        `${t.key}:\n${lead}  then:\n${lead}    - `,
+      );
     },
     type: "namespace",
     detail: "trigger",
@@ -392,11 +411,12 @@ function actionToCompletion(a: SchemaAction): Completion {
       const before = line.text.slice(0, from - line.from);
       // ``  - `` already present → just append ``key: ``.
       const hasListDash = /^\s*-\s+$/.test(before);
-      const insert = hasListDash ? `${a.key}: ` : `- ${a.key}: `;
-      view.dispatch({
-        changes: { from, to, insert },
-        selection: { anchor: from + insert.length },
-      });
+      applyInsertion(
+        view,
+        from,
+        to,
+        hasListDash ? `${a.key}: ` : `- ${a.key}: `,
+      );
     },
     type: "function",
     detail: "action",
