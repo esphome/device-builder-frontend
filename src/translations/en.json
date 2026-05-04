@@ -249,7 +249,7 @@
     "hide_secrets_tooltip": "Redact resolved !secret values back to <removed>",
     "show_logs_after_install": "Logs after",
     "show_logs_after_install_tooltip": "After a successful install, automatically open device logs (like esphome run)",
-    "show_logs": "Show logs",
+    "show_logs": "Logs",
     "clean_success": "Build files cleaned.",
     "clean_failed": "Clean failed.",
     "reset_success": "Build environment reset. The next compile will redownload the toolchain.",
