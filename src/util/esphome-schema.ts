@@ -179,6 +179,15 @@ export function fetchBundle(
     }
   })();
   cache.set(name, promise);
+  // Evict failed lookups so a transient outage / CSP toggle / network
+  // hiccup doesn't poison the cache for the lifetime of the page —
+  // the next caller retries. Successful entries stay cached for the
+  // session (the schema host serves the same bundle per version).
+  promise.then((value) => {
+    if (value === null && cache.get(name) === promise) {
+      cache.delete(name);
+    }
+  });
   return promise;
 }
 
@@ -202,6 +211,58 @@ export async function getTriggerKeys(
   for (const [key, cv] of Object.entries(schema.config_vars)) {
     if (cv && cv.type === "trigger") {
       out.push({ key, docs: cv.docs });
+    }
+  }
+  return out;
+}
+
+export interface SchemaAction {
+  /** Dotted key as the user types it: ``logger.log``, ``light.turn_on``,
+   *  or just ``delay`` / ``if`` / ``lambda`` for core actions. */
+  key: string;
+  docs?: string;
+}
+
+/**
+ * Aggregate the action-registry entries reachable from the components
+ * actually present in *bundleNames*. Mirrors the legacy dashboard's
+ * ``getRegistry("action", doc)`` behaviour: only suggest actions
+ * contributed by components the user is editing, so a config that
+ * touches ``logger:`` and ``light:`` gets ``logger.log`` and
+ * ``light.turn_on`` but not ``sensor.*`` actions if no sensor block
+ * is configured.
+ *
+ * The legacy yields each action under ``<reversedDomain>.<name>``
+ * for non-``core`` registries — e.g. an action named ``turn_on``
+ * registered on the ``light`` component becomes ``light.turn_on``.
+ * Core actions (``delay``, ``if``, ``while``, ``lambda``,
+ * ``script.execute``, …) keep their plain key. Returns ``[]`` if
+ * every bundle fails to load (graceful degradation).
+ */
+export async function getActions(
+  api: ESPHomeAPI,
+  bundleNames: string[],
+): Promise<SchemaAction[]> {
+  const bundles = await Promise.all(
+    bundleNames.map((name) => fetchBundle(api, name)),
+  );
+  const out: SchemaAction[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < bundles.length; i++) {
+    const bundle = bundles[i];
+    if (!bundle) continue;
+    for (const [componentName, component] of Object.entries(bundle)) {
+      const actions = (component as SchemaComponent | undefined)?.action;
+      if (!actions) continue;
+      for (const [actionName, cv] of Object.entries(actions)) {
+        const key =
+          componentName === "core"
+            ? actionName
+            : `${componentName.split(".").reverse().join(".")}.${actionName}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ key, docs: cv?.docs });
+      }
     }
   }
   return out;

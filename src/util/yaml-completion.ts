@@ -30,7 +30,36 @@ import {
   type ComponentCatalogEntry,
   type ConfigEntry,
 } from "../api/types.js";
-import { getTriggerKeys } from "./esphome-schema.js";
+import {
+  getActions,
+  getTriggerKeys,
+  type SchemaAction,
+} from "./esphome-schema.js";
+
+// ─── ``validFor`` regex constants ─────────────────────────────────────
+//
+// CodeMirror calls the completion source once per "word boundary"
+// transition, then re-uses the returned ``options`` for subsequent
+// keystrokes as long as the typed text still matches ``validFor``.
+// Using one regex consistently per completion shape (plain key /
+// boolean / enum / dotted-action) keeps the live-filter behaviour
+// honest without forcing a re-run on every keypress.
+//
+// ``[A-Za-z0-9_]`` — the YAML key character class. Used for plain
+// component names (``wifi``, ``logger``) and config-var keys
+// (``name``, ``ssid``).
+const RE_KEY = /^[A-Za-z0-9_]*$/;
+// Boolean-value typing — only ``true`` / ``false`` matter, so any
+// further character drops the popup.
+const RE_BOOLEAN_VALUE = /^[A-Za-z]*$/;
+// Enum-value characters: digits / letters / dot / slash / dash so
+// ``8N1``, ``Noise_NNpsk0_25519_…``, ``UNKNOWN-state``, dotted
+// platform names all keep typing.
+const RE_ENUM_VALUE = /^[A-Za-z0-9_./-]*$/;
+// Action-registry keys are dotted (``logger.log``, ``light.turn_on``)
+// — the regex must accept ``.`` or CodeMirror discards the result
+// the moment the user types past the dot.
+const RE_KEY_OR_ACTION = /^[A-Za-z0-9_.]*$/;
 
 interface CatalogIndex {
   /** Loaded list of components — used for top-level keys. */
@@ -133,6 +162,48 @@ function findTopLevelBlock(
     if (m) return m[1];
   }
   return null;
+}
+
+/** Collect all top-level component keys (column-0 ``key:``) in the
+ *  doc — the set the action-registry walker should aggregate from.
+ *  Mirrors the legacy ``getDocComponents``: only suggest actions
+ *  contributed by components the user is actually editing. */
+function collectTopLevelComponents(lines: string[]): string[] {
+  const seen = new Set<string>();
+  for (const raw of lines) {
+    const stripped = stripComment(raw);
+    if (!stripped.trim()) continue;
+    if (indentOf(stripped) !== 0) continue;
+    const m = stripped.match(/^([A-Za-z0-9_]+)\s*:/);
+    if (m) seen.add(m[1]);
+  }
+  return [...seen];
+}
+
+/**
+ * True when the cursor is inside an automation body — i.e. it's
+ * a list item directly under a ``then:`` (``-`` at indent that
+ * matches a ``then:`` ancestor's indent + 2). Loose match: we
+ * don't try to validate that the ``then:`` lives under a real
+ * trigger config-var. Triggers are the canonical shape but
+ * ``script:`` and a few others also accept a ``then:`` body, and
+ * mistaking a non-automation ``then:`` for one is harmless — the
+ * worst case is a few extra completion entries.
+ */
+function isInAutomationBody(lines: string[], lineIdx: number): boolean {
+  // The user typed a list-item indent; walk up looking for ``then:``
+  // at exactly two columns shallower (``  then:`` → list-item at
+  // column 4).
+  for (let i = lineIdx - 1; i >= 0; i--) {
+    const raw = lines[i];
+    const stripped = stripComment(raw);
+    if (!stripped.trim()) continue;
+    if (/^(\s*)then\s*:\s*$/.test(stripped)) return true;
+    // Stop ascent at any line at column 0 that isn't ``then:`` —
+    // we've left the automation context.
+    if (indentOf(stripped) === 0) return false;
+  }
+  return false;
 }
 
 // ─── Completion building blocks ──────────────────────────────────────
@@ -241,18 +312,62 @@ function platformValueCompletion(c: ComponentCatalogEntry): Completion {
 /**
  * Render a trigger config-var (``on_boot`` / ``on_press`` / …) as a
  * completion. Mirrors the legacy dashboard's behaviour: the canonical
- * shape of an automation trigger is ``on_*: \n  then: \n    - `` so
+ * shape of an automation trigger is ``on_*:\n  then:\n    - `` so
  * we apply that snippet directly — saves the user three Tab presses
  * to land at the action position.
+ *
+ * The trigger key may itself be at any indent (column 0 under
+ * ``esphome:`` body, but column 4+ under
+ * ``binary_sensor: - platform: gpio:``). ``apply`` is a function so
+ * it can read the current line's leading whitespace and emit
+ * ``then:`` / ``-`` at the right depth instead of hard-coding two
+ * and four spaces. (Copilot-flagged on the fixed-snippet version.)
  */
 function triggerToCompletion(t: { key: string; docs?: string }): Completion {
   return {
     label: t.key,
-    apply: `${t.key}:\n  then:\n    - `,
+    apply: (view, _completion, from, to) => {
+      const line = view.state.doc.lineAt(from);
+      const lead = line.text.match(/^( *)/)?.[1] ?? "";
+      const insert =
+        `${t.key}:\n${lead}  then:\n${lead}    - `;
+      view.dispatch({
+        changes: { from, to, insert },
+        selection: { anchor: from + insert.length },
+      });
+    },
     type: "namespace",
     detail: "trigger",
     info: t.docs ?? undefined,
     boost: 2,
+  };
+}
+
+/**
+ * Render an action-registry entry (``logger.log`` / ``light.turn_on``
+ * / ``delay`` / …) as a completion inside an automation body.
+ * Applied as ``- <action>: `` so the user lands at the action's
+ * argument position. List-item shape is dynamic: if the current
+ * line is already a list item (``  - `` already typed), don't
+ * double up the dash.
+ */
+function actionToCompletion(a: SchemaAction): Completion {
+  return {
+    label: a.key,
+    apply: (view, _completion, from, to) => {
+      const line = view.state.doc.lineAt(from);
+      const before = line.text.slice(0, from - line.from);
+      // ``  - `` already present → just append ``key: ``.
+      const hasListDash = /^\s*-\s+$/.test(before);
+      const insert = hasListDash ? `${a.key}: ` : `- ${a.key}: `;
+      view.dispatch({
+        changes: { from, to, insert },
+        selection: { anchor: from + insert.length },
+      });
+    },
+    type: "function",
+    detail: "action",
+    info: a.docs ?? undefined,
   };
 }
 
@@ -366,7 +481,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
             return {
               from: valueFrom,
               options: candidates.map(platformValueCompletion),
-              validFor: /^[A-Za-z0-9_]*$/,
+              validFor: RE_KEY,
             };
           }
         }
@@ -395,7 +510,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
             { label: "true", type: "constant" },
             { label: "false", type: "constant" },
           ],
-          validFor: /^[A-Za-z]*$/,
+          validFor: RE_BOOLEAN_VALUE,
         };
       }
       if (entry.options && entry.options.length > 0) {
@@ -406,7 +521,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
             type: "enum",
             detail: o.label !== o.value ? o.label : undefined,
           })),
-          validFor: /^[A-Za-z0-9_./-]*$/,
+          validFor: RE_ENUM_VALUE,
         };
       }
       return null;
@@ -429,7 +544,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       return {
         from: keyFrom,
         options: catalog.components.map(componentToCompletion),
-        validFor: /^[A-Za-z0-9_]*$/,
+        validFor: RE_KEY,
       };
     }
 
@@ -438,31 +553,60 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     if (!parent) return null;
 
     const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-    const [entries, triggers] = await Promise.all([
+    // Action-registry inside an automation body
+    // (``then: \n  - <here>``) — list-items in a ``then:`` block
+    // get cross-component action suggestions. Detect from the
+    // structural shape (we *know* the cursor is inside ``then:``
+    // because of ``isInAutomationBody``), not from the partial
+    // text — the user has already typed ``-`` to land here.
+    const inAutomation = isInAutomationBody(allLines, lineInfo.number - 1);
+    // Only fetch trigger keys when the partial *could* match one
+    // — they all start with ``on_``. Saves a network round-trip
+    // (and the failure-mode log on CSP-blocked deployments) on
+    // every keystroke that obviously doesn't want a trigger.
+    // Explicit ctrl-space requests bypass the prefix gate so
+    // power users can still browse.
+    const partialCouldBeTrigger =
+      ctx.explicit || partial === "" || /^o(n(_[a-z0-9_]*)?)?$/i.test(partial);
+    const [entries, triggers, actions] = await Promise.all([
       resolveAvailableEntries(api, catalog, parent.key, platformValue),
       // Pull the typed schema's ``on_*`` triggers from
       // ``schema.esphome.io`` and stack them on top of the
-      // catalog's config-vars. ``getTriggerKeys`` returns ``[]``
-      // on any failure (CSP / offline / missing bundle), so the
-      // catalog completions stay the floor — graceful
-      // degradation for when schema.esphome.io isn't reachable.
+      // catalog's config-vars. Returns ``[]`` on any failure
+      // (CSP / offline / missing bundle), so the catalog
+      // completions stay the floor — graceful degradation for
+      // when schema.esphome.io isn't reachable.
       (async () => {
+        if (!partialCouldBeTrigger) return [];
         const target = bundleFor(parent.key, platformValue);
         if (!target) return [];
         return getTriggerKeys(api, target.bundle, target.componentKey);
       })(),
+      // Aggregate action-registry entries across components in
+      // the doc when the cursor is inside ``then:``. Same null-
+      // safe pattern as triggers.
+      (async () => {
+        if (!inAutomation) return [] as SchemaAction[];
+        return getActions(api, collectTopLevelComponents(allLines));
+      })(),
     ]);
-    if (entries.length === 0 && triggers.length === 0) return null;
+    if (
+      entries.length === 0 &&
+      triggers.length === 0 &&
+      actions.length === 0
+    )
+      return null;
 
     const options: Completion[] = [
       ...entries.filter((e) => !e.hidden).map(entryToCompletion),
       ...triggers.map(triggerToCompletion),
+      ...actions.map(actionToCompletion),
     ];
 
     return {
       from: keyFrom,
       options,
-      validFor: /^[A-Za-z0-9_]*$/,
+      validFor: RE_KEY_OR_ACTION,
     };
   };
 }

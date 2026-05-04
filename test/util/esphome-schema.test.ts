@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetSchemaCacheForTests,
   fetchBundle,
+  getActions,
   getTriggerKeys,
 } from "../../src/util/esphome-schema.js";
 
@@ -59,10 +60,15 @@ let fetchSpy: ReturnType<typeof vi.fn>;
 beforeEach(() => {
   _resetSchemaCacheForTests();
   fetchSpy = vi.fn();
-  globalThis.fetch = fetchSpy as unknown as typeof fetch;
+  // ``vi.stubGlobal`` is the repo's convention for swapping
+  // built-ins; matching ``vi.unstubAllGlobals`` in afterEach
+  // restores the original ``fetch`` so a later test that doesn't
+  // mock can't accidentally reuse this spy.
+  vi.stubGlobal("fetch", fetchSpy);
 });
 
 afterEach(() => {
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -193,5 +199,115 @@ describe("getTriggerKeys", () => {
     });
     const triggers = await getTriggerKeys(makeApi() as never, "plain", "plain");
     expect(triggers).toEqual([]);
+  });
+});
+
+const LOGGER_BUNDLE = {
+  logger: {
+    schemas: {
+      CONFIG_SCHEMA: {
+        type: "schema",
+        schema: { config_vars: { level: { type: "enum", values: {} } } },
+      },
+    },
+    action: {
+      log: { type: "schema", docs: "Log a message" },
+      set_level: { type: "schema" },
+    },
+  },
+};
+
+const LIGHT_BUNDLE = {
+  light: {
+    action: {
+      // Component file under ``light/`` registers an action named
+      // ``turn_on``. Legacy reverses the dotted form so the user
+      // sees ``light.turn_on``.
+      turn_on: { type: "schema", docs: "Turn the light on" },
+      turn_off: { type: "schema" },
+    },
+  },
+};
+
+const CORE_BUNDLE = {
+  // ``core`` actions stay un-prefixed: ``delay``, ``if``, ``lambda``.
+  core: {
+    action: {
+      delay: { type: "schema", docs: "Wait before continuing" },
+      if: { type: "schema" },
+    },
+  },
+};
+
+describe("getActions", () => {
+  it("aggregates actions across the requested bundles", async () => {
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.includes("logger.json"))
+        return new Response(JSON.stringify(LOGGER_BUNDLE), { status: 200 });
+      if (url.includes("light.json"))
+        return new Response(JSON.stringify(LIGHT_BUNDLE), { status: 200 });
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const actions = await getActions(makeApi() as never, ["logger", "light"]);
+    const keys = actions.map((a) => a.key).sort();
+    expect(keys).toEqual([
+      "light.turn_off",
+      "light.turn_on",
+      "logger.log",
+      "logger.set_level",
+    ]);
+    expect(actions.find((a) => a.key === "logger.log")?.docs).toBe(
+      "Log a message",
+    );
+  });
+
+  it("emits core actions without a domain prefix", async () => {
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(CORE_BUNDLE), { status: 200 });
+    });
+    const actions = await getActions(makeApi() as never, ["core"]);
+    expect(actions.map((a) => a.key).sort()).toEqual(["delay", "if"]);
+  });
+
+  it("returns [] when every bundle fails to load (graceful degradation)", async () => {
+    fetchSpy.mockRejectedValue(new TypeError("Failed to fetch"));
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const actions = await getActions(makeApi() as never, ["logger", "light"]);
+    expect(actions).toEqual([]);
+    debugSpy.mockRestore();
+  });
+
+  it("dedupes actions when the same component appears under two bundles", async () => {
+    // Both bundles carry the same ``logger.log`` action — the
+    // aggregator should not list it twice.
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(LOGGER_BUNDLE), { status: 200 });
+    });
+    const actions = await getActions(makeApi() as never, ["logger", "logger"]);
+    expect(actions.filter((a) => a.key === "logger.log").length).toBe(1);
+  });
+});
+
+describe("fetchBundle (negative cache eviction)", () => {
+  it("evicts a failed lookup so the next caller retries", async () => {
+    let attempt = 0;
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      attempt += 1;
+      if (attempt === 1) throw new TypeError("Failed to fetch");
+      return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+    });
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const first = await fetchBundle(makeApi() as never, "esphome");
+    expect(first).toBeNull();
+    // The second call should NOT see the cached null — it should
+    // fire a fresh fetch (the cache evicted the failed entry) and
+    // get the now-successful response.
+    const second = await fetchBundle(makeApi() as never, "esphome");
+    expect(second).not.toBeNull();
+    debugSpy.mockRestore();
   });
 });
