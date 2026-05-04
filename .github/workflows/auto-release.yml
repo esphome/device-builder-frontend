@@ -95,5 +95,5 @@ jobs:
         run: |
           gh workflow run release.yml \
             --repo "${{ github.repository }}" \
-            --ref "${{ github.ref_name }}" \
+            --ref "${{ github.sha }}" \
             -f version="$VERSION"
