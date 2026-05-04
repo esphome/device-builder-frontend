@@ -9,8 +9,31 @@
 
 import { serializeYamlValues } from "./yaml-serialize.js";
 
+/**
+ * Identifier alphabet ESPHome accepts for top-level / nested config
+ * keys. Centralised so the parse and write paths stay in lockstep —
+ * if the schema ever broadens (e.g. hyphenated or namespaced keys),
+ * both sides change at one site instead of drifting silently.
+ */
+const KEY_PATTERN = "[a-zA-Z_][a-zA-Z0-9_]*";
+
+/**
+ * Match the inline-key form on a YAML list-item line
+ * (`  - platform: esphome`). Capture group 1 is the key.
+ *
+ * Used by `parseYamlSectionValues` (to read the inline key into
+ * the form values) and by `updateSectionInYaml` (to drop that
+ * same key from the values before re-serializing the body, so it
+ * isn't emitted twice). The two call sites must agree on what
+ * "inline key" means; sharing the regex makes that a compile-time
+ * fact.
+ */
+const LIST_ITEM_INLINE_KEY_RE = new RegExp(
+  `^\\s+-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
+);
+
 const childRegexFor = (indent: string) =>
-  new RegExp(`^${indent}([a-zA-Z_][a-zA-Z0-9_]*):\\s*(.*)$`);
+  new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
 
 const listItemRegexFor = (indent: string) =>
   new RegExp(`^${indent}  -\\s+(.*)$`);
@@ -95,9 +118,7 @@ export function parseYamlSectionValues(
   // List-item form: the first child key may sit on the same line as
   // the leading dash (e.g. `  - platform: gpio\n    pin: 4`).
   if (isListItem) {
-    const firstMatch = lines[startIdx].match(
-      /^\s+-\s+([a-zA-Z_][a-zA-Z0-9_]*):\s*(.*)$/,
-    );
+    const firstMatch = lines[startIdx].match(LIST_ITEM_INLINE_KEY_RE);
     if (firstMatch) {
       const raw = firstMatch[2].trim();
       if (raw !== "") values[firstMatch[1]] = parseScalar(raw);
@@ -270,18 +291,10 @@ export function updateSectionInYaml(
     // once as a regular child — producing visibly duplicated
     // settings (`- platform: esphome\n    platform: esphome`).
     // Drop the inline key from the values before serializing so
-    // only the dash line carries it.
-    //
-    // The regex matches a single ESPHome-shape inline key
-    // (`[a-zA-Z_][a-zA-Z0-9_]*`) — same alphabet
-    // `parseYamlSectionValues` reads on the dash line, so the
-    // two stay in lockstep. Multi-key inline-flow YAML
-    // (`- platform: esphome, password: secret`) isn't valid for
-    // any ESPHome list-item schema we serve, so we don't try to
-    // dedupe past the first inline key.
-    const inlineMatch = lines[start].match(
-      /^\s+-\s+([a-zA-Z_][a-zA-Z0-9_]*):/,
-    );
+    // only the dash line carries it. Uses the same regex
+    // `parseYamlSectionValues` reads on the dash line so the two
+    // sides can't drift on what counts as an inline key.
+    const inlineMatch = lines[start].match(LIST_ITEM_INLINE_KEY_RE);
     if (inlineMatch) {
       const inlineKey = inlineMatch[1];
       if (inlineKey in values) {
