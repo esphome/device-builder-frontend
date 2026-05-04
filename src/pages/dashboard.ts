@@ -413,11 +413,11 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * Toolbar shown in YAML mode — same search input + view toggle
+   * Toolbar shown in YAML mode — same search input + view-toggle
    * row as the cards-view toolbar, but the count line counts
-   * matched lines instead of devices, and the view toggle is
-   * hidden (cards/table doesn't apply when the grid is replaced
-   * by a hit list).
+   * matched *lines* instead of devices. The view toggle stays
+   * visible (with ``{}`` showing as the active segment) so the
+   * user always has a one-click path back to cards / list.
    */
   private _renderYamlToolbar() {
     const hits = this._yamlSearch.hits;
@@ -698,12 +698,17 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * Click on a device-view segment (cards or table). If the
-   * user was in YAML mode, drop the YAML search and return to
-   * the picked device view; otherwise just switch the view.
+   * Click on a device-view segment (cards or table).
+   *
+   * If the user was in YAML mode, flip out of YAML mode while
+   * *preserving* the typed query — same behaviour as the
+   * leading-icon toggle and the back-link affordance, so all
+   * exit paths feel consistent. Only the explicit Esc keystroke
+   * clears the query (``Esc`` reads as "abandon"). Then switch
+   * the device view.
    */
   private _enterDeviceView(view: DashboardView) {
-    if (this._yamlMode) this._setSearchMode(false, "");
+    if (this._yamlMode) this._setSearchMode(false);
     this._setView(view);
   }
 
@@ -1447,8 +1452,14 @@ export class ESPHomePageDashboard extends LitElement {
    * view banner above the table consumes the same preview hits.
    */
   private _maybeFireEmptyStatePreview(changed: PropertyValues) {
-    if (!changed.has("_search") && !changed.has("_yamlMode") && !changed.has("_devices"))
-      return;
+    // Trigger only on user-driven changes (typed query / mode
+    // toggle). NOT ``_devices`` — that ref churns on every
+    // ``DEVICE_STATE_CHANGED`` (online/offline transitions),
+    // which doesn't change which devices match the name search.
+    // Driving the preview off ``_devices`` was scheduling a
+    // fresh ``yaml/search`` on every status flap and keeping the
+    // controller in a perpetual debounce / "Searching…" state.
+    if (!changed.has("_search") && !changed.has("_yamlMode")) return;
     // YAML mode: the controller is being driven by ``_syncYamlSearch``
     // for the actual user-facing search; this preview path must not
     // clear or overwrite. Pre-load: nothing to filter against yet.
