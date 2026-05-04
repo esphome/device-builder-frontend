@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
+  collectSubstitutionKeys,
   collectTopLevelKeys,
   getPlatformValue,
   getTopLevelKey,
@@ -228,6 +229,27 @@ describe("isUnderThenItem", () => {
     // Inline value form, no BlockSequence — not an automation body.
     expect(isUnderThenItem(state, posAt(yaml, 3, 25))).toBe(false);
   });
+
+  it("recognises cover-style ``*_action:`` bodies as automation lists", () => {
+    // ``open_action:`` / ``close_action:`` / ``stop_action:`` are
+    // declared as ``type: trigger`` in the schema; the action
+    // registry should fire at their list-item positions just like
+    // it does under ``then:``. Without this, picking
+    // ``- switch.turn_off:`` at the dash position misses the
+    // registry and falls back to plain key completion.
+    const yaml =
+      "cover:\n  - platform: feedback\n    open_action:\n      - switch.turn_off: foo\n";
+    const state = makeState(yaml);
+    expect(isUnderThenItem(state, posAt(yaml, 4, 9))).toBe(true);
+  });
+
+  it("recognises ``else:`` as an automation list", () => {
+    const yaml =
+      "esphome:\n  on_boot:\n    then:\n      - if:\n          condition:\n            switch.is_on: foo\n          then:\n            - delay: 1s\n          else:\n            - delay: 2s\n";
+    const state = makeState(yaml);
+    // Cursor on the ``- delay: 2s`` line under ``else:``.
+    expect(isUnderThenItem(state, posAt(yaml, 10, 14))).toBe(true);
+  });
 });
 
 describe("collectTopLevelKeys", () => {
@@ -251,5 +273,37 @@ describe("collectTopLevelKeys", () => {
 
   it("returns [] for empty / unparseable input", () => {
     expect(collectTopLevelKeys(makeState(""))).toEqual([]);
+  });
+});
+
+describe("collectSubstitutionKeys", () => {
+  it("reads keys from a substitutions: mapping", () => {
+    const yaml = [
+      "substitutions:",
+      "  id_prefix: driveway_gate",
+      "  devicename: drivewaygate",
+      "  upper_devicename: Driveway Gate",
+      "esphome:",
+      "  name: ${devicename}",
+    ].join("\n");
+    expect(collectSubstitutionKeys(makeState(yaml))).toEqual([
+      "id_prefix",
+      "devicename",
+      "upper_devicename",
+    ]);
+  });
+
+  it("returns [] when there is no substitutions: block", () => {
+    const yaml = "esphome:\n  name: foo\n";
+    expect(collectSubstitutionKeys(makeState(yaml))).toEqual([]);
+  });
+
+  it("returns [] for empty / unparseable input", () => {
+    expect(collectSubstitutionKeys(makeState(""))).toEqual([]);
+  });
+
+  it("returns [] when substitutions: has no body yet", () => {
+    const yaml = "substitutions:\nesphome:\n  name: foo\n";
+    expect(collectSubstitutionKeys(makeState(yaml))).toEqual([]);
   });
 });

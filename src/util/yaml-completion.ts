@@ -47,8 +47,9 @@ import {
   type SchemaRegistryEntry,
 } from "./esphome-schema.js";
 import {
+  collectSubstitutionKeys,
   collectTopLevelKeys,
-  isUnderThenItem,
+  isUnderAutomationItem,
   resolveBundleContext,
 } from "./yaml-ast.js";
 import {
@@ -61,6 +62,13 @@ import {
 // ``validFor`` regex constants — consumed by CodeMirror to decide
 // whether cached completion options stay valid as the user types.
 const RE_KEY = /^[A-Za-z0-9_]*$/;
+/** Trigger-prefix gate for the trigger-keys provider — every
+ *  ESPHome trigger starts with ``on_``; partials matching this
+ *  shape may yet become a trigger, so it's worth fetching the
+ *  schema. Anything else (``platform``, ``name``, ``device_class``,
+ *  …) saves the round-trip. Explicit ctrl-space bypasses the
+ *  gate so power users can browse. */
+const RE_TRIGGER_PREFIX = /^o(n(_[a-z0-9_]*)?)?$/i;
 // Cursor-position matchers. ``plain`` covers ordinary nested-key
 // editing (``  partial``); ``list`` covers list-item position
 // (``  - partial``) — the entry point for action-registry
@@ -704,6 +712,32 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // (User-requested: empty-partial gate was too strict at
       // value position.)
 
+      // Substitution reference: the partial starts with ``${``
+      // (and the user hasn't closed the ``}`` yet). Suggest every
+      // key declared under the doc's ``substitutions:`` mapping
+      // — typing ``${id_pre`` lands ``id_prefix``. Mirrors the
+      // legacy editor's ``${…}`` reference completion. Distinct
+      // from value-position enum / boolean: a ``${ref}`` can
+      // appear in any value, regardless of the entry's type.
+      const subRefMatch = /^\$\{([A-Za-z0-9_]*)$/.exec(partial);
+      if (subRefMatch) {
+        const subs = collectSubstitutionKeys(state);
+        if (subs.length > 0) {
+          return {
+            from: valueFrom,
+            options: subs.map((name) => ({
+              label: `\${${name}}`,
+              apply: `\${${name}}`,
+              type: "variable",
+              detail: "substitution",
+            })),
+            // ``\$\{…\}`` partial — keep options valid only while
+            // the partial stays in the ``${ident`` shape.
+            validFor: /^\$\{[A-Za-z0-9_]*\}?$/,
+          };
+        }
+      }
+
       const catalog = await loadCatalog(api);
 
       // `platform:` value → suggest components whose category matches the
@@ -853,19 +887,16 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       bundleCtx: completionCtx.bundleCtx,
       platformValue: completionCtx.platformValue,
       topLevelKey: completionCtx.topLevelKey,
-      // ``then:`` is the legacy automation entry point; cover-style
-      // ``*_action:`` bodies and other automation lists fall to the
-      // same provider when their parent.key resolves to an
-      // automation-shaped registry. Today we still gate on
-      // ``then:`` only — extending this is a follow-up.
-      inAutomation: isListItem && isUnderThenItem(state, pos),
+      // Automation-list detection: ``then:``, ``else:``, ``on_*:``,
+      // and ``*_action:`` (cover ``open_action`` / ``close_action`` /
+      // ``stop_action``, lock ``unlock_action``, etc.) all surface
+      // the action registry at list-item position.
+      inAutomation: isListItem && isUnderAutomationItem(state, pos),
       // Triggers all start with ``on_``; gate the schema fetch on
       // the partial's prefix so non-trigger keystrokes don't burn
       // a round-trip.
       partialCouldBeTrigger:
-        ctx.explicit ||
-        partial === "" ||
-        /^o(n(_[a-z0-9_]*)?)?$/i.test(partial),
+        ctx.explicit || partial === "" || RE_TRIGGER_PREFIX.test(partial),
     };
 
     const buckets = await Promise.all(
@@ -911,11 +942,27 @@ interface KeyPositionCtx {
   partial: string;
   parent: { key: string };
   isListItem: boolean;
+  /** AST-only resolution of the cursor's surrounding component
+   *  block. ``null`` when the AST is silent — typically at a
+   *  half-typed pair (``device_class:`` with no value yet) that
+   *  Lezer hasn't completed. Use this for providers whose
+   *  correctness depends on a fully-parsed structure (triggers
+   *  on a settled platform context); fall through when null. */
   bundleCtx: { topLevelKey: string; platformValue: string | null } | null;
+  /** AST-with-regex-fallback resolution. Always returns the best
+   *  available answer, including at half-typed pairs. Use this
+   *  for providers whose correctness tolerates a partial parse
+   *  (registry / schema-bundle lookup at a list-item dash). */
   platformValue: string | null;
+  /** AST-with-regex-fallback resolution of the column-0 ancestor.
+   *  Same null-handling guidance as ``platformValue``. */
   topLevelKey: string | null;
   inAutomation: boolean;
   partialCouldBeTrigger: boolean;
+  /** Per-turn memo of ``resolveAvailableEntries`` so the catalog
+   *  and schema-bundle providers don't re-walk the same answer.
+   *  Populated lazily via ``resolveCatalogEntries``. */
+  _cachedCatalogEntries?: Promise<ConfigEntry[]>;
 }
 
 interface KeyPositionProvider {
@@ -925,19 +972,34 @@ interface KeyPositionProvider {
   fetch: (k: KeyPositionCtx) => Promise<Completion[]>;
 }
 
-/** Catalog ``config_entries`` of the parent block, with platform-
- *  merged sub_entries when the parent is a list-item header. */
-const catalogEntriesProvider: KeyPositionProvider = {
-  name: "catalog-entries",
-  fetch: async (k) => {
-    if (k.inAutomation) return [];
-    const entries = await resolveAvailableEntries(
+/** Resolve the catalog config-entries for the cursor's parent
+ *  exactly once per turn. Both ``catalogEntriesProvider`` and
+ *  ``schemaBundleKeyProvider`` need the answer, and the
+ *  ``hidden:`` filter is render-time concern — so the providers
+ *  read off this memo on the per-turn ``KeyPositionCtx``. The
+ *  catalog index plus the in-memory ``fetchComponent`` cache
+ *  make this a no-network call, but skipping the duplicate
+ *  ``await`` saves one microtask per keystroke. */
+async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> {
+  if (k.inAutomation) return [];
+  if (!k._cachedCatalogEntries) {
+    k._cachedCatalogEntries = resolveAvailableEntries(
       k.api,
       k.catalog,
       k.parent.key,
       k.platformValue,
       k.bundleCtx?.topLevelKey ?? null,
     );
+  }
+  return k._cachedCatalogEntries;
+}
+
+/** Catalog ``config_entries`` of the parent block, with platform-
+ *  merged sub_entries when the parent is a list-item header. */
+const catalogEntriesProvider: KeyPositionProvider = {
+  name: "catalog-entries",
+  fetch: async (k) => {
+    const entries = await resolveCatalogEntries(k);
     return entries.filter((e) => !e.hidden).map(entryToCompletion);
   },
 };
@@ -953,15 +1015,7 @@ const schemaBundleKeyProvider: KeyPositionProvider = {
   fetch: async (k) => {
     if (k.inAutomation) return [];
     if (!k.bundleCtx) return [];
-    // Sequenced via the catalog provider's own resolution — both
-    // share the in-memory cache so this is a free re-read.
-    const entries = await resolveAvailableEntries(
-      k.api,
-      k.catalog,
-      k.parent.key,
-      k.platformValue,
-      k.bundleCtx.topLevelKey,
-    );
+    const entries = await resolveCatalogEntries(k);
     if (entries.length > 0) return [];
     const target = bundleFor(k.bundleCtx.topLevelKey, k.bundleCtx.platformValue);
     const keys = await getConfigVarKeys(k.api, target.bundle, target.componentKey);

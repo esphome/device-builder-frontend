@@ -128,6 +128,31 @@ export function findTopLevelPair(
  * completion entries the user can ignore).
  */
 export function isUnderThenItem(state: EditorState, pos: number): boolean {
+  return isUnderAutomationItem(state, pos);
+}
+
+/** Pattern for automation-shaped pair keys: ``then`` / ``else``
+ *  / ``on_*`` / ``*_action`` (cover ``open_action`` /
+ *  ``close_action``, lock ``unlock_action``, …). Covers every
+ *  list-of-actions body in the ESPHome schema; broader than the
+ *  legacy ``then``-only carve-out. */
+const RE_AUTOMATION_KEY = /^(?:then|else|on_[a-z0-9_]*|[a-z0-9_]+_action)$/;
+
+/**
+ * True when *pos* is inside a list ``Item`` whose enclosing Pair
+ * is an automation-shaped key. Generalised from the legacy
+ * ``then``-only carve-out so cover ``open_action:`` /
+ * ``close_action:`` / ``stop_action:`` and similar
+ * ``*_action:`` bodies fire the action-registry too. Action
+ * arguments inside those items are part of the action's own
+ * schema, not the registry — the source still gates on the
+ * list-item position via ``isListItem`` so this only triggers
+ * the registry at the dash position.
+ */
+export function isUnderAutomationItem(
+  state: EditorState,
+  pos: number,
+): boolean {
   const node = syntaxTree(state).resolveInner(pos, -1);
   let cur: SyntaxNode | null = node;
   while (cur) {
@@ -135,8 +160,9 @@ export function isUnderThenItem(state: EditorState, pos: number): boolean {
       const seq = cur.parent;
       if (seq?.name === "BlockSequence") {
         const pair = seq.parent;
-        if (pair?.name === "Pair" && getPairKey(state, pair) === "then") {
-          return true;
+        if (pair?.name === "Pair") {
+          const key = getPairKey(state, pair);
+          if (key && RE_AUTOMATION_KEY.test(key)) return true;
         }
       }
     }
@@ -215,6 +241,51 @@ export function resolveBundleContext(
   const topLevelKey = getTopLevelKey(state, pos);
   if (!topLevelKey) return null;
   return { topLevelKey, platformValue: getPlatformValue(state, pos) };
+}
+
+/** Memoise substitution-key collection by Lezer ``Tree`` identity.
+ *  Same incremental-tree reuse as ``collectTopLevelKeys`` —
+ *  unchanged ``substitutions:`` mapping shouldn't re-walk on every
+ *  keystroke. */
+const substitutionKeysMemo = new WeakMap<object, string[]>();
+
+/**
+ * Read every key declared under the doc's ``substitutions:``
+ * mapping. Drives the ``${…}`` reference completion at value
+ * position — typing ``${id_pre`` should suggest ``id_prefix``
+ * if the doc declares it.
+ */
+export function collectSubstitutionKeys(state: EditorState): string[] {
+  const tree = syntaxTree(state);
+  const cached = substitutionKeysMemo.get(tree);
+  if (cached) return cached;
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const doc = tree.topNode.getChild("Document");
+  const map = doc?.getChild("BlockMapping");
+  if (!map) {
+    substitutionKeysMemo.set(tree, out);
+    return out;
+  }
+  for (let pair = map.firstChild; pair; pair = pair.nextSibling) {
+    if (pair.name !== "Pair") continue;
+    if (getPairKey(state, pair) !== "substitutions") continue;
+    // ``substitutions:`` value is a BlockMapping of leaf pairs.
+    let val: SyntaxNode | null = pair.lastChild;
+    while (val && val.name !== "BlockMapping") val = val.prevSibling;
+    if (!val) break;
+    for (let inner = val.firstChild; inner; inner = inner.nextSibling) {
+      if (inner.name !== "Pair") continue;
+      const k = getPairKey(state, inner);
+      if (k && !seen.has(k)) {
+        seen.add(k);
+        out.push(k);
+      }
+    }
+    break;
+  }
+  substitutionKeysMemo.set(tree, out);
+  return out;
 }
 
 /** Memoise top-level-key collection by Lezer ``Tree`` identity.
