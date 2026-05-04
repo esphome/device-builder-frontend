@@ -44,36 +44,11 @@ describe("updateSectionInYaml — list item with inline key", () => {
     expect(after).not.toContain("password: a");
   });
 
-  it("does not duplicate the inline key when only that key was changed", () => {
-    // User changed `platform: esphome` to `platform: http_request`
-    // (e.g. switched OTA backend). The inline-key dedupe must not
-    // strip the *new* value — but the dash line itself still
-    // carries the old one. The current implementation keeps the
-    // dash line verbatim and drops the now-redundant `platform`
-    // key from the body; net effect is the YAML stays at
-    // `- platform: esphome` even though the user picked
-    // `http_request`. Pin the current (limited) behavior so a
-    // future fix can change it deliberately rather than by
-    // accident.
-    const before = ["ota:", "  - platform: esphome", ""].join("\n");
-    const after = updateSectionInYaml(
-      before,
-      "ota.esphome",
-      { platform: "http_request" },
-      2,
-    );
-    // Today: the dash line is preserved verbatim — switching
-    // platforms via this path is not yet supported, but the
-    // result is at least syntactically valid (no duplicate).
-    expect(after.match(/platform:/g)).toHaveLength(1);
-  });
-
-  it("does not strip the inline key when the dash line has no value", () => {
-    // `- platform:` (no inline value) means the form value lives
-    // only in `values` — `parseYamlSectionValues` skips empty
-    // inline values (`raw !== ""`). If the dedupe fired
-    // unconditionally we'd strip `platform` from the body too
-    // and the user's pick would be lost on save.
+  it("rewrites the dash line when it has no inline value", () => {
+    // `- platform:` (no value on dash) and form has `platform`:
+    // the dash line is rewritten with the form's value so the
+    // resulting YAML has `platform` exactly once on the dash,
+    // not duplicated as an empty dash plus a body child.
     const before = "ota:\n  - platform:\n";
     const after = updateSectionInYaml(
       before,
@@ -81,8 +56,83 @@ describe("updateSectionInYaml — list item with inline key", () => {
       { platform: "esphome", password: "secret" },
       2,
     );
-    expect(after).toContain("platform: esphome");
+    expect(after.match(/platform:/g)).toHaveLength(1);
+    expect(after).toContain("- platform: esphome");
     expect(after).toContain("password: secret");
+  });
+
+  it("rewrites the dash line when the form's value differs from inline", () => {
+    // Stale-inline case: dash carries `- platform: esphome` but
+    // the form's value is `http_request` (user picked a new
+    // backend). The rewrite means the dash reflects the form's
+    // current pick instead of the YAML's old value.
+    const before = "ota:\n  - platform: esphome\n";
+    const after = updateSectionInYaml(
+      before,
+      "ota.esphome",
+      { platform: "http_request" },
+      2,
+    );
+    expect(after.match(/platform:/g)).toHaveLength(1);
+    expect(after).toContain("- platform: http_request");
+    expect(after).not.toContain("esphome");
+  });
+
+  it("rewrites a dash line that carried a trailing comment", () => {
+    // Edge case: the dash line carries a `#` comment after the
+    // colon (`- platform: # set later`). The empty-value guard
+    // can't tell that apart from a real value via plain
+    // `inlineMatch[2].trim()`, but the rewrite path doesn't
+    // need to: it builds the dash line from scratch, so the
+    // comment is dropped along with the stale value and the
+    // form's pick lands.
+    const before = "ota:\n  - platform: # filled later\n";
+    const after = updateSectionInYaml(
+      before,
+      "ota.esphome",
+      { platform: "esphome" },
+      2,
+    );
+    expect(after.match(/platform:/g)).toHaveLength(1);
+    expect(after).toContain("- platform: esphome");
+    expect(after).not.toContain("filled later");
+  });
+
+  it("leaves the dash alone when the form's value is non-scalar", () => {
+    // A complex (object) inline value can't sit on the dash, so
+    // the rewrite skips and the original behaviour stands —
+    // dash kept, value emitted normally in the body. We don't
+    // dedupe in that path because there's nothing useful to
+    // collapse to.
+    const before = "wrap:\n  - platform: x\n";
+    const after = updateSectionInYaml(
+      before,
+      "wrap.x",
+      { platform: { complex: "object" } },
+      2,
+    );
+    expect(after).toContain("- platform: x");
+    expect(after).toContain("complex: object");
+  });
+
+  it("handles inline keys with the full identifier alphabet", () => {
+    // The shared `KEY_PATTERN` claims `[a-zA-Z_][a-zA-Z0-9_]*`
+    // is the alphabet both parse and write recognise. Pin that
+    // behaviorally with edge-case key shapes (leading
+    // underscore, trailing digit, internal underscore) so a
+    // future schema broadening that misses one site trips this.
+    for (const key of ["_internal_id", "pin1", "is_active", "platform_v2"]) {
+      const before = `wrap:\n  - ${key}: a\n`;
+      const after = updateSectionInYaml(
+        before,
+        `wrap.${key}`,
+        { [key]: "b", extra: "y" },
+        2,
+      );
+      expect(after.match(new RegExp(`${key}:`, "g"))).toHaveLength(1);
+      expect(after).toContain(`- ${key}: b`);
+      expect(after).toContain("extra: y");
+    }
   });
 
   it("still serializes regular non-list-item sections normally", () => {

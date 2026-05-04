@@ -7,7 +7,7 @@
  * read and write — not as a general YAML parser.
  */
 
-import { serializeYamlValues } from "./yaml-serialize.js";
+import { formatYamlScalar, serializeYamlValues } from "./yaml-serialize.js";
 
 /**
  * Identifier alphabet ESPHome accepts for top-level / nested config
@@ -35,6 +35,11 @@ const LIST_ITEM_INLINE_KEY_RE = new RegExp(
 const childRegexFor = (indent: string) =>
   new RegExp(`^${indent}(${KEY_PATTERN}):\\s*(.*)$`);
 
+// Intentionally permissive — the body after `- ` can be any
+// scalar (string with spaces, number, !secret reference) and we
+// just round-trip it. Validating the leading-token shape here
+// would over-match `KEY_PATTERN`'s purpose; that constraint
+// applies only to dict keys.
 const listItemRegexFor = (indent: string) =>
   new RegExp(`^${indent}  -\\s+(.*)$`);
 
@@ -283,36 +288,62 @@ export function updateSectionInYaml(
   const isListItem = /^\s+-\s/.test(lines[start]);
   const childIndent = isListItem ? "    " : "  ";
   let toSerialize = values;
+  let dashLine = lines[start];
   if (isListItem) {
     // List items can carry a key/value inline with the dash
     // (`- platform: esphome`). `parseYamlSectionValues` reads that
-    // key into `values`; if we serialize it again under the kept
-    // dash line it gets emitted twice — once as the inline pair,
-    // once as a regular child — producing visibly duplicated
-    // settings (`- platform: esphome\n    platform: esphome`).
-    // Drop the inline key from the values before serializing so
-    // only the dash line carries it. Uses the same regex
-    // `parseYamlSectionValues` reads on the dash line so the two
-    // sides can't drift on what counts as an inline key.
+    // key into `values`; if we re-serialize it under the dash
+    // line it gets emitted twice — once on the dash, once as a
+    // regular child — the visible
+    // `- platform: esphome\n    platform: esphome` duplicate users
+    // reported as "Save adds another esphome item".
     //
-    // Only dedupe when the dash line carries a non-empty inline
-    // value — `parseYamlSectionValues` mirrors this guard
-    // (`raw !== ""` before adding to the values map). A dash line
-    // with no value (`- platform:`) means the form value lives
-    // *only* in `values`; stripping it would keep the empty dash
-    // verbatim and lose the user's input on save.
-    const inlineMatch = lines[start].match(LIST_ITEM_INLINE_KEY_RE);
-    if (inlineMatch && inlineMatch[2].trim() !== "") {
+    // The form is the authoritative source for the inline key:
+    // rewrite the dash line to whatever the form holds, then drop
+    // that key from the body so it isn't emitted twice. Two
+    // shapes this handles:
+    //
+    //   - dash already carried a value, form unchanged: rewrite
+    //     yields the same line (no diff).
+    //   - dash was empty (`- platform:`) and form has a value:
+    //     rewrite produces `- platform: esphome` instead of
+    //     leaving an empty dash with a duplicate child below.
+    //
+    // Only acts on inline-able scalar values — a complex (object
+    // / list) form value can't sit on the dash line, so we leave
+    // the dash alone and emit the value normally in the body.
+    // Same regex `parseYamlSectionValues` reads so the two sides
+    // stay in lockstep on what counts as an inline key.
+    const inlineMatch = dashLine.match(LIST_ITEM_INLINE_KEY_RE);
+    if (inlineMatch) {
       const inlineKey = inlineMatch[1];
-      if (inlineKey in values) {
+      if (
+        inlineKey in values &&
+        _isInlinableScalar(values[inlineKey])
+      ) {
+        const dashPrefix = dashLine.match(/^(\s+-\s+)/)?.[1] ?? "  - ";
+        dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(
+          values[inlineKey],
+        )}`;
         const { [inlineKey]: _omit, ...rest } = values;
         toSerialize = rest;
       }
     }
   }
-  const newLines = [lines[start], ...serializeYamlValues(toSerialize, childIndent)];
+  const newLines = [dashLine, ...serializeYamlValues(toSerialize, childIndent)];
   lines.splice(start, end - start, ...newLines);
   return lines.join("\n");
+}
+
+/**
+ * True when *value* can be emitted on the dash line as
+ * `- key: <value>`. Strings, numbers, booleans qualify; objects,
+ * arrays, null, and undefined need the body representation.
+ */
+function _isInlinableScalar(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  const t = typeof value;
+  return t === "string" || t === "number" || t === "boolean";
 }
 
 /**

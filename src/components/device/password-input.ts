@@ -26,14 +26,15 @@ registerMdiIcons({
   "eye-off": mdiEyeOff,
 });
 
-/**
- * Detail shape of the `value-change` event this component fires
- * when the user types. Re-exported so consumers can type their
- * `@value-change` listener without redeclaring the shape.
- */
-export interface PasswordInputValueChange {
-  value: string;
-}
+// Event contract lives in a side-effect-free module so tests can
+// import the builder without pulling in the webawesome
+// CSSStyleSheet polyfill (which fails in Node).
+export {
+  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
+  buildPasswordValueChangeEvent,
+  type PasswordInputValueChange,
+} from "./password-input-event.js";
+import { buildPasswordValueChangeEvent as _buildEvent } from "./password-input-event.js";
 
 @customElement("esphome-password-input")
 export class ESPHomePasswordInput extends LitElement {
@@ -150,23 +151,14 @@ export class ESPHomePasswordInput extends LitElement {
   }
 
   private _onInput(e: Event) {
-    // Fire under a distinct event name (`value-change`, not
-    // `input`) so the native InputEvent that bubbles out of the
-    // inner `<input>` can never collide with our synthesized
-    // event on a consumer's host-level listener. An earlier
-    // version re-fired as `input` and the host saw both events
-    // back-to-back: ours with `{value}` detail, then the native
-    // one with `detail = 0`, whose `(0).value` read as
-    // `undefined` and wiped the just-typed value.
+    // Deliberately fire `value-change` (not `input`) so the
+    // native InputEvent that bubbles out of the inner `<input>`
+    // can never collide with our synthesised event on a
+    // consumer's host-level listener — `@value-change` sees only
+    // ours, `@input` sees only the native one.
     const next = (e.target as HTMLInputElement).value;
     this.value = next;
-    this.dispatchEvent(
-      new CustomEvent<PasswordInputValueChange>("value-change", {
-        detail: { value: next },
-        bubbles: true,
-        composed: true,
-      }),
-    );
+    this.dispatchEvent(_buildEvent(next));
   }
 
   private _onToggle() {
