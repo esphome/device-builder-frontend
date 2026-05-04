@@ -79,12 +79,57 @@ interface KeyPosition {
  * inside a comment). One callsite, one return shape — keeps the
  * completion source readable.
  */
-function matchKeyPosition(before: string): KeyPosition | null {
+export function matchKeyPosition(before: string): KeyPosition | null {
   const plain = before.match(RE_KEY_POSITION_PLAIN);
   if (plain) return { leading: plain[1], partial: plain[2], isListItem: false };
   const list = before.match(RE_KEY_POSITION_LIST);
   if (list) return { leading: list[1], partial: list[2], isListItem: true };
   return null;
+}
+
+interface ValuePosition {
+  leading: string;
+  key: string;
+  partial: string;
+}
+
+// Cursor is to the right of ``key:`` on the current line. Accepts
+// both plain (``  key: partial``) and list-item header
+// (``  - key: partial``) shapes — the dash form is the entry
+// point for ``- platform: <value>`` completion under domain
+// blocks like ``binary_sensor:``.
+const RE_VALUE_POSITION = /^(\s*)(?:-\s+)?([A-Za-z0-9_]+)\s*:\s*(\S*)$/;
+// ``# comment`` boundary — must be at line start or after
+// whitespace. ``#RRGGBB`` colour values inside a scalar are
+// valid YAML, so the boundary check rules them out.
+const RE_INLINE_COMMENT_BOUNDARY = /(^|\s)#/;
+// Whole-line pair shape: optional list-item dash, key, ``:``,
+// optional value text. Used by parent / top-level walkers in
+// helper functions; the regex captures ``(key, restOfLine)``.
+const RE_PAIR_LINE = /^\s*(?:-\s+)?([A-Za-z0-9_]+)\s*:\s*(.*)$/;
+// Column-0 pair: key starts at indent 0. Used to identify
+// top-level component blocks when walking up from the cursor.
+const RE_TOP_LEVEL_KEY = /^([A-Za-z0-9_]+)\s*:/;
+// ``platform: gpio`` sibling reader. Shape is identical to
+// RE_PAIR_LINE but constrains the key to literal ``platform``.
+const RE_PLATFORM_SIBLING =
+  /^\s*(?:-\s+)?platform\s*:\s*([A-Za-z0-9_]+)\s*$/;
+// Leading-whitespace counter — used when computing indents and
+// list-item lead text for the trigger / action apply snippets.
+const RE_LEADING_WHITESPACE = /^( *)/;
+
+/**
+ * Match the text before the cursor against the value-position
+ * shape (cursor is past a ``key:``). Returns ``null`` when the
+ * cursor is in a key-position or mid-line. ``leading`` excludes
+ * the optional ``- `` list-item dash so callers comparing it to
+ * other indents (e.g. ``findTopLevelBlock``) don't need to
+ * special-case the dash column.
+ */
+export function matchValuePosition(before: string): ValuePosition | null {
+  const m = before.match(RE_VALUE_POSITION);
+  if (!m) return null;
+  return { leading: m[1], key: m[2], partial: m[3] };
 }
 // Boolean-value typing — only ``true`` / ``false`` matter, so any
 // further character drops the popup.
@@ -152,7 +197,7 @@ function indentOf(line: string): number {
 function stripComment(line: string): string {
   // Only treat `#` as a comment when it's preceded by whitespace or starts
   // the line — `#RRGGBB` color values are valid YAML scalars.
-  const m = line.match(/(^|\s)#/);
+  const m = line.match(RE_INLINE_COMMENT_BOUNDARY);
   if (!m) return line.trimEnd();
   return line.slice(0, m.index! + m[0].length - 1).trimEnd();
 }
@@ -174,7 +219,7 @@ function findParentKey(
     const ind = indentOf(stripped);
     if (ind >= belowIndent) continue;
     // Match `<indent>key:` or `<indent>- key:` (list-of-mappings).
-    const keyMatch = stripped.match(/^\s*(?:-\s+)?([A-Za-z0-9_]+)\s*:\s*(.*)$/);
+    const keyMatch = stripped.match(RE_PAIR_LINE);
     if (keyMatch) {
       return { key: keyMatch[1], indent: ind, lineIdx: i };
     }
@@ -195,7 +240,7 @@ function findTopLevelBlock(
     const stripped = stripComment(raw);
     if (!stripped.trim()) continue;
     if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(/^([A-Za-z0-9_]+)\s*:/);
+    const m = stripped.match(RE_TOP_LEVEL_KEY);
     if (m) return m[1];
   }
   return null;
@@ -351,9 +396,17 @@ export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
   return out;
 }
 
-function platformValueCompletion(c: ComponentCatalogEntry): Completion {
+export function platformValueCompletion(
+  c: ComponentCatalogEntry,
+): Completion {
+  // ``c.id`` is the dotted catalog id (``binary_sensor.gpio``);
+  // YAML's ``platform:`` value is just the stem (``gpio``).
+  // Strip the domain prefix so the inserted text is valid YAML —
+  // matches the legacy editor's ``getPlatformNames`` which
+  // yielded each entry as the bare component name.
+  const stem = c.id.includes(".") ? c.id.slice(c.id.indexOf(".") + 1) : c.id;
   return {
-    label: c.id,
+    label: stem,
     type: "enum",
     detail: c.category,
     info: buildComponentInfo(c),
@@ -379,7 +432,7 @@ function triggerToCompletion(t: { key: string; docs?: string }): Completion {
     label: t.key,
     apply: (view, _completion, from, to) => {
       const line = view.state.doc.lineAt(from);
-      const lead = line.text.match(/^( *)/)?.[1] ?? "";
+      const lead = line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
       const insert =
         `${t.key}:\n${lead}  then:\n${lead}    - `;
       view.dispatch({
@@ -510,7 +563,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const before = lineText.slice(0, colInLine);
 
     // Don't fire inside comments.
-    const commentStart = before.match(/(^|\s)#/);
+    const commentStart = before.match(RE_INLINE_COMMENT_BOUNDARY);
     if (commentStart && commentStart.index !== undefined) {
       const idx = commentStart.index + commentStart[0].length - 1;
       if (colInLine > idx) return null;
@@ -519,7 +572,11 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     const allLines = state.doc.toString().split("\n");
 
     // ── Value position: `key:` already on this line, cursor after the colon.
-    const valueMatch = before.match(/^(\s*)([A-Za-z0-9_]+)\s*:\s*(\S*)$/);
+    // Value position: cursor is past ``  key: partial`` (plain) or
+    // ``  - key: partial`` (list-item header). The dash form is the
+    // entry point for ``- platform: <value>`` completion under
+    // domain blocks like ``binary_sensor:``.
+    const valueMatch = before.match(RE_VALUE_POSITION);
     if (valueMatch) {
       const [, leading, key, partial] = valueMatch;
       const indent = leading.length;
@@ -734,7 +791,7 @@ function readPlatformSibling(
     if (!stripped.trim()) continue;
     const ind = indentOf(stripped);
     if (i !== topOfBlock && ind < indent) break;
-    const m = stripped.match(/^\s*(?:-\s+)?platform\s*:\s*([A-Za-z0-9_]+)\s*$/);
+    const m = stripped.match(RE_PLATFORM_SIBLING);
     if (m) return m[1];
   }
   return null;
