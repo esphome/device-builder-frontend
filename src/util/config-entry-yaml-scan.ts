@@ -35,13 +35,14 @@
  * Key comparison uses `a.yaml === b.yaml` directly, which on
  * primitive strings is value equality, not reference identity.
  * In practice the parent (`pages/device.ts::_yaml`) hands us
- * the same string instance until the user types, so V8's
- * `===` short-circuits via pointer equality — O(1) on the
- * cache-hit path. When the content differs, length / hash
- * checks short-circuit before any byte-compare. Only an
- * unusual shape (two distinct strings with identical content)
- * would force the O(N) byte-compare; the typical render cycle
- * doesn't produce that.
+ * the same string instance until the user types, so engines
+ * typically short-circuit on pointer equality — no byte-compare
+ * on the typical equal-content fast path. When content differs
+ * they short-circuit on length and other structural
+ * mismatches. The unusual shape (two distinct strings with
+ * identical content) is the only one that forces an O(N)
+ * byte-compare; the typical render cycle doesn't produce
+ * that.
  *
  * The cache is content-keyed: a refactor that constructs a
  * fresh string per render with the same content still hits
@@ -67,8 +68,6 @@
  * as a legitimate cache key, which is fine because both memos
  * here use object keys; primitive-keyed memos that wanted to
  * cache `undefined` would need a different shape.
- */
-/**
  */
 function createScanMemo<K, V>(equals: (a: K, b: K) => boolean) {
   let key: K | undefined;
