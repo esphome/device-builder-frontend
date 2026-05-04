@@ -871,15 +871,12 @@ export class ESPHomeCommandDialog extends LitElement {
            open server-serial logs and OTA installs open network
            logs. Other command types (compile / clean) don't have a
            sensible logs follow-up, so we only surface it for
-           install.
-
-           Only show the button when the dialog observed the job
-           live (``_wasLiveAtAttach``). On the review path the
-           ``request-show-logs-after-install`` event has no
-           guaranteed listener (firmware-tasks dialog mounts its
-           own command-dialog without a logs-dialog handoff), so
-           the click would be a no-op. (issue #139) */
-        return this._commandType === "install" && this._wasLiveAtAttach
+           install. Every surface that mounts this command-dialog
+           also wires ``@request-show-logs-after-install`` to a
+           logs-dialog (dashboard, device editor,
+           firmware-tasks dialog), so the button works regardless
+           of whether the user came in fresh or reattached. */
+        return this._commandType === "install"
           ? html`<button class="term-btn term-btn--start" @click=${this._flipToLogs}>
                 <wa-icon library="mdi" name="console"></wa-icon>
                 ${this._localize("command.show_logs")}

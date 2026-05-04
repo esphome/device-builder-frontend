@@ -34,7 +34,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { clearJustCreated } from "../util/just-created.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
-import { handlePostInstallShowLogs } from "../util/post-install-logs.js";
+import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   archiveDevice,
@@ -1276,9 +1276,9 @@ export class ESPHomePageDashboard extends LitElement {
     }
   }
 
-  private _onPostInstallShowLogs = (
-    e: CustomEvent<import("../util/post-install-logs.js").PostInstallShowLogsDetail>
-  ) => handlePostInstallShowLogs(e, this._logsDialog);
+  private _onPostInstallShowLogs = postInstallShowLogsHandler(
+    () => this._logsDialog,
+  );
 
   private _openLogs(device: ConfiguredDevice) {
     if (device.state === DeviceState.ONLINE) {

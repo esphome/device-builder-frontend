@@ -33,6 +33,7 @@ import {
 } from "../util/format-job-time.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
+import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -41,6 +42,8 @@ import "./command-dialog.js";
 import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import "./logs-dialog.js";
+import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 
 registerMdiIcons({
   broom: mdiBroom,
@@ -88,6 +91,18 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   @query("esphome-command-dialog")
   private _commandDialog!: ESPHomeCommandDialog;
+
+  /** Logs dialog for the post-install hand-off when reattaching to
+   *  a job from this surface. Without one, the
+   *  ``request-show-logs-after-install`` event the nested command
+   *  dialog dispatches has no listener — both the auto-flip and the
+   *  post-success "Logs" button no-op. (issue #139) */
+  @query("esphome-logs-dialog")
+  private _logsDialog!: ESPHomeLogsDialog;
+
+  private _onPostInstallShowLogs = postInstallShowLogsHandler(
+    () => this._logsDialog,
+  );
 
   @query("esphome-confirm-dialog")
   private _confirmDialog!: ESPHomeConfirmDialog;
@@ -440,7 +455,10 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
           ? this._renderGroups(active, terminal)
           : this._renderEmpty()}
       </wa-dialog>
-      <esphome-command-dialog></esphome-command-dialog>
+      <esphome-command-dialog
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
+      ></esphome-command-dialog>
+      <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-confirm-dialog
         heading=${this._localize("firmware_jobs.reset_confirm_title")}
         confirm-label=${this._localize("firmware_jobs.reset_confirm_button")}
