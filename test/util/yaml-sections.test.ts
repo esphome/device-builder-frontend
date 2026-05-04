@@ -340,4 +340,68 @@ describe("resolveCurrentFromLine", () => {
     ].join("\n");
     expect(resolveCurrentFromLine(dup, "ota.esphome")).toBe(2);
   });
+
+  // ---------------------------------------------------------------
+  // Read-path round-trip: resolve → parseYamlSectionValues
+  // ---------------------------------------------------------------
+  //
+  // The section editor's `_loadConfig` calls
+  // `resolveCurrentFromLine` and feeds the result into
+  // `parseYamlSectionValues`. Pin the integration so a stale
+  // cached line (passed as the `staleFromLine` hint) produces
+  // values from the *right* section after the YAML has shifted.
+
+  it("read-path round-trip: stale line + shifted yaml seeds the right section", async () => {
+    const { parseYamlSectionValues } = await import(
+      "../../src/util/yaml-section-values.js"
+    );
+    // Pre-paste yaml: a single OTA item.
+    // Post-paste yaml: a leading top-level block pushed it down.
+    const yamlAfterPaste = [
+      "esphome:",
+      "  name: x",
+      "logger:",
+      "api:",
+      "ota:",
+      "  - platform: esphome",
+      "    password: secret",
+      "",
+    ].join("\n");
+    // Cached fromLine from before the paste — the stale hint.
+    const staleFromLine = 2;
+    const resolved = resolveCurrentFromLine(
+      yamlAfterPaste,
+      "ota.esphome",
+      staleFromLine,
+    );
+    expect(resolved).toBe(6);
+    const values = parseYamlSectionValues(
+      yamlAfterPaste,
+      "ota.esphome",
+      resolved!,
+    );
+    expect(values).toEqual({ platform: "esphome", password: "secret" });
+  });
+
+  it("read-path round-trip: missing section yields empty values", async () => {
+    // The section the editor is trying to load no longer
+    // exists in the yaml (user deleted it via the YAML pane).
+    // Resolver returns null; passing `undefined` to the parser
+    // makes it scan for `sectionKey:` at column 0 — for a
+    // platform-qualified key like `ota.esphome` no top-level
+    // line matches, so values come back empty. The form
+    // surfaces an empty section, the right outcome.
+    const { parseYamlSectionValues } = await import(
+      "../../src/util/yaml-section-values.js"
+    );
+    const yaml = "esphome:\n  name: x\n";
+    const resolved = resolveCurrentFromLine(yaml, "ota.esphome", 5);
+    expect(resolved).toBeNull();
+    const values = parseYamlSectionValues(
+      yaml,
+      "ota.esphome",
+      resolved ?? undefined,
+    );
+    expect(values).toEqual({});
+  });
 });

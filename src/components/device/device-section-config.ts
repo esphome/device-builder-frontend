@@ -172,6 +172,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _presentComponents: Set<string> = new Set();
 
+  /** Section's resolved `fromLine` against the *current* yaml,
+   *  recomputed each `_loadConfig`. Forwarded to the embedded
+   *  form so its conflict-detection (which skips the user's
+   *  own pin via `fromLine`) stays aligned with what the read
+   *  + write paths see. `undefined` when the section can't be
+   *  located in the live yaml — the form treats that as "no
+   *  exclusion" which is the right call for a not-found
+   *  section. */
+  @state()
+  private _resolvedFromLine?: number;
+
   @query("esphome-config-entry-form")
   private _form?: ESPHomeConfigEntryForm;
 
@@ -284,11 +295,26 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         image_url: component.image_url,
         entries: component.config_entries,
       };
+      // Resolve `fromLine` against the live YAML on the read
+      // path too — the cached `this.fromLine` can be stale by
+      // the time `reload()` fires (board-info debounces on
+      // yaml changes), and re-seeding from a stale line would
+      // populate the form with the wrong section's values.
+      // When the resolver can't find the section at all (key
+      // gone from yaml, empty pane), pass `undefined` so the
+      // parser falls back to its own column-0 scan (which
+      // won't match a dotted platform key, yielding `{}` —
+      // an empty form, the right outcome for a section that
+      // no longer exists).
+      const resolvedFromLine =
+        resolveCurrentFromLine(yaml, this.sectionKey, this.fromLine) ??
+        undefined;
       this._values = parseYamlSectionValues(
         yaml,
         this.sectionKey,
-        this.fromLine,
+        resolvedFromLine,
       );
+      this._resolvedFromLine = resolvedFromLine;
       this._presentComponents = parseTopLevelComponents(yaml);
     } catch (e) {
       if (id !== this._loadId) return;
@@ -397,7 +423,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .errors=${this._fieldErrors}
               .board=${this.board}
               .yaml=${this.yaml}
-              .fromLine=${this.fromLine}
+              .fromLine=${this._resolvedFromLine}
               .presentComponents=${this._presentComponents}
               ?disabled=${this._saving}
               ?show-advanced=${showAdvanced}
