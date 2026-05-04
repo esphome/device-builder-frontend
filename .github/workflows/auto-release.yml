@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   check-and-release:
@@ -74,11 +74,26 @@ jobs:
   trigger-release:
     needs: check-and-release
     if: needs.check-and-release.outputs.should_release == 'true'
-    permissions:
-      contents: read    # ceiling for release.yml's checkout + gh release view
-      id-token: write   # ceiling for release.yml's PyPI Trusted Publishing
-    uses: ./.github/workflows/release.yml
-    with:
-      version: ${{ needs.check-and-release.outputs.version }}
-    secrets:
-      ESPHOME_GITHUB_APP_PRIVATE_KEY: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
+    runs-on: ubuntu-latest
+    steps:
+      # Dispatch via an app token rather than calling release.yml as a
+      # reusable workflow: PyPI Trusted Publishing matches on the OIDC
+      # `workflow` claim, which is the *caller* under workflow_call.
+      # Dispatching gives release.yml its own run so the claim matches.
+      # The default GITHUB_TOKEN can't trigger workflows, so use the app.
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@1b10c78c7865c340bc4f6099eb2f838309f1e8c3 # v3.1.1
+        with:
+          client-id: ${{ vars.ESPHOME_GITHUB_APP_CLIENT_ID }}
+          private-key: ${{ secrets.ESPHOME_GITHUB_APP_PRIVATE_KEY }}
+
+      - name: Dispatch release workflow
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          VERSION: ${{ needs.check-and-release.outputs.version }}
+        run: |
+          gh workflow run release.yml \
+            --repo "${{ github.repository }}" \
+            --ref "${{ github.ref_name }}" \
+            -f version="$VERSION"

@@ -13,15 +13,6 @@ on:
         description: "Version number (e.g. 0.2.0)"
         required: true
         type: string
-  workflow_call:
-    inputs:
-      version:
-        description: "Version number (e.g. 0.2.0)"
-        required: true
-        type: string
-    secrets:
-      ESPHOME_GITHUB_APP_PRIVATE_KEY:
-        required: true
 
 env:
   PYTHON_VERSION: "3.12"
