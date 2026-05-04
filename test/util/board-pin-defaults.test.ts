@@ -164,6 +164,24 @@ describe("seedBoardPinDefaults", () => {
     expect(result).toEqual({});
   });
 
+  it("skips featured-component ids (their presets win)", () => {
+    // Featured components use ``featured.<board>.<local>`` ids —
+    // they include ``.`` so the platform-qualified-id skip catches
+    // them. Featured components carry their own per-pin presets
+    // (locked / suggested values from the board manifest); we must
+    // not override those with a generic peripheral-feature lookup
+    // because the featured preset is more specific (e.g. a
+    // PIR-on-FPC-connector preset that pins a particular GPIO).
+    const result = seedBoardPinDefaults(
+      "featured.athom-smart-plug-v3.relay",
+      [makeEntry({ key: "pin", default_value: "GPIO12" })],
+      makeBoard([makePin({ gpio: 8, features: ["i2c_sda"] })]),
+      { pin: "GPIO12" }, // catalog preset already in values
+    );
+    // No change — preset stays put.
+    expect(result).toEqual({ pin: "GPIO12" });
+  });
+
   it("only seeds PIN-typed entries, not other types", () => {
     // A board pin tagged i2c_frequency wouldn't make sense, but if
     // the manifest had it, the seeder must NOT touch a FLOAT entry.

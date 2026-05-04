@@ -501,6 +501,9 @@ export class ESPHomeAddComponentForm extends LitElement {
     errors: Map<string, ValidationError>,
     presentComponents: Set<string>,
   ): boolean {
+    // The caller (``_onSubmit``) only enters this branch when
+    // ``errors.size > 0``, but we keep the guard so the helper is
+    // safe to call from anywhere.
     if (errors.size === 0) return false;
     const renderedPaths = collectRenderablePaths(
       this.component.config_entries,

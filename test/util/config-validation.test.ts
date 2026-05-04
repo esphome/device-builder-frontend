@@ -265,21 +265,24 @@ describe("validateEntries", () => {
     expect(validateEntries(entries, {}).size).toBe(0);
   });
 
-  it("validates required entries against default_value (regression boundary)", () => {
-    // Required entry with a unit-suffixed default still validates —
-    // a regression that dropped the fallback for required entries
-    // would let an unset required field through where the catalog
-    // had pre-supplied a default.
+  it("required-with-default surfaces as required-empty when value is unset", () => {
+    // Without the (deliberately removed) ``?? default_value``
+    // fallback, an unset required entry surfaces as
+    // ``validation.required`` — which is the correct user-facing
+    // signal. The form's ``_seedDefaults`` pre-seeds required
+    // defaults into ``_values`` before validation runs, so this
+    // case only happens when the form bypasses seeding (or the
+    // section editor reads from a YAML that's missing the key).
     const entries = [
       makeEntry({
-        key: "frequency",
-        type: ConfigEntryType.FLOAT,
+        key: "address",
+        type: ConfigEntryType.INTEGER,
         required: true,
-        default_value: "50kHz",
+        default_value: "1",
       }),
     ];
     const errors = validateEntries(entries, {});
-    expect(errors.get("frequency")?.code).toBe("validation.not_a_number");
+    expect(errors.get("address")?.code).toBe("validation.required");
   });
 
   it("validates user-set values on optional numeric entries", () => {

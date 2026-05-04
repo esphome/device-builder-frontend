@@ -216,23 +216,26 @@ function _validateEntriesRecursive(
       continue;
     }
 
-    // Only fall back to ``default_value`` for required entries.
-    // For optional entries, an absent value means "use the backend's
-    // own default" — ``_coerceFields`` strips empty optional values
-    // from the API payload, so the backend never sees the frontend's
-    // catalog ``default_value``. Validating against it backfires when
-    // the default is a unit-suffixed string (e.g. ``frequency:
-    // "50kHz"``, ``timeout: "10s"``) on a numeric entry: ``Number()``
-    // returns ``NaN`` and the form rejects the submit with
-    // ``validation.not_a_number`` for a field the user can't see in
-    // ``required-only`` mode. Pin the original symptom from
-    // MasterOfNone (#issues): ``Add ES7210 → Add i2c → blue Add does
-    // nothing`` — i2c's optional ``frequency`` default was tripping
-    // this fallback.
-    const raw = entry.required
-      ? values[entry.key] ?? entry.default_value
-      : values[entry.key];
-    const err = validateEntry(entry, raw);
+    // Validate against the user-supplied (or seeded) value only —
+    // never against the catalog's ``default_value``. The original
+    // ``values[key] ?? default_value`` shape backfired on optional
+    // numeric entries with unit-suffixed string defaults (e.g.
+    // i2c's ``frequency: "50kHz"``, time-period ``timeout: "10s"``):
+    // ``Number("50kHz")`` is ``NaN`` and the validator emitted
+    // ``validation.not_a_number`` for a field the user couldn't see
+    // in ``required-only`` mode → silent dead Add button (the
+    // MasterOfNone repro).
+    //
+    // The fallback was unnecessary anyway:
+    // - Required entries with defaults are pre-seeded by the form's
+    //   ``_seedDefaults``, so ``values[key]`` is already populated
+    //   when this runs.
+    // - Optional defaults aren't sent to the backend (``_coerceFields``
+    //   strips empties), so validating against them is wrong by design.
+    // - The catalog has exactly one required entry with a default
+    //   (``modbus_controller.address: '1'``), and its default parses
+    //   cleanly without the fallback.
+    const err = validateEntry(entry, values[entry.key]);
     if (err) {
       const fullPath = [...pathPrefix, entry.key].join(".");
       errors.set(fullPath, { ...err, key: fullPath });
