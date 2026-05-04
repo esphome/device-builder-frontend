@@ -3,11 +3,11 @@ import {
   mdiAlertCircle,
   mdiCheckCircle,
   mdiClose,
+  mdiConsole,
   mdiDownload,
   mdiKey,
   mdiKeyOutline,
   mdiPlaylistCheck,
-  mdiPulse,
   mdiRefresh,
   mdiStop,
   mdiTimerSand,
@@ -38,6 +38,7 @@ import "./ansi-log.js";
 
 registerMdiIcons({
   close: mdiClose,
+  console: mdiConsole,
   download: mdiDownload,
   key: mdiKey,
   "key-outline": mdiKeyOutline,
@@ -46,7 +47,6 @@ registerMdiIcons({
   "check-circle": mdiCheckCircle,
   "alert-circle": mdiAlertCircle,
   "playlist-check": mdiPlaylistCheck,
-  pulse: mdiPulse,
   "timer-sand": mdiTimerSand,
 });
 
@@ -759,11 +759,15 @@ export class ESPHomeCommandDialog extends LitElement {
     return this._renderToolbarToggle({
       active: this._showLogsAfterInstall,
       onClick: this._toggleShowLogsAfterInstall,
-      iconActive: "pulse",
-      iconInactive: "pulse",
-      labelKeyActive: "command.hide_logs_after_install",
+      iconActive: "console",
+      iconInactive: "console",
+      /* Single label both ways — this is a checkbox-style toggle
+         (the ``is-active`` styling carries the on/off signal); the
+         text never swaps to "Skip logs after" so the user only has
+         to read one phrase to know what the control does. */
+      labelKeyActive: "command.show_logs_after_install",
       labelKeyInactive: "command.show_logs_after_install",
-      tooltipKeyActive: "command.hide_logs_after_install_tooltip",
+      tooltipKeyActive: "command.show_logs_after_install_tooltip",
       tooltipKeyInactive: "command.show_logs_after_install_tooltip",
     });
   }
@@ -816,9 +820,25 @@ export class ESPHomeCommandDialog extends LitElement {
                 ${this._localize("command.close")}
               </button>`;
       case "success":
-        return html`<button class="term-btn term-btn--ghost" @click=${this.close}>
-          ${this._localize("command.close")}
-        </button>`;
+        /* Surface a "Show logs" action on a successful install so
+           the user has a one-click path back to the live logs dialog
+           after they've clicked its "Back to install" button. The
+           same auto-flip path is reused so server-serial installs
+           open server-serial logs and OTA installs open network
+           logs. Other command types (compile / clean) don't have a
+           sensible logs follow-up, so we only surface it for
+           install. */
+        return this._commandType === "install"
+          ? html`<button class="term-btn term-btn--start" @click=${this._flipToLogs}>
+                <wa-icon library="mdi" name="console"></wa-icon>
+                ${this._localize("command.show_logs")}
+              </button>
+              <button class="term-btn term-btn--ghost" @click=${this.close}>
+                ${this._localize("command.close")}
+              </button>`
+          : html`<button class="term-btn term-btn--ghost" @click=${this.close}>
+              ${this._localize("command.close")}
+            </button>`;
       default:
         return nothing;
     }
