@@ -208,9 +208,9 @@ export class ESPHomeAddComponentForm extends LitElement {
     // a pin tagged with the matching peripheral feature. Without this,
     // ESPHome falls back to its compile-time defaults — which on the
     // ESP32-C3 (and other variants without an SCL/SDA alias) are
-    // either invalid or wrong-numbered (the original symptom from
-    // MasterOfNone: i2c on C3 emitting an "Invalid pin number: 22"
-    // squiggle because the bus block fell back to ESP32 GPIO22/21).
+    // either invalid or wrong-numbered: i2c on C3 emits an
+    // "Invalid pin number: 22" squiggle because the bus block
+    // falls back to ESP32 GPIO22/21.
     next = seedBoardPinDefaults(
       this.component.id,
       this.component.config_entries,
@@ -489,9 +489,9 @@ export class ESPHomeAddComponentForm extends LitElement {
    * shared ``esphome-config-entry-form`` actually renders. Built on
    * ``collectRenderablePaths`` so the visibility check stays in
    * lockstep with the form's render filter — any divergence would
-   * reintroduce the silent-button regression MasterOfNone reported
-   * (validation error on a hidden field → form bails on submit
-   * with no red ring anywhere).
+   * reintroduce the silent-button regression — validation error
+   * on a hidden field → form bails on submit with no red ring
+   * anywhere.
    *
    * The add-component form passes ``required-only`` and never
    * exposes a show-advanced toggle, so we always pass

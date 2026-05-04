@@ -239,7 +239,7 @@ function _validateEntriesRecursive(
     // surface as ``validation.required`` even though the catalog
     // pre-supplies a valid value.
     //
-    // The original symptom from MasterOfNone (#issues) — ``Add
+    // The original symptom — ``Add
     // ES7210 → Add i2c → blue Add does nothing`` — was the
     // unconditional fallback hitting i2c's optional ``frequency:
     // "50kHz"`` and tripping ``validation.not_a_number``. Pin the

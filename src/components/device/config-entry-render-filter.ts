@@ -11,11 +11,10 @@
  *    the user (a red ring on a paint that's actually onscreen).
  *
  * If they ever diverge, the add-component form regresses to the
- * silent-Add-button bug MasterOfNone reported: validation finds
- * an error on an entry the rendering filter dropped, the form
- * bails on submit, and the user sees nothing because no field is
- * highlighted. Pinning the predicate in one place is the
- * structural fix.
+ * silent-Add-button bug: validation finds an error on an entry
+ * the rendering filter dropped, the form bails on submit, and
+ * the user sees nothing because no field is highlighted.
+ * Pinning the predicate in one place is the structural fix.
  *
  * Returns the rendered list (rather than a boolean predicate) so
  * NESTED groups can be skipped when none of their children
