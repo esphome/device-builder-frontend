@@ -13,6 +13,7 @@ import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
+  isEntryVisible,
   validateEntries,
   type ValidationError,
 } from "../../util/config-validation.js";
@@ -24,6 +25,7 @@ import {
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
+import { ALWAYS_SHOWN_KEYS } from "./config-entry-form.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 
@@ -169,6 +171,11 @@ export class ESPHomeAddComponentForm extends LitElement {
       if (this.component) {
         this._initialized = true;
         this._initValues();
+        // Reset block message on retarget — without this, a "submit
+        // bailed" notice from the previous component (in the dep-flow
+        // detour the form gets reused for) would leak into the next
+        // component's form.
+        this._localBlockMessage = "";
       }
     }
   }
@@ -450,41 +457,90 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   /**
-   * True when at least one error key matches an entry that's actually
-   * rendered (i.e. the user can see the red ring). The shared form
-   * filters by ``required-only`` plus the advanced toggle, so a
-   * validation error on an optional / advanced entry is invisible
-   * unless we surface a top-level message — that's the symptom
-   * MasterOfNone reported as the "blue Add button does nothing"
-   * dead-button state.
+   * True when at least one error in the map lands on an entry the
+   * shared ``esphome-config-entry-form`` actually renders. Mirrors
+   * its ``_filterRenderable`` logic exactly so an invisible error
+   * (advanced, non-required leaf in required-only mode, hidden by
+   * ``isEntryVisible`` predicates, or a NESTED group whose only
+   * children are themselves filtered out) flips us into the
+   * top-level message lane instead of the dead-button state
+   * MasterOfNone reported.
    *
-   * Conservative heuristic: an error key's top-level segment is
-   * "visible" when the matching entry is required, NESTED (groups
-   * always render when they have content), or named ``name`` (the
-   * one always-shown leaf in required-only mode). Anything else is
-   * filtered out by the shared form and the user can't see it.
+   * Walks the schema recursively building the set of rendered
+   * paths, then checks each error key against that set.
    */
   private _anyErrorIsVisible(
     errors: Map<string, ValidationError>,
-    _presentComponents: Set<string>,
+    presentComponents: Set<string>,
   ): boolean {
-    const renderedKeys = new Set<string>();
-    for (const entry of this.component.config_entries) {
-      const isAlwaysShown = entry.key === "name";
-      if (
-        !entry.required &&
-        !isAlwaysShown &&
-        entry.type !== ConfigEntryType.NESTED
-      ) {
-        continue;
-      }
-      renderedKeys.add(entry.key);
-    }
+    if (errors.size === 0) return false;
+    const renderedPaths = new Set<string>();
+    this._collectRenderedPaths(
+      this.component.config_entries,
+      this._values,
+      presentComponents,
+      [],
+      renderedPaths,
+    );
     for (const key of errors.keys()) {
-      const top = key.split(".")[0];
-      if (renderedKeys.has(top)) return true;
+      if (renderedPaths.has(key)) return true;
     }
     return false;
+  }
+
+  /**
+   * Mirror of ``ESPHomeConfigEntryForm._filterRenderable`` — every
+   * entry key written here is one the user can actually see (so a
+   * validation error on it shows a red ring). Any divergence from
+   * the rendering filter reintroduces the silent-button regression
+   * this whole helper exists to prevent. Keep them in lockstep.
+   *
+   * Reads ``isEntryVisible`` for the cross-component +
+   * ``depends_on`` checks, drops advanced entries when the user
+   * hasn't toggled "show advanced", drops non-required leaves in
+   * required-only mode (always the case for the add-component
+   * form), and recurses into NESTED groups — emitting the group
+   * key only when at least one child is renderable, matching the
+   * shared form's "skip empty groups" rule.
+   */
+  private _collectRenderedPaths(
+    entries: ConfigEntry[],
+    values: Record<string, unknown>,
+    presentComponents: Set<string>,
+    pathPrefix: string[],
+    out: Set<string>,
+  ): void {
+    for (const entry of entries) {
+      if (!isEntryVisible(entry, values, presentComponents)) continue;
+      // ``advanced`` is a hard hide in the add-component form: the
+      // form passes ``required-only`` and never exposes a
+      // show-advanced toggle, so an advanced field is always
+      // filtered out here.
+      if (entry.advanced) continue;
+      if (entry.type === ConfigEntryType.NESTED) {
+        const child = values[entry.key];
+        const childValues =
+          child !== null && typeof child === "object" && !Array.isArray(child)
+            ? (child as Record<string, unknown>)
+            : {};
+        const before = out.size;
+        this._collectRenderedPaths(
+          entry.config_entries ?? [],
+          childValues,
+          presentComponents,
+          [...pathPrefix, entry.key],
+          out,
+        );
+        if (out.size > before) {
+          out.add([...pathPrefix, entry.key].join("."));
+        }
+        continue;
+      }
+      // Required-only mode: keep required leaves + the always-shown
+      // allowlist (``name``); drop everything else.
+      if (!entry.required && !ALWAYS_SHOWN_KEYS.has(entry.key)) continue;
+      out.add([...pathPrefix, entry.key].join("."));
+    }
   }
 
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
@@ -513,6 +569,11 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onSubmit() {
+    // Reset the local block message at the top of every submit
+    // attempt so a stale notice from a previous click can't render
+    // alongside a fresh result. Both bail paths below set their
+    // own message; the success path leaves it cleared.
+    this._localBlockMessage = "";
     const presentComponents = parseTopLevelComponents(this.yaml);
     // Block submit when there are missing top-level dependencies.
     // The button should already be disabled in that case, but defend

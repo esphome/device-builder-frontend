@@ -83,7 +83,7 @@ export interface ConfigEntryValueChange {
  * up-front when the user is creating something — fewer trips back to
  * the section editor for a label they always want.
  */
-const ALWAYS_SHOWN_KEYS: Set<string> = new Set(["name"]);
+export const ALWAYS_SHOWN_KEYS: Set<string> = new Set(["name"]);
 
 @customElement("esphome-config-entry-form")
 export class ESPHomeConfigEntryForm extends LitElement {
