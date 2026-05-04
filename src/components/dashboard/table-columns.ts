@@ -3,10 +3,7 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  getEncryptionState,
-  getEncryptionVisual,
-} from "../../util/encryption-state.js";
+import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
@@ -113,32 +110,19 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       header: localize("dashboard.table_col_name"),
       cell: (info) => {
         const row = info.row.original;
-        const encState = getEncryptionState({
+        // Compact-view variant: hides the green lock for
+        // mDNS-confirmed-encrypted devices (the noisy steady
+        // state on a healthy fleet) but keeps the icon for
+        // every other state, including "waiting / unknown"
+        // when mDNS hasn't broadcast yet. The drawer uses
+        // the full ``getEncryptionVisual`` for single-device
+        // inspection. (issue #141)
+        const encVisual = getCompactEncryptionVisual({
           api_enabled: row.api_enabled,
           api_encrypted: row.api_encrypted,
           api_encryption_active: row.api_encryption_active,
           has_pending_changes: row.hasPendingChanges,
         });
-        // Confirmed-encrypted is the steady state on a healthy
-        // fleet — repeating a green lock on every row drowns out
-        // the rows that need attention. Hide it in the table; the
-        // drawer keeps the full tri-state for single-device
-        // inspection. (issue #141)
-        //
-        // ``getEncryptionState`` returns "active" in two cases:
-        // (a) mDNS reported the device is *actually* running
-        // encryption (truthy ``api_encryption_active``), and
-        // (b) mDNS hasn't been seen yet but the YAML enables
-        // encryption — we trust the YAML pending broadcast
-        // (``api_encryption_active == null``). The issue is
-        // explicit that case (b) — "waiting / unknown" — should
-        // *keep* showing the icon, so gate on the broadcast
-        // value, not just on ``encState``.
-        const mdnsConfirmedEncrypted = !!row.api_encryption_active;
-        const encVisual =
-          encState === "active" && mdnsConfirmedEncrypted
-            ? null
-            : getEncryptionVisual(encState);
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
