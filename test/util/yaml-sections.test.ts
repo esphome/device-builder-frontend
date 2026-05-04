@@ -1,12 +1,21 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { parseYamlSectionValues } from "../../src/util/yaml-section-values.js";
 import {
+  _clearYamlSectionsMemo,
   categorizeSections,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   resolveCurrentFromLine,
+  sectionAtLine,
   type YamlSection,
 } from "../../src/util/yaml-sections.js";
+
+beforeEach(() => {
+  // Single-entry memo on `parseYamlTopLevelSections` would otherwise
+  // leak cached results between tests that happen to share `yaml`
+  // values across unrelated cases.
+  _clearYamlSectionsMemo();
+});
 
 describe("parseYamlTopLevelSections", () => {
   it("returns empty for empty input", () => {
@@ -162,6 +171,133 @@ wifi:
     const sections = parseYamlTopLevelSections(yaml);
     expect(sections).toHaveLength(1);
     expect(sections[0].parentKey).toBeUndefined();
+  });
+
+  it("returns the same array instance for repeated calls (memo)", () => {
+    // Cursor / hover dispatch hits this on every line transition;
+    // the memo turns those calls into pointer-equality fast-path
+    // hits when `_yaml` hasn't changed. Reference equality is the
+    // observable contract of the cache.
+    const yaml = `esphome:
+  name: test
+wifi:
+  ssid: x
+`;
+    const a = parseYamlTopLevelSections(yaml);
+    const b = parseYamlTopLevelSections(yaml);
+    expect(a).toBe(b);
+  });
+
+  it("re-parses when content changes (memo invalidates)", () => {
+    const yaml1 = `esphome:\n  name: test\n`;
+    const yaml2 = `esphome:\n  name: other\nwifi:\n  ssid: x\n`;
+    const a = parseYamlTopLevelSections(yaml1);
+    const b = parseYamlTopLevelSections(yaml2);
+    expect(a).not.toBe(b);
+    expect(a.map((s) => s.key)).toEqual(["esphome"]);
+    expect(b.map((s) => s.key)).toEqual(["esphome", "wifi"]);
+  });
+});
+
+describe("sectionAtLine", () => {
+  // Multi-section YAML with both a flat dict and an expanded list
+  // — covers parent-line, list-item, gap, and EOF cases.
+  const yaml = `# header banner
+esphome:
+  name: test
+  comment: stays
+
+logger:
+  level: INFO
+
+sensor:
+  - platform: dht
+    name: kitchen
+    pin: D1
+  - platform: bme280
+    name: bedroom
+`;
+  // Line numbers (1-indexed):
+  //   1: # header banner       — gap before first section
+  //   2: esphome:               — esphome [2..4]
+  //   3:   name: test
+  //   4:   comment: stays
+  //   5: (blank)                — gap (trimmed off esphome)
+  //   6: logger:                — logger [6..7]
+  //   7:   level: INFO
+  //   8: (blank)                — gap
+  //   9: sensor:                — covered by list-item ranges (no parent)
+  //  10:   - platform: dht      — sensor.dht [10..12]
+  //  11:     name: kitchen
+  //  12:     pin: D1
+  //  13:   - platform: bme280   — sensor.bme280 [13..14]
+  //  14:     name: bedroom
+
+  it("returns the section that owns the line", () => {
+    expect(sectionAtLine(yaml, 3)?.key).toBe("esphome");
+    expect(sectionAtLine(yaml, 7)?.key).toBe("logger");
+  });
+
+  it("hits the parent line of a flat-dict section", () => {
+    expect(sectionAtLine(yaml, 2)?.key).toBe("esphome");
+  });
+
+  it("attributes a list-item dash line to that item", () => {
+    const m = sectionAtLine(yaml, 10);
+    expect(m?.key).toBe("sensor");
+    expect(m?.platform).toBe("dht");
+  });
+
+  it("attributes content lines under a list item to the same item", () => {
+    const m = sectionAtLine(yaml, 11);
+    expect(m?.platform).toBe("dht");
+  });
+
+  it("crosses to the next list item", () => {
+    const m = sectionAtLine(yaml, 13);
+    expect(m?.platform).toBe("bme280");
+  });
+
+  it("returns null for the file header above the first section", () => {
+    expect(sectionAtLine(yaml, 1)).toBeNull();
+  });
+
+  it("returns null for a blank-line gap between sections", () => {
+    expect(sectionAtLine(yaml, 5)).toBeNull();
+  });
+
+  it("returns null for a line past EOF", () => {
+    expect(sectionAtLine(yaml, 9999)).toBeNull();
+  });
+
+  it("returns null on empty yaml", () => {
+    expect(sectionAtLine("", 1)).toBeNull();
+  });
+
+  // Pinning current behaviour for the known follow-up: when the
+  // cursor is inside an inline automation block (e.g. `on_press:`
+  // nested under a `binary_sensor` list item), `sectionAtLine`
+  // returns the enclosing component item, NOT the automation.
+  // Until the helper is extended to consult `parseYamlAutomations`
+  // and prefer the most-specific (smallest) range, this asymmetry
+  // means cursor-following picks the parent component while
+  // clicking the navigator's matching automation entry takes you
+  // to the automation. The test locks the contract so the
+  // follow-up doesn't accidentally regress the common case.
+  it("attributes inline automation lines to the enclosing component (known gap)", () => {
+    const yaml = `binary_sensor:
+  - platform: gpio
+    name: door
+    pin: D2
+    on_press:
+      then:
+        - logger.log: pressed
+`;
+    // `on_press:` itself is line 5; its body is lines 6-7.
+    const m = sectionAtLine(yaml, 6);
+    expect(m?.key).toBe("binary_sensor");
+    expect(m?.platform).toBe("gpio");
+    expect(m?.name).toBe("door");
   });
 });
 

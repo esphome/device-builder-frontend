@@ -13,24 +13,32 @@ categories:
     labels:
       - breaking-change
 
-  - title: "🚀 Features and enhancements"
+  - title: "🚀 New features"
     labels:
-      - feature
-      - enhancement
       - new-feature
+      - enhancement
 
   - title: "🐛 Bug fixes"
     labels:
       - bugfix
-      - bug
 
-  - title: "🧰 Maintenance and dependency bumps"
+  - title: "🔄 Refactor"
+    labels:
+      - refactor
+
+  - title: "📚 Documentation"
+    labels:
+      - docs
+
+  - title: "🧹 Maintenance"
+    labels:
+      - maintenance
+
+  - title: "⬆️ Dependencies / CI"
     collapse-after: 5
     labels:
-      - ci
-      - documentation
-      - maintenance
       - dependencies
+      - ci
 
 template: |
   $CHANGES

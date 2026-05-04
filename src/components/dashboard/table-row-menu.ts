@@ -8,7 +8,6 @@ import {
   mdiDelete,
   mdiDownload,
   mdiFileDownloadOutline,
-  mdiIpNetworkOutline,
   mdiKeyVariant,
   mdiOpenInNew,
   mdiPencil,
@@ -36,7 +35,6 @@ registerMdiIcons({
   delete: mdiDelete,
   download: mdiDownload,
   "file-download-outline": mdiFileDownloadOutline,
-  "ip-network-outline": mdiIpNetworkOutline,
   "key-variant": mdiKeyVariant,
   "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
@@ -69,25 +67,18 @@ export class ESPHomeTableRowMenu extends LitElement {
 
   /** When true, the menu is being shown for a card view where every
    *  inline action button is always rendered. The duplicate menu items
-   *  (Logs, Visit Web UI, Install when pending) are hidden via CSS
-   *  so the kebab only carries what isn't already on the card. The
-   *  host attribute drives the CSS selector — keep it in sync. */
+   *  (Logs, Visit Web UI) are hidden via CSS so the kebab only carries
+   *  what isn't already on the card. The host attribute drives the CSS
+   *  selector — keep it in sync.
+   *
+   *  ``Install`` is intentionally NOT deduped: it always shows in the
+   *  kebab (whether the inline button is "Install", "Update", or
+   *  absent) and opens the install-method dialog where the user picks
+   *  OTA / serial / web-flasher / custom-address. The inline buttons
+   *  are convenience shortcuts; the kebab entry is the consistent
+   *  entry point that doesn't change shape with device state. */
   @property({ type: Boolean, attribute: "card-mode", reflect: true })
   cardMode = false;
-
-  /** Mirrors ``ConfiguredDevice.has_pending_changes`` for the open
-   *  device. The inline Install button only renders when this is true,
-   *  so the kebab Install entry hides at the same widths to avoid the
-   *  duplicate. Reflected so CSS can target it via host attribute. */
-  @property({ type: Boolean, attribute: "has-pending", reflect: true })
-  hasPending = false;
-
-  /** Mirrors ``ConfiguredDevice.update_available`` for the open
-   *  device. The inline Update button takes precedence over Install
-   *  when this is true; the kebab's Install entry hides for the same
-   *  reason as ``hasPending``. */
-  @property({ type: Boolean, attribute: "has-update", reflect: true })
-  hasUpdate = false;
 
   @query(".menu")
   private _menuEl!: HTMLDivElement;
@@ -195,20 +186,16 @@ export class ESPHomeTableRowMenu extends LitElement {
          pairing is obvious at a glance; breakpoints are off-by-one
          from the inline rules so the transition pixel never has both
          copies hidden:
-           menu-item--install  (only when has-pending)  inline > 820px
            menu-item--logs                              inline > 920px
-           menu-item--visit-web                         inline > 1024px */
+           menu-item--visit-web                         inline > 1024px
+
+         The kebab Install entry is intentionally NOT deduped — it
+         always shows as the consistent "open the install-method
+         picker" entry point regardless of whether the inline button
+         is also currently rendering Install / Update. */
       :host([card-mode]) .menu-item--logs,
-      :host([card-mode]) .menu-item--visit-web,
-      :host([card-mode][has-pending]) .menu-item--install,
-      :host([card-mode][has-update]) .menu-item--install {
+      :host([card-mode]) .menu-item--visit-web {
         display: none;
-      }
-      @media (min-width: 821px) {
-        :host(:not([card-mode])[has-pending]) .menu-item--install,
-        :host(:not([card-mode])[has-update]) .menu-item--install {
-          display: none;
-        }
       }
       @media (min-width: 921px) {
         :host(:not([card-mode])) .menu-item--logs {
@@ -236,21 +223,13 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
         </div>
-        ${this.hasUpdate
-          ? html`<div
-              class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
-              @click=${this.busy ? undefined : () => this._emit("update-device")}
-            >
-              <wa-icon library="mdi" name="upload"></wa-icon>
-              ${this._localize("dashboard.update")}
-            </div>`
-          : html`<div
-              class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
-              @click=${this.busy ? undefined : () => this._emit("install-device")}
-            >
-              <wa-icon library="mdi" name="upload"></wa-icon>
-              ${this._localize("dashboard.action_install")}
-            </div>`}
+        <div
+          class="menu-item menu-item--install ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("install-device")}
+        >
+          <wa-icon library="mdi" name="upload"></wa-icon>
+          ${this._localize("dashboard.action_install")}
+        </div>
         <div class="menu-item menu-item--logs" @click=${() => this._emit("open-logs")}>
           <wa-icon library="mdi" name="console"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
@@ -274,15 +253,6 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="rename-outline"></wa-icon>
           ${this._localize("dashboard.action_rename")}
         </div>
-        ${this.device?.loaded_integrations?.includes("api")
-          ? html`<div
-              class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
-              @click=${this.busy ? undefined : () => this._emit("install-to-address")}
-            >
-              <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
-              ${this._localize("dashboard.action_install_to_address")}
-            </div>`
-          : nothing}
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("clean-build")}

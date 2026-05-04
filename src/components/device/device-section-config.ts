@@ -157,6 +157,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _error = "";
 
+  /** Set when `getComponent` returns null for `sectionKey` — usually
+   *  a custom or external component the backend's catalog doesn't
+   *  describe. We fall back to a synthetic `_config` with no entries
+   *  so the existing YAML-only notice fires; the subtitle renders
+   *  the `domain.platform` so the user can see which key the
+   *  fallback applies to. */
+  @state()
+  private _isUnknown = false;
+
   @state()
   private _fieldErrors: Map<string, ValidationError> = new Map();
 
@@ -277,6 +286,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._loading = true;
     this._error = "";
     this._config = null;
+    this._isUnknown = false;
     this._dirty = false;
 
     try {
@@ -285,14 +295,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
       if (id !== this._loadId) return;
 
-      if (!component) {
-        this._error = this._localize("device.unknown_section", {
-          key: this.sectionKey,
-        });
-        this._loading = false;
-        return;
-      }
-
       // Use the live YAML the parent passes in; `fromLine` is
       // relative to that. A `_api.getConfig` re-fetch would
       // disagree with the user-visible YAML when the editor
@@ -300,18 +302,39 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       // different section than the one they clicked.
       const yaml = this.yaml;
 
-      if (id !== this._loadId) return;
-
-      this._config = {
-        section_key: this.sectionKey,
-        section_type: "core",
-        title: component.name,
-        description: component.description,
-        docs_url: component.docs_url,
-        icon: "",
-        image_url: component.image_url,
-        entries: component.config_entries,
-      };
+      if (!component) {
+        // Custom / external component the backend doesn't know
+        // about. Synthesise a config with no entries so the
+        // existing YAML-only notice fires. We deliberately store
+        // `sectionKey` as the title rather than a localised
+        // "Custom component" label: the title flows into the
+        // delete confirm dialog and toast, so a generic label
+        // would make every prompt read the same when a device
+        // has multiple unknown sections. The header itself is
+        // re-localised live in render() — see _isUnknown branch.
+        this._config = {
+          section_key: this.sectionKey,
+          section_type: "core",
+          title: this.sectionKey,
+          description: "",
+          docs_url: "",
+          icon: "",
+          image_url: "",
+          entries: [],
+        };
+        this._isUnknown = true;
+      } else {
+        this._config = {
+          section_key: this.sectionKey,
+          section_type: "core",
+          title: component.name,
+          description: component.description,
+          docs_url: component.docs_url,
+          icon: "",
+          image_url: component.image_url,
+          entries: component.config_entries,
+        };
+      }
       // Resolve `fromLine` against the live YAML — see
       // `_resolveSpliceContext` for the contract and the
       // documented asymmetry between this read path
@@ -385,7 +408,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       <div class="section-header">
         <div class="section-header-info">
           <div class="section-header-title-row">
-            <h3 class="section-title">${this._config.title}</h3>
+            <h3 class="section-title">
+              ${this._isUnknown
+                ? this._localize("device.custom_component_title")
+                : this._config.title}
+            </h3>
             ${this._config.docs_url
               ? html`<a
                   class="docs-link"
@@ -398,18 +425,25 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                 </a>`
               : nothing}
           </div>
-          <p class="section-desc">
-            ${renderMarkdown(this._config.description)}
-          </p>
+          ${this._isUnknown
+            ? html`<p class="section-subtitle">${this.sectionKey}</p>`
+            : nothing}
+          ${this._config.description
+            ? html`<p class="section-desc">
+                ${renderMarkdown(this._config.description)}
+              </p>`
+            : nothing}
         </div>
-        <div class="section-image">
-          <img
-            src=${this._config.image_url || "/assets/board/default.svg"}
-            alt=${this._config.title}
-            referrerpolicy="no-referrer"
-            @error=${this._onImageError}
-          />
-        </div>
+        ${this._isUnknown
+          ? nothing
+          : html`<div class="section-image">
+              <img
+                src=${this._config.image_url || "/assets/board/default.svg"}
+                alt=${this._config.title}
+                referrerpolicy="no-referrer"
+                @error=${this._onImageError}
+              />
+            </div>`}
       </div>
       ${yamlOnly
         ? html`<div class="yaml-only-notice" role="note">

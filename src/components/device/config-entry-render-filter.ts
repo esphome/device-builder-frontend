@@ -40,10 +40,45 @@ export const ALWAYS_SHOWN_KEYS: ReadonlySet<string> = new Set(["name"]);
 export interface RenderFilterOptions {
   /** When true, drop non-required leaves (except ALWAYS_SHOWN_KEYS). */
   requiredOnly: boolean;
-  /** When false, drop entries marked ``advanced``. */
+  /** When false, drop entries marked ``advanced`` UNLESS they (or
+   *  a descendant) carry a YAML-supplied value. Pre-filled advanced
+   *  fields stay visible without forcing the user through the toggle;
+   *  clearing them in YAML lets them collapse back. */
   showAdvanced: boolean;
   /** Pass-through to ``isEntryVisible`` for cross-component checks. */
   presentComponents?: Set<string>;
+}
+
+/**
+ * True when ``entry`` carries a value the user has set (typically
+ * loaded from YAML). For leaves, any non-``undefined`` value counts
+ * — the YAML parser only adds a key to ``values`` when it's
+ * actually present in the document, so "present in ``values``"
+ * is the visibility signal we want. Note this is a visibility
+ * predicate, not a serialization predicate: an explicit empty
+ * scalar (``key: ""``) or null may render once and then be
+ * dropped on save by ``serializeYamlValues``, which is fine —
+ * the next reload will hide the field.
+ *
+ * For NESTED entries, recurse into the sub-dict and report true if
+ * any descendant leaf is set; an advanced group with at least one
+ * filled child needs to render so the child is reachable.
+ */
+function hasMaterialValue(
+  entry: ConfigEntry,
+  values: Record<string, unknown>,
+): boolean {
+  const value = values[entry.key];
+  if (entry.type === ConfigEntryType.NESTED) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+      return false;
+    }
+    const childValues = value as Record<string, unknown>;
+    return (entry.config_entries ?? []).some((child) =>
+      hasMaterialValue(child, childValues),
+    );
+  }
+  return value !== undefined;
 }
 
 export function filterRenderable(
@@ -54,7 +89,13 @@ export function filterRenderable(
   const out: ConfigEntry[] = [];
   for (const entry of entries) {
     if (!isEntryVisible(entry, values, opts.presentComponents)) continue;
-    if (entry.advanced && !opts.showAdvanced) continue;
+    if (
+      entry.advanced &&
+      !opts.showAdvanced &&
+      !hasMaterialValue(entry, values)
+    ) {
+      continue;
+    }
     if (entry.type === ConfigEntryType.NESTED) {
       const child = values[entry.key];
       const childValues =

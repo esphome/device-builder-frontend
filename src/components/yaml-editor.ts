@@ -79,6 +79,11 @@ export class ESPHomeYamlEditor extends LitElement {
 
   private _view: EditorView | null = null;
 
+  /** Last 1-indexed cursor line we emitted as `yaml-cursor-line`.
+   *  We only emit on line transitions so a horizontal mouse / arrow
+   *  movement inside the same line doesn't churn the page state. */
+  private _lastReportedCursorLine = 0;
+
   static styles = css`
     :host {
       display: block;
@@ -261,6 +266,19 @@ export class ESPHomeYamlEditor extends LitElement {
         },
       }),
       EditorView.updateListener.of((update) => {
+        // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
+        // before `yaml-cursor-line` within a single update.
+        // The page's `_onYamlChange` writes `_yaml` from the
+        // detail; its `_onYamlCursorLine` then reads `_yaml` to
+        // map the cursor's line to a section. A user pressing
+        // Enter at end-of-line fires both branches in one
+        // transaction (docChanged AND selectionSet) — if cursor
+        // ran first, it would parse a stale `_yaml` that
+        // doesn't yet contain the new line, and the section
+        // attribution would either miss or pick the wrong
+        // section. Don't reorder these `if` blocks. (See
+        // `pages/device.ts:_onYamlCursorLine` for the
+        // matching mention of this invariant.)
         if (update.docChanged) {
           this.dispatchEvent(
             new CustomEvent("yaml-change", {
@@ -269,6 +287,26 @@ export class ESPHomeYamlEditor extends LitElement {
               composed: true,
             }),
           );
+        }
+        // Cursor moved (click, arrow keys, find-jump). Emit the
+        // 1-indexed line so the page can switch the visual
+        // section editor to match. Throttle to line transitions:
+        // moving within the same line is irrelevant for section
+        // attribution, and emitting on every column change would
+        // churn page state.
+        if (update.selectionSet) {
+          const head = update.state.selection.main.head;
+          const line = update.state.doc.lineAt(head).number;
+          if (line !== this._lastReportedCursorLine) {
+            this._lastReportedCursorLine = line;
+            this.dispatchEvent(
+              new CustomEvent("yaml-cursor-line", {
+                detail: { line },
+                bubbles: true,
+                composed: true,
+              }),
+            );
+          }
         }
       }),
       ...(this._darkMode ? [oneDark] : []),
@@ -312,29 +350,128 @@ export class ESPHomeYamlEditor extends LitElement {
     }
   }
 
+  /**
+   * Tear down the current view and mount a fresh one against
+   * `this.value`. Both rebuild branches in `updated()` (theme/API
+   * change, configuration change) end with the same destroy +
+   * clear + reset-throttle + remount sequence; without this
+   * helper the throttle reset in particular tends to drift
+   * across the two copies (forgetting to reset
+   * `_lastReportedCursorLine` after a configuration change is
+   * what regressed cross-device cursor dispatch — a host-side
+   * field outliving the destroyed view).
+   */
+  private _remountEditor() {
+    this._view!.destroy();
+    this._container.innerHTML = "";
+    this._lastReportedCursorLine = 0;
+    this._mountEditor();
+  }
+
   updated(changed: Map<string, unknown>) {
-    // Theme or API/configuration changes require a full editor rebuild —
-    // CodeMirror extensions are static once the state is built.
+    // FIRST-MATCH-WINS: each branch below ends in `return` so a
+    // single render cycle takes exactly one path through this
+    // method. The same-document `value` branch is the fallthrough
+    // for the common case (no rebuild needed). Adding a fourth
+    // branch later? Preserve the early-return pattern — letting
+    // the value-change branch fire after a destroy + remount
+    // would dispatch a stale-cursor preservation against the
+    // freshly-mounted view.
+
+    // Theme / API changes require a full editor rebuild — CodeMirror
+    // extensions are static once the state is built. The user may
+    // have unsaved edits in the view that the parent's `value` prop
+    // doesn't yet reflect (the parent only learns about edits via
+    // `yaml-change`, which it loops back as `value`), so preserve
+    // the current view content across the rebuild by writing it
+    // back into `this.value` before remounting.
     if (
-      (changed.has("_darkMode") ||
-        changed.has("_api") ||
-        changed.has("configuration")) &&
+      (changed.has("_darkMode") || changed.has("_api")) &&
       this._view
     ) {
-      const doc = this._view.state.doc.toString();
-      this._view.destroy();
-      this._container.innerHTML = "";
-      this.value = doc;
-      this._mountEditor();
+      this.value = this._view.state.doc.toString();
+      this._remountEditor();
+      return;
+    }
+
+    // Configuration change = different device. The `<esphome-
+    // yaml-editor>` instance is reused across route changes, so
+    // we have to actively reset the view (destroy + remount with
+    // the parent's new `value`); skipping this would either keep
+    // the previous device's content or run the same-document
+    // preservation path below, which would map the prior file's
+    // cursor offset onto the new file (very disorienting on
+    // cross-device navigation). Initial cursor / scroll state is
+    // owned by `_mountEditor` (offset 0, scroll top via
+    // `EditorState.create`'s default selection), not this branch.
+    if (changed.has("configuration") && this._view) {
+      this._remountEditor();
       return;
     }
 
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
       if (current !== this.value) {
-        this._view.dispatch({
-          changes: { from: 0, to: current.length, insert: this.value },
+        // Same-document patch (section-editor save, …).
+        //
+        // The naive `from: 0, to: oldLen, insert: newText`
+        // reframes the entire doc as one giant replace, which
+        // (a) destroys CodeMirror's natural selection mapping
+        // (the cursor maps to offset 0 — the left side of the
+        // deletion's `assoc=-1` default) and (b) re-anchors
+        // `scrollTop` to keep the cursor visible, throwing the
+        // user back to the top of the YAML pane after a
+        // section-editor save.
+        //
+        // Compute a minimal change instead: shave the longest
+        // common prefix and suffix off both buffers and dispatch
+        // only the middle slice. CodeMirror's transaction then
+        // automatically maps the existing selection through that
+        // change — a cursor *before* the change sticks to the
+        // same offset (same line, same column); a cursor
+        // *after* shifts by (insert.length - delete.length),
+        // landing on the same logical line/column even when the
+        // save inserts or removes lines above. Offset-only
+        // preservation didn't have this property: a
+        // section-editor save above the cursor would land the
+        // caret on a different line in the new document.
+        //
+        // Scroll preservation stays separate — even with a
+        // minimal change, CodeMirror can re-anchor scroll if
+        // the selection mapping ends up "near" the visible
+        // viewport edge, so we snapshot `scrollTop` and write
+        // it back after the dispatch.
+        //
+        // Cross-device navigation skips this path via the
+        // `configuration`-change branch above, so the
+        // common-prefix logic only ever runs against doc pairs
+        // that share most of their content (typical
+        // section-save: one block changed, prefix+suffix
+        // untouched).
+        const view = this._view;
+        const scrollTop = view.scrollDOM.scrollTop;
+        const oldLen = current.length;
+        const newLen = this.value.length;
+        const minLen = Math.min(oldLen, newLen);
+        let prefix = 0;
+        while (prefix < minLen && current[prefix] === this.value[prefix]) {
+          prefix++;
+        }
+        let suffix = 0;
+        while (
+          suffix < minLen - prefix &&
+          current[oldLen - 1 - suffix] === this.value[newLen - 1 - suffix]
+        ) {
+          suffix++;
+        }
+        view.dispatch({
+          changes: {
+            from: prefix,
+            to: oldLen - suffix,
+            insert: this.value.slice(prefix, newLen - suffix),
+          },
         });
+        view.scrollDOM.scrollTop = scrollTop;
       }
     }
 

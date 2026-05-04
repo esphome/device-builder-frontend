@@ -100,12 +100,36 @@ function _isBlankOrBannerComment(line: string): boolean {
 }
 
 /**
+ * Single-entry memo for `parseYamlTopLevelSections`. The hot path
+ * is the YAML pane's cursor channel: the page's
+ * `_onYamlCursorLine` handler calls `sectionAtLine` on every line
+ * transition, which in turn re-parses the document. Hold-arrow
+ * scrolling and find-jumps fire that many times in a row, and the
+ * page hands us the same `_yaml` string instance until the user
+ * types, so this collapses to O(1) on the typical render cycle.
+ *
+ * The navigator also calls `parseYamlTopLevelSections` directly
+ * (twice per render — top-level sections + automation siblings),
+ * so the same memo also covers the navigator's render hot path.
+ *
+ * Same shape as `createScanMemo` in `config-entry-yaml-scan.ts`,
+ * but inlined here because the closure only needs to cache one
+ * function's input/output and a separate factory would be
+ * over-engineered for a single-keyed memo.
+ */
+let _topLevelSectionsKey: string | undefined;
+let _topLevelSectionsValue: YamlSection[] | undefined;
+
+/**
  * Extracts top-level YAML keys and their line ranges.
  * Top-level keys have no leading whitespace (e.g. `esphome:`, `wifi:`).
  * Sections containing YAML list items (e.g. `light:\n  - platform: binary`)
  * are expanded so each list item becomes its own section with name/platform metadata.
  */
 export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
+  if (_topLevelSectionsKey === yaml && _topLevelSectionsValue) {
+    return _topLevelSectionsValue;
+  }
   const lines = yaml.split("\n");
   const rawSections: Array<{ key: string; fromLine: number; toLine: number }> = [];
 
@@ -160,7 +184,19 @@ export function parseYamlTopLevelSections(yaml: string): YamlSection[] {
     sections.push(..._expandListItems(lines, raw));
   }
 
+  _topLevelSectionsKey = yaml;
+  _topLevelSectionsValue = sections;
   return sections;
+}
+
+/**
+ * Test-only: clear the `parseYamlTopLevelSections` memo so cached
+ * results from a prior test case don't leak into the next. Mirrors
+ * `_clearScanMemos` in `config-entry-yaml-scan.ts`.
+ */
+export function _clearYamlSectionsMemo(): void {
+  _topLevelSectionsKey = undefined;
+  _topLevelSectionsValue = undefined;
 }
 
 /**
@@ -364,6 +400,41 @@ export function findAddedSection(
   // The backend typically appends, so the new one is at the bottom.
   const last = candidates[candidates.length - 1];
   return { sectionKey: sectionKeyOf(last), fromLine: last.fromLine };
+}
+
+/**
+ * Pure line → section mapping used by the YAML pane's cursor
+ * handler. Returns the section whose `[fromLine, toLine]` range
+ * covers `line` (1-indexed), or `null` when `line` falls in the
+ * gap between sections (file header, blank-line interstitial,
+ * comment block above a top-level key — the trim done by
+ * `parseYamlTopLevelSections` deliberately keeps those gaps
+ * unattributed).
+ *
+ * `find` over the section array — sections are file-ordered with
+ * non-overlapping ranges, and at typical config sizes (~10-30
+ * sections) the constant factor of a binary search wouldn't beat
+ * the linear scan. Worth revisiting only if some pathological
+ * file blows the section count past ~50.
+ *
+ * Pulled out of the page handler (`_onYamlCursorLine`) so the
+ * mapping logic is testable without mounting CodeMirror — the
+ * handler reduces to "call this, dispatch state if it changed."
+ *
+ * Inline automations (`on_press:` etc. nested under component
+ * blocks, parsed by `parseYamlAutomations`) are deliberately not
+ * considered here — the cursor handler currently selects the
+ * enclosing component for those lines, which is a known gap vs.
+ * clicking the navigator's matching automation entry directly.
+ * Tracked as a follow-up to extend `sectionAtLine` to consult
+ * automations and prefer the most-specific (smallest) range.
+ */
+export function sectionAtLine(
+  yaml: string,
+  line: number,
+): YamlSection | null {
+  const sections = parseYamlTopLevelSections(yaml);
+  return sections.find((s) => line >= s.fromLine && line <= s.toLine) ?? null;
 }
 
 /**

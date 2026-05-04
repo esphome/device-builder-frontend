@@ -27,6 +27,19 @@ export function safeWebUiUrl(url: string): string {
 }
 
 /**
+ * Wrap *host* in square brackets when it's a bare IPv6 literal so the
+ * port suffix in a URL stays unambiguous (``http://[::1]:80`` rather
+ * than ``http://::1:80``, which the URL parser reads as host ``::``
+ * port ``1:80``). DNS hostnames can't contain ``:`` so the colon test
+ * is a reliable IPv6 detector; already-bracketed input is returned
+ * untouched so this can be called repeatedly without nesting.
+ */
+function _bracketIpv6(host: string): string {
+  if (host.startsWith("[") || !host.includes(":")) return host;
+  return `[${host}]`;
+}
+
+/**
  * Build the device's web-UI URL, or return ``""`` when the YAML didn't
  * expose a ``web_server`` port or we don't have a host to point at.
  *
@@ -41,6 +54,6 @@ export function buildWebUiUrl(device: ConfiguredDevice): string {
   const host = device.address || device.ip;
   if (!host) return "";
   return safeWebUiUrl(
-    `http://${host}${device.web_port === 80 ? "" : `:${device.web_port}`}`,
+    `http://${_bracketIpv6(host)}${device.web_port === 80 ? "" : `:${device.web_port}`}`,
   );
 }

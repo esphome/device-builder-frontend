@@ -11,6 +11,7 @@ import {
   mdiLockClock,
   mdiLockOpenVariant,
   mdiMemory,
+  mdiNetworkOutline,
   mdiSync,
   mdiTagMultiple,
   mdiTextShort,
@@ -43,6 +44,7 @@ registerMdiIcons({
   "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
   memory: mdiMemory,
+  "network-outline": mdiNetworkOutline,
   sync: mdiSync,
   "tag-multiple": mdiTagMultiple,
   "text-short": mdiTextShort,
@@ -333,7 +335,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       <div class="section">
         <h4 class="section-title">${this._localize("dashboard.drawer_device_info")}</h4>
         ${this._row("information-outline", this._localize("dashboard.drawer_name"), d.friendly_name || d.name)}
-        ${this._row("ip-network-outline", this._localize("dashboard.drawer_ip_address"), d.ip || d.address, true)}
+        ${this._row("network-outline", this._localize("dashboard.drawer_address"), d.address, true)}
+        ${this._renderIpAddressRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
 
@@ -521,6 +524,37 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       <wa-icon library="mdi" name=${v.icon}></wa-icon>
       ${this._localize(v.labelKey)}
     </span>`;
+  }
+
+  /**
+   * Render every resolved IP address for the device — IPv4 + IPv6 in
+   * the order the backend reported them. The label switches between
+   * singular and plural based on the list length, and an en-dash
+   * placeholder renders when the device has never been online so the
+   * row stays diagnostic.
+   */
+  private _renderIpAddressRow(d: ConfiguredDevice) {
+    const list = d.ip_addresses;
+    const labelKey = list.length > 1
+      ? "dashboard.drawer_ip_addresses"
+      : "dashboard.drawer_ip_address";
+    const label = this._localize(labelKey);
+    if (list.length === 0) {
+      return this._row("ip-network-outline", label, "", true);
+    }
+    return html`
+      <div class="row">
+        <div class="icon">
+          <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
+        </div>
+        <div class="content">
+          <div class="label">${label}</div>
+          ${list.map(
+            (ip) => html`<div class="value mono">${ip}</div>`,
+          )}
+        </div>
+      </div>
+    `;
   }
 
   private _row(icon: string, label: string, value: string | null, mono = false) {

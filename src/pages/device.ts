@@ -30,6 +30,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -418,17 +419,7 @@ export class ESPHomePageDevice extends LitElement {
         @section-select=${this._onSectionSelect}
         @yaml-highlight=${this._onYamlHighlight}
       >
-        <esphome-device-navigator
-          class="drawer-nav"
-          .openSections=${this._openSections}
-          .yaml=${this._yaml}
-          .board=${this._board}
-          .boardName=${this._board?.name ?? ""}
-          .configuration=${this.id}
-          .platform=${this._board?.esphome.platform ?? ""}
-          .selectedKey=${this._selectedSection}
-          .selectedFromLine=${this._selectedFromLine}
-        ></esphome-device-navigator>
+        ${this._renderNavigator("drawer-nav")}
       </div>
 
       <div class="page">
@@ -437,6 +428,7 @@ export class ESPHomePageDevice extends LitElement {
           @section-toggle=${this._onSectionToggle}
           @layout-change=${this._onLayoutChange}
           @yaml-change=${this._onYamlChange}
+          @yaml-cursor-line=${this._onYamlCursorLine}
           @yaml-highlight=${this._onYamlHighlight}
           @yaml-updated=${this._onYamlUpdated}
           @section-select=${this._onSectionSelect}
@@ -445,17 +437,7 @@ export class ESPHomePageDevice extends LitElement {
           @install-device=${this._installCtrl.onInstall}
           @update-device=${this._installCtrl.onUpdate}
         >
-          <esphome-device-navigator
-            class="desktop-nav"
-            .openSections=${this._openSections}
-            .yaml=${this._yaml}
-            .board=${this._board}
-            .boardName=${this._board?.name ?? ""}
-            .configuration=${this.id}
-            .platform=${this._board?.esphome.platform ?? ""}
-            .selectedKey=${this._selectedSection}
-            .selectedFromLine=${this._selectedFromLine}
-          ></esphome-device-navigator>
+          ${this._renderNavigator("desktop-nav")}
           <esphome-device-editor
             .yaml=${this._yaml}
             .savedYaml=${this._savedYaml}
@@ -491,6 +473,7 @@ export class ESPHomePageDevice extends LitElement {
         ?open=${this._installCtrl.installMethodOpen}
         .deviceState=${this._installCtrl.deviceState}
         .deviceTargetPlatform=${this._installCtrl.deviceTargetPlatform}
+        .deviceCurrentAddress=${this._installCtrl.deviceCurrentAddress}
         @close=${this._installCtrl.onInstallMethodClose}
         @select-method=${this._installCtrl.onInstallMethodSelect}
       ></esphome-install-method-dialog>
@@ -568,8 +551,73 @@ export class ESPHomePageDevice extends LitElement {
     localStorage.setItem("esphome-editor-layout", e.detail);
   }
 
+  /**
+   * Both nav instances (drawer + desktop) share the same prop set
+   * — only their CSS class differs. Pulled into a render helper
+   * so adding a prop touches one place instead of drifting
+   * across two copies.
+   */
+  private _renderNavigator(className: "drawer-nav" | "desktop-nav") {
+    return html`<esphome-device-navigator
+      class=${className}
+      .openSections=${this._openSections}
+      .yaml=${this._yaml}
+      .board=${this._board}
+      .boardName=${this._board?.name ?? ""}
+      .configuration=${this.id}
+      .platform=${this._board?.esphome.platform ?? ""}
+      .selectedKey=${this._selectedSection}
+      .selectedFromLine=${this._selectedFromLine}
+    ></esphome-device-navigator>`;
+  }
+
   private _onYamlChange(e: CustomEvent<{ value: string }>) {
     this._yaml = e.detail.value;
+  }
+
+  /**
+   * Cursor moved to a new line in the YAML pane. Find the section
+   * that owns that line and select it so the navigator's
+   * highlight follows the user's cursor (and the visual editor
+   * loads the same section). Throttled to line transitions by
+   * the editor itself; this handler runs once per traversed
+   * section.
+   *
+   * Lines that fall in the gap between sections (a comment block,
+   * a blank line, the file header above the first section) don't
+   * match any range — leave the current selection alone in that
+   * case rather than clearing it. The user-visible behaviour is
+   * "scrolling through configured fields highlights them; cursor
+   * resting in interstitial whitespace doesn't unhighlight what
+   * was last clicked."
+   *
+   * Load-bearing event ordering: this handler reads `this._yaml`
+   * to map the line to a section, but `this._yaml` is only
+   * advanced when `_onYamlChange` runs. The editor's
+   * `updateListener` dispatches `yaml-change` *before*
+   * `yaml-cursor-line` within a single CM transaction (the
+   * `update.docChanged` branch is checked first), so when the
+   * user types Enter at end-of-line, this handler sees the
+   * updated `_yaml` and the new line maps correctly. Swapping
+   * the dispatch order in the editor would silently break the
+   * cursor-follows-section path on every line-creating
+   * keystroke — re-validate this assumption if you reorder the
+   * `if` blocks in `yaml-editor.ts:_buildExtensions`'s
+   * `updateListener`.
+   */
+  private _onYamlCursorLine(e: CustomEvent<{ line: number }>) {
+    const match = sectionAtLine(this._yaml, e.detail.line);
+    if (!match) return;
+    const sectionKey = sectionKeyOf(match);
+    if (
+      sectionKey === this._selectedSection &&
+      match.fromLine === this._selectedFromLine
+    ) {
+      return;
+    }
+    this._selectedSection = sectionKey;
+    this._selectedFromLine = match.fromLine;
+    this._updateUrl();
   }
 
   private _onYamlHighlight(

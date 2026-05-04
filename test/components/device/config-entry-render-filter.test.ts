@@ -52,6 +52,95 @@ describe("filterRenderable", () => {
     expect(withAdv.map((e) => e.key)).toEqual(["a", "b"]);
   });
 
+  it("keeps advanced leaves whose YAML value is set, even with showAdvanced off", () => {
+    const entries = [
+      makeEntry({ key: "tx_power", advanced: true }),
+      makeEntry({ key: "fast_connect", advanced: true }),
+      makeEntry({ key: "ssid", required: true }),
+    ];
+    const out = filterRenderable(entries, { tx_power: "20dB", ssid: "x" }, {
+      requiredOnly: false,
+      showAdvanced: false,
+    });
+    // `tx_power` survives because YAML supplied a value;
+    // `fast_connect` stays hidden because it isn't filled.
+    expect(out.map((e) => e.key)).toEqual(["tx_power", "ssid"]);
+  });
+
+  it("treats explicit falsy values (false, 0, '') as set on advanced leaves", () => {
+    const entries = [
+      makeEntry({ key: "use_address", advanced: true }),
+      makeEntry({ key: "channel", advanced: true }),
+      makeEntry({ key: "comment", advanced: true }),
+    ];
+    const out = filterRenderable(
+      entries,
+      { use_address: false, channel: 0, comment: "" },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(out.map((e) => e.key)).toEqual([
+      "use_address",
+      "channel",
+      "comment",
+    ]);
+  });
+
+  it("keeps an advanced NESTED group when any descendant has a value", () => {
+    const entries = [
+      makeEntry({
+        key: "manual_ip",
+        type: ConfigEntryType.NESTED,
+        advanced: true,
+        config_entries: [
+          makeEntry({ key: "static_ip" }),
+          makeEntry({ key: "gateway" }),
+        ],
+      }),
+    ];
+    const filled = filterRenderable(
+      entries,
+      { manual_ip: { static_ip: "10.0.0.5" } },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(filled.map((e) => e.key)).toEqual(["manual_ip"]);
+    const empty = filterRenderable(entries, {}, {
+      requiredOnly: false,
+      showAdvanced: false,
+    });
+    expect(empty.map((e) => e.key)).toEqual([]);
+  });
+
+  it("surfaces an advanced leaf nested inside a non-advanced group when filled", () => {
+    const entries = [
+      makeEntry({
+        key: "ota",
+        type: ConfigEntryType.NESTED,
+        config_entries: [
+          makeEntry({ key: "platform", required: true }),
+          makeEntry({ key: "password", advanced: true }),
+        ],
+      }),
+    ];
+    const filled = filterRenderable(
+      entries,
+      { ota: { platform: "esphome", password: "secret" } },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(filled.map((e) => e.key)).toEqual(["ota"]);
+    const filledChildren = filterRenderable(
+      entries[0].config_entries!,
+      { platform: "esphome", password: "secret" },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(filledChildren.map((e) => e.key)).toEqual(["platform", "password"]);
+    const emptyChildren = filterRenderable(
+      entries[0].config_entries!,
+      { platform: "esphome" },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(emptyChildren.map((e) => e.key)).toEqual(["platform"]);
+  });
+
   it("drops non-required leaves in required-only mode (except ALWAYS_SHOWN_KEYS)", () => {
     const entries = [
       makeEntry({ key: "freq" }), // optional, not allowlisted

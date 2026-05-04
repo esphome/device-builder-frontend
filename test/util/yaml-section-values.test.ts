@@ -414,3 +414,273 @@ describe("removeSectionFromYaml — multi-item list", () => {
     expect(after).not.toContain("platform: esphome");
   });
 });
+
+describe("parseYamlSectionValues / updateSectionInYaml — block scalars and complex automations", () => {
+  // Reduced repro of the user-reported bug: opening a template
+  // button section in the visual editor and adding an icon mangled
+  // the `on_press: - lambda: |-` block into `- "lambda: |-"` and
+  // left the lambda body line stranded after the new icon row.
+  // Two compounding causes:
+  //   1. `findSectionRange` terminated the section at the indented
+  //      `      - lambda: |-` thinking it was a sibling list item
+  //      — it's actually nested inside the on_press value — so the
+  //      splice didn't cover the lambda body line.
+  //   2. The minimal parser/serializer can't represent block
+  //      scalars; `on_press` came back as `["lambda: |-"]` and
+  //      re-serialized as `- "lambda: |-"` (quoted because the
+  //      string contains `:`).
+  // Fix: track the section's leading-dash indent (only sibling
+  // dashes at the same indent terminate); detect block-scalar /
+  // sub-dict-list shapes and round-trip them via `YamlRawValue`.
+
+  const TEMPLATE_BUTTON_YAML = `button:
+  - platform: template
+    name: My Button
+    on_press:
+      - lambda: |-
+          some_code(1, 2);
+`;
+
+  it("preserves a list item's block-scalar lambda body across save", () => {
+    // This is the exact user-reported flow: parse → form adds
+    // `icon` → save. The lambda body must be intact and the
+    // on_press list must NOT have been re-serialized as a
+    // quoted string.
+    const values = parseYamlSectionValues(
+      TEMPLATE_BUTTON_YAML,
+      "button.template",
+      2,
+    );
+    expect(values.platform).toBe("template");
+    expect(values.name).toBe("My Button");
+    // Form-side: user adds an icon
+    (values as Record<string, unknown>).icon = "mdi:account";
+    const after = updateSectionInYaml(
+      TEMPLATE_BUTTON_YAML,
+      "button.template",
+      values,
+      2,
+    );
+
+    // Block scalar lambda is intact
+    expect(after).toContain("- lambda: |-");
+    expect(after).toContain("          some_code(1, 2);");
+    // No mangled quoted-string version
+    expect(after).not.toContain('- "lambda: |-"');
+    // The new icon was added
+    expect(after).toContain('icon: "mdi:account"');
+    // Exactly one on_press: line — not duplicated by the splice
+    expect(after.match(/on_press:/g)).toHaveLength(1);
+    // Exactly one lambda: line (only the original block scalar
+    // header), not the original-plus-mangled-copy
+    expect(after.match(/lambda:/g)).toHaveLength(1);
+  });
+
+  it("preserves the on_press list when the form leaves it untouched", () => {
+    // Sanity round-trip: parse + write WITHOUT the form changing
+    // anything must produce a byte-equivalent (modulo trailing
+    // newline handling) result for the section.
+    const values = parseYamlSectionValues(
+      TEMPLATE_BUTTON_YAML,
+      "button.template",
+      2,
+    );
+    const after = updateSectionInYaml(
+      TEMPLATE_BUTTON_YAML,
+      "button.template",
+      values,
+      2,
+    );
+    expect(after).toContain(
+      "    on_press:\n      - lambda: |-\n          some_code(1, 2);",
+    );
+    // Tighten the byte-stable contract: no duplicated section
+    // headers (regression check — early findSectionRange bug
+    // had on_press: appearing twice in the output).
+    expect(after.match(/on_press:/g)).toHaveLength(1);
+    expect(after.match(/lambda:/g)).toHaveLength(1);
+  });
+
+  it("overrides raw preservation when the form writes a new value to that key", () => {
+    // Contract pin: YamlRawValue is the parser's "I can't model
+    // this, paste it back unchanged" sentinel. If the form does
+    // get a real value into that key (a hypothetical edit field
+    // on `on_press`, or the user clearing the field), the
+    // form's value wins and serializer emits it normally —
+    // raw-preservation is a parser-side default, not a sticky
+    // protection.
+    const yaml = `button:
+  - platform: template
+    name: My Button
+    on_press:
+      - lambda: |-
+          some_code();
+`;
+    const values = parseYamlSectionValues(yaml, "button.template", 2);
+    // Form replaces the on_press value with a plain string
+    // (artificial — the real form doesn't expose on_press —
+    // but documents the override semantics).
+    (values as Record<string, unknown>).on_press = "new_value";
+    const after = updateSectionInYaml(yaml, "button.template", values, 2);
+    // Raw block is gone, replaced by the form's string.
+    expect(after).toContain("on_press: new_value");
+    expect(after).not.toContain("- lambda: |-");
+    expect(after).not.toContain("some_code()");
+  });
+
+  it("findSectionRange does not stop at a nested list inside a value", () => {
+    // Direct test for cause #1: parseYamlSectionValues exposes
+    // the same section-range walk via its outer break loop. If
+    // the loop bailed at `      - lambda: |-`, `name` would be
+    // captured but `on_press` wouldn't — so the presence of
+    // both keys in the parse output proves the walk crossed
+    // the nested dash.
+    const values = parseYamlSectionValues(
+      TEMPLATE_BUTTON_YAML,
+      "button.template",
+      2,
+    );
+    expect(Object.keys(values).sort()).toEqual(
+      ["name", "on_press", "platform"].sort(),
+    );
+  });
+
+  it("preserves sub-dict list items (`- then:` style automations)", () => {
+    // Automations frequently use `- then:` headers with their
+    // own indented body. The simple `string[]` parser would
+    // capture only "then:" and drop the body — same class of
+    // bug as the lambda block scalar.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - then:
+          - logger.log: pressed
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    (values as Record<string, unknown>).name = "Door";
+    const after = updateSectionInYaml(yaml, "binary_sensor.gpio", values, 2);
+    expect(after).toContain("- then:");
+    expect(after).toContain("          - logger.log: pressed");
+    expect(after).toContain("name: Door");
+    expect(after).not.toContain('- "then:"');
+  });
+
+  it("preserves a direct block scalar (`lambda: |-`) on a top-level key", () => {
+    // Direct block scalar — value sits on the SAME line as the
+    // key, body underneath. Without raw-preservation the parser
+    // captured `raw = "|-"` as a literal string and dropped the
+    // body; the serializer then quoted `"|-"` (starts with `-`)
+    // producing `lambda: "|-"` and corrupting the field.
+    const yaml = `lambda:
+  lambda: |-
+    return some_value;
+  other_field: hello
+`;
+    // The fixture's first line `lambda:` is a top-level key whose
+    // value is a dict with a NESTED `lambda: |-` field.
+    const values = parseYamlSectionValues(yaml, "lambda");
+    // The nested block is preserved as YamlRawValue under the
+    // outer dict's `lambda` key.
+    expect(values.other_field).toBe("hello");
+    // Now save the section unchanged and verify the block scalar
+    // round-trips byte-for-byte.
+    const after = updateSectionInYaml(yaml, "lambda", values);
+    expect(after).toContain("lambda: |-");
+    expect(after).toContain("    return some_value;");
+    expect(after).not.toContain('lambda: "|-"');
+  });
+
+  it("preserves a direct block scalar at the top level of a list-item section", () => {
+    // The repro Copilot flagged: a list-item section whose body
+    // includes a direct block scalar field (not wrapped in a
+    // list under a key). Editing a sibling field on save would
+    // otherwise drop the block scalar's body.
+    const yaml = `script:
+  - id: my_script
+    then:
+      - logger.log: hello
+    inline_code: |-
+      some_function();
+      another_line;
+`;
+    const values = parseYamlSectionValues(yaml, "script", 2);
+    expect(values.id).toBe("my_script");
+    // Form-side: rename the script
+    (values as Record<string, unknown>).id = "renamed_script";
+    const after = updateSectionInYaml(yaml, "script", values, 2);
+    expect(after).toContain("inline_code: |-");
+    expect(after).toContain("      some_function();");
+    expect(after).toContain("      another_line;");
+    expect(after).toContain("id: renamed_script");
+    expect(after).not.toContain('inline_code: "|-"');
+  });
+
+  it("preserves dotted-key automation actions (`- logger.log:`, `- switch.turn_on:`)", () => {
+    // Pre-fix `LIST_ITEM_DICT_KEY_RE` only matched bare
+    // identifiers, so `- logger.log: pressed` was treated as a
+    // plain string and re-emitted as `- "logger.log: pressed"`,
+    // corrupting the automation.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - logger.log: pressed
+      - switch.turn_on: relay_id
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    (values as Record<string, unknown>).name = "Door";
+    const after = updateSectionInYaml(yaml, "binary_sensor.gpio", values, 2);
+    // Both dotted-key items survive without quoting
+    expect(after).toContain("- logger.log: pressed");
+    expect(after).toContain("- switch.turn_on: relay_id");
+    expect(after).not.toContain('- "logger.log: pressed"');
+    expect(after).not.toContain('- "switch.turn_on: relay_id"');
+    expect(after).toContain("name: Door");
+  });
+
+  it("multi-button list: edits to one item don't disturb siblings", () => {
+    // The PR description's full scenario — multiple template
+    // buttons, only one is edited. Sibling buttons (above and
+    // below) keep their lambda blocks intact.
+    const yaml = `button:
+  - platform: template
+    name: Button A
+    on_press:
+      - lambda: |-
+          do_a();
+  - platform: template
+    name: Button B
+    on_press:
+      - lambda: |-
+          do_b();
+  - platform: template
+    name: Button C
+    on_press:
+      - lambda: |-
+          do_c();
+`;
+    // Edit the middle button (line 7 = `  - platform: template`
+    // for Button B).
+    const values = parseYamlSectionValues(yaml, "button.template", 7);
+    expect(values.name).toBe("Button B");
+    (values as Record<string, unknown>).icon = "mdi:account";
+    const after = updateSectionInYaml(yaml, "button.template", values, 7);
+    // All three lambda bodies still present
+    expect(after).toContain("do_a();");
+    expect(after).toContain("do_b();");
+    expect(after).toContain("do_c();");
+    // Exactly three lambda headers — the splice didn't duplicate
+    // or drop any
+    expect(after.match(/- lambda: \|-/g)).toHaveLength(3);
+    // Icon landed on the right button
+    const lines = after.split("\n");
+    const bIdx = lines.findIndex((l) => l.includes("name: Button B"));
+    const buttonBSlice = lines
+      .slice(bIdx, bIdx + 6)
+      .join("\n");
+    expect(buttonBSlice).toContain('icon: "mdi:account"');
+    // Sanity: only Button B got the icon (siblings stayed clean)
+    expect(after.match(/icon:/g)).toHaveLength(1);
+  });
+});

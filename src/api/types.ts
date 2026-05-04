@@ -82,8 +82,14 @@ export interface ConfiguredDevice {
   target_platform: string;
   /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */
   address: string;
-  /** Resolved IPv4 address from mDNS — empty until the device is seen online. */
+  /** Primary resolved IP from mDNS — empty until the device is seen online.
+   *  Prefers IPv4 when both are available. Used for OTA cache args, and as
+   *  the Visit-web-UI fallback when ``address`` (mDNS hostname) is empty. */
   ip: string;
+  /** All resolved addresses from mDNS (IPv4 + IPv6) — empty array until
+   *  the device is seen online. ``ip_addresses[0]`` matches ``ip`` when
+   *  populated. */
+  ip_addresses: string[];
   web_port: number | null;
   current_version: string;
   deployed_version: string;
