@@ -12,6 +12,7 @@
  */
 
 import { html, nothing } from "lit";
+import { ifDefined } from "lit/directives/if-defined.js";
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import {
@@ -135,8 +136,8 @@ export function renderFloatWithUnitField(
           class=${invalid ? "invalid" : ""}
           .value=${numberValue}
           ?disabled=${disabled}
-          min=${min ?? ""}
-          max=${max ?? ""}
+          min=${ifDefined(min)}
+          max=${ifDefined(max)}
           step="any"
           placeholder=${placeholder}
           @input=${(e: Event) => {
