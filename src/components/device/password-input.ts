@@ -141,6 +141,15 @@ export class ESPHomePasswordInput extends LitElement {
   }
 
   private _onInput(e: Event) {
+    // Stop the native input event from continuing to bubble. We
+    // re-fire the same event name as a `CustomEvent` with a
+    // `{value}` detail so consumers can use the shorter property
+    // access; if the native event were also allowed through, the
+    // host's `@input` listener would run twice — once with our
+    // detail, once with the native event whose `detail` is the
+    // numeric default `0` — and the second run would overwrite
+    // the just-typed value with `undefined`.
+    e.stopPropagation();
     const next = (e.target as HTMLInputElement).value;
     this.value = next;
     this.dispatchEvent(

@@ -261,7 +261,28 @@ export function updateSectionInYaml(
 
   const isListItem = /^\s+-\s/.test(lines[start]);
   const childIndent = isListItem ? "    " : "  ";
-  const newLines = [lines[start], ...serializeYamlValues(values, childIndent)];
+  let toSerialize = values;
+  if (isListItem) {
+    // List items can carry a key/value inline with the dash
+    // (`- platform: esphome`). `parseYamlSectionValues` reads that
+    // key into `values`; if we serialize it again under the kept
+    // dash line it gets emitted twice — once as the inline pair,
+    // once as a regular child — producing visibly duplicated
+    // settings (`- platform: esphome\n    platform: esphome`).
+    // Drop the inline key from the values before serializing so
+    // only the dash line carries it.
+    const inlineMatch = lines[start].match(
+      /^\s+-\s+([a-zA-Z_][a-zA-Z0-9_]*):/,
+    );
+    if (inlineMatch) {
+      const inlineKey = inlineMatch[1];
+      if (inlineKey in values) {
+        const { [inlineKey]: _omit, ...rest } = values;
+        toSerialize = rest;
+      }
+    }
+  }
+  const newLines = [lines[start], ...serializeYamlValues(toSerialize, childIndent)];
   lines.splice(start, end - start, ...newLines);
   return lines.join("\n");
 }
