@@ -256,7 +256,26 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const key = field.getAttribute("data-field-key");
       if (!key) continue;
       const path = key.split(".");
-      const raw = String(getIn(this.values, path) ?? "");
+      const value = getIn(this.values, path);
+      // ``wa-select`` only carries primitive values; if the YAML
+      // path resolves to an object (transient state from a partial
+      // edit — e.g. autocompletion just inserted ``then:\n  - ``
+      // and js-yaml produced an empty mapping at this position),
+      // ``String(value)`` can throw "Cannot convert object to
+      // primitive value" for null-prototype objects. Skip the
+      // sync for non-primitive values rather than crashing the
+      // updated() lifecycle.
+      const valueType = typeof value;
+      if (
+        value !== null &&
+        value !== undefined &&
+        valueType !== "string" &&
+        valueType !== "number" &&
+        valueType !== "boolean"
+      ) {
+        continue;
+      }
+      const raw = String(value ?? "");
       // wa-select filters its `value` against the exact string of an
       // option's `value`; case mismatches between YAML and catalog
       // would silently drop the value. Look up the matching option
