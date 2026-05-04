@@ -17,8 +17,6 @@ function deferredRunner() {
     calls,
     /** Release the Nth pending runner call (0-indexed). */
     release: (n: number) => releases[n](),
-    pendingCount: () =>
-      releases.length - calls.filter((_, i) => i < releases.length).length,
   };
 }
 
