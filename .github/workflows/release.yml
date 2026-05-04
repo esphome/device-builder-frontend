@@ -240,7 +240,7 @@ jobs:
         # token (esphome[bot]).
         env:
           GH_TOKEN: ${{ steps.generate-token.outputs.token }}
-        run: gh release edit "${{ inputs.version }}" --draft=false
+        run: gh release edit "${{ inputs.version }}" --draft=false --repo "${{ github.repository }}"
 
   bump-backend:
     name: Open bump PR on backend
