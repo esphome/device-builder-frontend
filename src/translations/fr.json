@@ -345,6 +345,8 @@
     "layout_components_only": "Afficher les composants uniquement",
     "layout_split": "Vue partagée",
     "layout_yaml_only": "Afficher l'éditeur YAML uniquement",
+    "yaml_reveal_sensitive": "Afficher les valeurs sensibles",
+    "yaml_mask_sensitive": "Masquer les valeurs sensibles",
     "yaml_editor": "Éditeur YAML",
     "add_config": "Ajouter une configuration",
     "add_component": "Ajouter un composant",

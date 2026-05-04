@@ -5,6 +5,8 @@ import {
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
+  mdiEye,
+  mdiEyeOff,
   mdiUpload,
   mdiVectorDifference,
   mdiViewSplitHorizontal,
@@ -30,6 +32,8 @@ registerMdiIcons({
   "arrow-collapse": mdiArrowCollapse,
   "arrow-expand": mdiArrowExpand,
   "content-save": mdiContentSave,
+  eye: mdiEye,
+  "eye-off": mdiEyeOff,
   "layout-left": mdiDockLeft,
   "layout-right": mdiDockRight,
   "layout-split": mdiViewSplitHorizontal,
@@ -148,6 +152,15 @@ export class ESPHomeDeviceEditor extends LitElement {
   @state()
   private _showDiff = false;
 
+  // Mirrors the per-field `<esphome-password-input>` reveal toggle —
+  // off by default so passwords/keys render as bullets in the YAML
+  // pane just as they do in the form. The toolbar button below flips
+  // this for the whole editor at once. Note: this is unrelated to
+  // ESPHome's `!secret`-tag indirection (those lines only carry the
+  // secret *name* and are passed through as-is).
+  @state()
+  private _revealSensitive = false;
+
   static styles = [espHomeStyles, deviceEditorStyles];
 
   protected render() {
@@ -188,6 +201,24 @@ export class ESPHomeDeviceEditor extends LitElement {
             <h2 class="editor-header-title">${title}</h2>
           </div>
           <div class="header-actions">
+            ${effectiveLayout !== "left"
+              ? html`<button
+                  type="button"
+                  class="diff-toggle"
+                  aria-pressed=${this._revealSensitive}
+                  @click=${this._toggleRevealSensitive}
+                  title=${this._localize(
+                    this._revealSensitive
+                      ? "device.yaml_mask_sensitive"
+                      : "device.yaml_reveal_sensitive",
+                  )}
+                >
+                  <wa-icon
+                    library="mdi"
+                    name=${this._revealSensitive ? "eye-off" : "eye"}
+                  ></wa-icon>
+                </button>`
+              : nothing}
             ${this._showDiffButton
               ? html`<button
                   type="button"
@@ -316,6 +347,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                       .configuration=${this.configuration}
                       .highlightRange=${this.highlightRange}
                       .scrollToHighlight=${this.scrollToHighlight}
+                      .revealSensitive=${this._revealSensitive}
                       @yaml-change=${this._onYamlChange}
                     ></esphome-yaml-editor>`}
               </div>
@@ -337,6 +369,10 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   private _toggleDiff() {
     this._showDiff = !this._showDiff;
+  }
+
+  private _toggleRevealSensitive() {
+    this._revealSensitive = !this._revealSensitive;
   }
 
   private _onInstall() {

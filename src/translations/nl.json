@@ -345,6 +345,8 @@
     "layout_components_only": "Alleen componenten weergeven",
     "layout_split": "Gesplitste weergave",
     "layout_yaml_only": "Alleen YAML-editor weergeven",
+    "yaml_reveal_sensitive": "Gevoelige waarden tonen",
+    "yaml_mask_sensitive": "Gevoelige waarden verbergen",
     "yaml_editor": "YAML-editor",
     "add_config": "Basisconfiguratie toevoegen",
     "add_component": "Component toevoegen",
