@@ -160,6 +160,16 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
+    if (changedProperties.size > 0) {
+      console.log(
+        "[ADD-DEBUG] form.willUpdate",
+        "changed:", [...changedProperties.keys()],
+        "comp:", this.component?.id,
+        "submitting:", this.submitting,
+        "prefill:", this.prefillReference,
+        "initialized:", this._initialized,
+      );
+    }
     // Initialize the form values once we have both `component` and
     // (if applicable) `prefillReference` set. We can't do this in
     // `connectedCallback` because Lit applies property bindings as
@@ -171,6 +181,10 @@ export class ESPHomeAddComponentForm extends LitElement {
       if (this.component) {
         this._initialized = true;
         this._initValues();
+        console.log(
+          "[ADD-DEBUG] form._initValues done",
+          "values:", JSON.stringify(this._values),
+        );
         // Reset block message on retarget — without this, a "submit
         // bailed" notice from the previous component (in the dep-flow
         // detour the form gets reused for) would leak into the next
@@ -569,19 +583,37 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onSubmit() {
+    console.log(
+      "[ADD-DEBUG] form._onSubmit ENTER",
+      "comp:", this.component?.id,
+      "deps:", this.component?.dependencies,
+      "values:", JSON.stringify(this._values),
+      "yamlLen:", this.yaml?.length,
+      "submitting:", this.submitting,
+      "errorsBefore:", [...this._errors.entries()],
+    );
     // Reset the local block message at the top of every submit
     // attempt so a stale notice from a previous click can't render
     // alongside a fresh result. Both bail paths below set their
     // own message; the success path leaves it cleared.
     this._localBlockMessage = "";
     const presentComponents = parseTopLevelComponents(this.yaml);
+    console.log(
+      "[ADD-DEBUG] presentComponents:",
+      [...presentComponents],
+    );
     // Block submit when there are missing top-level dependencies.
     // The button should already be disabled in that case, but defend
     // here too in case the YAML changed under us between renders.
     const missingDeps = (this.component.dependencies ?? []).filter(
       (d) => !presentComponents.has(d),
     );
+    console.log("[ADD-DEBUG] missingDeps:", missingDeps);
     if (missingDeps.length > 0) {
+      console.warn(
+        "[ADD-DEBUG] BAIL: missingDeps non-empty",
+        missingDeps,
+      );
       // Should be unreachable — the button-disabled predicate uses the
       // same check. If we get here, the YAML changed under us between
       // renders. Surface a visible message instead of returning silently
@@ -600,15 +632,15 @@ export class ESPHomeAddComponentForm extends LitElement {
       this._values,
       presentComponents,
     );
+    console.log("[ADD-DEBUG] validation errors:", [...errors.entries()]);
     if (errors.size > 0) {
       this._errors = errors;
-      // If every error key maps to an entry that's currently filtered
-      // out of the rendered form (advanced + non-required leaves are
-      // hidden by ``required-only`` mode), the user has no way to
-      // SEE the red ring. Surface a top-level message so the
-      // "blue Add does nothing" symptom doesn't reappear with the
-      // root cause invisible.
-      if (!this._anyErrorIsVisible(errors, presentComponents)) {
+      const visible = this._anyErrorIsVisible(errors, presentComponents);
+      console.warn(
+        "[ADD-DEBUG] BAIL: validation errors size=", errors.size,
+        "anyVisible:", visible,
+      );
+      if (!visible) {
         this._localBlockMessage = this._localize(
           "device.add_component_error",
         );
@@ -618,12 +650,13 @@ export class ESPHomeAddComponentForm extends LitElement {
     this._errors = new Map();
     this._localBlockMessage = "";
 
-    // Coerce the values dict for the API: strip empties so we don't
-    // send blank optional fields, and recurse through nested objects
-    // and arrays unchanged (the backend handles structured payloads).
     const fields = this._coerceFields(
       this.component.config_entries,
       this._values,
+    );
+    console.log(
+      "[ADD-DEBUG] DISPATCHING form-submit",
+      "fields:", JSON.stringify(fields),
     );
 
     this.dispatchEvent(
@@ -633,6 +666,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         composed: true,
       }),
     );
+    console.log("[ADD-DEBUG] form._onSubmit returned (dispatch done)");
   }
 
   /**
