@@ -75,6 +75,45 @@ describe("parseFloatWithUnit", () => {
   it("falls back to empty unit when unit_options is empty", () => {
     expect(parseFloatWithUnit("42", [])).toEqual({ value: 42, unit: "" });
   });
+
+  it("rejects non-finite numeric inputs", () => {
+    expect(parseFloatWithUnit(Number.NaN, FREQUENCY_UNITS)).toEqual({
+      value: null,
+      unit: "Hz",
+    });
+    expect(parseFloatWithUnit(Number.POSITIVE_INFINITY, FREQUENCY_UNITS)).toEqual({
+      value: null,
+      unit: "Hz",
+    });
+  });
+
+  it("treats whitespace-only strings as empty", () => {
+    expect(parseFloatWithUnit("   ", FREQUENCY_UNITS)).toEqual({
+      value: null,
+      unit: "Hz",
+    });
+  });
+
+  it("accepts scientific notation", () => {
+    expect(parseFloatWithUnit("1e3kHz", FREQUENCY_UNITS)).toEqual({
+      value: 1000,
+      unit: "kHz",
+    });
+  });
+
+  it("returns null for unparseable non-numeric / object inputs", () => {
+    expect(parseFloatWithUnit({}, FREQUENCY_UNITS)).toEqual({
+      value: null,
+      unit: "Hz",
+    });
+  });
+
+  it("round-trips through serialize for typical inputs", () => {
+    for (const raw of ["50kHz", "0.5mHz", "1000Hz", "-2GHz"]) {
+      expect(serializeFloatWithUnit(parseFloatWithUnit(raw, FREQUENCY_UNITS)))
+        .toBe(raw);
+    }
+  });
 });
 
 describe("placeholderForFloatWithUnit", () => {

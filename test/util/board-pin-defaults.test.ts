@@ -6,6 +6,7 @@ import {
   type ConfigEntry,
 } from "../../src/api/types.js";
 import { seedBoardPinDefaults } from "../../src/util/board-pin-defaults.js";
+import { makeConfigEntry } from "./_make-config-entry.js";
 
 function makePin(overrides: Partial<BoardPin>): BoardPin {
   return {
@@ -44,38 +45,11 @@ function makeBoard(pins: BoardPin[]): BoardCatalogEntry {
   };
 }
 
-function makeEntry(overrides: Partial<ConfigEntry>): ConfigEntry {
-  return {
-    key: "foo",
-    type: ConfigEntryType.PIN,
-    label: "",
-    default_value: null,
-    required: false,
-    description: null,
-    options: null,
-    allow_custom_value: false,
-    range: null,
-    unit_options: null,
-    help_link: null,
-    multi_value: false,
-    hidden: false,
-    advanced: false,
-    translation_key: null,
-    translation_params: null,
-    templatable: false,
-    depends_on: null,
-    depends_on_value: null,
-    depends_on_value_not: null,
-    depends_on_component: null,
-    references_component: null,
-    pin_features: [],
-    pin_mode: null,
-    locked: false,
-    suggestions: null,
-    config_entries: null,
-    platform_type: null,
-    ...overrides,
-  };
+// PIN-typed default + empty label match the original local helper —
+// the shared one defaults to STRING/"Foo", so callers pass overrides
+// here to keep behaviour identical.
+function makeEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
+  return makeConfigEntry({ type: ConfigEntryType.PIN, label: "", ...overrides });
 }
 
 describe("seedBoardPinDefaults", () => {

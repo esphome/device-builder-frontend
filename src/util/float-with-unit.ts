@@ -36,33 +36,28 @@ export function parseFloatWithUnit(
   unitOptions: readonly string[],
 ): FloatWithUnit {
   const fallbackUnit = unitOptions[0] ?? "";
-  if (raw === null || raw === undefined || raw === "") {
-    return { value: null, unit: fallbackUnit };
-  }
-  if (typeof raw === "number") {
-    return { value: Number.isFinite(raw) ? raw : null, unit: fallbackUnit };
-  }
-  const text = String(raw).trim();
+  // Funnel everything through `String().trim()` so the rest of the
+  // function only deals with strings. NaN/Infinity numbers stringify
+  // to "NaN"/"Infinity" which `Number()` round-trips back to non-finite
+  // — caught by the final `Number.isFinite` guard.
+  const text =
+    raw === null || raw === undefined ? "" : String(raw).trim();
   if (text === "") return { value: null, unit: fallbackUnit };
-  // Sort options longest-first so a value like "50mHz" matches "mHz"
-  // rather than the shorter "Hz" option that appears earlier in the
-  // canonical-prefix list. Stable for equal lengths.
+  // Try the longest option first so `"50mHz"` matches `"mHz"` rather
+  // than the shorter `"Hz"` option earlier in the canonical-prefix
+  // list. `endsWith` is case-sensitive — esphome catalog units are
+  // canonical-cased.
   const sortedOptions = [...unitOptions].sort((a, b) => b.length - a.length);
-  for (const option of sortedOptions) {
-    if (option && text.endsWith(option)) {
-      const numericPart = text.slice(0, -option.length).trim();
-      const parsed = numericPart === "" ? null : Number(numericPart);
-      return {
-        value: parsed === null || Number.isNaN(parsed) ? null : parsed,
-        unit: option,
-      };
-    }
-  }
-  // No unit suffix recognised — treat the whole thing as a bare number.
-  const parsed = Number(text);
+  const match = sortedOptions.find(
+    (option) => option !== "" && text.endsWith(option),
+  );
+  const [numericText, unit] = match
+    ? [text.slice(0, -match.length).trim(), match]
+    : [text, fallbackUnit];
+  const value = numericText === "" ? null : Number(numericText);
   return {
-    value: Number.isFinite(parsed) ? parsed : null,
-    unit: fallbackUnit,
+    value: typeof value === "number" && Number.isFinite(value) ? value : null,
+    unit,
   };
 }
 
