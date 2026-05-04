@@ -31,11 +31,20 @@ export const ansiLogThemeLight = css`
 
     /* Foreground (codes 30-37 + bright 90-97). All chosen to read
        as comfortable text against #f5f5f5 — pure-RGB primaries
-       like rgb(255,255,0) wouldn't be visible at all. */
+       like rgb(255,255,0) wouldn't be visible at all.
+
+       Yellow (33 / 93) maps to GitHub Light's warning amber
+       (#9a6700) rather than Solarized's #b58900: the latter reads
+       as "orange-y note" rather than a clear warning, and ESPHome
+       emits ANSI yellow specifically for [WARNING] log lines.
+       Going darker + slightly more orange makes warnings read as
+       warnings even on the non-bold ANSI yellow path that
+       PlatformIO uses for things like "Using Python 3.12.7 ..."
+       informational notes. */
     --ansi-fg-30: #1f1f1f;
     --ansi-fg-31: #c01c28;
     --ansi-fg-32: #2aa198;
-    --ansi-fg-33: #b58900;
+    --ansi-fg-33: #9a6700;
     --ansi-fg-34: #0451a5;
     --ansi-fg-35: #a31515;
     --ansi-fg-36: #098658;
@@ -43,7 +52,7 @@ export const ansiLogThemeLight = css`
     --ansi-fg-90: #6e6e6e;
     --ansi-fg-91: #cd3131;
     --ansi-fg-92: #3d7a28;
-    --ansi-fg-93: #af6700;
+    --ansi-fg-93: #9a6700;
     --ansi-fg-94: #074d8c;
     --ansi-fg-95: #bc05bc;
     --ansi-fg-96: #0598bc;
