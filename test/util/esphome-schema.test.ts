@@ -4,6 +4,7 @@ import {
   fetchBundle,
   getActions,
   getConfigVarKeys,
+  getConfigVarValueOptions,
   getTriggerKeys,
 } from "../../src/util/esphome-schema.js";
 
@@ -580,6 +581,116 @@ describe("getConfigVarKeys", () => {
       "uptime.sensor",
     );
     expect(keys).toEqual([]);
+    debugSpy.mockRestore();
+  });
+});
+
+describe("getConfigVarValueOptions", () => {
+  // Scenario: typing ``device_class: dd`` under
+  // ``sensor: - platform: uptime``. The catalog has empty
+  // ``config_entries`` for ``sensor.uptime``, so the regular
+  // value-position lookup misses ``device_class``. The schema
+  // bundle declares it as ``type: enum`` on
+  // ``sensor._SENSOR_SCHEMA`` (inherited via the typed
+  // variants' extends chain).
+  it("walks typed_schema + extends to find an enum config-var", async () => {
+    const UPTIME_BUNDLE = {
+      "uptime.sensor": {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "typed",
+            typed_key: "type",
+            types: {
+              seconds: {
+                config_vars: { update_interval: { default: "60s" } },
+                extends: ["sensor._SENSOR_SCHEMA"],
+              },
+            },
+          },
+        },
+      },
+    };
+    const SENSOR_BUNDLE_WITH_ENUM = {
+      sensor: {
+        schemas: {
+          _SENSOR_SCHEMA: {
+            type: "schema",
+            schema: {
+              config_vars: {
+                device_class: {
+                  type: "enum",
+                  values: {
+                    duration: { docs: "Time elapsed" },
+                    temperature: { docs: "Heat" },
+                    humidity: {},
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.includes("uptime.json"))
+        return new Response(JSON.stringify(UPTIME_BUNDLE), { status: 200 });
+      if (url.includes("sensor.json"))
+        return new Response(JSON.stringify(SENSOR_BUNDLE_WITH_ENUM), {
+          status: 200,
+        });
+      throw new Error(`unexpected ${url}`);
+    });
+    const values = await getConfigVarValueOptions(
+      makeApi() as never,
+      "uptime",
+      "uptime.sensor",
+      "device_class",
+    );
+    expect(values.map((v) => v.value).sort()).toEqual([
+      "duration",
+      "humidity",
+      "temperature",
+    ]);
+    expect(values.find((v) => v.value === "duration")?.docs).toBe(
+      "Time elapsed",
+    );
+  });
+
+  it("returns [] when the named config-var isn't an enum", async () => {
+    const BUNDLE = {
+      thing: {
+        schemas: {
+          CONFIG_SCHEMA: {
+            type: "schema",
+            schema: { config_vars: { name: { type: "string" } } },
+          },
+        },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      return new Response(JSON.stringify(BUNDLE), { status: 200 });
+    });
+    const values = await getConfigVarValueOptions(
+      makeApi() as never,
+      "thing",
+      "thing",
+      "name",
+    );
+    expect(values).toEqual([]);
+  });
+
+  it("returns [] when the bundle fails to load", async () => {
+    fetchSpy.mockRejectedValue(new TypeError("Failed to fetch"));
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    const values = await getConfigVarValueOptions(
+      makeApi() as never,
+      "uptime",
+      "uptime.sensor",
+      "device_class",
+    );
+    expect(values).toEqual([]);
     debugSpy.mockRestore();
   });
 });

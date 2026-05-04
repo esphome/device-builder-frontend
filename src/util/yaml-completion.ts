@@ -37,6 +37,7 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   getActions,
   getConfigVarKeys,
+  getConfigVarValueOptions,
   getTriggerKeys,
   type SchemaAction,
   type SchemaConfigVarKey,
@@ -371,6 +372,16 @@ function applyInsertion(
   });
 }
 
+/** Read the leading-whitespace prefix of the editor line that
+ *  contains *from*. Used by completion ``apply`` callbacks that
+ *  need to emit a multi-line snippet whose indent must match the
+ *  current line — the snippet's ``then:`` / ``-`` lines live one
+ *  indent step deeper than the partial. */
+function readLineLead(view: EditorView, from: number): string {
+  const line = view.state.doc.lineAt(from);
+  return line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
+}
+
 /**
  * Render a schema-bundle config-var as a completion. Used as the
  * fallback when the prebuilt catalog has no ``config_entries`` for
@@ -395,13 +406,13 @@ function triggerToCompletion(t: { key: string; docs?: string }): Completion {
   return {
     label: t.key,
     apply: (view, _completion, from, to) => {
-      const line = view.state.doc.lineAt(from);
-      const lead = line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
+      const lead = readLineLead(view, from);
+      const inner = lead + ESPHOME_YAML_INDENT;
       applyInsertion(
         view,
         from,
         to,
-        `${t.key}:\n${lead}${ESPHOME_YAML_INDENT}then:\n${lead}${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}- `,
+        `${t.key}:\n${inner}then:\n${inner}${ESPHOME_YAML_INDENT}- `,
       );
     },
     type: "namespace",
@@ -637,32 +648,26 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
 
       // Resolve the entry being set so we can value-complete against it.
       const parent = findParentKey(allLines, lineInfo.number - 1, indent);
-      let entries: ConfigEntry[] = [];
-      if (parent) {
-        const completionCtx = resolveCompletionContext(
-          state,
-          pos,
-          allLines,
-          lineInfo.number - 1,
-          indent,
-        );
-        entries = await resolveAvailableEntries(
-          api,
-          catalog,
-          parent.key,
-          completionCtx.platformValue,
-          completionCtx.topLevelKey,
-        );
-      } else {
-        // We're in a top-level value (rare — most top-level values are
-        // mappings). Bail.
-        return null;
-      }
-
+      // We're in a top-level value (rare — most top-level values
+      // are mappings). Bail.
+      if (!parent) return null;
+      const completionCtx = resolveCompletionContext(
+        state,
+        pos,
+        allLines,
+        lineInfo.number - 1,
+        indent,
+      );
+      const entries = await resolveAvailableEntries(
+        api,
+        catalog,
+        parent.key,
+        completionCtx.platformValue,
+        completionCtx.topLevelKey,
+      );
       const entry = entries.find((e) => e.key === key);
-      if (!entry) return null;
 
-      if (entry.type === ConfigEntryType.BOOLEAN) {
+      if (entry?.type === ConfigEntryType.BOOLEAN) {
         return {
           from: valueFrom,
           options: [
@@ -672,7 +677,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
           validFor: RE_BOOLEAN_VALUE,
         };
       }
-      if (entry.options && entry.options.length > 0) {
+      if (entry?.options && entry.options.length > 0) {
         return {
           from: valueFrom,
           options: entry.options.map((o) => ({
@@ -682,6 +687,36 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
           })),
           validFor: RE_ENUM_VALUE,
         };
+      }
+      // Schema-bundle fallback for the platform-merged case.
+      // ``sensor.uptime`` (and a few others) ship empty
+      // ``config_entries`` in the prebuilt catalog so
+      // ``device_class``'s enum values never reach the entry
+      // lookup. Walk ``schema.esphome.io`` (typed-schema variants
+      // + extends chain) for an enum with this key. Mirrors the
+      // legacy dashboard's enum-value lookup.
+      if (completionCtx.bundleCtx) {
+        const target = bundleFor(
+          completionCtx.bundleCtx.topLevelKey,
+          completionCtx.bundleCtx.platformValue,
+        );
+        const enumValues = await getConfigVarValueOptions(
+          api,
+          target.bundle,
+          target.componentKey,
+          key,
+        );
+        if (enumValues.length > 0) {
+          return {
+            from: valueFrom,
+            options: enumValues.map((v) => ({
+              label: v.value,
+              type: "enum",
+              info: v.docs || undefined,
+            })),
+            validFor: RE_ENUM_VALUE,
+          };
+        }
       }
       return null;
     }
@@ -859,12 +894,10 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
             apply: (view, _completion, from, to) => {
               // ``then:`` is at the same indent as the current
               // partial; the action list-item ``-`` lives one
-              // indent step deeper. Read the current line's
-              // leading whitespace so the snippet stays valid
-              // YAML at any nesting depth.
-              const line = view.state.doc.lineAt(from);
-              const lead =
-                line.text.match(RE_LEADING_WHITESPACE)?.[1] ?? "";
+              // indent step deeper. Read the current line's lead
+              // so the snippet stays valid YAML at any nesting
+              // depth.
+              const lead = readLineLead(view, from);
               applyInsertion(
                 view,
                 from,

@@ -296,17 +296,15 @@ async function collectTriggers(
   seenKeys: Set<string>,
   visited: Set<string>,
 ): Promise<void> {
-  const visitKey = `${bundleName}|${componentKey}|${schemaName}`;
-  if (visited.has(visitKey)) return;
-  visited.add(visitKey);
-
-  const bundle = await fetchBundle(api, bundleName);
-  if (!bundle) return;
-  const component = bundle[componentKey];
-  if (!component) return;
-  const cv = (component as SchemaComponent).schemas?.[schemaName];
-  if (!cv || typeof cv !== "object") return;
-  const schema = (cv as SchemaConfigVarSchema).schema;
+  const cv = await loadSchemaCv(
+    api,
+    bundleName,
+    componentKey,
+    schemaName,
+    visited,
+  );
+  if (!cv) return;
+  const schema = "schema" in cv ? cv.schema : undefined;
   if (!schema) return;
 
   for (const [key, varDecl] of Object.entries(schema.config_vars ?? {})) {
@@ -316,26 +314,18 @@ async function collectTriggers(
     }
   }
 
-  // ``extends`` references take two shapes:
-  //   ``<bundle>.<schemaName>``   — e.g. ``binary_sensor._BINARY_SENSOR_SCHEMA``
-  //   ``<bundle>.<comp>.<schemaName>`` — e.g.
-  //                                ``gpio.binary_sensor.SOMETHING``
-  // The legacy ``getExtendedConfigVar`` parses them by part-count.
   for (const ext of schema.extends ?? []) {
-    const parts = ext.split(".");
-    if (parts.length === 2) {
-      await collectTriggers(api, parts[0], parts[0], parts[1], out, seenKeys, visited);
-    } else if (parts.length === 3) {
-      await collectTriggers(
-        api,
-        parts[0],
-        `${parts[0]}.${parts[1]}`,
-        parts[2],
-        out,
-        seenKeys,
-        visited,
-      );
-    }
+    const ref = parseExtendsRef(ext);
+    if (!ref) continue;
+    await collectTriggers(
+      api,
+      ref.bundle,
+      ref.componentKey,
+      ref.schemaName,
+      out,
+      seenKeys,
+      visited,
+    );
   }
 }
 
@@ -393,17 +383,14 @@ async function collectConfigVars(
   seenKeys: Set<string>,
   visited: Set<string>,
 ): Promise<void> {
-  const visitKey = `${bundleName}|${componentKey}|${schemaName}`;
-  if (visited.has(visitKey)) return;
-  visited.add(visitKey);
-
-  const bundle = await fetchBundle(api, bundleName);
-  if (!bundle) return;
-  const component = bundle[componentKey];
-  if (!component) return;
-  const cv: SchemaConfigVar | undefined = (component as SchemaComponent)
-    .schemas?.[schemaName];
-  if (!cv || typeof cv !== "object") return;
+  const cv = await loadSchemaCv(
+    api,
+    bundleName,
+    componentKey,
+    schemaName,
+    visited,
+  );
+  if (!cv) return;
 
   // Discriminated union narrows on ``cv.type``.
   if (cv.type === "typed") {
@@ -414,7 +401,13 @@ async function collectConfigVars(
     for (const variant of Object.values(cv.types ?? {})) {
       if (!variant) continue;
       pushConfigVars(variant.config_vars, out, seenKeys);
-      await collectExtends(api, variant.extends, out, seenKeys, visited);
+      await walkConfigVarExtends(
+        api,
+        variant.extends,
+        out,
+        seenKeys,
+        visited,
+      );
     }
     return;
   }
@@ -425,7 +418,31 @@ async function collectConfigVars(
   const schema = "schema" in cv ? cv.schema : undefined;
   if (!schema) return;
   pushConfigVars(schema.config_vars, out, seenKeys);
-  await collectExtends(api, schema.extends, out, seenKeys, visited);
+  await walkConfigVarExtends(api, schema.extends, out, seenKeys, visited);
+}
+
+/** Walk an ``extends`` list and recurse into each referenced schema
+ *  to keep collecting config-var keys. */
+async function walkConfigVarExtends(
+  api: ESPHomeAPI,
+  extendsList: string[] | undefined,
+  out: SchemaConfigVarKey[],
+  seenKeys: Set<string>,
+  visited: Set<string>,
+): Promise<void> {
+  for (const ext of extendsList ?? []) {
+    const ref = parseExtendsRef(ext);
+    if (!ref) continue;
+    await collectConfigVars(
+      api,
+      ref.bundle,
+      ref.componentKey,
+      ref.schemaName,
+      out,
+      seenKeys,
+      visited,
+    );
+  }
 }
 
 /** Push every key of *vars* into *out*, deduping via *seenKeys*. */
@@ -450,38 +467,169 @@ function pushConfigVars(
   }
 }
 
-/** Walk ``extends`` references, dispatching on the ``2-part`` /
- *  ``3-part`` shapes (same parsing as ``collectTriggers``). */
-async function collectExtends(
+/** Parse a single ``extends`` reference into a
+ *  ``(bundleName, componentKey, schemaName)`` triple. References
+ *  take two shapes:
+ *    ``<bundle>.<schemaName>``       — e.g. ``binary_sensor._BINARY_SENSOR_SCHEMA``
+ *    ``<bundle>.<comp>.<schemaName>`` — e.g. ``gpio.binary_sensor.X``
+ *  Anything else is ignored (returns ``null``).
+ *  Mirrors the legacy ``getExtendedConfigVar``'s part-count
+ *  dispatch.
+ */
+function parseExtendsRef(
+  ext: string,
+): { bundle: string; componentKey: string; schemaName: string } | null {
+  const parts = ext.split(".");
+  if (parts.length === 2) {
+    return { bundle: parts[0], componentKey: parts[0], schemaName: parts[1] };
+  }
+  if (parts.length === 3) {
+    return {
+      bundle: parts[0],
+      componentKey: `${parts[0]}.${parts[1]}`,
+      schemaName: parts[2],
+    };
+  }
+  return null;
+}
+
+/** Mark *(bundle, component, schema)* visited and load the named
+ *  ``ConfigVar`` from the bundle. Centralises the dedupe key plus
+ *  the bundle → component → schema chain that every recursive
+ *  collector below opens with — returns ``null`` when any link is
+ *  missing or the visit-key was already seen. */
+async function loadSchemaCv(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  schemaName: string,
+  visited: Set<string>,
+): Promise<SchemaConfigVar | null> {
+  const visitKey = `${bundleName}|${componentKey}|${schemaName}`;
+  if (visited.has(visitKey)) return null;
+  visited.add(visitKey);
+  const bundle = await fetchBundle(api, bundleName);
+  if (!bundle) return null;
+  const component = bundle[componentKey];
+  if (!component) return null;
+  const cv: SchemaConfigVar | undefined = (component as SchemaComponent)
+    .schemas?.[schemaName];
+  if (!cv || typeof cv !== "object") return null;
+  return cv;
+}
+
+export interface SchemaEnumValue {
+  value: string;
+  docs?: string;
+}
+
+/**
+ * Look up the enum values declared for a single config-var. Used
+ * by value-position completion when the catalog has no
+ * ``config_entries`` for the parent (typically platform-merged
+ * ids — same gap ``getConfigVarKeys`` covers for keys).
+ *
+ * Walks ``cv.typed_schema`` variants and the ``extends`` chain
+ * looking for a config-var of name *varKey* whose schema declares
+ * ``type: "enum"`` and ``values: { ... }``. Returns ``[]`` when
+ * no enum is found (or the bundle fails to load).
+ */
+export async function getConfigVarValueOptions(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  varKey: string,
+): Promise<SchemaEnumValue[]> {
+  const out: SchemaEnumValue[] = [];
+  await collectEnumValues(
+    api,
+    bundleName,
+    componentKey,
+    "CONFIG_SCHEMA",
+    varKey,
+    out,
+    new Set(),
+  );
+  return out;
+}
+
+async function collectEnumValues(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  schemaName: string,
+  varKey: string,
+  out: SchemaEnumValue[],
+  visited: Set<string>,
+): Promise<void> {
+  if (out.length > 0) return; // first hit wins
+  const cv = await loadSchemaCv(
+    api,
+    bundleName,
+    componentKey,
+    schemaName,
+    visited,
+  );
+  if (!cv) return;
+
+  const tryVars = (
+    vars: Record<string, SchemaConfigVar | undefined> | undefined,
+  ): boolean => {
+    const decl = vars?.[varKey];
+    if (!decl || decl.type !== "enum") return false;
+    const values = (decl as SchemaConfigVarOther & { values?: unknown }).values;
+    if (!values || typeof values !== "object") return false;
+    for (const [v, meta] of Object.entries(values)) {
+      out.push({
+        value: v,
+        docs:
+          meta && typeof meta === "object" && "docs" in meta
+            ? String((meta as { docs?: unknown }).docs ?? "")
+            : undefined,
+      });
+    }
+    return true;
+  };
+
+  if (cv.type === "typed") {
+    for (const variant of Object.values(cv.types ?? {})) {
+      if (!variant) continue;
+      if (tryVars(variant.config_vars)) return;
+      await walkEnumExtends(api, variant.extends, varKey, out, visited);
+      if (out.length > 0) return;
+    }
+    return;
+  }
+
+  const schema = "schema" in cv ? cv.schema : undefined;
+  if (!schema) return;
+  if (tryVars(schema.config_vars)) return;
+  await walkEnumExtends(api, schema.extends, varKey, out, visited);
+}
+
+/** Walk an ``extends`` list, recursing into each referenced schema
+ *  to keep searching for the target enum config-var. Stops on the
+ *  first hit (``out.length > 0``). */
+async function walkEnumExtends(
   api: ESPHomeAPI,
   extendsList: string[] | undefined,
-  out: SchemaConfigVarKey[],
-  seenKeys: Set<string>,
+  varKey: string,
+  out: SchemaEnumValue[],
   visited: Set<string>,
 ): Promise<void> {
   for (const ext of extendsList ?? []) {
-    const parts = ext.split(".");
-    if (parts.length === 2) {
-      await collectConfigVars(
-        api,
-        parts[0],
-        parts[0],
-        parts[1],
-        out,
-        seenKeys,
-        visited,
-      );
-    } else if (parts.length === 3) {
-      await collectConfigVars(
-        api,
-        parts[0],
-        `${parts[0]}.${parts[1]}`,
-        parts[2],
-        out,
-        seenKeys,
-        visited,
-      );
-    }
+    const ref = parseExtendsRef(ext);
+    if (!ref) continue;
+    await collectEnumValues(
+      api,
+      ref.bundle,
+      ref.componentKey,
+      ref.schemaName,
+      varKey,
+      out,
+      visited,
+    );
+    if (out.length > 0) return;
   }
 }
 
