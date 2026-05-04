@@ -102,7 +102,14 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     // `reload()` per debounce window, but bypass the debounce
     // on the empty-to-populated transition (page-load arrival,
     // user cleared the pane and pasted new content) so the
-    // section editor's empty-form window is a render-frame
+    // section editor's empty-form window is bounded by the
+    // next render frame rather than a full coalesce window.
+    //
+    // Calling `reload()` synchronously from `updated()` is the
+    // right shape here: `reload()` mutates the child's `@state`,
+    // which Lit batches into the same render pass that's about
+    // to run anyway — no extra paint, no recursion. A separate
+    // `requestAnimationFrame` would just delay the effect.
     if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
       if (this._reloadTimer) clearTimeout(this._reloadTimer);
       const prev = changedProperties.get("yaml") as string | undefined;
