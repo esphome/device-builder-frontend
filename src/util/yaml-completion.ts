@@ -35,6 +35,11 @@ import {
   getTriggerKeys,
   type SchemaAction,
 } from "./esphome-schema.js";
+import {
+  collectTopLevelKeys,
+  isUnderThenItem,
+  resolveBundleContext,
+} from "./yaml-ast.js";
 
 // ─── ``validFor`` regex constants ─────────────────────────────────────
 //
@@ -193,63 +198,6 @@ function findTopLevelBlock(
     if (m) return m[1];
   }
   return null;
-}
-
-/** Collect all top-level component keys (column-0 ``key:``) in the
- *  doc — the set the action-registry walker should aggregate from.
- *  Mirrors the legacy ``getDocComponents``: only suggest actions
- *  contributed by components the user is actually editing. */
-function collectTopLevelComponents(lines: string[]): string[] {
-  const seen = new Set<string>();
-  for (const raw of lines) {
-    const stripped = stripComment(raw);
-    if (!stripped.trim()) continue;
-    if (indentOf(stripped) !== 0) continue;
-    const m = stripped.match(/^([A-Za-z0-9_]+)\s*:/);
-    if (m) seen.add(m[1]);
-  }
-  return [...seen];
-}
-
-/**
- * True when the cursor is a list item directly under a
- * ``then:`` block — the position where action-registry
- * completion should fire. Strict indent check: the ``then:``
- * line must sit at exactly the cursor's indent minus two (i.e.
- * the canonical list-item under a key). That avoids matching
- * deeply-nested keys that *happen* to live somewhere under a
- * ``then:`` ancestor — those are action arguments, not new
- * action slots.
- *
- * Loose on which ``then:`` we trust: triggers are the canonical
- * parent but ``script:`` and a few others also accept a ``then:``
- * body. Mistaking those is harmless — the worst case is a few
- * extra completion entries the user can ignore.
- */
-function isInAutomationBody(
-  lines: string[],
-  lineIdx: number,
-  cursorIndent: number,
-): boolean {
-  // Walk up from the cursor's line looking for the right
-  // ``then:`` candidate. Stop early if indentation drops below
-  // ``cursorIndent - 2`` (we've left the candidate ``then:``
-  // block) or below 0.
-  const wantedThenIndent = cursorIndent - 2;
-  if (wantedThenIndent < 0) return false;
-  for (let i = lineIdx - 1; i >= 0; i--) {
-    const raw = lines[i];
-    const stripped = stripComment(raw);
-    if (!stripped.trim()) continue;
-    const ind = indentOf(stripped);
-    // Found a ``then:`` at exactly the right indent? Match.
-    const m = stripped.match(/^(\s*)then\s*:\s*$/);
-    if (m && ind === wantedThenIndent) return true;
-    // Anything else at or below ``wantedThenIndent`` means we've
-    // left the candidate block — bail.
-    if (ind <= wantedThenIndent) return false;
-  }
-  return false;
 }
 
 // ─── Completion building blocks ──────────────────────────────────────
@@ -616,20 +564,21 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     if (!parent) return null;
 
     const platformValue = readPlatformSibling(allLines, lineInfo.number - 1, indent);
-    // For schema-bundle lookups we want the *top-level* block
-    // name (``binary_sensor``, ``esphome``), not whatever the
-    // parent walker found (which can be the literal ``platform``
-    // keyword from a list-item header). Mirrors the legacy
-    // dashboard's path-based lookup which walked back to the
-    // top-level component for the schema fetch.
-    const topLevelBlock = findTopLevelBlock(allLines, lineInfo.number - 1);
+    // Resolve the schema-bundle context structurally from the
+    // Lezer parse tree. This is the AST equivalent of "find the
+    // top-level component the cursor lives under, plus the
+    // platform sibling if any". More robust than walking text
+    // lines because the tree handles block scalars, quoted
+    // keys, and partial / invalid input via Lezer's error
+    // recovery.
+    const bundleCtx = resolveBundleContext(state, pos);
     // Action-registry only fires at the list-item position under
-    // a ``then:`` block. Mirrors the legacy ``resolveTriggerInner``
-    // → ``addRegistry({registry: "action"})`` path: cursor must
-    // be the dash position itself (``- <partial>``), and the
-    // ``then:`` ancestor must sit at exactly the right indent.
-    const inAutomation =
-      isListItem && isInAutomationBody(allLines, lineInfo.number - 1, indent);
+    // a ``then:`` block. AST-based: walk up the tree looking for
+    // an ``Item`` whose enclosing ``Pair`` has Key=``then``.
+    // Mirrors the legacy ``resolveTriggerInner`` →
+    // ``addRegistry({registry: "action"})`` shape; replaces the
+    // brittle indent-walking heuristic.
+    const inAutomation = isListItem && isUnderThenItem(state, pos);
     // Only fetch trigger keys when the partial *could* match one
     // — they all start with ``on_``. Saves a network round-trip
     // (and the failure-mode log on CSP-blocked deployments) on
@@ -648,8 +597,12 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // when schema.esphome.io isn't reachable.
       (async () => {
         if (!partialCouldBeTrigger) return [];
-        if (!topLevelBlock) return [];
-        const target = bundleFor(catalog, topLevelBlock, platformValue);
+        if (!bundleCtx) return [];
+        const target = bundleFor(
+          catalog,
+          bundleCtx.topLevelKey,
+          bundleCtx.platformValue,
+        );
         if (!target) return [];
         return getTriggerKeys(api, target.bundle, target.componentKey);
       })(),
@@ -657,7 +610,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // the doc when the cursor is inside a ``then:`` list-item.
       (async () => {
         if (!inAutomation) return [] as SchemaAction[];
-        return getActions(api, collectTopLevelComponents(allLines));
+        return getActions(api, collectTopLevelKeys(state));
       })(),
     ]);
     if (
