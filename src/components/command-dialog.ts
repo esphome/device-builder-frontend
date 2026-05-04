@@ -30,6 +30,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -971,6 +972,15 @@ export class ESPHomeCommandDialog extends LitElement {
 
   /** Attach to a job's output stream. Works for queued, running, or finished jobs. */
   private _followJob(jobId: string) {
+    /* Snapshot whether this attach saw the job live (QUEUED /
+       RUNNING) — captured locally so the closure below can gate
+       the auto-flip on it. Reattaching to a job that's already
+       terminal is a review path: yanking the user to logs after
+       they opened firmware-tasks specifically to read the past
+       install output is the surprise behaviour. The toolbar
+       toggle and the post-success "Logs" button stay unconditional
+       — those are user-initiated, not automatic. */
+    const wasLiveAtAttach = !isTerminalJobStatus(this._jobStatus);
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];
@@ -988,6 +998,7 @@ export class ESPHomeCommandDialog extends LitElement {
         this._jobId = "";
         if (
           success &&
+          wasLiveAtAttach &&
           this._commandType === "install" &&
           this._showLogsAfterInstall
         ) {
