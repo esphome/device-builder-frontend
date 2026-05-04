@@ -25,10 +25,7 @@ import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import {
-  getEncryptionState,
-  getEncryptionVisual,
-} from "../util/encryption-state.js";
+import { getCompactEncryptionVisual } from "../util/encryption-state.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -645,13 +642,17 @@ export class ESPHomeDeviceCard extends LitElement {
   }
 
   private _renderEncryptionIcon() {
-    const state = getEncryptionState({
+    // Compact-view variant: same gate the dashboard table uses,
+    // hiding the green lock when mDNS has confirmed encryption
+    // (the steady state on a healthy fleet) while keeping every
+    // other state — including "waiting / unknown" — visible.
+    // (issue #141)
+    const visual = getCompactEncryptionVisual({
       api_enabled: this.apiEnabled,
       api_encrypted: this.apiEncrypted,
       api_encryption_active: this.apiEncryptionActive,
       has_pending_changes: this.hasPendingChanges,
     });
-    const visual = getEncryptionVisual(state);
     if (!visual) return nothing;
     return html`<wa-icon
       class="encryption-icon ${visual.cssClass}"

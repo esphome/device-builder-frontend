@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getCompactEncryptionVisual,
   getEncryptionState,
   getEncryptionVisual,
 } from "../../src/util/encryption-state.js";
@@ -109,5 +110,50 @@ describe("getEncryptionVisual", () => {
       expect(v!.cssClass).toBeTruthy();
       expect(v!.tooltipKey).toMatch(/^dashboard\./);
     }
+  });
+});
+
+describe("getCompactEncryptionVisual", () => {
+  it("hides the lock when mDNS has confirmed encryption", () => {
+    // Truthy api_encryption_active + active state → noisy steady
+    // state, hidden in compact views.
+    expect(
+      getCompactEncryptionVisual(
+        inputs({ api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256" }),
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps the lock when YAML enables encryption but mDNS hasn't broadcast", () => {
+    // active state with null api_encryption_active is the
+    // "waiting / unknown" case the issue explicitly wants visible.
+    const v = getCompactEncryptionVisual(
+      inputs({ api_encryption_active: null }),
+    );
+    expect(v).not.toBeNull();
+    expect(v!.cssClass).toBe("secure");
+  });
+
+  it("keeps showing the icon for plaintext / pending / mismatch states", () => {
+    const plaintext = getCompactEncryptionVisual(
+      inputs({ api_encrypted: false, api_encryption_active: null }),
+    );
+    expect(plaintext?.cssClass).toBe("insecure");
+
+    const pending = getCompactEncryptionVisual(
+      inputs({ api_encryption_active: "", has_pending_changes: true }),
+    );
+    expect(pending?.cssClass).toBe("pending");
+
+    const mismatch = getCompactEncryptionVisual(
+      inputs({ api_encryption_active: "" }),
+    );
+    expect(mismatch?.cssClass).toBe("mismatch");
+  });
+
+  it("returns null when the API is disabled (no indicator at all)", () => {
+    expect(
+      getCompactEncryptionVisual(inputs({ api_enabled: false })),
+    ).toBeNull();
   });
 });

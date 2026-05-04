@@ -3,10 +3,7 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  getEncryptionState,
-  getEncryptionVisual,
-} from "../../util/encryption-state.js";
+import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
@@ -113,13 +110,19 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       header: localize("dashboard.table_col_name"),
       cell: (info) => {
         const row = info.row.original;
-        const encState = getEncryptionState({
+        // Compact-view variant: hides the green lock for
+        // mDNS-confirmed-encrypted devices (the noisy steady
+        // state on a healthy fleet) but keeps the icon for
+        // every other state, including "waiting / unknown"
+        // when mDNS hasn't broadcast yet. The drawer uses
+        // the full ``getEncryptionVisual`` for single-device
+        // inspection. (issue #141)
+        const encVisual = getCompactEncryptionVisual({
           api_enabled: row.api_enabled,
           api_encrypted: row.api_encrypted,
           api_encryption_active: row.api_encryption_active,
           has_pending_changes: row.hasPendingChanges,
         });
-        const encVisual = getEncryptionVisual(encState);
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
