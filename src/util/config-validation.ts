@@ -108,7 +108,23 @@ export function validateEntry(
   if (isEmpty) return null;
 
   if (entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT) {
-    const num = typeof raw === "number" ? raw : Number(String(raw));
+    let num: number;
+    if (typeof raw === "number") {
+      num = raw;
+    } else {
+      const str = String(raw);
+      // ESPHome catalog entries marked FLOAT / INTEGER routinely
+      // accept unit-suffixed strings — ``frequency: "50kHz"``,
+      // ``timeout: "10s"``, ``update_interval: "60s"`` — because
+      // upstream's schema is ``cv.frequency`` / ``cv.time_period``,
+      // which the catalog-sync flattens into our numeric types.
+      // Match a leading numeric portion (``"50kHz"`` → ``50``,
+      // ``"1.5MHz"`` → ``1.5``); reject the value only when no
+      // numeric prefix is parseable. Range / integer checks then
+      // apply to the numeric portion.
+      const numericPrefix = str.match(/^\s*(-?\d+(?:\.\d+)?)/);
+      num = numericPrefix ? Number(numericPrefix[1]) : Number(str);
+    }
     if (Number.isNaN(num)) {
       return { key: entry.key, code: "validation.not_a_number" };
     }
@@ -216,26 +232,24 @@ function _validateEntriesRecursive(
       continue;
     }
 
-    // Validate against the user-supplied (or seeded) value only —
-    // never against the catalog's ``default_value``. The original
-    // ``values[key] ?? default_value`` shape backfired on optional
-    // numeric entries with unit-suffixed string defaults (e.g.
-    // i2c's ``frequency: "50kHz"``, time-period ``timeout: "10s"``):
-    // ``Number("50kHz")`` is ``NaN`` and the validator emitted
-    // ``validation.not_a_number`` for a field the user couldn't see
-    // in ``required-only`` mode → silent dead Add button (the
-    // MasterOfNone repro).
+    // Optional defaults aren't sent to the backend (``_coerceFields``
+    // strips empties from the API payload), so validating against
+    // them is wrong by design — only fall back to ``default_value``
+    // for required entries, where an unset value would otherwise
+    // surface as ``validation.required`` even though the catalog
+    // pre-supplies a valid value.
     //
-    // The fallback was unnecessary anyway:
-    // - Required entries with defaults are pre-seeded by the form's
-    //   ``_seedDefaults``, so ``values[key]`` is already populated
-    //   when this runs.
-    // - Optional defaults aren't sent to the backend (``_coerceFields``
-    //   strips empties), so validating against them is wrong by design.
-    // - The catalog has exactly one required entry with a default
-    //   (``modbus_controller.address: '1'``), and its default parses
-    //   cleanly without the fallback.
-    const err = validateEntry(entry, values[entry.key]);
+    // The original symptom from MasterOfNone (#issues) — ``Add
+    // ES7210 → Add i2c → blue Add does nothing`` — was the
+    // unconditional fallback hitting i2c's optional ``frequency:
+    // "50kHz"`` and tripping ``validation.not_a_number``. Pin the
+    // optional-skip here AND teach ``validateEntry`` to accept
+    // unit-suffixed numeric strings (the actual upstream shape of
+    // ``cv.frequency`` / ``cv.time_period`` after catalog-sync).
+    const raw = entry.required
+      ? values[entry.key] ?? entry.default_value
+      : values[entry.key];
+    const err = validateEntry(entry, raw);
     if (err) {
       const fullPath = [...pathPrefix, entry.key].join(".");
       errors.set(fullPath, { ...err, key: fullPath });

@@ -251,6 +251,9 @@ describe("validateEntries", () => {
     ];
     // User never touched the field — no value in the dict.
     expect(validateEntries(entries, {}).size).toBe(0);
+    // User explicitly set a unit-suffixed string — also accepted
+    // (the upstream ``cv.frequency`` / ``cv.time_period`` shape).
+    expect(validateEntries(entries, { frequency: "100kHz" }).size).toBe(0);
   });
 
   it("does not validate optional time-period entries against unit-suffixed defaults", () => {
@@ -265,14 +268,13 @@ describe("validateEntries", () => {
     expect(validateEntries(entries, {}).size).toBe(0);
   });
 
-  it("required-with-default surfaces as required-empty when value is unset", () => {
-    // Without the (deliberately removed) ``?? default_value``
-    // fallback, an unset required entry surfaces as
-    // ``validation.required`` — which is the correct user-facing
-    // signal. The form's ``_seedDefaults`` pre-seeds required
-    // defaults into ``_values`` before validation runs, so this
-    // case only happens when the form bypasses seeding (or the
-    // section editor reads from a YAML that's missing the key).
+  it("falls back to default_value for required entries", () => {
+    // Mirrors ``modbus_controller.address`` (the one required
+    // entry with a default in the catalog). When the value isn't
+    // explicitly set, the validator falls back to the catalog
+    // default — which the form's ``_seedDefaults`` pre-seeds
+    // into ``_values`` anyway, so this is mostly defensive for
+    // callers (e.g. section editor) that don't pre-seed.
     const entries = [
       makeEntry({
         key: "address",
@@ -281,8 +283,61 @@ describe("validateEntries", () => {
         default_value: "1",
       }),
     ];
-    const errors = validateEntries(entries, {});
-    expect(errors.get("address")?.code).toBe("validation.required");
+    expect(validateEntries(entries, {}).size).toBe(0);
+  });
+
+  it("accepts unit-suffixed strings on FLOAT/INTEGER required defaults", () => {
+    // The MasterOfNone case in reverse: when the catalog default
+    // for a numeric entry is a unit-suffixed string (``"50kHz"``,
+    // ``"10s"``, ``"100ms"``) — which is the actual upstream
+    // ``cv.frequency`` / ``cv.time_period`` shape — the validator
+    // must accept it as the seeded value, not reject it as
+    // ``validation.not_a_number``.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        required: true,
+        default_value: "50kHz",
+      }),
+    ];
+    // Required + default_value="50kHz" + values empty → fallback
+    // kicks in → "50kHz" is parsed numerically as 50 → no error.
+    expect(validateEntries(entries, {}).size).toBe(0);
+    // User-set unit-suffixed string also accepted.
+    expect(validateEntries(entries, { frequency: "1.5MHz" }).size).toBe(0);
+    // Range checks apply to the numeric prefix.
+    const ranged = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        required: true,
+        default_value: "50kHz",
+        range: [10, 100],
+      }),
+    ];
+    // 5kHz < 10 → range error on the parsed prefix.
+    expect(validateEntries(ranged, { frequency: "5kHz" }).get("frequency")?.code)
+      .toBe("validation.min");
+    // 200kHz > 100 → max error.
+    expect(validateEntries(ranged, { frequency: "200kHz" }).get("frequency")?.code)
+      .toBe("validation.max");
+  });
+
+  it("rejects strings with no parseable numeric prefix on FLOAT/INTEGER", () => {
+    // Defensive: even with the unit-suffix relaxation, a string
+    // that has no numeric prefix at all is still nonsense.
+    const entries = [
+      makeEntry({
+        key: "frequency",
+        type: ConfigEntryType.FLOAT,
+        required: true,
+      }),
+    ];
+    expect(validateEntries(entries, { frequency: "abc" }).get("frequency")?.code)
+      .toBe("validation.not_a_number");
+    expect(validateEntries(entries, { frequency: "kHz" }).get("frequency")?.code)
+      .toBe("validation.not_a_number");
   });
 
   it("validates user-set values on optional numeric entries", () => {
