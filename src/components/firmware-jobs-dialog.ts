@@ -130,6 +130,17 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._confirmDialog.open();
   }
 
+  /** Catch ``open-reset-build-env`` from the inner command-dialog so
+   *  the post-failure hint also works when the user is reviewing a
+   *  past failed install from the Firmware Tasks list. The app-shell
+   *  listener sits on ``<esphome-layout>``, but this dialog is a
+   *  sibling of the layout (both mounted under app-shell), so the
+   *  event would otherwise bubble past with nothing to handle it. */
+  private _onLocalResetEvent = (e: Event) => {
+    e.stopPropagation();
+    this.openResetBuildEnv();
+  };
+
   disconnectedCallback() {
     super.disconnectedCallback();
     this._stopTicker();
@@ -460,7 +471,9 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
           ? this._renderGroups(active, terminal)
           : this._renderEmpty()}
       </wa-dialog>
-      <esphome-command-dialog></esphome-command-dialog>
+      <esphome-command-dialog
+        @open-reset-build-env=${this._onLocalResetEvent}
+      ></esphome-command-dialog>
       <esphome-confirm-dialog
         heading=${this._localize("firmware_jobs.reset_confirm_title")}
         confirm-label=${this._localize("firmware_jobs.reset_confirm_button")}
