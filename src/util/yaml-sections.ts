@@ -393,7 +393,21 @@ export function sectionKeyOf(section: YamlSection): string {
  * Returns the matching section's 1-indexed `fromLine`, or
  * `null` when no section in `yaml` matches `sectionKey` —
  * callers surface that as an explicit error rather than running
- * a wrong-line splice.
+ * a wrong-line splice. Empty `yaml` or empty `sectionKey` also
+ * return `null` so an unbound prop and a cleared editor pane
+ * collapse into the same caller-visible failure.
+ *
+ * Same-key duplicates (two `ota.esphome` items — pathological
+ * but legal YAML): closest-match is a heuristic, strictly
+ * better than ignoring `staleFromLine` but not guaranteed
+ * correct. If the user originally clicked the first of two
+ * duplicates and a subsequent paste shifted line numbers far
+ * enough that the stale line is now closer to the second
+ * duplicate, the resolver picks the second. There's no oracle
+ * once the array is reshuffled; a re-click is the expected
+ * recovery for that case. Equidistant ties prefer the first
+ * match (the test pins this; `reduce` with `<` keeps the
+ * accumulator on ties).
  */
 export function resolveCurrentFromLine(
   yaml: string,
@@ -408,10 +422,6 @@ export function resolveCurrentFromLine(
   if (matches.length === 1 || staleFromLine === undefined) {
     return matches[0].fromLine;
   }
-  // Disambiguate: pick the candidate closest to the stale line.
-  // Same-key duplicates (two `ota.esphome` items) are
-  // pathological but legal in YAML; closest-match keeps a small
-  // shift mapped to the same item the user clicked.
   return matches.reduce((best, candidate) =>
     Math.abs(candidate.fromLine - staleFromLine) <
     Math.abs(best.fromLine - staleFromLine)

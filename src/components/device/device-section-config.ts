@@ -108,11 +108,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * owns this state (`pages/device.ts`) feeds it through
    * `device-board-info`.
    *
-   * Default `""` keeps the property optional for the (currently
-   * single) consumer; `_onSave` and `_onDeleteConfirmed` bail
-   * defensively when `this.yaml === ""` so a forgotten binding
-   * in a future parent can't silently clobber the device's
-   * config with an empty splice.
+   * Empty / unbound values are caught at the splice site by
+   * `resolveCurrentFromLine` returning `null` — the splice
+   * never runs without a resolved `fromLine`, so an empty YAML
+   * (user cleared the pane) and a missing prop binding both
+   * surface as a localised section-not-found error rather than
+   * an empty-string clobber.
    */
   @property()
   yaml = "";
@@ -197,30 +198,27 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   /**
    * Resolve the splice context for save / delete — the live YAML
    * and a current, validated `fromLine`. Sets `_error` and
-   * returns `null` when either is missing so callers surface the
-   * failure instead of running the splice with stale inputs.
+   * returns `null` when the section can't be located so callers
+   * surface the failure with a localised error instead of running
+   * the splice with stale inputs.
    *
-   * Empty `this.yaml` means a parent forgot to wire the prop;
-   * without the guard, `updateSectionInYaml("", ...)` would emit
-   * `""` and the parent's `updateConfig` call would silently
-   * clobber the device's entire config. Stale `this.fromLine`
-   * happens when the YAML pane shifted after section selection
-   * (paste / external edit) — `resolveCurrentFromLine` re-finds
-   * the section by key against the live YAML.
+   * `resolveCurrentFromLine` returns `null` for empty / unbound
+   * `this.yaml` AND for "section key no longer present in the
+   * live YAML" (user pasted away the section, cleared the editor,
+   * or the cached `fromLine` shifted past a now-removed key).
+   * All three collapse to the same user-facing error — clobbering
+   * config with an empty-string splice is structurally
+   * impossible when we don't proceed without a resolved line.
    *
-   * `notFoundErrorKey` is the localize key surfaced on the
-   * section-not-found path (`device.save_error` /
-   * `device.section_delete_error`). The empty-prop case uses a
-   * fixed dev-facing string because that branch should never
-   * reach a real user.
+   * `notFoundErrorKey` is the localize key surfaced
+   * (`device.save_error` / `device.section_delete_error`).
    */
   private _resolveSpliceContext(
-    notFoundErrorKey: string,
+    // Closed union so a typo at the call site (the only two
+    // surfacing paths) fails to compile rather than silently
+    // resolving to the locale key as English.
+    notFoundErrorKey: "device.save_error" | "device.section_delete_error",
   ): { yaml: string; fromLine: number } | null {
-    if (!this.yaml) {
-      this._error = "Internal error: section editor missing yaml prop";
-      return null;
-    }
     const fromLine = resolveCurrentFromLine(
       this.yaml,
       this.sectionKey,
