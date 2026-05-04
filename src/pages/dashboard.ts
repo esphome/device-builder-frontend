@@ -34,10 +34,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { clearJustCreated } from "../util/just-created.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
-import {
-  handleLogsBackToInstall,
-  handlePostInstallShowLogs,
-} from "../util/post-install-logs.js";
+import { handlePostInstallShowLogs } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   archiveDevice,
@@ -842,10 +839,10 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-command-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
       ></esphome-command-dialog>
-      <esphome-firmware-install-dialog></esphome-firmware-install-dialog>
-      <esphome-logs-dialog
-        @back-to-install=${this._onLogsBackToInstall}
-      ></esphome-logs-dialog>
+      <esphome-firmware-install-dialog
+        @request-show-logs-after-install=${this._onPostInstallShowLogs}
+      ></esphome-firmware-install-dialog>
+      <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
         ?open=${this._installMethodOpen}
         .deviceState=${this._installMethodDevice?.state ?? DeviceState.UNKNOWN}
@@ -1280,10 +1277,8 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _onPostInstallShowLogs = (
-    e: CustomEvent<{ configuration: string; name: string; port: string }>
+    e: CustomEvent<import("../util/post-install-logs.js").PostInstallShowLogsDetail>
   ) => handlePostInstallShowLogs(e, this._logsDialog);
-
-  private _onLogsBackToInstall = () => handleLogsBackToInstall(this._commandDialog);
 
   private _openLogs(device: ConfiguredDevice) {
     if (device.state === DeviceState.ONLINE) {

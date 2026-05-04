@@ -1,37 +1,86 @@
-import type { ESPHomeCommandDialog } from "../components/command-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
+import { streamSerialToDialog } from "../pages/dashboard-actions.js";
 
 /**
- * Shared handler for the command-dialog → logs-dialog hand-off.
+ * Detail shape of the cancelable ``request-show-logs-after-install``
+ * event dispatched by the install dialogs (command-dialog for OTA /
+ * server-serial, firmware-install-dialog for Web Serial).
  *
- * The command-dialog dispatches ``request-show-logs-after-install``
- * when an install completes successfully and the user hasn't opted
- * out of the toolbar's "show logs after" toggle. Pages that mount
- * both dialogs (dashboard, device editor) wire this onto the
- * command-dialog and the matching ``handleLogsBackToInstall`` onto
- * the logs-dialog so the flip is symmetric.
+ * ``port`` is set on the network / server-serial path. ``webSerialPort``
+ * is set on the Web Serial path — the dispatching dialog disconnected
+ * it for the install reset, and the handler reopens it at log baud.
+ * Exactly one of those two is set per event. ``reopenInstall`` is the
+ * callback the logs dialog's "Back to install" button invokes to
+ * re-show the original install dialog with its preserved state.
  */
-export function handlePostInstallShowLogs(
-  e: CustomEvent<{ configuration: string; name: string; port: string }>,
-  logsDialog: ESPHomeLogsDialog
-) {
-  /* Claim the cancelable handoff event — without this the source
-     command-dialog won't hide itself, which is the right default
-     for hosts that don't mount a logs dialog (firmware-jobs-dialog
-     etc.) but the wrong outcome here where we ARE handling it. */
-  e.preventDefault();
-  const { configuration, name, port } = e.detail;
-  logsDialog.configuration = configuration;
-  logsDialog.name = name;
-  logsDialog.open(port, { backToInstall: true });
+export interface PostInstallShowLogsDetail {
+  configuration: string;
+  name: string;
+  port?: string;
+  webSerialPort?: SerialPort;
+  reopenInstall: () => void;
 }
 
 /**
- * Reverse hand-off: the logs-dialog dispatches ``back-to-install``
- * when the user clicks its "Back to install" button. The command
- * dialog's state (line buffer, success banner) is preserved across
- * the flip so reopening is a pure show.
+ * Dispatch the cancelable ``request-show-logs-after-install`` event
+ * from an install dialog. Returns ``true`` iff a host claimed the
+ * handoff (called ``preventDefault()``) — the install dialog uses
+ * that to decide whether to hide itself or stay open. Centralised
+ * here so the two install dialogs (command-dialog for OTA / server-
+ * serial, firmware-install-dialog for Web Serial) don't drift on
+ * the event name, the ``cancelable`` flag, or the bubble shape.
  */
-export function handleLogsBackToInstall(commandDialog: ESPHomeCommandDialog) {
-  commandDialog.reopen();
+export function dispatchShowLogsAfterInstall(
+  source: HTMLElement,
+  detail: PostInstallShowLogsDetail
+): boolean {
+  const event = new CustomEvent("request-show-logs-after-install", {
+    bubbles: true,
+    composed: true,
+    cancelable: true,
+    detail,
+  });
+  return !source.dispatchEvent(event);
+}
+
+/**
+ * Shared handler for the install-dialog → logs-dialog hand-off.
+ *
+ * Pages that mount both install dialogs and a logs dialog
+ * (dashboard, device editor) wire this onto each install dialog's
+ * ``@request-show-logs-after-install``. The handler routes Web
+ * Serial through ``openPassive`` + ``streamSerialToDialog`` (no
+ * backend subprocess), and routes OTA / server-serial through
+ * ``open(port)`` (the regular esphome-logs WS endpoint).
+ *
+ * Calls ``preventDefault()`` so the source dialog hides itself —
+ * contexts that DON'T mount a logs dialog (e.g. firmware-jobs-dialog
+ * for past-job replay) leave the source open instead of vanishing.
+ */
+export async function handlePostInstallShowLogs(
+  e: CustomEvent<PostInstallShowLogsDetail>,
+  logsDialog: ESPHomeLogsDialog
+) {
+  e.preventDefault();
+  const { configuration, name, port, webSerialPort, reopenInstall } = e.detail;
+  logsDialog.configuration = configuration;
+  logsDialog.name = name;
+  if (webSerialPort) {
+    logsDialog.openPassive({ onBackToInstall: reopenInstall });
+    /* Reopen the port at the logs baud — the install just left it
+       closed via ``resetAndDisconnect``. The grant from the
+       original ``requestPort()`` is still in effect for this
+       origin, so this doesn't re-prompt the user. */
+    try {
+      await webSerialPort.open({ baudRate: 115200 });
+    } catch {
+      /* port might already be open if the user mashed buttons —
+         streamSerialToDialog will surface its own error if read
+         fails. */
+    }
+    const cancel = streamSerialToDialog(webSerialPort, logsDialog);
+    logsDialog.setSerialCancel(cancel);
+  } else {
+    logsDialog.open(port ?? "OTA", { onBackToInstall: reopenInstall });
+  }
 }

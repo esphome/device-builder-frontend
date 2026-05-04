@@ -68,15 +68,22 @@ export class ESPHomeLogsDialog extends LitElement {
   private _passive = false;
 
   /**
-   * `true` when this session was launched as the post-install
-   * logs hand-off. Surfaces a "Back to install" button in the
-   * toolbar; clicking it stops the stream, closes the dialog,
-   * and emits ``back-to-install`` so the host can re-show the
-   * install dialog. Reset on every fresh ``open`` / ``openPassive``
-   * so the affordance only appears for the run that asked for it.
+   * Set when this session was launched as the post-install logs
+   * hand-off. Surfaces a "Back to install" button in the toolbar;
+   * clicking it stops the stream, closes the dialog, and invokes
+   * the supplied callback so the source install dialog (could be
+   * either the command-dialog or the firmware-install-dialog) can
+   * re-show itself with its preserved state. Reset on every fresh
+   * ``open`` / ``openPassive`` so the affordance only appears for
+   * the run that asked for it.
+   *
+   * Callback in the field, boolean in the state — the boolean
+   * drives the toolbar render and updates trigger Lit reactivity;
+   * the callback closure isn't render-relevant on its own.
    */
   @state()
   private _backToInstall = false;
+  private _backToInstallHandler: (() => void) | null = null;
 
   @state()
   _lines: string[] = [];
@@ -386,7 +393,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _port = "OTA";
 
-  public open(port = "OTA", options: { backToInstall?: boolean } = {}) {
+  public open(port = "OTA", options: { onBackToInstall?: () => void } = {}) {
     this._port = port;
     this._lines = [];
     this._streaming = false;
@@ -397,7 +404,8 @@ export class ESPHomeLogsDialog extends LitElement {
        explicitly flips the toggle this session. */
     this._showStates = true;
     this._passive = false;
-    this._backToInstall = options.backToInstall ?? false;
+    this._backToInstallHandler = options.onBackToInstall ?? null;
+    this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -436,7 +444,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  public openPassive() {
+  public openPassive(options: { onBackToInstall?: () => void } = {}) {
     // Tear down any previous Web Serial read loop before kicking off
     // the new session — without this the prior reader keeps shoving
     // bytes into ``_lines`` and the new device's output is mixed
@@ -453,7 +461,8 @@ export class ESPHomeLogsDialog extends LitElement {
        subprocess to pass ``--no-states`` to, so the toggle is hidden
        in passive mode to avoid implying state filtering is available. */
     this._passive = true;
-    this._backToInstall = false;
+    this._backToInstallHandler = options.onBackToInstall ?? null;
+    this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
     this._dialog.open = true;
     this._resetAnsiLogScroll();
@@ -626,24 +635,24 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   /**
-   * "Back to install" handler — only visible when ``_backToInstall``
-   * is set (post-install hand-off). Stops the live stream, closes
-   * this dialog, and dispatches ``back-to-install`` so the host
-   * can re-show the install dialog with its preserved buffer.
+   * "Back to install" handler — only visible when an ``onBackToInstall``
+   * callback was supplied to ``open`` / ``openPassive`` (post-install
+   * hand-off). Stops the live stream, closes this dialog, and invokes
+   * the supplied callback to re-show the source install dialog with
+   * its preserved state.
    *
    * Awaits ``_stopStreaming`` so the backend log subprocess has
-   * actually torn down before the host can spawn a fresh logs
-   * stream from the same dialog. Without the await, a fast
-   * ``Back → Logs → Back → Logs`` toggle by the user could leave
-   * two backend log subscriptions running briefly, both pumping
-   * lines into the same buffer. */
+   * actually torn down before the install dialog re-takes the
+   * screen. Without the await, a fast ``Back → Logs → Back → Logs``
+   * toggle by the user could leave two backend log subscriptions
+   * running briefly, both pumping lines into the same buffer. */
   private _onBackToInstall = async () => {
     await this._stopStreaming();
+    const handler = this._backToInstallHandler;
     this._backToInstall = false;
+    this._backToInstallHandler = null;
     this._dialog.open = false;
-    this.dispatchEvent(
-      new CustomEvent("back-to-install", { bubbles: true, composed: true })
-    );
+    handler?.();
   };
 }
 

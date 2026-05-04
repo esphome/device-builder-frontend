@@ -30,6 +30,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
+import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -539,19 +540,12 @@ export class ESPHomeCommandDialog extends LitElement {
    * the handoff call ``e.preventDefault()`` from
    * ``handlePostInstallShowLogs`` to claim it. */
   private _flipToLogs = () => {
-    const event = new CustomEvent("request-show-logs-after-install", {
-      bubbles: true,
-      composed: true,
-      cancelable: true,
-      detail: {
-        configuration: this.configuration,
-        name: this.name,
-        port: this._port,
-      },
+    const handled = dispatchShowLogsAfterInstall(this, {
+      configuration: this.configuration,
+      name: this.name,
+      port: this._port,
+      reopenInstall: () => this.reopen(),
     });
-    /* ``dispatchEvent`` returns ``false`` iff a listener called
-       ``preventDefault()`` — i.e. a host claimed the handoff. */
-    const handled = !this.dispatchEvent(event);
     if (handled) this._dialog.open = false;
   };
 
