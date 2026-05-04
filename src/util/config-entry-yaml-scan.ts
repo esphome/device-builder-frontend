@@ -49,11 +49,24 @@
  * means a new `createScanMemo<K, V>()` line, not editing two
  * places.
  */
-function createScanMemo<K, V>() {
+/**
+ * `equals` is bound at factory time, not per-call: a single
+ * `pinMemo` always uses one key-equality contract, so a future
+ * caller can't silently flip cache semantics by passing a
+ * different `equals` to `.get()`. The factory holds it as a
+ * closed-over private.
+ *
+ * `undefined` is the unset sentinel — the cache always misses
+ * before the first `set()`. That precludes using `undefined`
+ * as a legitimate cache key, which is fine because both memos
+ * here use object keys; primitive-keyed memos that wanted to
+ * cache `undefined` would need a different shape.
+ */
+function createScanMemo<K, V>(equals: (a: K, b: K) => boolean) {
   let key: K | undefined;
   let value: V | undefined;
   return {
-    get(probe: K, equals: (a: K, b: K) => boolean): V | undefined {
+    get(probe: K): V | undefined {
       if (key !== undefined && equals(probe, key)) return value;
       return undefined;
     },
@@ -70,17 +83,20 @@ function createScanMemo<K, V>() {
 
 interface PinKey {
   yaml: string;
-  // Note: the cache distinguishes `undefined` (no exclude range)
-  // from `0` exactly via `Object.is`, so a future caller that
-  // passes `0` won't collide with the unset state.
+  // Cache distinguishes `undefined` (no exclude range) from
+  // `0` exactly via `===`, so a future caller passing `0` as
+  // a line number won't collide with the unset state. (`===`
+  // and `Object.is` agree for the realistic shapes here —
+  // strings, integers, undefined; the only divergent case is
+  // NaN, which line numbers can't be.)
   excludeFromLine: number | undefined;
   excludeToLine: number | undefined;
 }
-const pinMemo = createScanMemo<PinKey, Map<number, string>>();
 const pinKeyEquals = (a: PinKey, b: PinKey) =>
   a.yaml === b.yaml &&
   a.excludeFromLine === b.excludeFromLine &&
   a.excludeToLine === b.excludeToLine;
+const pinMemo = createScanMemo<PinKey, Map<number, string>>(pinKeyEquals);
 
 export function findUsedPins(
   yaml: string,
@@ -88,7 +104,7 @@ export function findUsedPins(
   excludeToLine?: number,
 ): Map<number, string> {
   const probe: PinKey = { yaml, excludeFromLine, excludeToLine };
-  const cached = pinMemo.get(probe, pinKeyEquals);
+  const cached = pinMemo.get(probe);
   if (cached) return cached;
   const used = new Map<number, string>();
   if (!yaml) {
@@ -156,9 +172,12 @@ interface RefKey {
   yaml: string;
   domain: string;
 }
-const refMemo = createScanMemo<RefKey, Array<{ id: string; name: string }>>();
 const refKeyEquals = (a: RefKey, b: RefKey) =>
   a.yaml === b.yaml && a.domain === b.domain;
+const refMemo = createScanMemo<
+  RefKey,
+  Array<{ id: string; name: string }>
+>(refKeyEquals);
 
 export function findReferencedComponents(
   yaml: string,
@@ -166,7 +185,7 @@ export function findReferencedComponents(
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
   const probe: RefKey = { yaml, domain };
-  const cached = refMemo.get(probe, refKeyEquals);
+  const cached = refMemo.get(probe);
   if (cached) return cached;
   const lines = yaml.split("\n");
   const result: Array<{ id: string; name: string }> = [];
