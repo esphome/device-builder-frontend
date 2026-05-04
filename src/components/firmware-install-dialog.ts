@@ -16,6 +16,7 @@ import type { ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { chipNameToVariant } from "../util/chip-variant.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   connectToPort,
@@ -50,10 +51,6 @@ type InstallStep =
   | "done"
   | "download-ready"
   | "error";
-
-function normalizeChipName(name: string): string {
-  return name.split("(")[0].trim().toLowerCase().replace(/-/g, "");
-}
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
@@ -594,7 +591,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     // the board catalog (same approach the wizard uses), and only
     // strict-compare when we got authoritative info back.
     this._statusMessage = this._localize("firmware.status_verifying");
-    const detectedNorm = normalizeChipName(detected.chipName);
+    const detectedVariant = chipNameToVariant(detected.chipName);
     let expected = device.target_platform;
     let hasAuthoritativeVariant = false;
     if (device.board_id) {
@@ -617,7 +614,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       "[Web Serial] Detected chip:",
       detected.chipName,
       "→",
-      detectedNorm,
+      detectedVariant,
       "| Expected:",
       expected,
       "→",
@@ -628,8 +625,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (
       expectedNorm &&
       expectedNorm !== "unknown" &&
-      detectedNorm !== expectedNorm &&
-      !(expectedIsCoarseEsp32 && detectedNorm.startsWith("esp32"))
+      detectedVariant !== expectedNorm &&
+      !(expectedIsCoarseEsp32 && detectedVariant.startsWith("esp32"))
     ) {
       try {
         await disconnect(detected.transport);
