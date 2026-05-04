@@ -394,27 +394,34 @@ export class ESPHomeAnsiLog extends LitElement {
       }
     }
 
-    return html`<div class="log-line">
-      ${spans.map((span) => {
-        const style = [
-          span.color ? `color:${span.color}` : "",
-          span.bgColor ? `background:${span.bgColor}` : "",
-        ]
-          .filter(Boolean)
-          .join(";");
-
-        const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
-          .filter(Boolean)
-          .join(" ");
-
-        if (style || classes) {
-          return html`<span class=${classes || nothing} style=${style || nothing}
-            >${span.text}</span
-          >`;
-        }
-        return span.text;
-      })}
-    </div>`;
+    // The ``<div class="log-line">`` opening tag, the ``${spans.map(...)}``
+    // children, and the closing ``</div>`` MUST stay on one logical line:
+    // ``.log-line`` has ``white-space: pre-wrap`` (preserves runs of
+    // newlines and leading spaces in the log text), so inter-tag
+    // whitespace from a multi-line template literal renders as a
+    // visible blank row + leading-space indent on every log line.
+    // Prettier reformatting will silently re-introduce the bug — keep
+    // the prettier-ignore directive here. The same shape applies to
+    // the per-span ``<span ...>`` template below.
+    /* prettier-ignore */
+    const children = spans.map((span) => {
+      const style = [
+        span.color ? `color:${span.color}` : "",
+        span.bgColor ? `background:${span.bgColor}` : "",
+      ]
+        .filter(Boolean)
+        .join(";");
+      const classes = [span.bold ? "bold" : "", span.dim ? "dim" : ""]
+        .filter(Boolean)
+        .join(" ");
+      if (style || classes) {
+        // prettier-ignore
+        return html`<span class=${classes || nothing} style=${style || nothing}>${span.text}</span>`;
+      }
+      return span.text;
+    });
+    // prettier-ignore
+    return html`<div class="log-line">${children}</div>`;
   }
 
   private _ignoreNextScroll = false;
