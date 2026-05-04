@@ -153,6 +153,11 @@ export class ESPHomeCommandPalette extends LitElement {
 
   close() {
     this._open = false;
+    // The palette is hidden by ``render() → nothing``, not by
+    // disconnecting from the DOM, so ``hostDisconnected`` doesn't
+    // fire and a pending debounce timer / queued dispatcher input
+    // would otherwise still flush a ``yaml/search`` after close.
+    this._yamlSearch.clear();
   }
 
   private _toggle() {
@@ -487,7 +492,13 @@ export class ESPHomeCommandPalette extends LitElement {
    * the freshly-filtered list still works without a tab back.
    */
   private _onToggleMode = () => {
-    const stripped = this._query.replace(/^\s*\/+\s*/, "");
+    // Only strip the *single* leading prefix slash (plus any
+    // surrounding whitespace), not every leading slash. A user
+    // searching for ``/dev/ttyUSB0`` would type ``//dev/ttyUSB0``
+    // — the first slash is the mode prefix, the second begins
+    // the body. Stripping ``/+`` would mangle the body into
+    // ``dev/ttyUSB0`` on toggle.
+    const stripped = this._query.replace(/^\s*\/\s*/, "");
     this._query = this._isYamlMode
       ? stripped
       : `${ESPHomeCommandPalette._YAML_PREFIX}${stripped}`;
