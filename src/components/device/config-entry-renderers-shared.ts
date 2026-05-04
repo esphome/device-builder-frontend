@@ -210,7 +210,7 @@ export function renderStringField(
           .invalid=${invalid}
           .disabled=${disabled}
           .placeholder=${placeholder}
-          @value-change=${(e: CustomEvent<PasswordInputValueChange>) =>
+          @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) =>
             ctx.emitChange(path, e.detail.value)}
         ></esphome-password-input>
         ${renderSecretHint(value, ctx)} ${renderFieldError(path, ctx)}

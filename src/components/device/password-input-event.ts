@@ -22,19 +22,31 @@ export interface PasswordInputValueChange {
 /**
  * Wire name for the value-change event the password input emits.
  * Pinned in the test so a rename here trips the contract check
- * instead of silently leaving consumer `@value-change` listeners
- * with no firing event.
+ * instead of silently leaving consumer `@password-input-change`
+ * listeners with no firing event.
  *
  * Deliberately *not* `"input"` — that would collide with the
  * native InputEvent that bubbles out of the inner `<input>` and
- * a host-level listener would see both back-to-back.
+ * a host-level listener would see both back-to-back. Also
+ * deliberately *not* `"value-change"` — that's the wire name the
+ * config-entry form already uses for its own value-change events
+ * (with a `{path, value}` detail), and a generic name on a
+ * bubbling event would let the password's `{value}`-only detail
+ * reach a parent form listener that's expecting `{path}` and
+ * crash.
  */
-export const PASSWORD_INPUT_VALUE_CHANGE_EVENT = "value-change";
+export const PASSWORD_INPUT_VALUE_CHANGE_EVENT = "password-input-change";
 
 /**
- * Build the `value-change` `CustomEvent` the component fires.
- * Extracted so the test can pin both the wire name and the
- * detail shape against the same builder the component uses.
+ * Build the `password-input-change` `CustomEvent` the component
+ * fires. Extracted so the test can pin both the wire name and
+ * the detail shape against the same builder the component uses.
+ *
+ * Non-bubbling, non-composed: the only consumer pattern is a
+ * direct `@password-input-change` listener on the
+ * `<esphome-password-input>` element, so bubbling buys nothing
+ * and would only invite collisions with parent listeners. Direct
+ * listeners fire regardless of `bubbles`.
  */
 export function buildPasswordValueChangeEvent(
   value: string,
@@ -43,8 +55,8 @@ export function buildPasswordValueChangeEvent(
     PASSWORD_INPUT_VALUE_CHANGE_EVENT,
     {
       detail: { value },
-      bubbles: true,
-      composed: true,
+      bubbles: false,
+      composed: false,
     },
   );
 }

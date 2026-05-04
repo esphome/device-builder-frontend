@@ -115,10 +115,16 @@ export function parseYamlSectionValues(
   // Null-prototype map so a YAML key like `__proto__` /
   // `constructor` / `prototype` lands as a normal own property
   // instead of mutating the inherited prototype chain — defends
-  // against prototype-pollution via crafted YAML. ESPHome doesn't
-  // use those names as legitimate keys, but the values map flows
-  // into the form and into downstream code that does property
-  // access; a null-prototype root keeps the dunder attempts inert.
+  // against prototype-pollution via crafted YAML.
+  //
+  // Semantic change for downstream: the returned map (and the
+  // nested blocks parsed via `parseNestedBlock`) have no
+  // `Object.prototype` methods. `for ... in`, `Object.keys`,
+  // spread, `JSON.stringify`, `in`, and direct property access
+  // all behave identically — they read enumerable own properties,
+  // not prototype-inherited ones — but `values.hasOwnProperty(k)`
+  // would now throw. Use `Object.prototype.hasOwnProperty.call` if
+  // you need that check on a downstream consumer.
   const values: Record<string, unknown> = Object.create(null);
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) return values;
@@ -301,42 +307,54 @@ export function updateSectionInYaml(
   let dashLine = lines[start];
   if (isListItem) {
     // List items can carry a key/value inline with the dash
-    // (`- platform: esphome`). `parseYamlSectionValues` reads that
-    // key into `values`; if we re-serialize it under the dash
-    // line it gets emitted twice — once on the dash, once as a
-    // regular child — the visible
-    // `- platform: esphome\n    platform: esphome` duplicate users
-    // reported as "Save adds another esphome item".
+    // (`- platform: esphome`). `parseYamlSectionValues` reads
+    // that key into `values`; if we re-serialize it under the
+    // dash line it gets emitted twice — once on the dash, once
+    // as a regular child — the visible
+    // `- platform: esphome\n    platform: esphome` duplicate
+    // users reported as "Save adds another esphome item".
     //
-    // The form is the authoritative source for the inline key:
-    // rewrite the dash line to whatever the form holds, then drop
-    // that key from the body so it isn't emitted twice. Two
-    // shapes this handles:
+    // The form is the authoritative source for the inline key.
+    // Three cases, all of which yield the inline key exactly
+    // once in the output (or zero times when the form dropped
+    // it):
     //
-    //   - dash already carried a value, form unchanged: rewrite
-    //     yields the same line (no diff).
-    //   - dash was empty (`- platform:`) and form has a value:
-    //     rewrite produces `- platform: esphome` instead of
-    //     leaving an empty dash with a duplicate child below.
+    //   1. inline key absent from form: dash kept as-is, body
+    //      emitted normally. Original behaviour.
+    //   2. form value is an inline-able scalar (string / number
+    //      / boolean): rewrite the dash to carry the form's
+    //      value, drop the key from the body. Handles the
+    //      empty-inline (`- platform:`), stale-inline (form
+    //      picked a different value), and trailing-comment
+    //      (`- platform: # ...`) cases uniformly.
+    //   3. form value is non-scalar (object / array / null /
+    //      undefined): collapse the dash to bare `-` and emit
+    //      the full body — including the inline key — at the
+    //      child indent. The dash can't represent a
+    //      multi-line value, so demoting to a bare list-item
+    //      head and letting the serializer handle it is the
+    //      only way to keep the inline key from appearing twice.
     //
-    // Only acts on inline-able scalar values — a complex (object
-    // / list) form value can't sit on the dash line, so we leave
-    // the dash alone and emit the value normally in the body.
-    // Same regex `parseYamlSectionValues` reads so the two sides
-    // stay in lockstep on what counts as an inline key.
+    // Same regex `parseYamlSectionValues` reads so the two
+    // sides stay in lockstep on what counts as an inline key.
     const inlineMatch = dashLine.match(LIST_ITEM_INLINE_KEY_RE);
     if (inlineMatch) {
       const inlineKey = inlineMatch[1];
-      if (
-        inlineKey in values &&
-        _isInlinableScalar(values[inlineKey])
-      ) {
+      if (inlineKey in values) {
         const dashPrefix = dashLine.match(/^(\s+-\s+)/)?.[1] ?? "  - ";
-        dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(
-          values[inlineKey],
-        )}`;
-        const { [inlineKey]: _omit, ...rest } = values;
-        toSerialize = rest;
+        const dashIndent = dashLine.match(/^(\s+)-/)?.[1] ?? "  ";
+        if (_isInlinableScalar(values[inlineKey])) {
+          dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(
+            values[inlineKey],
+          )}`;
+          const { [inlineKey]: _omit, ...rest } = values;
+          toSerialize = rest;
+        } else {
+          // Non-scalar form value: drop the inline key from the
+          // dash and let the body serializer emit everything,
+          // including the now-non-inline key.
+          dashLine = `${dashIndent}-`;
+        }
       }
     }
   }

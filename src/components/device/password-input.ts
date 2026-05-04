@@ -29,12 +29,16 @@ registerMdiIcons({
 // Event contract lives in a side-effect-free module so tests can
 // import the builder without pulling in the webawesome
 // CSSStyleSheet polyfill (which fails in Node).
-export {
+import {
   PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   buildPasswordValueChangeEvent,
   type PasswordInputValueChange,
 } from "./password-input-event.js";
-import { buildPasswordValueChangeEvent as _buildEvent } from "./password-input-event.js";
+export {
+  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
+  buildPasswordValueChangeEvent,
+  type PasswordInputValueChange,
+};
 
 @customElement("esphome-password-input")
 export class ESPHomePasswordInput extends LitElement {
@@ -158,7 +162,7 @@ export class ESPHomePasswordInput extends LitElement {
     // ours, `@input` sees only the native one.
     const next = (e.target as HTMLInputElement).value;
     this.value = next;
-    this.dispatchEvent(_buildEvent(next));
+    this.dispatchEvent(buildPasswordValueChangeEvent(next));
   }
 
   private _onToggle() {

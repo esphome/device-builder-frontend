@@ -35,6 +35,36 @@ describe("parseYamlSectionValues — prototype pollution defense", () => {
     const values = parseYamlSectionValues(yaml, "wrap");
     expect(Object.getPrototypeOf(values)).toBeNull();
   });
+
+  it("propagates null-prototype to nested blocks and survives round-trip", () => {
+    // `parseNestedBlock` (recursive) also uses
+    // `Object.create(null)`. A deeply-nested config must round-trip
+    // through downstream consumers (`Object.keys`, `for ... in`,
+    // spread, JSON.stringify) without the missing prototype methods
+    // causing surprises. Pin one config that exercises the full
+    // chain.
+    const yaml = [
+      "outer:",
+      "  level1:",
+      "    level2:",
+      "      key: value",
+      "      arr:",
+      "        - a",
+      "        - b",
+    ].join("\n");
+    const values = parseYamlSectionValues(yaml, "outer");
+    // Spread + JSON.stringify both rely on enumerable own properties
+    // (not prototype methods), so they handle null-prototype maps
+    // identically to plain objects.
+    const nested = (values.level1 as Record<string, unknown>).level2 as Record<
+      string,
+      unknown
+    >;
+    expect(nested.key).toBe("value");
+    expect(nested.arr).toEqual(["a", "b"]);
+    expect(Object.getPrototypeOf(nested)).toBeNull();
+    expect(JSON.stringify(values)).toContain('"key":"value"');
+  });
 });
 
 describe("updateSectionInYaml — list item with inline key", () => {
@@ -131,12 +161,12 @@ describe("updateSectionInYaml — list item with inline key", () => {
     expect(after).not.toContain("filled later");
   });
 
-  it("leaves the dash alone when the form's value is non-scalar", () => {
-    // A complex (object) inline value can't sit on the dash, so
-    // the rewrite skips and the original behaviour stands —
-    // dash kept, value emitted normally in the body. We don't
-    // dedupe in that path because there's nothing useful to
-    // collapse to.
+  it("collapses dash to bare `-` when the form's value is non-scalar", () => {
+    // A complex (object) inline value can't sit on the dash. The
+    // dash is demoted to a bare `-` and the full body is emitted
+    // at the child indent; the inline key still appears exactly
+    // once (under its own line), preserving the no-duplicate
+    // contract regardless of value type.
     const before = "wrap:\n  - platform: x\n";
     const after = updateSectionInYaml(
       before,
@@ -144,8 +174,26 @@ describe("updateSectionInYaml — list item with inline key", () => {
       { platform: { complex: "object" } },
       2,
     );
-    expect(after).toContain("- platform: x");
+    expect(after.match(/platform:/g)).toHaveLength(1);
+    expect(after).not.toContain("- platform: x");
     expect(after).toContain("complex: object");
+  });
+
+  it("collapses dash to bare `-` when the form's value is null", () => {
+    // Same shape as the non-scalar case — null isn't inlinable
+    // (nothing useful to write after the colon), so we demote
+    // the dash and let the body emit the (empty) entry. The
+    // serializer skips null/empty values; net result is just
+    // the bare `-` with whatever else the form holds.
+    const before = "ota:\n  - platform: esphome\n";
+    const after = updateSectionInYaml(
+      before,
+      "ota.esphome",
+      { platform: null, password: "secret" },
+      2,
+    );
+    expect(after).not.toContain("- platform: esphome");
+    expect(after).toContain("password: secret");
   });
 
   it("handles inline keys with the full identifier alphabet", () => {
@@ -154,6 +202,12 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // behaviorally with edge-case key shapes (leading
     // underscore, trailing digit, internal underscore) so a
     // future schema broadening that misses one site trips this.
+    //
+    // Escape regex metacharacters in the key when constructing
+    // the count assertion — today's alphabet has none, but if
+    // it ever broadens to include `.` / `+` / `*` etc. the
+    // assertion would silently over-match without this guard.
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     for (const key of ["_internal_id", "pin1", "is_active", "platform_v2"]) {
       const before = `wrap:\n  - ${key}: a\n`;
       const after = updateSectionInYaml(
@@ -162,7 +216,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
         { [key]: "b", extra: "y" },
         2,
       );
-      expect(after.match(new RegExp(`${key}:`, "g"))).toHaveLength(1);
+      expect(after.match(new RegExp(`${escape(key)}:`, "g"))).toHaveLength(1);
       expect(after).toContain(`- ${key}: b`);
       expect(after).toContain("extra: y");
     }
