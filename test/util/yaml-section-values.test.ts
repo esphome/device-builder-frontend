@@ -62,6 +62,45 @@ describe("test helper: nthListItemLine", () => {
   });
 });
 
+describe("parseYamlSectionValues — permissive key alphabet", () => {
+  it("captures dotted / hyphenated keys (URL-style package names)", () => {
+    // ``packages:`` accepts URL-derived names like
+    // ``ApolloAutomation.R-PRO-1-ETH:`` (issue surfaced in the
+    // form editor where the row vanished because the strict
+    // ``[a-zA-Z_][a-zA-Z0-9_]*`` regex rejected the dot + hyphen
+    // and the parser silently dropped the line). The MAP-fallback
+    // editor uses ``parseYamlSectionValues`` to populate row
+    // values; if the parser drops the line, the form shows
+    // "No entries yet" while the YAML clearly has one.
+    const yaml =
+      "packages:\n" +
+      "  ApolloAutomation.R-PRO-1-ETH: github://ApolloAutomation/R_PRO-1/Integrations/ESPHome/R_PRO-1_ETH.yaml\n";
+    const values = parseYamlSectionValues(yaml, "packages");
+    expect(values["ApolloAutomation.R-PRO-1-ETH"]).toBe(
+      "github://ApolloAutomation/R_PRO-1/Integrations/ESPHome/R_PRO-1_ETH.yaml",
+    );
+  });
+
+  it("captures path- and namespaced-style keys", () => {
+    const yaml =
+      "packages:\n" +
+      "  vendor/lib@v1.2.3: ./local/path.yaml\n" +
+      "  com.example.thing: github://example/thing\n";
+    const values = parseYamlSectionValues(yaml, "packages");
+    expect(values["vendor/lib@v1.2.3"]).toBe("./local/path.yaml");
+    expect(values["com.example.thing"]).toBe("github://example/thing");
+  });
+
+  it("still rejects keys that start with a list-item dash or hash", () => {
+    // The leading-character constraint stays strict so a stray
+    // ``- `` (list item) or ``# `` (comment) at the section indent
+    // doesn't masquerade as a key.
+    const yaml = "packages:\n  - not_a_key: value\n  # commented: out\n";
+    const values = parseYamlSectionValues(yaml, "packages");
+    expect(values).toEqual({});
+  });
+});
+
 describe("parseYamlSectionValues — prototype pollution defense", () => {
   // YAML keys like `__proto__` / `constructor` / `prototype`
   // would otherwise hit the corresponding setter on
