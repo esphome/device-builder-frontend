@@ -220,10 +220,16 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
           ? html`<span class="cell-mono">${formatFileSize(bytes)}</span>`
           : html`<span class="cell-muted">—</span>`;
       },
-      // Sort numerically rather than lexicographically so larger
-      // builds sort above smaller ones regardless of unit suffix
-      // (the cell renders KB/MB but the underlying value is bytes).
-      sortingFn: "basic",
+      // Compare the raw byte counts directly. ``"basic"`` /
+      // ``"alphanumeric"`` would sort by the accessor value too
+      // in theory, but stringifying-then-comparing has bitten us
+      // here — a 1024-byte file lands above a 2048-byte one on
+      // lex compare ("1" < "2" inside "1024" vs "2048" works,
+      // but "16777216" vs "2097152" puts the smaller value
+      // above the larger one). Explicit ``a - b`` is the
+      // canonical numeric sort and removes the ambiguity.
+      sortingFn: (rowA, rowB) =>
+        rowA.original.build_size_bytes - rowB.original.build_size_bytes,
       size: 120,
       enableHiding: true,
     },
