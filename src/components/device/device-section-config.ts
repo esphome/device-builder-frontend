@@ -709,6 +709,20 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         // placeholder row keeps the saved config loadable.
         { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(this.sectionKey) },
       );
+      // Refuse to save a YAML that ESPHome would reject. Same
+      // backend lint the YAML editor's red squiggles come from
+      // (yaml-lint-backend.ts) — surface upstream's actual error
+      // message verbatim instead of duplicating ESPHome's
+      // validators here (where they'd silently drift on any
+      // upstream change to e.g. the ``packages:`` shorthand).
+      // Catching it pre-save means the user gets immediate
+      // feedback in the form view rather than discovering the
+      // failure on the next compile.
+      const lintError = await this._lintFailureMessage(newYaml);
+      if (lintError !== null) {
+        this._error = lintError;
+        return;
+      }
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {
         this._error =
@@ -731,6 +745,30 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     } finally {
       this._saving = false;
     }
+  }
+
+  /**
+   * Run *candidateYaml* through ``editor/validate_yaml`` (the same
+   * backend lint that drives the YAML editor's red squiggles) and
+   * return ESPHome's first error message if any, or ``null`` when
+   * the YAML is clean. Network failure → ``null`` (fail open):
+   * blocking save on a transient WS hiccup would be worse UX than
+   * letting the user proceed and seeing the error on next compile.
+   */
+  private async _lintFailureMessage(
+    candidateYaml: string,
+  ): Promise<string | null> {
+    let res;
+    try {
+      res = await this._api.validateYaml(this.configuration, candidateYaml);
+    } catch {
+      return null;
+    }
+    const validation = res.validation_errors?.[0];
+    if (validation?.message) return validation.message.trim();
+    const yaml = res.yaml_errors?.[0];
+    if (yaml?.message) return yaml.message.trim();
+    return null;
   }
 }
 

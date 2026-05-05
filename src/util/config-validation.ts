@@ -160,28 +160,6 @@ export function validateEntry(
     }
   }
 
-  // String-shape pattern check. Only fires for string raws so that
-  // complex MAP values (rendered via ``renderMapField``'s
-  // "edit in YAML" placeholder rather than the value template's
-  // input) don't get cast to a string and rejected.
-  if (entry.pattern && typeof raw === "string") {
-    let re: RegExp | null = null;
-    try {
-      re = new RegExp(entry.pattern);
-    } catch {
-      // Malformed pattern — fail open rather than block save with a
-      // pattern the user can't see or fix. Catalog patterns are
-      // authored, not user-supplied, so a regex error here is a
-      // catalog bug worth not breaking the form over.
-    }
-    if (re && !re.test(raw)) {
-      return {
-        key: entry.key,
-        code: entry.pattern_error ?? "validation.pattern_mismatch",
-      };
-    }
-  }
-
   return null;
 }
 
@@ -241,50 +219,27 @@ function _validateEntriesRecursive(
     }
 
     // MAP entries have user-defined keys, not schema-defined ones, so
-    // we can't descend into ``config_entries`` the way NESTED does.
-    // Required-ness is checked against map size; each user-keyed
-    // primitive value is validated against the value template
-    // (``config_entries[0]``) so per-row patterns / options apply.
-    // Complex (object) values are skipped — they bypass the
-    // template's UI via ``renderMapField``'s
-    // "edit in YAML" placeholder, so validating them against a
-    // string-shaped template would be a category error.
+    // we can't recurse into config_entries the way NESTED does.
+    // Required-ness is enforced by checking the map has at least one
+    // entry; per-value validation is delegated to ESPHome's own
+    // ``validate_yaml`` (yaml-lint-backend.ts) so the form doesn't
+    // duplicate-and-drift the upstream validators (e.g.
+    // ``packages:`` accepts only the github://gitlab:// shorthand
+    // ESPHome's ``GitFile.from_shorthand`` parses; mirroring that
+    // regex here would silently drift on any upstream change).
     if (entry.type === ConfigEntryType.MAP) {
-      // The synthesised user-keyed-MAP entry uses ``key=""`` to mean
-      // "the section's whole values dict IS the map" (e.g.
-      // ``substitutions``, ``packages``); a normal MAP entry reads a
-      // sub-dict at its key. Same branch handles both.
-      const map: Record<string, unknown> | null =
-        entry.key === ""
-          ? values
-          : (() => {
-              const raw = values[entry.key];
-              return raw !== null &&
-                typeof raw === "object" &&
-                !Array.isArray(raw)
-                ? (raw as Record<string, unknown>)
-                : null;
-            })();
-      if (entry.required && (!map || Object.keys(map).length === 0)) {
-        const fullPath = [...pathPrefix, entry.key]
-          .filter((p) => p !== "")
-          .join(".");
-        errors.set(fullPath, {
-          key: fullPath,
-          code: "validation.required",
-        });
-      }
-      const valueTemplate = entry.config_entries?.[0];
-      if (map && valueTemplate) {
-        for (const [userKey, userValue] of Object.entries(map)) {
-          if (userValue !== null && typeof userValue === "object") continue;
-          const err = validateEntry(valueTemplate, userValue);
-          if (err) {
-            const fullPath = [...pathPrefix, entry.key, userKey]
-              .filter((p) => p !== "")
-              .join(".");
-            errors.set(fullPath, { ...err, key: fullPath });
-          }
+      if (entry.required) {
+        const raw = values[entry.key];
+        const map =
+          raw !== null && typeof raw === "object" && !Array.isArray(raw)
+            ? (raw as Record<string, unknown>)
+            : null;
+        if (!map || Object.keys(map).length === 0) {
+          const fullPath = [...pathPrefix, entry.key].join(".");
+          errors.set(fullPath, {
+            key: fullPath,
+            code: "validation.required",
+          });
         }
       }
       continue;

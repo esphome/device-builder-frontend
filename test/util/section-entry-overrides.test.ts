@@ -64,7 +64,6 @@ describe("resolveSectionEntries", () => {
       advanced: true,
     });
     const result = resolveSectionEntries("substitutions", [bogusCatalogEntry]);
-    expect(result).not.toBe([bogusCatalogEntry]);
     expect(result[0].type).toBe(ConfigEntryType.MAP);
   });
 
@@ -94,20 +93,6 @@ describe("resolveSectionEntries", () => {
       expect(a).toBe(b);
     },
   );
-
-  it("hands packages a different value template than substitutions", () => {
-    // Packages uses a stricter template (pattern-validated source
-    // shorthand) so the two MAP sections must NOT alias the same
-    // synthesised entry — otherwise editing one section's pattern
-    // would silently change the other's validation.
-    const subs = resolveSectionEntries("substitutions", []);
-    const pkgs = resolveSectionEntries("packages", []);
-    expect(subs).not.toBe(pkgs);
-    const subsTemplate = subs[0].config_entries?.[0];
-    const pkgsTemplate = pkgs[0].config_entries?.[0];
-    expect(subsTemplate!.pattern).toBeNull();
-    expect(pkgsTemplate!.pattern).not.toBeNull();
-  });
 });
 
 describe("device-section-config wiring", () => {
@@ -159,6 +144,60 @@ describe("device-section-config wiring", () => {
       expr.includes("this._config.entries"),
       "form's .entries binds to the raw catalog entries — substitutions override is bypassed",
     ).toBe(false);
+  });
+
+  it("routes _onSave through validateYaml to refuse saves ESPHome would reject", async () => {
+    // Regression pin for the "x y is invalid but the form lets it
+    // through" complaint on ``packages:``. We deliberately don't
+    // duplicate ESPHome's source-shorthand validator on the
+    // frontend (drift risk on every upstream change to accepted
+    // domains / chars). Instead, ``_onSave`` runs the candidate
+    // YAML through ``editor/validate_yaml`` — the same backend
+    // lint that drives the editor's red squiggles
+    // (``yaml-lint-backend.ts``) — and bails with the upstream
+    // error message when ESPHome reports a problem. This test
+    // pins the *wiring* (a ``_lintFailureMessage`` helper exists
+    // and ``_onSave`` consults it before ``updateConfig``); the
+    // backend's actual rejection logic is upstream's concern.
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const fs = await import("node:fs");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const path = await import("node:path");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../src/components/device/device-section-config.ts",
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+
+    expect(
+      /private async _lintFailureMessage\s*\(/.test(src),
+      "_lintFailureMessage helper missing",
+    ).toBe(true);
+    expect(
+      /this\._api\.validateYaml\s*\(\s*this\.configuration\s*,\s*candidateYaml\s*\)/.test(
+        src,
+      ),
+      "_lintFailureMessage doesn't call validateYaml with the candidate YAML",
+    ).toBe(true);
+    // ``_onSave`` must consult the lint between building newYaml
+    // and calling updateConfig. Pin both the order (lint after
+    // updateSectionInYaml, before updateConfig) and the bail
+    // (assigning ``this._error`` and returning).
+    const onSave = src.slice(src.indexOf("private async _onSave"));
+    const lintCallIdx = onSave.indexOf("_lintFailureMessage");
+    const updateConfigIdx = onSave.indexOf("updateConfig");
+    const updateSectionIdx = onSave.indexOf("updateSectionInYaml");
+    expect(
+      updateSectionIdx > 0 && lintCallIdx > updateSectionIdx,
+      "_lintFailureMessage must run after updateSectionInYaml",
+    ).toBe(true);
+    expect(
+      lintCallIdx > 0 && updateConfigIdx > lintCallIdx,
+      "_lintFailureMessage must run before updateConfig",
+    ).toBe(true);
   });
 
   it("routes _onSave's validateEntries through the resolver, not the catalog", async () => {
@@ -261,80 +300,5 @@ describe("save validation contract", () => {
       {},
     );
     expect(errors.has("ssid")).toBe(true);
-  });
-});
-
-describe("packages source pattern", () => {
-  // The visible bug: a user types ``x y`` (a value with whitespace
-  // — never a valid git shorthand) into a ``packages:`` row, hits
-  // Save, and the form lets it through. ESPHome's loader then
-  // rejects the config with "URL is not in expected format!" at
-  // compile time. The fix routes per-row values through the
-  // packages value template's ``pattern`` (mirrors ESPHome's
-  // ``GitFile.from_shorthand`` regex) so the form catches obvious
-  // typos before save.
-  const pkgEntries = resolveSectionEntries("packages", []);
-
-  it("rejects a value containing whitespace (the reported `x y` case)", () => {
-    const errors = validateEntries(pkgEntries, {
-      ApolloAutomation: "x y",
-    });
-    expect(errors.size).toBe(1);
-    expect(errors.get("ApolloAutomation")?.code).toBe(
-      "validation.invalid_package_source",
-    );
-  });
-
-  it.each([
-    ["bare-string", "xyz"],
-    ["wrong-protocol", "https://example.com/repo/file.yaml"],
-    ["unknown-domain", "bitbucket://owner/repo/file.yaml"],
-    ["empty-after-protocol", "github://"],
-  ])("rejects %s (`%s`)", (_label, value) => {
-    const errors = validateEntries(pkgEntries, { row: value });
-    expect(errors.has("row")).toBe(true);
-  });
-
-  it.each([
-    ["github short", "github://owner/repo/file.yaml"],
-    ["github with subfolder", "github://owner/repo/sub/dir/file.yaml"],
-    ["github with ref", "github://owner/repo/file.yaml@main"],
-    [
-      "github with ref containing dots",
-      "github://owner/repo/file.yaml@v1.2.3",
-    ],
-    ["gitlab short", "gitlab://owner/repo/file.yaml"],
-    [
-      "ApolloAutomation real-world example",
-      "github://ApolloAutomation/PLT-1/Integrations/ESPHome/PLT-1_Minimal.yaml",
-    ],
-  ])("accepts %s (`%s`)", (_label, value) => {
-    const errors = validateEntries(pkgEntries, { row: value });
-    expect(errors.size).toBe(0);
-  });
-
-  it("skips the pattern check for complex (object) row values", () => {
-    // Packages rows can be a YAML mapping (``url:`` + ``ref:`` +
-    // ``files:`` …) instead of a shorthand string. Those bypass
-    // the value template's input via ``renderMapField``'s
-    // "edit in YAML" placeholder, so validating them against the
-    // string-shape pattern is a category error. Pin that the
-    // recursion skips them.
-    const errors = validateEntries(pkgEntries, {
-      row: { url: "https://example.com/repo.git", ref: "main" },
-    });
-    expect(errors.size).toBe(0);
-  });
-
-  it("substitutions doesn't apply the packages pattern (its values are arbitrary strings)", () => {
-    // Substitutions accepts any string (per ESPHome's
-    // ``cv.Schema({validate_substitution_key: object})``). Pin
-    // that the pattern is a per-section override, not a leak from
-    // packages back onto substitutions.
-    const subEntries = resolveSectionEntries("substitutions", []);
-    const errors = validateEntries(subEntries, {
-      ssid_default: "x y has spaces and that's fine",
-    });
-    expect(errors.size).toBe(0);
   });
 });

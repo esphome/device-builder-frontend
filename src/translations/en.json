@@ -569,9 +569,7 @@
     "invalid_option": "Not a valid option",
     "invalid_device_name": "Only lowercase letters, digits, hyphens and underscores",
     "device_name_underscore": "Underscores work but aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks",
-    "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks",
-    "pattern_mismatch": "Doesn't match the expected format",
-    "invalid_package_source": "Must be a github:// or gitlab:// shorthand URL (e.g. github://owner/repo/path/file.yaml)"
+    "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks"
   },
   "layout": {
     "secrets": "Secrets",

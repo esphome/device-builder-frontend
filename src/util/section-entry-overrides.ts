@@ -51,86 +51,56 @@ export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set([
   "substitutions",
 ]);
 
-/** Mirror of ESPHome's ``GitFile.from_shorthand`` regex (esphome/git.py)
- *  pinned to the supported domains. Anchored end-to-end so the form
- *  rejects values with whitespace, missing protocol, or unsupported
- *  domain *before* save instead of round-tripping a config that
- *  ESPHome's loader will reject at compile time. Mirrors upstream;
- *  any ESPHome-side change to accepted shorthand should land here
- *  too. */
-const PACKAGES_SOURCE_PATTERN =
-  "^(github|gitlab):\\/\\/[A-Za-z0-9\\-]+\\/[A-Za-z0-9._\\-]+\\/[A-Za-z0-9._\\/-]+(@[A-Za-z0-9._\\/-]+)?(\\?[A-Za-z0-9._\\/-]+)?$";
-
-/** Synthesised value template shared by every user-keyed-MAP section.
- *  Most sections (``substitutions:`` and any future addition) accept
- *  arbitrary string values, so this is the neutral default — a
- *  required string with no pattern. Sections that need a stricter
- *  shape (``packages:``) override the template via
- *  :data:`SECTION_VALUE_TEMPLATE_OVERRIDES` below. */
-const DEFAULT_VALUE_TEMPLATE = makeConfigEntry({
-  key: "value",
-  label: "Value",
-  required: true,
-});
-
-/** Per-section value-template overrides. Anything not in this map
- *  uses :data:`DEFAULT_VALUE_TEMPLATE`. Kept as a Map so callers can
- *  iterate the configured sections (tests do this) without spreading
- *  an object's enumerable own keys. */
-const SECTION_VALUE_TEMPLATE_OVERRIDES: ReadonlyMap<string, ConfigEntry> =
-  new Map([
-    [
-      "packages",
+/** Synthesised entries shared by every section in :data:`MAP_SECTIONS`
+ *  — a single MAP whose value template is a string. The user names
+ *  each row's key themselves (the substitution name, the package
+ *  name, etc.). The string template is the primitive-value case;
+ *  non-primitive values (lists / dicts, e.g. nested package
+ *  definitions) get a per-row "edit in YAML" placeholder via
+ *  ``renderMapField`` rather than being forced through the string
+ *  template (which would stringify them to ``[object Object]`` and
+ *  lose data on save).
+ *
+ *  Per-row format validation (e.g. ``packages:`` only accepts the
+ *  ``github://`` / ``gitlab://`` shorthand) is intentionally NOT
+ *  done here — the YAML editor's ``yaml-lint-backend.ts`` already
+ *  pipes the document through ``editor/validate_yaml``
+ *  (``esphome vscode --ace``) and surfaces ESPHome's actual error
+ *  as a red squiggle, so the form's save path delegates to that
+ *  same backend lint. Duplicating ESPHome's validators in the
+ *  frontend would silently drift the moment upstream's accepted
+ *  shorthand changes (new domain, new alias, char class loosened).
+ *  The save path's roundtrip lives in ``device-section-config``'s
+ *  ``_onSave``. */
+const MAP_SECTION_ENTRIES: ConfigEntry[] = [
+  makeConfigEntry({
+    type: ConfigEntryType.MAP,
+    config_entries: [
       makeConfigEntry({
         key: "value",
-        label: "Source",
+        label: "Value",
         required: true,
-        pattern: PACKAGES_SOURCE_PATTERN,
-        pattern_error: "validation.invalid_package_source",
       }),
     ],
-  ]);
-
-/** Cache of synthesised entries per section key. Cached because the
- *  form's ``.entries`` prop is referentially compared on each render
- *  cycle — building a fresh array each call would re-mount the rows
- *  every keystroke. Populated lazily on the first
- *  :func:`resolveSectionEntries` call per section key. */
-const SECTION_ENTRIES_CACHE = new Map<string, ConfigEntry[]>();
+  }),
+];
 
 /**
  * Pick the right ``ConfigEntry[]`` to render for *sectionKey*.
  *
- * For sections in ``MAP_SECTIONS`` returns a single user-keyed-MAP
- * entry whose value template comes from
- * :data:`SECTION_VALUE_TEMPLATE_OVERRIDES` (when configured) or
- * :data:`DEFAULT_VALUE_TEMPLATE` (otherwise). Non-MAP sections hand
- * the catalog entries back unchanged. Pure (cached internally, so
- * identical sectionKey returns the same reference) — the render
- * path's correctness is testable without standing up a shadow
- * root, and the form's ``.entries`` prop reference is stable
- * across renders. (Previously the override variable existed but
- * the form's ``.entries`` prop bound to the wrong source, leaving
- * the section silently empty; pinning the resolution as a function
- * the tests call directly closes that loophole.)
+ * For sections in ``MAP_SECTIONS`` returns the synthesised MAP
+ * shape; otherwise hands back the catalog entries unchanged. Pure
+ * function — same input, same output, no side effects — so the
+ * render path's correctness is testable without standing up a
+ * shadow root. (Previously the override variable existed but the
+ * form's ``.entries`` prop bound to the wrong source, leaving the
+ * section silently empty; pinning the resolution as a function the
+ * tests call directly closes that loophole.)
  */
 export function resolveSectionEntries(
   sectionKey: string,
   catalogEntries: ConfigEntry[],
 ): ConfigEntry[] {
-  if (!MAP_SECTIONS.has(sectionKey)) return catalogEntries;
-  let cached = SECTION_ENTRIES_CACHE.get(sectionKey);
-  if (!cached) {
-    const valueTemplate =
-      SECTION_VALUE_TEMPLATE_OVERRIDES.get(sectionKey) ??
-      DEFAULT_VALUE_TEMPLATE;
-    cached = [
-      makeConfigEntry({
-        type: ConfigEntryType.MAP,
-        config_entries: [valueTemplate],
-      }),
-    ];
-    SECTION_ENTRIES_CACHE.set(sectionKey, cached);
-  }
-  return cached;
+  if (MAP_SECTIONS.has(sectionKey)) return MAP_SECTION_ENTRIES;
+  return catalogEntries;
 }

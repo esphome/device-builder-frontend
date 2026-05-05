@@ -542,26 +542,6 @@ export interface ConfigEntry {
   multi_value: boolean;
   /** When True accepts either a literal value OR a !lambda block. */
   templatable: boolean;
-  /**
-   * Optional regex (anchored, source form — no surrounding ``/.../``)
-   * that string values must match. Frontend-only constraint used for
-   * fields whose backend validator runs at compile time but where the
-   * obvious-typo case (e.g. ``packages:`` value with whitespace, no
-   * ``github://`` prefix) deserves immediate UI feedback rather than
-   * a save-then-compile-then-fail loop. Only checked when the raw
-   * value is a string; non-string values fall through (e.g. a
-   * complex package mapping rendered via ``renderMapField``'s
-   * "edit in YAML" placeholder bypasses pattern validation).
-   */
-  pattern: string | null;
-  /**
-   * i18n error code emitted when ``pattern`` doesn't match. Lets a
-   * specific override (e.g. "Must be a github:// URL") replace the
-   * generic ``validation.pattern_mismatch`` so the user sees an
-   * explanation tied to the field's actual contract rather than a
-   * regex-shaped error. Null = use the generic code.
-   */
-  pattern_error: string | null;
 
   // === featured-component overlays ===
   /**

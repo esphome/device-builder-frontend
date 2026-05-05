@@ -49,8 +49,6 @@ export function makeConfigEntry(
     suggestions: null,
     config_entries: null,
     platform_type: null,
-    pattern: null,
-    pattern_error: null,
     ...overrides,
   };
 }
