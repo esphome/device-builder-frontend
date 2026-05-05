@@ -205,13 +205,23 @@ export class ESPHomePageDevice extends LitElement {
   /** When true, the next popstate is allowed to fall through to the router. */
   private _allowingLeave = false;
 
-  private get _isDirty(): boolean {
+  private get _isYamlDirty(): boolean {
     return this._yaml !== this._savedYaml;
   }
 
-  /* The Save / Discard handlers flip ``_allowingLeave`` BEFORE
-   * the guard Promise resolves so the page-leave callers see a
-   * coherent state on the next microtask:
+  /** Combined "anything unsaved on this page" check. The YAML
+   *  buffer ``_isYamlDirty`` and the visual editor's form
+   *  ``_sectionDirty`` are independent — typing in the form
+   *  doesn't flip the YAML buffer until the user clicks Save —
+   *  but both should block a page-leave / refresh until the
+   *  user picks Discard or Save. */
+  private get _isDirty(): boolean {
+    return this._isYamlDirty || this._sectionDirty;
+  }
+
+  /* ``_allowingLeave`` is flipped BEFORE the guard Promise
+   * resolves so the page-leave callers see a coherent state on
+   * the next microtask:
    *
    *   - The browser-back path ``.then``s on the resolved
    *     Promise and calls ``history.back()`` itself.
@@ -223,9 +233,14 @@ export class ESPHomePageDevice extends LitElement {
    *     bounced back to the device URL, leaving the user stuck.
    *     Flipping the flag here short-circuits that.
    *
-   * The flag is page-leave-only; the section-switch caller never
-   * sets it (the section guard's ``save`` lambda is the one
-   * carrying the leave-flag write).
+   * The flip happens inside the page-leave save lambda (so it
+   * lands synchronously before the guard's resolve when the
+   * user picks Save) and again in ``_confirmLeave`` after the
+   * await (so it covers the Discard path too — Discard doesn't
+   * route through the save lambda). The redundant write on Save
+   * is idempotent. The section-switch guard never sets the flag
+   * — its ``save`` returns to the page synchronously after the
+   * await without leaving the page.
    */
   private _onUnsavedDiscard = () => this._unsavedGuard.onDiscard();
   private _onUnsavedSave = () => this._unsavedGuard.onSave();
@@ -235,10 +250,21 @@ export class ESPHomePageDevice extends LitElement {
     const ok = await this._unsavedGuard.run({
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
-      save: () => {
-        this._saveYaml();
+      // Save persists *both* dirty buffers when the user picks
+      // "Save and leave" — the YAML pane and the section form
+      // are independent and either can be dirty on its own. The
+      // section save runs first because its output writes
+      // through ``yaml-updated`` which advances ``_savedYaml``;
+      // then ``_saveYaml`` covers anything the user typed in
+      // the YAML pane on top.
+      save: async () => {
+        if (this._sectionDirty) {
+          const sectionOk = (await this._activeSection?.save()) ?? false;
+          if (!sectionOk) return false;
+        }
+        if (this._isYamlDirty) this._saveYaml();
         this._allowingLeave = true;
-        return Promise.resolve(true);
+        return true;
       },
     });
     if (ok) this._allowingLeave = true;

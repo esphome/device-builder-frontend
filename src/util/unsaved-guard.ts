@@ -65,12 +65,24 @@ export class UnsavedGuard {
   /** Dialog "Save and leave" → run the saver, proceed iff it
    *  succeeded. The saver's return value is the source of truth:
    *  validation errors / IO failures should resolve to ``false``
-   *  so the caller stays put. */
+   *  so the caller stays put.
+   *
+   *  Wraps the await in try/catch so a saver that *throws*
+   *  (network error, programmer mistake) still resolves the
+   *  guard Promise. Without this, an in-flight ``run()`` would
+   *  dangle forever — the caller's ``await`` never returns and
+   *  the dialog can't be re-opened (``isPending`` stays stale). */
   async onSave(): Promise<void> {
     const a = this._active;
     this._active = null;
     if (!a) return;
-    a.resolve(await a.save());
+    let ok = false;
+    try {
+      ok = await a.save();
+    } catch {
+      ok = false;
+    }
+    a.resolve(ok);
   }
 
   /** Dialog "Cancel" / dismiss → resolve ``false`` so the caller

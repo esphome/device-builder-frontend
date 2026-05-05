@@ -235,7 +235,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // (``device.ts``) can hold a direct ref. The component tree
     // is page → device-editor → device-board-info → us, three
     // shadow boundaries deep, so a property-passthrough chain
-    // would cost three editsper API change. ``composed: true``
+    // would cost three edits per API change. ``composed: true``
     // lets the event escape every shadow root on the way up.
     this.dispatchEvent(
       new CustomEvent("section-mount", {

@@ -76,6 +76,25 @@ describe("UnsavedGuard", () => {
     expect(save).toHaveBeenCalledOnce();
   });
 
+  it("resolves false when save throws — guard never hangs", async () => {
+    const guard = new UnsavedGuard();
+    const { open } = makeOpener();
+    // A saver that rejects (network blip, programmer bug) would
+    // otherwise leave the guard's resolver dangling. ``onSave``
+    // has to contain the throw and resolve the guard Promise to
+    // ``false`` — otherwise the caller's ``await`` never
+    // returns and ``isPending`` stays stale, blocking the
+    // dialog from re-opening.
+    const save = vi.fn(() => Promise.reject(new Error("boom")));
+
+    const promise = guard.run({ dirty: true, open, save });
+    await guard.onSave();
+
+    expect(await promise).toBe(false);
+    expect(guard.isPending).toBe(false);
+    expect(save).toHaveBeenCalledOnce();
+  });
+
   it("resolves false on Cancel without invoking save", async () => {
     const guard = new UnsavedGuard();
     const { open } = makeOpener();
