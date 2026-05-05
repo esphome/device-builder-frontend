@@ -85,21 +85,24 @@ export class UnsavedGuard {
     a.resolve(ok);
   }
 
-  /** Dialog "Cancel" / dismiss → resolve ``false`` so the caller
-   *  drops its action. */
+  /** Dialog "Cancel" / dismiss, *and* the page-disconnect
+   *  cleanup path — both want the same "resolve any in-flight
+   *  guard as don't-proceed" behaviour, so they share one
+   *  implementation. The two call sites are named differently
+   *  in the page (``_onUnsavedCancel`` for the dialog event,
+   *  ``cancelPending`` for unmount) but funnel through here. */
   onCancel(): void {
     const a = this._active;
     this._active = null;
     a?.resolve(false);
   }
 
-  /** Resolve any in-flight guard as "don't proceed". Used on
-   *  page disconnect so awaiters don't dangle past unmount. */
-  cancelPending(): void {
-    const a = this._active;
-    this._active = null;
-    a?.resolve(false);
-  }
+  /** Alias — same behaviour as :meth:`onCancel`, kept for the
+   *  page's ``disconnectedCallback`` to read clearly at the
+   *  call site (``cancelPending`` vs ``onCancel`` carries
+   *  different intent even though the implementation is one
+   *  thing). */
+  cancelPending = this.onCancel;
 
   /** Test/debug introspection: is a guard currently waiting? */
   get isPending(): boolean {
