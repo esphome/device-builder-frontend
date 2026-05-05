@@ -9,7 +9,11 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
+import type {
+  BoardCatalogEntry,
+  ConfigEntry,
+  EditorValidateResponse,
+} from "../../api/types.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
   resolveSectionEntries,
@@ -826,23 +830,33 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private async _lintFailureMessage(
     candidateYaml: string,
   ): Promise<string | null> {
-    let res;
+    let res: EditorValidateResponse;
     try {
       res = await this._api.validateYaml(this.configuration, candidateYaml);
     } catch {
       return null;
     }
-    // Trim first, then check truthiness — a whitespace-only
-    // ``message`` would otherwise return ``""`` and ``_onSave``
-    // treats any non-null string as a failure, silently
-    // blocking the save while the error ``<p>`` renders empty
-    // (Lit's truthy gate hides ``""``). Coalescing to null on
-    // empty keeps the surface "either a real message or
-    // proceed."
-    const validationMsg = res.validation_errors?.[0]?.message?.trim();
-    if (validationMsg) return validationMsg;
-    const yamlMsg = res.yaml_errors?.[0]?.message?.trim();
-    if (yamlMsg) return yamlMsg;
+    // Two distinct empty-string cases to keep apart:
+    //   1. No errors at all — return null, ``_onSave`` proceeds.
+    //   2. Errors reported but the first one's ``message`` is
+    //      whitespace-only — the backend flagged a problem we
+    //      can't render verbatim, but proceeding would silently
+    //      ignore a real validation failure. Fall back to a
+    //      generic localised label so ``_onSave`` blocks AND
+    //      the user gets a visible error.
+    // Without case 2, ``_onSave`` would update the YAML on the
+    // backend's own "this is invalid" response just because the
+    // message string happened to trim away to nothing.
+    const validation = res.validation_errors?.[0];
+    if (validation) {
+      const msg = validation.message?.trim();
+      return msg || this._localize("device.section_save_error");
+    }
+    const yaml = res.yaml_errors?.[0];
+    if (yaml) {
+      const msg = yaml.message?.trim();
+      return msg || this._localize("device.section_save_error");
+    }
     return null;
   }
 }
