@@ -186,32 +186,26 @@ export class ESPHomePageDashboard extends LitElement {
   @state() private _drawerDevice: ConfiguredDevice | null = null;
   @state() private _cardContextDevice: ConfiguredDevice | null = null;
   @state() private _cardContextPosition: { x: number; y: number } | null = null;
-  /** Single device queued for delete confirmation. ``null`` means
-   *  the shared confirm dialog is in bulk-delete mode (driven by
-   *  ``_selectedDevices``). The state-keyed mode-switch lets us
-   *  reuse one ``esphome-confirm-dialog`` instance for both the
-   *  per-device kebab Delete and the select-mode bulk Delete
-   *  without juggling two dialog elements. */
-  @state() private _pendingDelete: ConfiguredDevice | null = null;
-  /** Archived configuration queued for permanent-delete confirmation.
-   *  Routed through the same ``esphome-confirm-dialog`` instance as
-   *  the active-device delete by setting this state alongside
-   *  clearing ``_pendingDelete`` — the dialog's copy and confirm
-   *  router both branch on which is non-null. */
-  @state() private _pendingDeleteArchived: ArchivedDevice | null = null;
-  /** Active device queued for archive confirmation. Archive is
-   *  reversible but wipes the per-device build dir — that's
-   *  expensive (5-10min ESP-IDF recompile) so it deserves a
-   *  confirm step. Same shared dialog as the two delete flows. */
-  @state() private _pendingArchive: ConfiguredDevice | null = null;
-  /** True while the select-bar's "Archive selected" flow waits on
-   *  the shared confirm dialog. Same routing pattern as the
-   *  ``_pendingDelete*`` / ``_pendingArchive`` fields — at most one
-   *  is set; the others stay null so dialog copy + ``_executeConfirm``
-   *  can branch on which mode is active. Bulk archive doesn't need
-   *  to carry a target list itself; the active selection lives in
-   *  ``_selectedDevices`` and is read at execute time. */
-  @state() private _pendingArchiveBulk = false;
+  /**
+   * Tagged-union slot for whatever destructive action is waiting
+   * on ``esphome-confirm-dialog``. One shared dialog instance
+   * routes through the ``kind`` field below — copy in
+   * ``_renderDialogs`` and execute in ``_executeConfirm`` both
+   * switch on it. Setting this implicitly clears whatever was
+   * pending before, which is the whole reason it's a single
+   * union and not five parallel ``_pending*`` flags.
+   *
+   * ``delete-bulk`` and ``archive-bulk`` carry no payload — the
+   * active selection lives in ``_selectedDevices`` and is read
+   * at execute time, same as before.
+   */
+  @state() private _pendingConfirm:
+    | { kind: "delete-single"; device: ConfiguredDevice }
+    | { kind: "delete-archived"; device: ArchivedDevice }
+    | { kind: "delete-bulk" }
+    | { kind: "archive-single"; device: ConfiguredDevice }
+    | { kind: "archive-bulk" }
+    | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
    *  device card / row so the user can spot the freshly-imported
@@ -1246,79 +1240,100 @@ export class ESPHomePageDashboard extends LitElement {
     return "";
   }
 
+  /**
+   * Resolve the localised copy + destructive flag for whatever
+   * destructive action is currently pending. One source of truth
+   * for the dialog's heading / message / confirm-label / red
+   * style — adding a new ``_pendingConfirm`` ``kind`` lights up
+   * here once instead of branching across two render functions.
+   */
+  private _confirmDialogCopy(): {
+    heading: string;
+    message: string;
+    confirm: string;
+    destructive: boolean;
+  } {
+    const t = this._localize;
+    const p = this._pendingConfirm;
+    // Fallback when the dialog has no kind set — should be unreachable
+    // since every open path assigns one, but pin a safe default rather
+    // than letting an undefined slip through to the dialog.
+    if (!p) {
+      return {
+        heading: t("dashboard.delete_selected_title"),
+        message: t("dashboard.delete_selected_desc", {
+          count: this._selectedDevices.size,
+        }),
+        confirm: t("dashboard.delete_selected_confirm"),
+        destructive: true,
+      };
+    }
+    switch (p.kind) {
+      case "delete-bulk":
+        return {
+          heading: t("dashboard.delete_selected_title"),
+          message: t("dashboard.delete_selected_desc", {
+            count: this._selectedDevices.size,
+          }),
+          confirm: t("dashboard.delete_selected_confirm"),
+          destructive: true,
+        };
+      case "delete-single": {
+        const name = p.device.friendly_name || p.device.name;
+        return {
+          heading: t("dashboard.delete_single_title"),
+          message: t("dashboard.delete_single_desc", { name }),
+          confirm: t("dashboard.delete_selected_confirm"),
+          destructive: true,
+        };
+      }
+      case "delete-archived": {
+        const name =
+          p.device.friendly_name || p.device.name || p.device.configuration;
+        return {
+          heading: t("dashboard.delete_archived_title"),
+          message: t("dashboard.delete_archived_desc", { name }),
+          confirm: t("dashboard.action_delete_permanently"),
+          destructive: true,
+        };
+      }
+      case "archive-bulk":
+        return {
+          heading: t("dashboard.archive_selected_title"),
+          message: t("dashboard.archive_selected_desc", {
+            count: this._selectedDevices.size,
+          }),
+          confirm: t("dashboard.archive_selected_confirm"),
+          destructive: false,
+        };
+      case "archive-single": {
+        const name = p.device.friendly_name || p.device.name;
+        return {
+          heading: t("dashboard.archive_title"),
+          message: t("dashboard.archive_desc", { name }),
+          confirm: t("dashboard.archive_confirm"),
+          destructive: false,
+        };
+      }
+    }
+  }
+
   private _renderDialogs() {
     /* One confirm-dialog instance covers three flows: per-device
        kebab Delete, select-mode bulk Delete, and Delete-permanently
        on an archived row. ``_pendingDelete`` and
-       ``_pendingDeleteArchived`` drive the copy + ``@confirm``
-       router; at most one is non-null at a time, with both null
-       falling through to the bulk-delete copy.
-
        Picking up the device's friendly name keeps the prompt
        readable when the technical hostname is something like
        ``athom-rgbcw-bulb-998181``. */
-    const pendingName = this._pendingDelete
-      ? this._pendingDelete.friendly_name || this._pendingDelete.name
-      : "";
-    const pendingArchivedName = this._pendingDeleteArchived
-      ? this._pendingDeleteArchived.friendly_name ||
-        this._pendingDeleteArchived.name ||
-        this._pendingDeleteArchived.configuration
-      : "";
-    const pendingArchiveName = this._pendingArchive
-      ? this._pendingArchive.friendly_name || this._pendingArchive.name
-      : "";
-    let dialogHeading: string;
-    let dialogMessage: string;
-    let dialogConfirm: string;
-    let dialogDestructive = false;
-    if (this._pendingArchiveBulk) {
-      dialogHeading = this._localize("dashboard.archive_selected_title");
-      dialogMessage = this._localize("dashboard.archive_selected_desc", {
-        count: this._selectedDevices.size,
-      });
-      dialogConfirm = this._localize("dashboard.archive_selected_confirm");
-    } else if (this._pendingArchive) {
-      dialogHeading = this._localize("dashboard.archive_title");
-      dialogMessage = this._localize("dashboard.archive_desc", {
-        name: pendingArchiveName,
-      });
-      dialogConfirm = this._localize("dashboard.archive_confirm");
-    } else if (this._pendingDeleteArchived) {
-      dialogHeading = this._localize("dashboard.delete_archived_title");
-      dialogMessage = this._localize("dashboard.delete_archived_desc", {
-        name: pendingArchivedName,
-      });
-      dialogConfirm = this._localize("dashboard.action_delete_permanently");
-      dialogDestructive = true;
-    } else if (this._pendingDelete) {
-      dialogHeading = this._localize("dashboard.delete_single_title");
-      dialogMessage = this._localize("dashboard.delete_single_desc", {
-        name: pendingName,
-      });
-      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
-      dialogDestructive = true;
-    } else {
-      dialogHeading = this._localize("dashboard.delete_selected_title");
-      dialogMessage = this._localize("dashboard.delete_selected_desc", {
-        count: this._selectedDevices.size,
-      });
-      dialogConfirm = this._localize("dashboard.delete_selected_confirm");
-      dialogDestructive = true;
-    }
+    const { heading, message, confirm, destructive } = this._confirmDialogCopy();
     return html`
       <esphome-confirm-dialog
-        heading=${dialogHeading}
-        message=${dialogMessage}
-        confirm-label=${dialogConfirm}
-        ?destructive=${dialogDestructive}
+        heading=${heading}
+        message=${message}
+        confirm-label=${confirm}
+        ?destructive=${destructive}
         @confirm=${this._executeConfirm}
-        @cancel=${() => {
-          this._pendingDelete = null;
-          this._pendingDeleteArchived = null;
-          this._pendingArchive = null;
-          this._pendingArchiveBulk = false;
-        }}
+        @cancel=${() => (this._pendingConfirm = null)}
       ></esphome-confirm-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
@@ -1864,18 +1879,25 @@ export class ESPHomePageDashboard extends LitElement {
     }
   }
 
+  /**
+   * Open ``_confirmDialog`` after assigning a kind to
+   * ``_pendingConfirm``. Single mutation site so the five entry
+   * points (bulk-delete, bulk-archive, kebab single-delete,
+   * kebab single-archive, archived-row delete-permanently) can't
+   * forget to clear the previous tag — the assignment is the
+   * clear.
+   */
+  private _openConfirm(pending: NonNullable<ESPHomePageDashboard["_pendingConfirm"]>) {
+    this._pendingConfirm = pending;
+    this._confirmDialog.open();
+  }
+
   private _deleteSelected() {
     if (this._selectedDevices.size === 0) {
       toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
       return;
     }
-    /* Bulk-delete path — all four pending-* states stay null/false
-       so the confirm dialog shows the bulk-delete copy. */
-    this._pendingDelete = null;
-    this._pendingDeleteArchived = null;
-    this._pendingArchive = null;
-    this._pendingArchiveBulk = false;
-    this._confirmDialog.open();
+    this._openConfirm({ kind: "delete-bulk" });
   }
 
   private _archiveSelected() {
@@ -1883,84 +1905,58 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("dashboard.archive_all_none"), { richColors: true });
       return;
     }
-    /* Bulk-archive path — same shape as ``_deleteSelected`` but
-       sets ``_pendingArchiveBulk`` so the confirm dialog renders
-       the archive copy and ``_executeConfirm`` routes to
-       ``archiveBulkDevices``. */
-    this._pendingDelete = null;
-    this._pendingDeleteArchived = null;
-    this._pendingArchive = null;
-    this._pendingArchiveBulk = true;
-    this._confirmDialog.open();
+    this._openConfirm({ kind: "archive-bulk" });
   }
 
   private _confirmDeleteSingle(device: ConfiguredDevice) {
-    /* Per-device kebab Delete — set ``_pendingDelete`` so the
-       confirm dialog shows the single-device copy and routes to the
-       single-device path. Earlier this skipped the dialog entirely
-       and went straight to ``deleteDevice`` — there's no undo, so a
-       missed click on the kebab silently nuked the YAML. */
-    this._pendingDelete = device;
-    this._pendingDeleteArchived = null;
-    this._pendingArchive = null;
-    this._pendingArchiveBulk = false;
-    this._confirmDialog.open();
+    /* Per-device kebab Delete. Earlier this skipped the dialog
+       entirely and went straight to ``deleteDevice`` — there's no
+       undo, so a missed click silently nuked the YAML. */
+    this._openConfirm({ kind: "delete-single", device });
   }
 
   private _confirmDeleteArchived(device: ArchivedDevice) {
-    /* Permanent-delete from the archived section. Same dialog as
-       the active-device delete, with branched copy. The archive
+    /* Permanent-delete from the archived section. The archive
        was already a soft-delete, so this is the "really, gone"
        step — the YAML and its sidecars are unlinked. */
-    this._pendingDelete = null;
-    this._pendingArchive = null;
-    this._pendingArchiveBulk = false;
-    this._pendingDeleteArchived = device;
-    this._confirmDialog.open();
+    this._openConfirm({ kind: "delete-archived", device });
   }
 
   private _confirmArchive(device: ConfiguredDevice) {
     /* Archive is reversible but wipes the per-device build dir
-       (5-10 min recompile when restored). Show a confirm dialog
-       — single-device kebab path, mirrors ``_confirmDeleteSingle``. */
-    this._pendingDelete = null;
-    this._pendingDeleteArchived = null;
-    this._pendingArchiveBulk = false;
-    this._pendingArchive = device;
-    this._confirmDialog.open();
+       (5-10 min recompile when restored). */
+    this._openConfirm({ kind: "archive-single", device });
   }
 
   private _executeConfirm() {
-    if (this._pendingArchiveBulk) {
-      const selected = [...this._selectedDevices];
-      this._pendingArchiveBulk = false;
-      this._selectMode = false;
-      this._selectedDevices = new Set();
-      archiveBulkDevices(selected, this._devices, this._api, this._localize);
-      return;
+    const p = this._pendingConfirm;
+    this._pendingConfirm = null;
+    if (!p) return;
+    switch (p.kind) {
+      case "delete-bulk": {
+        const selected = [...this._selectedDevices];
+        this._selectMode = false;
+        this._selectedDevices = new Set();
+        deleteBulkDevices(selected, this._devices, this._api, this._localize);
+        return;
+      }
+      case "archive-bulk": {
+        const selected = [...this._selectedDevices];
+        this._selectMode = false;
+        this._selectedDevices = new Set();
+        archiveBulkDevices(selected, this._devices, this._api, this._localize);
+        return;
+      }
+      case "delete-single":
+        deleteDevice(p.device, this._api, this._devices, this._localize);
+        return;
+      case "delete-archived":
+        this._deleteArchivedDevice(p.device);
+        return;
+      case "archive-single":
+        this._archiveDevice(p.device);
+        return;
     }
-    if (this._pendingArchive) {
-      const target = this._pendingArchive;
-      this._pendingArchive = null;
-      this._archiveDevice(target);
-      return;
-    }
-    if (this._pendingDeleteArchived) {
-      const target = this._pendingDeleteArchived;
-      this._pendingDeleteArchived = null;
-      this._deleteArchivedDevice(target);
-      return;
-    }
-    if (this._pendingDelete) {
-      const target = this._pendingDelete;
-      this._pendingDelete = null;
-      deleteDevice(target, this._api, this._devices, this._localize);
-      return;
-    }
-    const selected = [...this._selectedDevices];
-    this._selectMode = false;
-    this._selectedDevices = new Set();
-    deleteBulkDevices(selected, this._devices, this._api, this._localize);
   }
 
   private async _deleteArchivedDevice(device: ArchivedDevice) {
