@@ -165,10 +165,25 @@ export async function archiveBulkDevices(
       },
     );
   }
+  // Index by configuration up front so failure-toast naming is
+  // O(failures) instead of O(failures × devices) on big selections.
+  const devicesByConfiguration = new Map(
+    devices.map((d) => [d.configuration, d] as const),
+  );
   for (const { result, configuration } of failures) {
-    const device = devices.find((d) => d.configuration === configuration);
+    const device = devicesByConfiguration.get(configuration);
     const name = device ? device.friendly_name || device.name : configuration;
-    const reason = result.status === "rejected" ? String(result.reason) : "";
+    // Match the single-archive path's ``err instanceof Error ?
+    // err.message : String(err)`` shape so a plain ``new Error('...')``
+    // surfaces the message and a non-Error rejection (an opaque
+    // object, a string) still stringifies legibly instead of
+    // falling through to ``[object Object]``.
+    const reason =
+      result.status === "rejected"
+        ? result.reason instanceof Error
+          ? result.reason.message
+          : String(result.reason)
+        : "";
     toast.error(
       localize("dashboard.action_archive_failed", { name, error: reason }),
       { richColors: true },
