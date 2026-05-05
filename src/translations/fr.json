@@ -480,6 +480,8 @@
     "show_ignored_discoveries": "Afficher les découvertes ignorées",
     "archived_devices": "Appareils archivés",
     "reset_build_env": "Réinitialiser l'environnement de compilation",
+    "report_issue": "Signaler un problème",
+    "request_feature": "Demander une fonctionnalité",
     "back": "Retour",
     "home_assistant": "Home Assistant",
     "editor": "Éditeur",

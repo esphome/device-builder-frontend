@@ -480,6 +480,8 @@
     "show_ignored_discoveries": "Genegeerde ontdekkingen tonen",
     "archived_devices": "Gearchiveerde apparaten",
     "reset_build_env": "Bouw-omgeving resetten",
+    "report_issue": "Probleem melden",
+    "request_feature": "Functie aanvragen",
     "back": "Terug",
     "home_assistant": "Home Assistant",
     "editor": "Editor",

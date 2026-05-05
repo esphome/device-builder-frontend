@@ -566,6 +566,8 @@
     "show_ignored_discoveries": "Show ignored discoveries",
     "archived_devices": "Archived devices",
     "reset_build_env": "Reset build environment",
+    "report_issue": "Report an issue",
+    "request_feature": "Request a feature",
     "back": "Back",
     "home_assistant": "Home Assistant",
     "editor": "Editor",
