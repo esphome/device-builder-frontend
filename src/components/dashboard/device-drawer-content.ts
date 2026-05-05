@@ -99,11 +99,6 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
-  /** Remaining cache TTL in seconds (mDNS row only). When non-null
-   *  the row appends "TTL: 38s" so the user can see whether the
-   *  device is "due to re-announce" or "missed several windows
-   *  already." */
-  ttlRemaining?: number | null;
 }
 
 @customElement("esphome-device-drawer-content")
@@ -757,27 +752,20 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const now = Date.now();
     const anchor = this._reachabilityAnchorMs;
 
-    // The backend stamps ``ttl_remaining`` at send time, so it
-    // needs to *count down* by ``now - anchor`` to stay accurate
-    // between server pushes — the inverse of ``ageOf``'s
-    // count-up. Clamps at zero so a stale snapshot doesn't
-    // surface negative seconds.
-    const elapsedSeconds =
-      r.mdns_ttl_remaining_seconds === null
-        ? 0
-        : Math.max(0, (now - anchor) / 1000);
-    const ttlRemaining =
-      r.mdns_ttl_remaining_seconds === null
-        ? null
-        : Math.max(0, r.mdns_ttl_remaining_seconds - elapsedSeconds);
-
+    // ``mdns_ttl_remaining_seconds`` is intentionally not
+    // surfaced in the row. It came from the cached A record's
+    // remaining TTL, which the backend's refresh loop drives
+    // back to ~120s on every probe — so the displayed value
+    // would mostly be a function of when our refresh tick last
+    // fired, not "how soon the device's announce expires" the
+    // way a naive reader would interpret it. The "Last seen"
+    // age is the truthful diagnostic; TTL is internal plumbing.
     const rows: ReachabilityRowSpec[] = [
       {
         source: "mdns",
         icon: "access-point-network",
         labelKey: "dashboard.drawer_source_mdns",
         age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
-        ttlRemaining,
       },
       {
         source: "ping",
@@ -834,18 +822,6 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
             // suffix should match.
             n: rttFmt.format(row.rttMs),
           });
-    // mDNS row appends "TTL: 38s" — truthful diagnostic so the
-    // user can tell "due to re-announce in 8s" from "missed
-    // several windows already". Round to whole seconds so the
-    // 1Hz tick doesn't render a jarring fractional decrement
-    // ("TTL: 94.8s → 94.3s → 93.8s") twice per second.
-    const ttlFmt = getNumberFormatter(lang, 0);
-    const ttlText =
-      row.ttlRemaining === null || row.ttlRemaining === undefined
-        ? null
-        : this._localize("dashboard.drawer_mdns_ttl_remaining", {
-            n: ttlFmt.format(row.ttlRemaining),
-          });
     const isActive = activeSource === row.source;
     return html`
       <div class="row">
@@ -864,8 +840,6 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           <div class="value">
             ${ageText}${rttText
               ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
-              : nothing}${ttlText
-              ? html` &middot; <span class="reachability-rtt">${ttlText}</span>`
               : nothing}
           </div>
         </div>
