@@ -1,46 +1,22 @@
 /**
- * Top-level keys we always treat as YAML-only regardless of what the
- * backend returns.
+ * Top-level keys always rendered YAML-only.
  *
- * - `external_components` — accepts two distinct shapes for `source`
- *   (a string shorthand `"local_components"` / `"github://..."` and a
- *   typed-object form `{type: local|git, path|url|ref, ...}`). The
- *   form-driven editor only renders the string shorthand, which means
- *   the typed-object form is invisible and the description for the
- *   inner `type` discriminator gets attached to the outer string field
- *   ("Repository type. One of local, git." — issue #337). The catalog
- *   model can't express a discriminated union, and adding a
- *   YAML-fragment escape hatch per row (the way ``packages`` is
- *   handled via ``MAP_SECTIONS``) doesn't fit either: the user-keyed
- *   shape isn't a map, it's a list of items each with a structured
- *   body. Always YAML-only.
+ * `external_components` accepts both a string-shorthand `source:` and
+ * a typed-object `source: {type, path|url|ref, ...}`. The catalog
+ * model can't express the discriminated union, so the form editor
+ * renders only the string shape and mislabels the field with the
+ * inner `type` discriminator's description (issue #337). `packages`
+ * is *not* here — it goes through ``MAP_SECTIONS`` instead.
  *
- * `packages` is *not* in this set — see ``MAP_SECTIONS`` for how it
- * gets a partial structured editor (key list with per-row "edit in
- * YAML" placeholders for the structured values). Substitutions /
- * globals / etc. rely on the backend describing them as a MAP entry
- * and fall back to the YAML notice automatically when the schema
- * returns no entries.
- *
- * Lives in its own module rather than alongside the Lit component
- * so unit tests can pin the contract without dragging in Lit / DOM
- * dependencies that aren't available in the vitest Node
- * environment. One source of truth — the component imports from
- * here, the test imports from here.
+ * Lives in its own module so the unit test can import without
+ * dragging Lit / DOM into the vitest Node environment.
  */
 export const YAML_ONLY_SECTIONS: ReadonlySet<string> = new Set([
   "external_components",
 ]);
 
-/**
- * Decide whether a section should be rendered as YAML-only.
- *
- * Two paths:
- * 1. The key is in the always-YAML set above.
- * 2. The backend returned no schema entries — there's nothing to
- *    render a structured form for, so fall back to the YAML notice
- *    rather than emit an empty form with just the description.
- */
+/** True when the section should fall back to the YAML notice — either
+ *  always-YAML, or the backend returned no schema entries to render. */
 export function isYamlOnlySection(
   sectionKey: string,
   entryCount: number,

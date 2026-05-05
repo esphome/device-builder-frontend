@@ -75,9 +75,8 @@ interface SectionConfigResponse {
   entries: ConfigEntry[];
 }
 
-// YAML-only-section gate lives in its own module so the unit test
-// can import it without dragging Lit / DOM into the vitest Node
-// environment. See ``yaml-only-sections.ts``.
+// YAML-only-section gate lives in ``yaml-only-sections.ts`` so the
+// unit test can import it without pulling Lit / DOM through here.
 
 @customElement("esphome-device-section-config")
 export class ESPHomeDeviceSectionConfig extends LitElement {

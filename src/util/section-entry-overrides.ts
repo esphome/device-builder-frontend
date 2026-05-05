@@ -21,23 +21,14 @@ import { ConfigEntryType, type ConfigEntry } from "../api/types.js";
 import { makeConfigEntry } from "./config-entry-defaults.js";
 
 /** Top-level YAML keys whose entire body is a user-keyed map.
- *  Values can be any YAML shape — ESPHome's
- *  ``CONFIG_SCHEMA = cv.Schema({validate_substitution_key: object})``
- *  permits scalars, lists, and dicts. The structured editor handles
- *  primitives via the value template; non-primitive values fall back
- *  to a per-row "edit in YAML" placeholder in ``renderMapField``
- *  (verified by ``test/components/device/render-map-field.test.ts``)
- *  so the YAML still round-trips losslessly even though the form
- *  doesn't surface a structured editor for them.
- *
- *  ``packages:`` is treated the same way: a user-keyed map whose
- *  values are nested package definitions (``{url, ref, file, ...}``).
- *  The form lets the user add / rename / delete row keys (the
- *  package names), and per-row complex-value detection in
- *  ``renderMapField`` surfaces the "edit in YAML" placeholder for
- *  the structured value bodies — so the editor is at least
- *  partially usable for the package list itself instead of
- *  forcing the whole section to YAML. */
+ *  Values can be any YAML shape — ``renderMapField`` handles
+ *  primitives via the value template and falls back to a per-row
+ *  "edit in YAML" placeholder for non-primitives (verified by
+ *  ``test/components/device/render-map-field.test.ts``), so the YAML
+ *  still round-trips losslessly. ``packages:`` rides this same path
+ *  so the user can at least add / rename / delete package keys from
+ *  the form even though each value's structured body falls through
+ *  to the per-row YAML placeholder. */
 export const MAP_SECTIONS: ReadonlySet<string> = new Set([
   "substitutions",
   "packages",
