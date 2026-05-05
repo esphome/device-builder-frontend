@@ -849,7 +849,20 @@ export interface ReachabilityStateEvent {
   state: DeviceState;
   active_source: ReachabilitySource;
   ip: string;
+  /** Seconds since the device's last ``_esphomelib._tcp.local.``
+   *  SRV announce, read live from ``zeroconf.cache.created``.
+   *  Truthful even when ``ServiceStateChange.Updated`` doesn't
+   *  fire (zeroconf suppresses callbacks for same-content TTL
+   *  refreshes); ``null`` when zeroconf isn't running or the
+   *  device hasn't been heard from at all. */
   mdns_last_seen_seconds_ago: number | null;
+  /** Seconds the cached SRV record has left before
+   *  ``zeroconf`` evicts it without a refreshing announce.
+   *  Surfaced beside the mDNS row as a TTL bar / countdown
+   *  so the user can tell "due to re-announce" from "missed
+   *  several windows already". ``null`` when ``mdns_last_seen``
+   *  is null. */
+  mdns_ttl_remaining_seconds: number | null;
   ping_last_seen_seconds_ago: number | null;
   mqtt_last_seen_seconds_ago: number | null;
   ping_rtt_ms: number | null;

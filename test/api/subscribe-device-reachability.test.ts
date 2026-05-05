@@ -49,6 +49,7 @@ const SAMPLE_STATE: ReachabilityStateEvent = {
   active_source: "mdns",
   ip: "10.0.0.42",
   mdns_last_seen_seconds_ago: 12.4,
+  mdns_ttl_remaining_seconds: 107.6,
   ping_last_seen_seconds_ago: 47.0,
   mqtt_last_seen_seconds_ago: null,
   ping_rtt_ms: null,

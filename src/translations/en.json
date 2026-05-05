@@ -196,6 +196,7 @@
     "drawer_source_mqtt": "MQTT",
     "drawer_source_active": "active",
     "drawer_round_trip_ms": "{n} ms",
+    "drawer_mdns_ttl_remaining": "TTL: {n}s",
     "drawer_waiting_for_broadcast": "Waiting for first broadcast…",
     "drawer_ip_address": "IP Address",
     "drawer_ip_addresses": "IP Addresses",
