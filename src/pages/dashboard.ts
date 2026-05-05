@@ -1319,10 +1319,13 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderDialogs() {
-    /* One confirm-dialog instance covers three flows: per-device
-       kebab Delete, select-mode bulk Delete, and Delete-permanently
-       on an archived row. ``_pendingDelete`` and
-       Picking up the device's friendly name keeps the prompt
+    /* One ``esphome-confirm-dialog`` instance covers every
+       destructive-action entry point — per-device kebab Delete or
+       Archive, select-mode bulk Delete or Archive, and
+       Delete-permanently on an archived row. The active flow is
+       carried on ``_pendingConfirm`` (a tagged union); copy + the
+       execute branch derive from its ``kind``. Picking up the
+       device's friendly name in the message keeps the prompt
        readable when the technical hostname is something like
        ``athom-rgbcw-bulb-998181``. */
     const { heading, message, confirm, destructive } = this._confirmDialogCopy();

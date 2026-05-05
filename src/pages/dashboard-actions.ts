@@ -13,6 +13,37 @@ export function editDevice(device: ConfiguredDevice) {
 }
 
 /**
+ * Stringify a ``Promise.allSettled`` rejection reason for a toast.
+ *
+ * Three cascading cases keep "[object Object]" out of the rendered
+ * error toast — the most common failure mode of a bare
+ * ``String(err)``:
+ *
+ *   1. ``Error`` → ``.message`` (the ergonomic case for thrown
+ *      ``new Error('Already archived')``-style failures).
+ *   2. Plain object / array → ``JSON.stringify`` so a backend
+ *      ``{code, details}`` shape surfaces legibly. Wrapped in
+ *      ``try`` so a circular reference (which JSON.stringify
+ *      throws on) falls through to the bare-string branch
+ *      instead of crashing the toast.
+ *   3. Anything else (string, number, null, undefined) →
+ *      ``String(...)`` — the right shape for primitives where
+ *      ``JSON.stringify`` would add wrapping quotes the toast
+ *      doesn't want.
+ */
+function _formatReason(reason: unknown): string {
+  if (reason instanceof Error) return reason.message;
+  if (typeof reason === "object" && reason !== null) {
+    try {
+      return JSON.stringify(reason);
+    } catch {
+      /* fall through to String() below */
+    }
+  }
+  return String(reason);
+}
+
+/**
  * Soft-delete: backend moves YAML to ``<config_dir>/archive/`` and
  * wipes the per-device build dir. Reversible via ``unarchiveDevice``.
  *
@@ -173,17 +204,8 @@ export async function archiveBulkDevices(
   for (const { result, configuration } of failures) {
     const device = devicesByConfiguration.get(configuration);
     const name = device ? device.friendly_name || device.name : configuration;
-    // Match the single-archive path's ``err instanceof Error ?
-    // err.message : String(err)`` shape so a plain ``new Error('...')``
-    // surfaces the message and a non-Error rejection (an opaque
-    // object, a string) still stringifies legibly instead of
-    // falling through to ``[object Object]``.
     const reason =
-      result.status === "rejected"
-        ? result.reason instanceof Error
-          ? result.reason.message
-          : String(result.reason)
-        : "";
+      result.status === "rejected" ? _formatReason(result.reason) : "";
     toast.error(
       localize("dashboard.action_archive_failed", { name, error: reason }),
       { richColors: true },
