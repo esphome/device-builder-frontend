@@ -1,0 +1,111 @@
+---
+name: pr-workflow
+description: Create pull requests for esphome/device-builder-frontend. Use when creating PRs, submitting changes, or preparing contributions.
+allowed-tools: Read, Bash, Glob, Grep
+---
+
+# device-builder-frontend PR Workflow
+
+When creating a pull request for `esphome/device-builder-frontend`,
+follow these steps. The frontend ships prebuilt inside the
+`esphome/device-builder` Python wheel, so backend-visible changes
+(WS commands, model shapes, `ConfigEntryType` values) usually need
+a coordinated PR there too.
+
+## 1. Create branch from origin/main
+
+`origin` already points at `esphome/device-builder-frontend` —
+there is no fork in this workflow. Always re-fetch first:
+
+```bash
+git fetch origin
+git checkout -b <branch-name> origin/main
+```
+
+## 2. Read the PR template
+
+Before creating a PR, read `.github/PULL_REQUEST_TEMPLATE.md` for
+the required sections. Fill in **every** section — do not skip or
+abbreviate. If the template's "Types of changes" list looks
+narrower than the label set the workflow enforces (see step 3),
+prefer the workflow's canonical list when picking a label.
+
+## 3. Apply exactly one release-notes label
+
+`.github/workflows/pr-labels.yaml` uses
+`ludeeus/action-require-labels` to require **at least one** of the
+release-drafter labels:
+
+`breaking-change`, `bugfix`, `refactor`, `new-feature`,
+`enhancement`, `maintenance`, `ci`, `dependencies`, `docs`.
+
+Unlike the backend repo, this workflow does **not** auto-apply a
+label from a checkbox — you must pass the label explicitly when
+creating the PR (or apply it via the UI before CI runs):
+
+```bash
+gh pr create --label enhancement ...
+```
+
+Pick whichever label release-drafter would file the change under;
+if in doubt, look at the headings in `.github/release-drafter.yml`.
+
+## 4. Backend coordination
+
+If the change consumes a new WS command, event, model field, or
+`ConfigEntryType` from `esphome/device-builder`, link the companion
+backend PR in the description. Frontend PRs that depend on
+unmerged backend changes should stay in draft until the backend
+side has landed.
+
+## 5. Commit message conventions
+
+- **Imperative-mood subject line** — "Add X", not "Added X".
+- **No `Co-Authored-By: Claude` trailer.** Project preference
+  (matches the backend repo).
+- One logical change per commit. Run `npm run lint` and
+  `npm run test` locally before pushing.
+
+## 6. Push and create the PR
+
+```bash
+git push -u origin <branch-name>
+gh pr create --repo esphome/device-builder-frontend --base main \
+  --label enhancement \
+  --title "Imperative subject under 70 chars" \
+  --body "$(cat <<'EOF'
+# What does this implement/fix?
+
+<one paragraph: what changed and why>
+
+## Types of changes
+
+- [ ] Bugfix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [x] Code quality improvements to existing code or addition of tests
+- [ ] Other
+
+**Related issue or feature (if applicable):**
+
+- fixes #<issue-number>
+
+## Checklist:
+  - [x] The code change is tested and works locally.
+  - [x] `npm run lint` passes.
+  - [x] `npm run test` passes.
+  - [x] Tests have been added to verify that the new code works (where applicable).
+EOF
+)"
+```
+
+The keep-the-checklist-honest rule applies — only tick a box
+you've actually verified by running the command or inspecting the
+diff.
+
+## 7. After the PR is open
+
+CI runs the test workflow and the label-verifier. If `pr-labels`
+fails, the PR is missing one of the canonical release-drafter
+labels — apply one via `gh pr edit --add-label <label>` rather
+than pushing an empty commit.

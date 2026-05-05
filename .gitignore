@@ -11,4 +11,5 @@ build/
 .cache/
 *.tsbuildinfo
 .DS_Store
-.claude
+.claude/*
+!.claude/skills/
