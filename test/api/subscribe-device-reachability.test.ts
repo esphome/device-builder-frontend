@@ -212,4 +212,37 @@ describe("ESPHomeAPI.subscribeDeviceReachability", () => {
       api.subscribeDeviceReachability("kitchen", () => {}),
     ).rejects.toThrow(/not connected/i);
   });
+
+  it("cleans up the listener if the server rejects the subscribe", async () => {
+    // Server-side rejections (NOT_FOUND for unknown device,
+    // INVALID_ARGS) would otherwise leave the
+    // ``_eventSubscriptions`` entry attached forever — every
+    // subsequent failed subscribe would compound the leak.
+    // Connection-level failures get cleared by ``_onClose``, so
+    // this branch only matters for the
+    // server-rejects-but-WS-stays-open shape.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const callback = vi.fn();
+
+    const pending = api.subscribeDeviceReachability("ghost", callback);
+    const sent = ws.sentAs<{ message_id: string }>(0);
+
+    ws.receive({
+      message_id: sent.message_id,
+      error_code: "not_found",
+      details: "No configured device named 'ghost'",
+    });
+    await expect(pending).rejects.toThrow();
+
+    // After the rejection, a stray event under the same id must
+    // not reach the original callback — proving the listener is
+    // gone.
+    ws.receive({
+      message_id: sent.message_id,
+      event: "reachability_state",
+      data: SAMPLE_STATE,
+    });
+    expect(callback).not.toHaveBeenCalled();
+  });
 });

@@ -587,12 +587,25 @@ export class ESPHomeAPI {
     // emits the initial event *before* the result, so by the time
     // this resolves the caller has already received the first
     // snapshot via the callback.
-    await new Promise<void>((resolve, reject) => {
-      this._pendingRequests.set(messageId, {
-        resolve: () => resolve(),
-        reject,
+    //
+    // On server error (NOT_FOUND for an unknown device, INVALID_ARGS,
+    // INTERNAL_ERROR mid-handler) the await rejects via
+    // ``_pendingRequests``; without the listener cleanup below the
+    // ``_eventSubscriptions`` entry would leak and stay attached
+    // forever. Connection-level failures get clean-up via
+    // ``_onClose`` already, so this only matters for the
+    // server-rejects-but-WS-stays-open case.
+    try {
+      await new Promise<void>((resolve, reject) => {
+        this._pendingRequests.set(messageId, {
+          resolve: () => resolve(),
+          reject,
+        });
       });
-    });
+    } catch (err) {
+      this._eventSubscriptions.delete(messageId);
+      throw err;
+    }
 
     return {
       unsubscribe: async () => {
