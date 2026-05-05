@@ -771,6 +771,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
             : nothing}
           <button
             class="ip-toggle"
+            type="button"
+            aria-expanded=${expanded}
             @click=${() => {
               this._ipExpanded = !this._ipExpanded;
             }}
@@ -982,6 +984,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   protected updated(changed: Map<string, unknown>) {
     super.updated?.(changed);
+    if (changed.has("device")) {
+      // Per-device UI state must reset when the drawer is reused
+      // for a new device — without this a user who expanded the
+      // multi-IP row on device A would see device B's drawer open
+      // already-expanded, contradicting the "collapsed by default"
+      // contract.
+      this._ipExpanded = false;
+    }
     if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
       this._reconcileReachabilitySubscription();
       // Run the tick whenever there's a *target* (drawer open +
