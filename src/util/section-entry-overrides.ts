@@ -43,22 +43,29 @@ export const MAP_SECTIONS: ReadonlySet<string> = new Set([
  *  substitution is intentionally empty"), whereas ``packages``
  *  values are nested package mappings — a top-level empty-string
  *  there is just a placeholder from ``renderMapField`` that the
- *  user hasn't filled in yet, and persisting it as
- *  ``packages: { new_1: "" }`` produces invalid YAML on save. */
+ *  user hasn't filled in yet. ``packages: { new_1: "" }`` is
+ *  syntactically valid YAML but ESPHome's ``packages:`` schema
+ *  rejects an empty-string package definition, so persisting it
+ *  produces a config that fails validation. */
 export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set([
   "substitutions",
 ]);
 
-/** Synthesised entries for ``substitutions:`` — a single MAP whose
- *  value template is a string. The user names each row's key
- *  themselves (the substitution name). The string template is the
- *  primitive-value case; non-primitive values (lists / dicts) get a
- *  per-row "edit in YAML" placeholder via ``renderMapField`` rather
- *  than being forced through the string template (which would
- *  stringify them to ``[object Object]`` and lose data on save).
- *  Built via ``makeConfigEntry`` so all 28 required ``ConfigEntry``
- *  fields are populated. */
-export const SUBSTITUTIONS_ENTRIES: ConfigEntry[] = [
+/** Synthesised entries for any section in :data:`MAP_SECTIONS` — a
+ *  single MAP whose value template is a string. The user names each
+ *  row's key themselves (the substitution name, the package name,
+ *  etc.). The string template is the primitive-value case;
+ *  non-primitive values (lists / dicts, e.g. nested package
+ *  definitions) get a per-row "edit in YAML" placeholder via
+ *  ``renderMapField`` rather than being forced through the string
+ *  template (which would stringify them to ``[object Object]`` and
+ *  lose data on save). Built via ``makeConfigEntry`` so all 28
+ *  required ``ConfigEntry`` fields are populated.
+ *
+ *  Section-agnostic name: the same shape works for substitutions,
+ *  packages, and any future user-keyed map section since the
+ *  per-row complex-value placeholder is the YAML escape hatch. */
+export const MAP_SECTION_ENTRIES: ConfigEntry[] = [
   makeConfigEntry({
     type: ConfigEntryType.MAP,
     config_entries: [
@@ -87,6 +94,6 @@ export function resolveSectionEntries(
   sectionKey: string,
   catalogEntries: ConfigEntry[],
 ): ConfigEntry[] {
-  if (MAP_SECTIONS.has(sectionKey)) return SUBSTITUTIONS_ENTRIES;
+  if (MAP_SECTIONS.has(sectionKey)) return MAP_SECTION_ENTRIES;
   return catalogEntries;
 }

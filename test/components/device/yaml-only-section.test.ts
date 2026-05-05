@@ -42,8 +42,9 @@ describe("KEEP_EMPTY_STRING_SECTIONS", () => {
   it("contains substitutions only — substitutions-specific contract", () => {
     // The keep-empty-strings invariant matters for substitutions
     // (a cleared value is intentional data) but breaks ``packages``
-    // (an empty value is a placeholder row that would round-trip
-    // as invalid YAML on save). Pin substitutions in, packages out.
+    // (an empty value is a placeholder row whose YAML is
+    // syntactically valid but rejected by ESPHome's ``packages:``
+    // schema validator). Pin substitutions in, packages out.
     expect(KEEP_EMPTY_STRING_SECTIONS.has("substitutions")).toBe(true);
     expect(KEEP_EMPTY_STRING_SECTIONS.has("packages")).toBe(false);
   });

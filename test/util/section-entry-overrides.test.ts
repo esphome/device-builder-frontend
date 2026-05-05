@@ -3,7 +3,7 @@
  * substitutions-section render path goes through.
  *
  * A previous iteration of #160 had ``MAP_SECTIONS`` and the
- * synthesised ``SUBSTITUTIONS_ENTRIES`` in the section component
+ * synthesised ``MAP_SECTION_ENTRIES`` in the section component
  * but bound the form's ``.entries`` prop to the *catalog's*
  * entries by mistake — leaving the section silently empty in the
  * UI. Hoisting the resolution into a pure function lets us test
@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
 import {
   MAP_SECTIONS,
-  SUBSTITUTIONS_ENTRIES,
+  MAP_SECTION_ENTRIES,
   resolveSectionEntries,
 } from "../../src/util/section-entry-overrides.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
@@ -26,21 +26,21 @@ describe("MAP_SECTIONS", () => {
   });
 });
 
-describe("SUBSTITUTIONS_ENTRIES", () => {
+describe("MAP_SECTION_ENTRIES", () => {
   it("is a single MAP entry with an empty key", () => {
     // Empty key is the "this entry IS the whole values dict"
     // signal the form's ``_renderEntry`` reads to switch to
     // ``path=[]`` for ``ctx.getAt`` / ``ctx.emitChange``.
-    expect(SUBSTITUTIONS_ENTRIES).toHaveLength(1);
-    expect(SUBSTITUTIONS_ENTRIES[0].key).toBe("");
-    expect(SUBSTITUTIONS_ENTRIES[0].type).toBe(ConfigEntryType.MAP);
+    expect(MAP_SECTION_ENTRIES).toHaveLength(1);
+    expect(MAP_SECTION_ENTRIES[0].key).toBe("");
+    expect(MAP_SECTION_ENTRIES[0].type).toBe(ConfigEntryType.MAP);
   });
 
   it("declares a string value template at config_entries[0]", () => {
     // The MAP renderer uses ``entry.config_entries[0]`` as the
     // value template — it must be a string-shaped entry so
     // primitive values (the common case) get a text input.
-    const valueTemplate = SUBSTITUTIONS_ENTRIES[0].config_entries?.[0];
+    const valueTemplate = MAP_SECTION_ENTRIES[0].config_entries?.[0];
     expect(valueTemplate).toBeDefined();
     expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
     expect(valueTemplate!.required).toBe(true);
@@ -63,7 +63,7 @@ describe("resolveSectionEntries", () => {
       advanced: true,
     });
     const result = resolveSectionEntries("substitutions", [bogusCatalogEntry]);
-    expect(result).toBe(SUBSTITUTIONS_ENTRIES);
+    expect(result).toBe(MAP_SECTION_ENTRIES);
   });
 
   it("returns the catalog entries unchanged for non-overridden sections", () => {
@@ -99,7 +99,7 @@ describe("device-section-config wiring", () => {
   // output, not the catalog's raw ``this._config.entries``.
   //
   // Regression pin: a previous iteration of #160 had
-  // ``MAP_SECTIONS`` and ``SUBSTITUTIONS_ENTRIES`` defined in
+  // ``MAP_SECTIONS`` and ``MAP_SECTION_ENTRIES`` defined in
   // the section component but bound the form's ``.entries``
   // prop directly to the catalog source — leaving the
   // substitutions section silently empty in the UI.
