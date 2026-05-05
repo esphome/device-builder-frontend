@@ -16,6 +16,7 @@ import { DeviceInstallController } from "../components/device/device-install-con
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
+import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
 import {
   activeJobsContext,
@@ -27,6 +28,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
+import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
@@ -142,7 +144,19 @@ export class ESPHomePageDevice extends LitElement {
   private _savedYaml = "";
 
   @query("esphome-unsaved-changes-dialog")
-  private _leaveDialog!: ESPHomeUnsavedChangesDialog;
+  private _unsavedDialog!: ESPHomeUnsavedChangesDialog;
+
+  /** Live ref to the mounted section-config component, when one
+   *  is rendered. Captured via ``section-mount`` /
+   *  ``section-unmount`` events that the component fires on its
+   *  own lifecycle hooks; ``@query`` doesn't reach across the
+   *  three shadow roots between this page and the section
+   *  editor, so the registration pattern keeps the call site
+   *  for ``activeSection.save()`` cheap and direct. */
+  private _activeSection: ESPHomeDeviceSectionConfig | null = null;
+
+  @state()
+  private _sectionDirty = false;
 
   @query("esphome-command-dialog")
   private _commandDialog!: ESPHomeCommandDialog;
@@ -180,57 +194,82 @@ export class ESPHomePageDevice extends LitElement {
     });
   }
 
-  private _pendingLeaveResolve: ((value: boolean) => void) | null = null;
+  /** Pending unsaved-changes guard. Both the page-leave check
+   *  and the section-switch check pipe through this one helper:
+   *  the dialog event handlers call into whichever one is
+   *  currently set, the unset case is a no-op. Owning the
+   *  bookkeeping in a separate class keeps the page lean and
+   *  lets the logic be unit-tested in node without happy-dom. */
+  private _unsavedGuard = new UnsavedGuard();
 
   /** When true, the next popstate is allowed to fall through to the router. */
   private _allowingLeave = false;
 
-  private get _isDirty(): boolean {
+  private get _isYamlDirty(): boolean {
     return this._yaml !== this._savedYaml;
   }
 
-  private _confirmLeave = (): Promise<boolean> => {
-    if (!this._isDirty) return Promise.resolve(true);
-    if (this._pendingLeaveResolve) return Promise.resolve(false);
-    return new Promise<boolean>((resolve) => {
-      this._pendingLeaveResolve = resolve;
-      this._leaveDialog?.open();
-    });
-  };
-
-  private _resolvePendingLeave(value: boolean) {
-    const r = this._pendingLeaveResolve;
-    this._pendingLeaveResolve = null;
-    r?.(value);
+  /** Combined "anything unsaved on this page" check. The YAML
+   *  buffer ``_isYamlDirty`` and the visual editor's form
+   *  ``_sectionDirty`` are independent — typing in the form
+   *  doesn't flip the YAML buffer until the user clicks Save —
+   *  but both should block a page-leave / refresh until the
+   *  user picks Discard or Save. */
+  private get _isDirty(): boolean {
+    return this._isYamlDirty || this._sectionDirty;
   }
 
-  /* Discard / Save flip ``_allowingLeave`` BEFORE resolving the
-   * guard Promise. Two callers wait on that resolve:
-   *   - The browser-back path, which then calls ``history.back()``
-   *     itself (the popstate handler's ``.then`` would set
-   *     ``_allowingLeave`` afterwards).
-   *   - ``navigate()`` (in-app Back / logo click), which on
+  /* ``_allowingLeave`` is flipped BEFORE the guard Promise
+   * resolves so the page-leave callers see a coherent state on
+   * the next microtask:
+   *
+   *   - The browser-back path ``.then``s on the resolved
+   *     Promise and calls ``history.back()`` itself.
+   *   - ``navigate()`` (in-app Back / logo click) on
    *     ``canLeave=true`` does ``pushState + dispatchEvent(popstate)``
-   *     synchronously. That synthetic popstate would otherwise be
-   *     re-intercepted by ``_onPopState`` (because ``_isDirty`` is
-   *     still true here — Discard doesn't revert the buffer) and
-   *     bounced back to the device URL, leaving the user stuck on
-   *     the page they were trying to leave. Setting the flag here
-   *     short-circuits the next popstate so navigate's URL push
-   *     actually sticks.
+   *     synchronously. That synthetic popstate would otherwise
+   *     be re-intercepted by ``_onPopState`` (because ``_isDirty``
+   *     stays true — Discard doesn't revert the buffer) and
+   *     bounced back to the device URL, leaving the user stuck.
+   *     Flipping the flag here short-circuits that.
+   *
+   * The flip happens inside the page-leave save lambda (so it
+   * lands synchronously before the guard's resolve when the
+   * user picks Save) and again in ``_confirmLeave`` after the
+   * await (so it covers the Discard path too — Discard doesn't
+   * route through the save lambda). The redundant write on Save
+   * is idempotent. The section-switch guard never sets the flag
+   * — its ``save`` returns to the page synchronously after the
+   * await without leaving the page.
    */
-  private _onLeaveDiscard = () => {
-    this._allowingLeave = true;
-    this._resolvePendingLeave(true);
-  };
+  private _onUnsavedDiscard = () => this._unsavedGuard.onDiscard();
+  private _onUnsavedSave = () => this._unsavedGuard.onSave();
+  private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
 
-  private _onLeaveSave = () => {
-    this._saveYaml();
-    this._allowingLeave = true;
-    this._resolvePendingLeave(true);
+  private _confirmLeave = async (): Promise<boolean> => {
+    const ok = await this._unsavedGuard.run({
+      dirty: this._isDirty,
+      open: () => this._unsavedDialog?.open(),
+      // Save persists *both* dirty buffers when the user picks
+      // "Save and leave" — the YAML pane and the section form
+      // are independent and either can be dirty on its own. The
+      // section save runs first because its output writes
+      // through ``yaml-updated`` which advances ``_savedYaml``;
+      // then ``_saveYaml`` covers anything the user typed in
+      // the YAML pane on top.
+      save: async () => {
+        if (this._sectionDirty) {
+          const sectionOk = (await this._activeSection?.save()) ?? false;
+          if (!sectionOk) return false;
+        }
+        if (this._isYamlDirty) this._saveYaml();
+        this._allowingLeave = true;
+        return true;
+      },
+    });
+    if (ok) this._allowingLeave = true;
+    return ok;
   };
-
-  private _onLeaveCancel = () => this._resolvePendingLeave(false);
 
   private _onBeforeUnload = (e: BeforeUnloadEvent) => {
     if (this._isDirty) {
@@ -270,7 +309,10 @@ export class ESPHomePageDevice extends LitElement {
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
     window.removeEventListener("keydown", this._onKeydown);
-    this._resolvePendingLeave(false);
+    // Drop any in-flight unsaved-changes guard so its caller's
+    // ``await`` doesn't dangle past unmount — resolve as "don't
+    // proceed" since the page is going away anyway.
+    this._unsavedGuard.cancelPending();
   }
 
   private _onKeydown = (e: KeyboardEvent) => {
@@ -471,6 +513,9 @@ export class ESPHomePageDevice extends LitElement {
           @yaml-highlight=${this._onYamlHighlight}
           @yaml-updated=${this._onYamlUpdated}
           @section-select=${this._onSectionSelect}
+          @section-mount=${this._onSectionMount}
+          @section-unmount=${this._onSectionUnmount}
+          @dirty-change=${this._onSectionDirtyChange}
           @nav-section-show=${this._onNavSectionShow}
           @save-yaml=${this._saveYaml}
           @install-device=${this._installCtrl.onInstall}
@@ -502,9 +547,9 @@ export class ESPHomePageDevice extends LitElement {
         </div>
       </div>
       <esphome-unsaved-changes-dialog
-        @discard=${this._onLeaveDiscard}
-        @save=${this._onLeaveSave}
-        @cancel=${this._onLeaveCancel}
+        @discard=${this._onUnsavedDiscard}
+        @save=${this._onUnsavedSave}
+        @cancel=${this._onUnsavedCancel}
       ></esphome-unsaved-changes-dialog>
       <esphome-command-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
@@ -657,9 +702,11 @@ export class ESPHomePageDevice extends LitElement {
     ) {
       return;
     }
-    this._selectedSection = sectionKey;
-    this._selectedFromLine = match.fromLine;
-    this._updateUrl();
+    this._guardSectionSwitch(() => {
+      this._selectedSection = sectionKey;
+      this._selectedFromLine = match.fromLine;
+      this._updateUrl();
+    });
   }
 
   private _onYamlHighlight(
@@ -695,11 +742,52 @@ export class ESPHomePageDevice extends LitElement {
   private _onSectionSelect(
     e: CustomEvent<{ sectionKey: string | null; fromLine?: number }>
   ) {
-    this._selectedSection = e.detail.sectionKey;
-    this._selectedFromLine = e.detail.fromLine;
-    this._drawerOpen = false;
-    this._updateUrl();
+    const { sectionKey, fromLine } = e.detail;
+    if (sectionKey === this._selectedSection && fromLine === this._selectedFromLine) {
+      this._drawerOpen = false;
+      return;
+    }
+    this._guardSectionSwitch(() => {
+      this._selectedSection = sectionKey;
+      this._selectedFromLine = fromLine;
+      this._drawerOpen = false;
+      this._updateUrl();
+    });
   }
+
+  /** Run *action* now if the section editor has no unsaved
+   *  edits; otherwise pop the unsaved-changes dialog and replay
+   *  the action only when the user picks Save (and the save
+   *  actually succeeds) or Discard. The section's own
+   *  ``_loadConfig`` clears ``_dirty`` after the switch lands,
+   *  so Discard doesn't need to revert form state explicitly. */
+  private async _guardSectionSwitch(action: () => void): Promise<void> {
+    const ok = await this._unsavedGuard.run({
+      dirty: this._sectionDirty,
+      open: () => this._unsavedDialog?.open(),
+      save: () => this._activeSection?.save() ?? Promise.resolve(false),
+    });
+    if (ok) action();
+  }
+
+  private _onSectionMount = (e: Event) => {
+    const ev = e as CustomEvent<{ node: ESPHomeDeviceSectionConfig }>;
+    this._activeSection = ev.detail.node;
+    this._sectionDirty = ev.detail.node.dirty;
+  };
+
+  private _onSectionUnmount = (e: Event) => {
+    const ev = e as CustomEvent<{ node: ESPHomeDeviceSectionConfig }>;
+    if (this._activeSection === ev.detail.node) {
+      this._activeSection = null;
+      this._sectionDirty = false;
+    }
+  };
+
+  private _onSectionDirtyChange = (e: Event) => {
+    const ev = e as CustomEvent<{ dirty: boolean }>;
+    this._sectionDirty = ev.detail.dirty;
+  };
 
   // ─── URL State Persistence ─────────────────────────────────
 
