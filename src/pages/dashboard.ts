@@ -1164,6 +1164,10 @@ export class ESPHomePageDashboard extends LitElement {
           this._drawerOpen = false;
           this._openLogs(e.detail);
         }}
+        @clean-build=${(e: CustomEvent<ConfiguredDevice>) => {
+          this._drawerOpen = false;
+          this._openCommand(e.detail, "clean");
+        }}
       ></esphome-device-drawer>
     `;
   }

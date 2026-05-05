@@ -4,6 +4,7 @@ import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import { formatFileSize } from "../../util/format-file-size.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
@@ -18,6 +19,7 @@ export interface DeviceRow {
   version: string;
   comment: string;
   config: string;
+  build_size_bytes: number;
   hasPendingChanges: boolean;
   hasUpdateAvailable: boolean;
   api_enabled: boolean;
@@ -207,6 +209,28 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) =>
         html`<span class="cell-mono cell-config">${info.getValue()}</span>`,
       size: 180,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "build_size_bytes",
+      header: localize("dashboard.table_col_build_size"),
+      cell: (info) => {
+        const bytes = info.getValue() as number;
+        return bytes
+          ? html`<span class="cell-mono">${formatFileSize(bytes)}</span>`
+          : html`<span class="cell-muted">—</span>`;
+      },
+      // Compare the raw byte counts directly. ``"basic"`` /
+      // ``"alphanumeric"`` would sort by the accessor value too
+      // in theory, but stringifying-then-comparing has bitten us
+      // here — a 1024-byte file lands above a 2048-byte one on
+      // lex compare ("1" < "2" inside "1024" vs "2048" works,
+      // but "16777216" vs "2097152" puts the smaller value
+      // above the larger one). Explicit ``a - b`` is the
+      // canonical numeric sort and removes the ambiguity.
+      sortingFn: (rowA, rowB) =>
+        rowA.original.build_size_bytes - rowB.original.build_size_bytes,
+      size: 120,
       enableHiding: true,
     },
     {

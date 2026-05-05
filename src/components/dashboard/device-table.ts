@@ -83,6 +83,7 @@ const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
   version: false,
   ip: false,
   mac_address: false,
+  build_size_bytes: false,
 };
 
 @customElement("esphome-device-table")
@@ -276,6 +277,7 @@ export class ESPHomeDeviceTable extends LitElement {
         // belongs in the per-device drawer.
         platform: d.target_platform || "",
         version: d.deployed_version || "",
+        build_size_bytes: d.build_size_bytes || 0,
         comment: d.comment || "",
         config: d.configuration,
         hasPendingChanges: d.has_pending_changes === true,

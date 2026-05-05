@@ -3,11 +3,13 @@ import {
   mdiAccessPointNetwork,
   mdiAlertCircleOutline,
   mdiBluetooth,
+  mdiBroom,
   mdiCheckCircleOutline,
   mdiChevronDown,
   mdiChevronUp,
   mdiFileDocumentOutline,
   mdiFingerprint,
+  mdiHarddisk,
   mdiEthernet,
   mdiInformationOutline,
   mdiIpNetworkOutline,
@@ -42,6 +44,7 @@ import {
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
+import { formatFileSize } from "../../util/format-file-size.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   ageOf,
@@ -55,12 +58,14 @@ registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
   "alert-circle-outline": mdiAlertCircleOutline,
   bluetooth: mdiBluetooth,
+  broom: mdiBroom,
   "check-circle-outline": mdiCheckCircleOutline,
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   ethernet: mdiEthernet,
   "file-document-outline": mdiFileDocumentOutline,
   fingerprint: mdiFingerprint,
+  harddisk: mdiHarddisk,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
   lan: mdiLan,
@@ -309,6 +314,37 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         font-size: 14px;
       }
 
+      .build-size-value {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .build-size-clean {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        padding: 0;
+        border: none;
+        border-radius: var(--wa-border-radius-s);
+        background: none;
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+      }
+      .build-size-clean:hover {
+        color: var(--wa-color-text-normal);
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 88%
+        );
+      }
+      .build-size-clean wa-icon {
+        font-size: 14px;
+      }
+
       .tags-wrap {
         display: flex;
         flex-wrap: wrap;
@@ -507,6 +543,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderEthernetMacRow(d)}
         ${this._renderBluetoothMacRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
+        ${this._renderBuildSizeRow(d)}
       </div>
 
       ${this._renderReachabilitySection()}
@@ -844,6 +881,63 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       this._localize("dashboard.drawer_bluetooth_mac"),
       d.bluetooth_mac,
       true,
+    );
+  }
+
+  /**
+   * Render the cached build-directory size, with an inline "Clean" button.
+   *
+   * Hidden on devices that have never been compiled (the
+   * backend's mtime-gated cache reports ``0`` for those). The
+   * value updates lazily — backend re-walks only when the build
+   * directory's mtime moves, which only happens on a fresh
+   * compile or a clean, so the drawer's number can lag a
+   * session's worth behind a CLI-driven build until the
+   * dashboard's job-completion hook (or the next backend
+   * restart) triggers a refresh.
+   *
+   * The "Clean" button bubbles a ``clean-build`` ``CustomEvent``
+   * (with the device as ``detail``) up through the drawer to
+   * ``dashboard.ts``, which routes it through the same
+   * ``_openCommand(device, "clean")`` path as the table row
+   * menu's clean action — same backend ``esphome clean`` job,
+   * same job-completion hook that fires the build-size refresh.
+   */
+  private _renderBuildSizeRow(d: ConfiguredDevice) {
+    if (!d.build_size_bytes) return nothing;
+    return html`
+      <div class="row">
+        <div class="icon">
+          <wa-icon library="mdi" name="harddisk"></wa-icon>
+        </div>
+        <div class="content">
+          <div class="label">
+            ${this._localize("dashboard.drawer_build_size")}
+          </div>
+          <div class="value build-size-value">
+            <span>${formatFileSize(d.build_size_bytes)}</span>
+            <button
+              class="build-size-clean"
+              type="button"
+              title=${this._localize("dashboard.action_clean_build")}
+              aria-label=${this._localize("dashboard.action_clean_build")}
+              @click=${() => this._emitCleanBuild(d)}
+            >
+              <wa-icon library="mdi" name="broom"></wa-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private _emitCleanBuild(device: ConfiguredDevice) {
+    this.dispatchEvent(
+      new CustomEvent("clean-build", {
+        detail: device,
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 
