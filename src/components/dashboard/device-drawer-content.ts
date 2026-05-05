@@ -1,16 +1,19 @@
 import { consume } from "@lit/context";
 import {
+  mdiAccessPointNetwork,
   mdiAlertCircleOutline,
   mdiCheckCircleOutline,
   mdiFileDocumentOutline,
   mdiFingerprint,
   mdiInformationOutline,
   mdiIpNetworkOutline,
+  mdiLan,
   mdiLock,
   mdiLockAlert,
   mdiLockClock,
   mdiLockOpenVariant,
   mdiMemory,
+  mdiMessage,
   mdiNetworkOutline,
   mdiSync,
   mdiTagMultiple,
@@ -21,29 +24,39 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { ConfiguredDevice } from "../../api/types.js";
+import type {
+  ConfiguredDevice,
+  ReachabilityStateEvent,
+  ReachabilitySubscription,
+} from "../../api/types.js";
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import {
+  apiContext,
   integrationDocsContext,
   localizeContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { ageOf, formatSecondsAgo } from "../../util/relative-time.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "access-point-network": mdiAccessPointNetwork,
   "alert-circle-outline": mdiAlertCircleOutline,
   "check-circle-outline": mdiCheckCircleOutline,
   "file-document-outline": mdiFileDocumentOutline,
   fingerprint: mdiFingerprint,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
+  lan: mdiLan,
   lock: mdiLock,
   "lock-alert": mdiLockAlert,
   "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
   memory: mdiMemory,
+  message: mdiMessage,
   "network-outline": mdiNetworkOutline,
   sync: mdiSync,
   "tag-multiple": mdiTagMultiple,
@@ -71,6 +84,18 @@ function _isSafeDocsUrl(url: string): boolean {
   }
 }
 
+/** Per-signal config for one Reachability row. The render method
+ *  iterates a static table of these so adding a new freshness
+ *  channel (a future "ARP-cached" / "WS-heartbeat" line) is one
+ *  array entry instead of yet another duplicated row block. */
+interface ReachabilityRowSpec {
+  source: "mdns" | "ping" | "mqtt";
+  icon: string;
+  labelKey: string;
+  age: number | null;
+  rttMs?: number | null;
+}
+
 @customElement("esphome-device-drawer-content")
 export class ESPHomeDeviceDrawerContent extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -81,8 +106,54 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   @state()
   private _integrationDocs: Record<string, string> = {};
 
+  @consume({ context: apiContext })
+  @state()
+  private _api?: ESPHomeAPI;
+
   @property({ attribute: false })
   device!: ConfiguredDevice;
+
+  /** Whether the drawer is currently visible. The reachability
+   *  subscription is gated on this so a slid-off drawer doesn't
+   *  keep streaming events. Falls back to ``true`` for tests that
+   *  render the content directly without the parent drawer. */
+  @property({ type: Boolean, attribute: "drawer-open" })
+  drawerOpen = true;
+
+  /** Latest reachability snapshot pushed by the backend over the
+   *  per-device WS subscription. ``null`` until the initial event
+   *  arrives or after the subscription tears down. */
+  @state()
+  private _reachability: ReachabilityStateEvent | null = null;
+
+  /** Wall-clock anchor for the last received snapshot. The
+   *  ``*_last_seen_seconds_ago`` values are stamped at send time
+   *  on the backend, so the rendered relative time is
+   *  ``snapshot.value + (now - anchor) / 1000``. Lets the 500ms
+   *  re-render tick advance the displayed age without a fresh
+   *  push from the server. */
+  @state()
+  private _reachabilityAnchorMs = 0;
+
+  /** Tick counter the relative-time renderer reads from to force a
+   *  re-render every 500ms. Mutating it inside ``setInterval`` is
+   *  what nudges Lit's reactivity — the actual value is unused. */
+  @state()
+  private _tick = 0;
+
+  /** Currently subscribed device name. Tracked separately from
+   *  ``device.configuration`` so a swap to a new device cleanly
+   *  tears down the previous subscription before opening a new
+   *  one. */
+  private _subscribedDevice: string | null = null;
+
+  /** Active subscription handle. ``unsubscribe()`` is called on
+   *  disconnect / device change / drawer close. */
+  private _subscription: ReachabilitySubscription | null = null;
+
+  /** ``setInterval`` handle for the 500ms relative-time re-render
+   *  tick. Cleared together with the subscription. */
+  private _tickInterval: ReturnType<typeof setInterval> | null = null;
 
   static styles = [
     espHomeStyles,
@@ -296,6 +367,31 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
         color: var(--esphome-warning, #d97706);
       }
+
+      /* Small "active" pill that sits next to the row label of the
+         reachability source currently driving the device's online
+         state. Same chrome shape as the section badges above but
+         compact enough to share a line with the label. */
+      .reachability-badge {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 6px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 0.7em;
+        font-weight: var(--wa-font-weight-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: color-mix(in srgb, var(--esphome-success), transparent 85%);
+        color: var(--esphome-success);
+      }
+
+      /* Subtle separation for the round-trip-ms suffix on the Ping
+         row so it reads as additional info rather than part of the
+         relative-time string. */
+      .reachability-rtt {
+        color: var(--wa-color-text-quiet);
+      }
     `,
   ];
 
@@ -339,6 +435,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderIpAddressRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
+
+      ${this._renderReachabilitySection()}
 
       ${this._renderVersionSection(d)}
 
@@ -582,6 +680,207 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Render the per-signal Reachability section.
+   *
+   * Shows one row per channel the device has been observed on
+   * (mDNS / Ping / MQTT). Each row carries the localized "N
+   * seconds/minutes ago" relative time plus, for the channel
+   * driving the device's online state, an "active" badge so the
+   * user can tell which signal is authoritative. The Ping row
+   * also surfaces the most recent round-trip in milliseconds.
+   *
+   * Hides itself when no signal has ever been observed (a
+   * brand-new device that's never broadcast and never been
+   * pinged) — the placeholder "Waiting for first broadcast…" text
+   * goes there instead. Suppresses the section entirely when the
+   * subscription is in flight (no snapshot yet) so the drawer
+   * doesn't flash an empty header.
+   *
+   * The three signal rows share enough shape that a small
+   * declarative table drives them — the per-signal differences
+   * are just (icon, label, age field, source name, optional rtt
+   * field), and the row template handles the rest.
+   */
+  private _renderReachabilitySection() {
+    const r = this._reachability;
+    if (r === null) return nothing;
+
+    const lang =
+      typeof navigator !== "undefined" ? navigator.language : undefined;
+    const now = Date.now();
+    const anchor = this._reachabilityAnchorMs;
+
+    const rows: ReachabilityRowSpec[] = [
+      {
+        source: "mdns",
+        icon: "access-point-network",
+        labelKey: "dashboard.drawer_source_mdns",
+        age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
+      },
+      {
+        source: "ping",
+        icon: "lan",
+        labelKey: "dashboard.drawer_source_ping",
+        age: ageOf(r.ping_last_seen_seconds_ago, anchor, now),
+        rttMs: r.ping_rtt_ms,
+      },
+      {
+        source: "mqtt",
+        icon: "message",
+        labelKey: "dashboard.drawer_source_mqtt",
+        age: ageOf(r.mqtt_last_seen_seconds_ago, anchor, now),
+      },
+    ];
+    const anySignal = rows.some((row) => row.age !== null);
+
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_reachability")}
+        </h4>
+        ${!anySignal
+          ? html`<div class="value muted">
+              ${this._localize("dashboard.drawer_waiting_for_broadcast")}
+            </div>`
+          : rows.map((row) =>
+              this._renderReachabilityRow(row, r.active_source, lang),
+            )}
+      </div>
+    `;
+  }
+
+  private _renderReachabilityRow(
+    row: ReachabilityRowSpec,
+    activeSource: string,
+    lang: string | undefined,
+  ) {
+    if (row.age === null) return nothing;
+    const ageText = formatSecondsAgo(row.age, lang);
+    const rttText =
+      row.rttMs === null || row.rttMs === undefined
+        ? null
+        : this._localize("dashboard.drawer_round_trip_ms", {
+            n: Math.round(row.rttMs * 10) / 10,
+          });
+    const isActive = activeSource === row.source;
+    return html`
+      <div class="row">
+        <div class="icon">
+          <wa-icon library="mdi" name=${row.icon}></wa-icon>
+        </div>
+        <div class="content">
+          <div class="label">
+            ${this._localize(row.labelKey)}
+            ${isActive
+              ? html`<span class="reachability-badge"
+                  >${this._localize("dashboard.drawer_source_active")}</span
+                >`
+              : nothing}
+          </div>
+          <div class="value">
+            ${ageText}${rttText
+              ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
+              : nothing}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── Reachability subscription lifecycle ───────────────────
+
+  protected updated(changed: Map<string, unknown>) {
+    super.updated?.(changed);
+    if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
+      this._reconcileReachabilitySubscription();
+    }
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._teardownReachabilitySubscription();
+  }
+
+  /** Open / close / swap the per-device reachability subscription
+   *  to match (drawerOpen, device.name, api). Called from
+   *  ``updated()`` whenever any of those move. Idempotent when the
+   *  three inputs are unchanged from the active subscription. */
+  private _reconcileReachabilitySubscription() {
+    const wantName =
+      this.drawerOpen && this.device && this._api ? this.device.name : null;
+    if (wantName === this._subscribedDevice) return;
+
+    this._teardownReachabilitySubscription();
+    if (wantName === null || this._api === undefined) return;
+
+    this._subscribedDevice = wantName;
+    // Kick off the async subscribe — failures are logged but
+    // don't propagate. The drawer still works without
+    // reachability; the section just stays hidden.
+    void this._openReachabilitySubscription(wantName, this._api);
+  }
+
+  private async _openReachabilitySubscription(
+    deviceName: string,
+    api: ESPHomeAPI,
+  ) {
+    try {
+      const subscription = await api.subscribeDeviceReachability(
+        deviceName,
+        (state) => {
+          // Drop late-arriving events from a previous subscription
+          // — the user already swapped to a different device.
+          if (this._subscribedDevice !== state.device) return;
+          this._reachability = state;
+          this._reachabilityAnchorMs = Date.now();
+        },
+      );
+      // The user may have already moved on by the time the await
+      // resolves; tear the just-created subscription down if so.
+      if (this._subscribedDevice !== deviceName) {
+        void subscription.unsubscribe();
+        return;
+      }
+      this._subscription = subscription;
+      this._startTickInterval();
+    } catch (err) {
+      // Connection went away mid-subscribe, or the device was
+      // deleted between drawer open and the subscribe round
+      // trip. Either way the section just stays empty.
+      // eslint-disable-next-line no-console
+      console.warn("subscribeDeviceReachability failed", err);
+      if (this._subscribedDevice === deviceName) {
+        this._subscribedDevice = null;
+      }
+    }
+  }
+
+  private _teardownReachabilitySubscription() {
+    this._subscribedDevice = null;
+    this._reachability = null;
+    this._reachabilityAnchorMs = 0;
+    this._stopTickInterval();
+    if (this._subscription !== null) {
+      const sub = this._subscription;
+      this._subscription = null;
+      void sub.unsubscribe();
+    }
+  }
+
+  private _startTickInterval() {
+    if (this._tickInterval !== null) return;
+    this._tickInterval = setInterval(() => {
+      this._tick = (this._tick + 1) % 1000;
+    }, 500);
+  }
+
+  private _stopTickInterval() {
+    if (this._tickInterval === null) return;
+    clearInterval(this._tickInterval);
+    this._tickInterval = null;
   }
 
   private _row(icon: string, label: string, value: string | null, mono = false) {

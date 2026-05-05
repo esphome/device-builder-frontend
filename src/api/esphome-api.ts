@@ -21,6 +21,8 @@ import type {
   EventMessage,
   EventSubscriptionCallback,
   FirmwareBinary,
+  ReachabilityStateEvent,
+  ReachabilitySubscription,
   FirmwareDownload,
   FirmwareJob,
   PagedBoardsResponse,
@@ -533,6 +535,83 @@ export class ESPHomeAPI {
         reject,
       });
     });
+  }
+
+  /**
+   * Subscribe to per-signal reachability events for one device.
+   *
+   * The drawer opens this stream while showing a single device so
+   * the Reachability section can refresh "mDNS heard 12s ago, ping
+   * 47s ago, MQTT 2 min ago, RTT 4 ms" without bloating the
+   * broadcast ``subscribe_events`` channel for every other client.
+   * The backend emits one initial ``reachability_state`` event,
+   * then a fresh one whenever any signal updates for the
+   * subscribed device. While subscribed AND the active source is
+   * mDNS, the backend force-refreshes the A record every 60s.
+   *
+   * Returns a handle whose ``unsubscribe()`` sends
+   * ``devices/stop_stream`` to detach the listener cleanly without
+   * closing the shared WS. Unsubscribe is best-effort: errors are
+   * swallowed since the per-stream task is cancelled by the WS
+   * disconnect anyway.
+   */
+  async subscribeDeviceReachability(
+    deviceName: string,
+    callback: (state: ReachabilityStateEvent) => void,
+  ): Promise<ReachabilitySubscription> {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
+    }
+
+    const messageId = this._nextMessageId();
+    // Register before sending so we don't miss the initial
+    // ``reachability_state`` event the backend emits inside its
+    // ``send_initial`` callback. The handler in the WS dispatcher
+    // forwards every event under this message_id through the
+    // ``_eventSubscriptions`` map — same path ``subscribe_events``
+    // uses, just filtered to a single device on the backend side.
+    this._eventSubscriptions.set(messageId, (event, data) => {
+      if (event === "reachability_state") {
+        callback(data as ReachabilityStateEvent);
+      }
+    });
+
+    const msg: CommandMessage = {
+      command: "devices/subscribe_reachability",
+      message_id: messageId,
+      args: { device_name: deviceName },
+    };
+    this._ws.send(JSON.stringify(msg));
+
+    // Wait for the {subscribed: true} confirmation. ``send_initial``
+    // emits the initial event *before* the result, so by the time
+    // this resolves the caller has already received the first
+    // snapshot via the callback.
+    await new Promise<void>((resolve, reject) => {
+      this._pendingRequests.set(messageId, {
+        resolve: () => resolve(),
+        reject,
+      });
+    });
+
+    return {
+      unsubscribe: async () => {
+        // Drop the callback synchronously so any in-flight event
+        // queued after this point is silently discarded.
+        this._eventSubscriptions.delete(messageId);
+        try {
+          await this.sendCommand("devices/stop_stream", {
+            stream_id: messageId,
+          });
+        } catch {
+          // Best-effort: the WS disconnect or a server-side
+          // shutdown can race the cancel and surface an error
+          // here. The listener is already gone client-side and
+          // the backend task is owned by the connection's
+          // cleanup path either way.
+        }
+      },
+    };
   }
 
   // ─── Device Commands ──────────────────────────────────────
