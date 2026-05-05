@@ -53,6 +53,7 @@
     "delete_all_none": "Aucun appareil sélectionné à supprimer",
     "delete_bulk_success": "{count} appareil(s) supprimé(s)",
     "delete_bulk_failed": "Échec de la suppression en lot",
+    "bulk_failure_unknown_error": "Erreur inconnue",
     "update_device_success": "\"{name}\" mis à jour avec succès",
     "update_device_failed": "Échec de la mise à jour de \"{name}\"",
     "delete_failed": "Échec de la suppression de \"{name}\"",

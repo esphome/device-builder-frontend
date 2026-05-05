@@ -175,11 +175,17 @@ async function runBulkAction(
   const devicesByConfiguration = new Map(
     devices.map((d) => [d.configuration, d] as const),
   );
+  const fallbackError = localize("dashboard.bulk_failure_unknown_error");
   for (const result of failed) {
     const device = devicesByConfiguration.get(result.configuration);
     const name = device ? device.friendly_name || device.name : result.configuration;
+    // Fall back to a localized "Unknown error" string when the
+    // backend's per-row result didn't include one — without this
+    // the failure toasts read like ``Failed to archive "kitchen": ``
+    // (dangling colon) because ``action_archive_failed`` /
+    // ``action_unarchive_failed`` interpolate ``{error}`` directly.
     toast.error(
-      localize(copy.failureKey, { name, error: result.error ?? "" }),
+      localize(copy.failureKey, { name, error: result.error || fallbackError }),
       { richColors: true },
     );
   }

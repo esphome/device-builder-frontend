@@ -86,6 +86,7 @@
     "archive_all_none": "No devices selected to archive",
     "archive_bulk_success": "{count} device(s) archived",
     "archive_bulk_failed": "Bulk archive failed",
+    "bulk_failure_unknown_error": "Unknown error",
     "update_device_success": "\"{name}\" updated successfully",
     "update_device_failed": "\"{name}\" update failed",
     "delete_failed": "Failed to delete \"{name}\"",

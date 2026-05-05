@@ -53,6 +53,7 @@
     "delete_all_none": "Geen apparaten geselecteerd om te verwijderen",
     "delete_bulk_success": "{count} apparaat/apparaten verwijderd",
     "delete_bulk_failed": "Bulkverwijdering mislukt",
+    "bulk_failure_unknown_error": "Onbekende fout",
     "update_device_success": "\"{name}\" succesvol bijgewerkt",
     "update_device_failed": "Bijwerken van \"{name}\" mislukt",
     "delete_failed": "Verwijderen van \"{name}\" mislukt",
