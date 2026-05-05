@@ -28,6 +28,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
+import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
@@ -194,45 +195,18 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   /** Pending unsaved-changes guard. Both the page-leave check
-   *  and the section-switch check pipe through this single
-   *  resolver: the dialog event handlers call into whichever
-   *  one is currently set, the unsetcase is a no-op. Holding
-   *  one resolver instead of one-per-callsite means the dialog
-   *  can be a singleton and the duplicated handler pairs
-   *  (``_onLeaveDiscard`` / ``_onSectionSwitchDiscard`` / …)
-   *  collapse into ``_runUnsavedGuard``'s wiring. */
-  private _activeGuard: {
-    save: () => Promise<boolean>;
-    resolve: (proceed: boolean) => void;
-  } | null = null;
+   *  and the section-switch check pipe through this one helper:
+   *  the dialog event handlers call into whichever one is
+   *  currently set, the unset case is a no-op. Owning the
+   *  bookkeeping in a separate class keeps the page lean and
+   *  lets the logic be unit-tested in node without happy-dom. */
+  private _unsavedGuard = new UnsavedGuard();
 
   /** When true, the next popstate is allowed to fall through to the router. */
   private _allowingLeave = false;
 
   private get _isDirty(): boolean {
     return this._yaml !== this._savedYaml;
-  }
-
-  /** Open the dialog (if dirty) and resolve once the user picks.
-   *
-   *  ``save`` is the saver to invoke when the user clicks "Save and
-   *  leave" — returns ``true`` when the buffer is actually clean
-   *  afterwards (so a save that fails validation correctly leaves
-   *  the user on the dirty content rather than allowing the
-   *  switch). ``Discard`` always resolves true; ``Cancel`` always
-   *  resolves false. A re-entrant call (``_activeGuard`` already
-   *  set) returns ``false`` so the second caller silently drops
-   *  its action — chaining two dialogs makes no sense. */
-  private _runUnsavedGuard(opts: {
-    dirty: boolean;
-    save: () => Promise<boolean>;
-  }): Promise<boolean> {
-    if (!opts.dirty) return Promise.resolve(true);
-    if (this._activeGuard) return Promise.resolve(false);
-    return new Promise<boolean>((resolve) => {
-      this._activeGuard = { save: opts.save, resolve };
-      this._unsavedDialog?.open();
-    });
   }
 
   /* The Save / Discard handlers flip ``_allowingLeave`` BEFORE
@@ -253,29 +227,14 @@ export class ESPHomePageDevice extends LitElement {
    * sets it (the section guard's ``save`` lambda is the one
    * carrying the leave-flag write).
    */
-  private _onUnsavedDiscard = () => {
-    const guard = this._activeGuard;
-    this._activeGuard = null;
-    guard?.resolve(true);
-  };
-
-  private _onUnsavedSave = async () => {
-    const guard = this._activeGuard;
-    this._activeGuard = null;
-    if (!guard) return;
-    const ok = await guard.save();
-    guard.resolve(ok);
-  };
-
-  private _onUnsavedCancel = () => {
-    const guard = this._activeGuard;
-    this._activeGuard = null;
-    guard?.resolve(false);
-  };
+  private _onUnsavedDiscard = () => this._unsavedGuard.onDiscard();
+  private _onUnsavedSave = () => this._unsavedGuard.onSave();
+  private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
 
   private _confirmLeave = async (): Promise<boolean> => {
-    const ok = await this._runUnsavedGuard({
+    const ok = await this._unsavedGuard.run({
       dirty: this._isDirty,
+      open: () => this._unsavedDialog?.open(),
       save: () => {
         this._saveYaml();
         this._allowingLeave = true;
@@ -327,8 +286,7 @@ export class ESPHomePageDevice extends LitElement {
     // Drop any in-flight unsaved-changes guard so its caller's
     // ``await`` doesn't dangle past unmount — resolve as "don't
     // proceed" since the page is going away anyway.
-    this._activeGuard?.resolve(false);
-    this._activeGuard = null;
+    this._unsavedGuard.cancelPending();
   }
 
   private _onKeydown = (e: KeyboardEvent) => {
@@ -778,8 +736,9 @@ export class ESPHomePageDevice extends LitElement {
    *  ``_loadConfig`` clears ``_dirty`` after the switch lands,
    *  so Discard doesn't need to revert form state explicitly. */
   private async _guardSectionSwitch(action: () => void): Promise<void> {
-    const ok = await this._runUnsavedGuard({
+    const ok = await this._unsavedGuard.run({
       dirty: this._sectionDirty,
+      open: () => this._unsavedDialog?.open(),
       save: () => this._activeSection?.save() ?? Promise.resolve(false),
     });
     if (ok) action();
