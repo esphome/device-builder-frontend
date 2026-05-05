@@ -85,6 +85,12 @@ When filling in the template:
 - Tick exactly one "Types of changes" box. For the Checklist
   section, only tick boxes you have actually verified; leave the
   rest as `- [ ]`.
+- **Do not escape characters from the template.** Backticks,
+  asterisks, angle brackets, etc. must be passed through verbatim
+  — escaping a backtick to `` \` `` corrupts inline code in the
+  rendered PR. The template is already valid Markdown; do not
+  rewrite it for shell quoting. Use `--body-file`, never
+  `--body "..."` with shell-escaping.
 
 ```bash
 git push -u origin <branch-name>
