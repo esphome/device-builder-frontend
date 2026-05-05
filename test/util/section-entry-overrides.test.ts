@@ -1,13 +1,13 @@
 /**
  * Pinning tests for ``resolveSectionEntries`` — the seam the
- * substitutions-section render path goes through.
+ * MAP-section render path goes through.
  *
  * A previous iteration of #160 had ``MAP_SECTIONS`` and the
- * synthesised ``MAP_SECTION_ENTRIES`` in the section component
- * but bound the form's ``.entries`` prop to the *catalog's*
- * entries by mistake — leaving the section silently empty in the
- * UI. Hoisting the resolution into a pure function lets us test
- * "for sectionKey=substitutions, the result IS the synthesised
+ * synthesised MAP entries in the section component but bound the
+ * form's ``.entries`` prop to the *catalog's* entries by mistake —
+ * leaving the section silently empty in the UI. Hoisting the
+ * resolution into a pure function lets us test "for
+ * sectionKey=substitutions/packages, the result IS the synthesised
  * MAP entry, regardless of what the catalog ships" without
  * standing up a Lit shadow root.
  */
@@ -15,37 +15,39 @@ import { describe, expect, it } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
 import {
   MAP_SECTIONS,
-  MAP_SECTION_ENTRIES,
   resolveSectionEntries,
 } from "../../src/util/section-entry-overrides.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 
 describe("MAP_SECTIONS", () => {
-  it("contains 'substitutions'", () => {
+  it("contains 'substitutions' and 'packages'", () => {
     expect(MAP_SECTIONS.has("substitutions")).toBe(true);
+    expect(MAP_SECTIONS.has("packages")).toBe(true);
   });
 });
 
-describe("MAP_SECTION_ENTRIES", () => {
-  it("is a single MAP entry with an empty key", () => {
-    // Empty key is the "this entry IS the whole values dict"
-    // signal the form's ``_renderEntry`` reads to switch to
-    // ``path=[]`` for ``ctx.getAt`` / ``ctx.emitChange``.
-    expect(MAP_SECTION_ENTRIES).toHaveLength(1);
-    expect(MAP_SECTION_ENTRIES[0].key).toBe("");
-    expect(MAP_SECTION_ENTRIES[0].type).toBe(ConfigEntryType.MAP);
-  });
-
-  it("declares a string value template at config_entries[0]", () => {
-    // The MAP renderer uses ``entry.config_entries[0]`` as the
-    // value template — it must be a string-shaped entry so
-    // primitive values (the common case) get a text input.
-    const valueTemplate = MAP_SECTION_ENTRIES[0].config_entries?.[0];
-    expect(valueTemplate).toBeDefined();
-    expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
-    expect(valueTemplate!.required).toBe(true);
-  });
+describe("resolveSectionEntries — MAP section shape", () => {
+  // Each MAP section renders as a single user-keyed-MAP entry
+  // whose ``config_entries[0]`` is the value template. The empty
+  // key is the "this entry IS the whole values dict" signal the
+  // form's ``_renderEntry`` reads to switch to ``path=[]`` for
+  // ``ctx.getAt`` / ``ctx.emitChange``. The value template must be
+  // a string-shaped entry so primitive values (the common case)
+  // get a text input.
+  it.each(["substitutions", "packages"])(
+    "%s resolves to a single empty-keyed MAP with a required string value template",
+    (sectionKey) => {
+      const entries = resolveSectionEntries(sectionKey, []);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].key).toBe("");
+      expect(entries[0].type).toBe(ConfigEntryType.MAP);
+      const valueTemplate = entries[0].config_entries?.[0];
+      expect(valueTemplate).toBeDefined();
+      expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
+      expect(valueTemplate!.required).toBe(true);
+    },
+  );
 });
 
 describe("resolveSectionEntries", () => {
@@ -55,8 +57,6 @@ describe("resolveSectionEntries", () => {
     // sync script doesn't honour ``key_type`` at component
     // level). Without this override the section renders ONE
     // advanced text field labelled "String" — the bug from #160.
-    // Pin that the resolver returns the synthesised MAP entry
-    // even when the catalog's input is the bogus shape.
     const bogusCatalogEntry: ConfigEntry = makeConfigEntry({
       key: "string",
       type: ConfigEntryType.STRING,
@@ -64,7 +64,8 @@ describe("resolveSectionEntries", () => {
       advanced: true,
     });
     const result = resolveSectionEntries("substitutions", [bogusCatalogEntry]);
-    expect(result).toBe(MAP_SECTION_ENTRIES);
+    expect(result).not.toBe([bogusCatalogEntry]);
+    expect(result[0].type).toBe(ConfigEntryType.MAP);
   });
 
   it("returns the catalog entries unchanged for non-overridden sections", () => {
@@ -81,14 +82,31 @@ describe("resolveSectionEntries", () => {
     expect(resolveSectionEntries("custom_unknown", [])).toEqual([]);
   });
 
-  it("is referentially stable for substitutions (same reference across calls)", () => {
-    // The form re-renders on every state change; if the resolver
-    // built a new array each time, the form's ``.entries`` prop
-    // would change reference and Lit would re-mount the rows.
-    // Same reference → no churn.
-    const a = resolveSectionEntries("substitutions", []);
-    const b = resolveSectionEntries("substitutions", []);
-    expect(a).toBe(b);
+  it.each(["substitutions", "packages"])(
+    "is referentially stable for %s (same reference across calls)",
+    (sectionKey) => {
+      // The form re-renders on every state change; if the resolver
+      // built a new array each time, the form's ``.entries`` prop
+      // would change reference and Lit would re-mount the rows.
+      // Same reference → no churn.
+      const a = resolveSectionEntries(sectionKey, []);
+      const b = resolveSectionEntries(sectionKey, []);
+      expect(a).toBe(b);
+    },
+  );
+
+  it("hands packages a different value template than substitutions", () => {
+    // Packages uses a stricter template (pattern-validated source
+    // shorthand) so the two MAP sections must NOT alias the same
+    // synthesised entry — otherwise editing one section's pattern
+    // would silently change the other's validation.
+    const subs = resolveSectionEntries("substitutions", []);
+    const pkgs = resolveSectionEntries("packages", []);
+    expect(subs).not.toBe(pkgs);
+    const subsTemplate = subs[0].config_entries?.[0];
+    const pkgsTemplate = pkgs[0].config_entries?.[0];
+    expect(subsTemplate!.pattern).toBeNull();
+    expect(pkgsTemplate!.pattern).not.toBeNull();
   });
 });
 
@@ -100,7 +118,7 @@ describe("device-section-config wiring", () => {
   // output, not the catalog's raw ``this._config.entries``.
   //
   // Regression pin: a previous iteration of #160 had
-  // ``MAP_SECTIONS`` and ``MAP_SECTION_ENTRIES`` defined in
+  // ``MAP_SECTIONS`` and the synthesised MAP entries defined in
   // the section component but bound the form's ``.entries``
   // prop directly to the catalog source — leaving the
   // substitutions section silently empty in the UI.
@@ -243,5 +261,80 @@ describe("save validation contract", () => {
       {},
     );
     expect(errors.has("ssid")).toBe(true);
+  });
+});
+
+describe("packages source pattern", () => {
+  // The visible bug: a user types ``x y`` (a value with whitespace
+  // — never a valid git shorthand) into a ``packages:`` row, hits
+  // Save, and the form lets it through. ESPHome's loader then
+  // rejects the config with "URL is not in expected format!" at
+  // compile time. The fix routes per-row values through the
+  // packages value template's ``pattern`` (mirrors ESPHome's
+  // ``GitFile.from_shorthand`` regex) so the form catches obvious
+  // typos before save.
+  const pkgEntries = resolveSectionEntries("packages", []);
+
+  it("rejects a value containing whitespace (the reported `x y` case)", () => {
+    const errors = validateEntries(pkgEntries, {
+      ApolloAutomation: "x y",
+    });
+    expect(errors.size).toBe(1);
+    expect(errors.get("ApolloAutomation")?.code).toBe(
+      "validation.invalid_package_source",
+    );
+  });
+
+  it.each([
+    ["bare-string", "xyz"],
+    ["wrong-protocol", "https://example.com/repo/file.yaml"],
+    ["unknown-domain", "bitbucket://owner/repo/file.yaml"],
+    ["empty-after-protocol", "github://"],
+  ])("rejects %s (`%s`)", (_label, value) => {
+    const errors = validateEntries(pkgEntries, { row: value });
+    expect(errors.has("row")).toBe(true);
+  });
+
+  it.each([
+    ["github short", "github://owner/repo/file.yaml"],
+    ["github with subfolder", "github://owner/repo/sub/dir/file.yaml"],
+    ["github with ref", "github://owner/repo/file.yaml@main"],
+    [
+      "github with ref containing dots",
+      "github://owner/repo/file.yaml@v1.2.3",
+    ],
+    ["gitlab short", "gitlab://owner/repo/file.yaml"],
+    [
+      "ApolloAutomation real-world example",
+      "github://ApolloAutomation/PLT-1/Integrations/ESPHome/PLT-1_Minimal.yaml",
+    ],
+  ])("accepts %s (`%s`)", (_label, value) => {
+    const errors = validateEntries(pkgEntries, { row: value });
+    expect(errors.size).toBe(0);
+  });
+
+  it("skips the pattern check for complex (object) row values", () => {
+    // Packages rows can be a YAML mapping (``url:`` + ``ref:`` +
+    // ``files:`` …) instead of a shorthand string. Those bypass
+    // the value template's input via ``renderMapField``'s
+    // "edit in YAML" placeholder, so validating them against the
+    // string-shape pattern is a category error. Pin that the
+    // recursion skips them.
+    const errors = validateEntries(pkgEntries, {
+      row: { url: "https://example.com/repo.git", ref: "main" },
+    });
+    expect(errors.size).toBe(0);
+  });
+
+  it("substitutions doesn't apply the packages pattern (its values are arbitrary strings)", () => {
+    // Substitutions accepts any string (per ESPHome's
+    // ``cv.Schema({validate_substitution_key: object})``). Pin
+    // that the pattern is a per-section override, not a leak from
+    // packages back onto substitutions.
+    const subEntries = resolveSectionEntries("substitutions", []);
+    const errors = validateEntries(subEntries, {
+      ssid_default: "x y has spaces and that's fine",
+    });
+    expect(errors.size).toBe(0);
   });
 });

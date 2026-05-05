@@ -150,6 +150,47 @@ describe("validateEntry", () => {
     const entry = makeEntry({ required: true, multi_value: true });
     expect(validateEntry(entry, [])?.code).toBe("validation.required");
   });
+
+  it("rejects string values that don't match the entry's pattern", () => {
+    // Pattern is the seam ``packages:`` uses to reject obvious
+    // typos (e.g. ``x y``) before save instead of round-tripping
+    // a config that ESPHome's loader will then reject at compile.
+    const entry = makeEntry({ pattern: "^github://\\S+$" });
+    expect(validateEntry(entry, "x y")?.code).toBe(
+      "validation.pattern_mismatch",
+    );
+    expect(validateEntry(entry, "github://owner/repo/file.yaml")).toBeNull();
+  });
+
+  it("uses the entry's pattern_error override for a tailored message", () => {
+    const entry = makeEntry({
+      pattern: "^github://\\S+$",
+      pattern_error: "validation.invalid_package_source",
+    });
+    expect(validateEntry(entry, "x y")?.code).toBe(
+      "validation.invalid_package_source",
+    );
+  });
+
+  it("skips the pattern check for non-string raws", () => {
+    // MAP rows can carry complex (object) values; the renderer
+    // surfaces those via the "edit in YAML" placeholder rather
+    // than the value template's input. Validating an object
+    // against a string-shape pattern would be a category error
+    // and trip on every multi-key package row.
+    const entry = makeEntry({ pattern: "^github://\\S+$" });
+    expect(validateEntry(entry, { url: "anything" })).toBeNull();
+  });
+
+  it("fails open on a malformed pattern (catalog bug, not user error)", () => {
+    // Catalog patterns are authored, not user-supplied; a regex
+    // syntax error here is a bug to fix at the catalog source.
+    // Failing open keeps the form usable even when the override
+    // is broken — the worst case is no early feedback, not a
+    // permanently-blocked save.
+    const entry = makeEntry({ pattern: "[unterminated" });
+    expect(validateEntry(entry, "anything")).toBeNull();
+  });
 });
 
 describe("validateEntries", () => {
