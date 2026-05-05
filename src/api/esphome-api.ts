@@ -634,17 +634,19 @@ export class ESPHomeAPI {
         // Drop the callback synchronously so any in-flight event
         // queued after this point is silently discarded.
         this._eventSubscriptions.delete(messageId);
-        try {
-          await this.sendCommand("devices/stop_stream", {
-            stream_id: messageId,
-          });
-        } catch {
-          // Best-effort: the WS disconnect or a server-side
-          // shutdown can race the cancel and surface an error
-          // here. The listener is already gone client-side and
-          // the backend task is owned by the connection's
-          // cleanup path either way.
-        }
+        // Fire-and-forget the stop_stream round-trip. The
+        // backend's per-stream task is also cancelled by the WS
+        // disconnect, so awaiting the result has no functional
+        // value — and ``sendCommand`` carries a 10s default
+        // timeout that would make ``unsubscribe()`` hang for
+        // 10s on any non-responsive server. Swallow the
+        // returned promise (and any rejection it produces) so
+        // callers see the cleanup as essentially synchronous.
+        this.sendCommand("devices/stop_stream", {
+          stream_id: messageId,
+        }).catch(() => {
+          /* server hiccup or already-disconnected; ignore */
+        });
       },
     };
   }

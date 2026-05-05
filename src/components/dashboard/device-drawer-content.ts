@@ -26,6 +26,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import type {
   ConfiguredDevice,
+  ReachabilitySource,
   ReachabilityStateEvent,
   ReachabilitySubscription,
 } from "../../api/types.js";
@@ -766,7 +767,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   private _renderReachabilityRow(
     row: ReachabilityRowSpec,
-    activeSource: string,
+    activeSource: ReachabilitySource,
     lang: string | undefined,
   ) {
     if (row.age === null) return nothing;
@@ -775,7 +776,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       row.rttMs === null || row.rttMs === undefined
         ? null
         : this._localize("dashboard.drawer_round_trip_ms", {
-            n: Math.round(row.rttMs * 10) / 10,
+            // Format the RTT through ``Intl.NumberFormat`` so the
+            // decimal separator follows the active locale (French
+            // expects ``1,4 ms`` not ``1.4 ms``). Ages already
+            // localize via ``Intl.RelativeTimeFormat``; the RTT
+            // suffix should match.
+            n: new Intl.NumberFormat(lang, {
+              maximumFractionDigits: 1,
+            }).format(row.rttMs),
           });
     const isActive = activeSource === row.source;
     return html`
@@ -808,12 +816,24 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     super.updated?.(changed);
     if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
       this._reconcileReachabilitySubscription();
+      // Run the tick whenever there's a *target* (drawer open +
+      // device + api), independent of whether the subscribe
+      // succeeded. The tick re-runs reconcile, so a failed
+      // initial subscribe (WS not connected yet, server hiccup)
+      // gets retried every 500ms instead of leaving the
+      // section permanently disabled until the user
+      // closes/reopens the drawer.
+      this._syncTickInterval();
     }
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback();
     this._teardownReachabilitySubscription();
+    if (this._tickInterval !== null) {
+      clearInterval(this._tickInterval);
+      this._tickInterval = null;
+    }
   }
 
   /** Open / close / swap the per-device reachability subscription
@@ -869,7 +889,6 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         return;
       }
       this._subscription = subscription;
-      this._startTickInterval();
     } catch (err) {
       // Connection went away mid-subscribe, or the device was
       // deleted between drawer open and the subscribe round
@@ -886,7 +905,6 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     this._subscribedDevice = null;
     this._reachability = null;
     this._reachabilityAnchorMs = 0;
-    this._stopTickInterval();
     if (this._subscription !== null) {
       const sub = this._subscription;
       this._subscription = null;
@@ -894,25 +912,33 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     }
   }
 
-  private _startTickInterval() {
-    if (this._tickInterval !== null) return;
-    this._tickInterval = setInterval(() => {
-      this._tick = (this._tick + 1) % 1000;
-      // Probe for WS reconnect on every tick. ``api`` clears its
-      // event listeners on close (``_onClose`` →
-      // ``_eventSubscriptions.clear``), so on reconnect our
-      // listener is gone but ``_subscribedDevice`` still says we
-      // think we're subscribed. Reconciling here re-detects the
-      // generation bump and resubscribes; without it the drawer
-      // would tick stale ages forever after a single drop.
-      this._reconcileReachabilitySubscription();
-    }, 500);
-  }
-
-  private _stopTickInterval() {
-    if (this._tickInterval === null) return;
-    clearInterval(this._tickInterval);
-    this._tickInterval = null;
+  /** Match the 500ms tick to whether there's a target. Called from
+   *  ``updated()`` and ``disconnectedCallback`` so the tick runs
+   *  while the drawer is open with a device, regardless of
+   *  whether the subscription itself succeeded — a failed initial
+   *  subscribe (WS not connected yet, server hiccup) gets
+   *  retried via the tick's reconcile call rather than leaving
+   *  the section permanently disabled. */
+  private _syncTickInterval() {
+    const wantTick = this.drawerOpen && this.device !== undefined && this._api !== undefined;
+    if (wantTick && this._tickInterval === null) {
+      this._tickInterval = setInterval(() => {
+        this._tick = (this._tick + 1) % 1000;
+        // Probe for WS reconnect / failed-initial-subscribe on
+        // every tick. ``api`` clears its event listeners on
+        // close (``_onClose`` → ``_eventSubscriptions.clear``),
+        // so on reconnect our listener is gone but
+        // ``_subscribedDevice`` still says we think we're
+        // subscribed; reconciling here re-detects the
+        // generation bump and resubscribes. The tick also
+        // retries an initial subscribe that failed (e.g. the
+        // WS wasn't open yet when the drawer first rendered).
+        this._reconcileReachabilitySubscription();
+      }, 500);
+    } else if (!wantTick && this._tickInterval !== null) {
+      clearInterval(this._tickInterval);
+      this._tickInterval = null;
+    }
   }
 
   private _row(icon: string, label: string, value: string | null, mono = false) {
