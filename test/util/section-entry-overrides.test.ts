@@ -185,7 +185,9 @@ describe("device-section-config wiring", () => {
     // ``_onSave`` must consult the lint between building newYaml
     // and calling updateConfig. Pin both the order (lint after
     // updateSectionInYaml, before updateConfig) and the bail
-    // (assigning ``this._error`` and returning).
+    // (assigning ``this._error`` and returning before the
+    // ``updateConfig`` call) so a future refactor that reads
+    // the lint message but forgets to bail can't ship.
     const onSave = src.slice(src.indexOf("private async _onSave"));
     const lintCallIdx = onSave.indexOf("_lintFailureMessage");
     const updateConfigIdx = onSave.indexOf("updateConfig");
@@ -197,6 +199,20 @@ describe("device-section-config wiring", () => {
     expect(
       lintCallIdx > 0 && updateConfigIdx > lintCallIdx,
       "_lintFailureMessage must run before updateConfig",
+    ).toBe(true);
+    // Between the lint call and the ``updateConfig`` call, the
+    // bail must assign the message to ``this._error`` AND
+    // ``return`` early — otherwise the lint message gets
+    // surfaced but the save proceeds anyway, which is the exact
+    // shape the comment above warned about.
+    const bailRegion = onSave.slice(lintCallIdx, updateConfigIdx);
+    expect(
+      /this\._error\s*=/.test(bailRegion),
+      "lint failure must assign this._error before updateConfig",
+    ).toBe(true);
+    expect(
+      /\breturn\b/.test(bailRegion),
+      "lint failure must return before reaching updateConfig",
     ).toBe(true);
   });
 
