@@ -628,6 +628,7 @@ export function renderNestedField(
         <button
           type="button"
           class="nested-toggle"
+          aria-expanded=${isOpen}
           @click=${() => ctx.toggleNested(key)}
         >
           <wa-icon

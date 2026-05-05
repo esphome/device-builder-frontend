@@ -115,6 +115,7 @@ export const configEntryFormStyles = css`
   .nested-toggle {
     display: flex;
     flex: 1;
+    min-width: 0;
     align-items: center;
     gap: var(--wa-space-2xs);
     background: none;
@@ -144,6 +145,8 @@ export const configEntryFormStyles = css`
 
   .nested-title {
     flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .nested-platform {
