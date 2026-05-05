@@ -686,7 +686,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         // cleared the value, that's intentional data and must
         // round-trip. Other MAP sections (``packages``) treat an
         // empty value as a placeholder row the user hasn't filled
-        // in yet — keeping it would write invalid YAML on save.
+        // in yet — the YAML would still be syntactically valid,
+        // but ESPHome's ``packages:`` schema validator rejects an
+        // empty-string package definition, so dropping the
+        // placeholder row keeps the saved config loadable.
         { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(this.sectionKey) },
       );
       const title = this._config.title;
