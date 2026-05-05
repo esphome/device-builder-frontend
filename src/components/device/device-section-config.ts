@@ -229,6 +229,48 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   }
 
+  connectedCallback() {
+    super.connectedCallback();
+    // Announce ourselves so the page-level navigation guard
+    // (``device.ts``) can hold a direct ref. The component tree
+    // is page → device-editor → device-board-info → us, three
+    // shadow boundaries deep, so a property-passthrough chain
+    // would cost three editsper API change. ``composed: true``
+    // lets the event escape every shadow root on the way up.
+    this.dispatchEvent(
+      new CustomEvent("section-mount", {
+        detail: { node: this },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.dispatchEvent(
+      new CustomEvent("section-unmount", {
+        detail: { node: this },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /** Trigger the section's save flow from outside.
+   *
+   *  Returns ``true`` iff the save actually succeeded —
+   *  ``_onSave`` early-returns silently on validation errors
+   *  (the form's ``_fieldErrors`` stamp tells the user) and on
+   *  ``_resolveSpliceContext`` failure, leaving ``_dirty=true``.
+   *  The page-level "Save and leave" handler awaits this and
+   *  only proceeds with the section switch when the buffer is
+   *  actually clean. */
+  public async save(): Promise<boolean> {
+    await this._onSave();
+    return !this._dirty;
+  }
+
   /**
    * Resolve the splice context for save / delete — the live YAML
    * and a current, validated `fromLine`. Sets `_error` and
@@ -286,13 +328,39 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     }
   }
 
+  /** Public read-only view of the unsaved-changes flag.
+   *  The page-level navigation handlers (`device.ts`) consult
+   *  this before mutating ``_selectedSection`` so a section
+   *  switch doesn't silently clobber in-progress field edits. */
+  public get dirty(): boolean {
+    return this._dirty;
+  }
+
+  /** Single mutator for ``_dirty`` so a transition fires a
+   *  ``dirty-change`` event the page can listen for without
+   *  reaching into this component's internals. The event is
+   *  cheap (one bubble per actual flip) and only emitted when
+   *  the value really changes — re-saves with no edits, repeat
+   *  load cycles, etc. don't churn listeners. */
+  private _setDirty(value: boolean): void {
+    if (this._dirty === value) return;
+    this._dirty = value;
+    this.dispatchEvent(
+      new CustomEvent("dirty-change", {
+        detail: { dirty: value },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
   private async _loadConfig() {
     const id = ++this._loadId;
     this._loading = true;
     this._error = "";
     this._config = null;
     this._isUnknown = false;
-    this._dirty = false;
+    this._setDirty(false);
 
     try {
       const platform = this.board?.esphome.platform;
@@ -579,7 +647,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         return;
       }
       await this._api.updateConfig(this.configuration, newYaml);
-      this._dirty = false;
+      this._setDirty(false);
       this.dispatchEvent(
         new CustomEvent("yaml-updated", {
           detail: { yaml: newYaml },
@@ -619,7 +687,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _onValueChange(e: CustomEvent<ConfigEntryValueChange>) {
     const { path, value } = e.detail;
     this._values = setIn(this._values, path, value);
-    this._dirty = true;
+    this._setDirty(true);
     const errKey = path.join(".");
     if (this._fieldErrors.has(errKey)) {
       const next = new Map(this._fieldErrors);
@@ -722,7 +790,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         this._error =
           e instanceof Error ? e.message : this._localize("device.save_error");
       });
-      this._dirty = false;
+      this._setDirty(false);
       this.dispatchEvent(
         new CustomEvent("yaml-updated", {
           detail: { yaml: newYaml },
