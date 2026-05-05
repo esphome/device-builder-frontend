@@ -2,7 +2,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type {
   ArchivedDevice,
-  BulkDeleteResult,
+  BulkActionResult,
   ConfiguredDevice,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -10,37 +10,6 @@ import type { LocalizeFunc } from "../common/localize.js";
 export function editDevice(device: ConfiguredDevice) {
   window.history.pushState({}, "", `/device/${device.configuration}`);
   window.dispatchEvent(new PopStateEvent("popstate"));
-}
-
-/**
- * Stringify a ``Promise.allSettled`` rejection reason for a toast.
- *
- * Three cascading cases keep "[object Object]" out of the rendered
- * error toast — the most common failure mode of a bare
- * ``String(err)``:
- *
- *   1. ``Error`` → ``.message`` (the ergonomic case for thrown
- *      ``new Error('Already archived')``-style failures).
- *   2. Plain object / array → ``JSON.stringify`` so a backend
- *      ``{code, details}`` shape surfaces legibly. Wrapped in
- *      ``try`` so a circular reference (which JSON.stringify
- *      throws on) falls through to the bare-string branch
- *      instead of crashing the toast.
- *   3. Anything else (string, number, null, undefined) →
- *      ``String(...)`` — the right shape for primitives where
- *      ``JSON.stringify`` would add wrapping quotes the toast
- *      doesn't want.
- */
-function _formatReason(reason: unknown): string {
-  if (reason instanceof Error) return reason.message;
-  if (typeof reason === "object" && reason !== null) {
-    try {
-      return JSON.stringify(reason);
-    } catch {
-      /* fall through to String() below */
-    }
-  }
-  return String(reason);
 }
 
 /**
@@ -161,69 +130,34 @@ export function deleteDevice(
 }
 
 /**
- * Archive several devices at once. Mirrors ``deleteBulkDevices``
- * shape but fans out one ``archiveDevice`` WS call per
- * configuration — the backend doesn't carry a bulk-archive
- * command (per-device archive moves YAML + wipes the per-device
- * build dir; bundling that server-side hasn't paid for itself
- * yet against the once-in-a-while operation this is). Calls run
- * concurrently via ``Promise.allSettled`` so the user doesn't
- * wait N×latency for a small fleet selection; toasts collapse
- * to one summary success + one toast per failure rather than
- * the per-device toast the single-archive path emits.
+ * Shared per-row success/failure toast handler for bulk WS commands
+ * (``devices/delete_bulk``, ``devices/archive_bulk``). The backend
+ * runs each per-device action independently and returns
+ * ``BulkActionResult[]`` — aggregate the per-row outcomes into one
+ * success-count toast plus one error toast per failed row, instead
+ * of the per-device toasts the single-call paths emit.
+ *
+ * ``catchAllKey`` is the localize key shown when the bulk command
+ * itself rejects (network drop, server-side ``CommandError``) before
+ * any per-row results come back.
  */
-export async function archiveBulkDevices(
+async function runBulkAction(
   configurations: string[],
   devices: ConfiguredDevice[],
-  api: ESPHomeAPI,
   localize: LocalizeFunc,
+  call: (configurations: string[]) => Promise<BulkActionResult[]>,
+  copy: {
+    catchAllKey: string;
+    successKey: string;
+    failureKey: string;
+    successOptions?: Parameters<typeof toast.success>[1];
+  },
 ) {
-  const results = await Promise.allSettled(
-    configurations.map((c) => api.archiveDevice(c)),
-  );
-  const succeeded = results.filter((r) => r.status === "fulfilled").length;
-  const failures = results
-    .map((r, i) => ({ result: r, configuration: configurations[i] }))
-    .filter(({ result }) => result.status === "rejected");
-
-  if (succeeded > 0) {
-    toast.success(
-      localize("dashboard.archive_bulk_success", { count: succeeded }),
-      {
-        description: localize("dashboard.action_archive_success_hint"),
-        richColors: true,
-        duration: 8000,
-      },
-    );
-  }
-  // Index by configuration up front so failure-toast naming is
-  // O(failures) instead of O(failures × devices) on big selections.
-  const devicesByConfiguration = new Map(
-    devices.map((d) => [d.configuration, d] as const),
-  );
-  for (const { result, configuration } of failures) {
-    const device = devicesByConfiguration.get(configuration);
-    const name = device ? device.friendly_name || device.name : configuration;
-    const reason =
-      result.status === "rejected" ? _formatReason(result.reason) : "";
-    toast.error(
-      localize("dashboard.action_archive_failed", { name, error: reason }),
-      { richColors: true },
-    );
-  }
-}
-
-export async function deleteBulkDevices(
-  configurations: string[],
-  devices: ConfiguredDevice[],
-  api: ESPHomeAPI,
-  localize: LocalizeFunc
-) {
-  let results: BulkDeleteResult[];
+  let results: BulkActionResult[];
   try {
-    results = await api.deleteBulkDevices(configurations);
+    results = await call(configurations);
   } catch {
-    toast.error(localize("dashboard.delete_bulk_failed"), { richColors: true });
+    toast.error(localize(copy.catchAllKey), { richColors: true });
     return;
   }
 
@@ -231,15 +165,59 @@ export async function deleteBulkDevices(
   const failed = results.filter((r) => !r.success);
 
   if (succeeded > 0) {
-    toast.success(localize("dashboard.delete_bulk_success", { count: succeeded }), {
-      richColors: true,
-    });
+    toast.success(
+      localize(copy.successKey, { count: succeeded }),
+      { richColors: true, ...copy.successOptions },
+    );
   }
+  // Index by configuration up front so failure-toast naming is
+  // O(failures) instead of O(failures × devices) on big selections.
+  const devicesByConfiguration = new Map(
+    devices.map((d) => [d.configuration, d] as const),
+  );
   for (const result of failed) {
-    const device = devices.find((d) => d.configuration === result.configuration);
+    const device = devicesByConfiguration.get(result.configuration);
     const name = device ? device.friendly_name || device.name : result.configuration;
-    toast.error(localize("dashboard.delete_failed", { name }), { richColors: true });
+    toast.error(
+      localize(copy.failureKey, { name, error: result.error ?? "" }),
+      { richColors: true },
+    );
   }
+}
+
+/**
+ * Archive several devices at once via the ``devices/archive_bulk``
+ * WS command. Per-row results route through ``runBulkAction`` so
+ * the toast shape matches ``deleteBulkDevices``.
+ */
+export async function archiveBulkDevices(
+  configurations: string[],
+  devices: ConfiguredDevice[],
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+) {
+  await runBulkAction(configurations, devices, localize, (c) => api.archiveBulkDevices(c), {
+    catchAllKey: "dashboard.archive_bulk_failed",
+    successKey: "dashboard.archive_bulk_success",
+    failureKey: "dashboard.action_archive_failed",
+    successOptions: {
+      description: localize("dashboard.action_archive_success_hint"),
+      duration: 8000,
+    },
+  });
+}
+
+export async function deleteBulkDevices(
+  configurations: string[],
+  devices: ConfiguredDevice[],
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+) {
+  await runBulkAction(configurations, devices, localize, (c) => api.deleteBulkDevices(c), {
+    catchAllKey: "dashboard.delete_bulk_failed",
+    successKey: "dashboard.delete_bulk_success",
+    failureKey: "dashboard.delete_failed",
+  });
 }
 
 export async function downloadYaml(

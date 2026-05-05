@@ -676,7 +676,12 @@ export interface UserPreferences {
   table_sort_direction: SortDirection | null;
 }
 
-export interface BulkDeleteResult {
+/**
+ * Per-device result from any bulk WS command (``devices/delete_bulk``,
+ * ``devices/archive_bulk``). Shape is ``{configuration, success, error?}``;
+ * the backend's ``_run_bulk_per_device`` helper produces this for both.
+ */
+export interface BulkActionResult {
   configuration: string;
   success: boolean;
   error?: string;

@@ -12,7 +12,7 @@ import type {
   AddComponentResponse,
   ArchivedDevice,
   BoardCatalogEntry,
-  BulkDeleteResult,
+  BulkActionResult,
   CommandMessage,
   ComponentCatalogEntry,
   DevicesResponse,
@@ -615,8 +615,8 @@ export class ESPHomeAPI {
   }
 
   /** Delete multiple devices at once. Returns per-device results. */
-  async deleteBulkDevices(configurations: string[]): Promise<BulkDeleteResult[]> {
-    return this.sendCommand<BulkDeleteResult[]>("devices/delete_bulk", {
+  async deleteBulkDevices(configurations: string[]): Promise<BulkActionResult[]> {
+    return this.sendCommand<BulkActionResult[]>("devices/delete_bulk", {
       configurations,
     });
   }
@@ -628,6 +628,17 @@ export class ESPHomeAPI {
    */
   async archiveDevice(configuration: string): Promise<void> {
     await this.sendCommand("devices/archive", { configuration });
+  }
+
+  /**
+   * Archive multiple devices at once. Returns per-device results
+   * with the same shape as ``deleteBulkDevices`` so the dashboard
+   * can route both bulk flows through one toast handler.
+   */
+  async archiveBulkDevices(configurations: string[]): Promise<BulkActionResult[]> {
+    return this.sendCommand<BulkActionResult[]>("devices/archive_bulk", {
+      configurations,
+    });
   }
 
   /**
