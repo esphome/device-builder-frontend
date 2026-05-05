@@ -4,6 +4,7 @@ import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
+import { formatFileSize } from "../../util/format-file-size.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
@@ -18,6 +19,7 @@ export interface DeviceRow {
   version: string;
   comment: string;
   config: string;
+  build_size_bytes: number;
   hasPendingChanges: boolean;
   hasUpdateAvailable: boolean;
   api_enabled: boolean;
@@ -207,6 +209,22 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) =>
         html`<span class="cell-mono cell-config">${info.getValue()}</span>`,
       size: 180,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "build_size_bytes",
+      header: localize("dashboard.table_col_build_size"),
+      cell: (info) => {
+        const bytes = info.getValue() as number;
+        return bytes
+          ? html`<span class="cell-mono">${formatFileSize(bytes)}</span>`
+          : html`<span class="cell-muted">—</span>`;
+      },
+      // Sort numerically rather than lexicographically so larger
+      // builds sort above smaller ones regardless of unit suffix
+      // (the cell renders KB/MB but the underlying value is bytes).
+      sortingFn: "basic",
+      size: 120,
       enableHiding: true,
     },
     {

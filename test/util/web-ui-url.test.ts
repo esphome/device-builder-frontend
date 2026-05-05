@@ -16,6 +16,7 @@ const _baseDevice = {
   mac_address: "",
   ethernet_mac: "",
   bluetooth_mac: "",
+  build_size_bytes: 0,
   web_port: null,
   current_version: "",
   deployed_version: "",

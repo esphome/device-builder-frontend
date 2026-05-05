@@ -178,6 +178,12 @@ export interface ConfiguredDevice {
    *  chip with its own allocation).
    */
   bluetooth_mac: string;
+  /** Cached total size in bytes of the per-device build directory
+   *  (``.esphome/build/<name>/``). ``0`` until the device has been
+   *  compiled and the backend has walked its build tree. The walk
+   *  is heavy I/O — backend caches the value keyed off the build
+   *  directory's mtime, so a steady-state poll never re-walks. */
+  build_size_bytes: number;
 }
 
 /** An adoptable/importable ESPHome device. */

@@ -8,6 +8,7 @@ import {
   mdiChevronUp,
   mdiFileDocumentOutline,
   mdiFingerprint,
+  mdiHarddisk,
   mdiEthernet,
   mdiInformationOutline,
   mdiIpNetworkOutline,
@@ -42,6 +43,7 @@ import {
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
+import { formatFileSize } from "../../util/format-file-size.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   ageOf,
@@ -61,6 +63,7 @@ registerMdiIcons({
   ethernet: mdiEthernet,
   "file-document-outline": mdiFileDocumentOutline,
   fingerprint: mdiFingerprint,
+  harddisk: mdiHarddisk,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
   lan: mdiLan,
@@ -507,6 +510,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderEthernetMacRow(d)}
         ${this._renderBluetoothMacRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
+        ${this._renderBuildSizeRow(d)}
       </div>
 
       ${this._renderReachabilitySection()}
@@ -844,6 +848,26 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       this._localize("dashboard.drawer_bluetooth_mac"),
       d.bluetooth_mac,
       true,
+    );
+  }
+
+  /**
+   * Render the cached build-directory size, when the device has been built.
+   *
+   * Hidden on devices that have never been compiled (the
+   * backend's mtime-gated cache reports ``0`` for those). The
+   * value updates lazily — backend re-walks only when the build
+   * directory's mtime moves, which only happens on a fresh
+   * compile, so the drawer's number can lag a session's worth
+   * behind a CLI-driven build until the dashboard's job-completion
+   * hook (or the next backend restart) triggers a refresh.
+   */
+  private _renderBuildSizeRow(d: ConfiguredDevice) {
+    if (!d.build_size_bytes) return nothing;
+    return this._row(
+      "harddisk",
+      this._localize("dashboard.drawer_build_size"),
+      formatFileSize(d.build_size_bytes),
     );
   }
 
