@@ -1,13 +1,13 @@
 /**
  * Pinning tests for ``resolveSectionEntries`` — the seam the
- * substitutions-section render path goes through.
+ * MAP-section render path goes through.
  *
  * A previous iteration of #160 had ``MAP_SECTIONS`` and the
- * synthesised ``SUBSTITUTIONS_ENTRIES`` in the section component
- * but bound the form's ``.entries`` prop to the *catalog's*
- * entries by mistake — leaving the section silently empty in the
- * UI. Hoisting the resolution into a pure function lets us test
- * "for sectionKey=substitutions, the result IS the synthesised
+ * synthesised MAP entries in the section component but bound the
+ * form's ``.entries`` prop to the *catalog's* entries by mistake —
+ * leaving the section silently empty in the UI. Hoisting the
+ * resolution into a pure function lets us test "for
+ * sectionKey=substitutions/packages, the result IS the synthesised
  * MAP entry, regardless of what the catalog ships" without
  * standing up a Lit shadow root.
  */
@@ -15,37 +15,39 @@ import { describe, expect, it } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
 import {
   MAP_SECTIONS,
-  SUBSTITUTIONS_ENTRIES,
   resolveSectionEntries,
 } from "../../src/util/section-entry-overrides.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 
 describe("MAP_SECTIONS", () => {
-  it("contains 'substitutions'", () => {
+  it("contains 'substitutions' and 'packages'", () => {
     expect(MAP_SECTIONS.has("substitutions")).toBe(true);
+    expect(MAP_SECTIONS.has("packages")).toBe(true);
   });
 });
 
-describe("SUBSTITUTIONS_ENTRIES", () => {
-  it("is a single MAP entry with an empty key", () => {
-    // Empty key is the "this entry IS the whole values dict"
-    // signal the form's ``_renderEntry`` reads to switch to
-    // ``path=[]`` for ``ctx.getAt`` / ``ctx.emitChange``.
-    expect(SUBSTITUTIONS_ENTRIES).toHaveLength(1);
-    expect(SUBSTITUTIONS_ENTRIES[0].key).toBe("");
-    expect(SUBSTITUTIONS_ENTRIES[0].type).toBe(ConfigEntryType.MAP);
-  });
-
-  it("declares a string value template at config_entries[0]", () => {
-    // The MAP renderer uses ``entry.config_entries[0]`` as the
-    // value template — it must be a string-shaped entry so
-    // primitive values (the common case) get a text input.
-    const valueTemplate = SUBSTITUTIONS_ENTRIES[0].config_entries?.[0];
-    expect(valueTemplate).toBeDefined();
-    expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
-    expect(valueTemplate!.required).toBe(true);
-  });
+describe("resolveSectionEntries — MAP section shape", () => {
+  // Each MAP section renders as a single user-keyed-MAP entry
+  // whose ``config_entries[0]`` is the value template. The empty
+  // key is the "this entry IS the whole values dict" signal the
+  // form's ``_renderEntry`` reads to switch to ``path=[]`` for
+  // ``ctx.getAt`` / ``ctx.emitChange``. The value template must be
+  // a string-shaped entry so primitive values (the common case)
+  // get a text input.
+  it.each(["substitutions", "packages"])(
+    "%s resolves to a single empty-keyed MAP with a required string value template",
+    (sectionKey) => {
+      const entries = resolveSectionEntries(sectionKey, []);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].key).toBe("");
+      expect(entries[0].type).toBe(ConfigEntryType.MAP);
+      const valueTemplate = entries[0].config_entries?.[0];
+      expect(valueTemplate).toBeDefined();
+      expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
+      expect(valueTemplate!.required).toBe(true);
+    },
+  );
 });
 
 describe("resolveSectionEntries", () => {
@@ -55,8 +57,6 @@ describe("resolveSectionEntries", () => {
     // sync script doesn't honour ``key_type`` at component
     // level). Without this override the section renders ONE
     // advanced text field labelled "String" — the bug from #160.
-    // Pin that the resolver returns the synthesised MAP entry
-    // even when the catalog's input is the bogus shape.
     const bogusCatalogEntry: ConfigEntry = makeConfigEntry({
       key: "string",
       type: ConfigEntryType.STRING,
@@ -64,7 +64,7 @@ describe("resolveSectionEntries", () => {
       advanced: true,
     });
     const result = resolveSectionEntries("substitutions", [bogusCatalogEntry]);
-    expect(result).toBe(SUBSTITUTIONS_ENTRIES);
+    expect(result[0].type).toBe(ConfigEntryType.MAP);
   });
 
   it("returns the catalog entries unchanged for non-overridden sections", () => {
@@ -81,15 +81,18 @@ describe("resolveSectionEntries", () => {
     expect(resolveSectionEntries("custom_unknown", [])).toEqual([]);
   });
 
-  it("is referentially stable for substitutions (same reference across calls)", () => {
-    // The form re-renders on every state change; if the resolver
-    // built a new array each time, the form's ``.entries`` prop
-    // would change reference and Lit would re-mount the rows.
-    // Same reference → no churn.
-    const a = resolveSectionEntries("substitutions", []);
-    const b = resolveSectionEntries("substitutions", []);
-    expect(a).toBe(b);
-  });
+  it.each(["substitutions", "packages"])(
+    "is referentially stable for %s (same reference across calls)",
+    (sectionKey) => {
+      // The form re-renders on every state change; if the resolver
+      // built a new array each time, the form's ``.entries`` prop
+      // would change reference and Lit would re-mount the rows.
+      // Same reference → no churn.
+      const a = resolveSectionEntries(sectionKey, []);
+      const b = resolveSectionEntries(sectionKey, []);
+      expect(a).toBe(b);
+    },
+  );
 });
 
 describe("device-section-config wiring", () => {
@@ -100,7 +103,7 @@ describe("device-section-config wiring", () => {
   // output, not the catalog's raw ``this._config.entries``.
   //
   // Regression pin: a previous iteration of #160 had
-  // ``MAP_SECTIONS`` and ``SUBSTITUTIONS_ENTRIES`` defined in
+  // ``MAP_SECTIONS`` and the synthesised MAP entries defined in
   // the section component but bound the form's ``.entries``
   // prop directly to the catalog source — leaving the
   // substitutions section silently empty in the UI.
@@ -141,6 +144,76 @@ describe("device-section-config wiring", () => {
       expr.includes("this._config.entries"),
       "form's .entries binds to the raw catalog entries — substitutions override is bypassed",
     ).toBe(false);
+  });
+
+  it("routes _onSave through validateYaml to refuse saves ESPHome would reject", async () => {
+    // Regression pin for the "x y is invalid but the form lets it
+    // through" complaint on ``packages:``. We deliberately don't
+    // duplicate ESPHome's source-shorthand validator on the
+    // frontend (drift risk on every upstream change to accepted
+    // domains / chars). Instead, ``_onSave`` runs the candidate
+    // YAML through ``editor/validate_yaml`` — the same backend
+    // lint that drives the editor's red squiggles
+    // (``yaml-lint-backend.ts``) — and bails with the upstream
+    // error message when ESPHome reports a problem. This test
+    // pins the *wiring* (a ``_lintFailureMessage`` helper exists
+    // and ``_onSave`` consults it before ``updateConfig``); the
+    // backend's actual rejection logic is upstream's concern.
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const fs = await import("node:fs");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const path = await import("node:path");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../src/components/device/device-section-config.ts",
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+
+    expect(
+      /private async _lintFailureMessage\s*\(/.test(src),
+      "_lintFailureMessage helper missing",
+    ).toBe(true);
+    expect(
+      /this\._api\.validateYaml\s*\(\s*this\.configuration\s*,\s*candidateYaml\s*\)/.test(
+        src,
+      ),
+      "_lintFailureMessage doesn't call validateYaml with the candidate YAML",
+    ).toBe(true);
+    // ``_onSave`` must consult the lint between building newYaml
+    // and calling updateConfig. Pin both the order (lint after
+    // updateSectionInYaml, before updateConfig) and the bail
+    // (assigning ``this._error`` and returning before the
+    // ``updateConfig`` call) so a future refactor that reads
+    // the lint message but forgets to bail can't ship.
+    const onSave = src.slice(src.indexOf("private async _onSave"));
+    const lintCallIdx = onSave.indexOf("_lintFailureMessage");
+    const updateConfigIdx = onSave.indexOf("updateConfig");
+    const updateSectionIdx = onSave.indexOf("updateSectionInYaml");
+    expect(
+      updateSectionIdx > 0 && lintCallIdx > updateSectionIdx,
+      "_lintFailureMessage must run after updateSectionInYaml",
+    ).toBe(true);
+    expect(
+      lintCallIdx > 0 && updateConfigIdx > lintCallIdx,
+      "_lintFailureMessage must run before updateConfig",
+    ).toBe(true);
+    // Between the lint call and the ``updateConfig`` call, the
+    // bail must assign the message to ``this._error`` AND
+    // ``return`` early — otherwise the lint message gets
+    // surfaced but the save proceeds anyway, which is the exact
+    // shape the comment above warned about.
+    const bailRegion = onSave.slice(lintCallIdx, updateConfigIdx);
+    expect(
+      /this\._error\s*=/.test(bailRegion),
+      "lint failure must assign this._error before updateConfig",
+    ).toBe(true);
+    expect(
+      /\breturn\b/.test(bailRegion),
+      "lint failure must return before reaching updateConfig",
+    ).toBe(true);
   });
 
   it("routes _onSave's validateEntries through the resolver, not the catalog", async () => {

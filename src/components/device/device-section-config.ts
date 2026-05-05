@@ -9,9 +9,13 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
+import type {
+  BoardCatalogEntry,
+  ConfigEntry,
+  EditorValidateResponse,
+} from "../../api/types.js";
 import {
-  MAP_SECTIONS,
+  KEEP_EMPTY_STRING_SECTIONS,
   resolveSectionEntries,
 } from "../../util/section-entry-overrides.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
@@ -37,6 +41,7 @@ import {
 } from "../../util/yaml-section-values.js";
 import { resolveCurrentFromLine } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
+import { isYamlOnlySection } from "./yaml-only-sections.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -74,16 +79,8 @@ interface SectionConfigResponse {
   entries: ConfigEntry[];
 }
 
-/**
- * Top-level keys we always treat as YAML-only regardless of what the
- * backend returns. `packages` is the remaining holdout — its YAML
- * shape (dict-of-dicts referencing remote files) doesn't fit the
- * MAP-of-typed-values pattern. Everything else (substitutions,
- * globals, ...) now relies on the backend describing it as a MAP
- * entry, and falls back to the YAML notice automatically when the
- * schema returns no entries.
- */
-const YAML_ONLY_SECTIONS = new Set(["packages"]);
+// YAML-only-section gate lives in ``yaml-only-sections.ts`` so the
+// unit test can import it without pulling Lit / DOM through here.
 
 @customElement("esphome-device-section-config")
 export class ESPHomeDeviceSectionConfig extends LitElement {
@@ -480,14 +477,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
     const hasAdvanced = anyAdvancedEntry(renderEntries);
     // Free-form / structural sections: show the description + a
-    // "edit via YAML" notice instead of attempting to render the form.
-    // We force this for `packages` (where any schema the backend
-    // returns won't match the actual list / dict shape) and also
-    // fall back to it for any section that happens to come back
-    // with no entries at all.
-    const yamlOnly =
-      YAML_ONLY_SECTIONS.has(this.sectionKey) ||
-      renderEntries.length === 0;
+    // "edit via YAML" notice instead of attempting to render the
+    // form. ``external_components`` is the always-YAML case (its
+    // ``source`` discriminated union doesn't fit the catalog model);
+    // any section with zero entries also falls back here.
+    // ``packages`` rides the MAP renderer instead — see
+    // ``MAP_SECTIONS``.
+    const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 
@@ -775,16 +771,30 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         this.sectionKey,
         this._values,
         ctx.fromLine,
-        // Top-level user-keyed sections (``substitutions:``)
-        // must persist explicit ``""`` values — the user typed
-        // a key + cleared the value, that's intentional data.
-        // For ordinary sections the default drops ``""`` to
-        // mean "user cleared the field"; the override only
-        // flips the contract for ``MAP_SECTIONS``. (Copilot:
-        // empty-string substitutions were silently dropped on
-        // any save.)
-        { keepEmptyStrings: MAP_SECTIONS.has(this.sectionKey) },
+        // Substitutions-only contract: the user typed a key +
+        // cleared the value, that's intentional data and must
+        // round-trip. Other MAP sections (``packages``) treat an
+        // empty value as a placeholder row the user hasn't filled
+        // in yet — the YAML would still be syntactically valid,
+        // but ESPHome's ``packages:`` schema validator rejects an
+        // empty-string package definition, so dropping the
+        // placeholder row keeps the saved config loadable.
+        { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(this.sectionKey) },
       );
+      // Refuse to save a YAML that ESPHome would reject. Same
+      // backend lint the YAML editor's red squiggles come from
+      // (yaml-lint-backend.ts) — surface upstream's actual error
+      // message verbatim instead of duplicating ESPHome's
+      // validators here (where they'd silently drift on any
+      // upstream change to e.g. the ``packages:`` shorthand).
+      // Catching it pre-save means the user gets immediate
+      // feedback in the form view rather than discovering the
+      // failure on the next compile.
+      const lintError = await this._lintFailureMessage(newYaml);
+      if (lintError !== null) {
+        this._error = lintError;
+        return;
+      }
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {
         this._error =
@@ -807,6 +817,47 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     } finally {
       this._saving = false;
     }
+  }
+
+  /**
+   * Run *candidateYaml* through ``editor/validate_yaml`` (the same
+   * backend lint that drives the YAML editor's red squiggles) and
+   * return ESPHome's first error message if any, or ``null`` when
+   * the YAML is clean. Network failure → ``null`` (fail open):
+   * blocking save on a transient WS hiccup would be worse UX than
+   * letting the user proceed and seeing the error on next compile.
+   */
+  private async _lintFailureMessage(
+    candidateYaml: string,
+  ): Promise<string | null> {
+    let res: EditorValidateResponse;
+    try {
+      res = await this._api.validateYaml(this.configuration, candidateYaml);
+    } catch {
+      return null;
+    }
+    // Two distinct empty-string cases to keep apart:
+    //   1. No errors at all — return null, ``_onSave`` proceeds.
+    //   2. Errors reported but the first one's ``message`` is
+    //      whitespace-only — the backend flagged a problem we
+    //      can't render verbatim, but proceeding would silently
+    //      ignore a real validation failure. Fall back to a
+    //      generic localised label so ``_onSave`` blocks AND
+    //      the user gets a visible error.
+    // Without case 2, ``_onSave`` would update the YAML on the
+    // backend's own "this is invalid" response just because the
+    // message string happened to trim away to nothing.
+    const validation = res.validation_errors?.[0];
+    if (validation) {
+      const msg = validation.message?.trim();
+      return msg || this._localize("device.section_save_error");
+    }
+    const yaml = res.yaml_errors?.[0];
+    if (yaml) {
+      const msg = yaml.message?.trim();
+      return msg || this._localize("device.section_save_error");
+    }
+    return null;
   }
 }
 
