@@ -12,7 +12,7 @@ contact_links:
       direction the project is heading.
 
   - name: 🐛 Report a bug
-    url: https://github.com/esphome/device-builder-dashboard-backend/issues/new?labels=bug
+    url: https://github.com/esphome/device-builder/issues/new?template=bug_report.yml
     about: |
       All bug reports — UI included — go on the backend tracker
       so we can triage in one place.
