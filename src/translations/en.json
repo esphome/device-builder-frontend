@@ -203,6 +203,7 @@
     "drawer_config_hash_title": "Config Hash",
     "drawer_config_hash_local": "Local",
     "drawer_config_hash_deployed": "Deployed",
+    "drawer_config_hash_value": "Hash",
     "drawer_config_hash_in_sync": "In sync",
     "drawer_config_hash_out_of_sync": "Out of sync — flash to update",
     "drawer_version_in_sync": "In sync",

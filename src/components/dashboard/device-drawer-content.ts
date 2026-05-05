@@ -413,18 +413,31 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               <span>${this._localize(statusKey)}</span>
             </div>`
           : nothing}
-        ${this._row(
-          "tag-multiple",
-          this._localize("dashboard.drawer_current_version"),
-          local,
-          true,
-        )}
-        ${this._row(
-          "upload",
-          this._localize("dashboard.drawer_deployed_version"),
-          deployed,
-          true,
-        )}
+        ${matches
+          ? // In sync — collapse the two identical rows into one.
+            // Showing "Current Version: 2026.5.0-dev" and
+            // "Deployed Version: 2026.5.0-dev" stacked is redundant
+            // and wastes drawer height.
+            this._row(
+              "tag-multiple",
+              this._localize("dashboard.drawer_version"),
+              local,
+              true,
+            )
+          : html`
+              ${this._row(
+                "tag-multiple",
+                this._localize("dashboard.drawer_current_version"),
+                local,
+                true,
+              )}
+              ${this._row(
+                "upload",
+                this._localize("dashboard.drawer_deployed_version"),
+                deployed,
+                true,
+              )}
+            `}
       </div>
     `;
   }
@@ -470,18 +483,32 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               <span>${this._localize(statusKey)}</span>
             </div>`
           : nothing}
-        ${this._row(
-          "fingerprint",
-          this._localize("dashboard.drawer_config_hash_local"),
-          expected,
-          true,
-        )}
-        ${this._row(
-          "fingerprint",
-          this._localize("dashboard.drawer_config_hash_deployed"),
-          deployed,
-          true,
-        )}
+        ${matches
+          ? // In sync — show the hash once instead of twice. The
+            // two-row form is reserved for the diagnostic "Local
+            // vs Deployed" comparison; once they match the
+            // distinction is meaningless and just doubles the
+            // drawer height.
+            this._row(
+              "fingerprint",
+              this._localize("dashboard.drawer_config_hash_value"),
+              expected,
+              true,
+            )
+          : html`
+              ${this._row(
+                "fingerprint",
+                this._localize("dashboard.drawer_config_hash_local"),
+                expected,
+                true,
+              )}
+              ${this._row(
+                "fingerprint",
+                this._localize("dashboard.drawer_config_hash_deployed"),
+                deployed,
+                true,
+              )}
+            `}
       </div>
     `;
   }
