@@ -10,7 +10,7 @@
  * the right unit + sign.
  *
  * Used by the device drawer's Reachability section to render the
- * per-signal "last seen" line. The drawer ticks every ~500ms so
+ * per-signal "last seen" line. The drawer ticks at 1Hz so
  * the displayed string reads fresh without round-tripping the
  * backend; this formatter is a pure function so each tick is just
  * a recompute against ``Date.now()``.

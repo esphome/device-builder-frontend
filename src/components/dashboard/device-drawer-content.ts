@@ -139,14 +139,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   /** Wall-clock anchor for the last received snapshot. The
    *  ``*_last_seen_seconds_ago`` values are stamped at send time
    *  on the backend, so the rendered relative time is
-   *  ``snapshot.value + (now - anchor) / 1000``. Lets the 500ms
+   *  ``snapshot.value + (now - anchor) / 1000``. Lets the 1Hz
    *  re-render tick advance the displayed age without a fresh
    *  push from the server. */
   @state()
   private _reachabilityAnchorMs = 0;
 
   /** Tick counter the relative-time renderer reads from to force a
-   *  re-render every 500ms. Mutating it inside ``setInterval`` is
+   *  re-render at 1Hz. Mutating it inside ``setInterval`` is
    *  what nudges Lit's reactivity — the actual value is unused. */
   @state()
   private _tick = 0;
@@ -173,7 +173,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *  we logged, or ``null`` if we haven't logged yet for this
    *  (device, connection) pair. Without this gate, a transient
    *  WS-not-yet-connected window during drawer-open would log the
-   *  same warning twice per second (the 500ms tick runs reconcile,
+   *  same warning every tick (the 1Hz tick runs reconcile,
    *  reconcile re-attempts the subscribe, which logs on failure).
    *  Reset by the natural progression — a new device or a new
    *  WS open both flip the key, so the next failure logs once. */
@@ -191,7 +191,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *  without the user having to close-and-reopen the drawer. */
   private _failedSubscribeKey: string | null = null;
 
-  /** ``setInterval`` handle for the 500ms relative-time re-render
+  /** ``setInterval`` handle for the 1Hz relative-time re-render
    *  tick. Cleared together with the subscription. */
   private _tickInterval: ReturnType<typeof setInterval> | null = null;
 
@@ -883,7 +883,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       // device + api), independent of whether the subscribe
       // succeeded. The tick re-runs reconcile, so a failed
       // initial subscribe (WS not connected yet, server hiccup)
-      // gets retried every 500ms instead of leaving the
+      // gets retried at 1Hz instead of leaving the
       // section permanently disabled until the user
       // closes/reopens the drawer.
       this._syncTickInterval();
@@ -901,7 +901,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   /** Open / close / swap the per-device reachability subscription
    *  to match (drawerOpen, device.name, api). Called from
-   *  ``updated()`` whenever any of those move and from the 500ms
+   *  ``updated()`` whenever any of those move and from the 1Hz
    *  tick to catch WS reconnects (the API clears its event
    *  listeners on close, so a stale ``_subscribedDevice`` flag
    *  would otherwise prevent resubscribing on reconnect).
@@ -936,65 +936,85 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     this._subscribedGeneration = currentGeneration;
     // Kick off the async subscribe — failures are logged but
     // don't propagate. The drawer still works without
-    // reachability; the section just stays hidden.
-    void this._openReachabilitySubscription(wantName, this._api);
+    // reachability; the section just stays hidden. The
+    // ``targetKey`` we just computed pins this attempt's
+    // identity so the in-flight handler can tell whether its
+    // resolve/reject still matches the current state when it
+    // wakes up (a WS reconnect during the round trip would
+    // otherwise let a stale rejection clobber the new
+    // subscribe's bookkeeping).
+    void this._openReachabilitySubscription(
+      wantName,
+      currentGeneration,
+      targetKey,
+      this._api,
+    );
   }
 
   private async _openReachabilitySubscription(
     deviceName: string,
+    attemptGeneration: number,
+    attemptKey: string,
     api: ESPHomeAPI,
   ) {
+    // Helper: is this attempt still the current one? A WS
+    // reconnect (generation bump) or a different-device
+    // selection between subscribe-start and resolve/reject
+    // makes the attempt stale; in that case the catch path
+    // must NOT mutate ``_failedSubscribeKey`` /
+    // ``_subscribedDevice`` (those now belong to the newer
+    // attempt) and the success path must unsubscribe.
+    const isCurrent = (): boolean =>
+      this._subscribedDevice === deviceName &&
+      this._subscribedGeneration === attemptGeneration;
+
     try {
       const subscription = await api.subscribeDeviceReachability(
         deviceName,
         (state) => {
-          // Drop late-arriving events from a previous subscription
-          // — the user already swapped to a different device.
-          if (this._subscribedDevice !== state.device) return;
+          // Drop late-arriving events from a stale subscription
+          // — the user already swapped to a different device or
+          // the WS reconnected and a fresher subscribe is now
+          // the source of truth.
+          if (!isCurrent()) return;
           this._reachability = state;
           this._reachabilityAnchorMs = Date.now();
         },
       );
-      // The user may have already moved on by the time the await
-      // resolves; tear the just-created subscription down if so.
-      if (this._subscribedDevice !== deviceName) {
+      if (!isCurrent()) {
+        // User moved on or the WS cycled while our subscribe
+        // was in flight — tear this just-created subscription
+        // down without touching the newer attempt's state.
         void subscription.unsubscribe();
         return;
       }
       this._subscription = subscription;
       // Successful subscribe — clear any stale "we already failed
       // on this (device, gen)" gate so a future drop from this
-      // session can retry. Without this clear, a flaky backend
-      // that fails once and then succeeds would still have the
-      // failure key pinned from the earlier attempt and
-      // reconcile would refuse to re-attempt after the next
-      // teardown.
+      // session can retry.
       this._failedSubscribeKey = null;
     } catch (err) {
-      // Connection went away mid-subscribe, or the device was
-      // deleted between drawer open and the subscribe round
-      // trip. Either way the section just stays empty.
-      //
-      // Rate-limit the warning: the 500ms tick re-runs reconcile,
-      // and during a WS-not-yet-connected window each retry would
-      // also fail and log. Without the gate the console fills with
-      // "subscribeDeviceReachability failed" twice per second
-      // until the WS comes back. Key on (device, connection
-      // generation) so each new device or each reconnect logs
-      // exactly once, but the spam window is bounded.
-      const failureKey = `${deviceName}:${this._subscribedGeneration}`;
-      if (this._loggedFailureKey !== failureKey) {
-        this._loggedFailureKey = failureKey;
+      // Rate-limit the warning: the 1Hz tick re-runs reconcile,
+      // and during a WS-not-yet-connected window each retry
+      // would also fail and log. Without the gate the console
+      // fills with "subscribeDeviceReachability failed" once
+      // a second until the WS comes back. Key on (device,
+      // generation) of *this* attempt so each new device or
+      // each reconnect logs exactly once.
+      if (this._loggedFailureKey !== attemptKey) {
+        this._loggedFailureKey = attemptKey;
         // eslint-disable-next-line no-console
         console.warn("subscribeDeviceReachability failed", err);
       }
-      // Pin this (device, generation) so the tick's reconcile
-      // doesn't re-attempt the subscribe on every iteration.
-      // The key flips on a new device or a WS reconnect — both
-      // natural triggers for "the failure mode might have
-      // changed."
-      this._failedSubscribeKey = failureKey;
-      if (this._subscribedDevice === deviceName) {
+      // Only pin the failure key + clear ``_subscribedDevice``
+      // if this attempt is still the current one. A stale
+      // rejection (the WS cycled during our await) belongs
+      // to a previous attempt; mutating now would (a) clobber
+      // the newer subscribe's bookkeeping and (b) pin
+      // ``_failedSubscribeKey`` against a generation that's
+      // already been superseded, blocking legitimate retries.
+      if (isCurrent()) {
+        this._failedSubscribeKey = attemptKey;
         this._subscribedDevice = null;
       }
     }
@@ -1011,7 +1031,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     }
   }
 
-  /** Match the 500ms tick to whether there's a target. Called from
+  /** Match the 1Hz tick to whether there's a target. Called from
    *  ``updated()`` and ``disconnectedCallback`` so the tick runs
    *  while the drawer is open with a device, regardless of
    *  whether the subscription itself succeeded — a failed initial
