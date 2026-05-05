@@ -802,7 +802,9 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   ) {
     if (row.age === null) return nothing;
     const ageText = formatSecondsAgo(row.age, lang);
-    const numFmt = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 });
+    // RTT keeps 1 decimal — sub-millisecond precision is the
+    // signal here (4.2 ms vs 4 ms is meaningful for a LAN ping).
+    const rttFmt = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 });
     const rttText =
       row.rttMs === null || row.rttMs === undefined
         ? null
@@ -812,16 +814,19 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
             // expects ``1,4 ms`` not ``1.4 ms``). Ages already
             // localize via ``Intl.RelativeTimeFormat``; the RTT
             // suffix should match.
-            n: numFmt.format(row.rttMs),
+            n: rttFmt.format(row.rttMs),
           });
     // mDNS row appends "TTL: 38s" — truthful diagnostic so the
     // user can tell "due to re-announce in 8s" from "missed
-    // several windows already".
+    // several windows already". Round to whole seconds so the
+    // 1Hz tick doesn't render a jarring fractional decrement
+    // ("TTL: 94.8s → 94.3s → 93.8s") twice per second.
+    const ttlFmt = new Intl.NumberFormat(lang, { maximumFractionDigits: 0 });
     const ttlText =
       row.ttlRemaining === null || row.ttlRemaining === undefined
         ? null
         : this._localize("dashboard.drawer_mdns_ttl_remaining", {
-            n: numFmt.format(row.ttlRemaining),
+            n: ttlFmt.format(row.ttlRemaining),
           });
     const isActive = activeSource === row.source;
     return html`
@@ -974,6 +979,12 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   private _syncTickInterval() {
     const wantTick = this.drawerOpen && this.device !== undefined && this._api !== undefined;
     if (wantTick && this._tickInterval === null) {
+      // 1Hz: the displayed values (relative-time string, integer
+      // TTL seconds) only resolve at second precision, so a 2Hz
+      // tick was just rendering the same string twice. Anything
+      // slower than 1s would let the seconds-ago display lag a
+      // beat behind reality. The reconcile probe inside the tick
+      // doesn't need millisecond precision either.
       this._tickInterval = setInterval(() => {
         this._tick = (this._tick + 1) % 1000;
         // Probe for WS reconnect / failed-initial-subscribe on
@@ -986,7 +997,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         // retries an initial subscribe that failed (e.g. the
         // WS wasn't open yet when the drawer first rendered).
         this._reconcileReachabilitySubscription();
-      }, 500);
+      }, 1000);
     } else if (!wantTick && this._tickInterval !== null) {
       clearInterval(this._tickInterval);
       this._tickInterval = null;
