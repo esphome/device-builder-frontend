@@ -684,3 +684,67 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     expect(after.match(/icon:/g)).toHaveLength(1);
   });
 });
+
+describe("updateSectionInYaml — keepEmptyStrings option", () => {
+  // Regression pin for Copilot's post-merge finding on #161:
+  // ``serializeYamlValues`` drops ``""`` values by default
+  // (form's "user cleared the field" semantics for ordinary
+  // entries). For ``substitutions:`` and other top-level
+  // user-keyed maps that's wrong — every key the user typed is
+  // intentional data, ``foo: ""`` is a valid substitution that
+  // must round-trip. Without ``keepEmptyStrings: true`` a save
+  // in the substitutions section silently deletes any existing
+  // empty-string substitution alongside the user's actual edit.
+
+  it("drops empty-string values by default (ordinary section semantics)", () => {
+    const yaml = "wifi:\n  ssid: home\n  password: secret\n";
+    const values = { ssid: "home", password: "" };
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after).toContain("ssid: home");
+    // ``password`` got dropped (the form-cleared semantics).
+    expect(after).not.toMatch(/password:/);
+  });
+
+  it("preserves empty-string values when keepEmptyStrings is true (substitutions semantics)", () => {
+    // Two substitutions, one with an empty value. After loading
+    // and saving with no further edits, both must persist.
+    const yaml = 'substitutions:\n  id_prefix: kitchen\n  empty_var: ""\n';
+    const values = parseYamlSectionValues(yaml, "substitutions");
+    expect(values.empty_var).toBe("");
+    const after = updateSectionInYaml(yaml, "substitutions", values, undefined, {
+      keepEmptyStrings: true,
+    });
+    expect(after).toContain("id_prefix: kitchen");
+    expect(after).toMatch(/empty_var:\s*""/);
+  });
+
+  it("preserves empty strings while saving an unrelated edit", () => {
+    // The user edits ``id_prefix``; ``empty_var: ""`` must
+    // survive the round-trip even though the user didn't touch
+    // it.
+    const yaml = 'substitutions:\n  id_prefix: kitchen\n  empty_var: ""\n';
+    const values = parseYamlSectionValues(yaml, "substitutions");
+    (values as Record<string, unknown>).id_prefix = "bedroom";
+    const after = updateSectionInYaml(yaml, "substitutions", values, undefined, {
+      keepEmptyStrings: true,
+    });
+    expect(after).toContain("id_prefix: bedroom");
+    expect(after).toMatch(/empty_var:\s*""/);
+  });
+
+  it("threads keepEmptyStrings through nested objects (recursion preserves the option)", () => {
+    // Copilot-flagged: ``serializeYamlValues`` recurses into
+    // nested objects but didn't pass ``options`` through, so an
+    // empty string inside a nested mapping was still dropped
+    // even when ``keepEmptyStrings: true``. Pin the recursion.
+    const yaml = 'esphome:\n  name: test\n  nested:\n    inner_empty: ""\n';
+    const values = {
+      name: "test",
+      nested: { inner_empty: "" },
+    };
+    const after = updateSectionInYaml(yaml, "esphome", values, undefined, {
+      keepEmptyStrings: true,
+    });
+    expect(after).toMatch(/inner_empty:\s*""/);
+  });
+});

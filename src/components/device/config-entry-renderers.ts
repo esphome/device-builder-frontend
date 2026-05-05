@@ -480,11 +480,25 @@ export function renderMapField(
   const keys = Object.keys(map);
   const disabled = effectiveDisabled(entry, ctx);
 
+  // Mutations preserve the source dict's null-prototype shape.
+  // ``parseYamlSectionValues`` builds top-level values via
+  // ``Object.create(null)`` so a YAML key like ``__proto__`` /
+  // ``constructor`` lands as own property data instead of
+  // mutating ``Object.prototype``. A naive ``{...obj}`` spread
+  // would silently swap that for a regular prototype-bearing
+  // object on the first add / rename / delete and re-open the
+  // prototype-pollution surface. Always copy via
+  // ``Object.assign(Object.create(null), …)`` so the protection
+  // survives every mutation. (Copilot-flagged.)
+  const cloneMap = (
+    src: Record<string, unknown>,
+  ): Record<string, unknown> => Object.assign(Object.create(null), src);
+
   const readMap = (): Record<string, unknown> => {
     const cur = ctx.getAt(path);
     return cur && typeof cur === "object" && !Array.isArray(cur)
-      ? { ...(cur as Record<string, unknown>) }
-      : {};
+      ? cloneMap(cur as Record<string, unknown>)
+      : Object.create(null);
   };
 
   const addEntry = () => {
@@ -511,7 +525,7 @@ export function renderMapField(
     if (!cur || typeof cur !== "object" || Array.isArray(cur)) return;
     const m = cur as Record<string, unknown>;
     if (newKey in m) return;
-    const next: Record<string, unknown> = {};
+    const next: Record<string, unknown> = Object.create(null);
     for (const [k, v] of Object.entries(m)) {
       next[k === oldKey ? newKey : k] = v;
     }

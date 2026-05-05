@@ -50,6 +50,22 @@ export class YamlRawValue {
   ) {}
 }
 
+/** Options for ``serializeYamlValues``. */
+export interface SerializeYamlOptions {
+  /**
+   * Preserve empty-string values (``foo: ""``) instead of
+   * dropping them. Default ``false`` matches the form's
+   * "user cleared the field" semantics for ordinary
+   * config-entries. Set ``true`` for top-level user-keyed
+   * sections (``substitutions:``) where every key the user
+   * typed is intentional data and ``""`` is a valid value
+   * the YAML must round-trip. (Copilot-flagged: without this
+   * a save in the substitutions section silently drops any
+   * existing empty-string substitution.)
+   */
+  keepEmptyStrings?: boolean;
+}
+
 /**
  * Serialize a values dict as YAML lines at the given indent.
  * Returns an array of lines (not a joined string) so callers can
@@ -58,10 +74,13 @@ export class YamlRawValue {
 export function serializeYamlValues(
   values: Record<string, unknown>,
   indent: string,
+  options: SerializeYamlOptions = {},
 ): string[] {
   const lines: string[] = [];
+  const keepEmpty = options.keepEmptyStrings === true;
   for (const [key, val] of Object.entries(values)) {
-    if (val === undefined || val === null || val === "") continue;
+    if (val === undefined || val === null) continue;
+    if (val === "" && !keepEmpty) continue;
     if (val instanceof YamlRawValue) {
       // Raw block (block scalar, automation handler, …). Lines
       // already carry their original indentation — emit `key:`
@@ -84,9 +103,15 @@ export function serializeYamlValues(
       continue;
     }
     if (typeof val === "object") {
+      // Thread ``options`` through the recursion so
+      // ``keepEmptyStrings`` applies at every depth — without
+      // this, an empty string inside a nested mapping would
+      // still be dropped while the top level kept them, which
+      // is surprising and loses data on round-trip. (Copilot.)
       const sub = serializeYamlValues(
         val as Record<string, unknown>,
         `${indent}  `,
+        options,
       );
       if (sub.length === 0) continue;
       lines.push(`${indent}${key}:`);
@@ -162,7 +187,12 @@ export function formatYamlScalar(v: unknown): string {
   if (typeof v === "boolean") return String(v);
   if (typeof v === "number") return String(v);
   const s = String(v);
-  if (/[:#]/.test(s) || /^[-\s'"]/.test(s) || /\s$/.test(s)) {
+  // Empty string must be quoted: a bare ``key: `` round-trips as
+  // YAML ``null``, not as the empty string we started with. Only
+  // matters when the caller has opted into keep-empty-strings
+  // (default is to drop the key entirely), but the formatter is
+  // shared so we get it right at the source.
+  if (s === "" || /[:#]/.test(s) || /^[-\s'"]/.test(s) || /\s$/.test(s)) {
     return `"${s.replace(/"/g, '\\"')}"`;
   }
   return s;

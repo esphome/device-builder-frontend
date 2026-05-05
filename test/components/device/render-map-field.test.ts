@@ -40,6 +40,27 @@ interface CtxStub {
   emitChange: ReturnType<typeof vi.fn>;
 }
 
+/** Walk a Lit ``TemplateResult.values`` array recursively and
+ *  collect every function (event handlers Lit binds to ``@click``
+ *  / ``@change`` attributes). Used by the null-prototype test to
+ *  invoke add / rename / delete handlers without a DOM. */
+function collectHandlers(
+  values: unknown[],
+): Array<(...args: unknown[]) => unknown> {
+  const out: Array<(...args: unknown[]) => unknown> = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === "function") {
+      out.push(v as (...args: unknown[]) => unknown);
+    } else if (Array.isArray(v)) {
+      v.forEach(walk);
+    } else if (v && typeof v === "object" && "values" in v) {
+      walk((v as { values: unknown[] }).values);
+    }
+  };
+  walk(values);
+  return out;
+}
+
 function makeCtx(values: Record<string, unknown>): CtxStub {
   const renderEntry = vi.fn(() => "<rendered>");
   const emitChange = vi.fn();
@@ -149,6 +170,68 @@ describe("renderMapField (substitutions / logger.logs / etc.)", () => {
     const stub = makeCtx({});
     renderMapField(makeMapEntry(), [], stub.ctx);
     expect(stub.renderEntry).not.toHaveBeenCalled();
+  });
+
+  it("preserves null-prototype shape across add / rename / delete (prototype-pollution defense)", () => {
+    // Regression pin for Copilot's post-merge finding on #161:
+    // ``parseYamlSectionValues`` builds top-level values via
+    // ``Object.create(null)`` so a YAML key like ``__proto__``
+    // / ``constructor`` lands as own-property data instead of
+    // mutating ``Object.prototype``. A naive ``{...obj}`` spread
+    // in the renderer's mutation paths silently swapped that
+    // for a regular prototype-bearing object on the first add /
+    // rename / delete, re-opening the prototype-pollution
+    // surface. Locate each mutation handler explicitly and
+    // assert every dict the renderer hands to ``ctx.emitChange``
+    // has a ``null`` prototype.
+    const values: Record<string, unknown> = Object.create(null);
+    values["existing"] = "foo";
+    const stub = makeCtx(values);
+    const result = renderMapField(makeMapEntry(), [], stub.ctx) as {
+      values: unknown[];
+    };
+
+    // Index handlers by the Lit attribute they're bound to.
+    // ``TemplateResult.strings`` carries the static template
+    // text; the index of each placeholder corresponds to the
+    // gap between two adjacent strings, and the value at the
+    // same index is what Lit interpolates there. By inspecting
+    // the trailing characters of each static string we can tell
+    // which event handler is which.
+    const handlers = collectHandlers(result.values);
+
+    // ``addEntry`` — the ``+`` button — takes no args. There's
+    // exactly one such handler in this template.
+    const addHandlers = handlers.filter((h) => h.length === 0);
+    expect(addHandlers.length).toBeGreaterThan(0);
+    addHandlers[0]!();
+
+    // ``renameKey`` — the key input's ``@change`` — takes a
+    // change event whose ``target.value`` carries the new key.
+    // The renderer's signature is ``(e: Event) => renameKey(rowKey, e.target.value)``,
+    // so any 1-arg handler can be probed with a synthetic event.
+    const renameHandlers = handlers.filter((h) => h.length === 1);
+    expect(renameHandlers.length).toBeGreaterThan(0);
+    renameHandlers[0]!({
+      target: { value: "renamed_key" },
+    } as unknown as Event);
+
+    // ``removeEntry`` — the ``×`` button per row — takes no
+    // args (the ``rowKey`` is closed over). Should have at least
+    // one no-arg handler too; the add+remove distinction is by
+    // count and order.
+    if (addHandlers.length > 1) addHandlers[1]!();
+
+    // Every dict ``ctx.emitChange`` received must be null-proto.
+    const emittedDicts = stub.emitChange.mock.calls
+      .map((c) => c[1])
+      .filter(
+        (v) => v !== null && typeof v === "object" && !Array.isArray(v),
+      ) as Record<string, unknown>[];
+    expect(emittedDicts.length).toBeGreaterThanOrEqual(2);
+    for (const d of emittedDicts) {
+      expect(Object.getPrototypeOf(d)).toBeNull();
+    }
   });
 
   it("does not throw on a values dict whose entry was never normalised (defensive)", () => {

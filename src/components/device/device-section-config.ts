@@ -10,7 +10,10 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
-import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
+import {
+  MAP_SECTIONS,
+  resolveSectionEntries,
+} from "../../util/section-entry-overrides.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -687,6 +690,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         this.sectionKey,
         this._values,
         ctx.fromLine,
+        // Top-level user-keyed sections (``substitutions:``)
+        // must persist explicit ``""`` values — the user typed
+        // a key + cleared the value, that's intentional data.
+        // For ordinary sections the default drops ``""`` to
+        // mean "user cleared the field"; the override only
+        // flips the contract for ``MAP_SECTIONS``. (Copilot:
+        // empty-string substitutions were silently dropped on
+        // any save.)
+        { keepEmptyStrings: MAP_SECTIONS.has(this.sectionKey) },
       );
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {

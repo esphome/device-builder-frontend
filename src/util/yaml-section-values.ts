@@ -11,6 +11,7 @@ import {
   YamlRawValue,
   formatYamlScalar,
   serializeYamlValues,
+  type SerializeYamlOptions,
 } from "./yaml-serialize.js";
 
 /**
@@ -500,12 +501,22 @@ export function findSectionRange(
   return { start, end };
 }
 
-/** Replace the body of a section in a YAML document with `values`. */
+/**
+ * Replace the body of a section in a YAML document with `values`.
+ *
+ * ``options.keepEmptyStrings`` opts the serializer out of dropping
+ * empty-string values. Required for top-level user-keyed sections
+ * (``substitutions:``) where every key the user typed is
+ * intentional data and ``""`` is a valid value the YAML must
+ * round-trip; left at the default ``false`` for ordinary
+ * config-entries where ``""`` means "user cleared the field".
+ */
 export function updateSectionInYaml(
   yaml: string,
   sectionKey: string,
   values: Record<string, unknown>,
   fromLine?: number,
+  options: SerializeYamlOptions = {},
 ): string {
   const lines = yaml.split("\n");
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
@@ -591,7 +602,10 @@ export function updateSectionInYaml(
       }
     }
   }
-  const newLines = [dashLine, ...serializeYamlValues(toSerialize, childIndent)];
+  const newLines = [
+    dashLine,
+    ...serializeYamlValues(toSerialize, childIndent, options),
+  ];
   lines.splice(start, end - start, ...newLines);
   return lines.join("\n");
 }
