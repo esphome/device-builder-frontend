@@ -34,6 +34,21 @@ export const MAP_SECTIONS: ReadonlySet<string> = new Set([
   "packages",
 ]);
 
+/** Sections that must persist explicit ``""`` values in YAML — i.e.
+ *  the user typed a key + cleared the value, treat that as
+ *  intentional data instead of "user cleared the field, drop it".
+ *  Distinct from :data:`MAP_SECTIONS` because the empty-string
+ *  invariant is a substitutions-specific contract: substitutions
+ *  values are user-supplied strings (a cleared value means "this
+ *  substitution is intentionally empty"), whereas ``packages``
+ *  values are nested package mappings — a top-level empty-string
+ *  there is just a placeholder from ``renderMapField`` that the
+ *  user hasn't filled in yet, and persisting it as
+ *  ``packages: { new_1: "" }`` produces invalid YAML on save. */
+export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set([
+  "substitutions",
+]);
+
 /** Synthesised entries for ``substitutions:`` — a single MAP whose
  *  value template is a string. The user names each row's key
  *  themselves (the substitution name). The string template is the

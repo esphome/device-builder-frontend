@@ -11,7 +11,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
 import {
-  MAP_SECTIONS,
+  KEEP_EMPTY_STRING_SECTIONS,
   resolveSectionEntries,
 } from "../../util/section-entry-overrides.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
@@ -405,11 +405,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
     const hasAdvanced = anyAdvancedEntry(renderEntries);
     // Free-form / structural sections: show the description + a
-    // "edit via YAML" notice instead of attempting to render the form.
-    // We force this for `packages` (where any schema the backend
-    // returns won't match the actual list / dict shape) and also
-    // fall back to it for any section that happens to come back
-    // with no entries at all.
+    // "edit via YAML" notice instead of attempting to render the
+    // form. ``external_components`` is the always-YAML case (its
+    // ``source`` discriminated union doesn't fit the catalog model);
+    // any section with zero entries also falls back here.
+    // ``packages`` rides the MAP renderer instead — see
+    // ``MAP_SECTIONS``.
     const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
@@ -681,15 +682,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         this.sectionKey,
         this._values,
         ctx.fromLine,
-        // Top-level user-keyed sections (``substitutions:``)
-        // must persist explicit ``""`` values — the user typed
-        // a key + cleared the value, that's intentional data.
-        // For ordinary sections the default drops ``""`` to
-        // mean "user cleared the field"; the override only
-        // flips the contract for ``MAP_SECTIONS``. (Copilot:
-        // empty-string substitutions were silently dropped on
-        // any save.)
-        { keepEmptyStrings: MAP_SECTIONS.has(this.sectionKey) },
+        // Substitutions-only contract: the user typed a key +
+        // cleared the value, that's intentional data and must
+        // round-trip. Other MAP sections (``packages``) treat an
+        // empty value as a placeholder row the user hasn't filled
+        // in yet — keeping it would write invalid YAML on save.
+        { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(this.sectionKey) },
       );
       const title = this._config.title;
       this._api.updateConfig(this.configuration, newYaml).catch((e) => {

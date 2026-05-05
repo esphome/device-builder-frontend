@@ -3,9 +3,9 @@
  *
  * `external_components` is always YAML-only (catalog can't express
  * the `source` discriminated union — issue #337). `packages` rides
- * ``MAP_SECTIONS`` instead. The two sets must stay disjoint — the
- * gate runs before the MAP resolver, so an entry in both would
- * silently demote to YAML-only.
+ * ``MAP_SECTIONS`` instead. The two sets must stay disjoint —
+ * YAML-only takes precedence in the render path, so an entry in
+ * both would silently demote a MAP section to a YAML notice.
  */
 
 import { describe, expect, it } from "vitest";
@@ -14,7 +14,10 @@ import {
   YAML_ONLY_SECTIONS,
   isYamlOnlySection,
 } from "../../../src/components/device/yaml-only-sections.js";
-import { MAP_SECTIONS } from "../../../src/util/section-entry-overrides.js";
+import {
+  KEEP_EMPTY_STRING_SECTIONS,
+  MAP_SECTIONS,
+} from "../../../src/util/section-entry-overrides.js";
 
 describe("YAML_ONLY_SECTIONS", () => {
   it("contains external_components — issue #337", () => {
@@ -27,10 +30,32 @@ describe("YAML_ONLY_SECTIONS", () => {
   });
 
   it("YAML_ONLY_SECTIONS and MAP_SECTIONS are mutually exclusive", () => {
-    // Gate runs before the MAP resolver — an entry in both would
-    // silently demote to YAML-only.
+    // YAML-only takes precedence — an entry in both would silently
+    // demote a MAP section to a YAML notice.
     for (const key of YAML_ONLY_SECTIONS) {
       expect(MAP_SECTIONS.has(key)).toBe(false);
+    }
+  });
+});
+
+describe("KEEP_EMPTY_STRING_SECTIONS", () => {
+  it("contains substitutions only — substitutions-specific contract", () => {
+    // The keep-empty-strings invariant matters for substitutions
+    // (a cleared value is intentional data) but breaks ``packages``
+    // (an empty value is a placeholder row that would round-trip
+    // as invalid YAML on save). Pin substitutions in, packages out.
+    expect(KEEP_EMPTY_STRING_SECTIONS.has("substitutions")).toBe(true);
+    expect(KEEP_EMPTY_STRING_SECTIONS.has("packages")).toBe(false);
+  });
+
+  it("is a strict subset of MAP_SECTIONS", () => {
+    // Empty-string preservation only makes sense for sections that
+    // *are* MAP-rendered in the first place — outside that path
+    // there's no row-key/value distinction for the flag to apply
+    // to. Pin so a future addition here that isn't also in
+    // MAP_SECTIONS surfaces immediately.
+    for (const key of KEEP_EMPTY_STRING_SECTIONS) {
+      expect(MAP_SECTIONS.has(key)).toBe(true);
     }
   });
 });
