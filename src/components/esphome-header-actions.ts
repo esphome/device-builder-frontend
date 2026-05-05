@@ -1,14 +1,13 @@
 import { consume } from "@lit/context";
 import {
   mdiArchiveOutline,
-  mdiBugOutline,
   mdiCheck,
   mdiCog,
   mdiCogRefresh,
+  mdiCommentQuestionOutline,
   mdiDotsVertical,
   mdiEyeOutline,
   mdiKeyVariant,
-  mdiLightbulbOutline,
   mdiPlaylistCheck,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
@@ -26,14 +25,13 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   "archive-outline": mdiArchiveOutline,
-  "bug-outline": mdiBugOutline,
   check: mdiCheck,
   cog: mdiCog,
   "cog-refresh": mdiCogRefresh,
+  "comment-question-outline": mdiCommentQuestionOutline,
   "dots-vertical": mdiDotsVertical,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
-  "lightbulb-outline": mdiLightbulbOutline,
   "playlist-check": mdiPlaylistCheck,
 });
 
@@ -191,15 +189,6 @@ export class ESPHomeHeaderActions extends LitElement {
 
       .menu-item:hover {
         background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
-      }
-
-      /* Anchor-based menu items (external links) get the browser's
-         rel="noopener noreferrer" enforcement instead of a flaky
-         window.open flag. Reset anchor defaults so they read as
-         regular menu rows. */
-      .menu-item--link {
-        text-decoration: none;
-        color: inherit;
       }
 
       .menu-item wa-icon {
@@ -395,28 +384,16 @@ export class ESPHomeHeaderActions extends LitElement {
                 ${this._localize("layout.settings")}
               </div>
               <div class="menu-divider" role="separator"></div>
-              <a
-                class="menu-item menu-item--link"
+              <div
+                class="menu-item"
                 role="menuitem"
-                href="https://github.com/esphome/esphome/issues/new/choose"
-                target="_blank"
-                rel="noopener noreferrer"
-                @click=${this._close}
+                tabindex="0"
+                @click=${this._openFeedback}
+                @keydown=${this._onMenuItemKeydown}
               >
-                <wa-icon library="mdi" name="bug-outline"></wa-icon>
-                ${this._localize("layout.report_issue")}
-              </a>
-              <a
-                class="menu-item menu-item--link"
-                role="menuitem"
-                href="https://github.com/orgs/esphome/discussions/new/choose"
-                target="_blank"
-                rel="noopener noreferrer"
-                @click=${this._close}
-              >
-                <wa-icon library="mdi" name="lightbulb-outline"></wa-icon>
-                ${this._localize("layout.request_feature")}
-              </a>
+                <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
+                ${this._localize("layout.feedback_menu")}
+              </div>
             </div>
           `
         : nothing}
@@ -523,6 +500,16 @@ export class ESPHomeHeaderActions extends LitElement {
     this._close();
     this.dispatchEvent(
       new CustomEvent("open-settings", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _openFeedback() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-feedback", {
         bubbles: true,
         composed: true,
       }),

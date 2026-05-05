@@ -566,14 +566,21 @@
     "show_ignored_discoveries": "Show ignored discoveries",
     "archived_devices": "Archived devices",
     "reset_build_env": "Reset build environment",
-    "report_issue": "Report an issue",
-    "request_feature": "Request a feature",
+    "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "home_assistant": "Home Assistant",
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button",
     "header_actions_label": "Dashboard actions",
     "more_options_with_count": "More options ({count} firmware task(s) active)"
+  },
+  "feedback": {
+    "title": "Found a bug? Have an idea?",
+    "description": "Help us improve ESPHome Device Builder by reporting issues or sharing your ideas.",
+    "browse_issues": "Browse open issues",
+    "new_issue": "Report a new issue",
+    "browse_features": "Browse feature requests",
+    "new_feature": "Request a new feature"
   },
   "command_palette": {
     "placeholder": "Type a command — or / to search YAML content",

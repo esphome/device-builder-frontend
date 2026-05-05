@@ -97,6 +97,8 @@ import "../pages/dashboard.js";
 import "./command-palette.js";
 import "./esphome-layout.js";
 import "./esphome-login.js";
+import "./feedback-dialog.js";
+import type { ESPHomeFeedbackDialog } from "./feedback-dialog.js";
 import "./firmware-jobs-dialog.js";
 import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
 import "./settings-dialog.js";
@@ -697,6 +699,9 @@ export class ESPHomeApp extends LitElement {
   @query("esphome-firmware-jobs-dialog")
   private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
 
+  @query("esphome-feedback-dialog")
+  private _feedbackDialog!: ESPHomeFeedbackDialog;
+
   protected render() {
     if (this._authState === "connecting") {
       return html`
@@ -727,6 +732,7 @@ export class ESPHomeApp extends LitElement {
         @open-settings=${this._onOpenSettings}
         @open-firmware-jobs=${this._onOpenFirmwareJobs}
         @open-reset-build-env=${this._onOpenResetBuildEnv}
+        @open-feedback=${this._onOpenFeedback}
       >
         ${this._router.outlet()}
       </esphome-layout>
@@ -743,6 +749,7 @@ export class ESPHomeApp extends LitElement {
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${this._onFirmwareHistoryCleared}
       ></esphome-firmware-jobs-dialog>
+      <esphome-feedback-dialog></esphome-feedback-dialog>
     `;
   }
 
@@ -836,6 +843,10 @@ export class ESPHomeApp extends LitElement {
 
   private _onOpenResetBuildEnv() {
     this._firmwareJobsDialog?.openResetBuildEnv();
+  }
+
+  private _onOpenFeedback() {
+    this._feedbackDialog?.open();
   }
 
   /** Prune retained terminal jobs locally after the user clears
