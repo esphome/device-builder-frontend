@@ -82,6 +82,7 @@ const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
   comment: false,
   version: false,
   ip: false,
+  mac_address: false,
 };
 
 @customElement("esphome-device-table")
@@ -253,6 +254,13 @@ export class ESPHomeDeviceTable extends LitElement {
         address: d.address || "",
         ip: d.ip || "",
         ip_addresses: d.ip_addresses,
+        mac_address: d.mac_address || "",
+        // ``ethernet_mac`` / ``bluetooth_mac`` aren't surfaced in
+        // the device list — those are drawer-only fields. The table
+        // column shows the primary MAC (``mac_address``) since
+        // that's the universally-meaningful identifier; the per-
+        // interface derived values are diagnostic detail that
+        // belongs in the per-device drawer.
         platform: d.target_platform || "",
         version: d.deployed_version || "",
         comment: d.comment || "",

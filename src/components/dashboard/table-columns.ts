@@ -13,6 +13,7 @@ export interface DeviceRow {
   address: string;
   ip: string;
   ip_addresses: string[];
+  mac_address: string;
   platform: string;
   version: string;
   comment: string;
@@ -158,6 +159,18 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) =>
         html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
       size: 140,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "mac_address",
+      header: localize("dashboard.table_col_mac"),
+      cell: (info) => {
+        const raw = info.getValue() as string;
+        return raw
+          ? html`<span class="cell-mono">${raw}</span>`
+          : html`<span class="cell-muted">—</span>`;
+      },
+      size: 160,
       enableHiding: true,
     },
     {
