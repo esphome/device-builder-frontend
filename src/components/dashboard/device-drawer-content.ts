@@ -23,7 +23,7 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { LocalizeFunc } from "../../common/localize.js";
+import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import type {
   ConfiguredDevice,
   ReachabilityStateEvent,
@@ -150,6 +150,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   /** Active subscription handle. ``unsubscribe()`` is called on
    *  disconnect / device change / drawer close. */
   private _subscription: ReachabilitySubscription | null = null;
+
+  /** Connection generation captured when the active subscription
+   *  was opened. Compared against ``api.connectionGeneration`` on
+   *  every reconcile tick — a mismatch means the WS dropped and
+   *  reconnected (which clears the API's ``_eventSubscriptions``
+   *  map) and we need to resubscribe even though the device name
+   *  didn't change. */
+  private _subscribedGeneration = 0;
 
   /** ``setInterval`` handle for the 500ms relative-time re-render
    *  tick. Cleared together with the subscription. */
@@ -708,8 +716,12 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const r = this._reachability;
     if (r === null) return nothing;
 
-    const lang =
-      typeof navigator !== "undefined" ? navigator.language : undefined;
+    // Use the same active locale as the rest of the UI — a user
+    // who's overridden their language to ``fr`` or ``nl`` should
+    // see "il y a 12 secondes" alongside the rest of the
+    // localized chrome, not English seconds-ago lines from
+    // ``navigator.language``.
+    const lang = activeLocale();
     const now = Date.now();
     const anchor = this._reachabilityAnchorMs;
 
@@ -806,17 +818,29 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   /** Open / close / swap the per-device reachability subscription
    *  to match (drawerOpen, device.name, api). Called from
-   *  ``updated()`` whenever any of those move. Idempotent when the
-   *  three inputs are unchanged from the active subscription. */
+   *  ``updated()`` whenever any of those move and from the 500ms
+   *  tick to catch WS reconnects (the API clears its event
+   *  listeners on close, so a stale ``_subscribedDevice`` flag
+   *  would otherwise prevent resubscribing on reconnect).
+   *  Idempotent when the four inputs are unchanged from the
+   *  active subscription. */
   private _reconcileReachabilitySubscription() {
     const wantName =
       this.drawerOpen && this.device && this._api ? this.device.name : null;
-    if (wantName === this._subscribedDevice) return;
+    const currentGeneration = this._api?.connectionGeneration ?? 0;
+    // Resubscribe if the device target moved OR the WS reconnected
+    // (which cleared ``_eventSubscriptions`` on the API side; without
+    // a fresh subscribe our listener never sees another event).
+    const generationChanged =
+      this._subscribedDevice !== null &&
+      currentGeneration !== this._subscribedGeneration;
+    if (wantName === this._subscribedDevice && !generationChanged) return;
 
     this._teardownReachabilitySubscription();
     if (wantName === null || this._api === undefined) return;
 
     this._subscribedDevice = wantName;
+    this._subscribedGeneration = currentGeneration;
     // Kick off the async subscribe — failures are logged but
     // don't propagate. The drawer still works without
     // reachability; the section just stays hidden.
@@ -874,6 +898,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     if (this._tickInterval !== null) return;
     this._tickInterval = setInterval(() => {
       this._tick = (this._tick + 1) % 1000;
+      // Probe for WS reconnect on every tick. ``api`` clears its
+      // event listeners on close (``_onClose`` →
+      // ``_eventSubscriptions.clear``), so on reconnect our
+      // listener is gone but ``_subscribedDevice`` still says we
+      // think we're subscribed. Reconciling here re-detects the
+      // generation bump and resubscribes; without it the drawer
+      // would tick stale ages forever after a single drop.
+      this._reconcileReachabilitySubscription();
     }, 500);
   }
 

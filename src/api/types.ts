@@ -861,7 +861,7 @@ export interface SubscribeReachabilityResult {
   subscribed: boolean;
 }
 
-/** Handle returned by ``EsphomeApi.subscribeDeviceReachability``.
+/** Handle returned by ``ESPHomeAPI.subscribeDeviceReachability``.
  *  Call ``unsubscribe()`` when the drawer closes — best-effort,
  *  network failures are swallowed since the per-stream task is
  *  also cancelled by the WS disconnect anyway. */

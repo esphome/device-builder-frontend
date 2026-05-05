@@ -213,6 +213,29 @@ describe("ESPHomeAPI.subscribeDeviceReachability", () => {
     ).rejects.toThrow(/not connected/i);
   });
 
+  it("bumps connectionGeneration on every WS open", async () => {
+    // The drawer's reachability subscription compares
+    // ``api.connectionGeneration`` against the value captured at
+    // subscribe time to detect WS reconnects (the API clears its
+    // event listeners on close, so a stale subscription would
+    // never recover otherwise). Pin the bump-per-connect contract
+    // so a refactor that drops the increment is caught.
+    const api = new ESPHomeAPI();
+    expect(api.connectionGeneration).toBe(0);
+    await connect(api);
+    expect(api.connectionGeneration).toBe(1);
+    // A second connect (simulating a reconnect after a close)
+    // must increment again — proving long-lived consumers can
+    // distinguish the new connection from the old.
+    MockWebSocket.latest().close();
+    const second = api.connect();
+    const ws = MockWebSocket.latest();
+    ws.open();
+    ws.receive(serverInfo);
+    await second;
+    expect(api.connectionGeneration).toBe(2);
+  });
+
   it("cleans up the listener if the server rejects the subscribe", async () => {
     // Server-side rejections (NOT_FOUND for unknown device,
     // INVALID_ARGS) would otherwise leave the

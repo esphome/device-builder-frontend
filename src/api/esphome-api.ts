@@ -90,6 +90,13 @@ export class ESPHomeAPI {
   private _eventSubscriptions = new Map<string, EventSubscriptionCallback>();
   private _serverInfo: ServerInfoMessage | null = null;
   private _connected = false;
+  // Bumps every time the WS opens — i.e. on the initial connect
+  // and on every reconnect after a drop. Per-device streams
+  // (``subscribeDeviceReachability``) read this to detect that
+  // ``_eventSubscriptions`` was cleared by ``_onClose`` and
+  // resubscribe; the WS itself can't deliver a "reconnected"
+  // signal to long-lived consumers any other way.
+  private _connectionGeneration = 0;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _reconnectDelay = 1000;
   private _intentionalDisconnect = false;
@@ -118,6 +125,16 @@ export class ESPHomeAPI {
 
   get connected(): boolean {
     return this._connected;
+  }
+
+  /** Generation counter that increments on every successful WS open
+   *  (initial connect *and* every reconnect). Long-lived per-stream
+   *  consumers (the drawer's reachability subscription) compare
+   *  against the value they captured at subscribe time and resub
+   *  when it changes — ``_onClose`` clears every event listener,
+   *  so without this signal a closed stream never recovers. */
+  get connectionGeneration(): number {
+    return this._connectionGeneration;
   }
 
   get serverInfo(): ServerInfoMessage | null {
@@ -220,6 +237,11 @@ export class ESPHomeAPI {
     if ("server_version" in data) {
       this._serverInfo = data as unknown as ServerInfoMessage;
       this._connected = true;
+      // Bump *before* firing ``onConnected`` so any handler that
+      // immediately reads ``connectionGeneration`` (e.g. the
+      // drawer's reachability reconcile via tick) sees the fresh
+      // value rather than the previous one.
+      this._connectionGeneration += 1;
       this._reconnectDelay = 1000;
       if (this._connectPromise) {
         this._connectPromise.resolve(this._serverInfo);
