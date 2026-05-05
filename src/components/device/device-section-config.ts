@@ -764,10 +764,17 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     } catch {
       return null;
     }
-    const validation = res.validation_errors?.[0];
-    if (validation?.message) return validation.message.trim();
-    const yaml = res.yaml_errors?.[0];
-    if (yaml?.message) return yaml.message.trim();
+    // Trim first, then check truthiness — a whitespace-only
+    // ``message`` would otherwise return ``""`` and ``_onSave``
+    // treats any non-null string as a failure, silently
+    // blocking the save while the error ``<p>`` renders empty
+    // (Lit's truthy gate hides ``""``). Coalescing to null on
+    // empty keeps the surface "either a real message or
+    // proceed."
+    const validationMsg = res.validation_errors?.[0]?.message?.trim();
+    if (validationMsg) return validationMsg;
+    const yamlMsg = res.yaml_errors?.[0]?.message?.trim();
+    if (yamlMsg) return yamlMsg;
     return null;
   }
 }
