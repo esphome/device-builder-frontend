@@ -39,6 +39,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../util/yaml-section-values.js";
+import { lintFailureMessageFromResponse } from "../../util/lint-failure-message.js";
 import { resolveCurrentFromLine } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
@@ -836,28 +837,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     } catch {
       return null;
     }
-    // Two distinct empty-string cases to keep apart:
-    //   1. No errors at all — return null, ``_onSave`` proceeds.
-    //   2. Errors reported but the first one's ``message`` is
-    //      whitespace-only — the backend flagged a problem we
-    //      can't render verbatim, but proceeding would silently
-    //      ignore a real validation failure. Fall back to a
-    //      generic localised label so ``_onSave`` blocks AND
-    //      the user gets a visible error.
-    // Without case 2, ``_onSave`` would update the YAML on the
-    // backend's own "this is invalid" response just because the
-    // message string happened to trim away to nothing.
-    const validation = res.validation_errors?.[0];
-    if (validation) {
-      const msg = validation.message?.trim();
-      return msg || this._localize("device.section_save_error");
-    }
-    const yaml = res.yaml_errors?.[0];
-    if (yaml) {
-      const msg = yaml.message?.trim();
-      return msg || this._localize("device.section_save_error");
-    }
-    return null;
+    // Pure response→message reduction lives in
+    // ``util/lint-failure-message.ts`` so the empty-trim
+    // fallback contract is unit-testable in node without
+    // standing up a Lit component. The localised label is the
+    // fallback when the backend reports an error whose
+    // ``message`` trims to empty.
+    return lintFailureMessageFromResponse(
+      res,
+      this._localize("device.section_save_error"),
+    );
   }
 }
 
