@@ -13,7 +13,11 @@
  * picks up the user's chosen locale automatically.
  */
 import { describe, expect, it } from "vitest";
-import { ageOf, formatSecondsAgo } from "../../src/util/relative-time.js";
+import {
+  ageOf,
+  formatSecondsAgo,
+  getNumberFormatter,
+} from "../../src/util/relative-time.js";
 
 describe("formatSecondsAgo", () => {
   it("returns empty string for null / undefined", () => {
@@ -97,5 +101,31 @@ describe("ageOf", () => {
     const out = ageOf(10, 1_000_000, 1_000_500);
     expect(out).not.toBeNull();
     expect(out!).toBeCloseTo(10.5, 5);
+  });
+});
+
+describe("getNumberFormatter", () => {
+  it("returns the same instance for the same (locale, fraction-digits)", () => {
+    // Pin the memoization so a future change that drops the
+    // cache (e.g. switching to ``new Intl.NumberFormat`` on
+    // every call) regresses the drawer's per-row, per-tick
+    // allocation churn that this cache fixes.
+    const a = getNumberFormatter("en", 1);
+    const b = getNumberFormatter("en", 1);
+    expect(a).toBe(b);
+  });
+
+  it("keys on both locale and fraction-digit count", () => {
+    const enOne = getNumberFormatter("en", 1);
+    const enZero = getNumberFormatter("en", 0);
+    const frOne = getNumberFormatter("fr", 1);
+    expect(enOne).not.toBe(enZero); // different precision
+    expect(enOne).not.toBe(frOne); // different locale
+    expect(enZero.format(94.8)).toBe("95");
+    expect(enOne.format(94.8)).toBe("94.8");
+  });
+
+  it("does not crash without a language argument", () => {
+    expect(() => getNumberFormatter(undefined, 0)).not.toThrow();
   });
 });

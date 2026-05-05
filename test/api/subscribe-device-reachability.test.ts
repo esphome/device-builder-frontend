@@ -227,15 +227,22 @@ describe("ESPHomeAPI.subscribeDeviceReachability", () => {
     let pendingTimer: (() => void) | null = null;
     vi.stubGlobal(
       "setTimeout",
-      (fn: () => void, _delay: number) => {
+      // Rest-parameter so unrelated callers using
+      // ``setTimeout(fn, delay, ...args)`` still pass their
+      // extra arguments through to the real impl. Without the
+      // forward, any code (test fixture, lib in node_modules)
+      // scheduling a timer with extra args during this test
+      // would silently lose them.
+      (fn: (...args: unknown[]) => void, delay: number, ...args: unknown[]) => {
         // Capture the subscribe-ack timer (the next setTimeout
         // call after we kick off the subscribe). All other
-        // timer schedules pass through to the real impl.
-        if (pendingTimer === null && _delay === 10000) {
-          pendingTimer = fn;
+        // timer schedules pass through to the real impl with
+        // every argument they were called with.
+        if (pendingTimer === null && delay === 10000) {
+          pendingTimer = () => fn(...args);
           return 0 as unknown as ReturnType<typeof setTimeout>;
         }
-        return realSetTimeout(fn, _delay);
+        return realSetTimeout(fn, delay, ...args);
       },
     );
 

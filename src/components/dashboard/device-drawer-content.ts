@@ -39,7 +39,11 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { ageOf, formatSecondsAgo } from "../../util/relative-time.js";
+import {
+  ageOf,
+  formatSecondsAgo,
+  getNumberFormatter,
+} from "../../util/relative-time.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -174,6 +178,18 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *  Reset by the natural progression — a new device or a new
    *  WS open both flip the key, so the next failure logs once. */
   private _loggedFailureKey: string | null = null;
+
+  /** ``"<deviceName>:<generation>"`` of the last subscribe attempt
+   *  that failed. The reconcile tick checks this before
+   *  re-attempting, so a permanent error (NOT_FOUND for an
+   *  unknown device, INVALID_ARGS for a bad arg) doesn't fire
+   *  ``devices/subscribe_reachability`` once a second forever
+   *  while the drawer stays open. The key resets when the
+   *  natural progression changes one of its components — a
+   *  different device selection or a fresh WS connection —
+   *  so a transient WS-down window self-heals on reconnect
+   *  without the user having to close-and-reopen the drawer. */
+  private _failedSubscribeKey: string | null = null;
 
   /** ``setInterval`` handle for the 500ms relative-time re-render
    *  tick. Cleared together with the subscription. */
@@ -804,7 +820,9 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const ageText = formatSecondsAgo(row.age, lang);
     // RTT keeps 1 decimal — sub-millisecond precision is the
     // signal here (4.2 ms vs 4 ms is meaningful for a LAN ping).
-    const rttFmt = new Intl.NumberFormat(lang, { maximumFractionDigits: 1 });
+    // Pull from the module-level cache so the 1Hz drawer
+    // re-render doesn't churn one allocation per row per tick.
+    const rttFmt = getNumberFormatter(lang, 1);
     const rttText =
       row.rttMs === null || row.rttMs === undefined
         ? null
@@ -821,7 +839,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     // several windows already". Round to whole seconds so the
     // 1Hz tick doesn't render a jarring fractional decrement
     // ("TTL: 94.8s → 94.3s → 93.8s") twice per second.
-    const ttlFmt = new Intl.NumberFormat(lang, { maximumFractionDigits: 0 });
+    const ttlFmt = getNumberFormatter(lang, 0);
     const ttlText =
       row.ttlRemaining === null || row.ttlRemaining === undefined
         ? null
@@ -904,6 +922,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     this._teardownReachabilitySubscription();
     if (wantName === null || this._api === undefined) return;
 
+    // Skip the retry if we already failed on this exact
+    // (device, connection generation) tuple. Permanent errors
+    // (NOT_FOUND, INVALID_ARGS) would otherwise re-fire
+    // ``devices/subscribe_reachability`` every tick for as long
+    // as the drawer stays open. A new device selection or a WS
+    // reconnect both flip the key, so transient failures
+    // self-heal on the natural progression.
+    const targetKey = `${wantName}:${currentGeneration}`;
+    if (this._failedSubscribeKey === targetKey) return;
+
     this._subscribedDevice = wantName;
     this._subscribedGeneration = currentGeneration;
     // Kick off the async subscribe — failures are logged but
@@ -934,6 +962,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         return;
       }
       this._subscription = subscription;
+      // Successful subscribe — clear any stale "we already failed
+      // on this (device, gen)" gate so a future drop from this
+      // session can retry. Without this clear, a flaky backend
+      // that fails once and then succeeds would still have the
+      // failure key pinned from the earlier attempt and
+      // reconcile would refuse to re-attempt after the next
+      // teardown.
+      this._failedSubscribeKey = null;
     } catch (err) {
       // Connection went away mid-subscribe, or the device was
       // deleted between drawer open and the subscribe round
@@ -952,6 +988,12 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         // eslint-disable-next-line no-console
         console.warn("subscribeDeviceReachability failed", err);
       }
+      // Pin this (device, generation) so the tick's reconcile
+      // doesn't re-attempt the subscribe on every iteration.
+      // The key flips on a new device or a WS reconnect — both
+      // natural triggers for "the failure mode might have
+      // changed."
+      this._failedSubscribeKey = failureKey;
       if (this._subscribedDevice === deviceName) {
         this._subscribedDevice = null;
       }

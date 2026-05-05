@@ -89,3 +89,32 @@ export function ageOf(
   const elapsedSeconds = Math.max(0, (nowMs - anchorMs) / 1000);
   return baselineSecondsAgo + elapsedSeconds;
 }
+
+/**
+ * Memoized ``Intl.NumberFormat`` per (locale, fraction-digits) key.
+ *
+ * Both the drawer's RTT row ("4.2 ms", 1 fraction digit) and TTL
+ * row ("38s", 0 fraction digits) need a locale-aware number
+ * formatter. Constructing one in the row renderer means a fresh
+ * allocation per row per render — the drawer ticks at 1Hz and
+ * has up to three Reachability rows visible, so that's 3
+ * allocations/sec for what should be a stable lookup.
+ *
+ * Mirrors the ``RelativeTimeFormat`` cache above, just keyed on
+ * the joint of language + ``maximumFractionDigits`` so the two
+ * call sites don't share each other's precision.
+ */
+const numberFormatterCache = new Map<string, Intl.NumberFormat>();
+
+export function getNumberFormatter(
+  language: string | undefined,
+  maximumFractionDigits: number,
+): Intl.NumberFormat {
+  const key = `${language ?? "default"}|${maximumFractionDigits}`;
+  let formatter = numberFormatterCache.get(key);
+  if (formatter === undefined) {
+    formatter = new Intl.NumberFormat(language, { maximumFractionDigits });
+    numberFormatterCache.set(key, formatter);
+  }
+  return formatter;
+}
