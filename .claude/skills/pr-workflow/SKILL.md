@@ -68,40 +68,31 @@ side has landed.
 
 ## 6. Push and create the PR
 
+**Always read `.github/PULL_REQUEST_TEMPLATE.md` from the repo at
+PR-creation time and use it verbatim as the body** — do not
+reproduce, paraphrase, or trim the template anywhere else, or it
+will silently drift out of sync as the template evolves.
+
+When filling in the template:
+
+- Replace the `<!-- ... -->` prompt comments with the actual prose
+  for that section. Do not delete anything else.
+- **Leave all the checkboxes in place.** Do not remove rows you
+  aren't ticking — the human reviewer relies on the full list
+  being present.
+- Tick exactly one "Types of changes" box. For the Checklist
+  section, only tick boxes you have actually verified; leave the
+  rest as `- [ ]`.
+
 ```bash
 git push -u origin <branch-name>
+# Read .github/PULL_REQUEST_TEMPLATE.md, fill it in as above,
+# write the result to a temp file, then:
 gh pr create --repo esphome/device-builder-frontend --base main \
-  --label enhancement \
+  --label <release-notes-label> \
   --title "Imperative subject under 70 chars" \
-  --body "$(cat <<'EOF'
-# What does this implement/fix?
-
-<one paragraph: what changed and why>
-
-## Types of changes
-
-- [ ] Bugfix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [x] Code quality improvements to existing code or addition of tests
-- [ ] Other
-
-**Related issue or feature (if applicable):**
-
-- fixes #<issue-number>
-
-## Checklist:
-  - [x] The code change is tested and works locally.
-  - [x] `npm run lint` passes.
-  - [x] `npm run test` passes.
-  - [x] Tests have been added to verify that the new code works (where applicable).
-EOF
-)"
+  --body-file /tmp/pr-body.md
 ```
-
-The keep-the-checklist-honest rule applies — only tick a box
-you've actually verified by running the command or inspecting the
-diff.
 
 ## 7. After the PR is open
 
