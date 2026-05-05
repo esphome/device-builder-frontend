@@ -1,16 +1,19 @@
 import { consume } from "@lit/context";
 import {
+  mdiAccessPointNetwork,
   mdiAlertCircleOutline,
   mdiCheckCircleOutline,
   mdiFileDocumentOutline,
   mdiFingerprint,
   mdiInformationOutline,
   mdiIpNetworkOutline,
+  mdiLan,
   mdiLock,
   mdiLockAlert,
   mdiLockClock,
   mdiLockOpenVariant,
   mdiMemory,
+  mdiMessage,
   mdiNetworkOutline,
   mdiSync,
   mdiTagMultiple,
@@ -20,30 +23,45 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { LocalizeFunc } from "../../common/localize.js";
-import type { ConfiguredDevice } from "../../api/types.js";
+import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
+import type {
+  ConfiguredDevice,
+  ReachabilitySource,
+  ReachabilityStateEvent,
+  ReachabilitySubscription,
+} from "../../api/types.js";
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import {
+  apiContext,
   integrationDocsContext,
   localizeContext,
 } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import {
+  ageOf,
+  formatSecondsAgo,
+  getNumberFormatter,
+} from "../../util/relative-time.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "access-point-network": mdiAccessPointNetwork,
   "alert-circle-outline": mdiAlertCircleOutline,
   "check-circle-outline": mdiCheckCircleOutline,
   "file-document-outline": mdiFileDocumentOutline,
   fingerprint: mdiFingerprint,
   "information-outline": mdiInformationOutline,
   "ip-network-outline": mdiIpNetworkOutline,
+  lan: mdiLan,
   lock: mdiLock,
   "lock-alert": mdiLockAlert,
   "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
   memory: mdiMemory,
+  message: mdiMessage,
   "network-outline": mdiNetworkOutline,
   sync: mdiSync,
   "tag-multiple": mdiTagMultiple,
@@ -71,6 +89,18 @@ function _isSafeDocsUrl(url: string): boolean {
   }
 }
 
+/** Per-signal config for one Reachability row. The render method
+ *  iterates a static table of these so adding a new freshness
+ *  channel (a future "ARP-cached" / "WS-heartbeat" line) is one
+ *  array entry instead of yet another duplicated row block. */
+interface ReachabilityRowSpec {
+  source: "mdns" | "ping" | "mqtt";
+  icon: string;
+  labelKey: string;
+  age: number | null;
+  rttMs?: number | null;
+}
+
 @customElement("esphome-device-drawer-content")
 export class ESPHomeDeviceDrawerContent extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -81,8 +111,84 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   @state()
   private _integrationDocs: Record<string, string> = {};
 
+  @consume({ context: apiContext })
+  @state()
+  private _api?: ESPHomeAPI;
+
   @property({ attribute: false })
   device!: ConfiguredDevice;
+
+  /** Whether the drawer is currently visible. The reachability
+   *  subscription is gated on this so a slid-off drawer doesn't
+   *  keep streaming events. Falls back to ``true`` for tests that
+   *  render the content directly without the parent drawer. */
+  @property({ type: Boolean, attribute: "drawer-open" })
+  drawerOpen = true;
+
+  /** Latest reachability snapshot pushed by the backend over the
+   *  per-device WS subscription. ``null`` until the initial event
+   *  arrives or after the subscription tears down. */
+  @state()
+  private _reachability: ReachabilityStateEvent | null = null;
+
+  /** Wall-clock anchor for the last received snapshot. The
+   *  ``*_last_seen_seconds_ago`` values are stamped at send time
+   *  on the backend, so the rendered relative time is
+   *  ``snapshot.value + (now - anchor) / 1000``. Lets the 1Hz
+   *  re-render tick advance the displayed age without a fresh
+   *  push from the server. */
+  @state()
+  private _reachabilityAnchorMs = 0;
+
+  /** Tick counter the relative-time renderer reads from to force a
+   *  re-render at 1Hz. Mutating it inside ``setInterval`` is
+   *  what nudges Lit's reactivity — the actual value is unused. */
+  @state()
+  private _tick = 0;
+
+  /** Currently subscribed device name. Tracked separately from
+   *  ``device.configuration`` so a swap to a new device cleanly
+   *  tears down the previous subscription before opening a new
+   *  one. */
+  private _subscribedDevice: string | null = null;
+
+  /** Active subscription handle. ``unsubscribe()`` is called on
+   *  disconnect / device change / drawer close. */
+  private _subscription: ReachabilitySubscription | null = null;
+
+  /** Connection generation captured when the active subscription
+   *  was opened. Compared against ``api.connectionGeneration`` on
+   *  every reconcile tick — a mismatch means the WS dropped and
+   *  reconnected (which clears the API's ``_eventSubscriptions``
+   *  map) and we need to resubscribe even though the device name
+   *  didn't change. */
+  private _subscribedGeneration = 0;
+
+  /** ``"<deviceName>:<generation>"`` of the last subscribe failure
+   *  we logged, or ``null`` if we haven't logged yet for this
+   *  (device, connection) pair. Without this gate, a transient
+   *  WS-not-yet-connected window during drawer-open would log the
+   *  same warning every tick (the 1Hz tick runs reconcile,
+   *  reconcile re-attempts the subscribe, which logs on failure).
+   *  Reset by the natural progression — a new device or a new
+   *  WS open both flip the key, so the next failure logs once. */
+  private _loggedFailureKey: string | null = null;
+
+  /** ``"<deviceName>:<generation>"`` of the last subscribe attempt
+   *  that failed. The reconcile tick checks this before
+   *  re-attempting, so a permanent error (NOT_FOUND for an
+   *  unknown device, INVALID_ARGS for a bad arg) doesn't fire
+   *  ``devices/subscribe_reachability`` once a second forever
+   *  while the drawer stays open. The key resets when the
+   *  natural progression changes one of its components — a
+   *  different device selection or a fresh WS connection —
+   *  so a transient WS-down window self-heals on reconnect
+   *  without the user having to close-and-reopen the drawer. */
+  private _failedSubscribeKey: string | null = null;
+
+  /** ``setInterval`` handle for the 1Hz relative-time re-render
+   *  tick. Cleared together with the subscription. */
+  private _tickInterval: ReturnType<typeof setInterval> | null = null;
 
   static styles = [
     espHomeStyles,
@@ -296,6 +402,31 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 85%);
         color: var(--esphome-warning, #d97706);
       }
+
+      /* Small "active" pill that sits next to the row label of the
+         reachability source currently driving the device's online
+         state. Same chrome shape as the section badges above but
+         compact enough to share a line with the label. */
+      .reachability-badge {
+        display: inline-flex;
+        align-items: center;
+        margin-left: 6px;
+        padding: 1px 6px;
+        border-radius: 999px;
+        font-size: 0.7em;
+        font-weight: var(--wa-font-weight-bold);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        background: color-mix(in srgb, var(--esphome-success), transparent 85%);
+        color: var(--esphome-success);
+      }
+
+      /* Subtle separation for the round-trip-ms suffix on the Ping
+         row so it reads as additional info rather than part of the
+         relative-time string. */
+      .reachability-rtt {
+        color: var(--wa-color-text-quiet);
+      }
     `,
   ];
 
@@ -339,6 +470,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderIpAddressRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
+
+      ${this._renderReachabilitySection()}
 
       ${this._renderVersionSection(d)}
 
@@ -582,6 +715,329 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Render the per-signal Reachability section.
+   *
+   * Shows one row per channel the device has been observed on
+   * (mDNS / Ping / MQTT). Each row carries the localized "N
+   * seconds/minutes ago" relative time plus, for the channel
+   * driving the device's online state, an "active" badge so the
+   * user can tell which signal is authoritative. The Ping row
+   * also surfaces the most recent round-trip in milliseconds.
+   *
+   * Hides itself when no signal has ever been observed (a
+   * brand-new device that's never broadcast and never been
+   * pinged) — the placeholder "Waiting for first broadcast…" text
+   * goes there instead. Suppresses the section entirely when the
+   * subscription is in flight (no snapshot yet) so the drawer
+   * doesn't flash an empty header.
+   *
+   * The three signal rows share enough shape that a small
+   * declarative table drives them — the per-signal differences
+   * are just (icon, label, age field, source name, optional rtt
+   * field), and the row template handles the rest.
+   */
+  private _renderReachabilitySection() {
+    const r = this._reachability;
+    if (r === null) return nothing;
+
+    // Use the same active locale as the rest of the UI — a user
+    // who's overridden their language to ``fr`` or ``nl`` should
+    // see "il y a 12 secondes" alongside the rest of the
+    // localized chrome, not English seconds-ago lines from
+    // ``navigator.language``.
+    const lang = activeLocale();
+    const now = Date.now();
+    const anchor = this._reachabilityAnchorMs;
+
+    // ``mdns_ttl_remaining_seconds`` is intentionally not
+    // surfaced in the row. It came from the cached A record's
+    // remaining TTL, which the backend's refresh loop drives
+    // back to ~120s on every probe — so the displayed value
+    // would mostly be a function of when our refresh tick last
+    // fired, not "how soon the device's announce expires" the
+    // way a naive reader would interpret it. The "Last seen"
+    // age is the truthful diagnostic; TTL is internal plumbing.
+    const rows: ReachabilityRowSpec[] = [
+      {
+        source: "mdns",
+        icon: "access-point-network",
+        labelKey: "dashboard.drawer_source_mdns",
+        age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
+      },
+      {
+        source: "ping",
+        icon: "lan",
+        labelKey: "dashboard.drawer_source_ping",
+        age: ageOf(r.ping_last_seen_seconds_ago, anchor, now),
+        rttMs: r.ping_rtt_ms,
+      },
+      {
+        source: "mqtt",
+        icon: "message",
+        labelKey: "dashboard.drawer_source_mqtt",
+        age: ageOf(r.mqtt_last_seen_seconds_ago, anchor, now),
+      },
+    ];
+    const anySignal = rows.some((row) => row.age !== null);
+
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_reachability")}
+        </h4>
+        ${!anySignal
+          ? html`<div class="value muted">
+              ${this._localize("dashboard.drawer_waiting_for_broadcast")}
+            </div>`
+          : rows.map((row) =>
+              this._renderReachabilityRow(row, r.active_source, lang),
+            )}
+      </div>
+    `;
+  }
+
+  private _renderReachabilityRow(
+    row: ReachabilityRowSpec,
+    activeSource: ReachabilitySource,
+    lang: string | undefined,
+  ) {
+    if (row.age === null) return nothing;
+    const ageText = formatSecondsAgo(row.age, lang);
+    // RTT keeps 1 decimal — sub-millisecond precision is the
+    // signal here (4.2 ms vs 4 ms is meaningful for a LAN ping).
+    // Pull from the module-level cache so the 1Hz drawer
+    // re-render doesn't churn one allocation per row per tick.
+    const rttFmt = getNumberFormatter(lang, 1);
+    const rttText =
+      row.rttMs === null || row.rttMs === undefined
+        ? null
+        : this._localize("dashboard.drawer_round_trip_ms", {
+            // Format the RTT through ``Intl.NumberFormat`` so the
+            // decimal separator follows the active locale (French
+            // expects ``1,4 ms`` not ``1.4 ms``). Ages already
+            // localize via ``Intl.RelativeTimeFormat``; the RTT
+            // suffix should match.
+            n: rttFmt.format(row.rttMs),
+          });
+    const isActive = activeSource === row.source;
+    return html`
+      <div class="row">
+        <div class="icon">
+          <wa-icon library="mdi" name=${row.icon}></wa-icon>
+        </div>
+        <div class="content">
+          <div class="label">
+            ${this._localize(row.labelKey)}
+            ${isActive
+              ? html`<span class="reachability-badge"
+                  >${this._localize("dashboard.drawer_source_active")}</span
+                >`
+              : nothing}
+          </div>
+          <div class="value">
+            ${ageText}${rttText
+              ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
+              : nothing}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  // ─── Reachability subscription lifecycle ───────────────────
+
+  protected updated(changed: Map<string, unknown>) {
+    super.updated?.(changed);
+    if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
+      this._reconcileReachabilitySubscription();
+      // Run the tick whenever there's a *target* (drawer open +
+      // device + api), independent of whether the subscribe
+      // succeeded. The tick re-runs reconcile, so a failed
+      // initial subscribe (WS not connected yet, server hiccup)
+      // gets retried at 1Hz instead of leaving the
+      // section permanently disabled until the user
+      // closes/reopens the drawer.
+      this._syncTickInterval();
+    }
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    this._teardownReachabilitySubscription();
+    if (this._tickInterval !== null) {
+      clearInterval(this._tickInterval);
+      this._tickInterval = null;
+    }
+  }
+
+  /** Open / close / swap the per-device reachability subscription
+   *  to match (drawerOpen, device.name, api). Called from
+   *  ``updated()`` whenever any of those move and from the 1Hz
+   *  tick to catch WS reconnects (the API clears its event
+   *  listeners on close, so a stale ``_subscribedDevice`` flag
+   *  would otherwise prevent resubscribing on reconnect).
+   *  Idempotent when the four inputs are unchanged from the
+   *  active subscription. */
+  private _reconcileReachabilitySubscription() {
+    const wantName =
+      this.drawerOpen && this.device && this._api ? this.device.name : null;
+    const currentGeneration = this._api?.connectionGeneration ?? 0;
+    // Resubscribe if the device target moved OR the WS reconnected
+    // (which cleared ``_eventSubscriptions`` on the API side; without
+    // a fresh subscribe our listener never sees another event).
+    const generationChanged =
+      this._subscribedDevice !== null &&
+      currentGeneration !== this._subscribedGeneration;
+    if (wantName === this._subscribedDevice && !generationChanged) return;
+
+    this._teardownReachabilitySubscription();
+    if (wantName === null || this._api === undefined) return;
+
+    // Skip the retry if we already failed on this exact
+    // (device, connection generation) tuple. Permanent errors
+    // (NOT_FOUND, INVALID_ARGS) would otherwise re-fire
+    // ``devices/subscribe_reachability`` every tick for as long
+    // as the drawer stays open. A new device selection or a WS
+    // reconnect both flip the key, so transient failures
+    // self-heal on the natural progression.
+    const targetKey = `${wantName}:${currentGeneration}`;
+    if (this._failedSubscribeKey === targetKey) return;
+
+    this._subscribedDevice = wantName;
+    this._subscribedGeneration = currentGeneration;
+    // Kick off the async subscribe — failures are logged but
+    // don't propagate. The drawer still works without
+    // reachability; the section just stays hidden. The
+    // ``targetKey`` we just computed pins this attempt's
+    // identity so the in-flight handler can tell whether its
+    // resolve/reject still matches the current state when it
+    // wakes up (a WS reconnect during the round trip would
+    // otherwise let a stale rejection clobber the new
+    // subscribe's bookkeeping).
+    void this._openReachabilitySubscription(
+      wantName,
+      currentGeneration,
+      targetKey,
+      this._api,
+    );
+  }
+
+  private async _openReachabilitySubscription(
+    deviceName: string,
+    attemptGeneration: number,
+    attemptKey: string,
+    api: ESPHomeAPI,
+  ) {
+    // Helper: is this attempt still the current one? A WS
+    // reconnect (generation bump) or a different-device
+    // selection between subscribe-start and resolve/reject
+    // makes the attempt stale; in that case the catch path
+    // must NOT mutate ``_failedSubscribeKey`` /
+    // ``_subscribedDevice`` (those now belong to the newer
+    // attempt) and the success path must unsubscribe.
+    const isCurrent = (): boolean =>
+      this._subscribedDevice === deviceName &&
+      this._subscribedGeneration === attemptGeneration;
+
+    try {
+      const subscription = await api.subscribeDeviceReachability(
+        deviceName,
+        (state) => {
+          // Drop late-arriving events from a stale subscription
+          // — the user already swapped to a different device or
+          // the WS reconnected and a fresher subscribe is now
+          // the source of truth.
+          if (!isCurrent()) return;
+          this._reachability = state;
+          this._reachabilityAnchorMs = Date.now();
+        },
+      );
+      if (!isCurrent()) {
+        // User moved on or the WS cycled while our subscribe
+        // was in flight — tear this just-created subscription
+        // down without touching the newer attempt's state.
+        void subscription.unsubscribe();
+        return;
+      }
+      this._subscription = subscription;
+      // Successful subscribe — clear any stale "we already failed
+      // on this (device, gen)" gate so a future drop from this
+      // session can retry.
+      this._failedSubscribeKey = null;
+    } catch (err) {
+      // Rate-limit the warning: the 1Hz tick re-runs reconcile,
+      // and during a WS-not-yet-connected window each retry
+      // would also fail and log. Without the gate the console
+      // fills with "subscribeDeviceReachability failed" once
+      // a second until the WS comes back. Key on (device,
+      // generation) of *this* attempt so each new device or
+      // each reconnect logs exactly once.
+      if (this._loggedFailureKey !== attemptKey) {
+        this._loggedFailureKey = attemptKey;
+        // eslint-disable-next-line no-console
+        console.warn("subscribeDeviceReachability failed", err);
+      }
+      // Only pin the failure key + clear ``_subscribedDevice``
+      // if this attempt is still the current one. A stale
+      // rejection (the WS cycled during our await) belongs
+      // to a previous attempt; mutating now would (a) clobber
+      // the newer subscribe's bookkeeping and (b) pin
+      // ``_failedSubscribeKey`` against a generation that's
+      // already been superseded, blocking legitimate retries.
+      if (isCurrent()) {
+        this._failedSubscribeKey = attemptKey;
+        this._subscribedDevice = null;
+      }
+    }
+  }
+
+  private _teardownReachabilitySubscription() {
+    this._subscribedDevice = null;
+    this._reachability = null;
+    this._reachabilityAnchorMs = 0;
+    if (this._subscription !== null) {
+      const sub = this._subscription;
+      this._subscription = null;
+      void sub.unsubscribe();
+    }
+  }
+
+  /** Match the 1Hz tick to whether there's a target. Called from
+   *  ``updated()`` and ``disconnectedCallback`` so the tick runs
+   *  while the drawer is open with a device, regardless of
+   *  whether the subscription itself succeeded — a failed initial
+   *  subscribe (WS not connected yet, server hiccup) gets
+   *  retried via the tick's reconcile call rather than leaving
+   *  the section permanently disabled. */
+  private _syncTickInterval() {
+    const wantTick = this.drawerOpen && this.device !== undefined && this._api !== undefined;
+    if (wantTick && this._tickInterval === null) {
+      // 1Hz: the displayed values (relative-time string, integer
+      // TTL seconds) only resolve at second precision, so a 2Hz
+      // tick was just rendering the same string twice. Anything
+      // slower than 1s would let the seconds-ago display lag a
+      // beat behind reality. The reconcile probe inside the tick
+      // doesn't need millisecond precision either.
+      this._tickInterval = setInterval(() => {
+        this._tick = (this._tick + 1) % 1000;
+        // Probe for WS reconnect / failed-initial-subscribe on
+        // every tick. ``api`` clears its event listeners on
+        // close (``_onClose`` → ``_eventSubscriptions.clear``),
+        // so on reconnect our listener is gone but
+        // ``_subscribedDevice`` still says we think we're
+        // subscribed; reconciling here re-detects the
+        // generation bump and resubscribes. The tick also
+        // retries an initial subscribe that failed (e.g. the
+        // WS wasn't open yet when the drawer first rendered).
+        this._reconcileReachabilitySubscription();
+      }, 1000);
+    } else if (!wantTick && this._tickInterval !== null) {
+      clearInterval(this._tickInterval);
+      this._tickInterval = null;
+    }
   }
 
   private _row(icon: string, label: string, value: string | null, mono = false) {

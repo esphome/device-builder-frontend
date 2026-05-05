@@ -4,6 +4,7 @@ import {
   mdiCheck,
   mdiCog,
   mdiCogRefresh,
+  mdiCommentQuestionOutline,
   mdiDotsVertical,
   mdiEyeOutline,
   mdiKeyVariant,
@@ -27,6 +28,7 @@ registerMdiIcons({
   check: mdiCheck,
   cog: mdiCog,
   "cog-refresh": mdiCogRefresh,
+  "comment-question-outline": mdiCommentQuestionOutline,
   "dots-vertical": mdiDotsVertical,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
@@ -381,6 +383,17 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="cog"></wa-icon>
                 ${this._localize("layout.settings")}
               </div>
+              <div class="menu-divider" role="separator"></div>
+              <div
+                class="menu-item"
+                role="menuitem"
+                tabindex="0"
+                @click=${this._openFeedback}
+                @keydown=${this._onMenuItemKeydown}
+              >
+                <wa-icon library="mdi" name="comment-question-outline"></wa-icon>
+                ${this._localize("layout.feedback_menu")}
+              </div>
             </div>
           `
         : nothing}
@@ -487,6 +500,16 @@ export class ESPHomeHeaderActions extends LitElement {
     this._close();
     this.dispatchEvent(
       new CustomEvent("open-settings", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  private _openFeedback() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-feedback", {
         bubbles: true,
         composed: true,
       }),

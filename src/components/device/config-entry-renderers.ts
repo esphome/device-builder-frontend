@@ -21,6 +21,7 @@ import {
   placeholderForFloatWithUnit,
   serializeFloatWithUnit,
 } from "../../util/float-with-unit.js";
+import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
@@ -623,20 +624,29 @@ export function renderNestedField(
   );
   return html`
     <div class="nested-group" data-field-key=${path.join(".")}>
-      <button
-        type="button"
-        class="nested-toggle"
-        @click=${() => ctx.toggleNested(key)}
-      >
-        <wa-icon
-          library="mdi"
-          name=${isOpen ? "chevron-up" : "chevron-down"}
-        ></wa-icon>
-        <span class="nested-title">${labelFor(entry, ctx)}</span>
-        ${entry.platform_type
-          ? html`<span class="nested-platform">${entry.platform_type}</span>`
-          : nothing}
-      </button>
+      <div class="nested-header">
+        <button
+          type="button"
+          class="nested-toggle"
+          aria-expanded=${isOpen}
+          @click=${() => ctx.toggleNested(key)}
+        >
+          <wa-icon
+            library="mdi"
+            name=${isOpen ? "chevron-up" : "chevron-down"}
+          ></wa-icon>
+          <span class="nested-title">${labelFor(entry, ctx)}</span>
+          ${entry.platform_type
+            ? html`<span class="nested-platform">${entry.platform_type}</span>`
+            : nothing}
+        </button>
+        ${renderHelpLink(entry, ctx)}
+      </div>
+      ${entry.description
+        ? html`<p class="nested-desc">
+            ${renderMarkdown(entry.description)}
+          </p>`
+        : nothing}
       ${isOpen
         ? html`<div class="nested-fields">
             ${renderableChildren.map((child) =>

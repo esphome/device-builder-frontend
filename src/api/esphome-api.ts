@@ -21,6 +21,8 @@ import type {
   EventMessage,
   EventSubscriptionCallback,
   FirmwareBinary,
+  ReachabilityStateEvent,
+  ReachabilitySubscription,
   FirmwareDownload,
   FirmwareJob,
   PagedBoardsResponse,
@@ -88,6 +90,13 @@ export class ESPHomeAPI {
   private _eventSubscriptions = new Map<string, EventSubscriptionCallback>();
   private _serverInfo: ServerInfoMessage | null = null;
   private _connected = false;
+  // Bumps every time the WS opens — i.e. on the initial connect
+  // and on every reconnect after a drop. Per-device streams
+  // (``subscribeDeviceReachability``) read this to detect that
+  // ``_eventSubscriptions`` was cleared by ``_onClose`` and
+  // resubscribe; the WS itself can't deliver a "reconnected"
+  // signal to long-lived consumers any other way.
+  private _connectionGeneration = 0;
   private _reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private _reconnectDelay = 1000;
   private _intentionalDisconnect = false;
@@ -116,6 +125,16 @@ export class ESPHomeAPI {
 
   get connected(): boolean {
     return this._connected;
+  }
+
+  /** Generation counter that increments on every successful WS open
+   *  (initial connect *and* every reconnect). Long-lived per-stream
+   *  consumers (the drawer's reachability subscription) compare
+   *  against the value they captured at subscribe time and resub
+   *  when it changes — ``_onClose`` clears every event listener,
+   *  so without this signal a closed stream never recovers. */
+  get connectionGeneration(): number {
+    return this._connectionGeneration;
   }
 
   get serverInfo(): ServerInfoMessage | null {
@@ -218,6 +237,11 @@ export class ESPHomeAPI {
     if ("server_version" in data) {
       this._serverInfo = data as unknown as ServerInfoMessage;
       this._connected = true;
+      // Bump *before* firing ``onConnected`` so any handler that
+      // immediately reads ``connectionGeneration`` (e.g. the
+      // drawer's reachability reconcile via tick) sees the fresh
+      // value rather than the previous one.
+      this._connectionGeneration += 1;
       this._reconnectDelay = 1000;
       if (this._connectPromise) {
         this._connectPromise.resolve(this._serverInfo);
@@ -533,6 +557,117 @@ export class ESPHomeAPI {
         reject,
       });
     });
+  }
+
+  /**
+   * Subscribe to per-signal reachability events for one device.
+   *
+   * The drawer opens this stream while showing a single device so
+   * the Reachability section can refresh "mDNS heard 12s ago, ping
+   * 47s ago, MQTT 2 min ago, RTT 4 ms" without bloating the
+   * broadcast ``subscribe_events`` channel for every other client.
+   * The backend emits one initial ``reachability_state`` event,
+   * then a fresh one whenever any signal updates for the
+   * subscribed device. While subscribed AND the active source is
+   * mDNS, the backend force-refreshes the A record every 60s.
+   *
+   * Returns a handle whose ``unsubscribe()`` sends
+   * ``devices/stop_stream`` to detach the listener cleanly without
+   * closing the shared WS. Unsubscribe is best-effort: errors are
+   * swallowed since the per-stream task is cancelled by the WS
+   * disconnect anyway.
+   */
+  async subscribeDeviceReachability(
+    deviceName: string,
+    callback: (state: ReachabilityStateEvent) => void,
+  ): Promise<ReachabilitySubscription> {
+    if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
+      throw new Error("WebSocket not connected");
+    }
+
+    const messageId = this._nextMessageId();
+    // Register before sending so we don't miss the initial
+    // ``reachability_state`` event the backend emits inside its
+    // ``send_initial`` callback. The handler in the WS dispatcher
+    // forwards every event under this message_id through the
+    // ``_eventSubscriptions`` map — same path ``subscribe_events``
+    // uses, just filtered to a single device on the backend side.
+    this._eventSubscriptions.set(messageId, (event, data) => {
+      if (event === "reachability_state") {
+        callback(data as ReachabilityStateEvent);
+      }
+    });
+
+    const msg: CommandMessage = {
+      command: "devices/subscribe_reachability",
+      message_id: messageId,
+      args: { device_name: deviceName },
+    };
+    this._ws.send(JSON.stringify(msg));
+
+    // Wait for the {subscribed: true} confirmation. ``send_initial``
+    // emits the initial event *before* the result, so by the time
+    // this resolves the caller has already received the first
+    // snapshot via the callback.
+    //
+    // On server error (NOT_FOUND for an unknown device, INVALID_ARGS,
+    // INTERNAL_ERROR mid-handler) the await rejects via
+    // ``_pendingRequests`` — but a non-responding backend (or a
+    // proxy that drops the result frame while keeping the WS
+    // open) would otherwise hang the await forever, leaking the
+    // ``_pendingRequests`` *and* ``_eventSubscriptions`` entries
+    // and pinning the drawer's "subscribed" flag so it never
+    // retries. Match ``sendCommand``'s 10s timeout so the
+    // failure mode is a typed reject the caller's catch can
+    // handle. Connection-level drops still get blanket-cleared
+    // by ``_onClose``.
+    const SUBSCRIBE_TIMEOUT_MS = 10000;
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this._pendingRequests.delete(messageId);
+          reject(
+            new Error(
+              `subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`,
+            ),
+          );
+        }, SUBSCRIBE_TIMEOUT_MS);
+        this._pendingRequests.set(messageId, {
+          resolve: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          reject: (err) => {
+            clearTimeout(timer);
+            reject(err);
+          },
+        });
+      });
+    } catch (err) {
+      this._eventSubscriptions.delete(messageId);
+      throw err;
+    }
+
+    return {
+      unsubscribe: async () => {
+        // Drop the callback synchronously so any in-flight event
+        // queued after this point is silently discarded.
+        this._eventSubscriptions.delete(messageId);
+        // Fire-and-forget the stop_stream round-trip. The
+        // backend's per-stream task is also cancelled by the WS
+        // disconnect, so awaiting the result has no functional
+        // value — and ``sendCommand`` carries a 10s default
+        // timeout that would make ``unsubscribe()`` hang for
+        // 10s on any non-responsive server. Swallow the
+        // returned promise (and any rejection it produces) so
+        // callers see the cleanup as essentially synchronous.
+        this.sendCommand("devices/stop_stream", {
+          stream_id: messageId,
+        }).catch(() => {
+          /* server hiccup or already-disconnected; ignore */
+        });
+      },
+    };
   }
 
   // ─── Device Commands ──────────────────────────────────────

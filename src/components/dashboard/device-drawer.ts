@@ -357,6 +357,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
         <div class="body">
           <esphome-device-drawer-content
             .device=${device}
+            ?drawer-open=${this.open}
           ></esphome-device-drawer-content>
         </div>
 

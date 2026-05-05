@@ -106,8 +106,16 @@ export const configEntryFormStyles = css`
     border-radius: var(--wa-border-radius-m);
   }
 
+  .nested-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+
   .nested-toggle {
-    display: inline-flex;
+    display: flex;
+    flex: 1;
+    min-width: 0;
     align-items: center;
     gap: var(--wa-space-2xs);
     background: none;
@@ -121,6 +129,12 @@ export const configEntryFormStyles = css`
     text-align: left;
   }
 
+  .nested-desc {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+  }
+
   .nested-toggle:hover {
     color: var(--esphome-primary);
   }
@@ -131,6 +145,8 @@ export const configEntryFormStyles = css`
 
   .nested-title {
     flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
 
   .nested-platform {

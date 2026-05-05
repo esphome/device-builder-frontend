@@ -480,12 +480,21 @@
     "show_ignored_discoveries": "Genegeerde ontdekkingen tonen",
     "archived_devices": "Gearchiveerde apparaten",
     "reset_build_env": "Bouw-omgeving resetten",
+    "feedback_menu": "Probleem of idee?",
     "back": "Terug",
     "home_assistant": "Home Assistant",
     "editor": "Editor",
     "yaml_diff_button": "YAML-diff-knop",
     "header_actions_label": "Dashboardacties",
     "more_options_with_count": "Meer opties ({count} firmwaretaken actief)"
+  },
+  "feedback": {
+    "title": "Probleem of idee?",
+    "description": "Help ons ESPHome Device Builder te verbeteren door problemen te melden of ideeën te delen.",
+    "browse_issues": "Open problemen bekijken",
+    "new_issue": "Nieuw probleem melden",
+    "browse_features": "Functieverzoeken bekijken",
+    "new_feature": "Nieuwe functie aanvragen"
   },
   "auth": {
     "connecting": "Verbinden…",
