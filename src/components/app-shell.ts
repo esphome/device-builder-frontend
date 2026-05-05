@@ -363,7 +363,20 @@ export class ESPHomeApp extends LitElement {
 
   private async _init() {
     toast.config({
-      toastOptions: { position: "bottom-right", richColors: true, duration: 4000 },
+      toastOptions: {
+        position: "bottom-right",
+        richColors: true,
+        duration: 4000,
+        // The bottom-right toast can land on top of the device
+        // editor's Save / Install buttons (issue #171). The X
+        // gives the user a guaranteed dismissal that doesn't
+        // depend on swipe — which mouse users discover late and
+        // touchpad users may struggle with — and isn't gated on
+        // the 4s auto-close timer. UX team may swap this for a
+        // different placement later; the close affordance stays
+        // useful regardless of where the toast moves.
+        closeButton: true,
+      },
     });
     this._initDarkMode();
     try {
