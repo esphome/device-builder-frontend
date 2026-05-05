@@ -160,6 +160,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *  didn't change. */
   private _subscribedGeneration = 0;
 
+  /** ``"<deviceName>:<generation>"`` of the last subscribe failure
+   *  we logged, or ``null`` if we haven't logged yet for this
+   *  (device, connection) pair. Without this gate, a transient
+   *  WS-not-yet-connected window during drawer-open would log the
+   *  same warning twice per second (the 500ms tick runs reconcile,
+   *  reconcile re-attempts the subscribe, which logs on failure).
+   *  Reset by the natural progression — a new device or a new
+   *  WS open both flip the key, so the next failure logs once. */
+  private _loggedFailureKey: string | null = null;
+
   /** ``setInterval`` handle for the 500ms relative-time re-render
    *  tick. Cleared together with the subscription. */
   private _tickInterval: ReturnType<typeof setInterval> | null = null;
@@ -893,8 +903,20 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       // Connection went away mid-subscribe, or the device was
       // deleted between drawer open and the subscribe round
       // trip. Either way the section just stays empty.
-      // eslint-disable-next-line no-console
-      console.warn("subscribeDeviceReachability failed", err);
+      //
+      // Rate-limit the warning: the 500ms tick re-runs reconcile,
+      // and during a WS-not-yet-connected window each retry would
+      // also fail and log. Without the gate the console fills with
+      // "subscribeDeviceReachability failed" twice per second
+      // until the WS comes back. Key on (device, connection
+      // generation) so each new device or each reconnect logs
+      // exactly once, but the spam window is bounded.
+      const failureKey = `${deviceName}:${this._subscribedGeneration}`;
+      if (this._loggedFailureKey !== failureKey) {
+        this._loggedFailureKey = failureKey;
+        // eslint-disable-next-line no-console
+        console.warn("subscribeDeviceReachability failed", err);
+      }
       if (this._subscribedDevice === deviceName) {
         this._subscribedDevice = null;
       }

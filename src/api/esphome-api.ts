@@ -612,16 +612,35 @@ export class ESPHomeAPI {
     //
     // On server error (NOT_FOUND for an unknown device, INVALID_ARGS,
     // INTERNAL_ERROR mid-handler) the await rejects via
-    // ``_pendingRequests``; without the listener cleanup below the
-    // ``_eventSubscriptions`` entry would leak and stay attached
-    // forever. Connection-level failures get clean-up via
-    // ``_onClose`` already, so this only matters for the
-    // server-rejects-but-WS-stays-open case.
+    // ``_pendingRequests`` — but a non-responding backend (or a
+    // proxy that drops the result frame while keeping the WS
+    // open) would otherwise hang the await forever, leaking the
+    // ``_pendingRequests`` *and* ``_eventSubscriptions`` entries
+    // and pinning the drawer's "subscribed" flag so it never
+    // retries. Match ``sendCommand``'s 10s timeout so the
+    // failure mode is a typed reject the caller's catch can
+    // handle. Connection-level drops still get blanket-cleared
+    // by ``_onClose``.
+    const SUBSCRIBE_TIMEOUT_MS = 10000;
     try {
       await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => {
+          this._pendingRequests.delete(messageId);
+          reject(
+            new Error(
+              `subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`,
+            ),
+          );
+        }, SUBSCRIBE_TIMEOUT_MS);
         this._pendingRequests.set(messageId, {
-          resolve: () => resolve(),
-          reject,
+          resolve: () => {
+            clearTimeout(timer);
+            resolve();
+          },
+          reject: (err) => {
+            clearTimeout(timer);
+            reject(err);
+          },
         });
       });
     } catch (err) {

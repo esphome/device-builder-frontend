@@ -204,6 +204,60 @@ describe("ESPHomeAPI.subscribeDeviceReachability", () => {
     await expect(unsubPromise).resolves.toBeUndefined();
   });
 
+  it("rejects on subscribe-ack timeout and cleans up the listener", async () => {
+    // A non-responding backend (or a proxy that drops the
+    // result frame while keeping the WS open) would otherwise
+    // hang forever and leak the ``_pendingRequests`` /
+    // ``_eventSubscriptions`` entries. Pin the timeout-then-reject
+    // contract.
+    //
+    // Don't use ``vi.useFakeTimers`` — the WebSocket mock and
+    // the API's reconnect logic both schedule timers, and
+    // intercepting all of them at once breaks the connect
+    // dance. Drive the timeout directly by stubbing
+    // ``setTimeout`` only inside ``subscribeDeviceReachability``
+    // via a synchronous shim that fires the callback on
+    // ``advance()``.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const callback = vi.fn();
+
+    const realSetTimeout = globalThis.setTimeout;
+    let pendingTimer: (() => void) | null = null;
+    vi.stubGlobal(
+      "setTimeout",
+      (fn: () => void, _delay: number) => {
+        // Capture the subscribe-ack timer (the next setTimeout
+        // call after we kick off the subscribe). All other
+        // timer schedules pass through to the real impl.
+        if (pendingTimer === null && _delay === 10000) {
+          pendingTimer = fn;
+          return 0 as unknown as ReturnType<typeof setTimeout>;
+        }
+        return realSetTimeout(fn, _delay);
+      },
+    );
+
+    try {
+      const pending = api.subscribeDeviceReachability("kitchen", callback);
+      const sent = ws.sentAs<{ message_id: string }>(0);
+      expect(pendingTimer).not.toBeNull();
+      pendingTimer!(); // simulate timeout firing
+      await expect(pending).rejects.toThrow(/timed out/i);
+
+      // Late event under the same id must not reach the
+      // original callback — the listener is gone.
+      ws.receive({
+        message_id: sent.message_id,
+        event: "reachability_state",
+        data: SAMPLE_STATE,
+      });
+      expect(callback).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("rejects when the WS isn't open", async () => {
     const api = new ESPHomeAPI();
     // Don't connect — the call should reject immediately rather
