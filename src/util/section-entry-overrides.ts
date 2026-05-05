@@ -28,8 +28,20 @@ import { makeConfigEntry } from "./config-entry-defaults.js";
  *  to a per-row "edit in YAML" placeholder in ``renderMapField``
  *  (verified by ``test/components/device/render-map-field.test.ts``)
  *  so the YAML still round-trips losslessly even though the form
- *  doesn't surface a structured editor for them. */
-export const MAP_SECTIONS: ReadonlySet<string> = new Set(["substitutions"]);
+ *  doesn't surface a structured editor for them.
+ *
+ *  ``packages:`` is treated the same way: a user-keyed map whose
+ *  values are nested package definitions (``{url, ref, file, ...}``).
+ *  The form lets the user add / rename / delete row keys (the
+ *  package names), and per-row complex-value detection in
+ *  ``renderMapField`` surfaces the "edit in YAML" placeholder for
+ *  the structured value bodies — so the editor is at least
+ *  partially usable for the package list itself instead of
+ *  forcing the whole section to YAML. */
+export const MAP_SECTIONS: ReadonlySet<string> = new Set([
+  "substitutions",
+  "packages",
+]);
 
 /** Synthesised entries for ``substitutions:`` — a single MAP whose
  *  value template is a string. The user names each row's key

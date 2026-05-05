@@ -37,6 +37,7 @@ import {
 } from "../../util/yaml-section-values.js";
 import { resolveCurrentFromLine } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
+import { isYamlOnlySection } from "./yaml-only-sections.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -74,16 +75,9 @@ interface SectionConfigResponse {
   entries: ConfigEntry[];
 }
 
-/**
- * Top-level keys we always treat as YAML-only regardless of what the
- * backend returns. `packages` is the remaining holdout — its YAML
- * shape (dict-of-dicts referencing remote files) doesn't fit the
- * MAP-of-typed-values pattern. Everything else (substitutions,
- * globals, ...) now relies on the backend describing it as a MAP
- * entry, and falls back to the YAML notice automatically when the
- * schema returns no entries.
- */
-const YAML_ONLY_SECTIONS = new Set(["packages"]);
+// YAML-only-section gate lives in its own module so the unit test
+// can import it without dragging Lit / DOM into the vitest Node
+// environment. See ``yaml-only-sections.ts``.
 
 @customElement("esphome-device-section-config")
 export class ESPHomeDeviceSectionConfig extends LitElement {
@@ -417,9 +411,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // returns won't match the actual list / dict shape) and also
     // fall back to it for any section that happens to come back
     // with no entries at all.
-    const yamlOnly =
-      YAML_ONLY_SECTIONS.has(this.sectionKey) ||
-      renderEntries.length === 0;
+    const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 
