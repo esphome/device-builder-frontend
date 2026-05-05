@@ -27,9 +27,10 @@ import {
  * without dropping the row.
  *
  * Quoted keys (``"foo:bar":`` etc.) and other exotic forms aren't
- * matched here; they fall through to the form-editor's
- * "complex value" placeholder by virtue of not parsing — see
- * issue tracker for upstream support if needed.
+ * matched here; lines using them are skipped by the minimal parser
+ * and therefore won't appear in the returned values map or today's
+ * MAP editor. Supporting them would require a different parsing
+ * strategy; see issue tracker for upstream support if needed.
  */
 const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
 
