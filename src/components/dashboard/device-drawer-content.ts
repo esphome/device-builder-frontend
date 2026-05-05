@@ -2,9 +2,13 @@ import { consume } from "@lit/context";
 import {
   mdiAccessPointNetwork,
   mdiAlertCircleOutline,
+  mdiBluetooth,
   mdiCheckCircleOutline,
+  mdiChevronDown,
+  mdiChevronUp,
   mdiFileDocumentOutline,
   mdiFingerprint,
+  mdiEthernet,
   mdiInformationOutline,
   mdiIpNetworkOutline,
   mdiLan,
@@ -50,7 +54,11 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
   "alert-circle-outline": mdiAlertCircleOutline,
+  bluetooth: mdiBluetooth,
   "check-circle-outline": mdiCheckCircleOutline,
+  "chevron-down": mdiChevronDown,
+  "chevron-up": mdiChevronUp,
+  ethernet: mdiEthernet,
   "file-document-outline": mdiFileDocumentOutline,
   fingerprint: mdiFingerprint,
   "information-outline": mdiInformationOutline,
@@ -145,6 +153,13 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *  what nudges Lit's reactivity — the actual value is unused. */
   @state()
   private _tick = 0;
+
+  /** Whether the IP-address row is showing the full list. Collapsed
+   *  by default to keep the drawer scannable for the common
+   *  single-IPv4 case; flips when the user clicks the chevron on a
+   *  multi-IP device (typical when IPv6 is in play). */
+  @state()
+  private _ipExpanded = false;
 
   /** Currently subscribed device name. Tracked separately from
    *  ``device.configuration`` so a swap to a new device cleanly
@@ -272,6 +287,26 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       .value.muted {
         color: var(--wa-color-text-quiet);
         font-style: italic;
+      }
+
+      .ip-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 2px 0;
+        margin-top: 2px;
+        background: none;
+        border: none;
+        font-family: inherit;
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+      }
+      .ip-toggle:hover {
+        color: var(--wa-color-text-normal);
+      }
+      .ip-toggle wa-icon {
+        font-size: 14px;
       }
 
       .tags-wrap {
@@ -468,6 +503,9 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._row("information-outline", this._localize("dashboard.drawer_name"), d.friendly_name || d.name)}
         ${this._row("network-outline", this._localize("dashboard.drawer_address"), d.address, true)}
         ${this._renderIpAddressRow(d)}
+        ${this._renderMacAddressRow(d)}
+        ${this._renderEthernetMacRow(d)}
+        ${this._renderBluetoothMacRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
       </div>
 
@@ -687,21 +725,37 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   }
 
   /**
-   * Render every resolved IP address for the device — IPv4 + IPv6 in
-   * the order the backend reported them. The label switches between
-   * singular and plural based on the list length, and an en-dash
-   * placeholder renders when the device has never been online so the
-   * row stays diagnostic.
+   * Render the resolved IP addresses for the device.
+   *
+   * Single IP renders as a plain row. Multi-IP devices (the IPv6 +
+   * IPv4 case) collapse to the primary by default and surface a
+   * chevron toggle so the extras stay one click away — keeps the
+   * drawer scannable when the common case is "one address" but
+   * still lets the user see the full set when they want it. An
+   * en-dash placeholder renders when the device has never been
+   * online so the row stays diagnostic.
    */
   private _renderIpAddressRow(d: ConfiguredDevice) {
     const list = d.ip_addresses;
-    const labelKey = list.length > 1
-      ? "dashboard.drawer_ip_addresses"
-      : "dashboard.drawer_ip_address";
-    const label = this._localize(labelKey);
+    const label = this._localize("dashboard.drawer_ip_address");
     if (list.length === 0) {
       return this._row("ip-network-outline", label, "", true);
     }
+    if (list.length === 1) {
+      return html`
+        <div class="row">
+          <div class="icon">
+            <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
+          </div>
+          <div class="content">
+            <div class="label">${label}</div>
+            <div class="value mono">${list[0]}</div>
+          </div>
+        </div>
+      `;
+    }
+    const expanded = this._ipExpanded;
+    const extra = list.length - 1;
     return html`
       <div class="row">
         <div class="icon">
@@ -709,12 +763,88 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          ${list.map(
-            (ip) => html`<div class="value mono">${ip}</div>`,
-          )}
+          <div class="value mono">${list[0]}</div>
+          ${expanded
+            ? list
+                .slice(1)
+                .map((ip) => html`<div class="value mono">${ip}</div>`)
+            : nothing}
+          <button
+            class="ip-toggle"
+            type="button"
+            aria-expanded=${expanded}
+            @click=${() => {
+              this._ipExpanded = !this._ipExpanded;
+            }}
+          >
+            <wa-icon
+              library="mdi"
+              name=${expanded ? "chevron-up" : "chevron-down"}
+            ></wa-icon>
+            ${expanded
+              ? this._localize("dashboard.drawer_ip_hide_extra")
+              : this._localize("dashboard.drawer_ip_show_more", { n: extra })}
+          </button>
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Render the device's primary MAC address (always; placeholder when unknown).
+   *
+   * Backend normalizes at ingest to canonical
+   * ``XX:XX:XX:XX:XX:XX`` form, so ``d.mac_address`` is rendered
+   * directly with no per-display formatting. The row stays visible
+   * even before the first mDNS observation so users get a stable
+   * diagnostic shape — same em-dash placeholder ``_row`` already
+   * uses for the IP address row. The sidecar persists the value, so
+   * a freshly-restarted dashboard typically lands with the MAC
+   * pre-filled from the previous session.
+   */
+  private _renderMacAddressRow(d: ConfiguredDevice) {
+    return this._row(
+      "ethernet",
+      this._localize("dashboard.drawer_mac_address"),
+      d.mac_address,
+      true,
+    );
+  }
+
+  /**
+   * Render the derived ethernet MAC, when distinct from the primary.
+   *
+   * Hidden when the YAML doesn't load the ``ethernet`` integration
+   * or when the device's platform is single-MAC (RP2040 / RP2350)
+   * and the derived value would just duplicate ``mac_address``.
+   * Backend computes the offset (base + 3 on ESP32) so the frontend
+   * just renders the canonical form.
+   */
+  private _renderEthernetMacRow(d: ConfiguredDevice) {
+    if (!d.ethernet_mac || d.ethernet_mac === d.mac_address) return nothing;
+    return this._row(
+      "ethernet",
+      this._localize("dashboard.drawer_ethernet_mac"),
+      d.ethernet_mac,
+      true,
+    );
+  }
+
+  /**
+   * Render the derived Bluetooth MAC, when present.
+   *
+   * Empty for non-ESP32 platforms (the offset table is ESP32-
+   * specific) and for ESP32 devices whose YAML doesn't load any
+   * ``esp32_ble*`` / ``bluetooth_*`` integration.
+   */
+  private _renderBluetoothMacRow(d: ConfiguredDevice) {
+    if (!d.bluetooth_mac || d.bluetooth_mac === d.mac_address) return nothing;
+    return this._row(
+      "bluetooth",
+      this._localize("dashboard.drawer_bluetooth_mac"),
+      d.bluetooth_mac,
+      true,
+    );
   }
 
   /**
@@ -729,10 +859,13 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *
    * Hides itself when no signal has ever been observed (a
    * brand-new device that's never broadcast and never been
-   * pinged) — the placeholder "Waiting for first broadcast…" text
-   * goes there instead. Suppresses the section entirely when the
-   * subscription is in flight (no snapshot yet) so the drawer
-   * doesn't flash an empty header.
+   * pinged) — the placeholder "Waiting for first signal…" text
+   * goes there instead. "Signal" is source-neutral on purpose —
+   * ping is a probe, not a broadcast, so the older
+   * "first broadcast" wording was wrong for ping-source devices.
+   * Suppresses the section entirely when the subscription is in
+   * flight (no snapshot yet) so the drawer doesn't flash an
+   * empty header.
    *
    * The three signal rows share enough shape that a small
    * declarative table drives them — the per-signal differences
@@ -790,7 +923,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </h4>
         ${!anySignal
           ? html`<div class="value muted">
-              ${this._localize("dashboard.drawer_waiting_for_broadcast")}
+              ${this._localize("dashboard.drawer_waiting_for_signal")}
             </div>`
           : rows.map((row) =>
               this._renderReachabilityRow(row, r.active_source, lang),
@@ -851,6 +984,14 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   protected updated(changed: Map<string, unknown>) {
     super.updated?.(changed);
+    if (changed.has("device")) {
+      // Per-device UI state must reset when the drawer is reused
+      // for a new device — without this a user who expanded the
+      // multi-IP row on device A would see device B's drawer open
+      // already-expanded, contradicting the "collapsed by default"
+      // contract.
+      this._ipExpanded = false;
+    }
     if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
       this._reconcileReachabilitySubscription();
       // Run the tick whenever there's a *target* (drawer open +

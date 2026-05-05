@@ -82,6 +82,7 @@ const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
   comment: false,
   version: false,
   ip: false,
+  mac_address: false,
 };
 
 @customElement("esphome-device-table")
@@ -212,13 +213,26 @@ export class ESPHomeDeviceTable extends LitElement {
     const q = (filterValue as string).trim().toLowerCase();
     if (!q) return true;
     const d: DeviceRow = row.original;
-    return (
+    if (
       (d.friendly_name || d.name).toLowerCase().includes(q) ||
       d.config.toLowerCase().includes(q) ||
       d.address.toLowerCase().includes(q) ||
       d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
       d.platform.toLowerCase().includes(q)
-    );
+    ) {
+      return true;
+    }
+    // MAC search: strip ``:`` / ``-`` / ``.`` from both haystack
+    // and needle so a user can find a device by typing any of
+    // ``94:c9:60``, ``94-C9-60``, or the bare ``94c960`` —
+    // the canonical wire form is ``XX:XX:XX:XX:XX:XX`` but users
+    // copy-paste from router admin pages, vendor labels, etc.
+    if (d.mac_address) {
+      const macStripped = d.mac_address.toLowerCase().replace(/[:.-]/g, "");
+      const qStripped = q.replace(/[:.-]/g, "");
+      if (qStripped && macStripped.includes(qStripped)) return true;
+    }
+    return false;
   };
 
   // ─── Lifecycle ───
@@ -253,6 +267,13 @@ export class ESPHomeDeviceTable extends LitElement {
         address: d.address || "",
         ip: d.ip || "",
         ip_addresses: d.ip_addresses,
+        mac_address: d.mac_address || "",
+        // ``ethernet_mac`` / ``bluetooth_mac`` aren't surfaced in
+        // the device list — those are drawer-only fields. The table
+        // column shows the primary MAC (``mac_address``) since
+        // that's the universally-meaningful identifier; the per-
+        // interface derived values are diagnostic detail that
+        // belongs in the per-device drawer.
         platform: d.target_platform || "",
         version: d.deployed_version || "",
         comment: d.comment || "",

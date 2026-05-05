@@ -152,6 +152,32 @@ export interface ConfiguredDevice {
    * mismatch / plaintext.
    */
   api_encryption_active: string | null;
+  /** Canonical ``XX:XX:XX:XX:XX:XX`` MAC observed in the device's
+   *  ``_esphomelib._tcp.local.`` ``mac`` TXT record (e.g.
+   *  ``"94:C9:60:1F:8C:F1"``). Empty string when mDNS hasn't surfaced
+   *  one yet. The backend normalizes at ingest so this field always
+   *  carries the colon-separated uppercase form regardless of which
+   *  case / separator style the firmware happens to broadcast — the
+   *  frontend renders it directly without any per-display formatting.
+   */
+  mac_address: string;
+  /** Derived ethernet MAC for devices whose YAML loads the
+   *  ``ethernet`` integration, in the same canonical
+   *  ``XX:XX:XX:XX:XX:XX`` form as ``mac_address``. Empty string
+   *  when no ethernet integration is loaded or no primary MAC has
+   *  been observed yet. On ESP32 this is the base MAC + 3 to the
+   *  last octet; on RP2040 / RP2350 it equals ``mac_address``
+   *  (single-MAC platforms — the drawer hides the redundant row).
+   */
+  ethernet_mac: string;
+  /** Derived Bluetooth MAC for ESP32 devices whose YAML loads any
+   *  ``esp32_ble*`` / ``bluetooth_*`` integration. Same canonical
+   *  form. Empty string when no bluetooth integration is loaded
+   *  or the platform doesn't follow the ESP-IDF MAC offset scheme
+   *  (e.g. RP2040 — Pico W bluetooth lives on a separate radio
+   *  chip with its own allocation).
+   */
+  bluetooth_mac: string;
 }
 
 /** An adoptable/importable ESPHome device. */
