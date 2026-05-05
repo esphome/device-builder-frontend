@@ -30,11 +30,13 @@ abbreviate. If the template's "Types of changes" list looks
 narrower than the label set the workflow enforces (see step 3),
 prefer the workflow's canonical list when picking a label.
 
-## 3. Apply exactly one release-notes label
+## 3. Apply a release-notes label
 
 `.github/workflows/pr-labels.yaml` uses
 `ludeeus/action-require-labels` to require **at least one** of the
-release-drafter labels:
+release-drafter labels — it does not cap the number, but
+release-drafter slots a PR by its first matching label, so in
+practice apply just one:
 
 `breaking-change`, `bugfix`, `refactor`, `new-feature`,
 `enhancement`, `maintenance`, `ci`, `dependencies`, `docs`.
