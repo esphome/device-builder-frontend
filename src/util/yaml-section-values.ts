@@ -15,12 +15,23 @@ import {
 } from "./yaml-serialize.js";
 
 /**
- * Identifier alphabet ESPHome accepts for top-level / nested config
- * keys. Centralised so the parse and write paths stay in lockstep —
- * if the schema ever broadens (e.g. hyphenated or namespaced keys),
- * both sides change at one site instead of drifting silently.
+ * Identifier alphabet for plain-scalar YAML keys the parser will
+ * accept. The leading character stays strict (``[a-zA-Z_]``) so
+ * list-item dashes, comment lines, and YAML anchors / aliases
+ * (``&foo``, ``*foo``) can't masquerade as keys. The body is
+ * permissive — anything that isn't whitespace, ``:`` (separator),
+ * or ``#`` (comment) — so URL- and path-derived names that
+ * user-keyed sections like ``packages:`` and ``substitutions:``
+ * accept (``ApolloAutomation.R-PRO-1-ETH``, ``vendor/lib@v1``,
+ * ``com.example.thing``) round-trip through the form editor
+ * without dropping the row.
+ *
+ * Quoted keys (``"foo:bar":`` etc.) and other exotic forms aren't
+ * matched here; they fall through to the form-editor's
+ * "complex value" placeholder by virtue of not parsing — see
+ * issue tracker for upstream support if needed.
  */
-const KEY_PATTERN = "[a-zA-Z_][a-zA-Z0-9_]*";
+const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
 
 /**
  * Match the inline-key form on a YAML list-item line
