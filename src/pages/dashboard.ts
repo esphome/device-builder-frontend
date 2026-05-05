@@ -48,6 +48,7 @@ import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  archiveBulkDevices,
   archiveDevice,
   deleteArchivedDevice,
   deleteBulkDevices,
@@ -203,6 +204,14 @@ export class ESPHomePageDashboard extends LitElement {
    *  expensive (5-10min ESP-IDF recompile) so it deserves a
    *  confirm step. Same shared dialog as the two delete flows. */
   @state() private _pendingArchive: ConfiguredDevice | null = null;
+  /** True while the select-bar's "Archive selected" flow waits on
+   *  the shared confirm dialog. Same routing pattern as the
+   *  ``_pendingDelete*`` / ``_pendingArchive`` fields — at most one
+   *  is set; the others stay null so dialog copy + ``_executeConfirm``
+   *  can branch on which mode is active. Bulk archive doesn't need
+   *  to carry a target list itself; the active selection lives in
+   *  ``_selectedDevices`` and is read at execute time. */
+  @state() private _pendingArchiveBulk = false;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
    *  device card / row so the user can spot the freshly-imported
@@ -1219,6 +1228,7 @@ export class ESPHomePageDashboard extends LitElement {
             this._selectedDevices = new Set();
           }}
           @update-selected=${this._updateSelected}
+          @archive-selected=${this._archiveSelected}
           @delete-selected=${this._deleteSelected}
         ></esphome-select-bar>
       `;
@@ -1262,7 +1272,13 @@ export class ESPHomePageDashboard extends LitElement {
     let dialogMessage: string;
     let dialogConfirm: string;
     let dialogDestructive = false;
-    if (this._pendingArchive) {
+    if (this._pendingArchiveBulk) {
+      dialogHeading = this._localize("dashboard.archive_selected_title");
+      dialogMessage = this._localize("dashboard.archive_selected_desc", {
+        count: this._selectedDevices.size,
+      });
+      dialogConfirm = this._localize("dashboard.archive_selected_confirm");
+    } else if (this._pendingArchive) {
       dialogHeading = this._localize("dashboard.archive_title");
       dialogMessage = this._localize("dashboard.archive_desc", {
         name: pendingArchiveName,
@@ -1301,6 +1317,7 @@ export class ESPHomePageDashboard extends LitElement {
           this._pendingDelete = null;
           this._pendingDeleteArchived = null;
           this._pendingArchive = null;
+          this._pendingArchiveBulk = false;
         }}
       ></esphome-confirm-dialog>
       <esphome-rename-device-dialog
@@ -1852,11 +1869,28 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("dashboard.delete_all_none"), { richColors: true });
       return;
     }
-    /* Bulk-delete path — all three pending-* states stay null so
-       the confirm dialog shows the bulk copy ("Delete N device(s)"). */
+    /* Bulk-delete path — all four pending-* states stay null/false
+       so the confirm dialog shows the bulk-delete copy. */
     this._pendingDelete = null;
     this._pendingDeleteArchived = null;
     this._pendingArchive = null;
+    this._pendingArchiveBulk = false;
+    this._confirmDialog.open();
+  }
+
+  private _archiveSelected() {
+    if (this._selectedDevices.size === 0) {
+      toast.info(this._localize("dashboard.archive_all_none"), { richColors: true });
+      return;
+    }
+    /* Bulk-archive path — same shape as ``_deleteSelected`` but
+       sets ``_pendingArchiveBulk`` so the confirm dialog renders
+       the archive copy and ``_executeConfirm`` routes to
+       ``archiveBulkDevices``. */
+    this._pendingDelete = null;
+    this._pendingDeleteArchived = null;
+    this._pendingArchive = null;
+    this._pendingArchiveBulk = true;
     this._confirmDialog.open();
   }
 
@@ -1869,6 +1903,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._pendingDelete = device;
     this._pendingDeleteArchived = null;
     this._pendingArchive = null;
+    this._pendingArchiveBulk = false;
     this._confirmDialog.open();
   }
 
@@ -1879,6 +1914,7 @@ export class ESPHomePageDashboard extends LitElement {
        step — the YAML and its sidecars are unlinked. */
     this._pendingDelete = null;
     this._pendingArchive = null;
+    this._pendingArchiveBulk = false;
     this._pendingDeleteArchived = device;
     this._confirmDialog.open();
   }
@@ -1886,17 +1922,23 @@ export class ESPHomePageDashboard extends LitElement {
   private _confirmArchive(device: ConfiguredDevice) {
     /* Archive is reversible but wipes the per-device build dir
        (5-10 min recompile when restored). Show a confirm dialog
-       that explains both the build wipe and where the user can
-       find the device after archiving — without that hint a
-       silently-disappearing device leads to "where did it go?"
-       support. */
+       — single-device kebab path, mirrors ``_confirmDeleteSingle``. */
     this._pendingDelete = null;
     this._pendingDeleteArchived = null;
+    this._pendingArchiveBulk = false;
     this._pendingArchive = device;
     this._confirmDialog.open();
   }
 
   private _executeConfirm() {
+    if (this._pendingArchiveBulk) {
+      const selected = [...this._selectedDevices];
+      this._pendingArchiveBulk = false;
+      this._selectMode = false;
+      this._selectedDevices = new Set();
+      archiveBulkDevices(selected, this._devices, this._api, this._localize);
+      return;
+    }
     if (this._pendingArchive) {
       const target = this._pendingArchive;
       this._pendingArchive = null;

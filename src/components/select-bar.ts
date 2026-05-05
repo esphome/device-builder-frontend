@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiDelete, mdiUpdate } from "@mdi/js";
+import { mdiArchiveOutline, mdiDelete, mdiUpdate } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -9,7 +9,11 @@ import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-registerMdiIcons({ delete: mdiDelete, update: mdiUpdate });
+registerMdiIcons({
+  "archive-outline": mdiArchiveOutline,
+  delete: mdiDelete,
+  update: mdiUpdate,
+});
 
 @customElement("esphome-select-bar")
 export class ESPHomeSelectBar extends LitElement {
@@ -141,6 +145,16 @@ export class ESPHomeSelectBar extends LitElement {
         background: color-mix(in srgb, var(--esphome-error), transparent 90%);
       }
 
+      .btn--secondary {
+        background: transparent;
+        color: var(--wa-color-text-normal);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
+      .btn--secondary:hover:not(:disabled) {
+        background: var(--wa-color-surface-lowered);
+      }
+
       .btn wa-icon {
         font-size: 16px;
       }
@@ -171,6 +185,16 @@ export class ESPHomeSelectBar extends LitElement {
         <div class="right">
           <button class="btn btn--cancel" @click=${() => this._emit("cancel")}>
             ${this._localize("layout.cancel")}
+          </button>
+          <button
+            class="btn btn--secondary"
+            ?disabled=${this.selectedCount === 0}
+            @click=${() => this._emit("archive-selected")}
+          >
+            <wa-icon library="mdi" name="archive-outline"></wa-icon>
+            ${this._localize("dashboard.archive_selected", {
+              count: this.selectedCount,
+            })}
           </button>
           <button
             class="btn btn--danger"

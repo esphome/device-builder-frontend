@@ -129,6 +129,53 @@ export function deleteDevice(
   });
 }
 
+/**
+ * Archive several devices at once. Mirrors ``deleteBulkDevices``
+ * shape but fans out one ``archiveDevice`` WS call per
+ * configuration — the backend doesn't carry a bulk-archive
+ * command (per-device archive moves YAML + wipes the per-device
+ * build dir; bundling that server-side hasn't paid for itself
+ * yet against the once-in-a-while operation this is). Calls run
+ * concurrently via ``Promise.allSettled`` so the user doesn't
+ * wait N×latency for a small fleet selection; toasts collapse
+ * to one summary success + one toast per failure rather than
+ * the per-device toast the single-archive path emits.
+ */
+export async function archiveBulkDevices(
+  configurations: string[],
+  devices: ConfiguredDevice[],
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+) {
+  const results = await Promise.allSettled(
+    configurations.map((c) => api.archiveDevice(c)),
+  );
+  const succeeded = results.filter((r) => r.status === "fulfilled").length;
+  const failures = results
+    .map((r, i) => ({ result: r, configuration: configurations[i] }))
+    .filter(({ result }) => result.status === "rejected");
+
+  if (succeeded > 0) {
+    toast.success(
+      localize("dashboard.archive_bulk_success", { count: succeeded }),
+      {
+        description: localize("dashboard.action_archive_success_hint"),
+        richColors: true,
+        duration: 8000,
+      },
+    );
+  }
+  for (const { result, configuration } of failures) {
+    const device = devices.find((d) => d.configuration === configuration);
+    const name = device ? device.friendly_name || device.name : configuration;
+    const reason = result.status === "rejected" ? String(result.reason) : "";
+    toast.error(
+      localize("dashboard.action_archive_failed", { name, error: reason }),
+      { richColors: true },
+    );
+  }
+}
+
 export async function deleteBulkDevices(
   configurations: string[],
   devices: ConfiguredDevice[],
