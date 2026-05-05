@@ -668,8 +668,25 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onSave() {
     if (!this._config) return;
-    const errors = validateEntries(
+    // Validate against the *render* schema, not the raw catalog.
+    // For sections in ``MAP_SECTIONS`` (substitutions / packages /
+    // …) the catalog ships an irrelevant flat schema (9 specific
+    // fields for ``packages:``, one bogus ``string`` for
+    // ``substitutions:``) that does not match what the user
+    // actually edits in the form. ``resolveSectionEntries``
+    // produces the synthesised user-keyed-MAP shape; validating
+    // against the catalog instead would (e.g.) reject a
+    // ``packages:`` save because the catalog's required ``url``
+    // field isn't present in the user-named row, and the form
+    // would silently bail (Save click "does nothing") because
+    // ``_fieldErrors`` lives on entries the renderer never
+    // surfaces. Use the same entries the form rendered.
+    const renderEntries = resolveSectionEntries(
+      this.sectionKey,
       this._config.entries,
+    );
+    const errors = validateEntries(
+      renderEntries,
       this._values,
       this._presentComponents,
     );

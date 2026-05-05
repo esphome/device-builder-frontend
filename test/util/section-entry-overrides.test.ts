@@ -19,6 +19,7 @@ import {
   resolveSectionEntries,
 } from "../../src/util/section-entry-overrides.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
+import { validateEntries } from "../../src/util/config-validation.js";
 
 describe("MAP_SECTIONS", () => {
   it("contains 'substitutions'", () => {
@@ -140,5 +141,107 @@ describe("device-section-config wiring", () => {
       expr.includes("this._config.entries"),
       "form's .entries binds to the raw catalog entries — substitutions override is bypassed",
     ).toBe(false);
+  });
+
+  it("routes _onSave's validateEntries through the resolver, not the catalog", async () => {
+    // Regression pin for the "Save click does nothing" bug on
+    // ``packages:`` (and the latent equivalent on
+    // ``substitutions:``). The form rendered the resolver's
+    // user-keyed MAP shape, but ``_onSave`` validated against the
+    // catalog's flat schema — whose required fields (``url`` etc.
+    // for packages) were absent from the user-named rows, so
+    // ``_fieldErrors`` filled up and the save bailed silently.
+    // ``validateEntries`` must see the same entries the form
+    // rendered.
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const fs = await import("node:fs");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const path = await import("node:path");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../src/components/device/device-section-config.ts",
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+
+    const validateCall = /validateEntries\s*\(\s*([^,)]+)\s*,/;
+    const match = src.match(validateCall);
+    expect(match, "validateEntries call not found").not.toBeNull();
+    const firstArg = match![1].trim();
+    expect(
+      firstArg.includes("renderEntries") ||
+        firstArg.includes("resolveSectionEntries"),
+      `validateEntries' first arg is '${firstArg}', not the resolver's output`,
+    ).toBe(true);
+    expect(
+      firstArg === "this._config.entries",
+      "validateEntries reads the raw catalog — MAP-section saves silently bail on the catalog's required fields",
+    ).toBe(false);
+  });
+});
+
+describe("save validation contract", () => {
+  // ``_onSave`` must validate against the *render* schema. Pin
+  // the contract directly: a packages-shaped catalog (some
+  // required fields the user-keyed rows don't carry) produces
+  // errors when validated raw, but no errors once routed through
+  // ``resolveSectionEntries`` for a MAP section. Same shape that
+  // bit ``substitutions`` latently and ``packages`` visibly.
+  it("validateEntries against the resolver's output accepts user-keyed values that the raw catalog would reject", () => {
+    const packagesShapedCatalog: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "url",
+        type: ConfigEntryType.STRING,
+        required: true,
+      }),
+      makeConfigEntry({
+        key: "ref",
+        type: ConfigEntryType.STRING,
+        required: false,
+      }),
+    ];
+    const userKeyedValues: Record<string, unknown> = {
+      ApolloAutomation: "github://example/repo",
+      new_1: "github://example/other",
+    };
+
+    // Buggy path (validate against catalog): ``url`` reports
+    // required, so ``_fieldErrors`` populates and the save bails.
+    const rawErrors = validateEntries(
+      packagesShapedCatalog,
+      userKeyedValues,
+    );
+    expect(rawErrors.has("url")).toBe(true);
+
+    // Fixed path (validate against resolver output): the single
+    // user-keyed MAP entry isn't required, so no errors and the
+    // save proceeds.
+    const resolved = resolveSectionEntries(
+      "substitutions",
+      packagesShapedCatalog,
+    );
+    const resolvedErrors = validateEntries(resolved, userKeyedValues);
+    expect(resolvedErrors.size).toBe(0);
+  });
+
+  it("non-MAP sections still see catalog requirements (the resolver is a pass-through)", () => {
+    // Sanity check: the fix doesn't accidentally suppress
+    // validation for non-MAP sections. For ``wifi`` the resolver
+    // hands the catalog back unchanged, so a missing required
+    // ``ssid`` still errors.
+    const wifiCatalog: ConfigEntry[] = [
+      makeConfigEntry({
+        key: "ssid",
+        type: ConfigEntryType.STRING,
+        required: true,
+      }),
+    ];
+    const errors = validateEntries(
+      resolveSectionEntries("wifi", wifiCatalog),
+      {},
+    );
+    expect(errors.has("ssid")).toBe(true);
   });
 });
