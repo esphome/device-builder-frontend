@@ -479,6 +479,14 @@ export class ESPHomePageDevice extends LitElement {
     // debounce window) into ``_yaml`` so the save commits exactly
     // what the user typed — not what was last flushed.
     this._activeSection?.flushPending();
+    // The Save button activates on ``_isDirty`` (yaml diff OR the
+    // section editor's transient pre-flush dirty flag), so a click
+    // inside the debounce window can land here with the form
+    // marked dirty but the post-flush yaml unchanged from the
+    // saved buffer (e.g. user typed and undid a character, or the
+    // splice normalised to the same serialisation). Bail before
+    // toasting / hitting the backend — neither has anything to do.
+    if (!this._isYamlDirty) return;
     this._savedYaml = this._yaml;
     toast.success(this._localize("device.yaml_saved"), { richColors: true });
     this._api.updateConfig(this.id, this._yaml).catch((e) => {

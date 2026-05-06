@@ -325,18 +325,28 @@ export class ESPHomeDeviceEditor extends LitElement {
                     ${this._localize("dashboard.install")}
                   </button>`
                 : nothing}
-            <button
-              type="button"
-              class="validate-button"
-              ?disabled=${this.hasUnsavedEdits}
-              @click=${this._onValidate}
+            <!-- Span wrapper carries the title because a disabled
+                 button isn't focusable and most browsers won't
+                 surface its tooltip on hover. The disabled state
+                 is still announced via the button's own disabled
+                 attribute; the span just makes the why-disabled
+                 hint reachable for mouse users. -->
+            <span
+              class="validate-button-wrap"
               title=${this.hasUnsavedEdits
                 ? this._localize("device.validate_disabled_pending")
                 : this._localize("device.validate_yaml")}
             >
-              <wa-icon library="mdi" name="check-circle-outline"></wa-icon>
-              ${this._localize("device.validate")}
-            </button>
+              <button
+                type="button"
+                class="validate-button"
+                ?disabled=${this.hasUnsavedEdits}
+                @click=${this._onValidate}
+              >
+                <wa-icon library="mdi" name="check-circle-outline"></wa-icon>
+                ${this._localize("device.validate")}
+              </button>
+            </span>
             <button
               type="button"
               class="save-button"

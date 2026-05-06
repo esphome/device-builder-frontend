@@ -169,6 +169,13 @@ export const deviceEditorStyles = css`
     font-size: 16px;
   }
 
+  /* Tooltip carrier so the "why disabled" hint reaches mouse users
+     even when the underlying button has the disabled attribute
+     (which suppresses pointer events on the button itself). */
+  .validate-button-wrap {
+    display: inline-flex;
+  }
+
   .header-actions {
     display: inline-flex;
     align-items: center;
