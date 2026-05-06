@@ -30,6 +30,9 @@ import type {
   ImportableDeviceAddedEventData,
   ImportableDeviceRemovedEventData,
   InitialStateEventData,
+  Label,
+  LabelDeletedEventData,
+  LabelEventData,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -51,6 +54,7 @@ import {
   importableDevicesContext,
   integrationDocsContext,
   isHaIngressContext,
+  labelsContext,
   localizeContext,
   serverVersionContext,
   versionContext,
@@ -200,6 +204,17 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: integrationDocsContext })
   @state()
   private _integrationDocs: Record<string, string> = {};
+
+  /** Global label catalog. Fetched once on (re)connect via
+   *  ``labels/list`` and kept in sync by ``label_*`` events
+   *  delivered through ``subscribe_events``. Empty until the
+   *  fetch lands; consumers tolerate that — chip renderers
+   *  silently drop unknown ids (``resolveLabelIds``) and the
+   *  toolbar filter hides itself entirely on an empty catalog,
+   *  so missing entries simply produce no visible UI. */
+  @provide({ context: labelsContext })
+  @state()
+  private _labels: Label[] = [];
 
   // ─── Auth gate ───────────────────────────────────────────
   // Drives whether we render the connecting spinner, the login form,
@@ -440,7 +455,24 @@ export class ESPHomeApp extends LitElement {
     this._subscribeToEvents();
     this._subscribeToFollowJobs();
     this._loadIntegrationDocs();
+    this._loadLabels();
     this._loadThemePreference();
+  }
+
+  /** Fetch the global label catalog. Called on every (re)connect so
+   *  a session that reconnects after a backend label change picks up
+   *  the latest state — push events drive it day-to-day, but a
+   *  reconnect crosses a window where events were dropped. A failure
+   *  here is non-fatal: ``_labels`` stays at its previous value (or
+   *  empty on first load); chip renderers silently drop unknown ids
+   *  and the toolbar filter hides itself on an empty catalog, so the
+   *  missing data simply produces no visible UI. */
+  private async _loadLabels() {
+    try {
+      this._labels = await this._api.listLabels();
+    } catch (err) {
+      console.warn("Failed to load labels catalog:", err);
+    }
   }
 
   /**
@@ -706,6 +738,32 @@ export class ESPHomeApp extends LitElement {
         this._importableDevices = this._importableDevices.filter(
           (d) => d.name !== name,
         );
+        break;
+      }
+      case DeviceEventType.LABEL_CREATED: {
+        const { label } = data as LabelEventData;
+        if (!this._labels.some((l) => l.id === label.id)) {
+          this._labels = [...this._labels, label];
+        }
+        break;
+      }
+      case DeviceEventType.LABEL_UPDATED: {
+        // Upsert, not just replace — if the initial ``labels/list``
+        // failed (or this client missed the matching ``LABEL_CREATED``
+        // for any reason) the catalog can be missing this entry, and
+        // a plain ``map`` would silently drop the update and leave the
+        // catalog permanently incomplete until the next reconnect.
+        const { label } = data as LabelEventData;
+        const idx = this._labels.findIndex((l) => l.id === label.id);
+        this._labels =
+          idx === -1
+            ? [...this._labels, label]
+            : this._labels.map((l) => (l.id === label.id ? label : l));
+        break;
+      }
+      case DeviceEventType.LABEL_DELETED: {
+        const { label_id } = data as LabelDeletedEventData;
+        this._labels = this._labels.filter((l) => l.id !== label_id);
         break;
       }
     }

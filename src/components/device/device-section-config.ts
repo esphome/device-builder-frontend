@@ -1,6 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiContentSave,
   mdiDelete,
   mdiInformationOutline,
   mdiOpenInNew,
@@ -12,7 +11,6 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type {
   BoardCatalogEntry,
   ConfigEntry,
-  EditorValidateResponse,
 } from "../../api/types.js";
 import {
   KEEP_EMPTY_STRING_SECTIONS,
@@ -24,10 +22,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  anyAdvancedEntry,
-  findFirstErrorTarget,
-} from "../../util/config-entry-tree.js";
+import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import {
   validateEntries,
   type ValidationError,
@@ -40,7 +35,6 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../util/yaml-section-values.js";
-import { lintFailureMessageFromResponse } from "../../util/lint-failure-message.js";
 import { resolveCurrentFromLine } from "../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../util/yaml-serialize.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
@@ -51,14 +45,10 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import "./config-entry-form.js";
-import type {
-  ConfigEntryValueChange,
-  ESPHomeConfigEntryForm,
-} from "./config-entry-form.js";
+import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 
 registerMdiIcons({
-  "content-save": mdiContentSave,
   delete: mdiDelete,
   "information-outline": mdiInformationOutline,
   "open-in-new": mdiOpenInNew,
@@ -151,12 +141,29 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _loading = false;
 
   @state()
-  private _saving = false;
-
-  @state()
   private _dirty = false;
 
   private _loadId = 0;
+
+  /** Pending debounce for auto-syncing form edits into the draft
+   *  YAML. Cleared on flush, on unmount, and when the section
+   *  reloads. */
+  private _draftTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Last YAML the form wrote to itself via auto-sync. The parent
+   *  pipes our `yaml-draft` events back into our `yaml` prop, which
+   *  would otherwise trigger ``device-board-info``'s reload-on-yaml-
+   *  change debounce (`reload()`); reload would briefly flip
+   *  `_loading` and re-parse values into the form, costing the active
+   *  field its focus mid-edit. ``reload()`` short-circuits when this
+   *  matches the live yaml. */
+  private _lastSelfWrittenYaml: string | null = null;
+
+  /** Debounce window for syncing form values into the draft YAML.
+   *  Short enough that the YAML pane updates feel live as the user
+   *  moves between fields, long enough to coalesce typing within a
+   *  single field into one splice + re-render. */
+  private static readonly DRAFT_DEBOUNCE_MS = 200;
 
   @state()
   private _error = "";
@@ -205,9 +212,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state()
   private _resolvedFromLine?: number;
 
-  @query("esphome-config-entry-form")
-  private _form?: ESPHomeConfigEntryForm;
-
   @query("esphome-confirm-dialog")
   private _confirmDialog?: ESPHomeConfirmDialog;
 
@@ -247,6 +251,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
+    if (this._draftTimer) {
+      clearTimeout(this._draftTimer);
+      this._draftTimer = null;
+    }
     this.dispatchEvent(
       new CustomEvent("section-unmount", {
         detail: { node: this },
@@ -256,75 +264,74 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     );
   }
 
-  /** Trigger the section's save flow from outside.
-   *
-   *  Returns ``true`` iff the save actually succeeded —
-   *  ``_onSave`` early-returns silently on validation errors
-   *  (the form's ``_fieldErrors`` stamp tells the user) and on
-   *  ``_resolveSpliceContext`` failure, leaving ``_dirty=true``.
-   *  The page-level "Save and leave" handler awaits this and
-   *  only proceeds with the section switch when the buffer is
-   *  actually clean. */
-  public async save(): Promise<boolean> {
-    await this._onSave();
-    return !this._dirty;
+  /** Flush any pending draft sync immediately. Called by the page
+   *  before saving / switching sections / leaving the page so the
+   *  user's last keystroke isn't lost in the debounce window. Safe
+   *  to call when no flush is pending — no-op. The flush dispatches
+   *  ``yaml-draft`` synchronously, so callers that read
+   *  ``page._yaml`` on the next line see the up-to-date value. */
+  public flushPending(): void {
+    if (this._draftTimer === null) return;
+    clearTimeout(this._draftTimer);
+    this._draftTimer = null;
+    this._flushDraft();
   }
 
-  /**
-   * Resolve the splice context for save / delete — the live YAML
-   * and a current, validated `fromLine`. Sets `_error` and
-   * returns `null` when the section can't be located so callers
-   * surface the failure with a localised error instead of running
-   * the splice with stale inputs.
+  /** Resolve the splice context for delete — the live YAML and a
+   *  current, validated `fromLine`. Sets `_error` and returns `null`
+   *  when the section can't be located so callers surface the
+   *  failure with a localised error instead of running the splice
+   *  with stale inputs.
    *
-   * `resolveCurrentFromLine` returns `undefined` for empty /
-   * unbound `this.yaml` AND for "section key no longer present
-   * in the live YAML" (user pasted away the section, cleared
-   * the editor, or the cached `fromLine` shifted past a
-   * now-removed key). All three collapse to the same
-   * user-facing error — clobbering config with an empty-string
-   * splice is structurally impossible when we don't proceed
-   * without a resolved line.
+   *  `resolveCurrentFromLine` returns `undefined` for empty /
+   *  unbound `this.yaml` AND for "section key no longer present in
+   *  the live YAML" (user pasted away the section, cleared the
+   *  editor, or the cached `fromLine` shifted past a now-removed
+   *  key). All three collapse to the same user-facing error —
+   *  clobbering config with an empty-string splice is structurally
+   *  impossible when we don't proceed without a resolved line.
    *
-   * Asymmetric on purpose with the read / load path: that path
-   * is reactive (driven by external yaml mutation, not user
-   * intent), so a popup error for "section vanished" would feel
-   * intrusive — it surfaces an empty form instead. Save / delete
-   * fire from an explicit user action, so an error is the right
-   * acknowledgement.
-   *
-   * `notFoundErrorKey` is the localize key surfaced
-   * (`device.save_error` / `device.section_delete_error`).
+   *  Asymmetric on purpose with the read / load path: that path is
+   *  reactive (driven by external yaml mutation, not user intent),
+   *  so a popup error for "section vanished" would feel intrusive
+   *  — it surfaces an empty form instead. Delete fires from an
+   *  explicit user action, so an error is the right
+   *  acknowledgement.
    */
-  private _resolveSpliceContext(
-    // Closed union so a typo at the call site (the only two
-    // surfacing paths) fails to compile rather than silently
-    // resolving to the locale key as English.
-    notFoundErrorKey: "device.save_error" | "device.section_delete_error",
-  ): { yaml: string; fromLine: number } | null {
+  private _resolveDeleteContext(): { yaml: string; fromLine: number } | null {
     const fromLine = resolveCurrentFromLine(
       this.yaml,
       this.sectionKey,
       this.fromLine,
     );
     if (fromLine === undefined) {
-      this._error = this._localize(notFoundErrorKey);
+      this._error = this._localize("device.section_delete_error");
       return null;
     }
     return { yaml: this.yaml, fromLine };
   }
 
-  /** Reload config from the live YAML if the form has no unsaved
-   *  changes. The canonical caller is `device-board-info`'s
-   *  `updated()` hook (`device-board-info.ts`, `_reloadTimer`),
-   *  which debounces this against `yaml` prop changes so paste /
-   *  external mutations re-seed a clean form. The dirty-check
-   *  here keeps mid-edit reloads from clobbering unsaved field
-   *  changes — board-info delegates the gating to us. */
+  /** Reload config from the live YAML.
+   *
+   *  Two skip cases:
+   *  - the live yaml exactly matches what we just wrote ourselves
+   *    via ``_flushDraft`` (the parent loops the draft event back
+   *    through our ``yaml`` prop). Reloading would re-parse our
+   *    own write and rebuild ``_values`` — observable as a brief
+   *    spinner flash and a focus loss on whichever field the user
+   *    is still editing.
+   *  - a debounced flush is pending. The form is mid-edit; let it
+   *    flush first so the user's in-flight keystrokes aren't
+   *    overwritten by the now-stale yaml.
+   *
+   *  Canonical caller is ``device-board-info``'s ``updated()`` hook
+   *  (``_reloadTimer``), which debounces this against ``yaml`` prop
+   *  changes so paste / external mutations re-seed a clean form. */
   public reload() {
-    if (!this._dirty && this.sectionKey && this.configuration) {
-      this._loadConfig();
-    }
+    if (!this.sectionKey || !this.configuration) return;
+    if (this._draftTimer !== null) return;
+    if (this.yaml === this._lastSelfWrittenYaml) return;
+    this._loadConfig();
   }
 
   /** Public read-only view of the unsaved-changes flag.
@@ -360,6 +367,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     this._config = null;
     this._isUnknown = false;
     this._setDirty(false);
+    if (this._draftTimer) {
+      clearTimeout(this._draftTimer);
+      this._draftTimer = null;
+    }
+    this._lastSelfWrittenYaml = null;
 
     try {
       const platform = this.board?.esphome.platform;
@@ -560,14 +572,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .yaml=${this.yaml}
               .fromLine=${this._resolvedFromLine}
               .presentComponents=${this._presentComponents}
-              ?disabled=${this._saving}
               ?show-advanced=${showAdvanced}
               @value-change=${this._onValueChange}
             ></esphome-config-entry-form>
             ${hasAdvanced
               ? html`<div class="advanced-toggle-row">
                   <wa-switch
-                    ?checked=${showAdvanced}
+                    .checked=${showAdvanced}
                     @change=${(e: Event) =>
                       this._setShowAdvanced(
                         (
@@ -584,19 +595,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             ${this._error
               ? html`<p class="error">${this._error}</p>`
               : nothing}
-            <div class="actions">
-              ${canDelete ? this._renderDeleteButton() : nothing}
-              <button
-                class="save-button"
-                ?disabled=${this._saving || !this._dirty}
-                @click=${this._onSave}
-              >
-                <wa-icon library="mdi" name="content-save"></wa-icon>
-                ${this._saving
-                  ? this._localize("device.saving")
-                  : this._localize("device.save")}
-              </button>
-            </div>
+            ${canDelete
+              ? html`<div class="actions">
+                  ${this._renderDeleteButton()}
+                </div>`
+              : nothing}
           `}
       ${canDelete
         ? html`<esphome-confirm-dialog
@@ -615,7 +618,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _renderDeleteButton() {
     return html`<button
       class="delete-button"
-      ?disabled=${this._saving || this._deleting}
+      ?disabled=${this._deleting}
       @click=${this._onDeleteClick}
     >
       <wa-icon library="mdi" name="delete"></wa-icon>
@@ -629,7 +632,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private async _onDeleteConfirmed() {
     if (!this._config) return;
-    const ctx = this._resolveSpliceContext("device.section_delete_error");
+    const ctx = this._resolveDeleteContext();
     if (!ctx) return;
     this._deleting = true;
     this._error = "";
@@ -692,161 +695,93 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       next.delete(errKey);
       this._fieldErrors = next;
     }
+    this._scheduleDraftFlush();
   }
 
-  private async _scrollFirstErrorIntoView(
-    errors: Map<string, ValidationError>,
-  ) {
-    if (!this._config) return;
-
-    const firstHit = findFirstErrorTarget(this._config.entries, errors);
-    if (!firstHit) return;
-    const { path, hasAdvancedAncestor } = firstHit;
-
-    if (hasAdvancedAncestor && !this._showAdvanced) {
-      this._setShowAdvanced(true);
-      await this.updateComplete;
-    }
-
-    // Open every parent NESTED group on the form so the failing field
-    // is actually rendered when we go to find it.
-    if (path.length > 1) {
-      for (let i = 1; i < path.length; i++) {
-        this._form?.openNested(path.slice(0, i).join("."));
-      }
-      await this.updateComplete;
-      await this._form?.updateComplete;
-    }
-
-    const root = this._form?.shadowRoot;
-    if (!root) return;
-    const container = root.querySelector(
-      `[data-field-key="${CSS.escape(path.join("."))}"]`,
-    ) as HTMLElement | null;
-    if (!container) return;
-
-    container.scrollIntoView({ behavior: "smooth", block: "center" });
-    const focusable = container.querySelector<HTMLElement>(
-      "input, select, textarea, wa-select, wa-switch, [tabindex]",
+  private _scheduleDraftFlush() {
+    if (this._draftTimer) clearTimeout(this._draftTimer);
+    this._draftTimer = setTimeout(
+      () => this._flushDraft(),
+      ESPHomeDeviceSectionConfig.DRAFT_DEBOUNCE_MS,
     );
-    focusable?.focus({ preventScroll: true });
   }
 
-  private async _onSave() {
+  /** Splice the current form ``_values`` into the draft YAML and
+   *  emit ``yaml-draft`` so the page updates ``_yaml`` (NOT
+   *  ``_savedYaml`` — the right-pane Save button is the only path
+   *  that commits to disk).
+   *
+   *  Surfaces validation errors inline via ``_fieldErrors`` but
+   *  still splices when invalid: the YAML pane is the source of
+   *  truth for "what would be saved" and hiding partial edits there
+   *  would confuse a user who expects to see their changes show up.
+   *  Genuine YAML / ESPHome validity is enforced by the existing
+   *  red-squiggle lint on the YAML pane and by the explicit Validate
+   *  button. */
+  private _flushDraft() {
+    this._draftTimer = null;
     if (!this._config) return;
+
     // Validate against the *render* schema, not the raw catalog.
     // For sections in ``MAP_SECTIONS`` (substitutions / packages /
-    // …) the catalog ships an irrelevant flat schema (9 specific
-    // fields for ``packages:``, one bogus ``string`` for
-    // ``substitutions:``) that does not match what the user
-    // actually edits in the form. ``resolveSectionEntries``
-    // produces the synthesised user-keyed-MAP shape; validating
-    // against the catalog instead would (e.g.) reject a
-    // ``packages:`` save because the catalog's required ``url``
-    // field isn't present in the user-named row, and the form
-    // would silently bail (Save click "does nothing") because
-    // ``_fieldErrors`` lives on entries the renderer never
-    // surfaces. Use the same entries the form rendered.
+    // …) the catalog ships an irrelevant flat schema that does not
+    // match what the user actually edits in the form.
+    // ``resolveSectionEntries`` produces the synthesised user-keyed-
+    // MAP shape; using the catalog instead would surface phantom
+    // "missing required field" errors (e.g. ``packages.url``) on
+    // every keystroke.
     const renderEntries = resolveSectionEntries(
       this.sectionKey,
       this._config.entries,
     );
-    const errors = validateEntries(
+    this._fieldErrors = validateEntries(
       renderEntries,
       this._values,
       this._presentComponents,
     );
-    if (errors.size > 0) {
-      this._fieldErrors = errors;
-      await this.updateComplete;
-      this._scrollFirstErrorIntoView(errors);
+
+    const fromLine = resolveCurrentFromLine(
+      this.yaml,
+      this.sectionKey,
+      this.fromLine,
+    );
+    if (fromLine === undefined) {
+      // Section was removed from the live YAML between the user's
+      // keystroke and our debounce firing (paste / external edit).
+      // Drop the splice silently — the next time the user picks
+      // this section in the navigator, ``_loadConfig`` will rebuild
+      // from whatever's in YAML now.
+      this._setDirty(false);
       return;
     }
-    this._fieldErrors = new Map();
-    const ctx = this._resolveSpliceContext("device.save_error");
-    if (!ctx) return;
-    this._saving = true;
-    this._error = "";
-    try {
-      const newYaml = updateSectionInYaml(
-        ctx.yaml,
-        this.sectionKey,
-        this._values,
-        ctx.fromLine,
-        // Substitutions-only contract: the user typed a key +
-        // cleared the value, that's intentional data and must
-        // round-trip. Other MAP sections (``packages``) treat an
-        // empty value as a placeholder row the user hasn't filled
-        // in yet — the YAML would still be syntactically valid,
-        // but ESPHome's ``packages:`` schema validator rejects an
-        // empty-string package definition, so dropping the
-        // placeholder row keeps the saved config loadable.
-        { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(this.sectionKey) },
-      );
-      // Refuse to save a YAML that ESPHome would reject. Same
-      // backend lint the YAML editor's red squiggles come from
-      // (yaml-lint-backend.ts) — surface upstream's actual error
-      // message verbatim instead of duplicating ESPHome's
-      // validators here (where they'd silently drift on any
-      // upstream change to e.g. the ``packages:`` shorthand).
-      // Catching it pre-save means the user gets immediate
-      // feedback in the form view rather than discovering the
-      // failure on the next compile.
-      const lintError = await this._lintFailureMessage(newYaml);
-      if (lintError !== null) {
-        this._error = lintError;
-        return;
-      }
-      const title = this._config.title;
-      this._api.updateConfig(this.configuration, newYaml).catch((e) => {
-        this._error =
-          e instanceof Error ? e.message : this._localize("device.save_error");
-      });
-      this._setDirty(false);
-      this.dispatchEvent(
-        new CustomEvent("yaml-updated", {
-          detail: { yaml: newYaml },
-          bubbles: true,
-          composed: true,
-        }),
-      );
-      toast.success(this._localize("device.section_saved_toast", { title }), {
-        richColors: true,
-      });
-    } catch (e) {
-      this._error =
-        e instanceof Error ? e.message : this._localize("device.save_error");
-    } finally {
-      this._saving = false;
-    }
-  }
 
-  /**
-   * Run *candidateYaml* through ``editor/validate_yaml`` (the same
-   * backend lint that drives the YAML editor's red squiggles) and
-   * return ESPHome's first error message if any, or ``null`` when
-   * the YAML is clean. Network failure → ``null`` (fail open):
-   * blocking save on a transient WS hiccup would be worse UX than
-   * letting the user proceed and seeing the error on next compile.
-   */
-  private async _lintFailureMessage(
-    candidateYaml: string,
-  ): Promise<string | null> {
-    let res: EditorValidateResponse;
-    try {
-      res = await this._api.validateYaml(this.configuration, candidateYaml);
-    } catch {
-      return null;
-    }
-    // Pure response→message reduction lives in
-    // ``util/lint-failure-message.ts`` so the empty-trim
-    // fallback contract is unit-testable in node without
-    // standing up a Lit component. The localised label is the
-    // fallback when the backend reports an error whose
-    // ``message`` trims to empty.
-    return lintFailureMessageFromResponse(
-      res,
-      this._localize("device.section_save_error"),
+    const newYaml = updateSectionInYaml(
+      this.yaml,
+      this.sectionKey,
+      this._values,
+      fromLine,
+      // Substitutions-only contract: the user typed a key +
+      // cleared the value, that's intentional data and must
+      // round-trip. Other MAP sections (``packages``) treat an
+      // empty value as a placeholder row the user hasn't filled in
+      // yet — the YAML would still be syntactically valid, but
+      // ESPHome's ``packages:`` schema validator rejects an empty-
+      // string package definition, so dropping the placeholder row
+      // keeps the saved config loadable.
+      { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(this.sectionKey) },
+    );
+
+    this._setDirty(false);
+
+    if (newYaml === this.yaml) return;
+
+    this._lastSelfWrittenYaml = newYaml;
+    this.dispatchEvent(
+      new CustomEvent("yaml-draft", {
+        detail: { yaml: newYaml },
+        bubbles: true,
+        composed: true,
+      }),
     );
   }
 }

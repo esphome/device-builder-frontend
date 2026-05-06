@@ -76,6 +76,7 @@ import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
+import "../components/labels/labels-filter.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
@@ -136,6 +137,13 @@ export class ESPHomePageDashboard extends LitElement {
 
   @state() private _showDiscovered = false;
   @state() private _search = "";
+
+  /** Label-id filter: a device is shown only when its
+   *  ``device.labels`` list contains *every* selected id. Logical
+   *  AND on purpose — a user adding chips to the filter expects each
+   *  one to narrow the result, not widen it. Empty set disables the
+   *  filter entirely. */
+  @state() private _selectedLabels: string[] = [];
 
   /**
    * When true, the search input drives a fleet-wide YAML-content
@@ -409,9 +417,10 @@ export class ESPHomePageDashboard extends LitElement {
 
     const q = this._search.trim().toLowerCase();
     const sorted = this._sortedDevices;
+    const labelFiltered = this._applyLabelFilter(sorted);
     const filtered = q
-      ? sorted.filter((d) => matchesDeviceName(d, q))
-      : sorted;
+      ? labelFiltered.filter((d) => matchesDeviceName(d, q))
+      : labelFiltered;
 
     return html`
       ${this._renderBanner()} ${this._renderDiscoveredGrid()}
@@ -449,6 +458,8 @@ export class ESPHomePageDashboard extends LitElement {
       <div class="toolbar">
         <div class="toolbar-row">
           ${this._renderSearchInput()} ${this._renderViewToggle()}
+          <span class="toolbar-spacer"></span>
+          ${this._renderFilterGroup()}
         </div>
         ${this._renderDiscoveryHint()}
         ${matchCount !== null
@@ -519,6 +530,25 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  /** Apply the active label filter (logical AND across selections)
+   *  to the input device list. Empty selection short-circuits to
+   *  the input unchanged. Stale ids — labels that were deleted
+   *  while their filter chip stayed in our selection — silently
+   *  match no devices, surfacing the empty state and prompting the
+   *  user to clear; the alternative (silently dropping the stale
+   *  id) would change the result set without any visible
+   *  explanation. */
+  private _applyLabelFilter(devices: ConfiguredDevice[]): ConfiguredDevice[] {
+    if (this._selectedLabels.length === 0) return devices;
+    const required = this._selectedLabels;
+    return devices.filter((d) => {
+      const ids = d.labels;
+      if (!ids || ids.length === 0) return false;
+      const set = new Set(ids);
+      return required.every((id) => set.has(id));
+    });
+  }
+
   /** Cached, sorted view of ``_devices``. Cache key is the array
    *  reference, which is replaced (not mutated) by every WS event
    *  in app-shell, so an event that doesn't touch the device list
@@ -543,7 +573,7 @@ export class ESPHomePageDashboard extends LitElement {
    *  user can actually see. */
   private _currentlyVisibleConfigurations(): string[] {
     const q = this._search.trim().toLowerCase();
-    const sorted = this._sortedDevices;
+    const sorted = this._applyLabelFilter(this._sortedDevices);
     if (!q) return sorted.map((d) => d.configuration);
     const isTable = this._view === DashboardView.TABLE;
     return sorted
@@ -669,13 +699,11 @@ export class ESPHomePageDashboard extends LitElement {
     const yaml = this._yamlMode;
     const cardsLabel = this._localize("dashboard.view_cards");
     const tableLabel = this._localize("dashboard.view_table");
-    const yamlLabel = this._localize("yaml_search.switch_to_yaml");
-    // Three-way segmented control: device-list view (cards or
-    // table) plus a YAML-content-search mode. Only one button
-    // shows ``active`` at a time. Clicking cards / table while
-    // in YAML mode flips out of YAML and sets the chosen view;
-    // clicking ``{}`` flips into YAML mode and the underlying
-    // ``_view`` is preserved for when the user returns.
+    // Two-way segmented control for the device-list view. The YAML
+    // mode used to live here as a third segment but reads better
+    // grouped with the labels filter — it's a "narrow what's
+    // showing" affordance, not a "how is it laid out" choice. See
+    // ``_renderFilterGroup`` for the YAML-mode button.
     return html`
       <div
         class="view-toggle"
@@ -702,13 +730,30 @@ export class ESPHomePageDashboard extends LitElement {
         >
           <wa-icon library="mdi" name="table"></wa-icon>
         </button>
+      </div>
+    `;
+  }
+
+  /** Group the filtering affordances — labels filter + YAML-content
+   *  toggle — into one cluster sitting at the right of the toolbar.
+   *  Both narrow what the device list shows; pairing them visually
+   *  keeps the "how do I find a thing" tools together and away from
+   *  the view-mode toggle, which controls layout, not filtering. */
+  private _renderFilterGroup() {
+    const yaml = this._yamlMode;
+    const yamlLabel = this._localize(
+      yaml ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml",
+    );
+    return html`
+      <div class="filter-group">
+        ${this._renderLabelsFilter()}
         <button
-          class="view-toggle-btn ${yaml ? "active" : ""}"
+          class="select-toggle-btn ${yaml ? "active" : ""}"
           type="button"
           title=${yamlLabel}
           aria-label=${yamlLabel}
           aria-pressed=${yaml ? "true" : "false"}
-          @click=${() => this._setSearchMode(true)}
+          @click=${this._toggleSearchMode}
         >
           <wa-icon library="mdi" name="code-braces"></wa-icon>
         </button>
@@ -950,11 +995,22 @@ export class ESPHomePageDashboard extends LitElement {
         <div class="toolbar-row">
           ${this._renderSearchInput()} ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
+          <span class="toolbar-spacer"></span>
+          ${this._renderFilterGroup()}
         </div>
         ${this._renderDiscoveryHint()}
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
       </div>
     `;
+  }
+
+  private _renderLabelsFilter() {
+    return html`<esphome-labels-filter
+      .selected=${this._selectedLabels}
+      @labels-filter-change=${(e: CustomEvent<string[]>) => {
+        this._selectedLabels = e.detail;
+      }}
+    ></esphome-labels-filter>`;
   }
 
   private _renderEmptySearch() {
@@ -1039,6 +1095,7 @@ export class ESPHomePageDashboard extends LitElement {
               .name=${device.friendly_name || device.name}
               .configuration=${device.configuration}
               .state=${device.state}
+              .labelIds=${device.labels ?? []}
               ?has-pending-changes=${device.has_pending_changes === true}
               ?has-update-available=${device.update_available}
               ?api-enabled=${device.api_enabled === true}
@@ -1071,9 +1128,15 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderTable() {
+    // Pre-filter on labels at the dashboard level so the table only
+    // sees the post-filter set; the table's own global search then
+    // narrows further across name / address / IP / MAC. Using
+    // ``_devices`` directly (instead of ``_sortedDevices``) keeps
+    // the table's own column-level sort authoritative.
+    const filteredDevices = this._applyLabelFilter(this._devices);
     return html`
       <esphome-device-table
-        .devices=${this._devices}
+        .devices=${filteredDevices}
         .search=${this._search}
         .activeJobs=${this._activeJobs}
         .recentJobs=${this._recentJobs}
@@ -1122,6 +1185,8 @@ export class ESPHomePageDashboard extends LitElement {
           <div class="toolbar-row">
             ${this._renderSearchInput()} ${this._renderSelectToggle()}
             ${this._renderViewToggle()}
+            <span class="toolbar-spacer"></span>
+            ${this._renderFilterGroup()}
           </div>
           ${this._renderDiscoveryHint()}
         </div>

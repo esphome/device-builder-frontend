@@ -1,6 +1,8 @@
 import { consume } from "@lit/context";
 import {
   mdiBugOutline,
+  mdiClipboardListOutline,
+  mdiForumOutline,
   mdiLightbulbOutline,
   mdiMagnify,
   mdiOpenInNew,
@@ -17,10 +19,18 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   "bug-outline": mdiBugOutline,
+  "clipboard-list-outline": mdiClipboardListOutline,
+  "forum-outline": mdiForumOutline,
   "lightbulb-outline": mdiLightbulbOutline,
   magnify: mdiMagnify,
   "open-in-new": mdiOpenInNew,
 });
+
+const SURVEY_LINK = {
+  icon: "clipboard-list-outline",
+  labelKey: "feedback.survey",
+  href: "https://usabi.li/do/3wv9cloipto9/wadwk6",
+} as const;
 
 const LINKS = [
   {
@@ -42,6 +52,11 @@ const LINKS = [
     icon: "lightbulb-outline",
     labelKey: "feedback.new_feature",
     href: "https://github.com/orgs/esphome/discussions/new?category=builder-features-or-enhancements",
+  },
+  {
+    icon: "forum-outline",
+    labelKey: "feedback.discord",
+    href: "https://discord.gg/Rf2jWGVjaK",
   },
 ] as const;
 
@@ -136,6 +151,28 @@ export class ESPHomeFeedbackDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         flex-shrink: 0;
       }
+
+      .link.featured {
+        background: var(--esphome-primary);
+        border-color: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+        margin-bottom: var(--wa-space-s);
+      }
+
+      .link.featured:hover {
+        background: color-mix(in srgb, var(--esphome-primary), black 12%);
+        border-color: color-mix(in srgb, var(--esphome-primary), black 12%);
+      }
+
+      .link.featured .link-icon,
+      .link.featured .link-external,
+      .link.featured:hover .link-icon {
+        color: var(--esphome-on-primary);
+      }
+
+      .link.featured .link-label {
+        font-weight: var(--wa-font-weight-bold);
+      }
     `,
   ];
 
@@ -155,6 +192,21 @@ export class ESPHomeFeedbackDialog extends LitElement {
       >
         <p class="description">${this._localize("feedback.description")}</p>
         <div class="links">
+          <a
+            class="link featured"
+            href=${SURVEY_LINK.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            @click=${this.close}
+          >
+            <wa-icon class="link-icon" library="mdi" name=${SURVEY_LINK.icon}></wa-icon>
+            <span class="link-label">${this._localize(SURVEY_LINK.labelKey)}</span>
+            <wa-icon
+              class="link-external"
+              library="mdi"
+              name="open-in-new"
+            ></wa-icon>
+          </a>
           ${LINKS.map(
             (link) => html`
               <a

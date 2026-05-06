@@ -18,6 +18,7 @@ import {
   mdiLockAlert,
   mdiLockClock,
   mdiLockOpenVariant,
+  mdiMapMarkerOutline,
   mdiMemory,
   mdiMessage,
   mdiNetworkOutline,
@@ -53,6 +54,7 @@ import {
 } from "../../util/relative-time.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../labels/device-labels-editor.js";
 
 registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
@@ -73,6 +75,7 @@ registerMdiIcons({
   "lock-alert": mdiLockAlert,
   "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
+  "map-marker-outline": mdiMapMarkerOutline,
   memory: mdiMemory,
   message: mdiMessage,
   "network-outline": mdiNetworkOutline,
@@ -567,7 +570,10 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderBluetoothMacRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
         ${this._renderBuildSizeRow(d)}
+        ${d.area ? this._row("map-marker-outline", this._localize("dashboard.drawer_area"), d.area) : nothing}
       </div>
+
+      ${this._renderLabelsSection(d)}
 
       ${this._renderReachabilitySection()}
 
@@ -602,6 +608,28 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
             </div>
           `
         : nothing}
+    `;
+  }
+
+  /**
+   * Render the user-defined labels section with inline editor.
+   *
+   * The editor consumes ``apiContext`` and ``labelsContext`` itself
+   * — the drawer just hands it the device. Persists assignments
+   * via ``devices/set_labels``; the resulting ``DEVICE_UPDATED``
+   * push refreshes the ``device.labels`` array, which Lit reactivity
+   * threads back into the editor's chip row.
+   */
+  private _renderLabelsSection(d: ConfiguredDevice) {
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_labels")}
+        </h4>
+        <esphome-device-labels-editor
+          .device=${d}
+        ></esphome-device-labels-editor>
+      </div>
     `;
   }
 

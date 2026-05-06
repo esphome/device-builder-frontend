@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiArrowCollapse,
   mdiArrowExpand,
+  mdiCheckCircleOutline,
   mdiContentSave,
   mdiDockLeft,
   mdiDockRight,
@@ -31,6 +32,7 @@ import "./device-board-info.js";
 registerMdiIcons({
   "arrow-collapse": mdiArrowCollapse,
   "arrow-expand": mdiArrowExpand,
+  "check-circle-outline": mdiCheckCircleOutline,
   "content-save": mdiContentSave,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
@@ -93,7 +95,7 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _onGlobalKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
       e.preventDefault();
-      if (this.yaml !== this.savedYaml) {
+      if (this.hasUnsavedEdits) {
         this._onSave();
       }
     }
@@ -135,6 +137,17 @@ export class ESPHomeDeviceEditor extends LitElement {
   /** Yaml content at last save/load — compared against current yaml to detect changes. */
   @property({ attribute: false })
   savedYaml = "";
+
+  /** True when the page has any unsaved edits — covers both
+   *  ``yaml !== savedYaml`` AND the section editor's transient
+   *  pre-debounce-flush state. The page passes this in (rather
+   *  than us computing ``yaml !== savedYaml`` locally) so a click
+   *  on Save inside the form's 200ms debounce window still
+   *  enables the button: the page's save handler flushes the
+   *  form synchronously before reading ``yaml``, so the
+   *  resulting commit is correct. */
+  @property({ type: Boolean })
+  hasUnsavedEdits = false;
 
   @property({ type: Boolean })
   hasPendingChanges = false;
@@ -312,10 +325,32 @@ export class ESPHomeDeviceEditor extends LitElement {
                     ${this._localize("dashboard.install")}
                   </button>`
                 : nothing}
+            <!-- Span wrapper carries the title because a disabled
+                 button isn't focusable and most browsers won't
+                 surface its tooltip on hover. The disabled state
+                 is still announced via the button's own disabled
+                 attribute; the span just makes the why-disabled
+                 hint reachable for mouse users. -->
+            <span
+              class="validate-button-wrap"
+              title=${this.hasUnsavedEdits
+                ? this._localize("device.validate_disabled_pending")
+                : this._localize("device.validate_yaml")}
+            >
+              <button
+                type="button"
+                class="validate-button"
+                ?disabled=${this.hasUnsavedEdits}
+                @click=${this._onValidate}
+              >
+                <wa-icon library="mdi" name="check-circle-outline"></wa-icon>
+                ${this._localize("device.validate")}
+              </button>
+            </span>
             <button
               type="button"
               class="save-button"
-              ?disabled=${this.yaml === this.savedYaml}
+              ?disabled=${!this.hasUnsavedEdits}
               @click=${this._onSave}
               title=${this._localize("device.save_yaml")}
             >
@@ -365,6 +400,15 @@ export class ESPHomeDeviceEditor extends LitElement {
   private _onSave() {
     this.dispatchEvent(
       new CustomEvent("save-yaml", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onValidate() {
+    this.dispatchEvent(
+      new CustomEvent("validate-device", {
         bubbles: true,
         composed: true,
       })
