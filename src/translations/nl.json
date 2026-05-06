@@ -560,6 +560,7 @@
     "web_download_step_open": "Open web.esphome.io",
     "web_download_step_connect": "Klik op Connect en kies de seriële poort van je apparaat",
     "web_download_step_install": "Kies Install en selecteer het gedownloade bestand {filename}",
+    "web_download_browser_note": "Vereist een browser met Web Serial-ondersteuning (bijv. Chrome).",
     "web_download_open_button": "Open web.esphome.io",
     "binary_download_done_title": "Firmware-binary gedownload",
     "binary_download_done_body": "Opgeslagen als {filename}. Flash hem naar je apparaat met je eigen tool."

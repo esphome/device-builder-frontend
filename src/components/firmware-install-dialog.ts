@@ -378,6 +378,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       .instructions li + li {
         margin-top: var(--wa-space-2xs);
       }
+      .instructions-note {
+        margin: var(--wa-space-s) 0 0;
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+        line-height: 1.5;
+      }
 
       a.btn {
         text-decoration: none;
@@ -576,6 +582,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           <li>${this._localize("firmware.web_download_step_connect")}</li>
           <li>${this._localize("firmware.web_download_step_install", { filename })}</li>
         </ol>
+        <p class="instructions-note">
+          ${this._localize("firmware.web_download_browser_note")}
+        </p>
       `;
     }
     if (this._step === "error") {

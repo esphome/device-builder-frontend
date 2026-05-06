@@ -560,6 +560,7 @@
     "web_download_step_open": "Ouvrez web.esphome.io",
     "web_download_step_connect": "Cliquez sur Connect et choisissez le port série de votre appareil",
     "web_download_step_install": "Choisissez Install et sélectionnez le fichier téléchargé {filename}",
+    "web_download_browser_note": "Nécessite un navigateur compatible Web Serial (ex. Chrome).",
     "web_download_open_button": "Ouvrir web.esphome.io",
     "binary_download_done_title": "Binaire du firmware téléchargé",
     "binary_download_done_body": "Enregistré sous {filename}. Flashez-le sur votre appareil avec votre outil préféré."
