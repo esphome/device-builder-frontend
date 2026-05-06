@@ -2,7 +2,8 @@
   "dashboard": {
     "title": "ESPHome - Device Builder",
     "subtitle": "Create and make your smart devices and automations",
-    "discovered_count": "Discovered {count} device",
+    "discovered_count_singular": "Discovered {count} device",
+    "discovered_count_plural": "Discovered {count} devices",
     "discovered_status": "Discovered",
     "discovered_ignored": "Ignored",
     "show": "Show",

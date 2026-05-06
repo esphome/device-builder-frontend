@@ -2,7 +2,8 @@
   "dashboard": {
     "title": "ESPHome - Device Builder",
     "subtitle": "Maak en bouw uw slimme apparaten en automatiseringen",
-    "discovered_count": "{count} apparaat gevonden",
+    "discovered_count_singular": "{count} apparaat gevonden",
+    "discovered_count_plural": "{count} apparaten gevonden",
     "discovered_status": "Gevonden",
     "discovered_ignored": "Genegeerd",
     "show": "Tonen",
