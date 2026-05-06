@@ -22,8 +22,10 @@ import type {
 } from "../../../src/api/types.js";
 import { ConfigEntryType } from "../../../src/api/types.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
-import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
-import type { TemplateResult } from "lit";
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+} from "../../_lit-template-walker.js";
 
 /** Build a minimal ``BoardPin``. Defaults to a generic
  *  input+output GPIO with ``available=true`` so the pin-renderer's
@@ -131,47 +133,28 @@ export function makeEntry(
   } as never;
 }
 
-/* ------------------------------------------------------------------ */
-/* Per-tag binding extractors                                         */
-/*                                                                    */
-/* The pin renderer (and any future renderer that emits a            */
-/* ``wa-option``) lays its template literal out as:                  */
-/*   <wa-option                                                      */
-/*     class=${...}      slot 0                                      */
-/*     value=${...}      slot 1                                      */
-/*     .label=${...}     slot 2                                      */
-/*     ?selected=${...}  slot 3                                      */
-/*     ?disabled=${...}  slot 4                                      */
-/*     title=${...}      slot 5                                      */
-/*   >…</wa-option>                                                  */
-/* The slot numbers are baked in by the html literal's expression    */
-/* order — they're contractual with the renderer source. If the     */
-/* renderer reorders attributes, this helper has to follow.         */
-/* ------------------------------------------------------------------ */
-
-/** Bindings extracted from a single ``<wa-option>`` template. */
-export interface WaOptionBindings {
-  className: string;
-  value: string;
-  label: string;
-  selected: boolean;
-  disabled: boolean;
-  title: string;
-}
-
-/** Extract every ``<wa-option>`` binding set from *template*.
- *  Recurses through nested templates so a ``visible.map(pin =>
- *  html\`<wa-option …>\`)`` produces one entry per pin.
+/**
+ * Find every template that emits *tag* and return the attribute /
+ * property / boolean-attribute / event bindings on it as a name →
+ * value map.
+ *
+ * Generic over any element — tests pin the *tag* they care about
+ * (``"wa-option"``, ``"wa-select"``, ``"wa-input"``, …) and read
+ * bindings by name without depending on the order the renderer
+ * declared them. A renderer that swaps ``value=`` and ``?selected=``
+ * around still produces the same lookup keys, so reorder-only
+ * refactors don't break tests.
+ *
+ * Each returned map has Lit-prefixed keys to disambiguate binding
+ * kinds: ``"value"`` (string attr), ``".label"`` (property),
+ * ``"?selected"`` (boolean attr), ``"@change"`` (event handler).
+ * See ``extractAttributeBindings`` for the full table.
  */
-export function extractWaOptionBindings(
-  template: TemplateResult,
-): WaOptionBindings[] {
-  return findTemplatesByAnchor(template, "<wa-option").map((t) => ({
-    className: String(t.values[0] ?? ""),
-    value: String(t.values[1] ?? ""),
-    label: String(t.values[2] ?? ""),
-    selected: Boolean(t.values[3]),
-    disabled: Boolean(t.values[4]),
-    title: String(t.values[5] ?? ""),
-  }));
+export function findElementBindings(
+  template: unknown,
+  tag: string,
+): Record<string, unknown>[] {
+  return findTemplatesByAnchor(template, `<${tag}`).map(
+    extractAttributeBindings,
+  );
 }

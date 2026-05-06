@@ -75,3 +75,52 @@ export function findTemplatesByAnchor(
   });
   return matches;
 }
+
+/**
+ * Extract attribute → value bindings from a Lit ``TemplateResult``.
+ *
+ * Each ``${...}`` expression in the template is preceded by a
+ * static string. When that string ends with ``<name>=`` (with an
+ * optional ``.`` / ``?`` / ``@`` Lit prefix and an optional
+ * opening quote), the expression is the value bound to that
+ * attribute / property / boolean attribute / event handler:
+ *
+ * | Prefix | Lit binding kind          | Key in returned map  |
+ * |--------|---------------------------|----------------------|
+ * | (none) | string attribute          | ``name``             |
+ * | ``.``  | property                  | ``.name``            |
+ * | ``?``  | boolean attribute         | ``?name``            |
+ * | ``@``  | event listener            | ``@name``            |
+ *
+ * Mid-attribute-value bindings (``class="prefix ${...}"``,
+ * concatenated values) are deliberately skipped — the helper only
+ * surfaces "this expression IS the attribute's value" cases, which
+ * is the contractual shape for renderer assertions.
+ *
+ * Tests look up bindings by name (``b.value``, ``b["?selected"]``,
+ * ``b[".label"]``) without depending on the order the renderer
+ * wrote the attributes in the template literal.
+ */
+export function extractAttributeBindings(
+  t: TemplateResult,
+): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (let i = 0; i < t.values.length; i++) {
+    // The static string preceding `values[i]`. We only care about
+    // its tail — Lit places the binding's attribute name there.
+    const prefix = t.strings[i];
+    // Match: optional Lit prefix char, attribute name (kebab/camel),
+    // optional whitespace, ``=``, optional whitespace, optional
+    // opening quote, optional whitespace, end-of-string. End-of-
+    // string anchor is what makes this "this expression IS the
+    // attribute's value" rather than "this expression is a piece
+    // of a longer attribute value" (where the prefix ends with
+    // text BEFORE the attribute boundary instead of right after
+    // the ``=``).
+    const m = prefix.match(/(\.|@|\?)?([\w-]+)\s*=\s*"?\s*$/);
+    if (!m) continue;
+    const [, sigil, name] = m;
+    result[(sigil ?? "") + name] = t.values[i];
+  }
+  return result;
+}

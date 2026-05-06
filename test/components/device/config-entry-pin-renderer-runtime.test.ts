@@ -15,16 +15,18 @@
  * directly and assert that the option matching the YAML's GPIO
  * carries ``?selected=true`` and the right value.
  *
- * The walker, ctx factory, and option-binding extractor live in
+ * The walker, ctx factory, and binding extractor live in
  * ``test/_lit-template-walker.ts`` + ``./_renderer-fixtures.ts``
  * so future renderer tests can reuse them without rebuilding the
- * scaffolding.
+ * scaffolding. Bindings are looked up by name (``b.value``,
+ * ``b["?selected"]``, ``b[".label"]``) so reordering attributes
+ * in the renderer source doesn't break these assertions.
  */
 import { describe, expect, it } from "vitest";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
 import { ConfigEntryType } from "../../../src/api/types.js";
 import {
-  extractWaOptionBindings,
+  findElementBindings,
   makeEntry,
   makeRenderCtx,
 } from "./_renderer-fixtures.js";
@@ -47,25 +49,27 @@ describe("renderPinField — long-form pin block selection", () => {
     });
     const result = renderPinField(pinEntry(), ["pin"], ctx);
 
-    const options = extractWaOptionBindings(result);
+    const options = findElementBindings(result, "wa-option");
     expect(options.length, "expected wa-options to be rendered").toBeGreaterThan(0);
 
-    const selected = options.filter((o) => o.selected);
+    const selected = options.filter((o) => o["?selected"] === true);
     expect(
       selected.length,
       `exactly one option should be selected; got ${selected.length} (${selected
-        .map((s) => s.value)
+        .map((s) => String(s.value))
         .join(", ")})`,
     ).toBe(1);
     expect(selected[0].value, "selected option value").toBe("GPIO33");
-    expect(selected[0].label, "selected option label").toBe("GPIO33");
+    expect(selected[0][".label"], "selected option label").toBe("GPIO33");
   });
 
   it("marks GPIO33 selected when YAML uses bare integer { number: 33 }", () => {
     const ctx = makeRenderCtx({ pin: { number: 33 } });
     const result = renderPinField(pinEntry(), ["pin"], ctx);
 
-    const selected = extractWaOptionBindings(result).filter((o) => o.selected);
+    const selected = findElementBindings(result, "wa-option").filter(
+      (o) => o["?selected"] === true,
+    );
     expect(selected.length).toBe(1);
     expect(selected[0].value).toBe("GPIO33");
   });
@@ -77,7 +81,9 @@ describe("renderPinField — long-form pin block selection", () => {
     const ctx = makeRenderCtx({ pin: { mode: "INPUT", inverted: false } });
     const result = renderPinField(pinEntry(), ["pin"], ctx);
 
-    const selected = extractWaOptionBindings(result).filter((o) => o.selected);
+    const selected = findElementBindings(result, "wa-option").filter(
+      (o) => o["?selected"] === true,
+    );
     expect(selected.length).toBe(0);
   });
 });
