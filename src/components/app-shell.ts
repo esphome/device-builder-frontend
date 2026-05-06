@@ -52,10 +52,12 @@ import {
   integrationDocsContext,
   isHaIngressContext,
   localizeContext,
+  serverVersionContext,
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { BASE_PATH, withBase } from "../util/base-path.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 
 // Mirrors the backend's `_PRIMARY_JOB_TYPES` retention pool — these
@@ -157,6 +159,10 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _version = "";
 
+  @provide({ context: serverVersionContext })
+  @state()
+  private _serverVersion = "";
+
   @provide({ context: darkModeContext })
   @state()
   private _darkMode = false;
@@ -223,11 +229,11 @@ export class ESPHomeApp extends LitElement {
 
   private _router = new Router(this, [
     {
-      path: "/",
+      path: withBase("/"),
       render: () => html`<esphome-page-dashboard></esphome-page-dashboard>`,
     },
     {
-      path: "/secrets",
+      path: withBase("/secrets"),
       enter: async () => {
         await import("../pages/secrets.js");
         return true;
@@ -235,7 +241,7 @@ export class ESPHomeApp extends LitElement {
       render: () => html`<esphome-page-secrets></esphome-page-secrets>`,
     },
     {
-      path: "/device/:id",
+      path: withBase("/device/:id"),
       enter: async () => {
         await import("../pages/device.js");
         return true;
@@ -363,7 +369,20 @@ export class ESPHomeApp extends LitElement {
 
   private async _init() {
     toast.config({
-      toastOptions: { position: "bottom-right", richColors: true, duration: 4000 },
+      toastOptions: {
+        position: "bottom-right",
+        richColors: true,
+        duration: 4000,
+        // The bottom-right toast can land on top of the device
+        // editor's Save / Install buttons (issue #171). The X
+        // gives the user a guaranteed dismissal that doesn't
+        // depend on swipe — which mouse users discover late and
+        // touchpad users may struggle with — and isn't gated on
+        // the 4s auto-close timer. UX team may swap this for a
+        // different placement later; the close affordance stays
+        // useful regardless of where the toast moves.
+        closeButton: true,
+      },
     });
     this._initDarkMode();
     try {
@@ -378,7 +397,8 @@ export class ESPHomeApp extends LitElement {
     // sends backend commands has to wait for ``api.ready``.
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
-      this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
+      this._serverVersion = info.server_version;
+      this._isHaIngress = info.ha_addon && BASE_PATH.includes("/ingress");
       this._apiConnected = true;
       // ``api.ready`` resolves when the connection is usable — either
       // ``requires_auth: false``, or a stored token replay succeeds.

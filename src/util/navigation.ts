@@ -1,3 +1,5 @@
+import { withBase } from "./base-path.js";
+
 export type LeaveGuard = () => Promise<boolean>;
 
 let activeGuard: LeaveGuard | null = null;
@@ -11,6 +13,6 @@ export async function navigate(url: string): Promise<void> {
     const canLeave = await activeGuard();
     if (!canLeave) return;
   }
-  window.history.pushState({}, "", url);
+  window.history.pushState({}, "", withBase(url));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }

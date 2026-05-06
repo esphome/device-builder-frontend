@@ -7,6 +7,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { withBase } from "../../util/base-path.js";
 import { friendlyNameSlugify } from "../../util/friendly-name-slugify.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
@@ -291,7 +292,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     window.history.pushState(
       {},
       "",
-      `/device/${encodeURIComponent(configuration)}`,
+      withBase(`/device/${encodeURIComponent(configuration)}`),
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
   }

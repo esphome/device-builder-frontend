@@ -33,7 +33,11 @@ export const setRevealSensitiveEffect = StateEffect.define<boolean>();
 
 const sensitiveMark = Decoration.mark({ class: "cm-esphome-sensitive-value" });
 
-function computeDecorations(state: EditorState, revealed: boolean): DecorationSet {
+function computeDecorations(
+  state: EditorState,
+  revealed: boolean,
+  maskAllValues: boolean,
+): DecorationSet {
   if (revealed) return Decoration.none;
   const doc = state.doc;
   // Pass ``EditorState.doc`` (CodeMirror's ``Text``) directly to
@@ -43,7 +47,7 @@ function computeDecorations(state: EditorState, revealed: boolean): DecorationSe
   // the editor's update listener already pays one ``toString()``
   // for the ``yaml-change`` dispatch and we don't want to double
   // that just to compute mask decorations.
-  const ranges = findSensitiveValueRanges(doc);
+  const ranges = findSensitiveValueRanges(doc, { maskAllValues });
   if (ranges.length === 0) return Decoration.none;
   const built: Range<Decoration>[] = [];
   for (const r of ranges) {
@@ -56,7 +60,10 @@ function computeDecorations(state: EditorState, revealed: boolean): DecorationSe
   return Decoration.set(built, true);
 }
 
-export function sensitiveValueMaskExtension(initialReveal = false): Extension {
+export function sensitiveValueMaskExtension(
+  initialReveal = false,
+  maskAllValues = false,
+): Extension {
   // Holds the current reveal flag so the field can short-circuit
   // when the user has the toolbar reveal button on.
   const revealedField = StateField.define<boolean>({
@@ -73,8 +80,15 @@ export function sensitiveValueMaskExtension(initialReveal = false): Extension {
   // flag flips. Living in a StateField (not a ViewPlugin) means the
   // decorations are part of the editor state and the initial doc
   // mounts already-masked — no flash of plaintext on load.
+  //
+  // ``maskAllValues`` is captured here at extension-construction
+  // time. The flag is set once by the host page (false everywhere
+  // except the secrets editor) and is not expected to toggle at
+  // runtime — a change would require rebuilding the editor (the
+  // same path dark-mode and configuration changes already use).
   const decoField = StateField.define<DecorationSet>({
-    create: (state) => computeDecorations(state, state.field(revealedField)),
+    create: (state) =>
+      computeDecorations(state, state.field(revealedField), maskAllValues),
     update(decos, tr) {
       const revealed = tr.state.field(revealedField);
       const revealedChanged = tr.effects.some((e) =>
@@ -83,7 +97,7 @@ export function sensitiveValueMaskExtension(initialReveal = false): Extension {
       if (!tr.docChanged && !revealedChanged) {
         return decos.map(tr.changes);
       }
-      return computeDecorations(tr.state, revealed);
+      return computeDecorations(tr.state, revealed, maskAllValues);
     },
     provide: (f) => EditorView.decorations.from(f),
   });

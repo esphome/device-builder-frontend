@@ -3,6 +3,7 @@ export {
   devicesContext,
   importableDevicesContext,
   versionContext,
+  serverVersionContext,
   darkModeContext,
   localizeContext,
   devicesLoadedContext,
