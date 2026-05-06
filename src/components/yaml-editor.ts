@@ -78,9 +78,9 @@ export class ESPHomeYamlEditor extends LitElement {
   /** When true, EVERY key/value pair is masked — used by the
    *  `secrets.yaml` editor, where the entire file is by definition
    *  a list of credentials and the per-key allowlist (password,
-   *  ota_password, encryption.key, …) doesn't apply. Read at
-   *  extension-construction time; remount the editor to change it
-   *  at runtime. */
+   *  ota_password, encryption.key, …) doesn't apply. Captured at
+   *  extension-construction time; runtime changes trigger an
+   *  editor remount via `updated()` (same path dark-mode uses). */
   @property({ type: Boolean }) maskAllValues = false;
 
   @query(".cm-wrap") private _container!: HTMLDivElement;
@@ -386,15 +386,19 @@ export class ESPHomeYamlEditor extends LitElement {
     // would dispatch a stale-cursor preservation against the
     // freshly-mounted view.
 
-    // Theme / API changes require a full editor rebuild — CodeMirror
-    // extensions are static once the state is built. The user may
-    // have unsaved edits in the view that the parent's `value` prop
-    // doesn't yet reflect (the parent only learns about edits via
-    // `yaml-change`, which it loops back as `value`), so preserve
-    // the current view content across the rebuild by writing it
-    // back into `this.value` before remounting.
+    // Theme / API / maskAllValues changes require a full editor
+    // rebuild — CodeMirror extensions are static once the state is
+    // built, and the mask-all flag is captured at extension
+    // construction time. The user may have unsaved edits in the
+    // view that the parent's `value` prop doesn't yet reflect (the
+    // parent only learns about edits via `yaml-change`, which it
+    // loops back as `value`), so preserve the current view content
+    // across the rebuild by writing it back into `this.value`
+    // before remounting.
     if (
-      (changed.has("_darkMode") || changed.has("_api")) &&
+      (changed.has("_darkMode") ||
+        changed.has("_api") ||
+        changed.has("maskAllValues")) &&
       this._view
     ) {
       this.value = this._view.state.doc.toString();

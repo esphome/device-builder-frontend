@@ -359,5 +359,22 @@ wifi_password: should-be-skipped-without-flag
       // nothing here.
       expect(findSensitiveValueRanges(yaml)).toEqual([]);
     });
+
+    it("masks values for keys with hyphens and dots", () => {
+      // secrets.yaml has user-defined keys — kebab-case and
+      // dot.notation are both legal YAML. Without the broadened
+      // KEY_LINE matcher these lines wouldn't match the scanner
+      // and their values would slip through unmasked.
+      const yaml = `wifi-password: kebab-secret
+mqtt.user: dotted-user
+api-key.v2: mixed-secret
+`;
+      const ranges = findSensitiveValueRanges(yaml, { maskAllValues: true });
+      expect(valuesAt(yaml, ranges)).toEqual([
+        "kebab-secret",
+        "dotted-user",
+        "mixed-secret",
+      ]);
+    });
   });
 });

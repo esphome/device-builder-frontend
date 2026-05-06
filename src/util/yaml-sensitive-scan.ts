@@ -64,7 +64,16 @@ const PARENT_SCOPED_SENSITIVE_KEYS: Record<string, Set<string>> = {
   encryption: new Set(["key"]),
 };
 
-const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_]*):(\s*)(.*)$/;
+// Plain-scalar key matcher. Permits hyphens and dots inside the
+// key so user-defined secret names like `wifi-password:` or
+// `mqtt.user:` are recognised — important for the secrets editor's
+// `maskAllValues` mode where every key/value pair is supposed to
+// be masked. The leading-character class stays restrictive
+// (`[a-zA-Z_]`) so we don't pick up numeric scalars or list
+// dashes as keys. Quoted keys (`"my key": …`) are still not
+// matched; they're rare enough in ESPHome configs and
+// `secrets.yaml` that we accept the limitation.
+const KEY_LINE = /^(\s*)(-\s+)?([a-zA-Z_][a-zA-Z0-9_.\-]*):(\s*)(.*)$/;
 // Block-scalar header tail: `|`, `>`, optional chomping indicator (`+`/`-`),
 // optional explicit indentation digit, optional trailing comment.
 const BLOCK_SCALAR_HEADER = /^[|>][+-]?\d*\s*(#.*)?$/;
