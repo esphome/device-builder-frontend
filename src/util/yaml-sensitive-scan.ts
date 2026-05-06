@@ -30,6 +30,13 @@ export interface SensitiveValueRange {
   valueTo: number;
 }
 
+export interface FindSensitiveValueRangesOptions {
+  /** When true, every key/value pair is treated as sensitive — used
+   *  for `secrets.yaml`, where the entire file is by definition a
+   *  list of credentials and the per-key allowlist doesn't apply. */
+  maskAllValues?: boolean;
+}
+
 // Keys whose values are always credentials regardless of where they
 // appear in the document. These names are stable across the ESPHome
 // catalog (api/ota/mqtt/wifi/web_server/http_request all spell their
@@ -118,7 +125,9 @@ function isLineSource(value: string | LineSource): value is LineSource {
 
 export function findSensitiveValueRanges(
   yaml: string | LineSource,
+  options: FindSensitiveValueRangesOptions = {},
 ): SensitiveValueRange[] {
+  const { maskAllValues = false } = options;
   const ranges: SensitiveValueRange[] = [];
   let lines: string[];
   if (isLineSource(yaml)) {
@@ -163,11 +172,16 @@ export function findSensitiveValueRanges(
       stack.pop();
     }
 
-    let sensitive = ALWAYS_SENSITIVE_KEYS.has(key);
-    if (!sensitive && stack.length > 0) {
-      const parent = stack[stack.length - 1].key;
-      const allowed = PARENT_SCOPED_SENSITIVE_KEYS[parent];
-      if (allowed && allowed.has(key)) sensitive = true;
+    let sensitive: boolean;
+    if (maskAllValues) {
+      sensitive = true;
+    } else {
+      sensitive = ALWAYS_SENSITIVE_KEYS.has(key);
+      if (!sensitive && stack.length > 0) {
+        const parent = stack[stack.length - 1].key;
+        const allowed = PARENT_SCOPED_SENSITIVE_KEYS[parent];
+        if (allowed && allowed.has(key)) sensitive = true;
+      }
     }
 
     stack.push({ indent, key });

@@ -75,6 +75,14 @@ export class ESPHomeYamlEditor extends LitElement {
    *  `!secret`-tag handling — this only affects raw inline values. */
   @property({ type: Boolean }) revealSensitive = false;
 
+  /** When true, EVERY key/value pair is masked — used by the
+   *  `secrets.yaml` editor, where the entire file is by definition
+   *  a list of credentials and the per-key allowlist (password,
+   *  ota_password, encryption.key, …) doesn't apply. Read at
+   *  extension-construction time; remount the editor to change it
+   *  at runtime. */
+  @property({ type: Boolean }) maskAllValues = false;
+
   @query(".cm-wrap") private _container!: HTMLDivElement;
 
   private _view: EditorView | null = null;
@@ -113,7 +121,7 @@ export class ESPHomeYamlEditor extends LitElement {
       indentUnit.of(ESPHOME_YAML_INDENT),
       keymap.of([indentWithTab]),
       highlightField,
-      sensitiveValueMaskExtension(this.revealSensitive),
+      sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
       EditorView.theme({
         "&": { height: "100%" },
         ".cm-scroller": {

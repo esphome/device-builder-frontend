@@ -529,6 +529,8 @@
     "saving": "Opslaan…",
     "saved": "Geheimen opgeslagen",
     "save_error": "Opslaan van geheimen mislukt",
+    "reveal_values": "Waarden tonen",
+    "hide_values": "Waarden verbergen",
     "file_header": "# Geheimen — sla gevoelige waarden hier op en verwijs ernaar\n# in uw apparaatconfiguraties met !secret <sleutel>\n#\n# Voorbeeld:\n#   wifi_ssid: \"uw-netwerknaam\"\n#   wifi_password: \"uw-wachtwoord\"\n"
   },
   "firmware": {

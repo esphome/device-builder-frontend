@@ -529,6 +529,8 @@
     "saving": "Enregistrement…",
     "saved": "Secrets enregistrés",
     "save_error": "Échec de l'enregistrement des secrets",
+    "reveal_values": "Afficher les valeurs",
+    "hide_values": "Masquer les valeurs",
     "file_header": "# Secrets — stockez vos valeurs sensibles ici et référencez-les\n# dans vos configurations d'appareils avec !secret <clé>\n#\n# Exemple :\n#   wifi_ssid: \"nom-de-votre-réseau\"\n#   wifi_password: \"votre-mot-de-passe\"\n"
   },
   "firmware": {

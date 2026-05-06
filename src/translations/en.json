@@ -663,6 +663,8 @@
     "saving": "Saving…",
     "saved": "Secrets saved",
     "save_error": "Failed to save secrets",
+    "reveal_values": "Reveal values",
+    "hide_values": "Hide values",
     "file_header": "# Secrets — store sensitive values here and reference them\n# in your device configurations using !secret <key>\n#\n# Example:\n#   wifi_ssid: \"your-network-name\"\n#   wifi_password: \"your-password\"\n"
   },
   "auth": {
