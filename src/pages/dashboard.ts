@@ -640,9 +640,12 @@ export class ESPHomePageDashboard extends LitElement {
           <div style="justify-content: center; display: flex; align-items: center">
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
             <span
-              >${this._localize("dashboard.discovered_count", {
-                count: visible.length,
-              })}</span
+              >${this._localize(
+                visible.length === 1
+                  ? "dashboard.discovered_count_singular"
+                  : "dashboard.discovered_count_plural",
+                { count: visible.length },
+              )}</span
             >
           </div>
           <button

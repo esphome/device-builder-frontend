@@ -6,9 +6,10 @@ import type {
   ConfiguredDevice,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import { withBase } from "../util/base-path.js";
 
 export function editDevice(device: ConfiguredDevice) {
-  window.history.pushState({}, "", `/device/${device.configuration}`);
+  window.history.pushState({}, "", withBase(`/device/${device.configuration}`));
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 

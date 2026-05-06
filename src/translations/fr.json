@@ -2,7 +2,8 @@
   "dashboard": {
     "title": "ESPHome - Device Builder",
     "subtitle": "Créez et fabriquez vos appareils intelligents et automatisations",
-    "discovered_count": "{count} appareil détecté",
+    "discovered_count_singular": "{count} appareil détecté",
+    "discovered_count_plural": "{count} appareils détectés",
     "discovered_status": "Détecté",
     "discovered_ignored": "Ignoré",
     "show": "Afficher",
@@ -92,7 +93,7 @@
     "logs_method_wireless_desc": "Nécessite que l'appareil soit en ligne",
     "logs_method_usb_local": "Brancher sur cet ordinateur",
     "logs_method_usb_local_desc": "Pour les appareils connectés via USB à cet ordinateur",
-    "logs_method_usb_server": "Brancher sur l'ordinateur exécutant le tableau de bord ESPHome",
+    "logs_method_usb_server": "Brancher sur l'ordinateur exécutant ESPHome Device Builder",
     "logs_method_usb_server_desc": "Pour les appareils connectés via USB au serveur",
     "logs_web_serial_unsupported": "Web Serial n'est pas pris en charge dans ce navigateur",
     "table_columns": "Colonnes",
@@ -177,7 +178,7 @@
     "install_method_usb_local": "Brancher sur cet ordinateur",
     "install_method_usb_local_desc": "Pour les appareils connectés via USB à cet ordinateur",
     "install_method_usb_local_unsupported": "Nécessite un navigateur compatible Web Serial (ex. Chrome)",
-    "install_method_usb_server": "Brancher sur l'ordinateur exécutant le tableau de bord ESPHome",
+    "install_method_usb_server": "Brancher sur l'ordinateur exécutant ESPHome Device Builder",
     "install_method_usb_server_desc": "Pour les appareils connectés via USB au serveur",
     "install_method_web_download": "Flasher sur cet ordinateur via {link}",
     "install_method_web_download_link": "web.esphome.io",
@@ -528,6 +529,8 @@
     "saving": "Enregistrement…",
     "saved": "Secrets enregistrés",
     "save_error": "Échec de l'enregistrement des secrets",
+    "reveal_values": "Afficher les valeurs",
+    "hide_values": "Masquer les valeurs",
     "file_header": "# Secrets — stockez vos valeurs sensibles ici et référencez-les\n# dans vos configurations d'appareils avec !secret <clé>\n#\n# Exemple :\n#   wifi_ssid: \"nom-de-votre-réseau\"\n#   wifi_password: \"votre-mot-de-passe\"\n"
   },
   "firmware": {

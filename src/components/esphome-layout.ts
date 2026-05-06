@@ -3,8 +3,9 @@ import { mdiArrowCollapseRight, mdiArrowLeft } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { isHaIngressContext, localizeContext } from "../context/index.js";
+import { isHaIngressContext, localizeContext, serverVersionContext, versionContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { stripBase, withBase } from "../util/base-path.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -27,11 +28,19 @@ export class ESPHomeLayout extends LitElement {
   @state()
   private _isHaIngress = false;
 
+  @consume({ context: versionContext, subscribe: true })
   @state()
-  private _path = window.location.pathname;
+  private _esphomeVersion = "";
+
+  @consume({ context: serverVersionContext, subscribe: true })
+  @state()
+  private _serverVersion = "";
+
+  @state()
+  private _path = stripBase(window.location.pathname);
 
   private _onPopState = () => {
-    this._path = window.location.pathname;
+    this._path = stripBase(window.location.pathname);
   };
 
   connectedCallback() {
@@ -168,6 +177,22 @@ export class ESPHomeLayout extends LitElement {
           display: none;
         }
       }
+
+      .app-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--wa-space-m);
+        font-size: 10px;
+        color: var(--wa-color-text-quiet);
+        opacity: 0.5;
+        pointer-events: none;
+      }
     `,
   ];
 
@@ -188,7 +213,7 @@ export class ESPHomeLayout extends LitElement {
                   title=${this._localize("layout.home_assistant")}
                 >
                   <wa-icon library="mdi" name="arrow-collapse-right"></wa-icon>
-                  <img src="/assets/logo/ha.svg" alt="Home Assistant" />
+                  <img src=${withBase("/assets/logo/ha.svg")} alt="Home Assistant" />
                 </wa-button>
                 <div class="header-separator"></div>
               `
@@ -206,7 +231,7 @@ export class ESPHomeLayout extends LitElement {
               `
             : nothing}
           <button class="header-logo" @click=${this._goHome}>
-            <img src="/assets/logo/esphome.svg" alt="ESPHome" />
+            <img src=${withBase("/assets/logo/esphome.svg")} alt="ESPHome" />
           </button>
         </div>
         <div class="header-text">
@@ -217,6 +242,10 @@ export class ESPHomeLayout extends LitElement {
         <esphome-header-actions></esphome-header-actions>
       </div>
       <slot></slot>
+      <div class="app-footer">
+        ${this._serverVersion ? html`<span>ESPHome Device Builder v${this._serverVersion}</span>` : nothing}
+        ${this._esphomeVersion ? html`<span>ESPHome v${this._esphomeVersion}</span>` : nothing}
+      </div>
     `;
   }
 }

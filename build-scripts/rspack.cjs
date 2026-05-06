@@ -144,7 +144,15 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
     filename: isProdBuild ? "[name].[contenthash].js" : "[name].js",
     chunkFilename: isProdBuild ? "[name].[contenthash].js" : "[name].js",
     path: OUTPUT_DIR,
-    publicPath: "/",
+    // ``auto`` makes the runtime derive the public path from
+    // ``document.currentScript.src`` and HtmlRspackPlugin emit the
+    // entry script with a relative href. That lets the bundle load
+    // from any mount point — bare ``/``, an HA ingress prefix like
+    // ``/api/hassio_ingress/<token>/``, or a reverse-proxy subpath
+    // — without rebuilding. ``src/util/base-path.ts`` reads the same
+    // signal to keep client-side routing, the WebSocket URL, and the
+    // ``/assets/...`` references in lockstep.
+    publicPath: "auto",
     clean: true,
     hashFunction: "xxhash64",
   },
