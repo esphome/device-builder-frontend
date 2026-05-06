@@ -583,7 +583,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           <li>${this._localize("firmware.web_download_step_install", { filename })}</li>
         </ol>
         <p class="instructions-note">
-          ${this._localize("firmware.web_download_browser_note")}
+          ${this._localize("dashboard.install_method_web_download_desc")}
         </p>
       `;
     }

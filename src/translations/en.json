@@ -326,7 +326,6 @@
     "web_download_step_open": "Open web.esphome.io",
     "web_download_step_connect": "Click Connect and pick your device's serial port",
     "web_download_step_install": "Choose Install and select the downloaded {filename}",
-    "web_download_browser_note": "Requires a browser with Web Serial support (e.g. Chrome).",
     "web_download_open_button": "Open web.esphome.io",
     "binary_download_done_title": "Firmware binary downloaded",
     "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool."
