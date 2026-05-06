@@ -166,9 +166,9 @@ export function renderPinField(
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
       <wa-select
+        data-no-value-sync
         class=${invalid ? "invalid" : ""}
         ?disabled=${fieldDisabled}
-        .value=${value}
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
       >

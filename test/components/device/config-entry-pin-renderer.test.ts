@@ -47,15 +47,20 @@ describe("parsePinGpio", () => {
 });
 
 describe("renderPinField wa-select binding", () => {
-  // Pin a contract that's invisible to ``parsePinGpio``'s unit
-  // tests but is the actual user-facing bug: ``wa-select`` reads
-  // its displayed value from the parent's ``value`` property, not
-  // from per-option ``?selected`` attributes — those are only
-  // honored on the initial slot-change pass and don't propagate
-  // on re-render. With only ``?selected``, a pin block like
-  // ``pin: { number: GPIO33, mode: INPUT_PULLUP, inverted: false }``
-  // parses correctly (parsePinGpio → 33) but the closed select
-  // displays nothing because the value never reaches the parent.
+  // The form's ``_syncSelectValues`` clears ``wa-select.value`` to
+  // ``""`` for any non-primitive value (transient autocompletion
+  // state, the long-form pin block, …). PIN renderers can
+  // legitimately carry an object value
+  // (``{ number: GPIO33, mode: INPUT_PULLUP, inverted: false }``),
+  // so they MUST opt out of that generic sync via
+  // ``data-no-value-sync`` — which routes the form to
+  // ``_syncSelectedAttr`` instead. ``_syncSelectedAttr`` reads the
+  // option Lit's ``?selected`` binding marked and pushes its
+  // value onto the parent after wa-select's first paint; that's
+  // the generic mechanism every "non-primitive value" renderer
+  // uses (FLOAT_WITH_UNIT's unit picker is the other one), so
+  // adding new structured shapes doesn't grow the form's
+  // per-type knowledge.
   const importNode = async () => {
     const [fs, path, url] = await Promise.all([
       // @ts-expect-error — node-only module, types excluded from tsconfig
@@ -68,7 +73,7 @@ describe("renderPinField wa-select binding", () => {
     return { fs, path, url };
   };
 
-  it("binds .value on the parent wa-select so the closed display matches the selection", async () => {
+  it("opts out of the generic sync via data-no-value-sync on the wa-select", async () => {
     const { fs, path, url } = await importNode();
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
@@ -76,31 +81,32 @@ describe("renderPinField wa-select binding", () => {
       "../../../src/components/device/config-entry-pin-renderer.ts",
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
-    // The wa-select inside renderPinField must carry a property
-    // binding to ``value`` (Lit's ``.value=`` syntax) so re-renders
-    // update the displayed selection. Without it, an object pin
-    // block (``{ number: GPIO33, ... }``) parses correctly but the
-    // dropdown shows blank — the regression this test pins.
     const m = src.match(/<wa-select[^>]*?>/s);
     expect(m, "wa-select element missing from renderPinField").not.toBeNull();
     expect(
-      /\.value\s*=\s*\$\{value\}/.test(m![0]),
-      `wa-select doesn't bind .value=\${value}; matched element: ${m![0]}`,
+      /\bdata-no-value-sync\b/.test(m![0]),
+      `wa-select missing data-no-value-sync; matched element: ${m![0]}`,
     ).toBe(true);
+    // Pin the inverse: don't bind ``.value=`` on the parent. The
+    // generic sync would clobber it (object value → cleared to
+    // ""), and the ``data-no-value-sync`` path is the canonical
+    // mechanism — having both creates two competing sources of
+    // truth and confuses the next maintainer.
+    expect(
+      /\.value\s*=\s*\$\{/.test(m![0]),
+      `wa-select binds .value= alongside data-no-value-sync; matched element: ${m![0]}`,
+    ).toBe(false);
   });
 
-  it("config-entry-form's _syncSelectValues coerces object pin shapes via parsePinGpio", async () => {
-    // The renderer's ``.value=`` binding sets wa-select's value on
-    // the initial Lit render — but ``_syncSelectValues`` runs
-    // post-render and clears wa-select.value to "" for any
-    // non-primitive value. The long-form pin block is an object,
-    // so without the parsePinGpio coercion in the sync path the
-    // selection gets clobbered immediately after each render and
-    // the user sees a blank dropdown.
-    //
-    // Pin the wiring contract: the form must import parsePinGpio
-    // AND must run it against the raw value before the
-    // isPrimitiveOrNullish clear branch.
+  it("config-entry-form has no pin-specific knowledge in its generic sync", async () => {
+    // The first iteration of this fix coerced object pin shapes
+    // via ``parsePinGpio`` inside ``_syncSelectValues``. That
+    // worked but leaked field-type-specific knowledge into the
+    // generic helper — every future structured-value renderer
+    // would need its own coercer there. The data-no-value-sync
+    // refactor moves the responsibility back to the renderer
+    // and the generic ``_syncSelectedAttr`` handles every such
+    // field uniformly via ``wa-option[selected]``.
     const { fs, path, url } = await importNode();
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
@@ -108,30 +114,13 @@ describe("renderPinField wa-select binding", () => {
       "../../../src/components/device/config-entry-form.ts",
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
-
     expect(
-      /import\s*\{\s*parsePinGpio\s*\}\s*from\s*"\.\/config-entry-pin-renderer\.js"/.test(
-        src,
-      ),
-      "config-entry-form doesn't import parsePinGpio",
-    ).toBe(true);
-
-    // The coercion must precede the ``isPrimitiveOrNullish``
-    // clear so the object pin shape survives. Carve out the sync
-    // body and assert the order.
-    const syncStart = src.indexOf("private async _syncSelectValues");
-    expect(syncStart).toBeGreaterThan(-1);
-    const syncBody = src.slice(syncStart, syncStart + 4000);
-    const parseIdx = syncBody.indexOf("parsePinGpio(");
-    // Match the call site, not the surrounding rationale comment
-    // that names the function. ``if (!isPrimitiveOrNullish(value))``
-    // is unambiguous.
-    const clearIdx = syncBody.indexOf("!isPrimitiveOrNullish(");
-    expect(parseIdx).toBeGreaterThan(-1);
-    expect(clearIdx).toBeGreaterThan(-1);
+      /import\s*\{\s*parsePinGpio\s*\}/.test(src),
+      "config-entry-form imports parsePinGpio — pin-specific knowledge has leaked back into the generic form",
+    ).toBe(false);
     expect(
-      parseIdx < clearIdx,
-      "parsePinGpio coercion must run before the isPrimitiveOrNullish clear",
-    ).toBe(true);
+      /parsePinGpio\s*\(/.test(src),
+      "config-entry-form calls parsePinGpio — pin-specific knowledge has leaked back into the generic form",
+    ).toBe(false);
   });
 });

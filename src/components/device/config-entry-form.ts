@@ -35,7 +35,6 @@ import {
 } from "../../util/config-validation.js";
 import { filterRenderable } from "./config-entry-render-filter.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
-import { parsePinGpio } from "./config-entry-pin-renderer.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
@@ -261,25 +260,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       const key = field.getAttribute("data-field-key");
       if (!key) continue;
       const path = key.split(".");
-      let value = getIn(this.values, path);
-      // PIN entries can carry the long-form ESPHome pin block
-      // (``{ number: GPIO33, mode: INPUT_PULLUP, inverted: false }``)
-      // as their value. ``renderPinField``'s ``.value=`` binding
-      // extracts the GPIO and feeds wa-select the ``"GPIOn"``
-      // string on initial render — but this post-render sync runs
-      // after that and would otherwise hit the
-      // ``isPrimitiveOrNullish`` clear branch below (an object is
-      // non-primitive) and wipe the selection back to ``""``.
-      // Coerce the object → ``"GPIOn"`` string here so the sync
-      // path sees the same primitive the renderer did.
-      // ``parsePinGpio`` is the single source of truth for "what
-      // GPIO does this value represent", shared with the renderer.
-      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-        const gpio = parsePinGpio(value);
-        if (gpio !== null) {
-          value = `GPIO${gpio}`;
-        }
-      }
+      const value = getIn(this.values, path);
       // ``wa-select`` only carries primitive values; if the YAML
       // path resolves to an object (transient state from a partial
       // edit — e.g. autocompletion just inserted ``then:\n  - ``
@@ -288,6 +269,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // primitive value" for null-prototype objects. Clear any
       // stale selection rather than leaving the previous primitive
       // displayed against a now-non-primitive YAML state.
+      // Renderers whose value can legitimately be a non-primitive
+      // (PIN's long-form block, FLOAT_WITH_UNIT's unit picker)
+      // opt out of this generic sync via ``data-no-value-sync``
+      // — handled above — and own their selection through
+      // ``_syncSelectedAttr`` against the ``?selected`` Lit
+      // binding instead.
       if (!isPrimitiveOrNullish(value)) {
         const current = Array.isArray(select.value)
           ? select.value[0] ?? ""
