@@ -138,6 +138,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   @property({ type: Boolean, attribute: "drawer-open" })
   drawerOpen = true;
 
+  /** True while a firmware job is in flight for this device.
+   *  Gates the destructive in-content actions (the Build Size
+   *  row's broom button) so the user can't supersede a running
+   *  build by accident — the backend rejects ``firmware/clean``
+   *  in that state too, but disabling the affordance up front
+   *  avoids the round-trip and the resulting toast. Forwarded
+   *  from the parent ``<esphome-device-drawer>``. */
+  @property({ type: Boolean, reflect: true })
+  busy = false;
+
   /** Latest reachability snapshot pushed by the backend over the
    *  per-device WS subscription. ``null`` until the initial event
    *  arrives or after the subscription tears down. */
@@ -919,9 +929,12 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
             <button
               class="build-size-clean"
               type="button"
-              title=${this._localize("dashboard.action_clean_build")}
+              ?disabled=${this.busy}
+              title=${this.busy
+                ? this._localize("dashboard.action_clean_build_busy")
+                : this._localize("dashboard.action_clean_build")}
               aria-label=${this._localize("dashboard.action_clean_build")}
-              @click=${() => this._emitCleanBuild(d)}
+              @click=${() => (this.busy ? null : this._emitCleanBuild(d))}
             >
               <wa-icon library="mdi" name="broom"></wa-icon>
             </button>
