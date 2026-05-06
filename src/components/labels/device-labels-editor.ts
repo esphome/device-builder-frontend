@@ -75,10 +75,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @property({ attribute: false })
   device!: ConfiguredDevice;
 
-  /** Whether the assignment dialog is currently open. */
-  @state()
-  private _dialogOpen = false;
-
   /** Substring filter applied to the catalog inside the dialog.
    *  Case-insensitive. */
   @state()
@@ -147,6 +143,13 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       .assigned-chip {
         position: relative;
         padding-right: 6px;
+        /* Override the shared label-chip 'overflow: hidden' so a
+           keyboard focus ring on the nested remove button isn't
+           clipped at the chip's rounded edge. The chip's own ellipsis
+           still works because the label text is truncated by the
+           inline 'title' and the chip's natural width (driven by
+           white-space:nowrap) — no overflow clip needed for that. */
+        overflow: visible;
       }
 
       .assigned-chip .remove-btn {
@@ -167,6 +170,12 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
       .assigned-chip .remove-btn:hover {
         opacity: 1;
+      }
+
+      .assigned-chip .remove-btn:focus-visible {
+        opacity: 1;
+        outline: 2px solid currentColor;
+        outline-offset: 1px;
       }
 
       .assigned-chip .remove-btn wa-icon {
@@ -390,13 +399,17 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     if (changed.has("device")) {
       // Reset transient state when the drawer swaps to a different
       // device; otherwise a half-typed "create" form would persist
-      // into the next device's editor.
-      this._dialogOpen = false;
+      // into the next device's editor and a still-pending save
+      // chained against the previous device would gate this one's
+      // ``_saving`` indicator until that promise settled.
+      if (this._dialog) this._dialog.open = false;
       this._filter = "";
       this._createOpen = false;
       this._newName = "";
       this._newColor = null;
       this._optimisticLabels = null;
+      this._saving = false;
+      this._saveChain = Promise.resolve();
     }
   }
 
@@ -635,7 +648,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   }
 
   private _openDialog = () => {
-    this._dialogOpen = true;
     this._filter = "";
     this._createOpen = false;
     this._newName = "";
@@ -644,7 +656,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   };
 
   private _onDialogClose = () => {
-    this._dialogOpen = false;
     this._filter = "";
     this._createOpen = false;
     this._newName = "";

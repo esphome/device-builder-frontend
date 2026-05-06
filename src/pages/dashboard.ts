@@ -458,6 +458,8 @@ export class ESPHomePageDashboard extends LitElement {
       <div class="toolbar">
         <div class="toolbar-row">
           ${this._renderSearchInput()} ${this._renderViewToggle()}
+          <span class="toolbar-spacer"></span>
+          ${this._renderFilterGroup()}
         </div>
         ${this._renderDiscoveryHint()}
         ${matchCount !== null
@@ -697,13 +699,11 @@ export class ESPHomePageDashboard extends LitElement {
     const yaml = this._yamlMode;
     const cardsLabel = this._localize("dashboard.view_cards");
     const tableLabel = this._localize("dashboard.view_table");
-    const yamlLabel = this._localize("yaml_search.switch_to_yaml");
-    // Three-way segmented control: device-list view (cards or
-    // table) plus a YAML-content-search mode. Only one button
-    // shows ``active`` at a time. Clicking cards / table while
-    // in YAML mode flips out of YAML and sets the chosen view;
-    // clicking ``{}`` flips into YAML mode and the underlying
-    // ``_view`` is preserved for when the user returns.
+    // Two-way segmented control for the device-list view. The YAML
+    // mode used to live here as a third segment but reads better
+    // grouped with the labels filter — it's a "narrow what's
+    // showing" affordance, not a "how is it laid out" choice. See
+    // ``_renderFilterGroup`` for the YAML-mode button.
     return html`
       <div
         class="view-toggle"
@@ -730,13 +730,30 @@ export class ESPHomePageDashboard extends LitElement {
         >
           <wa-icon library="mdi" name="table"></wa-icon>
         </button>
+      </div>
+    `;
+  }
+
+  /** Group the filtering affordances — labels filter + YAML-content
+   *  toggle — into one cluster sitting at the right of the toolbar.
+   *  Both narrow what the device list shows; pairing them visually
+   *  keeps the "how do I find a thing" tools together and away from
+   *  the view-mode toggle, which controls layout, not filtering. */
+  private _renderFilterGroup() {
+    const yaml = this._yamlMode;
+    const yamlLabel = this._localize(
+      yaml ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml",
+    );
+    return html`
+      <div class="filter-group">
+        ${this._renderLabelsFilter()}
         <button
-          class="view-toggle-btn ${yaml ? "active" : ""}"
+          class="select-toggle-btn ${yaml ? "active" : ""}"
           type="button"
           title=${yamlLabel}
           aria-label=${yamlLabel}
           aria-pressed=${yaml ? "true" : "false"}
-          @click=${() => this._setSearchMode(true)}
+          @click=${this._toggleSearchMode}
         >
           <wa-icon library="mdi" name="code-braces"></wa-icon>
         </button>
@@ -976,8 +993,10 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       <div class="toolbar">
         <div class="toolbar-row">
-          ${this._renderSearchInput()} ${this._renderLabelsFilter()}
-          ${this._renderSelectToggle()} ${this._renderViewToggle()}
+          ${this._renderSearchInput()} ${this._renderSelectToggle()}
+          ${this._renderViewToggle()}
+          <span class="toolbar-spacer"></span>
+          ${this._renderFilterGroup()}
         </div>
         ${this._renderDiscoveryHint()}
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
@@ -1164,8 +1183,10 @@ export class ESPHomePageDashboard extends LitElement {
       >
         <div slot="toolbar" class="toolbar-stack">
           <div class="toolbar-row">
-            ${this._renderSearchInput()} ${this._renderLabelsFilter()}
-            ${this._renderSelectToggle()} ${this._renderViewToggle()}
+            ${this._renderSearchInput()} ${this._renderSelectToggle()}
+            ${this._renderViewToggle()}
+            <span class="toolbar-spacer"></span>
+            ${this._renderFilterGroup()}
           </div>
           ${this._renderDiscoveryHint()}
         </div>

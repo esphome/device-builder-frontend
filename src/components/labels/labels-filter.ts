@@ -14,7 +14,6 @@
 import { consume } from "@lit/context";
 import {
   mdiCheck,
-  mdiChevronDown,
   mdiTagMultipleOutline,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
@@ -34,7 +33,6 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   check: mdiCheck,
-  "chevron-down": mdiChevronDown,
   "tag-multiple-outline": mdiTagMultipleOutline,
 });
 
@@ -71,36 +69,54 @@ export class ESPHomeLabelsFilter extends LitElement {
         position: relative;
       }
 
+      /* Match the dashboard's other icon-button affordances
+         ('select-toggle-btn' + segmented 'view-toggle-btn'): 36px
+         square, neutral fill, primary fill when active. The active
+         count rides as a small badge in the upper-right corner so
+         the button stays icon-sized at any selection count. */
       .trigger {
+        position: relative;
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 10px;
-        background: var(--wa-color-surface-default);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        justify-content: center;
+        width: 36px;
+        height: 36px;
         border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        background: var(--wa-color-surface-raised);
+        color: var(--wa-color-text-quiet);
         cursor: pointer;
-        white-space: nowrap;
+        transition:
+          background 0.12s,
+          color 0.12s,
+          border-color 0.12s;
+        padding: 0;
+        flex-shrink: 0;
       }
 
       .trigger:hover {
-        border-color: var(--wa-color-text-quiet);
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
       }
 
       .trigger--active {
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
         border-color: var(--esphome-primary);
-        color: var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+      }
+
+      .trigger--active:hover {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
       }
 
       .trigger wa-icon {
-        font-size: 14px;
+        font-size: 18px;
       }
 
       .count-badge {
+        position: absolute;
+        top: -4px;
+        right: -4px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -108,10 +124,20 @@ export class ESPHomeLabelsFilter extends LitElement {
         height: 16px;
         padding: 0 4px;
         border-radius: 999px;
-        font-size: var(--wa-font-size-2xs);
+        font-size: 10px;
         font-weight: var(--wa-font-weight-bold);
+        line-height: 1;
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
+        border: 2px solid var(--wa-color-surface-default);
+      }
+
+      /* When the button itself is filled (active state), the badge
+         needs the inverse outline to stay distinct. */
+      .trigger--active .count-badge {
+        background: var(--wa-color-surface-default);
+        color: var(--esphome-primary);
+        border-color: var(--esphome-primary);
       }
 
       .popover {
@@ -230,18 +256,21 @@ export class ESPHomeLabelsFilter extends LitElement {
     if (this._catalog.length === 0) return nothing;
     const selectedSet = new Set(this.selected);
     const count = this.selected.length;
+    const label = this._localize("dashboard.filter_labels");
     return html`
       <button
         class="trigger ${count > 0 ? "trigger--active" : ""}"
         type="button"
+        title=${label}
+        aria-label=${label}
         aria-haspopup="true"
         aria-expanded=${this._open ? "true" : "false"}
         @click=${this._toggle}
       >
         <wa-icon library="mdi" name="tag-multiple-outline"></wa-icon>
-        <span>${this._localize("dashboard.filter_labels")}</span>
-        ${count > 0 ? html`<span class="count-badge">${count}</span>` : nothing}
-        <wa-icon library="mdi" name="chevron-down"></wa-icon>
+        ${count > 0
+          ? html`<span class="count-badge" aria-hidden="true">${count}</span>`
+          : nothing}
       </button>
       ${this._open ? this._renderPopover(selectedSet) : nothing}
     `;

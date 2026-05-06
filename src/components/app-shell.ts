@@ -464,8 +464,9 @@ export class ESPHomeApp extends LitElement {
    *  the latest state — push events drive it day-to-day, but a
    *  reconnect crosses a window where events were dropped. A failure
    *  here is non-fatal: ``_labels`` stays at its previous value (or
-   *  empty on first load); device chips fall back to a neutral
-   *  "(unknown)" placeholder. */
+   *  empty on first load); chip renderers silently drop unknown ids
+   *  and the toolbar filter hides itself on an empty catalog, so the
+   *  missing data simply produces no visible UI. */
   private async _loadLabels() {
     try {
       this._labels = await this._api.listLabels();

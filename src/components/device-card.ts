@@ -159,12 +159,20 @@ export class ESPHomeDeviceCard extends LitElement {
     espHomeStyles,
     labelChipStyles,
     css`
+      /* Always present so cards line up at equal height regardless
+         of whether a particular device carries labels — without the
+         reserved row, a single tagged device in the grid bumps every
+         neighbour out of column-baseline alignment. The min-height
+         matches one chip's natural height (chip line-height 1.4 +
+         padding) so an empty row leaves the same gap a single chip
+         would. */
       .device-card-labels {
         display: flex;
         flex-wrap: wrap;
         gap: 4px;
         padding: 0 var(--wa-space-m) var(--wa-space-s);
         margin-top: -2px;
+        min-height: 22px;
       }
     `,
     css`
@@ -669,14 +677,13 @@ export class ESPHomeDeviceCard extends LitElement {
   /** Render the device's label chips just below the name / status
    *  header. Caps at 4 visible chips with a "+N" overflow chip so a
    *  heavily-tagged device doesn't blow out the card height; the
-   *  full set is reachable from the drawer. ``nothing`` when the
-   *  device carries no labels — keeps the card visually unchanged
-   *  for the typical un-tagged device. */
+   *  full set is reachable from the drawer. The container is always
+   *  rendered (with ``min-height``) so cards keep equal heights
+   *  whether a particular device carries labels or not. */
   private _renderLabels() {
     const labels = resolveLabelIds(this.labelIds, this._labelCatalog);
-    if (labels.length === 0) return nothing;
     return html`<div class="device-card-labels">
-      ${renderLabelChips(labels, { max: 4 })}
+      ${labels.length === 0 ? nothing : renderLabelChips(labels, { max: 4 })}
     </div>`;
   }
 
