@@ -83,6 +83,7 @@ export const deviceEditorStyles = css`
   }
 
   .save-button,
+  .validate-button,
   .install-fab {
     display: inline-flex;
     align-items: center;
@@ -126,6 +127,26 @@ export const deviceEditorStyles = css`
     transform: none;
   }
 
+  /* Subordinate to Save: surface-tinted variant so the primary
+     action stays visually dominant. The disabled state (YAML buffer
+     dirty) is the more common one — a bright primary button there
+     would compete with Save for attention. */
+  .validate-button {
+    background: var(--wa-color-surface-default);
+    color: var(--wa-color-text-normal);
+    border-color: var(--wa-color-surface-border);
+  }
+
+  .validate-button:hover:not(:disabled) {
+    background: var(--wa-color-surface-raised);
+    border-color: color-mix(in srgb, var(--wa-color-text-normal), transparent 70%);
+  }
+
+  .validate-button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
   .install-fab {
     background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
     color: var(--esphome-primary);
@@ -143,6 +164,7 @@ export const deviceEditorStyles = css`
   }
 
   .save-button wa-icon,
+  .validate-button wa-icon,
   .install-fab wa-icon {
     font-size: 16px;
   }

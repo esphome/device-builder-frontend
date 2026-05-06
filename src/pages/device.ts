@@ -209,12 +209,21 @@ export class ESPHomePageDevice extends LitElement {
     return this._yaml !== this._savedYaml;
   }
 
-  /** Combined "anything unsaved on this page" check. The YAML
-   *  buffer ``_isYamlDirty`` and the visual editor's form
-   *  ``_sectionDirty`` are independent — typing in the form
-   *  doesn't flip the YAML buffer until the user clicks Save —
-   *  but both should block a page-leave / refresh until the
-   *  user picks Discard or Save. */
+  /** Combined "anything unsaved on this page" check.
+   *
+   *  The form auto-syncs into ``_yaml`` on a 200ms debounce
+   *  (``device-section-config._flushDraft``), so once the debounce
+   *  has fired ``_isYamlDirty`` already reflects the form edits.
+   *  ``_sectionDirty`` covers the brief window between a keystroke
+   *  and that flush — without it, hitting back / closing the tab
+   *  inside that window would silently lose the last keystroke
+   *  even though the user explicitly typed it.
+   *
+   *  The leave-page / save / popstate paths call
+   *  ``_activeSection?.flushPending()`` synchronously before they
+   *  read this getter, so by the time ``_isDirty`` is consulted
+   *  any pending form edits have been promoted into ``_yaml`` and
+   *  the YAML branch is authoritative. */
   private get _isDirty(): boolean {
     return this._isYamlDirty || this._sectionDirty;
   }
@@ -247,21 +256,17 @@ export class ESPHomePageDevice extends LitElement {
   private _onUnsavedCancel = () => this._unsavedGuard.onCancel();
 
   private _confirmLeave = async (): Promise<boolean> => {
+    // Promote any pending form keystrokes into ``_yaml`` before the
+    // dialog so the user is shown the canonical "do you want to
+    // save?" question. Without this flush, a user who typed in the
+    // form and immediately hit back would see the dialog reflect
+    // ``_sectionDirty`` (transient) rather than the YAML diff that
+    // ``Save`` is going to commit.
+    this._activeSection?.flushPending();
     const ok = await this._unsavedGuard.run({
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
-      // Save persists *both* dirty buffers when the user picks
-      // "Save and leave" — the YAML pane and the section form
-      // are independent and either can be dirty on its own. The
-      // section save runs first because its output writes
-      // through ``yaml-updated`` which advances ``_savedYaml``;
-      // then ``_saveYaml`` covers anything the user typed in
-      // the YAML pane on top.
       save: async () => {
-        if (this._sectionDirty) {
-          const sectionOk = (await this._activeSection?.save()) ?? false;
-          if (!sectionOk) return false;
-        }
         if (this._isYamlDirty) this._saveYaml();
         this._allowingLeave = true;
         return true;
@@ -272,6 +277,11 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   private _onBeforeUnload = (e: BeforeUnloadEvent) => {
+    // Flush the form's pending debounce so a user who typed in the
+    // form and immediately closed the tab gets warned (the form's
+    // own keystroke would otherwise sit in the debounce window with
+    // no representation in ``_yaml``).
+    this._activeSection?.flushPending();
     if (this._isDirty) {
       e.preventDefault();
       e.returnValue = "";
@@ -283,6 +293,7 @@ export class ESPHomePageDevice extends LitElement {
       this._allowingLeave = false;
       return;
     }
+    this._activeSection?.flushPending();
     if (!this._isDirty) return;
     e.stopImmediatePropagation();
     window.history.pushState({}, "", `/device/${this.id}`);
@@ -463,7 +474,11 @@ export class ESPHomePageDevice extends LitElement {
     this._scrollToHighlight = true;
   }
 
-  private _saveYaml() {
+  private _saveYaml = () => {
+    // Promote any in-flight form keystroke (still inside its 200ms
+    // debounce window) into ``_yaml`` so the save commits exactly
+    // what the user typed — not what was last flushed.
+    this._activeSection?.flushPending();
     this._savedYaml = this._yaml;
     toast.success(this._localize("device.yaml_saved"), { richColors: true });
     this._api.updateConfig(this.id, this._yaml).catch((e) => {
@@ -475,7 +490,15 @@ export class ESPHomePageDevice extends LitElement {
         toast.error(this._localize("device.yaml_save_error"), { richColors: true });
       }
     });
-  }
+  };
+
+  private _onValidateClick = () => {
+    if (!this._device) return;
+    this._commandDialog.configuration = this._device.configuration;
+    this._commandDialog.name =
+      this._device.friendly_name || this._device.name;
+    this._commandDialog.open("validate");
+  };
 
   static styles = [espHomeStyles, devicePageStyles];
 
@@ -512,12 +535,14 @@ export class ESPHomePageDevice extends LitElement {
           @yaml-cursor-line=${this._onYamlCursorLine}
           @yaml-highlight=${this._onYamlHighlight}
           @yaml-updated=${this._onYamlUpdated}
+          @yaml-draft=${this._onYamlDraft}
           @section-select=${this._onSectionSelect}
           @section-mount=${this._onSectionMount}
           @section-unmount=${this._onSectionUnmount}
           @dirty-change=${this._onSectionDirtyChange}
           @nav-section-show=${this._onNavSectionShow}
           @save-yaml=${this._saveYaml}
+          @validate-device=${this._onValidateClick}
           @install-device=${this._installCtrl.onInstall}
           @update-device=${this._installCtrl.onUpdate}
         >
@@ -536,6 +561,7 @@ export class ESPHomePageDevice extends LitElement {
             .selectedFromLine=${this._selectedFromLine}
             .justCreated=${this._justCreated}
             @just-created-dismiss=${this._dismissJustCreated}
+            ?hasUnsavedEdits=${this._isDirty}
             ?hasPendingChanges=${this._device?.has_pending_changes === true}
             ?hasUpdateAvailable=${this._device?.update_available === true}
             ?busy=${this._activeJobs.has(this.id)}
@@ -717,26 +743,27 @@ export class ESPHomePageDevice extends LitElement {
   }
 
   private _onYamlUpdated(e: CustomEvent<{ yaml: string }>) {
-    /* ``yaml-updated`` fires from the visual-editor section save,
-     * the add-component dialog, and the section-delete path. Two
-     * emitters (``add-component-dialog`` and the section-delete
-     * branch) ``await`` the API call before dispatching; the
-     * section-save path is intentionally optimistic — it kicks
-     * off ``api.updateConfig`` without awaiting and dispatches
-     * immediately so the form clears its dirty state without an
-     * extra round-trip. ``_savedYaml`` advances optimistically to
-     * match: it tracks "what we believe is on disk", consistent
-     * with the section component's own optimistic ``_dirty=false``.
-     * If the save fails, the section's existing error toast
-     * surfaces it; the parent's dirty state is the rare wrong
-     * follower of the optimistic flow.
+    /* ``yaml-updated`` fires from completed-API-call paths only —
+     * the add-component dialog and the section-delete branch.
+     * Both ``await`` the API call before dispatching, so by the
+     * time we see this event the new YAML is already on disk and
+     * ``_savedYaml`` can safely advance to match.
      *
-     * Without this, the YAML editor's Save button stayed enabled
-     * after a successful visual save because ``_isDirty`` (which
-     * compares ``_yaml`` vs ``_savedYaml``) latched true on the
-     * first ``yaml-updated``. */
+     * Form edits in the section editor flow through the separate
+     * ``yaml-draft`` event (see ``_onYamlDraft`` below) which
+     * advances only ``_yaml`` — those are committed via the right-
+     * pane Save button. */
     this._yaml = e.detail.yaml;
     this._savedYaml = e.detail.yaml;
+  }
+
+  private _onYamlDraft(e: CustomEvent<{ yaml: string }>) {
+    /* Form auto-sync: the section editor spliced its current
+     * ``_values`` into the YAML and is asking us to surface that
+     * in the YAML pane. Only ``_yaml`` advances; ``_savedYaml``
+     * stays put so the right-pane Save button activates and the
+     * user sees the buffer is dirty. */
+    this._yaml = e.detail.yaml;
   }
 
   private _onSectionSelect(
@@ -755,19 +782,19 @@ export class ESPHomePageDevice extends LitElement {
     });
   }
 
-  /** Run *action* now if the section editor has no unsaved
-   *  edits; otherwise pop the unsaved-changes dialog and replay
-   *  the action only when the user picks Save (and the save
-   *  actually succeeds) or Discard. The section's own
-   *  ``_loadConfig`` clears ``_dirty`` after the switch lands,
-   *  so Discard doesn't need to revert form state explicitly. */
-  private async _guardSectionSwitch(action: () => void): Promise<void> {
-    const ok = await this._unsavedGuard.run({
-      dirty: this._sectionDirty,
-      open: () => this._unsavedDialog?.open(),
-      save: () => this._activeSection?.save() ?? Promise.resolve(false),
-    });
-    if (ok) action();
+  /** Switch sections, flushing any pending form draft first.
+   *
+   *  No unsaved-changes dialog: with auto-sync, the form's
+   *  current ``_values`` are always already in the draft YAML
+   *  buffer (or a sync-microtask away). Switching never loses
+   *  work — the user's edits stay visible in the YAML pane and
+   *  re-render in the form when they come back to this section.
+   *  The leave-page guard (``_confirmLeave``) is the only thing
+   *  that prompts about unsaved YAML, since *that's* the only
+   *  state that's actually at risk. */
+  private _guardSectionSwitch(action: () => void): void {
+    this._activeSection?.flushPending();
+    action();
   }
 
   private _onSectionMount = (e: Event) => {
