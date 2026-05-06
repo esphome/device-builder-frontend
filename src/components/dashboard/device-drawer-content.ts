@@ -933,7 +933,9 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               title=${this.busy
                 ? this._localize("dashboard.action_clean_build_busy")
                 : this._localize("dashboard.action_clean_build")}
-              aria-label=${this._localize("dashboard.action_clean_build")}
+              aria-label=${this.busy
+                ? this._localize("dashboard.action_clean_build_busy")
+                : this._localize("dashboard.action_clean_build")}
               @click=${() => (this.busy ? null : this._emitCleanBuild(d))}
             >
               <wa-icon library="mdi" name="broom"></wa-icon>
