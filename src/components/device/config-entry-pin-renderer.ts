@@ -168,6 +168,7 @@ export function renderPinField(
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${fieldDisabled}
+        .value=${value}
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
       >

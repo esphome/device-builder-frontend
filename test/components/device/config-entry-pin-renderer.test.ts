@@ -45,3 +45,41 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio(Number.NaN)).toBeNull();
   });
 });
+
+describe("renderPinField wa-select binding", () => {
+  // Pin a contract that's invisible to ``parsePinGpio``'s unit
+  // tests but is the actual user-facing bug: ``wa-select`` reads
+  // its displayed value from the parent's ``value`` property, not
+  // from per-option ``?selected`` attributes — those are only
+  // honored on the initial slot-change pass and don't propagate
+  // on re-render. With only ``?selected``, a pin block like
+  // ``pin: { number: GPIO33, mode: INPUT_PULLUP, inverted: false }``
+  // parses correctly (parsePinGpio → 33) but the closed select
+  // displays nothing because the value never reaches the parent.
+  it("binds .value on the parent wa-select so the closed display matches the selection", async () => {
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const fs = await import("node:fs");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const path = await import("node:path");
+    // @ts-expect-error — node-only module, types excluded from tsconfig
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../../src/components/device/config-entry-pin-renderer.js"
+        .replace(/\.js$/, ".ts"),
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+    // The wa-select inside renderPinField must carry a property
+    // binding to ``value`` (Lit's ``.value=`` syntax) so re-renders
+    // update the displayed selection. Without it, an object pin
+    // block (``{ number: GPIO33, ... }``) parses correctly but the
+    // dropdown shows blank — the regression this test pins.
+    const m = src.match(/<wa-select[^>]*?>/s);
+    expect(m, "wa-select element missing from renderPinField").not.toBeNull();
+    expect(
+      /\.value\s*=\s*\$\{value\}/.test(m![0]),
+      `wa-select doesn't bind .value=\${value}; matched element: ${m![0]}`,
+    ).toBe(true);
+  });
+});
