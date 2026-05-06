@@ -3,10 +3,11 @@ import { mdiArrowCollapseRight, mdiArrowLeft } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { isHaIngressContext, localizeContext } from "../context/index.js";
+import { isHaIngressContext, localizeContext, versionContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import pkg from "../../package.json";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -26,6 +27,10 @@ export class ESPHomeLayout extends LitElement {
   @consume({ context: isHaIngressContext, subscribe: true })
   @state()
   private _isHaIngress = false;
+
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  private _esphomeVersion = "";
 
   @state()
   private _path = window.location.pathname;
@@ -168,6 +173,22 @@ export class ESPHomeLayout extends LitElement {
           display: none;
         }
       }
+
+      .app-footer {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: var(--wa-space-m);
+        font-size: 10px;
+        color: var(--wa-color-text-quiet);
+        opacity: 0.5;
+        pointer-events: none;
+      }
     `,
   ];
 
@@ -217,6 +238,10 @@ export class ESPHomeLayout extends LitElement {
         <esphome-header-actions></esphome-header-actions>
       </div>
       <slot></slot>
+      <div class="app-footer">
+        <span>ESPHome Device Builder v${pkg.version}</span>
+        ${this._esphomeVersion ? html`<span>ESPHome v${this._esphomeVersion}</span>` : nothing}
+      </div>
     `;
   }
 }
