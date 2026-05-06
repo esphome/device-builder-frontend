@@ -12,6 +12,7 @@ import {
   findUsedPins,
   sectionEndLine,
 } from "../../util/config-entry-yaml-scan.js";
+import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
   renderFieldError,
@@ -111,8 +112,19 @@ export function renderPinField(
   // before comparing or the disabled select renders blank.
   const rawValue = ctx.getAt(path);
   const valueGpio = parsePinGpio(rawValue);
+  // Fallback to ``String(rawValue)`` only when the value is a
+  // primitive — js-yaml emits null-prototype maps for partial /
+  // mid-edit pin blocks, and ``String(Object.create(null))`` throws
+  // "Cannot convert object to primitive value", crashing the form
+  // for a pin renderer that's already in a recoverable state. Treat
+  // unparseable objects as "no selection" so no option matches and
+  // the dropdown stays empty rather than blowing up.
   const value =
-    valueGpio !== null ? `GPIO${valueGpio}` : String(rawValue ?? "");
+    valueGpio !== null
+      ? `GPIO${valueGpio}`
+      : isPrimitiveOrNullish(rawValue)
+        ? String(rawValue ?? "")
+        : "";
   const invalid = ctx.errorAt(path) !== null;
   const required = entry.pin_features ?? [];
   const matchesFeatures = (pin: BoardPin) =>

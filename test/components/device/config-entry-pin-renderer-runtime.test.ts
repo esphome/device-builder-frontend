@@ -1,26 +1,28 @@
 /**
- * Runtime check that ``renderPinField`` actually does what PR #180
- * claims: with a long-form pin block in the YAML
- * (``{ number: 'GPIO33', mode: 'INPUT_PULLUP', inverted: false }``),
- * the rendered ``wa-select`` should land on the GPIO33 option as
- * selected, with the correct closed-state label.
+ * Walk ``renderPinField``'s ``TemplateResult`` and assert which
+ * ``<wa-option>`` is marked ``?selected=true`` for the YAML
+ * shapes the renderer is supposed to handle:
  *
- * The shipped test in ``config-entry-pin-renderer.test.ts`` only
- * source-scans the renderer for ``data-no-value-sync`` and the
- * absence of ``.value=``. That doesn't prove the bug is gone —
- * the form's ``_syncSelectedAttr`` could be silently dropping
- * the value, the renderer's ``?selected`` could be on the wrong
- * option, or ``parsePinGpio`` could be returning ``null`` for
- * a shape we thought it handled. Walk the ``TemplateResult``
- * directly and assert that the option matching the YAML's GPIO
- * carries ``?selected=true`` and the right value.
+ *   - long-form pin block (``{ number: 'GPIO33', ... }``)
+ *   - bare integer (``{ number: 33 }``)
+ *   - unparseable shape (no ``number`` key) — defensively
+ *     selects nothing, so a future ``parsePinGpio`` regression
+ *     can't quietly default to GPIO0
+ *   - null-prototype map (mid-edit YAML from js-yaml) — must
+ *     not crash on the ``String()`` fallback
  *
- * The walker, ctx factory, and binding extractor live in
+ * These are template-shape assertions: which option carries the
+ * ``?selected`` boolean attribute, which ``value`` attribute it
+ * has, and which ``.label`` property was bound to it. We don't
+ * assert on the closed-state ``displayLabel`` here — wa-select's
+ * runtime needs a real DOM with form-associated internals, and
+ * happy-dom doesn't implement ``ElementInternals.validity``.
+ *
+ * Walker / ctx factory / binding extractor live in
  * ``test/_lit-template-walker.ts`` + ``./_renderer-fixtures.ts``
- * so future renderer tests can reuse them without rebuilding the
- * scaffolding. Bindings are looked up by name (``b.value``,
- * ``b["?selected"]``, ``b[".label"]``) so reordering attributes
- * in the renderer source doesn't break these assertions.
+ * so future renderer tests reuse them; bindings are looked up by
+ * name (``b.value``, ``b["?selected"]``, ``b[".label"]``) so
+ * attribute order in the renderer source isn't load-bearing.
  */
 import { describe, expect, it } from "vitest";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
@@ -81,6 +83,25 @@ describe("renderPinField — long-form pin block selection", () => {
     const ctx = makeRenderCtx({ pin: { mode: "INPUT", inverted: false } });
     const result = renderPinField(pinEntry(), ["pin"], ctx);
 
+    const selected = findElementBindings(result, "wa-option").filter(
+      (o) => o["?selected"] === true,
+    );
+    expect(selected.length).toBe(0);
+  });
+
+  it("does not throw when the pin value is a null-prototype object", () => {
+    // js-yaml emits ``Object.create(null)`` maps for partial / mid-
+    // edit YAML. ``String()`` on those throws "Cannot convert
+    // object to primitive value", which would crash the renderer.
+    // The fallback path has to recognise non-primitives and
+    // return an empty selection instead.
+    const partial = Object.create(null) as Record<string, unknown>;
+    partial.mode = "INPUT_PULLUP";
+    const ctx = makeRenderCtx({ pin: partial });
+
+    expect(() => renderPinField(pinEntry(), ["pin"], ctx)).not.toThrow();
+
+    const result = renderPinField(pinEntry(), ["pin"], ctx);
     const selected = findElementBindings(result, "wa-option").filter(
       (o) => o["?selected"] === true,
     );
