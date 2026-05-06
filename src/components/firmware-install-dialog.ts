@@ -81,7 +81,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() private _failedDuringCompile = false;
   @state() private _logLines: string[] = [];
   @state() private _logsExpanded = false;
-  @state() private _logsFullHeight = false;
   @state() private _flashPercent = 0;
   @state() private _downloadedFilename = "";
   /** Auto-flip to the logs dialog after a successful Web Serial
@@ -203,7 +202,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._errorMessage = "";
     this._logLines = [];
     this._logsExpanded = false;
-    this._logsFullHeight = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
     this._showLogsAfterInstall = true;
@@ -425,20 +423,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         justify-content: space-between;
       }
 
-      .expand-btn {
-        display: inline-flex;
-        align-items: center;
-        padding: 0;
-        background: none;
-        border: none;
-        font-size: 16px;
-        color: var(--wa-color-text-quiet);
-        cursor: pointer;
-      }
-      .expand-btn:hover {
-        color: var(--wa-color-text-normal);
-      }
-
       .logs-container {
         margin-top: var(--wa-space-s);
         border: 1px solid var(--term-border);
@@ -447,12 +431,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       }
 
       esphome-ansi-log {
-        --log-height: 200px;
-      }
-
-      .logs-container--full esphome-ansi-log {
         --log-height: 50vh;
       }
+
       esphome-ansi-log::part(container) {
         border-radius: 0;
       }
@@ -507,8 +488,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
-    if (changedProperties.has("_logsFullHeight")) {
-      this.toggleAttribute("expanded", this._logsFullHeight);
+    if (changedProperties.has("_logsExpanded")) {
+      this.toggleAttribute("expanded", this._logsExpanded);
     }
   }
 
@@ -665,24 +646,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
             ? this._localize("firmware.hide_details")
             : this._localize("firmware.show_details")}
         </button>
-        ${this._logsExpanded
-          ? html`<button
-              class="expand-btn"
-              @click=${() => {
-                this._logsFullHeight = !this._logsFullHeight;
-              }}
-            >
-              <wa-icon
-                library="mdi"
-                name=${this._logsFullHeight ? "arrow-collapse" : "arrow-expand"}
-              ></wa-icon>
-            </button>`
-          : nothing}
       </div>
       ${this._logsExpanded
-        ? html`<div
-            class="logs-container ${this._logsFullHeight ? "logs-container--full" : ""}"
-          >
+        ? html`<div class="logs-container">
             <esphome-ansi-log
               .lines=${this._logLines}
               ?light=${!this._darkMode}
