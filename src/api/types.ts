@@ -591,12 +591,11 @@ export interface ConfigEntry {
   /**
    * When True frontend collapses this entry under an "Advanced" section.
    *
-   * Sourced from upstream esphome's `cv.Optional(...,
-   * visibility=cv.Visibility.ADVANCED)` schema kwarg
-   * (esphome/esphome#16267) when the field author marked it
-   * explicitly, or pushed down by the catalog generator's cascade
-   * pass when an ancestor is `ADVANCED` or stricter. The
-   * device-builder catalog's name-based heuristic is the
+   * Sourced from upstream esphome's `Visibility.ADVANCED` schema
+   * kwarg (esphome/esphome#16267) when the field author marked
+   * it explicitly, or pushed down by the catalog generator's
+   * cascade pass when an ancestor is `ADVANCED` or stricter.
+   * The device-builder catalog's name-based heuristic is the
    * fallback for fields the schema doesn't yet annotate; as
    * upstream adoption grows, the heuristic shrinks toward zero.
    */
@@ -604,17 +603,16 @@ export interface ConfigEntry {
   /**
    * When True frontend hides the entry entirely.
    *
-   * Sourced from upstream esphome's `cv.Optional(...,
-   * visibility=cv.Visibility.YAML_ONLY)` schema kwarg
-   * (esphome/esphome#16267). Marks fields the user shouldn't
-   * edit through a visual editor — e.g. `setup_priority` on
-   * every component, where casual UI-driven tweaks can break
-   * boot. The YAML escape hatch stays available for the rare
-   * power-user override. Also pushed down by the catalog
-   * generator's cascade pass when an ancestor is `YAML_ONLY`: a
-   * hidden parent takes its descendants with it (otherwise the
-   * editor would render an unrooted control with no surrounding
-   * context).
+   * Sourced from upstream esphome's `Visibility.YAML_ONLY`
+   * schema kwarg (esphome/esphome#16267). Marks fields the user
+   * shouldn't edit through a visual editor — e.g.
+   * `setup_priority` on every component, where casual UI-driven
+   * tweaks can break boot. The YAML escape hatch stays
+   * available for the rare power-user override. Also pushed down
+   * by the catalog generator's cascade pass when an ancestor is
+   * `YAML_ONLY`: a hidden parent takes its descendants with it
+   * (otherwise the editor would render an unrooted control with
+   * no surrounding context).
    */
   hidden: boolean;
   /** Optional URL pointing to documentation specific to this field. */
