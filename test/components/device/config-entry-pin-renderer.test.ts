@@ -56,18 +56,24 @@ describe("renderPinField wa-select binding", () => {
   // ``pin: { number: GPIO33, mode: INPUT_PULLUP, inverted: false }``
   // parses correctly (parsePinGpio → 33) but the closed select
   // displays nothing because the value never reaches the parent.
+  const importNode = async () => {
+    const [fs, path, url] = await Promise.all([
+      // @ts-expect-error — node-only module, types excluded from tsconfig
+      import("node:fs"),
+      // @ts-expect-error — node-only module, types excluded from tsconfig
+      import("node:path"),
+      // @ts-expect-error — node-only module, types excluded from tsconfig
+      import("node:url"),
+    ]);
+    return { fs, path, url };
+  };
+
   it("binds .value on the parent wa-select so the closed display matches the selection", async () => {
-    // @ts-expect-error — node-only module, types excluded from tsconfig
-    const fs = await import("node:fs");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
-    const path = await import("node:path");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
-    const url = await import("node:url");
+    const { fs, path, url } = await importNode();
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
       here,
-      "../../../src/components/device/config-entry-pin-renderer.js"
-        .replace(/\.js$/, ".ts"),
+      "../../../src/components/device/config-entry-pin-renderer.ts",
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
     // The wa-select inside renderPinField must carry a property
@@ -80,6 +86,52 @@ describe("renderPinField wa-select binding", () => {
     expect(
       /\.value\s*=\s*\$\{value\}/.test(m![0]),
       `wa-select doesn't bind .value=\${value}; matched element: ${m![0]}`,
+    ).toBe(true);
+  });
+
+  it("config-entry-form's _syncSelectValues coerces object pin shapes via parsePinGpio", async () => {
+    // The renderer's ``.value=`` binding sets wa-select's value on
+    // the initial Lit render — but ``_syncSelectValues`` runs
+    // post-render and clears wa-select.value to "" for any
+    // non-primitive value. The long-form pin block is an object,
+    // so without the parsePinGpio coercion in the sync path the
+    // selection gets clobbered immediately after each render and
+    // the user sees a blank dropdown.
+    //
+    // Pin the wiring contract: the form must import parsePinGpio
+    // AND must run it against the raw value before the
+    // isPrimitiveOrNullish clear branch.
+    const { fs, path, url } = await importNode();
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../../src/components/device/config-entry-form.ts",
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+
+    expect(
+      /import\s*\{\s*parsePinGpio\s*\}\s*from\s*"\.\/config-entry-pin-renderer\.js"/.test(
+        src,
+      ),
+      "config-entry-form doesn't import parsePinGpio",
+    ).toBe(true);
+
+    // The coercion must precede the ``isPrimitiveOrNullish``
+    // clear so the object pin shape survives. Carve out the sync
+    // body and assert the order.
+    const syncStart = src.indexOf("private async _syncSelectValues");
+    expect(syncStart).toBeGreaterThan(-1);
+    const syncBody = src.slice(syncStart, syncStart + 4000);
+    const parseIdx = syncBody.indexOf("parsePinGpio(");
+    // Match the call site, not the surrounding rationale comment
+    // that names the function. ``if (!isPrimitiveOrNullish(value))``
+    // is unambiguous.
+    const clearIdx = syncBody.indexOf("!isPrimitiveOrNullish(");
+    expect(parseIdx).toBeGreaterThan(-1);
+    expect(clearIdx).toBeGreaterThan(-1);
+    expect(
+      parseIdx < clearIdx,
+      "parsePinGpio coercion must run before the isPrimitiveOrNullish clear",
     ).toBe(true);
   });
 });
