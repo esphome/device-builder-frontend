@@ -8,6 +8,7 @@ const _baseDevice = {
   friendly_name: "Kitchen",
   configuration: "kitchen.yaml",
   comment: null,
+  area: "",
   board_id: "esp32-c3-devkitm-1",
   target_platform: "esp32",
   address: "kitchen.local",

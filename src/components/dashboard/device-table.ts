@@ -80,6 +80,7 @@ const paginatedRowModel = getPaginationRowModel<DeviceRow>();
 // Columns hidden by default unless the user explicitly enables them via preferences.
 const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
   comment: false,
+  area: false,
   version: false,
   ip: false,
   mac_address: false,
@@ -279,6 +280,7 @@ export class ESPHomeDeviceTable extends LitElement {
         version: d.deployed_version || "",
         build_size_bytes: d.build_size_bytes || 0,
         comment: d.comment || "",
+        area: d.area || "",
         config: d.configuration,
         hasPendingChanges: d.has_pending_changes === true,
         hasUpdateAvailable: d.update_available,

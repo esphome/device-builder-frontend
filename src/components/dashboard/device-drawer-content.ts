@@ -544,6 +544,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderBluetoothMacRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
         ${this._renderBuildSizeRow(d)}
+        ${d.area ? this._row("map-marker-outline", this._localize("dashboard.drawer_area"), d.area) : nothing}
       </div>
 
       ${this._renderReachabilitySection()}

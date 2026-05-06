@@ -78,6 +78,12 @@ export interface ConfiguredDevice {
   friendly_name: string;
   configuration: string;
   comment: string | null;
+  /** Optional ``esphome.area`` from the YAML — a free-form
+   *  room / location label (the same key Home Assistant uses as
+   *  a device-area hint). Empty string when the YAML doesn't
+   *  declare one. Surfaced in the drawer and as an opt-in table
+   *  column. */
+  area: string;
   board_id: string;
   target_platform: string;
   /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */

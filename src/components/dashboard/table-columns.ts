@@ -18,6 +18,7 @@ export interface DeviceRow {
   platform: string;
   version: string;
   comment: string;
+  area: string;
   config: string;
   build_size_bytes: number;
   hasPendingChanges: boolean;
@@ -201,6 +202,14 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) =>
         html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
       size: 180,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "area",
+      header: localize("dashboard.table_col_area"),
+      cell: (info) =>
+        html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
+      size: 160,
       enableHiding: true,
     },
     {
