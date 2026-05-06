@@ -34,10 +34,14 @@ import type { PropertyValues } from "lit";
 import { LitElement, html, nothing } from "lit";
 import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
+import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import {
+  labelChipStyles,
+  resolveLabelIds,
+} from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
@@ -81,6 +85,7 @@ const paginatedRowModel = getPaginationRowModel<DeviceRow>();
 const DEFAULT_HIDDEN_COLUMNS: VisibilityState = {
   comment: false,
   area: false,
+  labels: false,
   version: false,
   ip: false,
   mac_address: false,
@@ -92,6 +97,10 @@ export class ESPHomeDeviceTable extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: labelsContext, subscribe: true })
+  @state()
+  private _labelCatalog: Label[] = [];
 
   @property({ attribute: false })
   devices: ConfiguredDevice[] = [];
@@ -260,7 +269,8 @@ export class ESPHomeDeviceTable extends LitElement {
     if (
       changed.has("devices") ||
       changed.has("activeJobs") ||
-      changed.has("recentJobs")
+      changed.has("recentJobs") ||
+      changed.has("_labelCatalog")
     ) {
       this._rows = this.devices.map((d) => ({
         status: d.state,
@@ -281,6 +291,11 @@ export class ESPHomeDeviceTable extends LitElement {
         build_size_bytes: d.build_size_bytes || 0,
         comment: d.comment || "",
         area: d.area || "",
+        // Resolve labels here once per render rather than from the
+        // cell renderer — TanStack's sortingFn / filterFn read the
+        // accessor value, so they need the resolved objects rather
+        // than opaque ids.
+        labels: resolveLabelIds(d.labels, this._labelCatalog),
         config: d.configuration,
         hasPendingChanges: d.has_pending_changes === true,
         hasUpdateAvailable: d.update_available,
@@ -294,7 +309,7 @@ export class ESPHomeDeviceTable extends LitElement {
     }
   }
 
-  static styles = [espHomeStyles, tableCellStyles, tableLayoutStyles];
+  static styles = [espHomeStyles, tableCellStyles, tableLayoutStyles, labelChipStyles];
 
   // ─── Render ───
 

@@ -30,6 +30,9 @@ import type {
   ImportableDeviceAddedEventData,
   ImportableDeviceRemovedEventData,
   InitialStateEventData,
+  Label,
+  LabelDeletedEventData,
+  LabelEventData,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -51,6 +54,7 @@ import {
   importableDevicesContext,
   integrationDocsContext,
   isHaIngressContext,
+  labelsContext,
   localizeContext,
   serverVersionContext,
   versionContext,
@@ -200,6 +204,16 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: integrationDocsContext })
   @state()
   private _integrationDocs: Record<string, string> = {};
+
+  /** Global label catalog. Fetched once on (re)connect via
+   *  ``labels/list`` and kept in sync by ``label_*`` events
+   *  delivered through ``subscribe_events``. Empty until the
+   *  fetch lands; consumers tolerate that — devices that
+   *  reference unknown ids render a neutral "(unknown)" chip
+   *  and the filter dropdown is simply blank. */
+  @provide({ context: labelsContext })
+  @state()
+  private _labels: Label[] = [];
 
   // ─── Auth gate ───────────────────────────────────────────
   // Drives whether we render the connecting spinner, the login form,
@@ -440,7 +454,23 @@ export class ESPHomeApp extends LitElement {
     this._subscribeToEvents();
     this._subscribeToFollowJobs();
     this._loadIntegrationDocs();
+    this._loadLabels();
     this._loadThemePreference();
+  }
+
+  /** Fetch the global label catalog. Called on every (re)connect so
+   *  a session that reconnects after a backend label change picks up
+   *  the latest state — push events drive it day-to-day, but a
+   *  reconnect crosses a window where events were dropped. A failure
+   *  here is non-fatal: ``_labels`` stays at its previous value (or
+   *  empty on first load); device chips fall back to a neutral
+   *  "(unknown)" placeholder. */
+  private async _loadLabels() {
+    try {
+      this._labels = await this._api.listLabels();
+    } catch (err) {
+      console.warn("Failed to load labels catalog:", err);
+    }
   }
 
   /**
@@ -706,6 +736,25 @@ export class ESPHomeApp extends LitElement {
         this._importableDevices = this._importableDevices.filter(
           (d) => d.name !== name,
         );
+        break;
+      }
+      case DeviceEventType.LABEL_CREATED: {
+        const { label } = data as LabelEventData;
+        if (!this._labels.some((l) => l.id === label.id)) {
+          this._labels = [...this._labels, label];
+        }
+        break;
+      }
+      case DeviceEventType.LABEL_UPDATED: {
+        const { label } = data as LabelEventData;
+        this._labels = this._labels.map((l) =>
+          l.id === label.id ? label : l,
+        );
+        break;
+      }
+      case DeviceEventType.LABEL_DELETED: {
+        const { label_id } = data as LabelDeletedEventData;
+        this._labels = this._labels.filter((l) => l.id !== label_id);
         break;
       }
     }

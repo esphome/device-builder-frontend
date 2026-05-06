@@ -190,6 +190,30 @@ export interface ConfiguredDevice {
    *  is heavy I/O — backend caches the value keyed off the build
    *  directory's mtime, so a steady-state poll never re-walks. */
   build_size_bytes: number;
+  /** Opaque label IDs assigned to this device (uuid hex strings
+   *  from the global catalog at ``.device-builder.json``'s
+   *  ``_labels`` key). Resolved against ``labels/list`` to render
+   *  colored chips; the catalog entry is the source of truth for
+   *  name + color, so a rename / recolor doesn't require a
+   *  per-device write. */
+  labels: string[];
+}
+
+// ─── Labels ──────────────────────────────────────────────────
+
+/** A user-defined label that can be assigned to devices. The
+ *  catalog is global; ``ConfiguredDevice.labels`` carries an opaque
+ *  list of ids referencing entries here. */
+export interface Label {
+  /** Server-generated ``uuid.uuid4().hex``. Stable across name /
+   *  color edits — devices reference labels by id. */
+  id: string;
+  /** Display name. Trimmed before save; uniqueness is enforced
+   *  case-insensitively on the backend. 1-50 chars. */
+  name: string;
+  /** ``#rrggbb`` (lowercase). ``null`` means "no explicit color"
+   *  — frontend falls back to a neutral chip palette. */
+  color: string | null;
 }
 
 /** An adoptable/importable ESPHome device. */
@@ -810,6 +834,11 @@ export enum DeviceEventType {
   DEVICE_STATE_CHANGED = "device_state_changed",
   IMPORTABLE_DEVICE_ADDED = "importable_device_added",
   IMPORTABLE_DEVICE_REMOVED = "importable_device_removed",
+  // Label catalog mutations. Per-device label assignment changes
+  // ride the existing ``DEVICE_UPDATED`` event.
+  LABEL_CREATED = "label_created",
+  LABEL_UPDATED = "label_updated",
+  LABEL_DELETED = "label_deleted",
   JOB_QUEUED = "job_queued",
   JOB_STARTED = "job_started",
   JOB_OUTPUT = "job_output",
@@ -862,6 +891,18 @@ export interface ImportableDeviceAddedEventData {
  *  beyond the name to evict its own copy. */
 export interface ImportableDeviceRemovedEventData {
   name: string;
+}
+
+/** Data payload for label_created / label_updated events. */
+export interface LabelEventData {
+  label: Label;
+}
+
+/** Data payload for label_deleted events. The catalog entry is
+ *  already gone by the time this fires; per-device assignments
+ *  cascade through the existing ``device_updated`` events. */
+export interface LabelDeletedEventData {
+  label_id: string;
 }
 
 /** Callback for event subscription push events. */

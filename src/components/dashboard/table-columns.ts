@@ -1,10 +1,11 @@
 import { html, nothing } from "lit";
 import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
-import type { ConfiguredDevice, FirmwareJob } from "../../api/types.js";
+import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
+import { renderLabelChips } from "../../util/label-chip-template.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 export interface DeviceRow {
@@ -19,6 +20,11 @@ export interface DeviceRow {
   version: string;
   comment: string;
   area: string;
+  /** Resolved label objects (catalog joined against
+   *  ``device.labels``) so the cell renderer doesn't need access to
+   *  the catalog itself. ``device-table`` performs the resolve when
+   *  building rows. */
+  labels: Label[];
   config: string;
   build_size_bytes: number;
   hasPendingChanges: boolean;
@@ -210,6 +216,23 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       cell: (info) =>
         html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
       size: 160,
+      enableHiding: true,
+    },
+    {
+      accessorKey: "labels",
+      header: localize("dashboard.table_col_labels"),
+      cell: (info) => {
+        const labels = info.getValue() as Label[];
+        if (!labels || labels.length === 0)
+          return html`<span class="cell-muted">—</span>`;
+        return renderLabelChips(labels, { max: 3 });
+      },
+      sortingFn: (rowA, rowB) => {
+        const a = rowA.original.labels.map((l) => l.name).join(",");
+        const b = rowB.original.labels.map((l) => l.name).join(",");
+        return a.localeCompare(b);
+      },
+      size: 200,
       enableHiding: true,
     },
     {

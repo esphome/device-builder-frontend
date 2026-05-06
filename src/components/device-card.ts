@@ -21,11 +21,16 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { DeviceState, JobStatus, JobType } from "../api/types.js";
-import type { FirmwareJob } from "../api/types.js";
+import type { FirmwareJob, Label } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { localizeContext } from "../context/index.js";
+import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getCompactEncryptionVisual } from "../util/encryption-state.js";
+import {
+  labelChipStyles,
+  renderLabelChips,
+  resolveLabelIds,
+} from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -80,6 +85,16 @@ export class ESPHomeDeviceCard extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: labelsContext, subscribe: true })
+  @state()
+  private _labelCatalog: Label[] = [];
+
+  /** Label ids assigned to this device. Resolved against the
+   *  catalog at render time so a recolor / rename in another
+   *  client repaints every card without per-card state. */
+  @property({ attribute: false })
+  labelIds: string[] = [];
 
   @property({ attribute: false })
   name = "";
@@ -142,6 +157,16 @@ export class ESPHomeDeviceCard extends LitElement {
 
   static styles = [
     espHomeStyles,
+    labelChipStyles,
+    css`
+      .device-card-labels {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        padding: 0 var(--wa-space-m) var(--wa-space-s);
+        margin-top: -2px;
+      }
+    `,
     css`
       :host {
         display: block;
@@ -555,6 +580,7 @@ export class ESPHomeDeviceCard extends LitElement {
           </div>
           ${this._renderStatusBadge()}
         </div>
+        ${this._renderLabels()}
         ${!this.selectMode
           ? html`
               <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
@@ -638,6 +664,20 @@ export class ESPHomeDeviceCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /** Render the device's label chips just below the name / status
+   *  header. Caps at 4 visible chips with a "+N" overflow chip so a
+   *  heavily-tagged device doesn't blow out the card height; the
+   *  full set is reachable from the drawer. ``nothing`` when the
+   *  device carries no labels — keeps the card visually unchanged
+   *  for the typical un-tagged device. */
+  private _renderLabels() {
+    const labels = resolveLabelIds(this.labelIds, this._labelCatalog);
+    if (labels.length === 0) return nothing;
+    return html`<div class="device-card-labels">
+      ${renderLabelChips(labels, { max: 4 })}
+    </div>`;
   }
 
   private _renderEncryptionIcon() {

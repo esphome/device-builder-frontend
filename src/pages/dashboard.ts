@@ -76,6 +76,7 @@ import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
+import "../components/labels/labels-filter.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
@@ -136,6 +137,13 @@ export class ESPHomePageDashboard extends LitElement {
 
   @state() private _showDiscovered = false;
   @state() private _search = "";
+
+  /** Label-id filter: a device is shown only when its
+   *  ``device.labels`` list contains *every* selected id. Logical
+   *  AND on purpose — a user adding chips to the filter expects each
+   *  one to narrow the result, not widen it. Empty set disables the
+   *  filter entirely. */
+  @state() private _selectedLabels: string[] = [];
 
   /**
    * When true, the search input drives a fleet-wide YAML-content
@@ -409,9 +417,10 @@ export class ESPHomePageDashboard extends LitElement {
 
     const q = this._search.trim().toLowerCase();
     const sorted = this._sortedDevices;
+    const labelFiltered = this._applyLabelFilter(sorted);
     const filtered = q
-      ? sorted.filter((d) => matchesDeviceName(d, q))
-      : sorted;
+      ? labelFiltered.filter((d) => matchesDeviceName(d, q))
+      : labelFiltered;
 
     return html`
       ${this._renderBanner()} ${this._renderDiscoveredGrid()}
@@ -519,6 +528,25 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  /** Apply the active label filter (logical AND across selections)
+   *  to the input device list. Empty selection short-circuits to
+   *  the input unchanged. Stale ids — labels that were deleted
+   *  while their filter chip stayed in our selection — silently
+   *  match no devices, surfacing the empty state and prompting the
+   *  user to clear; the alternative (silently dropping the stale
+   *  id) would change the result set without any visible
+   *  explanation. */
+  private _applyLabelFilter(devices: ConfiguredDevice[]): ConfiguredDevice[] {
+    if (this._selectedLabels.length === 0) return devices;
+    const required = this._selectedLabels;
+    return devices.filter((d) => {
+      const ids = d.labels;
+      if (!ids || ids.length === 0) return false;
+      const set = new Set(ids);
+      return required.every((id) => set.has(id));
+    });
+  }
+
   /** Cached, sorted view of ``_devices``. Cache key is the array
    *  reference, which is replaced (not mutated) by every WS event
    *  in app-shell, so an event that doesn't touch the device list
@@ -543,7 +571,7 @@ export class ESPHomePageDashboard extends LitElement {
    *  user can actually see. */
   private _currentlyVisibleConfigurations(): string[] {
     const q = this._search.trim().toLowerCase();
-    const sorted = this._sortedDevices;
+    const sorted = this._applyLabelFilter(this._sortedDevices);
     if (!q) return sorted.map((d) => d.configuration);
     const isTable = this._view === DashboardView.TABLE;
     return sorted
@@ -948,13 +976,22 @@ export class ESPHomePageDashboard extends LitElement {
     return html`
       <div class="toolbar">
         <div class="toolbar-row">
-          ${this._renderSearchInput()} ${this._renderSelectToggle()}
-          ${this._renderViewToggle()}
+          ${this._renderSearchInput()} ${this._renderLabelsFilter()}
+          ${this._renderSelectToggle()} ${this._renderViewToggle()}
         </div>
         ${this._renderDiscoveryHint()}
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
       </div>
     `;
+  }
+
+  private _renderLabelsFilter() {
+    return html`<esphome-labels-filter
+      .selected=${this._selectedLabels}
+      @labels-filter-change=${(e: CustomEvent<string[]>) => {
+        this._selectedLabels = e.detail;
+      }}
+    ></esphome-labels-filter>`;
   }
 
   private _renderEmptySearch() {
@@ -1039,6 +1076,7 @@ export class ESPHomePageDashboard extends LitElement {
               .name=${device.friendly_name || device.name}
               .configuration=${device.configuration}
               .state=${device.state}
+              .labelIds=${device.labels ?? []}
               ?has-pending-changes=${device.has_pending_changes === true}
               ?has-update-available=${device.update_available}
               ?api-enabled=${device.api_enabled === true}
@@ -1071,9 +1109,15 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderTable() {
+    // Pre-filter on labels at the dashboard level so the table only
+    // sees the post-filter set; the table's own global search then
+    // narrows further across name / address / IP / MAC. Using
+    // ``_devices`` directly (instead of ``_sortedDevices``) keeps
+    // the table's own column-level sort authoritative.
+    const filteredDevices = this._applyLabelFilter(this._devices);
     return html`
       <esphome-device-table
-        .devices=${this._devices}
+        .devices=${filteredDevices}
         .search=${this._search}
         .activeJobs=${this._activeJobs}
         .recentJobs=${this._recentJobs}
@@ -1120,8 +1164,8 @@ export class ESPHomePageDashboard extends LitElement {
       >
         <div slot="toolbar" class="toolbar-stack">
           <div class="toolbar-row">
-            ${this._renderSearchInput()} ${this._renderSelectToggle()}
-            ${this._renderViewToggle()}
+            ${this._renderSearchInput()} ${this._renderLabelsFilter()}
+            ${this._renderSelectToggle()} ${this._renderViewToggle()}
           </div>
           ${this._renderDiscoveryHint()}
         </div>
