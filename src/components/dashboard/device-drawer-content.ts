@@ -351,6 +351,19 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           transparent 88%
         );
       }
+      /* Disabled state uses aria-disabled rather than the native
+         disabled attribute so the button stays focusable and the
+         title tooltip remains discoverable on hover — disabled
+         native buttons hide both, which would silently drop the
+         "wait for the current build…" explanation. The click
+         handler is gated separately on the busy property. */
+      .build-size-clean--disabled,
+      .build-size-clean--disabled:hover {
+        color: var(--wa-color-text-quiet);
+        background: none;
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
       .build-size-clean wa-icon {
         font-size: 14px;
       }
@@ -927,9 +940,11 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           <div class="value build-size-value">
             <span>${formatFileSize(d.build_size_bytes)}</span>
             <button
-              class="build-size-clean"
+              class="build-size-clean ${this.busy
+                ? "build-size-clean--disabled"
+                : ""}"
               type="button"
-              ?disabled=${this.busy}
+              aria-disabled=${this.busy ? "true" : "false"}
               title=${this.busy
                 ? this._localize("dashboard.action_clean_build_busy")
                 : this._localize("dashboard.action_clean_build")}
