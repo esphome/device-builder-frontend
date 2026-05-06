@@ -3,11 +3,10 @@ import { mdiArrowCollapseRight, mdiArrowLeft } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { isHaIngressContext, localizeContext, versionContext } from "../context/index.js";
+import { isHaIngressContext, localizeContext, serverVersionContext, versionContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import pkg from "../../package.json";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -31,6 +30,10 @@ export class ESPHomeLayout extends LitElement {
   @consume({ context: versionContext, subscribe: true })
   @state()
   private _esphomeVersion = "";
+
+  @consume({ context: serverVersionContext, subscribe: true })
+  @state()
+  private _serverVersion = "";
 
   @state()
   private _path = window.location.pathname;
@@ -239,7 +242,7 @@ export class ESPHomeLayout extends LitElement {
       </div>
       <slot></slot>
       <div class="app-footer">
-        <span>ESPHome Device Builder v${pkg.version}</span>
+        ${this._serverVersion ? html`<span>ESPHome Device Builder v${this._serverVersion}</span>` : nothing}
         ${this._esphomeVersion ? html`<span>ESPHome v${this._esphomeVersion}</span>` : nothing}
       </div>
     `;

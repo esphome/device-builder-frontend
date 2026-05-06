@@ -52,6 +52,7 @@ import {
   integrationDocsContext,
   isHaIngressContext,
   localizeContext,
+  serverVersionContext,
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
@@ -156,6 +157,10 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: versionContext })
   @state()
   private _version = "";
+
+  @provide({ context: serverVersionContext })
+  @state()
+  private _serverVersion = "";
 
   @provide({ context: darkModeContext })
   @state()
@@ -378,6 +383,7 @@ export class ESPHomeApp extends LitElement {
     // sends backend commands has to wait for ``api.ready``.
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
+      this._serverVersion = info.server_version;
       this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
       this._apiConnected = true;
       // ``api.ready`` resolves when the connection is usable — either
