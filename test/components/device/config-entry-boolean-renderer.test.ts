@@ -32,10 +32,17 @@ describe("renderBooleanField default-value fallback", () => {
     // ``export function`` boundary instead of a fixed offset.
     const startIdx = src.indexOf("export function renderBooleanField");
     expect(startIdx).toBeGreaterThan(-1);
+    // When ``renderBooleanField`` is the last export in the file
+    // there's no next-export sentinel; slice to end-of-file rather
+    // than a fixed window so a future implementation that grows
+    // past a hard-coded byte budget (extra comments, more guard
+    // branches) still produces a complete carve-out instead of a
+    // false failure when an assertion's anchor falls past the
+    // truncation boundary.
     const nextExportIdx = src.indexOf("export function ", startIdx + 1);
     const fnSrc = src.slice(
       startIdx,
-      nextExportIdx > 0 ? nextExportIdx : startIdx + 2000,
+      nextExportIdx > 0 ? nextExportIdx : src.length,
     );
 
     // The renderer must consult ``entry.default_value`` when
