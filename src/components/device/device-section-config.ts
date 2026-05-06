@@ -578,7 +578,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             ${hasAdvanced
               ? html`<div class="advanced-toggle-row">
                   <wa-switch
-                    ?checked=${showAdvanced}
+                    .checked=${showAdvanced}
                     @change=${(e: Event) =>
                       this._setShowAdvanced(
                         (
