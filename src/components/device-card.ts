@@ -159,22 +159,18 @@ export class ESPHomeDeviceCard extends LitElement {
     espHomeStyles,
     labelChipStyles,
     css`
-      /* Always present so cards line up at equal height regardless
-         of whether a particular device carries labels — without the
-         reserved row, a single tagged device in the grid bumps every
-         neighbour out of column-baseline alignment. The reserved
-         vertical space (padding + min-height) matches a single-chip
-         row exactly: 21px chip height + 6px top + 6px bottom = 33px.
-         align-items:center keeps the chip(s) vertically centred so a
-         tag-overflow case doesn't drag the chip baseline off the
-         shared rhythm. */
+      /* Only rendered when the device carries labels; an untagged
+         device gets no chip row and the card collapses naturally.
+         Padding leans top-heavy (8px top vs 4px bottom) because the
+         actions row that follows already carries its own
+         var(--wa-space-s) of top padding, so a symmetric padding
+         here reads as more space below the chips than above. */
       .device-card-labels {
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         gap: 4px;
-        padding: 6px var(--wa-space-m);
-        min-height: 21px;
+        padding: 8px var(--wa-space-m) 4px;
       }
     `,
     css`
@@ -679,13 +675,14 @@ export class ESPHomeDeviceCard extends LitElement {
   /** Render the device's label chips just below the name / status
    *  header. Caps at 4 visible chips with a "+N" overflow chip so a
    *  heavily-tagged device doesn't blow out the card height; the
-   *  full set is reachable from the drawer. The container is always
-   *  rendered (with ``min-height``) so cards keep equal heights
-   *  whether a particular device carries labels or not. */
+   *  full set is reachable from the drawer. ``nothing`` when the
+   *  device carries no labels — the card collapses naturally so
+   *  untagged cards don't show an empty band. */
   private _renderLabels() {
     const labels = resolveLabelIds(this.labelIds, this._labelCatalog);
+    if (labels.length === 0) return nothing;
     return html`<div class="device-card-labels">
-      ${labels.length === 0 ? nothing : renderLabelChips(labels, { max: 4 })}
+      ${renderLabelChips(labels, { max: 4 })}
     </div>`;
   }
 
