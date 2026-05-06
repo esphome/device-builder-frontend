@@ -162,17 +162,19 @@ export class ESPHomeDeviceCard extends LitElement {
       /* Always present so cards line up at equal height regardless
          of whether a particular device carries labels — without the
          reserved row, a single tagged device in the grid bumps every
-         neighbour out of column-baseline alignment. The min-height
-         matches one chip's natural height (chip line-height 1.4 +
-         padding) so an empty row leaves the same gap a single chip
-         would. */
+         neighbour out of column-baseline alignment. The reserved
+         vertical space (padding + min-height) matches a single-chip
+         row exactly: 21px chip height + 6px top + 6px bottom = 33px.
+         align-items:center keeps the chip(s) vertically centred so a
+         tag-overflow case doesn't drag the chip baseline off the
+         shared rhythm. */
       .device-card-labels {
         display: flex;
         flex-wrap: wrap;
+        align-items: center;
         gap: 4px;
-        padding: 0 var(--wa-space-m) var(--wa-space-s);
-        margin-top: -2px;
-        min-height: 22px;
+        padding: 6px var(--wa-space-m);
+        min-height: 21px;
       }
     `,
     css`
