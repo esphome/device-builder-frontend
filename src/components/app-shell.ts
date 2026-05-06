@@ -208,9 +208,10 @@ export class ESPHomeApp extends LitElement {
   /** Global label catalog. Fetched once on (re)connect via
    *  ``labels/list`` and kept in sync by ``label_*`` events
    *  delivered through ``subscribe_events``. Empty until the
-   *  fetch lands; consumers tolerate that — devices that
-   *  reference unknown ids render a neutral "(unknown)" chip
-   *  and the filter dropdown is simply blank. */
+   *  fetch lands; consumers tolerate that — chip renderers
+   *  silently drop unknown ids (``resolveLabelIds``) and the
+   *  toolbar filter hides itself entirely on an empty catalog,
+   *  so missing entries simply produce no visible UI. */
   @provide({ context: labelsContext })
   @state()
   private _labels: Label[] = [];
@@ -746,10 +747,17 @@ export class ESPHomeApp extends LitElement {
         break;
       }
       case DeviceEventType.LABEL_UPDATED: {
+        // Upsert, not just replace — if the initial ``labels/list``
+        // failed (or this client missed the matching ``LABEL_CREATED``
+        // for any reason) the catalog can be missing this entry, and
+        // a plain ``map`` would silently drop the update and leave the
+        // catalog permanently incomplete until the next reconnect.
         const { label } = data as LabelEventData;
-        this._labels = this._labels.map((l) =>
-          l.id === label.id ? label : l,
-        );
+        const idx = this._labels.findIndex((l) => l.id === label.id);
+        this._labels =
+          idx === -1
+            ? [...this._labels, label]
+            : this._labels.map((l) => (l.id === label.id ? label : l));
         break;
       }
       case DeviceEventType.LABEL_DELETED: {

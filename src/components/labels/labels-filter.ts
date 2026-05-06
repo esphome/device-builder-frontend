@@ -194,6 +194,19 @@ export class ESPHomeLabelsFilter extends LitElement {
   ];
 
   protected willUpdate(changed: Map<string, unknown>) {
+    // If the catalog drains while the popover is open (last label
+    // deleted via a push event), force-close so we don't leave the
+    // EscapeController bound and the component in an
+    // open-but-unrenderable state — ``render()`` returns ``nothing``
+    // on an empty catalog, so without this the popover is invisible
+    // but keystrokes still pretend to dismiss it.
+    if (
+      changed.has("_catalog") &&
+      this._catalog.length === 0 &&
+      this._open
+    ) {
+      this._open = false;
+    }
     if (changed.has("_open")) this._escape.set(this._open);
   }
 
@@ -221,7 +234,7 @@ export class ESPHomeLabelsFilter extends LitElement {
       <button
         class="trigger ${count > 0 ? "trigger--active" : ""}"
         type="button"
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-expanded=${this._open ? "true" : "false"}
         @click=${this._toggle}
       >
@@ -236,7 +249,11 @@ export class ESPHomeLabelsFilter extends LitElement {
 
   private _renderPopover(selectedSet: Set<string>) {
     return html`
-      <div class="popover" role="menu">
+      <div
+        class="popover"
+        role="group"
+        aria-label=${this._localize("dashboard.filter_labels")}
+      >
         ${this._catalog.length === 0
           ? html`<div class="empty">
               ${this._localize("dashboard.labels_no_matches")}
@@ -246,7 +263,7 @@ export class ESPHomeLabelsFilter extends LitElement {
               return html`<button
                 class="option"
                 type="button"
-                role="menuitemcheckbox"
+                role="checkbox"
                 aria-checked=${checked ? "true" : "false"}
                 @click=${() => this._toggleLabel(label.id, !checked)}
               >

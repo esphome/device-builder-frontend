@@ -98,6 +98,23 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @state()
   private _saving = false;
 
+  /** Optimistic label assignment that overrides ``device.labels``
+   *  while a save is in flight or queued. Lets the user toggle
+   *  multiple chips quickly without each click computing ``next``
+   *  off a stale prop — the editor reads from this state until
+   *  the next ``DEVICE_UPDATED`` push hands the prop a list that
+   *  matches what we already wrote. ``null`` means "no pending
+   *  override; trust the prop". */
+  @state()
+  private _optimisticLabels: string[] | null = null;
+
+  /** Promise chain that serializes ``set_labels`` round trips so
+   *  fast successive clicks reach the backend in click order
+   *  rather than in network-arrival order — without serialization,
+   *  the backend's "replace wholesale" semantics make the final
+   *  state non-deterministic on overlapping requests. */
+  private _saveChain: Promise<unknown> = Promise.resolve();
+
   /** Close the popover on Escape. Bound to ``window`` rather than
    *  ``document`` because the drawer's own Escape listener is on
    *  ``window`` and the controller's ``defaultPrevented`` guard
@@ -343,7 +360,15 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       this._createOpen = false;
       this._newName = "";
       this._newColor = null;
+      this._optimisticLabels = null;
     }
+  }
+
+  /** Effective label assignment — optimistic state if a save is
+   *  pending, otherwise the prop. Centralised so render and
+   *  toggle logic both read from the same source and don't drift. */
+  private get _currentLabelIds(): string[] {
+    return this._optimisticLabels ?? this.device.labels ?? [];
   }
 
   override connectedCallback() {
@@ -367,7 +392,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   };
 
   protected render() {
-    const assigned = resolveLabelIds(this.device.labels, this._catalog);
+    const assigned = resolveLabelIds(this._currentLabelIds, this._catalog);
     const assignedIds = new Set(assigned.map((l) => l.id));
 
     return html`
@@ -393,7 +418,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         <button
           class="add-btn"
           type="button"
-          aria-haspopup="menu"
+          aria-haspopup="true"
           aria-expanded=${this._popoverOpen ? "true" : "false"}
           @click=${this._togglePopover}
         >
@@ -412,7 +437,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       : this._catalog;
 
     return html`
-      <div class="popover" role="menu">
+      <div
+        class="popover"
+        role="group"
+        aria-label=${this._localize("dashboard.drawer_labels")}
+      >
         <wa-input
           type="search"
           with-clear
@@ -432,7 +461,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
                 return html`<button
                   class="option"
                   type="button"
-                  role="menuitemcheckbox"
+                  role="checkbox"
                   aria-checked=${checked ? "true" : "false"}
                   @click=${() => this._toggleAssignment(label.id, !checked)}
                 >
@@ -485,31 +514,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
             this._newName = (e.currentTarget as unknown as { value: string }).value;
           }}
         ></wa-input>
-        <div class="swatch-row" role="radiogroup" aria-label=${this._localize("dashboard.labels_color")}>
-          <button
-            type="button"
-            class="swatch swatch--clear ${this._newColor === null ? "swatch--selected" : ""}"
-            aria-label=${this._localize("dashboard.labels_color_none")}
-            title=${this._localize("dashboard.labels_color_none")}
-            @click=${() => {
-              this._newColor = null;
-            }}
-          >
-            ${this._newColor === null ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
-          </button>
-          ${LABEL_COLOR_SWATCHES.map(
-            (c) => html`<button
-              type="button"
-              class="swatch ${this._newColor === c ? "swatch--selected" : ""}"
-              style="background:${c}"
-              aria-label=${c}
-              title=${c}
-              @click=${() => {
-                this._newColor = c;
-              }}
-            ></button>`,
-          )}
-        </div>
+        ${this._renderSwatchRow()}
         <div class="create-actions">
           <button
             type="button"
@@ -532,6 +537,92 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         </div>
       </form>
     `;
+  }
+
+  /** Render the color-picker as a proper ARIA radio group.
+   *
+   *  Each swatch is a ``role="radio"`` with ``aria-checked``; only
+   *  the currently-selected swatch sits in the tab order (roving
+   *  tabindex), and ArrowLeft/Right/Home/End move focus + selection
+   *  the way screen readers expect of a radiogroup. The
+   *  null-color "no color" entry leads the list. */
+  private _renderSwatchRow() {
+    const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
+    return html`
+      <div
+        class="swatch-row"
+        role="radiogroup"
+        aria-label=${this._localize("dashboard.labels_color")}
+        @keydown=${(e: KeyboardEvent) => this._onSwatchKeyDown(e, values)}
+      >
+        ${values.map((c) => {
+          const selected = this._newColor === c;
+          if (c === null) {
+            return html`<button
+              type="button"
+              role="radio"
+              aria-checked=${selected ? "true" : "false"}
+              tabindex=${selected ? "0" : "-1"}
+              class="swatch swatch--clear ${selected ? "swatch--selected" : ""}"
+              aria-label=${this._localize("dashboard.labels_color_none")}
+              title=${this._localize("dashboard.labels_color_none")}
+              @click=${() => {
+                this._newColor = null;
+              }}
+            >
+              ${selected ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
+            </button>`;
+          }
+          return html`<button
+            type="button"
+            role="radio"
+            aria-checked=${selected ? "true" : "false"}
+            tabindex=${selected ? "0" : "-1"}
+            class="swatch ${selected ? "swatch--selected" : ""}"
+            style="background:${c}"
+            aria-label=${c}
+            title=${c}
+            @click=${() => {
+              this._newColor = c;
+            }}
+          ></button>`;
+        })}
+      </div>
+    `;
+  }
+
+  private _onSwatchKeyDown(e: KeyboardEvent, values: (string | null)[]) {
+    let idx = values.indexOf(this._newColor);
+    if (idx < 0) idx = 0;
+    let next = idx;
+    switch (e.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        next = (idx + 1) % values.length;
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        next = (idx - 1 + values.length) % values.length;
+        break;
+      case "Home":
+        next = 0;
+        break;
+      case "End":
+        next = values.length - 1;
+        break;
+      default:
+        return;
+    }
+    e.preventDefault();
+    this._newColor = values[next];
+    // Roving tabindex: focus the newly-selected swatch on the next
+    // frame so the rendered ``tabindex="0"`` is the one we focus.
+    requestAnimationFrame(() => {
+      const swatch = this.renderRoot.querySelectorAll<HTMLButtonElement>(
+        ".swatch",
+      )[next];
+      swatch?.focus();
+    });
   }
 
   private _togglePopover = () => {
@@ -558,26 +649,45 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
    *  mutated the local device. */
   private async _persist(nextIds: string[]) {
     if (!this._api) return;
+    const api = this._api;
+    const config = this.device.configuration;
     this._saving = true;
-    try {
-      await this._api.setDeviceLabels(this.device.configuration, nextIds);
-    } catch (err) {
-      console.warn("set_labels failed", err);
-      toast.error(this._localize("dashboard.labels_save_failed"), {
-        richColors: true,
-      });
-    } finally {
+    // Serialize behind any in-flight save so overlapping toggles
+    // reach the backend in click order rather than network-arrival
+    // order. ``set_labels`` replaces wholesale, so two concurrent
+    // requests would otherwise leave the device in whichever state
+    // the later response carried — non-deterministic on flaky links.
+    const task = this._saveChain.then(async () => {
+      try {
+        await api.setDeviceLabels(config, nextIds);
+      } catch (err) {
+        console.warn("set_labels failed", err);
+        toast.error(this._localize("dashboard.labels_save_failed"), {
+          richColors: true,
+        });
+      }
+    });
+    this._saveChain = task;
+    await task;
+    // Flip ``_saving`` off only when this task is the tail of the
+    // chain — a fast-following toggle would have already extended
+    // the chain and we want the spinner to stay on for that one too.
+    if (this._saveChain === task) {
       this._saving = false;
     }
   }
 
   private async _toggleAssignment(labelId: string, assign: boolean) {
-    const current = this.device.labels ?? [];
+    const current = this._currentLabelIds;
     const next = assign
       ? current.includes(labelId)
         ? current.slice()
         : [...current, labelId]
       : current.filter((id) => id !== labelId);
+    // Optimistic: the chip row reflects the click immediately and
+    // every subsequent toggle reads ``next`` off this fresher value
+    // rather than the (still-stale) prop.
+    this._optimisticLabels = next;
     await this._persist(next);
   }
 
@@ -599,8 +709,12 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       // updates via the ``LABEL_CREATED`` push (which app-shell
       // routes into ``labelsContext``); we don't touch ``_catalog``
       // here so the live context stays the source of truth.
-      const next = [...(this.device.labels ?? []), created.id];
-      await this._api.setDeviceLabels(this.device.configuration, next);
+      const next = [...this._currentLabelIds, created.id];
+      this._optimisticLabels = next;
+      // Route through ``_persist`` so the create+assign also sits
+      // in the serialized chain — a quick toggle landing right
+      // after Create otherwise races the assign half of this pair.
+      await this._persist(next);
       this._createOpen = false;
       this._newName = "";
       this._newColor = null;
