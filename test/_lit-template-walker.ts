@@ -11,14 +11,18 @@
  * of templates from ``items.map(...)``) and visits every
  * ``TemplateResult`` it finds, in document order.
  *
- * Pair this with a per-tag matcher that picks templates whose
- * static ``.strings`` contain the element opening you care about
- * (``"<wa-option"``, ``"<wa-select"``, …) and pulls the bound
- * values out of ``.values`` by their position in the template
- * literal. The shape of the renderer's html is what defines the
- * indexes — see ``extractWaOptionBindings`` in
- * ``components/device/_renderer-fixtures.ts`` for the pin
- * renderer's mapping.
+ * Pair ``findTemplatesByAnchor`` with ``extractAttributeBindings``
+ * to assert on the bindings of a specific element: the anchor
+ * (``"<wa-option"``, ``"<wa-select"``, …) picks the templates
+ * that emit that tag, and the extractor returns a name-keyed
+ * map of attribute / property / boolean / event bindings parsed
+ * from each static prefix string. Tests look up bindings by
+ * name (``b.value``, ``b["?selected"]``, ``b[".label"]``,
+ * ``b["@change"]``) so reordering attributes in the renderer
+ * source doesn't silently break assertions —
+ * ``components/device/_renderer-fixtures.ts``'s
+ * ``findElementBindings`` is the convenience wrapper that
+ * pairs the two for the common case.
  */
 import type { TemplateResult } from "lit";
 
