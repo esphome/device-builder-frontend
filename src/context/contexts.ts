@@ -6,7 +6,12 @@
  */
 import { createContext } from "@lit/context";
 import { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice, AdoptableDevice, FirmwareJob } from "../api/types.js";
+import type {
+  AdoptableDevice,
+  ConfiguredDevice,
+  FirmwareJob,
+  Label,
+} from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /** Context for the ESPHome API client instance. */
@@ -82,4 +87,14 @@ export const yamlDiffButtonContext = createContext<boolean>(
  *  render each name as a link or plain text. */
 export const integrationDocsContext = createContext<Record<string, string>>(
   Symbol("esphome-integration-docs")
+);
+
+/** Context for the global label catalog. Loaded once via
+ *  ``labels/list`` on (re)connect and kept in sync via the
+ *  ``label_created`` / ``label_updated`` / ``label_deleted`` push
+ *  events. Per-device assignments live on each
+ *  ``ConfiguredDevice.labels`` (an array of ids); consumers join
+ *  against this map at render time to resolve name + color. */
+export const labelsContext = createContext<Label[]>(
+  Symbol("esphome-labels")
 );

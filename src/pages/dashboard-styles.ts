@@ -137,6 +137,23 @@ export const dashboardStyles = css`
     gap: var(--wa-space-s);
   }
 
+  /* Pushes the filter group to the right edge of the toolbar so
+     view-toggles (left of the spacer) and filter affordances
+     (right of the spacer) read as separate clusters. Collapses to
+     zero on viewports too narrow to afford it — the row wraps via
+     'flex-wrap' higher up if individual buttons overflow. */
+  .toolbar-spacer {
+    flex: 1 1 auto;
+    min-width: var(--wa-space-s);
+  }
+
+  .filter-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-xs);
+    flex-shrink: 0;
+  }
+
   .search-wrap {
     max-width: 380px;
     flex: 1;

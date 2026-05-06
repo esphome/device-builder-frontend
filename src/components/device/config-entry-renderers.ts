@@ -206,8 +206,19 @@ export function renderBooleanField(
   path: string[],
   ctx: RenderCtx,
 ) {
+  // When the YAML doesn't set the field, fall back to the catalog's
+  // ``default_value`` so the toggle reflects what ESPHome will
+  // actually apply at compile time. Otherwise a default-true field
+  // (``esp32_ble_tracker.software_coexistence`` is the canonical
+  // example — defaults to ``true`` whenever ``wifi:`` is configured)
+  // renders OFF in the form even though the running firmware will
+  // have it ON, so a confused user toggles it on and saves a
+  // redundant explicit ``true:`` into the YAML — or worse, tries to
+  // toggle it off thinking it's already on. Treat undefined / null
+  // raw values as "use the catalog default".
   const raw = ctx.getAt(path);
-  const checked = raw === true || raw === "true";
+  const effective = raw === undefined || raw === null ? entry.default_value : raw;
+  const checked = effective === true || effective === "true";
   return html`
     <div class="switch-field" data-field-key=${path.join(".")}>
       <div class="field-info">

@@ -154,6 +154,23 @@ export class ESPHomeLayout extends LitElement {
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+      }
+
+      .preview-badge {
+        font-size: 9px;
+        font-weight: var(--wa-font-weight-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: var(--wa-border-radius-s);
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 80%);
+        color: var(--esphome-on-primary);
+        border: 1px solid color-mix(in srgb, var(--esphome-on-primary), transparent 60%);
+        line-height: 1;
+        flex-shrink: 0;
       }
 
       .header-text p {
@@ -235,7 +252,10 @@ export class ESPHomeLayout extends LitElement {
           </button>
         </div>
         <div class="header-text">
-          <h1>${this._localize("dashboard.title")}</h1>
+          <h1>
+            <span>${this._localize("dashboard.title")}</span>
+            <span class="preview-badge">${this._localize("layout.preview_badge")}</span>
+          </h1>
           <p>${this._localize("dashboard.subtitle")}</p>
         </div>
         <div class="header-spacer"></div>

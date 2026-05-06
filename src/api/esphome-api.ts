@@ -16,12 +16,14 @@ import type {
   BulkActionResult,
   CommandMessage,
   ComponentCatalogEntry,
+  ConfiguredDevice,
   DevicesResponse,
   EditorValidateResponse,
   ErrorMessage,
   EventMessage,
   EventSubscriptionCallback,
   FirmwareBinary,
+  Label,
   ReachabilityStateEvent,
   ReachabilitySubscription,
   FirmwareDownload,
@@ -866,6 +868,62 @@ export class ESPHomeAPI {
   /** Ignore/unignore a discovered device. */
   async ignoreDevice(name: string, ignore: boolean): Promise<void> {
     await this.sendCommand("devices/ignore", { name, ignore });
+  }
+
+  /** Replace this device's label assignments wholesale.
+   *
+   *  ``labelIds`` is the new full list — pass ``[]`` to clear every
+   *  assignment. Unknown ids are rejected as ``invalid_args``; the
+   *  catalog check runs inside the same metadata transaction as the
+   *  write so a concurrent ``labels/delete`` cascade can't leave a
+   *  dangling reference. The returned ``ConfiguredDevice`` already
+   *  reflects the freshly-loaded labels, so callers can update local
+   *  state without waiting for the ``device_updated`` event. */
+  async setDeviceLabels(
+    configuration: string,
+    labelIds: string[],
+  ): Promise<ConfiguredDevice> {
+    return this.sendCommand<ConfiguredDevice>("devices/set_labels", {
+      configuration,
+      label_ids: labelIds,
+    });
+  }
+
+  // ─── Labels Commands ──────────────────────────────────────
+
+  /** Return every label in the global catalog. */
+  async listLabels(): Promise<Label[]> {
+    return this.sendCommand<Label[]>("labels/list");
+  }
+
+  /** Create a new label. ``name`` 1-50 chars, unique
+   *  case-insensitively. ``color`` is ``#rrggbb`` (lowercased on
+   *  save) or ``null`` / omitted for "no explicit color". */
+  async createLabel(args: {
+    name: string;
+    color?: string | null;
+  }): Promise<Label> {
+    return this.sendCommand<Label>("labels/create", args);
+  }
+
+  /** Rename and / or recolor a label. Pass ``color: null`` to clear
+   *  the color; omit ``color`` from the request to leave it
+   *  unchanged. At least one of ``name`` / ``color`` is required. */
+  async updateLabel(args: {
+    label_id: string;
+    name?: string;
+    color?: string | null;
+  }): Promise<Label> {
+    return this.sendCommand<Label>("labels/update", args);
+  }
+
+  /** Delete a label. The backend cascades through every device
+   *  assignment in a single metadata transaction; affected devices
+   *  fire their own ``device_updated`` events as the live
+   *  ``Device`` objects reload, and a ``label_deleted`` event lands
+   *  last so consumers can drop the catalog entry. */
+  async deleteLabel(labelId: string): Promise<void> {
+    await this.sendCommand("labels/delete", { label_id: labelId });
   }
 
   // ─── Streaming Commands (per-connection) ───────────────────
