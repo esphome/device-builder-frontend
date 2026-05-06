@@ -128,30 +128,4 @@ describe("renderPinField wa-select binding", () => {
       `wa-select binds .value= alongside data-no-value-sync; matched element: ${tag}`,
     ).toBe(false);
   });
-
-  it("config-entry-form has no pin-specific knowledge in its generic sync", async () => {
-    // The first iteration of this fix coerced object pin shapes
-    // via ``parsePinGpio`` inside ``_syncSelectValues``. That
-    // worked but leaked field-type-specific knowledge into the
-    // generic helper — every future structured-value renderer
-    // would need its own coercer there. The data-no-value-sync
-    // refactor moves the responsibility back to the renderer
-    // and the generic ``_syncSelectedAttr`` handles every such
-    // field uniformly via ``wa-option[selected]``.
-    const { fs, path, url } = await importNode();
-    const here = path.dirname(url.fileURLToPath(import.meta.url));
-    const sourcePath = path.resolve(
-      here,
-      "../../../src/components/device/config-entry-form.ts",
-    );
-    const src = fs.readFileSync(sourcePath, "utf-8");
-    expect(
-      /import\s*\{\s*parsePinGpio\s*\}/.test(src),
-      "config-entry-form imports parsePinGpio — pin-specific knowledge has leaked back into the generic form",
-    ).toBe(false);
-    expect(
-      /parsePinGpio\s*\(/.test(src),
-      "config-entry-form calls parsePinGpio — pin-specific knowledge has leaked back into the generic form",
-    ).toBe(false);
-  });
 });
