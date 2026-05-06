@@ -25,8 +25,10 @@ describe("defaultLocalize", () => {
   });
 
   it("interpolates {variable} placeholders", () => {
-    const out = defaultLocalize("dashboard.discovered_count", { count: 3 });
-    expect(out).toBe("Discovered 3 device");
+    const out = defaultLocalize("dashboard.discovered_count_plural", {
+      count: 3,
+    });
+    expect(out).toBe("Discovered 3 devices");
   });
 
   it("interpolates multiple placeholders", () => {
@@ -38,7 +40,7 @@ describe("defaultLocalize", () => {
   });
 
   it("leaves unknown placeholders intact", () => {
-    const out = defaultLocalize("dashboard.discovered_count", {});
+    const out = defaultLocalize("dashboard.discovered_count_singular", {});
     expect(out).toBe("Discovered {count} device");
   });
 

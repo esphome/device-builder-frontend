@@ -14,6 +14,7 @@ import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { withBase } from "../../util/base-path.js";
 import { debounce } from "../../util/debounce.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -473,7 +474,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   private _renderFeatured(board: BoardCatalogEntry) {
     const imageUrl =
-      board.images.length > 0 ? board.images[0] : "/assets/board/default.svg";
+      board.images.length > 0 ? board.images[0] : withBase("/assets/board/default.svg");
     return html`
       <div class="featured-card">
         <img class="featured-image" src=${imageUrl} alt=${board.name} />
@@ -513,7 +514,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   private _renderBoardCard(board: BoardCatalogEntry, expanded: boolean) {
     const imageUrl =
-      board.images.length > 0 ? board.images[0] : "/assets/board/default.svg";
+      board.images.length > 0 ? board.images[0] : withBase("/assets/board/default.svg");
     return html`
       <article class="board-card ${expanded ? "board-card--expanded" : ""}">
         <div class="board-card-header">

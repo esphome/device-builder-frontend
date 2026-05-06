@@ -25,6 +25,9 @@ export const importableDevicesContext = createContext<AdoptableDevice[]>(
 /** Context for the ESPHome version string. */
 export const versionContext = createContext<string>(Symbol("esphome-version"));
 
+/** Context for the Device Builder server version string. */
+export const serverVersionContext = createContext<string>(Symbol("esphome-server-version"));
+
 /** Context for dark mode state. */
 export const darkModeContext = createContext<boolean>(Symbol("esphome-dark-mode"));
 

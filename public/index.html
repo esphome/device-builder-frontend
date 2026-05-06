@@ -79,7 +79,13 @@
       content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' ws: wss: data: https://schema.esphome.io; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <title>ESPHome</title>
-    <link rel="icon" type="image/svg+xml" href="/assets/logo/esphome.svg" />
+    <!-- Favicon href is set at runtime from entrypoint.ts via
+         ``withBase("/assets/logo/esphome.svg")`` so it resolves
+         correctly under any mount point — including HA ingress
+         and direct deep links like ``/device/<id>`` (which the
+         SPA serves the same ``index.html`` for, so a static
+         document-relative URL would resolve against the route). -->
+    <link rel="icon" type="image/svg+xml" />
     <style>
       :root,
       .wa-light,

@@ -221,7 +221,12 @@ function _validateEntriesRecursive(
     // MAP entries have user-defined keys, not schema-defined ones, so
     // we can't recurse into config_entries the way NESTED does.
     // Required-ness is enforced by checking the map has at least one
-    // entry; per-value validation is a future refinement.
+    // entry; per-value validation is delegated to ESPHome's own
+    // ``validate_yaml`` (yaml-lint-backend.ts) so the form doesn't
+    // duplicate-and-drift the upstream validators (e.g.
+    // ``packages:`` accepts only the github://gitlab:// shorthand
+    // ESPHome's ``GitFile.from_shorthand`` parses; mirroring that
+    // regex here would silently drift on any upstream change).
     if (entry.type === ConfigEntryType.MAP) {
       if (entry.required) {
         const raw = values[entry.key];
