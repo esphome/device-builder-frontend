@@ -18,6 +18,7 @@ import {
   KEEP_EMPTY_STRING_SECTIONS,
   resolveSectionEntries,
 } from "../../util/section-entry-overrides.js";
+import { withBase } from "../../util/base-path.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -447,7 +448,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   private _onImageError(e: Event) {
     const img = e.target as HTMLImageElement;
-    const fallback = "/assets/board/default.svg";
+    const fallback = withBase("/assets/board/default.svg");
     if (
       img.src !== window.location.origin + fallback &&
       !img.src.endsWith(fallback)
@@ -522,7 +523,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           ? nothing
           : html`<div class="section-image">
               <img
-                src=${this._config.image_url || "/assets/board/default.svg"}
+                src=${this._config.image_url || withBase("/assets/board/default.svg")}
                 alt=${this._config.title}
                 referrerpolicy="no-referrer"
                 @error=${this._onImageError}

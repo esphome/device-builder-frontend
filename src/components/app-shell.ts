@@ -57,6 +57,7 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { BASE_PATH, withBase } from "../util/base-path.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 
 // Mirrors the backend's `_PRIMARY_JOB_TYPES` retention pool — these
@@ -228,11 +229,11 @@ export class ESPHomeApp extends LitElement {
 
   private _router = new Router(this, [
     {
-      path: "/",
+      path: withBase("/"),
       render: () => html`<esphome-page-dashboard></esphome-page-dashboard>`,
     },
     {
-      path: "/secrets",
+      path: withBase("/secrets"),
       enter: async () => {
         await import("../pages/secrets.js");
         return true;
@@ -240,7 +241,7 @@ export class ESPHomeApp extends LitElement {
       render: () => html`<esphome-page-secrets></esphome-page-secrets>`,
     },
     {
-      path: "/device/:id",
+      path: withBase("/device/:id"),
       enter: async () => {
         await import("../pages/device.js");
         return true;
@@ -397,7 +398,7 @@ export class ESPHomeApp extends LitElement {
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
       this._serverVersion = info.server_version;
-      this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
+      this._isHaIngress = info.ha_addon && BASE_PATH.includes("/ingress");
       this._apiConnected = true;
       // ``api.ready`` resolves when the connection is usable — either
       // ``requires_auth: false``, or a stored token replay succeeds.

@@ -7,6 +7,7 @@
  * EventMessages with "output" and "result" events.
  */
 import { APIError } from "./api-error.js";
+import { BASE_PATH } from "../util/base-path.js";
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
 import type {
   AddComponentResponse,
@@ -190,7 +191,7 @@ export class ESPHomeAPI {
       this._intentionalDisconnect = false;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}${BASE_PATH}ws`;
 
       this._ws = new WebSocket(wsUrl);
 

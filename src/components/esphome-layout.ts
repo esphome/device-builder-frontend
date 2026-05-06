@@ -5,6 +5,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { isHaIngressContext, localizeContext, serverVersionContext, versionContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { stripBase, withBase } from "../util/base-path.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -36,10 +37,10 @@ export class ESPHomeLayout extends LitElement {
   private _serverVersion = "";
 
   @state()
-  private _path = window.location.pathname;
+  private _path = stripBase(window.location.pathname);
 
   private _onPopState = () => {
-    this._path = window.location.pathname;
+    this._path = stripBase(window.location.pathname);
   };
 
   connectedCallback() {
@@ -212,7 +213,7 @@ export class ESPHomeLayout extends LitElement {
                   title=${this._localize("layout.home_assistant")}
                 >
                   <wa-icon library="mdi" name="arrow-collapse-right"></wa-icon>
-                  <img src="/assets/logo/ha.svg" alt="Home Assistant" />
+                  <img src=${withBase("/assets/logo/ha.svg")} alt="Home Assistant" />
                 </wa-button>
                 <div class="header-separator"></div>
               `
@@ -230,7 +231,7 @@ export class ESPHomeLayout extends LitElement {
               `
             : nothing}
           <button class="header-logo" @click=${this._goHome}>
-            <img src="/assets/logo/esphome.svg" alt="ESPHome" />
+            <img src=${withBase("/assets/logo/esphome.svg")} alt="ESPHome" />
           </button>
         </div>
         <div class="header-text">

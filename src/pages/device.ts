@@ -25,6 +25,7 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { withBase } from "../util/base-path.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
@@ -285,7 +286,7 @@ export class ESPHomePageDevice extends LitElement {
     }
     if (!this._isDirty) return;
     e.stopImmediatePropagation();
-    window.history.pushState({}, "", `/device/${this.id}`);
+    window.history.pushState({}, "", withBase(`/device/${this.id}`));
     this._confirmLeave().then((canLeave) => {
       if (canLeave) {
         this._allowingLeave = true;
