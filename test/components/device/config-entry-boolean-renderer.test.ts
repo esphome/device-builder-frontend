@@ -38,26 +38,53 @@ describe("renderBooleanField default-value fallback", () => {
       nextExportIdx > 0 ? nextExportIdx : startIdx + 2000,
     );
 
-    // The renderer must consult ``entry.default_value`` when the
-    // raw value is unset. Accept any nullish-fallback expression
-    // (``?? entry.default_value``, an explicit
-    // ``raw === undefined || raw === null ? entry.default_value : raw``,
-    // …) so future refactors can pick whichever shape is cleanest
-    // without breaking this pin.
-    const referencesDefaultValue = /entry\.default_value/.test(fnSrc);
+    // The renderer must consult ``entry.default_value`` when
+    // computing the value that drives ``checked`` — a bare reference
+    // somewhere in the function body would pass even if ``checked``
+    // were computed off ``raw`` alone (with ``entry.default_value``
+    // mentioned in an unrelated expression). Pin a fallback shape
+    // that lands the catalog default into a single intermediate
+    // (commonly named ``effective``) before the boolean coercion.
+    //
+    // Accept either of the two shapes likely to be used:
+    //
+    //   const <name> = raw === undefined || raw === null
+    //     ? entry.default_value : raw;
+    //   const <name> = raw ?? entry.default_value;
+    //
+    // The ``checked`` line below must then derive from that
+    // intermediate (or from ``entry.default_value`` directly), so
+    // any future refactor that disconnects the two surfaces fails
+    // this test.
+    const fallbackShape =
+      /=\s*raw\s*===\s*undefined\s*\|\|\s*raw\s*===\s*null\s*\?\s*entry\.default_value\s*:\s*raw/.test(
+        fnSrc,
+      ) ||
+      /=\s*raw\s*\?\?\s*entry\.default_value/.test(fnSrc);
     expect(
-      referencesDefaultValue,
-      "renderBooleanField doesn't fall back to entry.default_value — " +
-        "default-true fields render OFF when the YAML omits them",
+      fallbackShape,
+      "renderBooleanField must compute an intermediate that falls " +
+        "back from raw to entry.default_value — default-true fields " +
+        "otherwise render OFF when the YAML omits them",
     ).toBe(true);
 
-    // And the checked computation must depend on whichever value
-    // wins the fallback (not just the raw). Pin a strict-equality
-    // check against ``true`` (or its quoted form) so a stray
-    // truthy coercion doesn't silently change semantics. Match
-    // both ``=== true`` and ``=== "true"`` separately so the
-    // assertion fails loudly if either is dropped.
+    // The ``checked`` computation must depend on whichever value
+    // wins the fallback (not just the raw). Pin both halves of the
+    // strict-equality compare so a stray truthy coercion (or
+    // dropping the string-form) fails loudly.
     expect(/===\s*true\b/.test(fnSrc)).toBe(true);
     expect(/===\s*"true"/.test(fnSrc)).toBe(true);
+
+    // ``checked`` must be derived from the same value that consulted
+    // ``entry.default_value`` — pin that the strict-equality check
+    // doesn't operate on a bare ``raw``. Use a non-greedy span to
+    // confirm there's at least one ``=== true`` after the
+    // fallback intermediate's assignment, and confirm none of the
+    // ``=== true`` / ``=== "true"`` lines compare against ``raw``
+    // directly.
+    expect(
+      /raw\s*===\s*true\b/.test(fnSrc),
+      "checked must be computed from the fallback intermediate, not raw directly",
+    ).toBe(false);
   });
 });
