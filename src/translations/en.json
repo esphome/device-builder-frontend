@@ -620,15 +620,18 @@
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button",
     "header_actions_label": "Dashboard actions",
-    "more_options_with_count": "More options ({count} firmware task(s) active)"
+    "more_options_with_count": "More options ({count} firmware task(s) active)",
+    "preview_badge": "Preview"
   },
   "feedback": {
     "title": "Found a bug? Have an idea?",
     "description": "Help us improve ESPHome Device Builder by reporting issues or sharing your ideas.",
+    "survey": "Join feedback survey",
     "browse_issues": "Browse open issues",
     "new_issue": "Report a new issue",
     "browse_features": "Browse feature requests",
-    "new_feature": "Request a new feature"
+    "new_feature": "Request a new feature",
+    "discord": "Chat on the ESPHome Discord"
   },
   "command_palette": {
     "placeholder": "Type a command — or / to search YAML content",

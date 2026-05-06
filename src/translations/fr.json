@@ -516,15 +516,18 @@
     "editor": "Éditeur",
     "yaml_diff_button": "Bouton de diff YAML",
     "header_actions_label": "Actions du tableau de bord",
-    "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))"
+    "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))",
+    "preview_badge": "Aperçu"
   },
   "feedback": {
     "title": "Un bug ? Une idée ?",
     "description": "Aidez-nous à améliorer ESPHome Device Builder en signalant des problèmes ou en partageant vos idées.",
+    "survey": "Participer au questionnaire",
     "browse_issues": "Parcourir les problèmes ouverts",
     "new_issue": "Signaler un nouveau problème",
     "browse_features": "Parcourir les demandes de fonctionnalités",
-    "new_feature": "Demander une nouvelle fonctionnalité"
+    "new_feature": "Demander une nouvelle fonctionnalité",
+    "discord": "Discuter sur le Discord ESPHome"
   },
   "auth": {
     "connecting": "Connexion…",

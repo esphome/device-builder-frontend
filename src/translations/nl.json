@@ -516,15 +516,18 @@
     "editor": "Editor",
     "yaml_diff_button": "YAML-diff-knop",
     "header_actions_label": "Dashboardacties",
-    "more_options_with_count": "Meer opties ({count} firmwaretaken actief)"
+    "more_options_with_count": "Meer opties ({count} firmwaretaken actief)",
+    "preview_badge": "Preview"
   },
   "feedback": {
     "title": "Probleem of idee?",
     "description": "Help ons ESPHome Device Builder te verbeteren door problemen te melden of ideeën te delen.",
+    "survey": "Doe mee aan de feedback-enquête",
     "browse_issues": "Open problemen bekijken",
     "new_issue": "Nieuw probleem melden",
     "browse_features": "Functieverzoeken bekijken",
-    "new_feature": "Nieuwe functie aanvragen"
+    "new_feature": "Nieuwe functie aanvragen",
+    "discord": "Chat op de ESPHome Discord"
   },
   "auth": {
     "connecting": "Verbinden…",
