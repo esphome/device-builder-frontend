@@ -80,15 +80,29 @@
     />
     <title>ESPHome</title>
     <!-- Backend rewrites ``__ESPHOME_BASE_HREF__`` per-request to
-         the deployment prefix (``/``, ``/api/hassio_ingress/...``,
-         a reverse-proxy subpath, etc.). All relative URLs below
-         — including the deferred app bundle that rspack emits
-         with ``publicPath: "auto"`` — resolve against this base,
-         so a hard-reload of a deep SPA URL like ``/device/<id>``
-         doesn't ask the server for ``/device/app.<hash>.js``
-         (which the SPA fallback would answer with HTML and the
-         browser would white-screen on). The placeholder is the
-         contract the backend's ``_shell_html`` substitutes. -->
+         the deployment prefix; values MUST end with a trailing
+         slash so a relative URL like ``app.HASH.js`` resolves
+         against the prefix-as-directory:
+             ``/`` (direct deploy)
+             ``/api/hassio_ingress/<token>/`` (HA add-on)
+             ``/dashboard/`` (reverse-proxy subpath)
+         A trailing-slash-less ``/api/hassio_ingress/<token>``
+         would resolve ``app.HASH.js`` to
+         ``/api/hassio_ingress/app.HASH.js`` and break loading.
+         All relative URLs below — including the deferred app
+         bundle that rspack emits with ``publicPath: "auto"`` —
+         resolve against this base, so a hard-reload of a deep
+         SPA URL like ``/device/<id>`` doesn't ask the server for
+         ``/device/app.<hash>.js`` (which the SPA fallback would
+         answer with HTML and the browser would white-screen on).
+         The placeholder is the contract the backend's
+         ``_shell_html`` substitutes — see esphome/device-builder's
+         ``_resolve_base_href`` for the canonical implementation
+         (always returns leading + trailing slashes). The rspack
+         dev server pre-substitutes the placeholder to ``"/"`` at
+         build time (``build-scripts/rspack.cjs``); only the prod
+         wheel ships with the literal placeholder for the backend
+         to fill. -->
     <base href="__ESPHOME_BASE_HREF__" />
     <!-- Favicon href is set at runtime from entrypoint.ts via
          ``withBase("/assets/logo/esphome.svg")`` so it resolves

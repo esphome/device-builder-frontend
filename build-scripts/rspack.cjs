@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const rspack = require("@rspack/core");
 
@@ -92,8 +93,21 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
         require(path.resolve(ROOT_DIR, "package.json")).version
       ),
     }),
+    // The source ``public/index.html`` carries an
+    // ``__ESPHOME_BASE_HREF__`` placeholder that the backend
+    // substitutes per-request with the deployment prefix
+    // (esphome/device-builder serves index.html and rewrites it).
+    // The rspack dev server doesn't go through that backend, so we
+    // pre-substitute the placeholder to ``"/"`` at build time for
+    // dev. Prod builds emit the placeholder verbatim — the backend
+    // is the substituter.
     new rspack.HtmlRspackPlugin({
-      template: path.resolve(PUBLIC_DIR, "index.html"),
+      templateContent: fs
+        .readFileSync(path.resolve(PUBLIC_DIR, "index.html"), "utf-8")
+        .replace(
+          /__ESPHOME_BASE_HREF__/g,
+          isProdBuild ? "__ESPHOME_BASE_HREF__" : "/",
+        ),
       inject: "body",
     }),
     new rspack.CopyRspackPlugin({
