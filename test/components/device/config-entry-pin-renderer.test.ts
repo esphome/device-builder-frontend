@@ -81,11 +81,42 @@ describe("renderPinField wa-select binding", () => {
       "../../../src/components/device/config-entry-pin-renderer.ts",
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
-    const m = src.match(/<wa-select[^>]*?>/s);
-    expect(m, "wa-select element missing from renderPinField").not.toBeNull();
+
+    // Carve out the full ``<wa-select>`` opening tag, balancing the
+    // ``${...}`` expressions inside it. A naive ``[^>]*`` would
+    // truncate at the ``>`` of an inline arrow function (``=>``) in
+    // an attribute value (Copilot caught this).
+    const startIdx = src.indexOf("<wa-select");
+    expect(startIdx, "wa-select element missing from renderPinField").toBeGreaterThan(
+      -1,
+    );
+    let i = startIdx;
+    let depth = 0;
+    let endIdx = -1;
+    while (i < src.length) {
+      const ch = src[i];
+      if (ch === "$" && src[i + 1] === "{") {
+        depth++;
+        i += 2;
+        continue;
+      }
+      if (ch === "}" && depth > 0) {
+        depth--;
+        i++;
+        continue;
+      }
+      if (ch === ">" && depth === 0) {
+        endIdx = i;
+        break;
+      }
+      i++;
+    }
+    expect(endIdx, "couldn't find end of wa-select opening tag").toBeGreaterThan(-1);
+    const tag = src.slice(startIdx, endIdx + 1);
+
     expect(
-      /\bdata-no-value-sync\b/.test(m![0]),
-      `wa-select missing data-no-value-sync; matched element: ${m![0]}`,
+      /\bdata-no-value-sync\b/.test(tag),
+      `wa-select missing data-no-value-sync; matched element: ${tag}`,
     ).toBe(true);
     // Pin the inverse: don't bind ``.value=`` on the parent. The
     // generic sync would clobber it (object value → cleared to
@@ -93,8 +124,8 @@ describe("renderPinField wa-select binding", () => {
     // mechanism — having both creates two competing sources of
     // truth and confuses the next maintainer.
     expect(
-      /\.value\s*=\s*\$\{/.test(m![0]),
-      `wa-select binds .value= alongside data-no-value-sync; matched element: ${m![0]}`,
+      /\.value\s*=\s*\$\{/.test(tag),
+      `wa-select binds .value= alongside data-no-value-sync; matched element: ${tag}`,
     ).toBe(false);
   });
 
