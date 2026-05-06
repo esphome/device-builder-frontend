@@ -45,8 +45,14 @@ export function withBase(path: string): string {
 
 /** Strip the deployment base from a pathname. Returns "/" when the pathname equals the base. */
 export function stripBase(pathname: string): string {
-  if (BASE_NO_TRAIL === "" || !pathname.startsWith(BASE_NO_TRAIL)) {
-    return pathname;
+  if (BASE_NO_TRAIL === "") return pathname;
+  // Require a path-segment boundary after the prefix so a base of
+  // "/foo" doesn't strip from "/foobar/...". The two valid forms
+  // are pathname === BASE_NO_TRAIL ("/foo") or pathname starts
+  // with BASE_PATH (the trailing-slash form, "/foo/...").
+  if (pathname === BASE_NO_TRAIL) return "/";
+  if (pathname.startsWith(BASE_PATH)) {
+    return pathname.slice(BASE_NO_TRAIL.length) || "/";
   }
-  return pathname.slice(BASE_NO_TRAIL.length) || "/";
+  return pathname;
 }

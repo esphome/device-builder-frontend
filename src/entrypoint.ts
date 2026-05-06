@@ -17,5 +17,16 @@ if (typeof crypto !== "undefined" && !crypto.randomUUID) {
     ) as `${string}-${string}-${string}-${string}-${string}`;
 }
 
+import { withBase } from "./util/base-path.js";
+
+// Set the favicon href at runtime so it resolves under any mount
+// point. A static ``href="/assets/..."`` would 404 under an HA
+// ingress prefix; a document-relative ``href="assets/..."`` would
+// resolve against the current route on a deep link (the SPA serves
+// the same index.html for ``/device/<id>``, which would then look
+// for ``/device/assets/...``).
+const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+if (favicon) favicon.href = withBase("/assets/logo/esphome.svg");
+
 import "./styles/apply-theme.js";
 import "./components/app-shell.js";
