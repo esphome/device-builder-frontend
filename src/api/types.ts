@@ -591,21 +591,21 @@ export interface ConfigEntry {
   /**
    * When True frontend collapses this entry under an "Advanced" section.
    *
-   * Source of truth: upstream esphome's ``cv.Optional(...,
-   * advanced=True)`` schema kwarg (esphome/esphome#16267) when the
-   * field author marked it explicitly. The catalog generator's
-   * ``_classify_advanced`` heuristic in ``script/sync_components.py``
-   * is the fallback for fields the schema doesn't yet annotate; as
-   * upstream adoption grows, the heuristic shrinks toward zero.
+   * Source of truth: upstream esphome's `cv.Optional(...,
+   * advanced=True)` schema kwarg (esphome/esphome#16267) when the
+   * field author marked it explicitly. The device-builder catalog
+   * generator's name-based heuristic is the fallback for fields the
+   * schema doesn't yet annotate; as upstream adoption grows, the
+   * heuristic shrinks toward zero.
    */
   advanced: boolean;
   /**
    * When True frontend hides the entry entirely.
    *
-   * Source of truth: upstream esphome's ``cv.Optional(...,
-   * yaml_only=True)`` schema kwarg (esphome/esphome#16267). Marks
+   * Source of truth: upstream esphome's `cv.Optional(...,
+   * yaml_only=True)` schema kwarg (esphome/esphome#16267). Marks
    * fields the user shouldn't edit through a visual editor — e.g.
-   * ``setup_priority`` on every component, where casual UI-driven
+   * `setup_priority` on every component, where casual UI-driven
    * tweaks can break boot. The YAML escape hatch stays available
    * for the rare power-user override.
    */
