@@ -1,39 +1,44 @@
 /**
- * Inline label editor for the device drawer.
+ * Label editor for the device drawer.
  *
- * Renders the device's currently-assigned labels as removable chips
- * plus an "Add label" affordance that opens a popover with:
- *  - a checkbox list of every catalog label (toggle assigns /
- *    unassigns immediately via ``devices/set_labels``);
- *  - a search input that narrows the catalog list;
- *  - an inline "Create new label" form (name + optional color
- *    swatch) that calls ``labels/create`` and immediately assigns
- *    the freshly-minted label to the device.
+ * In-drawer affordance is intentionally minimal: a chip row with
+ * per-chip × buttons plus a single "Edit labels" trigger. The
+ * full assignment / create UI lives behind that trigger in a
+ * ``<wa-dialog>`` so the drawer stays scannable when a device
+ * carries a long list of labels.
  *
- * The component is read-from-context: it consumes ``apiContext``
- * for the WS round trips and ``labelsContext`` for the live catalog
- * (so a ``label_*`` event from another client updates the dropdown
- * without a re-fetch). Per-device assignments are owned by the
- * caller — we receive ``device`` as a property and rely on the
- * subsequent ``DEVICE_UPDATED`` push (which the backend fires from
- * ``set_labels`` after the scanner reload) to refresh the chip row.
+ * The dialog body has three parts: a search input, a catalog list
+ * where each row is a checkbox toggling the device's assignment
+ * (``devices/set_labels`` round trips, optimistically reflected in
+ * the chip row immediately), and an inline "Create new label" form
+ * (name + optional color swatch) that calls ``labels/create`` and
+ * then assigns the freshly-minted label.
+ *
+ * The component reads from context: ``apiContext`` for the WS
+ * round trips and ``labelsContext`` for the live catalog (so a
+ * ``label_*`` event from another client updates the dialog without
+ * a re-fetch). Per-device assignments are owned by the caller —
+ * we receive ``device`` as a property and rely on the subsequent
+ * ``DEVICE_UPDATED`` push (fired from the backend after
+ * ``set_labels`` reloads the device) to reset our optimistic
+ * override.
  */
 import { consume } from "@lit/context";
 import {
   mdiCheck,
   mdiClose,
+  mdiPencil,
   mdiPlus,
   mdiTagMultiple,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { EscapeController } from "../../util/escape-controller.js";
 import { LABEL_COLOR_SWATCHES, labelChipStyleString } from "../../util/label-style.js";
 import {
   labelChipStyles,
@@ -41,12 +46,14 @@ import {
 } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
+import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/input/input.js";
 
 registerMdiIcons({
   check: mdiCheck,
   close: mdiClose,
+  pencil: mdiPencil,
   plus: mdiPlus,
   "tag-multiple": mdiTagMultiple,
 });
@@ -68,18 +75,17 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @property({ attribute: false })
   device!: ConfiguredDevice;
 
-  /** Whether the popover is currently visible. Toggled by the
-   *  "Add label" button; closed by Escape or by clicking outside. */
+  /** Whether the assignment dialog is currently open. */
   @state()
-  private _popoverOpen = false;
+  private _dialogOpen = false;
 
-  /** Substring filter applied to the catalog when the popover is
-   *  open. Case-insensitive. */
+  /** Substring filter applied to the catalog inside the dialog.
+   *  Case-insensitive. */
   @state()
   private _filter = "";
 
-  /** Whether the "Create new label" form is expanded inside the
-   *  popover. Collapsed by default to keep the popover compact. */
+  /** Whether the "Create new label" inline form is expanded inside
+   *  the dialog. Collapsed by default to keep the dialog compact. */
   @state()
   private _createOpen = false;
 
@@ -90,11 +96,10 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @state()
   private _newColor: string | null = null;
 
-  /** True while a ``set_labels`` round trip is in flight. We don't
-   *  block the popover during this — optimistic UX is fine since
-   *  the backend's reject path is rare (only "unknown id", which
-   *  shouldn't happen with the live catalog) — but we do disable
-   *  the create button to prevent double-fires. */
+  /** True while a ``set_labels`` round trip is in flight. Disables
+   *  the create submit button to prevent double-fires; toggle
+   *  clicks are still accepted and queued so fast multi-toggle
+   *  feels responsive. */
   @state()
   private _saving = false;
 
@@ -115,14 +120,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
    *  state non-deterministic on overlapping requests. */
   private _saveChain: Promise<unknown> = Promise.resolve();
 
-  /** Close the popover on Escape. Bound to ``window`` rather than
-   *  ``document`` because the drawer's own Escape listener is on
-   *  ``window`` and the controller's ``defaultPrevented`` guard
-   *  prevents both from firing on the same press. */
-  private _escape = new EscapeController(this, (e) => {
-    e.preventDefault();
-    this._closePopover();
-  });
+  @query("wa-dialog")
+  private _dialog?: HTMLElement & { open: boolean };
 
   static styles = [
     espHomeStyles,
@@ -130,7 +129,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     css`
       :host {
         display: block;
-        position: relative;
       }
 
       .row {
@@ -138,6 +136,12 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         flex-wrap: wrap;
         align-items: center;
         gap: 6px;
+      }
+
+      .empty {
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        font-style: italic;
       }
 
       .assigned-chip {
@@ -169,11 +173,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         font-size: 12px;
       }
 
-      .add-btn {
+      .edit-btn {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 2px 8px;
+        padding: 2px 10px;
         border-radius: 999px;
         font-size: var(--wa-font-size-2xs);
         font-weight: var(--wa-font-weight-bold);
@@ -182,49 +186,74 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         color: var(--wa-color-text-quiet);
         border: var(--wa-border-width-s) dashed var(--wa-color-surface-border);
         cursor: pointer;
+        font-family: inherit;
       }
 
-      .add-btn:hover {
+      .edit-btn:hover {
         color: var(--wa-color-text-normal);
         border-color: var(--wa-color-text-quiet);
       }
 
-      .add-btn wa-icon {
+      .edit-btn wa-icon {
         font-size: 12px;
       }
 
-      /* The popover is positioned below the chip row; keeps it
-         within the drawer's body so the drawer's overflow handles
-         scroll if the catalog grows long. */
-      .popover {
-        margin-top: var(--wa-space-s);
-        background: var(--wa-color-surface-default);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-m);
-        box-shadow: var(--wa-shadow-m);
-        padding: var(--wa-space-s);
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-        max-height: 320px;
-        overflow-y: auto;
+      /* ─── Dialog ──────────────────────────────────────────── */
+
+      wa-dialog {
+        --width: 460px;
+      }
+
+      wa-dialog::part(header) {
+        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
+      }
+
+      wa-dialog::part(title) {
+        font-size: var(--wa-font-size-m);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-normal);
+      }
+
+      wa-dialog::part(close-button__base) {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+      }
+
+      wa-dialog::part(body) {
+        padding: 0 var(--wa-space-l) var(--wa-space-l);
+      }
+
+      wa-dialog::part(footer) {
+        display: none;
+      }
+
+      .dialog-search {
+        margin-bottom: var(--wa-space-s);
       }
 
       .options {
         display: flex;
         flex-direction: column;
         gap: 2px;
-        max-height: 180px;
+        max-height: 300px;
         overflow-y: auto;
+        margin: 0 calc(var(--wa-space-l) * -1);
+        padding: 0 var(--wa-space-l);
       }
 
       .option {
         display: flex;
         align-items: center;
-        gap: 8px;
-        padding: 4px 6px;
+        gap: 10px;
+        padding: 6px 8px;
         border-radius: var(--wa-border-radius-s);
         cursor: pointer;
+        background: transparent;
+        border: none;
+        text-align: left;
+        font-family: inherit;
+        color: inherit;
       }
 
       .option:hover {
@@ -235,8 +264,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         border-radius: 4px;
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         flex-shrink: 0;
@@ -249,33 +278,35 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       }
 
       .option-check wa-icon {
-        font-size: 12px;
+        font-size: 13px;
       }
 
-      .empty {
+      .option-empty {
         text-align: center;
-        font-size: var(--wa-font-size-2xs);
+        font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
-        padding: var(--wa-space-s);
+        padding: var(--wa-space-m);
       }
 
       .divider {
         height: 1px;
         background: var(--wa-color-surface-border);
+        margin: var(--wa-space-s) 0;
       }
 
       .create-toggle {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 4px 6px;
+        padding: 6px 8px;
         background: transparent;
         border: none;
-        font-size: var(--wa-font-size-2xs);
+        font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         color: var(--esphome-primary);
         cursor: pointer;
         align-self: flex-start;
+        font-family: inherit;
       }
 
       .create-toggle wa-icon {
@@ -285,18 +316,25 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       .create-form {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: var(--wa-space-s);
+        padding: var(--wa-space-s) 0;
+      }
+
+      .create-form-label {
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-quiet);
       }
 
       .swatch-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 4px;
+        gap: 6px;
       }
 
       .swatch {
-        width: 22px;
-        height: 22px;
+        width: 24px;
+        height: 24px;
         border-radius: 50%;
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         cursor: pointer;
@@ -319,19 +357,20 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
       .create-actions {
         display: flex;
-        gap: 6px;
+        gap: var(--wa-space-xs);
         justify-content: flex-end;
       }
 
       .btn {
-        padding: 4px 10px;
-        font-size: var(--wa-font-size-2xs);
+        padding: 6px 14px;
+        font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         border-radius: var(--wa-border-radius-s);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         background: var(--wa-color-surface-default);
         color: var(--wa-color-text-normal);
         cursor: pointer;
+        font-family: inherit;
       }
 
       .btn--primary {
@@ -348,14 +387,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   ];
 
   protected willUpdate(changed: Map<string, unknown>) {
-    // Keep the controller in sync with the popover state so the
-    // listener detaches when the popover closes.
-    if (changed.has("_popoverOpen")) this._escape.set(this._popoverOpen);
     if (changed.has("device")) {
-      // Reset transient editor state when the drawer swaps to a
-      // different device; otherwise a half-typed "create" form
-      // would persist into the next device's editor.
-      this._popoverOpen = false;
+      // Reset transient state when the drawer swaps to a different
+      // device; otherwise a half-typed "create" form would persist
+      // into the next device's editor.
+      this._dialogOpen = false;
       this._filter = "";
       this._createOpen = false;
       this._newName = "";
@@ -371,33 +407,12 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     return this._optimisticLabels ?? this.device.labels ?? [];
   }
 
-  override connectedCallback() {
-    super.connectedCallback();
-    document.addEventListener("click", this._onDocumentClick, true);
-  }
-
-  override disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener("click", this._onDocumentClick, true);
-  }
-
-  /** Capture-phase document click that closes the popover when the
-   *  user clicks outside the editor. Uses ``composedPath`` so the
-   *  shadow-DOM internals of ``wa-input`` don't trigger close. */
-  private _onDocumentClick = (e: MouseEvent) => {
-    if (!this._popoverOpen) return;
-    const path = e.composedPath();
-    if (path.includes(this)) return;
-    this._closePopover();
-  };
-
   protected render() {
     const assigned = resolveLabelIds(this._currentLabelIds, this._catalog);
-    const assignedIds = new Set(assigned.map((l) => l.id));
 
     return html`
       <div class="row">
-        ${assigned.length === 0 && !this._popoverOpen
+        ${assigned.length === 0
           ? html`<span class="empty">${this._localize("dashboard.labels_none")}</span>`
           : nothing}
         ${assigned.map(
@@ -416,65 +431,69 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           </span>`,
         )}
         <button
-          class="add-btn"
+          class="edit-btn"
           type="button"
-          aria-haspopup="true"
-          aria-expanded=${this._popoverOpen ? "true" : "false"}
-          @click=${this._togglePopover}
+          @click=${this._openDialog}
         >
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${this._localize("dashboard.labels_add")}
+          <wa-icon library="mdi" name="pencil"></wa-icon>
+          ${this._localize("dashboard.labels_edit")}
         </button>
       </div>
-      ${this._popoverOpen ? this._renderPopover(assignedIds) : nothing}
+      ${this._renderDialog()}
     `;
   }
 
-  private _renderPopover(assignedIds: Set<string>) {
+  private _renderDialog() {
+    const assignedSet = new Set(this._currentLabelIds);
     const filter = this._filter.trim().toLowerCase();
     const filtered = filter
       ? this._catalog.filter((l) => l.name.toLowerCase().includes(filter))
       : this._catalog;
-
     return html`
-      <div
-        class="popover"
-        role="group"
-        aria-label=${this._localize("dashboard.drawer_labels")}
+      <wa-dialog
+        label=${this._localize("dashboard.labels_dialog_title")}
+        light-dismiss
+        @wa-after-hide=${this._onDialogClose}
       >
-        <wa-input
-          type="search"
-          with-clear
-          placeholder=${this._localize("dashboard.labels_search_placeholder")}
-          .value=${this._filter}
-          @input=${(e: Event) => {
-            this._filter = (e.currentTarget as unknown as { value: string }).value;
-          }}
-        ></wa-input>
-        <div class="options">
-          ${filtered.length === 0
-            ? html`<div class="empty">
-                ${this._localize("dashboard.labels_no_matches")}
+        <div class="dialog-search">
+          <wa-input
+            type="search"
+            with-clear
+            placeholder=${this._localize("dashboard.labels_search_placeholder")}
+            .value=${this._filter}
+            @input=${(e: Event) => {
+              this._filter = (e.currentTarget as unknown as { value: string }).value;
+            }}
+          ></wa-input>
+        </div>
+        <div class="options" role="group" aria-label=${this._localize("dashboard.drawer_labels")}>
+          ${this._catalog.length === 0
+            ? html`<div class="option-empty">
+                ${this._localize("dashboard.labels_dialog_empty")}
               </div>`
-            : filtered.map((label) => {
-                const checked = assignedIds.has(label.id);
-                return html`<button
-                  class="option"
-                  type="button"
-                  role="checkbox"
-                  aria-checked=${checked ? "true" : "false"}
-                  @click=${() => this._toggleAssignment(label.id, !checked)}
-                >
-                  <span class="option-check ${checked ? "option-check--checked" : ""}">
-                    ${checked
-                      ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                      : nothing}
-                  </span>
-                  <span class="label-chip" style=${labelChipStyleString(label.color)}
-                    >${label.name}</span
+            : filtered.length === 0
+              ? html`<div class="option-empty">
+                  ${this._localize("dashboard.labels_no_matches")}
+                </div>`
+              : filtered.map((label) => {
+                  const checked = assignedSet.has(label.id);
+                  return html`<button
+                    class="option"
+                    type="button"
+                    role="checkbox"
+                    aria-checked=${checked ? "true" : "false"}
+                    @click=${() => this._toggleAssignment(label.id, !checked)}
                   >
-                </button>`;
-              })}
+                    <span class="option-check ${checked ? "option-check--checked" : ""}">
+                      ${checked
+                        ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                        : nothing}
+                    </span>
+                    <span class="label-chip" style=${labelChipStyleString(label.color)}
+                      >${label.name}</span
+                    >
+                  </button>`;
+                })}
         </div>
         <div class="divider"></div>
         ${this._createOpen ? this._renderCreateForm() : html`<button
@@ -482,13 +501,17 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           type="button"
           @click=${() => {
             this._createOpen = true;
+            // Pre-fill the name from the current filter when the
+            // user typed something that didn't match — saves the
+            // re-type when "filter to find" turns into "didn't
+            // exist, create it".
             this._newName = this._filter;
           }}
         >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("dashboard.labels_create")}
         </button>`}
-      </div>
+      </wa-dialog>
     `;
   }
 
@@ -498,6 +521,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       (l) => l.name.toLowerCase() === trimmed.toLowerCase(),
     );
     const canCreate = trimmed.length > 0 && trimmed.length <= 50 && !duplicate;
+    const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
     return html`
       <form
         class="create-form"
@@ -506,6 +530,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           if (canCreate) void this._createAndAssign();
         }}
       >
+        <span class="create-form-label">${this._localize("dashboard.labels_create")}</span>
         <wa-input
           placeholder=${this._localize("dashboard.labels_create_placeholder")}
           maxlength="50"
@@ -514,7 +539,45 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
             this._newName = (e.currentTarget as unknown as { value: string }).value;
           }}
         ></wa-input>
-        ${this._renderSwatchRow()}
+        <div
+          class="swatch-row"
+          role="radiogroup"
+          aria-label=${this._localize("dashboard.labels_color")}
+          @keydown=${(e: KeyboardEvent) => this._onSwatchKeyDown(e, values)}
+        >
+          ${values.map((c) => {
+            const selected = this._newColor === c;
+            if (c === null) {
+              return html`<button
+                type="button"
+                role="radio"
+                aria-checked=${selected ? "true" : "false"}
+                tabindex=${selected ? "0" : "-1"}
+                class="swatch swatch--clear ${selected ? "swatch--selected" : ""}"
+                aria-label=${this._localize("dashboard.labels_color_none")}
+                title=${this._localize("dashboard.labels_color_none")}
+                @click=${() => {
+                  this._newColor = null;
+                }}
+              >
+                ${selected ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
+              </button>`;
+            }
+            return html`<button
+              type="button"
+              role="radio"
+              aria-checked=${selected ? "true" : "false"}
+              tabindex=${selected ? "0" : "-1"}
+              class="swatch ${selected ? "swatch--selected" : ""}"
+              style="background:${c}"
+              aria-label=${c}
+              title=${c}
+              @click=${() => {
+                this._newColor = c;
+              }}
+            ></button>`;
+          })}
+        </div>
         <div class="create-actions">
           <button
             type="button"
@@ -536,58 +599,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           </button>
         </div>
       </form>
-    `;
-  }
-
-  /** Render the color-picker as a proper ARIA radio group.
-   *
-   *  Each swatch is a ``role="radio"`` with ``aria-checked``; only
-   *  the currently-selected swatch sits in the tab order (roving
-   *  tabindex), and ArrowLeft/Right/Home/End move focus + selection
-   *  the way screen readers expect of a radiogroup. The
-   *  null-color "no color" entry leads the list. */
-  private _renderSwatchRow() {
-    const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
-    return html`
-      <div
-        class="swatch-row"
-        role="radiogroup"
-        aria-label=${this._localize("dashboard.labels_color")}
-        @keydown=${(e: KeyboardEvent) => this._onSwatchKeyDown(e, values)}
-      >
-        ${values.map((c) => {
-          const selected = this._newColor === c;
-          if (c === null) {
-            return html`<button
-              type="button"
-              role="radio"
-              aria-checked=${selected ? "true" : "false"}
-              tabindex=${selected ? "0" : "-1"}
-              class="swatch swatch--clear ${selected ? "swatch--selected" : ""}"
-              aria-label=${this._localize("dashboard.labels_color_none")}
-              title=${this._localize("dashboard.labels_color_none")}
-              @click=${() => {
-                this._newColor = null;
-              }}
-            >
-              ${selected ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
-            </button>`;
-          }
-          return html`<button
-            type="button"
-            role="radio"
-            aria-checked=${selected ? "true" : "false"}
-            tabindex=${selected ? "0" : "-1"}
-            class="swatch ${selected ? "swatch--selected" : ""}"
-            style="background:${c}"
-            aria-label=${c}
-            title=${c}
-            @click=${() => {
-              this._newColor = c;
-            }}
-          ></button>`;
-        })}
-      </div>
     `;
   }
 
@@ -615,8 +626,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     }
     e.preventDefault();
     this._newColor = values[next];
-    // Roving tabindex: focus the newly-selected swatch on the next
-    // frame so the rendered ``tabindex="0"`` is the one we focus.
     requestAnimationFrame(() => {
       const swatch = this.renderRoot.querySelectorAll<HTMLButtonElement>(
         ".swatch",
@@ -625,38 +634,33 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     });
   }
 
-  private _togglePopover = () => {
-    this._popoverOpen = !this._popoverOpen;
-    if (!this._popoverOpen) {
-      this._createOpen = false;
-      this._filter = "";
-    }
+  private _openDialog = () => {
+    this._dialogOpen = true;
+    this._filter = "";
+    this._createOpen = false;
+    this._newName = "";
+    this._newColor = null;
+    if (this._dialog) this._dialog.open = true;
   };
 
-  private _closePopover() {
-    if (!this._popoverOpen) return;
-    this._popoverOpen = false;
-    this._createOpen = false;
+  private _onDialogClose = () => {
+    this._dialogOpen = false;
     this._filter = "";
-  }
+    this._createOpen = false;
+    this._newName = "";
+    this._newColor = null;
+  };
 
-  /** Re-emit a ``label_ids`` change as a ``set_labels`` round trip.
-   *
-   *  We compute the new full list locally (the API contract is
-   *  "replace, not diff") and rely on the backend's
-   *  ``DEVICE_UPDATED`` push to refresh the chip row; if the round
-   *  trip fails, the surface stays consistent because we never
-   *  mutated the local device. */
+  /** Re-emit a ``label_ids`` change as a serialized
+   *  ``set_labels`` round trip. We rely on the backend's
+   *  ``DEVICE_UPDATED`` push to refresh the chip row; the
+   *  optimistic-state fallback keeps the UI consistent in the
+   *  meantime. */
   private async _persist(nextIds: string[]) {
     if (!this._api) return;
     const api = this._api;
     const config = this.device.configuration;
     this._saving = true;
-    // Serialize behind any in-flight save so overlapping toggles
-    // reach the backend in click order rather than network-arrival
-    // order. ``set_labels`` replaces wholesale, so two concurrent
-    // requests would otherwise leave the device in whichever state
-    // the later response carried — non-deterministic on flaky links.
     const task = this._saveChain.then(async () => {
       try {
         await api.setDeviceLabels(config, nextIds);
@@ -669,9 +673,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     });
     this._saveChain = task;
     await task;
-    // Flip ``_saving`` off only when this task is the tail of the
-    // chain — a fast-following toggle would have already extended
-    // the chain and we want the spinner to stay on for that one too.
     if (this._saveChain === task) {
       this._saving = false;
     }
@@ -684,9 +685,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         ? current.slice()
         : [...current, labelId]
       : current.filter((id) => id !== labelId);
-    // Optimistic: the chip row reflects the click immediately and
-    // every subsequent toggle reads ``next`` off this fresher value
-    // rather than the (still-stale) prop.
     this._optimisticLabels = next;
     await this._persist(next);
   }
@@ -705,15 +703,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         name,
         color: this._newColor,
       });
-      // Assign the freshly-minted label to the device. The catalog
-      // updates via the ``LABEL_CREATED`` push (which app-shell
-      // routes into ``labelsContext``); we don't touch ``_catalog``
-      // here so the live context stays the source of truth.
       const next = [...this._currentLabelIds, created.id];
       this._optimisticLabels = next;
-      // Route through ``_persist`` so the create+assign also sits
-      // in the serialized chain — a quick toggle landing right
-      // after Create otherwise races the assign half of this pair.
       await this._persist(next);
       this._createOpen = false;
       this._newName = "";
