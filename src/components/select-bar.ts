@@ -53,6 +53,8 @@ export class ESPHomeSelectBar extends LitElement {
         align-items: center;
         justify-content: space-between;
         padding: var(--wa-space-m) var(--wa-space-xl);
+        min-height: var(--select-bar-height, 64px);
+        box-sizing: border-box;
         background: var(--wa-color-surface-raised);
         border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);

@@ -9,6 +9,16 @@ export const tableLayoutStyles = css`
     min-height: 0;
   }
 
+  /* When the dashboard's floating multi-select bar is visible, reserve
+     space at the bottom of the table host so the pagination row sits
+     above it rather than behind it. The variable is defined on the
+     dashboard host alongside the bar's own min-height to keep the two
+     in lockstep. */
+  :host([select-mode]) {
+    padding-bottom: var(--select-bar-height, 64px);
+    box-sizing: border-box;
+  }
+
   .controls {
     display: flex;
     align-items: center;

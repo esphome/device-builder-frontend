@@ -17,6 +17,11 @@ export const dashboardStyles = css`
     --fab-bottom: var(--wa-space-l);
     --fab-height: 48px;
     --fab-clearance: calc(var(--fab-bottom) + var(--fab-height) + var(--wa-space-xs));
+    /* Height of the floating multi-select action bar (rendered by
+       esphome-select-bar at position:fixed; bottom:0). Used both to
+       enforce the bar's own height and to reserve clearance inside
+       the device table so its pagination row doesn't sit beneath it. */
+    --select-bar-height: 64px;
   }
 
   :host([view="cards"]) {
