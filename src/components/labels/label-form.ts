@@ -30,6 +30,7 @@ import type { Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { isLabelNameDuplicate } from "../../util/label-usage.js";
 import { LABEL_COLOR_SWATCHES } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -295,13 +296,13 @@ export class ESPHomeLabelForm extends LitElement {
       </button>`;
     }
     const trimmed = this._name.trim();
-    const editingNameLower = this.editing?.name.toLowerCase() ?? null;
-    const lowerExisting = this.existingNames
-      .map((n) => n.toLowerCase())
-      // In edit mode, exclude the label being edited so re-typing
-      // its current name doesn't falsely trip the duplicate guard.
-      .filter((n) => n !== editingNameLower);
-    const duplicate = lowerExisting.includes(trimmed.toLowerCase());
+    // In edit mode, exclude the label being edited so re-typing
+    // its current name doesn't falsely trip the duplicate guard.
+    const duplicate = isLabelNameDuplicate(
+      trimmed,
+      this.existingNames,
+      this.editing?.name ?? null,
+    );
     // ``_api`` is consumed from context; it's typically present once
     // the dashboard has finished its connect dance, but during the
     // initial WS handshake the context may still be undefined. Gate

@@ -36,6 +36,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import { computeLabelUsage } from "../util/label-usage.js";
 import {
   buildYamlSnippetBlocks,
   yamlEmptyMessageKey,
@@ -240,6 +241,17 @@ export class ESPHomePageDashboard extends LitElement {
   private _sortedDevicesCache: {
     source: ConfiguredDevice[];
     sorted: ConfiguredDevice[];
+  } | null = null;
+  /** Cache for the per-label usage count map (mirrors
+   *  ``_sortedDevicesCache``'s reference-keyed shape). The map
+   *  rebuilds only when ``_devices`` is replaced — every WS event
+   *  that mutates the list does a full reassign — so a render that
+   *  only flipped a search input or the view toggle reuses the
+   *  previous map and avoids a new ``Record`` reference handing
+   *  through to ``<esphome-labels-filter>``. */
+  private _labelUsageCache: {
+    source: ConfiguredDevice[];
+    map: Record<string, number>;
   } | null = null;
   /** When false (default), discovered devices the user previously
    *  marked as Ignored are hidden from the banner and grid; the
@@ -1092,19 +1104,19 @@ export class ESPHomePageDashboard extends LitElement {
   /** Per-label-id usage count across the current device list.
    *  Fed to the labels-filter so the delete-confirm dialog can
    *  warn the user "this will remove the label from N devices"
-   *  before the cascade fires. Computed on each render — the
-   *  device list is small enough that a single-pass count beats
-   *  caching for code complexity. */
+   *  before the cascade fires. Reference-keyed cache off
+   *  ``_devices`` so a render that doesn't touch the list doesn't
+   *  hand a fresh Record through to the filter (which would force
+   *  an unnecessary re-render of the popover on every search-input
+   *  keystroke). */
   private _computeLabelUsage(): Record<string, number> {
-    const usage: Record<string, number> = {};
-    for (const d of this._devices) {
-      const ids = d.labels;
-      if (!ids) continue;
-      for (const id of ids) {
-        usage[id] = (usage[id] ?? 0) + 1;
-      }
+    const source = this._devices;
+    if (this._labelUsageCache?.source === source) {
+      return this._labelUsageCache.map;
     }
-    return usage;
+    const map = computeLabelUsage(source);
+    this._labelUsageCache = { source, map };
+    return map;
   }
 
   private _renderLabelsFilter() {
