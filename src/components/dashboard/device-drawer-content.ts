@@ -49,6 +49,7 @@ import { getEncryptionState } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
+import { renderIpValue } from "./device-drawer-render.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -955,43 +956,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     `;
   }
 
-  /**
-   * Render the primary IP cell, optionally suffixed with a "Visit web UI"
-   * icon-link.
-   *
-   * *url* is the precomputed ``buildWebUiUrl`` result for the device —
-   * passed in (rather than recomputed) so the empty-IP guard in the
-   * caller and this render share a single URL parse. An empty *url*
-   * suppresses the link, mirroring the original "no link" branch.
-   * Pass an empty *ip* to render the ``—`` placeholder alongside the
-   * link; used in the "no resolved IPs yet but ``device.address`` is
-   * known" branch so the visit affordance isn't gated on the first
-   * mDNS A-record.
-   */
   private _renderIpValue(ip: string, url: string) {
-    const isPlaceholder = !ip;
-    const display = ip || "—";
-    if (!url) {
-      return html`<div
-        class="value mono ${isPlaceholder ? "muted" : ""}"
-      >${display}</div>`;
-    }
-    const visitLabel = this._localize("dashboard.action_visit_web_ui");
-    return html`
-      <div class="value mono ip-value ${isPlaceholder ? "muted" : ""}">
-        <span class="ip-value-text">${display}</span>
-        <a
-          class="ip-visit-link"
-          href=${url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label=${visitLabel}
-          title=${visitLabel}
-        >
-          <wa-icon library="mdi" name="open-in-new"></wa-icon>
-        </a>
-      </div>
-    `;
+    return renderIpValue(ip, url, this._localize);
   }
 
   /**
