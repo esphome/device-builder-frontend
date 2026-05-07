@@ -17,7 +17,7 @@ on:
         type: string
 
 env:
-  PYTHON_VERSION: "3.12"
+  PYTHON_VERSION: "3.14"
   NODE_VERSION: "24.x"
   BACKEND_REPO: esphome/device-builder
   PACKAGE_NAME: esphome-device-builder-frontend
