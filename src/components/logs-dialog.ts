@@ -16,6 +16,7 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -107,6 +108,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dialogCloseButtonStyles,
     css`
       :host {
         --term-bg: #1e1e1e;
@@ -181,30 +183,9 @@ export class ESPHomeLogsDialog extends LitElement {
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        /* Square 40x40 button matching the header height so the X has a
-           comfortable click/tap target instead of just the icon's
-           ~14px footprint. */
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-
-      /* Same affordance for keyboard users tabbing to the close
-         button — without a focus-visible style they'd land on an
-         identical-looking control with no visual cue. */
-      wa-dialog::part(close-button__base):hover,
-      wa-dialog::part(close-button__base):focus-visible {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        outline: none;
-      }
+      /* Close-button styling lives in
+         src/styles/dialog-close-button.ts — see the
+         dialogCloseButtonStyles import below. */
 
       wa-dialog::part(body) {
         padding: 0;

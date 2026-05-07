@@ -16,6 +16,7 @@ import { JobStatus } from "../api/types.js";
 import type { ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { chipNameToVariant } from "../util/chip-variant.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -242,6 +243,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dialogCloseButtonStyles,
     css`
       :host {
         --term-bg: #1e1e1e;
@@ -277,27 +279,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
       }
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        /* Square 40x40 button matching the header height so the X has a
-           comfortable click/tap target instead of just the icon's
-           ~14px footprint. Matches logs-dialog / command-dialog. */
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-
-      wa-dialog::part(close-button__base):hover,
-      wa-dialog::part(close-button__base):focus-visible {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        outline: none;
-      }
+      /* Close-button styling lives in
+         src/styles/dialog-close-button.ts — see the
+         dialogCloseButtonStyles import below. */
 
       wa-dialog::part(body) {
         padding: var(--wa-space-l) var(--wa-space-xl);

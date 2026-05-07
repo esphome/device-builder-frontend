@@ -4,6 +4,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -27,6 +28,7 @@ export class ESPHomeLogsMethodDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dialogCloseButtonStyles,
     css`
       wa-dialog {
         --width: 460px;
@@ -45,27 +47,9 @@ export class ESPHomeLogsMethodDialog extends LitElement {
         font-weight: var(--wa-font-weight-bold);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        /* Square 40x40 button matching the header height so the X has a
-           comfortable click/tap target instead of just the icon's
-           ~14px footprint. Matches logs-dialog / command-dialog. */
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-
-      wa-dialog::part(close-button__base):hover,
-      wa-dialog::part(close-button__base):focus-visible {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        outline: none;
-      }
+      /* Close-button styling lives in
+         src/styles/dialog-close-button.ts — see the
+         dialogCloseButtonStyles import below. */
 
       wa-dialog::part(body) {
         padding: var(--wa-space-l);
