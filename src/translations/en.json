@@ -486,7 +486,8 @@
       "tuya": "Tuya",
       "shelly": "Shelly"
     },
-    "create_general_error": "Failed to create the device. Please try again."
+    "create_general_error": "Failed to create the device. Please try again.",
+    "create_with_board_error": "Failed to create device for {board}: {message}"
   },
   "device": {
     "navigator_title": "Device navigator",

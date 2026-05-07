@@ -390,7 +390,8 @@
       "shelly": "Shelly"
     },
     "starter_kit": "À la une",
-    "create_general_error": "La création du dispositif a échoué. Veuillez réessayer."
+    "create_general_error": "La création du dispositif a échoué. Veuillez réessayer.",
+    "create_with_board_error": "Échec de la création du dispositif pour {board} : {message}"
   },
   "device": {
     "navigator_title": "Navigateur d'appareil",
