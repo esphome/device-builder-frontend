@@ -9,6 +9,7 @@ import {
   mdiDelete,
   mdiDownload,
   mdiFileDownloadOutline,
+  mdiFormTextbox,
   mdiKeyVariant,
   mdiOpenInNew,
   mdiPencil,
@@ -37,6 +38,7 @@ registerMdiIcons({
   delete: mdiDelete,
   download: mdiDownload,
   "file-download-outline": mdiFileDownloadOutline,
+  "form-textbox": mdiFormTextbox,
   "key-variant": mdiKeyVariant,
   "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
@@ -247,6 +249,15 @@ export class ESPHomeTableRowMenu extends LitElement {
         <div class="menu-item" @click=${() => this._emit("download-yaml")}>
           <wa-icon library="mdi" name="download"></wa-icon>
           ${this._localize("dashboard.action_download_yaml")}
+        </div>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy
+            ? undefined
+            : () => this._emit("edit-friendly-name")}
+        >
+          <wa-icon library="mdi" name="form-textbox"></wa-icon>
+          ${this._localize("dashboard.action_edit_friendly_name")}
         </div>
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
