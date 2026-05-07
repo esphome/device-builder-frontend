@@ -1218,7 +1218,22 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   protected updated(changed: Map<string, unknown>) {
     super.updated?.(changed);
-    if (changed.has("device")) {
+    /* The dashboard re-binds ``device`` to a fresh object on every
+       ``DEVICE_UPDATED`` push (state flap, IP change, version
+       change) so the drawer reflects the latest data without the
+       user closing and reopening it. We only want the per-device
+       resets / subscription churn when the drawer is actually
+       being reused for a *different* device — a new
+       configuration filename, or a transition from null to a
+       device. Compare ``configuration`` rather than identity so
+       same-device WS pushes don't reset ``_ipExpanded`` or rotate
+       the reachability subscription. */
+    const previousDevice = changed.get("device") as ConfiguredDevice | null | undefined;
+    const deviceTargetMoved =
+      changed.has("device") &&
+      (previousDevice?.configuration ?? null) !==
+        (this.device?.configuration ?? null);
+    if (deviceTargetMoved) {
       // Per-device UI state must reset when the drawer is reused
       // for a new device — without this a user who expanded the
       // multi-IP row on device A would see device B's drawer open
@@ -1226,7 +1241,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       // contract.
       this._ipExpanded = false;
     }
-    if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
+    if (deviceTargetMoved || changed.has("drawerOpen") || changed.has("_api")) {
       this._reconcileReachabilitySubscription();
       // Run the tick whenever there's a *target* (drawer open +
       // device + api), independent of whether the subscribe
