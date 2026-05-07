@@ -88,6 +88,8 @@ import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-instal
 import "../components/install-method-dialog.js";
 import "../components/clone-device-dialog.js";
 import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
+import "../components/friendly-name-dialog.js";
+import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/discovered-device-card.js";
@@ -286,6 +288,27 @@ export class ESPHomePageDashboard extends LitElement {
     if (changed.has("_devicesLoaded") && this._devicesLoaded) {
       this._loadPreferences();
     }
+    /* Re-bind the drawer's device reference when ``_devices``
+       updates. ``_toggleDrawerForDevice`` snapshots the device
+       object at click time, but the WS reducer in app-shell
+       replaces entries in ``_devices`` on every ``DEVICE_UPDATED``
+       push — without the re-bind, the drawer keeps showing the
+       fields it had at open time (stale ``friendly_name`` after
+       a rename, stale ``state`` after a flap, stale ``ip`` after
+       a DHCP renew). Lookup is by ``configuration`` since that's
+       the stable identity the WS reducer keys on too. */
+    if (changed.has("_devices") && this._drawerDevice) {
+      const live = this._devices.find(
+        (d) => d.configuration === this._drawerDevice!.configuration,
+      );
+      if (live && live !== this._drawerDevice) {
+        this._drawerDevice = live;
+      } else if (!live) {
+        // Device removed (delete / archive) — close the drawer.
+        this._drawerDevice = null;
+        this._drawerOpen = false;
+      }
+    }
   }
 
 
@@ -392,6 +415,8 @@ export class ESPHomePageDashboard extends LitElement {
   private _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-clone-device-dialog")
   private _cloneDialog!: ESPHomeCloneDeviceDialog;
+  @query("esphome-friendly-name-dialog")
+  private _friendlyNameDialog!: ESPHomeFriendlyNameDialog;
   @query("esphome-rename-device-dialog")
   private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
@@ -1295,6 +1320,8 @@ export class ESPHomePageDashboard extends LitElement {
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
+        @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openFriendlyName(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1391,6 +1418,8 @@ export class ESPHomePageDashboard extends LitElement {
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
         @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
+        @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openFriendlyName(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1551,6 +1580,9 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-clone-device-dialog
         @clone-confirm=${this._executeClone}
       ></esphome-clone-device-dialog>
+      <esphome-friendly-name-dialog
+        @friendly-name-confirm=${this._executeFriendlyName}
+      ></esphome-friendly-name-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
@@ -1856,6 +1888,79 @@ export class ESPHomePageDashboard extends LitElement {
   private _openClone(device: ConfiguredDevice) {
     this._actionDevice = device;
     this._cloneDialog.open(device.name);
+  }
+
+  private _openFriendlyName(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._friendlyNameDialog.open(
+      device.name,
+      device.friendly_name || device.name,
+    );
+  }
+
+  private async _executeFriendlyName(
+    e: CustomEvent<{ newFriendlyName: string; install: boolean }>,
+  ) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const { newFriendlyName, install } = e.detail;
+    let result: Awaited<ReturnType<ESPHomeAPI["editFriendlyName"]>>;
+    try {
+      result = await this._api.editFriendlyName(
+        device.configuration,
+        newFriendlyName,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      toast.error(
+        this._localize("dashboard.action_friendly_name_failed", {
+          name: device.name,
+          reason,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    /* ``rewritten=false`` means the YAML already had this value —
+       skip the install (no firmware-level change) and just close
+       the toast with a quiet success message. */
+    if (!result.rewritten) {
+      toast.success(
+        this._localize("dashboard.action_friendly_name_unchanged"),
+        { richColors: true },
+      );
+      return;
+    }
+    if (!install) {
+      /* Edit-only path: the YAML now reflects the new label, the
+         next compile will pick it up. The "Install" pending-changes
+         badge will surface in the row's update column via
+         ``compute_has_pending_changes`` since the YAML's mtime
+         moved. */
+      toast.success(
+        this._localize("dashboard.action_friendly_name_success", {
+          name: newFriendlyName,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    /* Toast first so the user sees the rewrite landed, then route
+       through the install-method picker. The picker handles every
+       install path the dashboard already knows about — OTA when
+       the device is online, web-serial / USB-via-server when it's
+       not, web-download / binary-download for "I want to flash
+       from another machine." It's also the only place that knows
+       to disable the OTA row for a device with no ``ota:`` block
+       (offline / no-OTA state). Reusing it avoids a parallel
+       install path that would have to learn the same edge cases. */
+    toast.success(
+      this._localize("dashboard.action_friendly_name_success", {
+        name: newFriendlyName,
+      }),
+      { richColors: true },
+    );
+    this._openInstallMethod(device);
   }
 
   private async _executeClone(

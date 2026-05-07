@@ -294,6 +294,58 @@ describe("ESPHomeAPI — cloneDevice", () => {
   });
 });
 
+describe("ESPHomeAPI — editFriendlyName", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/edit_friendly_name`` with snake_case args", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.editFriendlyName("kitchen.yaml", "Reading Lamp");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/edit_friendly_name");
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_friendly_name: "Reading Lamp",
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "kitchen.yaml", rewritten: true },
+    });
+    await expect(pending).resolves.toEqual({
+      configuration: "kitchen.yaml",
+      rewritten: true,
+    });
+  });
+
+  it("propagates the rewritten=false signal for an idempotent edit", async () => {
+    // The command is idempotent on the backend — submitting the
+    // same value the leaf already has skips the write and returns
+    // ``rewritten: false`` so the caller knows to skip the
+    // follow-up install. Pin that the helper passes the flag
+    // through unchanged so the dashboard handler can branch on it.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.editFriendlyName("kitchen.yaml", "Kitchen");
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "kitchen.yaml", rewritten: false },
+    });
+    await expect(pending).resolves.toEqual({
+      configuration: "kitchen.yaml",
+      rewritten: false,
+    });
+  });
+});
+
 describe("ESPHomeAPI — streaming commands", () => {
   beforeEach(() => {
     installMockWebSocket();

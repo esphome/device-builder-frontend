@@ -779,6 +779,37 @@ export class ESPHomeAPI {
     });
   }
 
+  /** Rewrite ``esphome.friendly_name`` in the device YAML in place.
+   *
+   *  The dashboard's friendly name and the running device's mDNS
+   *  broadcast both come from this YAML field, so an edit has to
+   *  land in the YAML (not just a sidecar) for the dashboard label
+   *  and the device's announced name to stay in sync. Backend
+   *  reuses the same YAML rewriter the clone path is built on:
+   *  substitution-aware (``${friendly_name}`` redirects through
+   *  the substitutions block) and safe on YAML-special characters
+   *  (``Bedroom #2`` round-trips correctly).
+   *
+   *  Returns ``{configuration, rewritten}``. ``rewritten=false``
+   *  signals an idempotent no-op (user submitted the same value
+   *  the leaf already had); the caller should skip a follow-up
+   *  install in that case.
+   *
+   *  ``CommandError(INVALID_ARGS)`` surfaces user-correctable
+   *  failures (blank name, missing device, package-driven
+   *  friendly_name with no inline leaf) so the dialog can show a
+   *  specific message.
+   */
+  async editFriendlyName(
+    configuration: string,
+    newFriendlyName: string
+  ): Promise<{ configuration: string; rewritten: boolean }> {
+    return this.sendCommand<{ configuration: string; rewritten: boolean }>(
+      "devices/edit_friendly_name",
+      { configuration, new_friendly_name: newFriendlyName }
+    );
+  }
+
   /** Delete a device and all associated files. */
   async deleteDevice(configuration: string): Promise<void> {
     await this.sendCommand("devices/delete", { configuration });
