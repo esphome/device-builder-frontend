@@ -49,6 +49,7 @@ import { getEncryptionState } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
+import { renderIpValue } from "./device-drawer-render.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -334,15 +335,31 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         display: inline-flex;
         align-items: center;
         gap: var(--wa-space-xs);
+        /* Cap to the row's text column so a long IPv6 literal wraps
+           in-place instead of pushing the visit-link icon out of the
+           drawer. The flex children below carry the actual wrapping
+           (min-width: 0) and shrink-protection (flex-shrink: 0). */
+        max-width: 100%;
+      }
+      /* Flex items default to min-width: auto, which prevents the IP
+         text from shrinking below its intrinsic width — long IPv6
+         literals would then overflow. Force min-width: 0 and let
+         overflow-wrap break inside the address. */
+      .ip-value-text {
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
       /* Match the table's .cell-action-btn icon-only target geometry
          so the drawer link is reachable by keyboard and touch —
          square hit area, :focus-visible ring, and the same hover
-         affordance the table-cell visit-web button uses. */
+         affordance the table-cell visit-web button uses.
+         flex-shrink: 0 keeps the icon a stable 24x24 even when the
+         IPv6 text is wrapping next to it. */
       .ip-visit-link {
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        flex-shrink: 0;
         width: 24px;
         height: 24px;
         border-radius: var(--wa-border-radius-m);
@@ -864,6 +881,10 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   private _renderIpAddressRow(d: ConfiguredDevice) {
     const list = d.ip_addresses;
     const label = this._localize("dashboard.drawer_ip_address");
+    // Resolve once per render — ``buildWebUiUrl`` parses a URL and
+    // both the empty-IP guard and ``_renderIpValue`` need the same
+    // answer.
+    const webUrl = buildWebUiUrl(d);
     if (list.length === 0) {
       // ``device.address`` (the YAML-declared mDNS hostname) plus a
       // configured ``web_port`` is enough to build a usable visit-web
@@ -871,7 +892,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       // route through ``_renderIpValue`` to surface the link in that
       // window. Falls back to ``_row``'s muted em-dash when neither
       // is available.
-      if (!buildWebUiUrl(d)) {
+      if (!webUrl) {
         return this._row("ip-network-outline", label, "", true);
       }
       return html`
@@ -881,7 +902,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           </div>
           <div class="content">
             <div class="label">${label}</div>
-            ${this._renderIpValue(d, "")}
+            ${this._renderIpValue("", webUrl)}
           </div>
         </div>
       `;
@@ -894,7 +915,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           </div>
           <div class="content">
             <div class="label">${label}</div>
-            ${this._renderIpValue(d, list[0])}
+            ${this._renderIpValue(list[0], webUrl)}
           </div>
         </div>
       `;
@@ -908,7 +929,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          ${this._renderIpValue(d, list[0])}
+          ${this._renderIpValue(list[0], webUrl)}
           ${expanded
             ? list
                 .slice(1)
@@ -935,46 +956,8 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     `;
   }
 
-  /**
-   * Render the primary IP cell, optionally suffixed with a "Visit web UI"
-   * icon-link.
-   *
-   * The link only renders when ``buildWebUiUrl`` returns a non-empty
-   * URL — i.e. the YAML enabled ``web_server`` and we have a host to
-   * point at. ``buildWebUiUrl`` is the single source of truth for the
-   * host/port/protocol logic shared with the table column and the
-   * row-menu, so the drawer can't drift out of sync with them.
-   *
-   * Pass an empty *ip* to render the ``—`` placeholder alongside the
-   * link; used in the "no resolved IPs yet but ``device.address`` is
-   * known" branch so the visit affordance isn't gated on the first
-   * mDNS A-record.
-   */
-  private _renderIpValue(d: ConfiguredDevice, ip: string) {
-    const url = buildWebUiUrl(d);
-    const isPlaceholder = !ip;
-    const display = ip || "—";
-    if (!url) {
-      return html`<div
-        class="value mono ${isPlaceholder ? "muted" : ""}"
-      >${display}</div>`;
-    }
-    const visitLabel = this._localize("dashboard.action_visit_web_ui");
-    return html`
-      <div class="value mono ip-value ${isPlaceholder ? "muted" : ""}">
-        <span>${display}</span>
-        <a
-          class="ip-visit-link"
-          href=${url}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label=${visitLabel}
-          title=${visitLabel}
-        >
-          <wa-icon library="mdi" name="open-in-new"></wa-icon>
-        </a>
-      </div>
-    `;
+  private _renderIpValue(ip: string, url: string) {
+    return renderIpValue(ip, url, this._localize);
   }
 
   /**
