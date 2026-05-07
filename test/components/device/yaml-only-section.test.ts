@@ -1,11 +1,22 @@
 /**
  * Tests for the YAML-only-section gate.
  *
- * `external_components` is always YAML-only (catalog can't express
- * the `source` discriminated union — issue #337). `packages` rides
- * ``MAP_SECTIONS`` instead. The two sets must stay disjoint —
- * YAML-only takes precedence in the render path, so an entry in
- * both would silently demote a MAP section to a YAML notice.
+ * Both ``external_components`` and ``packages`` are always YAML-
+ * only because their schemas have shapes the catalog model can't
+ * express:
+ *
+ * - ``external_components.source`` is a string-or-typed-object
+ *   discriminated union (#337).
+ * - ``packages`` accepts both a user-keyed dict and a list of
+ *   package definitions, with each value being a discriminated
+ *   union (string shorthand / ``!include`` directive / typed
+ *   remote-package object / inline package contents). Routing it
+ *   through the dict-only ``MAP_SECTIONS`` previously corrupted
+ *   list-shaped configs — see #361.
+ *
+ * The YAML-only and MAP sets must stay disjoint — YAML-only takes
+ * precedence in the render path, so an entry in both would
+ * silently demote a MAP section to a YAML notice.
  */
 
 import { describe, expect, it } from "vitest";
@@ -24,9 +35,14 @@ describe("YAML_ONLY_SECTIONS", () => {
     expect(YAML_ONLY_SECTIONS.has("external_components")).toBe(true);
   });
 
-  it("does NOT contain packages — packages uses the MAP fallback", () => {
-    expect(YAML_ONLY_SECTIONS.has("packages")).toBe(false);
-    expect(MAP_SECTIONS.has("packages")).toBe(true);
+  it("contains packages — issue #361 (list shape would corrupt)", () => {
+    // ``packages`` accepts both ``{name: pkg}`` and ``[pkg, pkg]``
+    // upstream. The dict-only ``renderMapField`` silently
+    // overwrote a list-shaped YAML with ``{}`` on save (#361).
+    // Pinning YAML-only keeps both shapes round-tripping cleanly
+    // through the YAML pane.
+    expect(YAML_ONLY_SECTIONS.has("packages")).toBe(true);
+    expect(MAP_SECTIONS.has("packages")).toBe(false);
   });
 
   it("YAML_ONLY_SECTIONS and MAP_SECTIONS are mutually exclusive", () => {
@@ -41,10 +57,8 @@ describe("YAML_ONLY_SECTIONS", () => {
 describe("KEEP_EMPTY_STRING_SECTIONS", () => {
   it("contains substitutions only — substitutions-specific contract", () => {
     // The keep-empty-strings invariant matters for substitutions
-    // (a cleared value is intentional data) but breaks ``packages``
-    // (an empty value is a placeholder row whose YAML is
-    // syntactically valid but rejected by ESPHome's ``packages:``
-    // schema validator). Pin substitutions in, packages out.
+    // (a cleared value is intentional data) and isn't relevant
+    // anywhere else right now.
     expect(KEEP_EMPTY_STRING_SECTIONS.has("substitutions")).toBe(true);
     expect(KEEP_EMPTY_STRING_SECTIONS.has("packages")).toBe(false);
   });
@@ -67,8 +81,13 @@ describe("isYamlOnlySection", () => {
     expect(isYamlOnlySection("external_components", 3)).toBe(true);
   });
 
-  it("returns false for packages so the MAP resolver runs", () => {
-    expect(isYamlOnlySection("packages", 9)).toBe(false);
+  it("returns true for packages regardless of entry count (#361)", () => {
+    // The bogus catalog shape ESPHome ships for packages would
+    // otherwise route through the form path; pin that the
+    // YAML-only gate fires before that even with non-zero
+    // entries.
+    expect(isYamlOnlySection("packages", 0)).toBe(true);
+    expect(isYamlOnlySection("packages", 9)).toBe(true);
   });
 
   it("returns true for any section with zero entries", () => {

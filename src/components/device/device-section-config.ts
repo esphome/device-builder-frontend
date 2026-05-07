@@ -492,11 +492,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const hasAdvanced = anyAdvancedEntry(renderEntries);
     // Free-form / structural sections: show the description + a
     // "edit via YAML" notice instead of attempting to render the
-    // form. ``external_components`` is the always-YAML case (its
-    // ``source`` discriminated union doesn't fit the catalog model);
-    // any section with zero entries also falls back here.
-    // ``packages`` rides the MAP renderer instead — see
-    // ``MAP_SECTIONS``.
+    // form. ``external_components`` and ``packages`` are the
+    // always-YAML cases (the discriminated unions in their
+    // schemas don't fit the catalog model — see #361 for the
+    // ``packages`` data-loss regression that led to it); any
+    // section with zero entries also falls back here.
     const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
