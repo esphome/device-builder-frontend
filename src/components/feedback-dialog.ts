@@ -61,7 +61,6 @@ const LINKS = [
 ] as const;
 
 const NEW_ISSUE_LABEL_KEY = "feedback.new_issue";
-const NEW_ISSUE_BASE_URL = "https://github.com/esphome/device-builder/issues/new";
 
 @customElement("esphome-feedback-dialog")
 export class ESPHomeFeedbackDialog extends LitElement {
@@ -76,12 +75,13 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
-  private _newIssueHref(): string {
-    const params = new URLSearchParams({ template: "bug_report.yml" });
-    if (this._serverVersion) {
-      params.set("version", this._serverVersion);
+  private _hrefFor(link: (typeof LINKS)[number]): string {
+    if (link.labelKey !== NEW_ISSUE_LABEL_KEY || !this._serverVersion) {
+      return link.href;
     }
-    return `${NEW_ISSUE_BASE_URL}?${params.toString()}`;
+    const url = new URL(link.href);
+    url.searchParams.set("version", this._serverVersion);
+    return url.toString();
   }
 
   static styles = [
@@ -226,9 +226,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
             (link) => html`
               <a
                 class="link"
-                href=${link.labelKey === NEW_ISSUE_LABEL_KEY
-                  ? this._newIssueHref()
-                  : link.href}
+                href=${this._hrefFor(link)}
                 target="_blank"
                 rel="noopener noreferrer"
                 @click=${this.close}
