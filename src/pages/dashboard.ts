@@ -20,6 +20,7 @@ import type {
   ArchivedDevice,
   ConfiguredDevice,
   FirmwareJob,
+  YamlSearchHit,
 } from "../api/types.js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -36,10 +37,11 @@ import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
 import {
-  forEachYamlMatch,
+  buildYamlSnippetBlocks,
   yamlEmptyMessageKey,
-  yamlHitHref,
-  yamlHitLabel,
+  yamlHitDeviceLabel,
+  yamlSnippetBlockHref,
+  type YamlSnippetBlock,
 } from "../util/yaml-search-helpers.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { navigate } from "../util/navigation.js";
@@ -472,10 +474,20 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * YAML-mode body — empty-state copy or a list of hit rows. Each
-   * row links to ``/device/<config>?line=<n>`` so click /
-   * cmd-click / middle-click all do the right thing without
-   * hand-rolling a click handler.
+   * YAML-mode body — empty-state copy or grouped device sections.
+   *
+   * Per device: a header (icon + friendly name + match count)
+   * followed by one or more code-snippet blocks. Each snippet
+   * block bundles a match together with its ±N context lines
+   * (from the backend's ``before`` / ``after`` fields), with the
+   * matched line(s) highlighted. Adjacent matches whose context
+   * windows overlap collapse into a single block — the visual
+   * shape GitHub code search and VS Code search both use.
+   *
+   * Each snippet block is its own clickable link to the editor
+   * pinned at the block's first match line, so click / cmd-click
+   * / middle-click all do the right thing without a custom
+   * click handler beyond the SPA-navigate guard.
    */
   private _renderYamlMode() {
     const hits = this._yamlSearch.hits;
@@ -494,31 +506,104 @@ export class ESPHomePageDashboard extends LitElement {
       // ``yaml_search.no_matches`` (fetched, no hits).
       return this._renderYamlEmptyState(emptyKey);
     }
-    // hits is non-empty here — render the rows.
+    // hits is non-empty here — render the device sections.
     return html`
       <div class="yaml-hits">
-        ${forEachYamlMatch(
-          hits,
-          (hit, match) => html`
-            <a
-              class="yaml-hit"
-              href=${yamlHitHref(hit, match)}
-              @click=${(e: MouseEvent) => {
-                // Plain left-click → SPA navigate; let middle /
-                // cmd / shift-click fall through to the browser
-                // for new-tab / new-window behaviour.
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                navigate(yamlHitHref(hit, match));
-              }}
-            >
-              <wa-icon library="mdi" name="code-braces"></wa-icon>
-              <span class="yaml-hit-label">${yamlHitLabel(hit, match)}</span>
-            </a>
-          `
-        )}
+        ${(hits ?? []).map((hit) => {
+          const blocks = buildYamlSnippetBlocks(hit.matches);
+          const matchCount = hit.matches.length;
+          const countUnit =
+            matchCount === 1
+              ? this._localize("yaml_search.match_count_singular")
+              : this._localize("yaml_search.match_count_plural");
+          return html`
+            <section class="yaml-hit-group">
+              <header class="yaml-hit-group-header">
+                <wa-icon library="mdi" name="code-braces"></wa-icon>
+                <span class="yaml-hit-group-name"
+                  >${yamlHitDeviceLabel(hit)}</span
+                >
+                <span class="yaml-hit-group-count"
+                  >${matchCount} ${countUnit}</span
+                >
+              </header>
+              ${blocks.map((block) =>
+                this._renderYamlSnippetBlock(hit, block, query)
+              )}
+            </section>
+          `;
+        })}
       </div>
     `;
+  }
+
+  /** Render a single ``YamlSnippetBlock`` as a clickable code panel.
+   *
+   *  Lines render in monospace with a small line-number gutter.
+   *  Match lines get a class hook (``yaml-snippet-line--match``)
+   *  so styling can highlight the row; the matched substring
+   *  itself is wrapped in ``<mark>`` for inline highlighting.
+   */
+  private _renderYamlSnippetBlock(
+    hit: YamlSearchHit,
+    block: YamlSnippetBlock,
+    query: string,
+  ) {
+    const href = yamlSnippetBlockHref(hit, block);
+    return html`
+      <a
+        class="yaml-snippet"
+        href=${href}
+        @click=${(e: MouseEvent) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          navigate(href);
+        }}
+      >
+        ${block.lines.map((text, i) => {
+          const lineNumber = block.startLine + i;
+          const isMatch = block.matchedLines.has(lineNumber);
+          return html`
+            <div
+              class="yaml-snippet-line ${isMatch
+                ? "yaml-snippet-line--match"
+                : ""}"
+            >
+              <span class="yaml-snippet-gutter">${lineNumber}</span>
+              <span class="yaml-snippet-text"
+                >${isMatch ? this._highlightMatch(text, query) : text}</span
+              >
+            </div>
+          `;
+        })}
+      </a>
+    `;
+  }
+
+  /** Wrap every case-insensitive occurrence of *needle* in *text*
+   *  with a ``<mark>`` element so the matched substring stands
+   *  out inside the snippet line. *needle* may be empty (the
+   *  caller already gates on ``query`` being non-empty before
+   *  calling, but defensively returns the unmodified text in
+   *  that case).
+   */
+  private _highlightMatch(text: string, needle: string) {
+    if (!needle) return text;
+    const lower = text.toLowerCase();
+    const lowerNeedle = needle.toLowerCase();
+    const out: Array<unknown> = [];
+    let i = 0;
+    while (i < text.length) {
+      const idx = lower.indexOf(lowerNeedle, i);
+      if (idx === -1) {
+        out.push(text.slice(i));
+        break;
+      }
+      if (idx > i) out.push(text.slice(i, idx));
+      out.push(html`<mark>${text.slice(idx, idx + needle.length)}</mark>`);
+      i = idx + needle.length;
+    }
+    return out;
   }
 
   private _renderYamlEmptyState(messageKey: string) {

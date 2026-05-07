@@ -237,10 +237,24 @@ export interface DevicesResponse {
   importable: AdoptableDevice[];
 }
 
-/** A single matching line within a YAML file. */
+/** A single matching line within a YAML file.
+ *
+ *  ``before`` / ``after`` carry up to ``MAX_CONTEXT_LINES`` (10)
+ *  lines on each side of the matched line, sliced from the same
+ *  capped scan window the backend walks. The frontend renders a
+ *  code-snippet block that surfaces the surrounding key
+ *  (``device:`` / ``platform:`` / list-anchor lines) so a hit
+ *  deep inside a nested block reads as anchored config rather
+ *  than a free-floating value. Both default to ``[]`` for
+ *  matches at file edges.
+ */
 export interface YamlSearchMatch {
   line_number: number;
   line_text: string;
+  /** Up to ``context_lines`` lines preceding the match (file order). */
+  before: string[];
+  /** Up to ``context_lines`` lines following the match (file order). */
+  after: string[];
 }
 
 /**

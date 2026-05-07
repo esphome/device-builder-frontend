@@ -276,32 +276,87 @@ export const dashboardStyles = css`
     display: flex;
     flex-direction: column;
     padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
-    gap: 2px;
+    gap: var(--wa-space-l);
   }
-  .yaml-hit {
+  .yaml-hit-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-xs);
+  }
+  .yaml-hit-group-header {
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-xs) var(--wa-space-s);
+    padding-bottom: var(--wa-space-xs);
+    border-bottom: 1px solid var(--wa-color-surface-border);
+  }
+  .yaml-hit-group-name {
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+  .yaml-hit-group-count {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+    margin-left: auto;
+  }
+  /* The legacy .yaml-hit / .yaml-hit-label rows (palette-style
+     flat per-match listing) are gone from the dashboard; the
+     snippet-block styles below replace them with a grouped
+     code-search shape. */
+  .yaml-snippet {
+    display: block;
+    background: var(--wa-color-surface-lowered);
+    border: 1px solid var(--wa-color-surface-border);
     border-radius: 6px;
     color: var(--wa-color-text-normal);
     text-decoration: none;
+    font-family: var(--wa-font-family-code, ui-monospace, monospace);
     font-size: var(--wa-font-size-s);
-    transition: background-color 0.1s ease;
+    overflow: hidden;
+    transition: border-color 0.1s ease, background-color 0.1s ease;
   }
-  .yaml-hit:hover,
-  .yaml-hit:focus-visible {
-    background: var(--wa-color-surface-raised);
+  .yaml-snippet:hover,
+  .yaml-snippet:focus-visible {
+    border-color: var(--esphome-primary);
     outline: none;
   }
-  .yaml-hit-label {
-    /* Single line, ellipsis on overflow — long YAML lines
-       (lambdas, comments) can run wide. */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .yaml-snippet-line {
+    display: flex;
+    align-items: baseline;
+    padding: 1px 0;
+  }
+  .yaml-snippet-line--match {
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 92%
+    );
+  }
+  .yaml-snippet-gutter {
+    flex: 0 0 auto;
+    width: 3em;
+    padding: 0 var(--wa-space-s);
+    text-align: right;
+    color: var(--wa-color-text-quiet);
+    user-select: none;
+  }
+  .yaml-snippet-text {
     flex: 1;
-    font-family: var(--wa-font-family-code, ui-monospace, monospace);
+    /* Preserve YAML indentation but wrap long lines (lambdas /
+       deeply-nested config) instead of horizontally scrolling. */
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding-right: var(--wa-space-s);
+  }
+  .yaml-snippet-text mark {
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 70%
+    );
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
   }
   .device-count {
     font-size: var(--wa-font-size-xs);

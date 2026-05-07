@@ -1,20 +1,49 @@
 import { describe, expect, it, vi } from "vitest";
 import type { YamlSearchHit, YamlSearchMatch } from "../../src/api/types.js";
 import {
+  buildYamlSnippetBlocks,
   forEachYamlMatch,
   yamlEmptyMessage,
   yamlEmptyMessageKey,
+  yamlHitDeviceLabel,
   yamlHitHref,
   yamlHitLabel,
+  yamlSnippetBlockHref,
 } from "../../src/util/yaml-search-helpers.js";
 
-const HIT: YamlSearchHit = {
-  configuration: "kitchen.yaml",
-  device_name: "kitchen",
-  friendly_name: "Kitchen Lamp",
-  matches: [{ line_number: 7, line_text: "  ssid: home" }],
-};
+/**
+ * Build a ``YamlSearchMatch`` with sensible defaults.
+ *
+ * Most label / mask tests don't care about the context windows;
+ * they only assert on ``line_text``. The factory keeps those
+ * cases readable (``mkMatch({ line_text: "wifi:" })``) without
+ * sprinkling ``before: [], after: []`` through every fixture,
+ * and centralises the wire-shape compatibility — when the
+ * backend adds another match-level field, only this helper
+ * changes.
+ */
+function mkMatch(overrides: Partial<YamlSearchMatch> = {}): YamlSearchMatch {
+  return {
+    line_number: 1,
+    line_text: "",
+    before: [],
+    after: [],
+    ...overrides,
+  };
+}
 
+/** Build a ``YamlSearchHit`` with a single match unless overridden. */
+function mkHit(overrides: Partial<YamlSearchHit> = {}): YamlSearchHit {
+  return {
+    configuration: "kitchen.yaml",
+    device_name: "kitchen",
+    friendly_name: "Kitchen Lamp",
+    matches: [mkMatch({ line_number: 7, line_text: "  ssid: home" })],
+    ...overrides,
+  };
+}
+
+const HIT: YamlSearchHit = mkHit();
 const MATCH: YamlSearchMatch = HIT.matches[0];
 
 describe("yamlHitLabel", () => {
@@ -23,23 +52,27 @@ describe("yamlHitLabel", () => {
   });
 
   it("falls back to device_name when friendly_name is empty", () => {
-    const hit = { ...HIT, friendly_name: "" };
-    expect(yamlHitLabel(hit, MATCH)).toBe("kitchen — ssid: home");
+    expect(yamlHitLabel(mkHit({ friendly_name: "" }), MATCH)).toBe(
+      "kitchen — ssid: home",
+    );
   });
 
   it("falls back to configuration when neither name is set", () => {
-    const hit = { ...HIT, friendly_name: "", device_name: "" };
-    expect(yamlHitLabel(hit, MATCH)).toBe("kitchen.yaml — ssid: home");
+    expect(
+      yamlHitLabel(mkHit({ friendly_name: "", device_name: "" }), MATCH),
+    ).toBe("kitchen.yaml — ssid: home");
   });
 
   it("uses 'line N' fallback when the matched line is whitespace-only", () => {
-    const match = { line_number: 12, line_text: "    " };
-    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — line 12");
+    expect(
+      yamlHitLabel(HIT, mkMatch({ line_number: 12, line_text: "    " })),
+    ).toBe("Kitchen Lamp — line 12");
   });
 
   it("trims surrounding whitespace from the line text", () => {
-    const match = { line_number: 3, line_text: "    wifi:    " };
-    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — wifi:");
+    expect(
+      yamlHitLabel(HIT, mkMatch({ line_number: 3, line_text: "    wifi:    " })),
+    ).toBe("Kitchen Lamp — wifi:");
   });
 
   it.each([
@@ -48,15 +81,18 @@ describe("yamlHitLabel", () => {
     ["  - ota_password: yellow1@@", "- ota_password: ••••••••"],
     ["psk: 0123456789abcdef", "psk: ••••••••"],
   ])("masks inline credential value in %s", (raw, expectedTrimmed) => {
-    const match = { line_number: 1, line_text: raw };
-    expect(yamlHitLabel(HIT, match)).toBe(`Kitchen Lamp — ${expectedTrimmed}`);
+    expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
+      `Kitchen Lamp — ${expectedTrimmed}`,
+    );
   });
 
   it("does not mask !secret references — those are indirections, not credentials", () => {
-    const match = { line_number: 1, line_text: "  password: !secret wifi_password" };
-    expect(yamlHitLabel(HIT, match)).toBe(
-      "Kitchen Lamp — password: !secret wifi_password"
-    );
+    expect(
+      yamlHitLabel(
+        HIT,
+        mkMatch({ line_text: "  password: !secret wifi_password" }),
+      ),
+    ).toBe("Kitchen Lamp — password: !secret wifi_password");
   });
 
   it("does not mask ${substitution} references — same indirection rule", () => {
@@ -66,15 +102,15 @@ describe("yamlHitLabel", () => {
     // the name of an indirection, not the credential itself —
     // the credential lives in the substitutions block (which
     // *is* masked, see the ``*_password`` suffix tests below).
-    const match = { line_number: 1, line_text: "  password: ${wifi_password}" };
-    expect(yamlHitLabel(HIT, match)).toBe(
-      "Kitchen Lamp — password: ${wifi_password}"
-    );
+    expect(
+      yamlHitLabel(HIT, mkMatch({ line_text: "  password: ${wifi_password}" })),
+    ).toBe("Kitchen Lamp — password: ${wifi_password}");
   });
 
   it("does not mask non-sensitive keys", () => {
-    const match = { line_number: 1, line_text: "  ssid: home_network" };
-    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — ssid: home_network");
+    expect(yamlHitLabel(HIT, mkMatch({ line_text: "  ssid: home_network" }))).toBe(
+      "Kitchen Lamp — ssid: home_network",
+    );
   });
 
   it("does not mask key: under ESPHome contexts where it's a button code, not a credential", () => {
@@ -83,8 +119,9 @@ describe("yamlHitLabel", () => {
     // here. Pin the don't-mask behaviour so a future change that
     // over-masks button codes (remote_receiver / remote_transmitter
     // commonly use ``key: <number>``) surfaces as a test failure.
-    const match = { line_number: 1, line_text: "    key: 0xABCDEF12" };
-    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — key: 0xABCDEF12");
+    expect(yamlHitLabel(HIT, mkMatch({ line_text: "    key: 0xABCDEF12" }))).toBe(
+      "Kitchen Lamp — key: 0xABCDEF12",
+    );
   });
 
   it.each([
@@ -98,8 +135,9 @@ describe("yamlHitLabel", () => {
     ["## password: hunter2", "## password: ••••••••"],
     ["# - ap_password: 42dfadc0c2", "# - ap_password: ••••••••"],
   ])("masks credential value inside a YAML comment (%s)", (raw, expectedTrimmed) => {
-    const match = { line_number: 1, line_text: raw };
-    expect(yamlHitLabel(HIT, match)).toBe(`Kitchen Lamp — ${expectedTrimmed}`);
+    expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
+      `Kitchen Lamp — ${expectedTrimmed}`,
+    );
   });
 
   it.each([
@@ -110,10 +148,14 @@ describe("yamlHitLabel", () => {
     ["wifi_password: yellow1@@", "wifi_password: ••••••••"],
     ["  guest_psk: HFrhVdN37Bb6mTFm", "guest_psk: ••••••••"],
     ['  WiFi_Password: "uppercase-key"', "WiFi_Password: ••••••••"],
-  ])("masks credential value for user-defined *_password / *_psk keys (%s)", (raw, expectedTrimmed) => {
-    const match = { line_number: 1, line_text: raw };
-    expect(yamlHitLabel(HIT, match)).toBe(`Kitchen Lamp — ${expectedTrimmed}`);
-  });
+  ])(
+    "masks credential value for user-defined *_password / *_psk keys (%s)",
+    (raw, expectedTrimmed) => {
+      expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
+        `Kitchen Lamp — ${expectedTrimmed}`,
+      );
+    },
+  );
 
   it.each([
     // Don't over-mask: keys that contain ``password`` mid-name
@@ -122,8 +164,7 @@ describe("yamlHitLabel", () => {
     "max_passwords: 5",
     "key_signed: 12345",
   ])("does not mask non-credential keys (%s)", (raw) => {
-    const match = { line_number: 1, line_text: raw };
-    expect(yamlHitLabel(HIT, match)).toContain(raw.trim());
+    expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toContain(raw.trim());
   });
 
   it("only masks in search results — editor's sensitive-scan keeps its own scope", () => {
@@ -135,8 +176,9 @@ describe("yamlHitLabel", () => {
     // ``findSensitiveValueRanges`` — verify by checking that
     // the editor's scan-only path (``key`` under encryption) is
     // *not* masked here.
-    const match = { line_number: 1, line_text: "    key: random-noise-here" };
-    expect(yamlHitLabel(HIT, match)).toBe("Kitchen Lamp — key: random-noise-here");
+    expect(
+      yamlHitLabel(HIT, mkMatch({ line_text: "    key: random-noise-here" })),
+    ).toBe("Kitchen Lamp — key: random-noise-here");
   });
 });
 
@@ -146,8 +188,25 @@ describe("yamlHitHref", () => {
   });
 
   it("URL-encodes the configuration filename", () => {
-    const hit = { ...HIT, configuration: "guest room (1).yaml" };
-    expect(yamlHitHref(hit, MATCH)).toBe("/device/guest%20room%20(1).yaml?line=7");
+    expect(
+      yamlHitHref(mkHit({ configuration: "guest room (1).yaml" }), MATCH),
+    ).toBe("/device/guest%20room%20(1).yaml?line=7");
+  });
+});
+
+describe("yamlHitDeviceLabel", () => {
+  it("uses friendly_name when set", () => {
+    expect(yamlHitDeviceLabel(HIT)).toBe("Kitchen Lamp");
+  });
+
+  it("falls back to device_name when friendly_name is empty", () => {
+    expect(yamlHitDeviceLabel(mkHit({ friendly_name: "" }))).toBe("kitchen");
+  });
+
+  it("falls back to configuration when neither name is set", () => {
+    expect(
+      yamlHitDeviceLabel(mkHit({ friendly_name: "", device_name: "" })),
+    ).toBe("kitchen.yaml");
   });
 });
 
@@ -191,21 +250,21 @@ describe("forEachYamlMatch", () => {
 
   it("walks each (hit, match) pair in file → match order", () => {
     const hits: YamlSearchHit[] = [
-      {
+      mkHit({
         configuration: "a.yaml",
         device_name: "a",
         friendly_name: "A",
         matches: [
-          { line_number: 1, line_text: "wifi:" },
-          { line_number: 5, line_text: "  ssid: home" },
+          mkMatch({ line_number: 1, line_text: "wifi:" }),
+          mkMatch({ line_number: 5, line_text: "  ssid: home" }),
         ],
-      },
-      {
+      }),
+      mkHit({
         configuration: "b.yaml",
         device_name: "b",
         friendly_name: "B",
-        matches: [{ line_number: 3, line_text: "wifi:" }],
-      },
+        matches: [mkMatch({ line_number: 3, line_text: "wifi:" })],
+      }),
     ];
     const fn = vi.fn((hit, match) => `${hit.device_name}:${match.line_number}`);
     expect(forEachYamlMatch(hits, fn)).toEqual(["a:1", "a:5", "b:3"]);
@@ -214,16 +273,186 @@ describe("forEachYamlMatch", () => {
 
   it("preserves typing — caller's return type flows through", () => {
     const hits: YamlSearchHit[] = [
-      {
+      mkHit({
         configuration: "a.yaml",
         device_name: "a",
         friendly_name: "A",
-        matches: [{ line_number: 1, line_text: "x" }],
-      },
+        matches: [mkMatch({ line_text: "x" })],
+      }),
     ];
     const out = forEachYamlMatch<{ id: string }>(hits, (hit, match) => ({
       id: `${hit.configuration}:${match.line_number}`,
     }));
     expect(out).toEqual([{ id: "a.yaml:1" }]);
+  });
+});
+
+describe("buildYamlSnippetBlocks", () => {
+  it("returns [] for an empty matches list", () => {
+    expect(buildYamlSnippetBlocks([])).toEqual([]);
+  });
+
+  it("turns a single match into one block spanning context + match", () => {
+    const m = mkMatch({
+      line_number: 5,
+      line_text: "wifi:",
+      before: ["esphome:", "  name: kitchen"],
+      after: ["  ssid: home", "  api:"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.startLine).toBe(3);
+    expect(block.endLine).toBe(7);
+    expect(block.lines).toEqual([
+      "esphome:",
+      "  name: kitchen",
+      "wifi:",
+      "  ssid: home",
+      "  api:",
+    ]);
+    expect([...block.matchedLines]).toEqual([5]);
+  });
+
+  it("merges adjacent matches whose context windows overlap", () => {
+    // Two matches in the same file at lines 5 and 7 with a
+    // ±2-line context window each. The windows overlap (5's
+    // ``after`` ends at 7, 7's ``before`` starts at 5), so the
+    // result must be ONE block spanning 3..9 with two matched
+    // lines, not two blocks with duplicated context rows.
+    const matches = [
+      mkMatch({
+        line_number: 5,
+        line_text: "wifi:",
+        before: ["esphome:", "  name: kitchen"],
+        after: ["  ssid: home", "binary_sensor:"],
+      }),
+      mkMatch({
+        line_number: 7,
+        line_text: "binary_sensor:",
+        before: ["wifi:", "  ssid: home"],
+        after: ["  - platform: gpio", "    name: door"],
+      }),
+    ];
+
+    const blocks = buildYamlSnippetBlocks(matches);
+
+    expect(blocks).toHaveLength(1);
+    const [block] = blocks;
+    expect(block.startLine).toBe(3);
+    expect(block.endLine).toBe(9);
+    expect(block.lines).toEqual([
+      "esphome:",
+      "  name: kitchen",
+      "wifi:",
+      "  ssid: home",
+      "binary_sensor:",
+      "  - platform: gpio",
+      "    name: door",
+    ]);
+    expect([...block.matchedLines].sort()).toEqual([5, 7]);
+  });
+
+  it("keeps non-overlapping matches as separate blocks", () => {
+    // Match at line 3 with ±2 context (lines 1..5) and match at
+    // line 50 with ±2 context (lines 48..52) — the windows are
+    // far apart, so each is its own block.
+    const matches = [
+      mkMatch({
+        line_number: 3,
+        line_text: "wifi:",
+        before: ["esphome:", "  name: kitchen"],
+        after: ["  ssid: home", "  password: x"],
+      }),
+      mkMatch({
+        line_number: 50,
+        line_text: "binary_sensor:",
+        before: ["", "switch:"],
+        after: ["  - platform: gpio", ""],
+      }),
+    ];
+
+    const blocks = buildYamlSnippetBlocks(matches);
+
+    expect(blocks).toHaveLength(2);
+    expect(blocks[0].startLine).toBe(1);
+    expect(blocks[0].endLine).toBe(5);
+    expect([...blocks[0].matchedLines]).toEqual([3]);
+    expect(blocks[1].startLine).toBe(48);
+    expect(blocks[1].endLine).toBe(52);
+    expect([...blocks[1].matchedLines]).toEqual([50]);
+  });
+
+  it("handles a match at the file edge (before / after partly empty)", () => {
+    // Backend clamps the context window at file edges. Pin
+    // that we don't synthesise lines we don't have — the block
+    // shrinks to whatever ``before`` / ``after`` actually
+    // contain.
+    const m = mkMatch({
+      line_number: 1,
+      line_text: "esphome:",
+      before: [],
+      after: ["  name: kitchen", "  friendly_name: Kitchen"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.startLine).toBe(1);
+    expect(block.endLine).toBe(3);
+    expect(block.lines).toEqual([
+      "esphome:",
+      "  name: kitchen",
+      "  friendly_name: Kitchen",
+    ]);
+  });
+
+  it("masks credential values in context lines too", () => {
+    // The ``password:`` line happens to be a *context* line
+    // for a match on the surrounding ``wifi:`` block, not the
+    // matched line itself — so masking has to apply to
+    // ``before`` / ``after`` content, not just ``line_text``.
+    // Otherwise a search for ``ssid`` would leak the password
+    // value in the rendered snippet.
+    const m = mkMatch({
+      line_number: 3,
+      line_text: "  ssid: home",
+      before: ["wifi:"],
+      after: ["  password: hunter2"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "wifi:",
+      "  ssid: home",
+      "  password: ••••••••",
+    ]);
+  });
+});
+
+describe("yamlSnippetBlockHref", () => {
+  it("links to the block's first matched line, not its start line", () => {
+    // The block spans context lines 3..7 with a single match
+    // at line 5. Linking to ``startLine`` would land the
+    // editor cursor on a context line — pin that we use the
+    // first match in the block instead.
+    const m = mkMatch({
+      line_number: 5,
+      line_text: "wifi:",
+      before: ["esphome:", "  name: kitchen"],
+      after: ["  ssid: home", "  password: x"],
+    });
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(yamlSnippetBlockHref(HIT, block)).toBe("/device/kitchen.yaml?line=5");
+  });
+
+  it("URL-encodes the configuration filename", () => {
+    const m = mkMatch({ line_number: 5, line_text: "wifi:" });
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(
+      yamlSnippetBlockHref(mkHit({ configuration: "guest room (1).yaml" }), block),
+    ).toBe("/device/guest%20room%20(1).yaml?line=5");
   });
 });
