@@ -56,9 +56,14 @@
 export function parseHexInt(raw: string): number | null {
   const trimmed = raw.trim();
   if (trimmed === "") return null;
-  // Reject internal whitespace / sign / exponents. ``Number.parseInt``
-  // happily eats trailing junk (``parseInt("0x76xyz") === 118``),
-  // which would silently swallow user typos.
+  // Strict regex gate. ``Number.parseInt`` happily eats trailing
+  // junk (``parseInt("0x76xyz") === 118``), which would silently
+  // swallow user typos. The two regexes accept only:
+  //   - ``0x`` / ``0X`` prefix followed by one or more hex digits;
+  //   - an optional leading ``-`` and one or more decimal digits.
+  // Everything else — internal whitespace, ``+`` sign, exponents
+  // (``1e3``), fractional (``3.14``), trailing characters,
+  // unprefixed hex letters — falls through to ``return null``.
   let value: number;
   if (/^0[xX][0-9a-fA-F]+$/.test(trimmed)) {
     value = Number.parseInt(trimmed.slice(2), 16);
@@ -145,11 +150,19 @@ export function normalizeHexValues(
 /**
  * Format an arbitrary form value as a hex literal for display.
  *
- * Returns `"0x" + lowercase-hex` matching ESPHome's own
- * `cv.hex_int` formatter (`f"0x{value:02X}"` style — caps in
- * Python, but the dashboard standardised on lowercase to match
- * the `0x76` form Home Assistant docs and most i2c datasheets
- * use).
+ * Returns `"0x" + value.toString(16)` — the minimum-width
+ * lowercase form. `0` → `"0x0"`, `0x76` → `"0x76"`,
+ * `0xff00` → `"0xff00"`. Intentionally not zero-padded: i2c
+ * addresses and register addresses are read at whatever width
+ * the underlying integer needs, and forcing a fixed
+ * width (e.g. always `0x00`-style for 8-bit) would mismatch
+ * larger hex types (`hex_uint16_t`, `hex_uint32_t`) sharing
+ * this formatter.
+ *
+ * Lowercase to match the `0x76` form Home Assistant docs and
+ * most i2c datasheets use. ESPHome's own `cv.hex_int` formatter
+ * uses uppercase, but its consumers compare numerically — the
+ * casing only matters in the dashboard's user-facing display.
  *
  * Accepts `unknown` so callers can pass straight from the form
  * value bag without retyping. The parser only handles
