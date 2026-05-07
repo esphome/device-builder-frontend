@@ -84,6 +84,8 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/install-method-dialog.js";
+import "../components/clone-device-dialog.js";
+import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/discovered-device-card.js";
@@ -373,6 +375,8 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog")
   private _createDialog!: ESPHomeCreateConfigDialog;
+  @query("esphome-clone-device-dialog")
+  private _cloneDialog!: ESPHomeCloneDeviceDialog;
   @query("esphome-rename-device-dialog")
   private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
@@ -1255,6 +1259,7 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1350,6 +1355,7 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1495,6 +1501,9 @@ export class ESPHomePageDashboard extends LitElement {
         @confirm=${this._executeConfirm}
         @cancel=${() => (this._pendingConfirm = null)}
       ></esphome-confirm-dialog>
+      <esphome-clone-device-dialog
+        @clone-confirm=${this._executeClone}
+      ></esphome-clone-device-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
@@ -1795,6 +1804,43 @@ export class ESPHomePageDashboard extends LitElement {
   private _openRename(device: ConfiguredDevice) {
     this._actionDevice = device;
     this._renameDialog.open(device.name);
+  }
+
+  private _openClone(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._cloneDialog.open(device.name);
+  }
+
+  private async _executeClone(
+    e: CustomEvent<{ newName: string; newFriendlyName: string }>,
+  ) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const { newName, newFriendlyName } = e.detail;
+    try {
+      // Empty friendlyName → forward as ``undefined`` so the
+      // backend defaults to ``friendly_name_slugify(new_name)``.
+      // Sending ``""`` would tell the backend to leave the
+      // source's friendly_name untouched, which produces two list
+      // entries with the same label — confusing for the common
+      // "clone and tweak" workflow.
+      const friendly = newFriendlyName.length > 0 ? newFriendlyName : undefined;
+      await this._api.cloneDevice(device.configuration, newName, friendly);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      toast.error(
+        this._localize("dashboard.action_clone_failed", {
+          name: device.name,
+          reason,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    toast.success(
+      this._localize("dashboard.action_clone_success", { name: newName }),
+      { richColors: true },
+    );
   }
 
   private async _executeRename(e: CustomEvent<string>) {

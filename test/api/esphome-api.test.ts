@@ -220,6 +220,80 @@ describe("ESPHomeAPI — sendCommand", () => {
   });
 });
 
+describe("ESPHomeAPI — cloneDevice", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/clone`` with snake_case args and returns the new configuration", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.cloneDevice(
+      "kitchen.yaml",
+      "bedroom-bulb",
+      "Bedroom Reading Lamp",
+    );
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/clone");
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "bedroom-bulb",
+      new_friendly_name: "Bedroom Reading Lamp",
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "bedroom-bulb.yaml" },
+    });
+    await expect(pending).resolves.toEqual({ configuration: "bedroom-bulb.yaml" });
+  });
+
+  it("omits ``new_friendly_name`` when the caller doesn't pass one", async () => {
+    // The backend defaults to ``friendly_name_slugify(new_name)``
+    // when the field is missing — sending an empty string instead
+    // would tell the backend to leave the source's
+    // ``friendly_name:`` line untouched, producing two list
+    // entries with the same label. Pin that the helper omits the
+    // key entirely on ``undefined`` so the default kicks in.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.cloneDevice("kitchen.yaml", "bedroom-bulb");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "bedroom-bulb",
+    });
+    expect("new_friendly_name" in sent.args).toBe(false);
+  });
+
+  it("forwards an explicit empty friendly name so the source's label is preserved", async () => {
+    // Edge case: a caller that *wants* the clone to share the
+    // source's ``friendly_name:`` line (rare but supported)
+    // passes ``""`` explicitly. Pin that the helper sends
+    // ``new_friendly_name: ""`` on the wire so the backend's
+    // ``if new_friendly_name:`` short-circuit fires and the
+    // rewrite is skipped.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.cloneDevice("kitchen.yaml", "bedroom-bulb", "");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "bedroom-bulb",
+      new_friendly_name: "",
+    });
+  });
+});
+
 describe("ESPHomeAPI — streaming commands", () => {
   beforeEach(() => {
     installMockWebSocket();

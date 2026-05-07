@@ -747,6 +747,38 @@ export class ESPHomeAPI {
     );
   }
 
+  /** Clone a device — copy the source YAML under a fresh hostname.
+   *
+   *  The clone gets:
+   *  - a fresh ``esphome.name`` (mDNS hostname / API endpoint),
+   *  - a fresh ``friendly_name`` (defaults to the slug-derived form
+   *    of *newName*; pass ``newFriendlyName`` to override),
+   *  - a freshly-generated ``api.encryption.key`` (fleet members
+   *    don't share encryption material).
+   *
+   *  Indirections (``!secret api_key`` / ``${api_key}``) are
+   *  preserved as-is — they point at content the clone shares with
+   *  the source on disk, and rewriting them would silently desync.
+   *
+   *  Returns the new configuration filename. ``CommandError(INVALID_ARGS)``
+   *  surfaces user-correctable failures (collision, empty / equal
+   *  name, missing source) so the dialog can show a specific
+   *  message.
+   */
+  async cloneDevice(
+    configuration: string,
+    newName: string,
+    newFriendlyName?: string
+  ): Promise<{ configuration: string }> {
+    return this.sendCommand<{ configuration: string }>("devices/clone", {
+      configuration,
+      new_name: newName,
+      ...(newFriendlyName !== undefined
+        ? { new_friendly_name: newFriendlyName }
+        : {}),
+    });
+  }
+
   /** Delete a device and all associated files. */
   async deleteDevice(configuration: string): Promise<void> {
     await this.sendCommand("devices/delete", { configuration });

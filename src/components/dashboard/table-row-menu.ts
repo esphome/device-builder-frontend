@@ -255,6 +255,13 @@ export class ESPHomeTableRowMenu extends LitElement {
         </div>
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("clone-device")}
+        >
+          <wa-icon library="mdi" name="content-duplicate"></wa-icon>
+          ${this._localize("dashboard.action_clone")}
+        </div>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("clean-build")}
         >
           <wa-icon library="mdi" name="broom"></wa-icon>
