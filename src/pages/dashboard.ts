@@ -1089,9 +1089,28 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  /** Per-label-id usage count across the current device list.
+   *  Fed to the labels-filter so the delete-confirm dialog can
+   *  warn the user "this will remove the label from N devices"
+   *  before the cascade fires. Computed on each render — the
+   *  device list is small enough that a single-pass count beats
+   *  caching for code complexity. */
+  private _computeLabelUsage(): Record<string, number> {
+    const usage: Record<string, number> = {};
+    for (const d of this._devices) {
+      const ids = d.labels;
+      if (!ids) continue;
+      for (const id of ids) {
+        usage[id] = (usage[id] ?? 0) + 1;
+      }
+    }
+    return usage;
+  }
+
   private _renderLabelsFilter() {
     return html`<esphome-labels-filter
       .selected=${this._selectedLabels}
+      .labelUsage=${this._computeLabelUsage()}
       @labels-filter-change=${(e: CustomEvent<string[]>) => {
         this._selectedLabels = e.detail;
       }}
