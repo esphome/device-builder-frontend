@@ -281,12 +281,24 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         background: transparent;
         border: none;
         box-shadow: none;
+        /* Square 40x40 button matching the header height so the X has a
+           comfortable click/tap target instead of just the icon's
+           ~14px footprint. Matches logs-dialog / command-dialog. */
         padding: 0;
+        width: 40px;
+        height: 40px;
         min-width: unset;
         min-height: unset;
         color: var(--esphome-on-primary);
         cursor: pointer;
       }
+
+      wa-dialog::part(close-button__base):hover,
+      wa-dialog::part(close-button__base):focus-visible {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+        outline: none;
+      }
+
       wa-dialog::part(body) {
         padding: var(--wa-space-l) var(--wa-space-xl);
       }
