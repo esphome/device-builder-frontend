@@ -200,15 +200,18 @@ export class ESPHomeLayout extends LitElement {
         bottom: 0;
         left: 0;
         right: 0;
-        height: 20px;
+        height: var(--esphome-footer-height);
         display: flex;
         align-items: center;
         justify-content: center;
         gap: var(--wa-space-m);
         font-size: 10px;
-        color: var(--wa-color-text-quiet);
-        opacity: 0.5;
-        pointer-events: none;
+        /* Opaque background so scrolled content can't bleed through;
+           text is dimmed via color-mix instead of an opacity on the
+           host (which would make the background translucent too). */
+        background: var(--wa-color-surface-default);
+        color: color-mix(in srgb, var(--wa-color-text-quiet), transparent 30%);
+        user-select: text;
       }
     `,
   ];

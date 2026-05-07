@@ -71,7 +71,7 @@ export class ESPHomePageSecrets extends LitElement {
       :host {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - var(--esphome-header-height));
+        height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
         box-sizing: border-box;
       }
 
