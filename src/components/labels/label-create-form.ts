@@ -221,9 +221,18 @@ export class ESPHomeLabelCreateForm extends LitElement {
 
   protected render() {
     if (!this._open) {
+      // ``aria-expanded`` + ``aria-controls`` advertise the
+      // disclosure relationship to assistive tech: the toggle
+      // reveals the form below it (which carries id ``create-form``
+      // when expanded), and a screen reader user gets to hear that
+      // the button reveals further controls instead of just
+      // landing on a bare "Create new label" button with no hint
+      // about what happens on click.
       return html`<button
         class="create-toggle"
         type="button"
+        aria-expanded="false"
+        aria-controls="create-form"
         @click=${() => this.expand()}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
@@ -247,6 +256,7 @@ export class ESPHomeLabelCreateForm extends LitElement {
     const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
     return html`
       <form
+        id="create-form"
         class="create-form"
         @submit=${(e: Event) => {
           e.preventDefault();
@@ -262,6 +272,7 @@ export class ESPHomeLabelCreateForm extends LitElement {
           placeholder=${this._localize("dashboard.labels_create_placeholder")}
           maxlength="50"
           .value=${this._name}
+          aria-label=${this._localize("dashboard.labels_create")}
           @input=${(e: Event) => {
             this._name = (e.currentTarget as unknown as { value: string }).value;
           }}
