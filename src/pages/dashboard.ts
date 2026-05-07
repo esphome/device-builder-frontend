@@ -1128,7 +1128,7 @@ export class ESPHomePageDashboard extends LitElement {
         this._selectedLabels = e.detail;
       }}
       @request-delete-label=${(e: CustomEvent<Label>) => {
-        this._pendingConfirm = { kind: "delete-label", label: e.detail };
+        this._openConfirm({ kind: "delete-label", label: e.detail });
       }}
     ></esphome-labels-filter>`;
   }
