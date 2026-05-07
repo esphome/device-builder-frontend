@@ -28,7 +28,6 @@ import {
   mdiCheck,
   mdiClose,
   mdiPencil,
-  mdiPlus,
   mdiTagMultiple,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
@@ -39,12 +38,14 @@ import type { ConfiguredDevice, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { LABEL_COLOR_SWATCHES, labelChipStyleString } from "../../util/label-style.js";
+import { labelChipStyleString } from "../../util/label-style.js";
 import {
   labelChipStyles,
   resolveLabelIds,
 } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import "./label-create-form.js";
+import type { ESPHomeLabelCreateForm } from "./label-create-form.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -54,7 +55,6 @@ registerMdiIcons({
   check: mdiCheck,
   close: mdiClose,
   pencil: mdiPencil,
-  plus: mdiPlus,
   "tag-multiple": mdiTagMultiple,
 });
 
@@ -80,22 +80,9 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @state()
   private _filter = "";
 
-  /** Whether the "Create new label" inline form is expanded inside
-   *  the dialog. Collapsed by default to keep the dialog compact. */
-  @state()
-  private _createOpen = false;
-
-  /** Pending values for the in-progress label creation. */
-  @state()
-  private _newName = "";
-
-  @state()
-  private _newColor: string | null = null;
-
-  /** True while a ``set_labels`` round trip is in flight. Disables
-   *  the create submit button to prevent double-fires; toggle
-   *  clicks are still accepted and queued so fast multi-toggle
-   *  feels responsive. */
+  /** True while a ``set_labels`` round trip is in flight. Used to
+   *  gate optimistic-state cleanup; toggle clicks are still
+   *  accepted and queued so fast multi-toggle feels responsive. */
   @state()
   private _saving = false;
 
@@ -118,6 +105,9 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   @query("wa-dialog")
   private _dialog?: HTMLElement & { open: boolean };
+
+  @query("esphome-label-create-form")
+  private _createForm?: ESPHomeLabelCreateForm;
 
   static styles = [
     espHomeStyles,
@@ -303,95 +293,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         margin: var(--wa-space-s) 0;
       }
 
-      .create-toggle {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 6px 8px;
-        background: transparent;
-        border: none;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--esphome-primary);
-        cursor: pointer;
-        align-self: flex-start;
-        font-family: inherit;
-      }
-
-      .create-toggle wa-icon {
-        font-size: 14px;
-      }
-
-      .create-form {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-s) 0;
-      }
-
-      .create-form-label {
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-quiet);
-      }
-
-      .swatch-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-      }
-
-      .swatch {
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        cursor: pointer;
-        padding: 0;
-      }
-
-      .swatch--selected {
-        outline: 2px solid var(--esphome-primary);
-        outline-offset: 2px;
-      }
-
-      .swatch--clear {
-        background: transparent;
-        color: var(--wa-color-text-quiet);
-        font-size: 12px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .create-actions {
-        display: flex;
-        gap: var(--wa-space-xs);
-        justify-content: flex-end;
-      }
-
-      .btn {
-        padding: 6px 14px;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        border-radius: var(--wa-border-radius-s);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
-        color: var(--wa-color-text-normal);
-        cursor: pointer;
-        font-family: inherit;
-      }
-
-      .btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-        border-color: var(--esphome-primary);
-      }
-
-      .btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
     `,
   ];
 
@@ -404,9 +305,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       // ``_saving`` indicator until that promise settled.
       if (this._dialog) this._dialog.open = false;
       this._filter = "";
-      this._createOpen = false;
-      this._newName = "";
-      this._newColor = null;
+      this._createForm?.collapse();
       this._optimisticLabels = null;
       this._saving = false;
       this._saveChain = Promise.resolve();
@@ -509,157 +408,26 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
                 })}
         </div>
         <div class="divider"></div>
-        ${this._createOpen ? this._renderCreateForm() : html`<button
-          class="create-toggle"
-          type="button"
-          @click=${() => {
-            this._createOpen = true;
-            // Pre-fill the name from the current filter when the
-            // user typed something that didn't match — saves the
-            // re-type when "filter to find" turns into "didn't
-            // exist, create it".
-            this._newName = this._filter;
+        <esphome-label-create-form
+          .existingNames=${this._catalog.map((l) => l.name)}
+          .nameSeed=${this._filter}
+          @label-created=${(e: CustomEvent<Label>) => {
+            void this._assignNewLabel(e.detail);
           }}
-        >
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${this._localize("dashboard.labels_create")}
-        </button>`}
+        ></esphome-label-create-form>
       </wa-dialog>
     `;
   }
 
-  private _renderCreateForm() {
-    const trimmed = this._newName.trim();
-    const duplicate = this._catalog.some(
-      (l) => l.name.toLowerCase() === trimmed.toLowerCase(),
-    );
-    const canCreate = trimmed.length > 0 && trimmed.length <= 50 && !duplicate;
-    const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
-    return html`
-      <form
-        class="create-form"
-        @submit=${(e: Event) => {
-          e.preventDefault();
-          if (canCreate) void this._createAndAssign();
-        }}
-      >
-        <span class="create-form-label">${this._localize("dashboard.labels_create")}</span>
-        <wa-input
-          placeholder=${this._localize("dashboard.labels_create_placeholder")}
-          maxlength="50"
-          .value=${this._newName}
-          @input=${(e: Event) => {
-            this._newName = (e.currentTarget as unknown as { value: string }).value;
-          }}
-        ></wa-input>
-        <div
-          class="swatch-row"
-          role="radiogroup"
-          aria-label=${this._localize("dashboard.labels_color")}
-          @keydown=${(e: KeyboardEvent) => this._onSwatchKeyDown(e, values)}
-        >
-          ${values.map((c) => {
-            const selected = this._newColor === c;
-            if (c === null) {
-              return html`<button
-                type="button"
-                role="radio"
-                aria-checked=${selected ? "true" : "false"}
-                tabindex=${selected ? "0" : "-1"}
-                class="swatch swatch--clear ${selected ? "swatch--selected" : ""}"
-                aria-label=${this._localize("dashboard.labels_color_none")}
-                title=${this._localize("dashboard.labels_color_none")}
-                @click=${() => {
-                  this._newColor = null;
-                }}
-              >
-                ${selected ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
-              </button>`;
-            }
-            return html`<button
-              type="button"
-              role="radio"
-              aria-checked=${selected ? "true" : "false"}
-              tabindex=${selected ? "0" : "-1"}
-              class="swatch ${selected ? "swatch--selected" : ""}"
-              style="background:${c}"
-              aria-label=${c}
-              title=${c}
-              @click=${() => {
-                this._newColor = c;
-              }}
-            ></button>`;
-          })}
-        </div>
-        <div class="create-actions">
-          <button
-            type="button"
-            class="btn"
-            @click=${() => {
-              this._createOpen = false;
-              this._newName = "";
-              this._newColor = null;
-            }}
-          >
-            ${this._localize("dashboard.labels_create_cancel")}
-          </button>
-          <button
-            type="submit"
-            class="btn btn--primary"
-            ?disabled=${!canCreate || this._saving}
-          >
-            ${this._localize("dashboard.labels_create_submit")}
-          </button>
-        </div>
-      </form>
-    `;
-  }
-
-  private _onSwatchKeyDown(e: KeyboardEvent, values: (string | null)[]) {
-    let idx = values.indexOf(this._newColor);
-    if (idx < 0) idx = 0;
-    let next = idx;
-    switch (e.key) {
-      case "ArrowRight":
-      case "ArrowDown":
-        next = (idx + 1) % values.length;
-        break;
-      case "ArrowLeft":
-      case "ArrowUp":
-        next = (idx - 1 + values.length) % values.length;
-        break;
-      case "Home":
-        next = 0;
-        break;
-      case "End":
-        next = values.length - 1;
-        break;
-      default:
-        return;
-    }
-    e.preventDefault();
-    this._newColor = values[next];
-    requestAnimationFrame(() => {
-      const swatch = this.renderRoot.querySelectorAll<HTMLButtonElement>(
-        ".swatch",
-      )[next];
-      swatch?.focus();
-    });
-  }
-
   private _openDialog = () => {
     this._filter = "";
-    this._createOpen = false;
-    this._newName = "";
-    this._newColor = null;
+    this._createForm?.collapse();
     if (this._dialog) this._dialog.open = true;
   };
 
   private _onDialogClose = () => {
     this._filter = "";
-    this._createOpen = false;
-    this._newName = "";
-    this._newColor = null;
+    this._createForm?.collapse();
   };
 
   /** Re-emit a ``label_ids`` change as a serialized
@@ -704,31 +472,16 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     await this._toggleAssignment(labelId, false);
   }
 
-  private async _createAndAssign() {
-    if (!this._api) return;
-    const name = this._newName.trim();
-    if (!name) return;
-    this._saving = true;
-    try {
-      const created = await this._api.createLabel({
-        name,
-        color: this._newColor,
-      });
-      const next = [...this._currentLabelIds, created.id];
-      this._optimisticLabels = next;
-      await this._persist(next);
-      this._createOpen = false;
-      this._newName = "";
-      this._newColor = null;
-      this._filter = "";
-    } catch (err) {
-      console.warn("label create failed", err);
-      toast.error(this._localize("dashboard.labels_create_failed"), {
-        richColors: true,
-      });
-    } finally {
-      this._saving = false;
-    }
+  /** Handle a freshly-created Label emitted by the inline form by
+   *  assigning it to the current device. The form already round-
+   *  tripped to ``labels/create`` and surfaced its own toast on
+   *  failure — this method is only on the success path, so the
+   *  only thing left is the ``set_labels`` follow-up. */
+  private async _assignNewLabel(label: Label) {
+    const next = [...this._currentLabelIds, label.id];
+    this._optimisticLabels = next;
+    this._filter = "";
+    await this._persist(next);
   }
 }
 
