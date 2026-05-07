@@ -13,6 +13,20 @@ describe("wizard step-board platform chips", () => {
     expect(ln882x?.variant).toBe("");
   });
 
+  it("includes an nRF52 chip backed by the nrf52 platform", () => {
+    // Backend `_PLATFORM_KEYS` advertises `nrf52` as a
+    // first-class platform alongside the libretiny chips.
+    // Even when the curated catalog has zero `nrf52`
+    // manifests today, the chip's presence tells users with
+    // nRF52 hardware that their platform is supported and
+    // saves them scrolling OTHER BOARDS for nothing — entries
+    // land here as the catalog grows.
+    const nrf52 = WIZARD_BOARD_PLATFORMS.find((p) => p.label === "nRF52");
+    expect(nrf52).toBeDefined();
+    expect(nrf52?.platform).toBe("nrf52");
+    expect(nrf52?.variant).toBe("");
+  });
+
   it("labels the rp2040 platform 'RP2040 / RP2350' so users searching for either chip name see it", () => {
     // ESPHome's `rp2040` platform key covers both the original
     // RP2040 and the newer RP2350 (Raspberry Pi Pico 2). A plain
