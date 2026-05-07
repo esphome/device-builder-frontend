@@ -151,7 +151,12 @@ export class ESPHomeLabelsFilter extends LitElement {
         z-index: 10;
         top: calc(100% + 4px);
         right: 0;
-        min-width: 240px;
+        /* Both bounds clamp to the viewport: on a phone-narrow
+           layout calc(100vw - 32px) can drop below the desired
+           240px floor, so a fixed min-width would force overflow.
+           Using min() lets the floor relax when the viewport is
+           tight, while the max-width keeps the upper bound. */
+        min-width: min(240px, calc(100vw - 32px));
         max-width: min(320px, calc(100vw - 32px));
         background: var(--wa-color-surface-default);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);

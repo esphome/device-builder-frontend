@@ -85,9 +85,19 @@ export class ESPHomeLabelCreateForm extends LitElement {
   @state()
   private _saving = false;
 
-  override connectedCallback() {
-    super.connectedCallback();
-    if (this.defaultOpen) this._open = true;
+  /** Open the form when ``defaultOpen`` flips true — handles both
+   *  the initial render (Lit fires ``willUpdate`` before the first
+   *  paint with every reactive property in *changed*) and a later
+   *  flip (e.g. the labels-filter rebinding ``default-open`` when
+   *  the catalog drains back to zero). We deliberately *don't*
+   *  auto-collapse on becomes-false: a host that flips it (e.g.
+   *  catalog growing past zero after a create) shouldn't yank a
+   *  half-typed form out from under the user — the user can
+   *  Cancel themselves. */
+  protected willUpdate(changed: Map<string, unknown>) {
+    if (changed.has("defaultOpen") && this.defaultOpen) {
+      this._open = true;
+    }
   }
 
   static styles = [
@@ -219,8 +229,17 @@ export class ESPHomeLabelCreateForm extends LitElement {
     const trimmed = this._name.trim();
     const lowerExisting = this.existingNames.map((n) => n.toLowerCase());
     const duplicate = lowerExisting.includes(trimmed.toLowerCase());
+    // ``_api`` is consumed from context; it's typically present once
+    // the dashboard has finished its connect dance, but during the
+    // initial WS handshake the context may still be undefined. Gate
+    // the submit button on it so we don't enable a control whose
+    // click would silently no-op.
     const canCreate =
-      trimmed.length > 0 && trimmed.length <= 50 && !duplicate && !this._saving;
+      trimmed.length > 0 &&
+      trimmed.length <= 50 &&
+      !duplicate &&
+      !this._saving &&
+      !!this._api;
     const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
     return html`
       <form
@@ -322,6 +341,14 @@ export class ESPHomeLabelCreateForm extends LitElement {
     if (!this._api) return;
     const name = this._name.trim();
     if (!name) return;
+    // Fire ``submitting`` *before* the round trip so a host that
+    // owns per-context state (the device-labels editor's "is the
+    // user still on the same device?" check) can snapshot before
+    // the await. The event has no detail; the host already knows
+    // its own context.
+    this.dispatchEvent(
+      new CustomEvent("submitting", { bubbles: true, composed: true }),
+    );
     this._saving = true;
     try {
       const created = await this._api.createLabel({

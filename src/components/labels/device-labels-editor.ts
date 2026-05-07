@@ -86,6 +86,16 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @state()
   private _saving = false;
 
+  /** Snapshot of ``device.configuration`` taken when the user
+   *  initiated a ``labels/create`` round trip. ``null`` means "no
+   *  create in flight". A device swap mid-flight clears it (in
+   *  ``willUpdate``) and the late ``label-created`` event is
+   *  ignored — without this, the freshly-minted label would get
+   *  assigned to whatever device the drawer happens to be showing
+   *  by the time the create resolves, which may not be the device
+   *  the user clicked Create from. */
+  private _pendingCreateConfig: string | null = null;
+
   /** Optimistic label assignment that overrides ``device.labels``
    *  while a save is in flight or queued. Lets the user toggle
    *  multiple chips quickly without each click computing ``next``
@@ -309,6 +319,10 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       this._optimisticLabels = null;
       this._saving = false;
       this._saveChain = Promise.resolve();
+      // Drop any in-flight create snapshot so a late
+      // ``label-created`` arriving after the swap is ignored rather
+      // than misapplied to the new device.
+      this._pendingCreateConfig = null;
     }
   }
 
@@ -411,13 +425,27 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         <esphome-label-create-form
           .existingNames=${this._catalog.map((l) => l.name)}
           .nameSeed=${this._filter}
-          @label-created=${(e: CustomEvent<Label>) => {
-            void this._assignNewLabel(e.detail);
-          }}
+          @submitting=${this._onCreateSubmitting}
+          @label-created=${this._onCreateResolved}
         ></esphome-label-create-form>
       </wa-dialog>
     `;
   }
+
+  /** Snapshot the device the user clicked Create from — checked
+   *  in ``_onCreateResolved`` against the current device so a
+   *  mid-flight swap can't misroute the assignment. */
+  private _onCreateSubmitting = () => {
+    this._pendingCreateConfig = this.device.configuration;
+  };
+
+  private _onCreateResolved = (e: CustomEvent<Label>) => {
+    const targetConfig = this._pendingCreateConfig;
+    this._pendingCreateConfig = null;
+    if (targetConfig === null) return;
+    if (targetConfig !== this.device.configuration) return;
+    void this._assignNewLabel(e.detail);
+  };
 
   private _openDialog = () => {
     this._filter = "";
