@@ -14,6 +14,7 @@ import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { WIZARD_BOARD_PLATFORMS } from "./wizard-step-board-platforms.js";
 import { withBase } from "../../util/base-path.js";
 import { debounce } from "../../util/debounce.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -63,18 +64,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   private _debouncedSearch = debounce(() => this._fetchBoards(), 300);
 
-  private static readonly PLATFORMS = [
-    { platform: "esp32", variant: "esp32", label: "ESP32" },
-    { platform: "esp32", variant: "esp32s2", label: "ESP32-S2" },
-    { platform: "esp32", variant: "esp32s3", label: "ESP32-S3" },
-    { platform: "esp32", variant: "esp32c3", label: "ESP32-C3" },
-    { platform: "esp32", variant: "esp32c6", label: "ESP32-C6" },
-    { platform: "esp32", variant: "esp32h2", label: "ESP32-H2" },
-    { platform: "esp8266", variant: "", label: "ESP8266" },
-    { platform: "rp2040", variant: "", label: "RP2040" },
-    { platform: "bk72xx", variant: "", label: "BK72xx" },
-    { platform: "rtl87xx", variant: "", label: "RTL87xx" },
-  ];
+  private static readonly PLATFORMS = WIZARD_BOARD_PLATFORMS;
 
   connectedCallback() {
     super.connectedCallback();
