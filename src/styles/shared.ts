@@ -25,6 +25,7 @@ export const espHomeStyles = css`
 
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
+    --esphome-footer-height: 20px;
 
     font-family: var(--wa-font-family-body);
   }

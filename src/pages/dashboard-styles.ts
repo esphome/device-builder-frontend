@@ -4,7 +4,7 @@ export const dashboardStyles = css`
   :host {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--esphome-header-height));
+    height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
        footprint. --fab-bottom is the gap between the FAB and the
@@ -13,8 +13,9 @@ export const dashboardStyles = css`
        text). The card grid pads its bottom by their sum so the
        trailing card's action row never sits under the FAB. Defining
        these once stops the grid clearance and the FAB position from
-       drifting if either gets tweaked later. */
-    --fab-bottom: var(--wa-space-l);
+       drifting if either gets tweaked later. The fab-bottom also
+       includes the footer height so the FAB clears the version line. */
+    --fab-bottom: calc(var(--wa-space-l) + var(--esphome-footer-height));
     --fab-height: 48px;
     --fab-clearance: calc(var(--fab-bottom) + var(--fab-height) + var(--wa-space-xs));
   }

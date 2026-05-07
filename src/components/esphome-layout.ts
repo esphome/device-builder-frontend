@@ -200,15 +200,16 @@ export class ESPHomeLayout extends LitElement {
         bottom: 0;
         left: 0;
         right: 0;
-        height: 20px;
+        height: var(--esphome-footer-height);
         display: flex;
         align-items: center;
         justify-content: center;
         gap: var(--wa-space-m);
         font-size: 10px;
         color: var(--wa-color-text-quiet);
-        opacity: 0.5;
-        pointer-events: none;
+        background: var(--wa-color-surface-default);
+        opacity: 0.7;
+        user-select: text;
       }
     `,
   ];
