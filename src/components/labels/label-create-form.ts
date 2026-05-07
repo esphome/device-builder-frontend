@@ -89,14 +89,18 @@ export class ESPHomeLabelCreateForm extends LitElement {
    *  the initial render (Lit fires ``willUpdate`` before the first
    *  paint with every reactive property in *changed*) and a later
    *  flip (e.g. the labels-filter rebinding ``default-open`` when
-   *  the catalog drains back to zero). We deliberately *don't*
-   *  auto-collapse on becomes-false: a host that flips it (e.g.
-   *  catalog growing past zero after a create) shouldn't yank a
-   *  half-typed form out from under the user — the user can
-   *  Cancel themselves. */
+   *  the catalog drains back to zero). Routes through ``expand()``
+   *  so ``nameSeed`` is honoured the same way it would be from a
+   *  manual click on the toggle button — both expansion paths must
+   *  agree, otherwise a host that uses ``default-open`` to start
+   *  expanded would silently lose the seed. We deliberately
+   *  *don't* auto-collapse on becomes-false: a host that flips it
+   *  (e.g. catalog growing past zero after a create) shouldn't
+   *  yank a half-typed form out from under the user — the user
+   *  can Cancel themselves. */
   protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("defaultOpen") && this.defaultOpen) {
-      this._open = true;
+    if (changed.has("defaultOpen") && this.defaultOpen && !this._open) {
+      this.expand();
     }
   }
 
@@ -338,6 +342,15 @@ export class ESPHomeLabelCreateForm extends LitElement {
   }
 
   private async _submit() {
+    // Re-entry guard. ``canCreate`` already gates the submit
+    // button on ``!this._saving``, but the ``@submit`` handler's
+    // closure captures whichever ``canCreate`` was active in the
+    // last render — a fast double-click / Enter before Lit has
+    // re-rendered the disabled state can route two submits
+    // through here and mint duplicate labels. The check on
+    // ``_saving`` makes that race harmless regardless of UI
+    // timing.
+    if (this._saving) return;
     if (!this._api) return;
     const name = this._name.trim();
     if (!name) return;

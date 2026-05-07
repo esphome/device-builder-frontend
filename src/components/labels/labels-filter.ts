@@ -2,14 +2,17 @@
  * Filter affordance that narrows the device list to entries
  * carrying every selected label (logical AND).
  *
- * Sits next to the search input in the dashboard toolbar. Hidden
- * when the catalog is empty so an un-tagged fleet doesn't see a
- * dead button. The component owns no filter state itself —
- * selections live on the parent dashboard so the device-filter
- * logic, the URL query string, and the empty-state copy can all
- * read from a single source. Selection changes are emitted as a
- * ``labels-filter-change`` ``CustomEvent<string[]>`` carrying the
- * new full set of selected ids.
+ * Sits next to the search input in the dashboard toolbar. The
+ * trigger renders unconditionally — even on a fleet that hasn't
+ * defined any labels yet — because the popover is the discovery
+ * path for creating the first label; hiding the button on an
+ * empty catalog (the original behaviour) made that affordance
+ * unreachable from the dashboard. The component owns no filter
+ * state itself — selections live on the parent dashboard so the
+ * device-filter logic, the URL query string, and the empty-state
+ * copy can all read from a single source. Selection changes are
+ * emitted as a ``labels-filter-change`` ``CustomEvent<string[]>``
+ * carrying the new full set of selected ids.
  */
 import { consume } from "@lit/context";
 import {
