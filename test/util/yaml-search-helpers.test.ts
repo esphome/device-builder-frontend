@@ -428,6 +428,146 @@ describe("buildYamlSnippetBlocks", () => {
       "  password: ••••••••",
     ]);
   });
+
+  it("masks the API encryption key when its parent is in the snippet window", () => {
+    // ``key:`` is parent-scoped sensitive (only under
+    // ``encryption:`` — generic ``key:`` is also used for
+    // non-sensitive button codes). Single-line masking can't
+    // make this call, but a snippet block carries enough
+    // surrounding lines for the multi-line scanner to see the
+    // parent. Pin that a search for ``api`` (matched line ``api:``)
+    // masks the encryption key sitting two lines below in the
+    // ``after`` window.
+    const m = mkMatch({
+      line_number: 5,
+      line_text: "api:",
+      before: ["esphome:", "  name: kitchen"],
+      after: ["  encryption:", "    key: AAABBBCCCDDDEEEFFFGGG="],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "esphome:",
+      "  name: kitchen",
+      "api:",
+      "  encryption:",
+      "    key: ••••••••",
+    ]);
+  });
+
+  it("does not mask a bare ``key:`` line when its parent is outside the window", () => {
+    // The scanner walks the block top-to-bottom; if the
+    // ``encryption:`` parent isn't included, ``key:`` reads as a
+    // plain (non-sensitive) field — same as a button code under
+    // ``remote_receiver``. Pin the don't-over-mask behaviour so
+    // this fallback case stays consistent with the editor's scan.
+    const m = mkMatch({
+      line_number: 9,
+      line_text: "    key: 0xABCDEF12",
+      before: ["    - protocol: NEC", "      data: 0x00FF"],
+      after: ["    - protocol: NEC"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "    - protocol: NEC",
+      "      data: 0x00FF",
+      "    key: 0xABCDEF12",
+      "    - protocol: NEC",
+    ]);
+  });
+
+  it("preserves trailing comments when the scanner masks a value", () => {
+    // ``findSensitiveValueRanges`` returns a precise
+    // ``[valueFrom, valueTo)`` range so the slice replacement
+    // keeps any trailing ``# comment`` untouched. The single-line
+    // ``maskSensitiveLine`` would clobber it via the wholesale
+    // ``${prefix}${key}: ••••••••`` rewrite — pin that the
+    // scanner-driven path is preferred.
+    const m = mkMatch({
+      line_number: 2,
+      line_text: "wifi:",
+      before: [],
+      after: ["  password: hunter2  # admin pwd"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "wifi:",
+      "  password: ••••••••  # admin pwd",
+    ]);
+  });
+
+  it("falls back to the single-line heuristic for commented credentials", () => {
+    // The scanner's ``KEY_LINE`` doesn't match a leading ``#``,
+    // so commented-out credentials only get masked by the
+    // post-scanner single-line pass. Pin that the fallback runs.
+    const m = mkMatch({
+      line_number: 2,
+      line_text: "wifi:",
+      before: [],
+      after: ["  # password: hunter2"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual(["wifi:", "  # password: ••••••••"]);
+  });
+
+  it("keeps ${substitution} indirections visible on context lines", () => {
+    // The matched-line path (``yamlHitLabel``) deliberately
+    // leaves ``${wifi_password}`` and ``!secret wifi_password``
+    // visible — they carry only the *name* of an indirection,
+    // not the credential. The scanner-driven block mask doesn't
+    // natively skip ``${...}`` (only ``!secret``), so without a
+    // filter the snippet renderer would mask substitution
+    // references while the command-palette labels still show
+    // them. Pin the consistency: the ``password:
+    // ${wifi_password}`` reference stays visible in a context
+    // line, while the actual substitution definition further
+    // down (``wifi_password: yellow1@@``) gets masked via the
+    // suffix heuristic.
+    const m = mkMatch({
+      line_number: 4,
+      line_text: "wifi:",
+      before: ["substitutions:", "  wifi_password: yellow1@@", ""],
+      after: ["  ssid: home", "  password: ${wifi_password}"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "substitutions:",
+      "  wifi_password: ••••••••",
+      "",
+      "wifi:",
+      "  ssid: home",
+      "  password: ${wifi_password}",
+    ]);
+  });
+
+  it("falls back to the *_password suffix heuristic on context lines", () => {
+    // User-defined ``substitutions: wifi_password: …`` shape —
+    // not in the scanner's ``ALWAYS_SENSITIVE_KEYS`` allowlist,
+    // so the single-line suffix heuristic catches it on the
+    // post-scanner pass.
+    const m = mkMatch({
+      line_number: 2,
+      line_text: "substitutions:",
+      before: [],
+      after: ["  wifi_password: yellow1@@"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "substitutions:",
+      "  wifi_password: ••••••••",
+    ]);
+  });
 });
 
 describe("yamlSnippetBlockHref", () => {
