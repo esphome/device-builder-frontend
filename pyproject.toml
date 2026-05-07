@@ -21,9 +21,10 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/esphome/device-builder-dashboard-frontend"
-Issues = "https://github.com/esphome/device-builder-dashboard-backend/issues"
-Repository = "https://github.com/esphome/device-builder-dashboard-frontend"
+Documentation = "https://esphome.io"
+Homepage = "https://esphome.io"
+Issues = "https://github.com/esphome/device-builder/issues"
+Repository = "https://github.com/esphome/device-builder-frontend"
 
 [build-system]
 requires = ["setuptools>=68", "wheel"]
