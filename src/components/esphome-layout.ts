@@ -206,9 +206,11 @@ export class ESPHomeLayout extends LitElement {
         justify-content: center;
         gap: var(--wa-space-m);
         font-size: 10px;
-        color: var(--wa-color-text-quiet);
+        /* Opaque background so scrolled content can't bleed through;
+           text is dimmed via color-mix instead of an opacity on the
+           host (which would make the background translucent too). */
         background: var(--wa-color-surface-default);
-        opacity: 0.7;
+        color: color-mix(in srgb, var(--wa-color-text-quiet), transparent 30%);
         user-select: text;
       }
     `,

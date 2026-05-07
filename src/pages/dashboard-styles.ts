@@ -23,6 +23,12 @@ export const dashboardStyles = css`
   :host([view="cards"]) {
     height: auto;
     overflow: visible;
+    /* Body scrolls in cards view (incl. YAML mode), and the layout
+       footer is fixed and opaque — without this padding the trailing
+       row of yaml-hits / banner content can sit behind the version
+       line. The configured device grid has its own --fab-clearance,
+       so this only matters for the YAML / discovered content paths. */
+    padding-bottom: var(--esphome-footer-height);
   }
 
   /* ─── Discovered Banner ─── */
