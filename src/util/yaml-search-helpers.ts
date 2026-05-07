@@ -124,6 +124,15 @@ function maskSnippetBlock(lines: readonly string[]): string[] {
     if (idx < 0 || idx >= out.length) continue;
     const line = out[idx];
     if (range.valueFrom < 0 || range.valueTo > line.length) continue;
+    // ``findSensitiveValueRanges`` skips ``!secret <name>`` (it only
+    // carries the indirection name, not the credential) but doesn't
+    // skip ``${substitution}`` references — they're the same shape
+    // of indirection and ``maskSensitiveLine`` already preserves
+    // them on single-line paths. Mirror that here so the search
+    // result label and the snippet-block render agree on what stays
+    // visible.
+    const value = line.slice(range.valueFrom, range.valueTo).trim();
+    if (value.startsWith("${")) continue;
     out[idx] =
       line.slice(0, range.valueFrom) +
       MASK_PLACEHOLDER +

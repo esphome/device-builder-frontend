@@ -517,6 +517,38 @@ describe("buildYamlSnippetBlocks", () => {
     expect(block.lines).toEqual(["wifi:", "  # password: ••••••••"]);
   });
 
+  it("keeps ${substitution} indirections visible on context lines", () => {
+    // The matched-line path (``yamlHitLabel``) deliberately
+    // leaves ``${wifi_password}`` and ``!secret wifi_password``
+    // visible — they carry only the *name* of an indirection,
+    // not the credential. The scanner-driven block mask doesn't
+    // natively skip ``${...}`` (only ``!secret``), so without a
+    // filter the snippet renderer would mask substitution
+    // references while the command-palette labels still show
+    // them. Pin the consistency: the ``password:
+    // ${wifi_password}`` reference stays visible in a context
+    // line, while the actual substitution definition further
+    // down (``wifi_password: yellow1@@``) gets masked via the
+    // suffix heuristic.
+    const m = mkMatch({
+      line_number: 4,
+      line_text: "wifi:",
+      before: ["substitutions:", "  wifi_password: yellow1@@", ""],
+      after: ["  ssid: home", "  password: ${wifi_password}"],
+    });
+
+    const [block] = buildYamlSnippetBlocks([m]);
+
+    expect(block.lines).toEqual([
+      "substitutions:",
+      "  wifi_password: ••••••••",
+      "",
+      "wifi:",
+      "  ssid: home",
+      "  password: ${wifi_password}",
+    ]);
+  });
+
   it("falls back to the *_password suffix heuristic on context lines", () => {
     // User-defined ``substitutions: wifi_password: …`` shape —
     // not in the scanner's ``ALWAYS_SENSITIVE_KEYS`` allowlist,
