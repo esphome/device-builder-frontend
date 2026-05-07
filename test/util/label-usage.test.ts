@@ -8,8 +8,6 @@
  * ``render-ip-value.test.ts`` works around.
  */
 import { describe, expect, it } from "vitest";
-import type { ConfiguredDevice } from "../../src/api/types.js";
-import { DeviceState } from "../../src/api/types.js";
 import {
   computeLabelUsage,
   deleteConfirmKey,
@@ -17,50 +15,16 @@ import {
   type LabelUsageDevice,
 } from "../../src/util/label-usage.js";
 
-const _baseDevice = {
-  name: "kitchen",
-  friendly_name: "Kitchen",
-  configuration: "kitchen.yaml",
-  comment: null,
-  area: "",
-  board_id: "esp32-c3-devkitm-1",
-  target_platform: "esp32",
-  address: "kitchen.local",
-  ip: "",
-  ip_addresses: [],
-  mac_address: "",
-  ethernet_mac: "",
-  bluetooth_mac: "",
-  build_size_bytes: 0,
-  labels: [],
-  web_port: null,
-  current_version: "",
-  deployed_version: "",
-  loaded_integrations: [],
-  state: DeviceState.UNKNOWN,
-  expected_config_hash: "",
-  deployed_config_hash: "",
-  has_pending_changes: false,
-  update_available: false,
-  api_enabled: false,
-  api_encrypted: false,
-  api_encryption_active: null,
-} satisfies ConfiguredDevice;
-
-function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
-  return { ..._baseDevice, ...overrides };
-}
-
 describe("computeLabelUsage", () => {
   it("returns an empty object for an empty device list", () => {
     expect(computeLabelUsage([])).toEqual({});
   });
 
   it("counts occurrences across multiple devices", () => {
-    const devices = [
-      _device({ labels: ["kitchen", "bluetooth_proxy"] }),
-      _device({ name: "bedroom", labels: ["bedroom", "bluetooth_proxy"] }),
-      _device({ name: "garage", labels: ["bluetooth_proxy"] }),
+    const devices: LabelUsageDevice[] = [
+      { labels: ["kitchen", "bluetooth_proxy"] },
+      { labels: ["bedroom", "bluetooth_proxy"] },
+      { labels: ["bluetooth_proxy"] },
     ];
     expect(computeLabelUsage(devices)).toEqual({
       kitchen: 1,
@@ -70,12 +34,12 @@ describe("computeLabelUsage", () => {
   });
 
   it("treats absent and empty labels as no-op", () => {
-    // ``computeLabelUsage`` is typed against the loose
-    // ``LabelUsageDevice`` shape (``labels?: readonly string[] | null``)
-    // so the helper covers both wire shapes — current ``ConfiguredDevice``
-    // payloads always include ``labels: []``, but the helper is robust
-    // to a future "no labels block" or explicit-null sentinel without
-    // a regression here.
+    // ``computeLabelUsage`` is typed against ``LabelUsageDevice``
+    // (``labels?: readonly string[] | null``), so the helper covers
+    // every "no labels on this device" wire shape — current
+    // ``ConfiguredDevice`` payloads always include ``labels: []``,
+    // but the helper is robust to a future explicit-null sentinel
+    // or an omitted-field shape without a regression here.
     const devices: LabelUsageDevice[] = [
       { labels: ["kitchen"] },
       { labels: null },
@@ -87,7 +51,7 @@ describe("computeLabelUsage", () => {
   });
 
   it("omits keys for unused labels (caller treats missing as zero)", () => {
-    const devices = [_device({ labels: ["kitchen"] })];
+    const devices: LabelUsageDevice[] = [{ labels: ["kitchen"] }];
     const usage = computeLabelUsage(devices);
     expect(usage).not.toHaveProperty("bedroom");
     // The delete-confirm dialog reads ``usage[id] ?? 0`` so an
