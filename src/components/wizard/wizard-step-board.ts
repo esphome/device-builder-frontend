@@ -71,9 +71,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
     { platform: "esp32", variant: "esp32c6", label: "ESP32-C6" },
     { platform: "esp32", variant: "esp32h2", label: "ESP32-H2" },
     { platform: "esp8266", variant: "", label: "ESP8266" },
-    { platform: "rp2040", variant: "", label: "RP2040" },
+    // ESPHome's ``rp2040`` platform covers both the original
+    // RP2040 and the newer RP2350; the label calls out both
+    // chip names so a user searching for either one sees the
+    // filter chip that owns them.
+    { platform: "rp2040", variant: "", label: "RP2040 / RP2350" },
     { platform: "bk72xx", variant: "", label: "BK72xx" },
     { platform: "rtl87xx", variant: "", label: "RTL87xx" },
+    { platform: "ln882x", variant: "", label: "LN882x" },
   ];
 
   connectedCallback() {
