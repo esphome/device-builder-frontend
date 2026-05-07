@@ -247,10 +247,11 @@ export class ESPHomePageDashboard extends LitElement {
   /** Cache for the per-label usage count map (mirrors
    *  ``_sortedDevicesCache``'s reference-keyed shape). The map
    *  rebuilds only when ``_devices`` is replaced — every WS event
-   *  that mutates the list does a full reassign — so a render that
-   *  only flipped a search input or the view toggle reuses the
-   *  previous map and avoids a new ``Record`` reference handing
-   *  through to ``<esphome-labels-filter>``. */
+   *  that mutates the list does a full reassign — so the
+   *  delete-label confirm dialog's "removes from N devices" copy,
+   *  which calls ``_computeLabelUsage()`` on every render of
+   *  ``_confirmDialogCopy``, doesn't pay the count walk while the
+   *  dialog sits open over an unchanged device list. */
   private _labelUsageCache: {
     source: ConfiguredDevice[];
     map: Record<string, number>;
