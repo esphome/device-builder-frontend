@@ -177,9 +177,13 @@ describe("parseFloatWithUnit", () => {
 
     it("normalises lowercase 'ghz' to canonical 'GHz'", () => {
       // Lowercase 'g' is NOT in ESPHome's METRIC_SUFFIXES (only G
-      // for giga); the case-insensitive match still picks GHz
-      // because that's the only option whose lowercase form ends
-      // the input. Round-trips through save as canonical GHz.
+      // for giga). Both ``GHz`` and ``Hz`` match ``"2ghz"`` case-
+      // insensitively (both lowercase forms end the input), and
+      // both score 0 case-sensitive leading-match characters
+      // (``2`` ≠ ``G``, ``h`` ≠ ``H``). The length tie-break picks
+      // ``GHz`` (3 chars > 2) so the user's ``g`` prefix isn't
+      // stranded as part of the numeric portion. Round-trips
+      // through save as canonical ``GHz``.
       expect(parseFloatWithUnit("2ghz", FREQUENCY_UNITS)).toEqual({
         value: 2,
         unit: "GHz",
@@ -204,11 +208,25 @@ describe("parseFloatWithUnit", () => {
       // not specific to ``cv.frequency``. Pin that resistance
       // (which takes ``Ω|ohm|Ohm|OHM`` and various SI prefixes in
       // its ESPHome regex) gets the same case-insensitive
-      // treatment.
-      const resistanceUnits = ["Ω", "kΩ", "MΩ"] as const;
-      expect(parseFloatWithUnit("4.7kΩ", resistanceUnits)).toEqual({
+      // treatment for the BASE unit. The user can type the base
+      // in any case (``ohm``, ``Ohm``, ``OHM``) and the parser
+      // picks the right SI-prefixed option, normalising to the
+      // canonical-cased option on round-trip.
+      const resistanceUnits = ["Ohm", "kOhm", "MOhm"] as const;
+      // All-lowercase: ``k`` matches case (score 1) > ``Ohm``'s
+      // ``o`` ≠ ``O`` (score 0). Length tie-break would also pick
+      // ``kOhm`` over the bare ``Ohm`` if scores tied.
+      expect(parseFloatWithUnit("4.7kohm", resistanceUnits)).toEqual({
         value: 4.7,
-        unit: "kΩ",
+        unit: "kOhm",
+      });
+      // Lowercase prefix + uppercase base: ``kOhm`` scores 2
+      // (k=k, O=O) vs ``Ohm``'s 1 (O=O, h≠H), so the SI prefix
+      // is preserved correctly even though the user uppercased
+      // the base.
+      expect(parseFloatWithUnit("4.7kOHM", resistanceUnits)).toEqual({
+        value: 4.7,
+        unit: "kOhm",
       });
     });
 
