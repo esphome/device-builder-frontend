@@ -14,6 +14,7 @@ import {
   computeLabelUsage,
   deleteConfirmKey,
   isLabelNameDuplicate,
+  type LabelUsageDevice,
 } from "../../src/util/label-usage.js";
 
 const _baseDevice = {
@@ -68,11 +69,19 @@ describe("computeLabelUsage", () => {
     });
   });
 
-  it("treats null and empty labels as no-op", () => {
-    const devices = [
-      _device({ labels: ["kitchen"] }),
-      _device({ name: "no-labels", labels: null as unknown as string[] }),
-      _device({ name: "empty-labels", labels: [] }),
+  it("treats absent and empty labels as no-op", () => {
+    // ``computeLabelUsage`` is typed against the loose
+    // ``LabelUsageDevice`` shape (``labels?: readonly string[] | null``)
+    // so the helper covers both wire shapes — current ``ConfiguredDevice``
+    // payloads always include ``labels: []``, but the helper is robust
+    // to a future "no labels block" or explicit-null sentinel without
+    // a regression here.
+    const devices: LabelUsageDevice[] = [
+      { labels: ["kitchen"] },
+      { labels: null },
+      { labels: undefined },
+      {}, // labels field omitted entirely
+      { labels: [] },
     ];
     expect(computeLabelUsage(devices)).toEqual({ kitchen: 1 });
   });

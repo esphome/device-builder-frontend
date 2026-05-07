@@ -1104,13 +1104,12 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /** Per-label-id usage count across the current device list.
-   *  Fed to the labels-filter so the delete-confirm dialog can
-   *  warn the user "this will remove the label from N devices"
-   *  before the cascade fires. Reference-keyed cache off
-   *  ``_devices`` so a render that doesn't touch the list doesn't
-   *  hand a fresh Record through to the filter (which would force
-   *  an unnecessary re-render of the popover on every search-input
-   *  keystroke). */
+   *  Read by ``_confirmDialogCopy`` when rendering the
+   *  delete-label confirm dialog so the prompt reads "this will
+   *  remove the label from N devices" before the cascade fires.
+   *  Reference-keyed cache off ``_devices`` so the dialog doesn't
+   *  pay the count walk twice if it re-renders while the list is
+   *  unchanged (which is most of the dialog's lifetime). */
   private _computeLabelUsage(): Record<string, number> {
     const source = this._devices;
     if (this._labelUsageCache?.source === source) {

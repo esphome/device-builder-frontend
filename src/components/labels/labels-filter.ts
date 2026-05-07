@@ -496,9 +496,17 @@ export class ESPHomeLabelsFilter extends LitElement {
                     // trip lives on the dashboard page, which
                     // already owns one ``<esphome-confirm-dialog>``
                     // instance shared across every destructive
-                    // action. Bubbling a request event keeps the
-                    // labels filter focused on filter / catalog
-                    // browse and avoids reinventing the dialog UX.
+                    // action. Close the popover before bubbling
+                    // the request so the dashboard's confirm
+                    // dialog (which portals into ``document.body``
+                    // and would otherwise be "outside" us under
+                    // the document-click guard) doesn't trigger
+                    // the popover-close path on its first
+                    // interaction. Closing up front keeps the
+                    // dashboard view stable behind the dialog and
+                    // matches how the other destructive actions
+                    // (kebab Delete, bulk Delete, …) behave.
+                    this._close();
                     this.dispatchEvent(
                       new CustomEvent<Label>("request-delete-label", {
                         detail: label,
