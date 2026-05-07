@@ -573,6 +573,18 @@ export interface ConfigEntry {
   /** Min/max bounds for INTEGER / FLOAT entries. */
   range: [number, number] | null;
   /**
+   * Display-formatting hint for INTEGER entries.
+   *
+   * Currently only `"hex"` is defined. The backend sets it for
+   * fields whose upstream validator is one of the `cv.hex_uint*_t`
+   * family (`i2c_address` is the canonical case). Frontend renders
+   * `<input type="text">` with a hex-aware parser/formatter so
+   * users can type either `0x76` or `118` and the value
+   * round-trips as `0x76`. `null` (the default for plain
+   * `cv.int_range` integers) → decimal display.
+   */
+  display_format: "hex" | null;
+  /**
    * Unit choices for `FLOAT_WITH_UNIT` entries. The frontend renders
    * a unit picker populated from this list; each option's string is
    * what the YAML serialization appends after the numeric value

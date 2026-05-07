@@ -27,6 +27,7 @@ import {
   validateEntries,
   type ValidationError,
 } from "../../util/config-validation.js";
+import { normalizeHexValues } from "../../util/hex-int.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -438,11 +439,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         this.sectionKey,
         this.fromLine,
       );
-      this._values = parseYamlSectionValues(
+      const parsedValues = parseYamlSectionValues(
         yaml,
         this.sectionKey,
         resolvedFromLine,
       );
+      // Pre-format hex-typed numeric values to their canonical
+      // ``"0x..."`` string form (issue #410) so a save preserves
+      // the user's hex notation even when they only edited an
+      // unrelated field. The serializer is schema-agnostic and
+      // emits numbers verbatim, so without this an i2c address
+      // round-trips from ``0x76`` to ``118`` on the next save.
+      this._values = normalizeHexValues(parsedValues, this._config.entries);
       this._resolvedFromLine = resolvedFromLine;
       this._presentComponents = parseTopLevelComponents(yaml);
     } catch (e) {

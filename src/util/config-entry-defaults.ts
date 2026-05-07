@@ -30,6 +30,7 @@ export function makeConfigEntry(
     options: null,
     allow_custom_value: false,
     range: null,
+    display_format: null,
     unit_options: null,
     help_link: null,
     multi_value: false,

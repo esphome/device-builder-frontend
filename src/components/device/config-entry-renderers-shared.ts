@@ -178,6 +178,38 @@ export function renderFieldError(path: string[], ctx: RenderCtx) {
   return html`<span class="field-error">${ctx.localize(err.code, err.params)}</span>`;
 }
 
+/**
+ * Wrap an input control in the standard field envelope:
+ * `<div class="field" data-field-key>` + label + input + optional
+ * trailing content (secret hint, suggestion picker badge) + error.
+ *
+ * Pulled out because every primitive renderer
+ * (`renderStringField`, `renderNumberField`, `renderHexIntField`,
+ * the password / suggestion-select branches, ...) repeated the
+ * same shell verbatim. Centralising means a future tweak to the
+ * field markup (an `aria-invalid` binding, a wrapper for
+ * field-group spacing, ...) lands in one place instead of being
+ * hand-applied to every renderer.
+ *
+ * `trailing` slots between the input and the error message — used
+ * by the string renderer to drop in the `Using stored secret:`
+ * hint when the value is a `!secret <key>` reference.
+ */
+export function renderFieldShell(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  input: unknown,
+  trailing: unknown = nothing,
+) {
+  return html`
+    <div class="field" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)} ${input} ${trailing}
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
 // Re-exported by `config-entry-renderers.ts`; placed here so the pin
 // renderer can fall back to a string field without importing the
 // barrel and creating a cycle.
