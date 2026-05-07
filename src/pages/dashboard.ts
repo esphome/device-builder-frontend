@@ -288,6 +288,27 @@ export class ESPHomePageDashboard extends LitElement {
     if (changed.has("_devicesLoaded") && this._devicesLoaded) {
       this._loadPreferences();
     }
+    /* Re-bind the drawer's device reference when ``_devices``
+       updates. ``_toggleDrawerForDevice`` snapshots the device
+       object at click time, but the WS reducer in app-shell
+       replaces entries in ``_devices`` on every ``DEVICE_UPDATED``
+       push — without the re-bind, the drawer keeps showing the
+       fields it had at open time (stale ``friendly_name`` after
+       a rename, stale ``state`` after a flap, stale ``ip`` after
+       a DHCP renew). Lookup is by ``configuration`` since that's
+       the stable identity the WS reducer keys on too. */
+    if (changed.has("_devices") && this._drawerDevice) {
+      const live = this._devices.find(
+        (d) => d.configuration === this._drawerDevice!.configuration,
+      );
+      if (live && live !== this._drawerDevice) {
+        this._drawerDevice = live;
+      } else if (!live) {
+        // Device removed (delete / archive) — close the drawer.
+        this._drawerDevice = null;
+        this._drawerOpen = false;
+      }
+    }
   }
 
 
