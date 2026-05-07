@@ -148,11 +148,16 @@ function renderHexIntField(
           return;
         }
         const parsed = parseHexInt(raw);
-        if (parsed === null) {
-          // Surface unparseable input by emitting the raw string —
-          // the backend validator will reject it and the inline
-          // error mechanism shows the user what's wrong, instead
-          // of silently swallowing the typo.
+        const formatted = parsed === null ? "" : formatHexInt(parsed);
+        if (formatted === "") {
+          // Either ``parseHexInt`` couldn't parse the input
+          // (bare letters, ``0x`` with no digits, garbage) OR
+          // it parsed to a value ``formatHexInt`` rejects (a
+          // negative, NaN, fractional — none of which round-trip
+          // through the hex literal grammar). Emit the raw
+          // string in both cases so the inline validator flags
+          // the input instead of silently clearing the field
+          // and dropping the value from the YAML.
           ctx.emitChange(path, raw);
           return;
         }
@@ -161,7 +166,7 @@ function renderHexIntField(
         // decimal — matches what gets normalised at parse time
         // for fields the user didn't touch. ESPHome's
         // ``cv.hex_int`` accepts the string form.
-        ctx.emitChange(path, formatHexInt(parsed));
+        ctx.emitChange(path, formatted);
       }}
       @blur=${() => ctx.clearEditingMagnitude(path)}
     />`,

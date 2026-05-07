@@ -13,17 +13,23 @@
  *   resolves to a single number. We render it as
  *   `formatHexInt(value)` → `"0x76"` (lowercase canonical form,
  *   matching `repr()` and `cv.hex_int`'s own output formatter).
- * - **Form input → emit**: `parseHexInt("0x76" | "0X76" | "76" |
- *   "118")` → number. Both hex and decimal-looking input are
- *   accepted; the user can type whichever is most natural for the
- *   value at hand. Empty string → `null` (so optional entries get
- *   stripped from the payload by the form's coerce pass).
+ * - **Form input → emit**: `parseHexInt("0x76" | "0X76" | "118")`
+ *   → number. Both hex (with explicit `0x` prefix) and decimal
+ *   input are accepted; the user can type whichever is most
+ *   natural for the value at hand. Empty string → `null` (so
+ *   optional entries get stripped from the payload by the form's
+ *   coerce pass).
  *
  * Round-trip preservation: when the YAML had `address: 0x76`, the
  * form shows `0x76` and the user can save without forcing the
- * file to flip to `address: 118`. The serializer in
- * `yaml-section-values.ts` formats hex-typed values as `0x..`
- * literals on write so the on-disk shape stays readable.
+ * file to flip to `address: 118`. The mechanism is: this module
+ * normalises hex-typed numeric form values into pre-formatted
+ * `"0x..."` strings (via `normalizeHexValues` at parse time and
+ * the renderer's emit-as-string at edit time); the YAML
+ * serializer in `yaml-serialize.ts` is schema-agnostic, but it
+ * passes string scalars through verbatim, so a value already
+ * shaped as `"0x76"` lands on disk as `address: 0x76` without
+ * the serializer needing to know about the hex hint.
  */
 
 /**
@@ -31,21 +37,21 @@
  *
  * Accepts:
  *  - hex with `0x` / `0X` prefix (`"0x76"`, `"0X1A"`);
- *  - bare hex when the leading character disambiguates it as such
- *    (intentionally NOT supported — `"76"` is decimal, see below);
- *  - decimal (`"118"`);
- *  - leading/trailing whitespace.
+ *  - decimal (`"118"`, `"-1"`);
+ *  - leading/trailing whitespace around either form.
  *
  * Returns `null` for empty input or any value that doesn't parse
  * as a finite integer. The caller decides whether to clear the
  * field, surface a validation error, etc.
  *
- * Why no bare hex without `0x`: the i2c address `76` is ambiguous
- * — it could be the user typing decimal 76 (intending `0x4C`) or
- * "0x76 with the prefix dropped" (intending `0x76` = 118). YAML
- * and ESPHome both treat unprefixed input as decimal, so we
- * follow that — typing `76` saves as `address: 76` (decimal),
- * typing `0x76` saves as `address: 0x76`.
+ * **Bare hex without `0x` is intentionally rejected.** The i2c
+ * address `76` would otherwise be ambiguous — could be the user
+ * typing decimal 76 (intending `0x4C`) or "0x76 with the prefix
+ * dropped" (intending `0x76` = 118). YAML and ESPHome both treat
+ * unprefixed input as decimal, so we follow that: typing `76`
+ * saves as `address: 76` (decimal), typing `0x76` saves as
+ * `address: 0x76`. Bare hex letters (`"abc"`, `"ff"`) hit
+ * neither regex and return `null`.
  */
 export function parseHexInt(raw: string): number | null {
   const trimmed = raw.trim();
@@ -89,7 +95,19 @@ export function parseHexInt(raw: string): number | null {
  * of their component, no nesting today; revisit if a future hex
  * field lands inside a NESTED group).
  *
- * Returns a fresh object; the input is never mutated.
+ * Returns the input object identity-equal when no rewrites are
+ * needed (cheap shortcut for non-hex sections); otherwise returns
+ * a fresh object preserving the input's prototype.
+ *
+ * Prototype preservation matters because ``parseYamlSectionValues``
+ * deliberately produces a null-prototype map to defend against
+ * user-keyed YAML containing ``__proto__`` / ``constructor`` /
+ * ``prototype`` (which would otherwise mutate the inherited
+ * prototype chain via ordinary property assignment). A naive
+ * ``{ ...values }`` spread re-opens that attack surface by
+ * promoting the result back to a regular ``Object``-prototype
+ * object; we copy into ``Object.create(null)`` instead so a
+ * crafted YAML can't escalate to prototype pollution.
  */
 import type { ConfigEntry } from "../api/types.js";
 
@@ -107,7 +125,13 @@ export function normalizeHexValues(
     }
   }
   if (!needsCopy) return values;
-  const out: Record<string, unknown> = { ...values };
+  // Preserve the input's prototype so a null-prototype map (the
+  // defence in ``parseYamlSectionValues`` against user-keyed
+  // ``__proto__`` etc.) survives the copy.
+  const out: Record<string, unknown> = Object.assign(
+    Object.create(Object.getPrototypeOf(values)),
+    values,
+  );
   for (const entry of entries) {
     if (entry.display_format !== "hex") continue;
     const v = out[entry.key];

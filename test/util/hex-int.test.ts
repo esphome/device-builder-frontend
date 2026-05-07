@@ -231,4 +231,32 @@ describe("normalizeHexValues", () => {
       addr: Number.NaN,
     });
   });
+
+  it("preserves a null prototype on the returned object", () => {
+    // ``parseYamlSectionValues`` returns ``Object.create(null)``
+    // maps to defend against user-keyed YAML containing
+    // ``__proto__`` / ``constructor`` / ``prototype``. A naive
+    // ``{ ...values }`` spread would promote that to a regular
+    // ``Object``-prototype object and re-open the prototype-
+    // pollution attack surface. Pin that the rewrite path
+    // preserves the input's prototype.
+    const entries = [entry("address", { display_format: "hex" })];
+    const input = Object.assign(Object.create(null), { address: 119 });
+    const out = normalizeHexValues(input, entries);
+    expect(Object.getPrototypeOf(out)).toBeNull();
+    expect(out).not.toBe(input);
+    expect(out["address"]).toBe("0x77");
+  });
+
+  it("preserves an Object prototype on the returned object", () => {
+    // Symmetric check for callers that pass a regular ``{}`` map
+    // (test fixtures, not the live ``parseYamlSectionValues``
+    // path) — they still expect the prototype they handed in.
+    const entries = [entry("address", { display_format: "hex" })];
+    const input = { address: 119 };
+    const out = normalizeHexValues(input, entries);
+    expect(Object.getPrototypeOf(out)).toBe(Object.prototype);
+    expect(out).not.toBe(input);
+    expect(out["address"]).toBe("0x77");
+  });
 });
