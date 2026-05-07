@@ -267,7 +267,7 @@ export class ESPHomeLayout extends LitElement {
       <slot></slot>
       <div class="app-footer">
         ${this._serverVersion ? html`<span>ESPHome Device Builder v${this._serverVersion}</span>` : nothing}
-        ${this._esphomeVersion ? html`<span>ESPHome v${this._esphomeVersion}</span>` : nothing}
+        ${this._esphomeVersion ? html`<span>ESPHome ${this._esphomeVersion}</span>` : nothing}
       </div>
     `;
   }
