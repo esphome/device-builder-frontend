@@ -5,7 +5,7 @@ name: PR Labels
 # how to slot into a release-notes section. We derive that label from
 # the "Types of changes" checkbox in the PR template and apply it
 # automatically — most external contributors can't label their own
-# PRs. The job only fails when no checkbox is ticked.
+# PRs. The job fails when zero or more than one checkbox is ticked.
 
 # yamllint disable-line rule:truthy
 on:
@@ -37,9 +37,10 @@ jobs:
               'ci', 'dependencies', 'docs',
             ];
 
-            // Match `- [x] ... `<label>`` lines in the PR body. The
-            // PR template puts the canonical label name in backticks
-            // at the end of each "Types of changes" bullet.
+            // Match a ticked checkbox bullet whose line ends with a
+            // backticked label, e.g.  - [x] CI / workflow change — `ci`
+            // The PR template puts the canonical label name in
+            // backticks at the end of each "Types of changes" bullet.
             const body = context.payload.pull_request.body || '';
             const re = /^\s*-\s*\[x\][^`\n]*`([^`]+)`/gim;
             const ticked = [];
