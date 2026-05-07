@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import { APIError } from "../../api/api-error.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -318,7 +319,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (this._submitting) return;
     const { name } = e.detail;
     const slug = friendlyNameSlugify(name);
+    // Clear both error slots so a stale message from a prior attempt
+    // (e.g. a failed import the user backed out of) doesn't sit
+    // alongside whatever this attempt produces.
     this._createError = "";
+    this._importError = "";
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
@@ -344,7 +349,10 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (this._submitting) return;
     if (!this._importFile) return;
 
+    // Same dual-clear as the other create handlers — see
+    // ``_onCreateEmptyConfig`` for the rationale.
     this._importError = "";
+    this._createError = "";
 
     let fileContent: string;
     try {
@@ -406,7 +414,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const { board, name, wifiSsid, wifiPassword } = e.detail;
     if (!board) return;
     const slug = friendlyNameSlugify(name);
+    // Same dual-clear as ``_onCreateEmptyConfig``.
     this._createError = "";
+    this._importError = "";
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
@@ -427,23 +437,22 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   /** Pull the user-facing message out of an APIError-shaped failure.
    *
-   * Backend ``CommandError`` messages carry the actual validation
-   * detail (e.g. "Provide either board_id or file_content; ...");
-   * the WS client wraps them as ``APIError: <code>: <message>``.
-   * Strip the wrapper prefix(es) so the dialog renders just the
-   * message, not the protocol noise. Falls back to a localised
-   * generic when the error doesn't expose a message at all.
+   * Reads the structured ``details`` field directly when the WS
+   * client throws an :class:`APIError`, so we don't have to parse
+   * the formatted ``"<code>: <details>"`` message string back
+   * apart. Falls back to a localised generic for any non-APIError
+   * shape (transport failures, unexpected non-Error throws) and
+   * for the case where ``details`` is empty (e.g. ``invalid_args:``
+   * with no body — empty after trimming would otherwise render as
+   * a blank red bar on the dialog, which is worse than a generic
+   * "create failed").
    */
   private _extractCreateErrorMessage(err: unknown): string {
-    const raw = err instanceof Error ? err.message : String(err);
-    if (!raw) return this._localize("wizard.create_general_error");
-    // Strip "APIError: " and the lowercase ErrorCode token
-    // (e.g. ``invalid_args:``, ``internal_error:``) so the
-    // surfaced text starts at the actual diagnostic.
-    return raw
-      .replace(/^APIError:\s*/, "")
-      .replace(/^[a-z_]+:\s*/, "")
-      .trim();
+    if (err instanceof APIError) {
+      const details = err.details.trim();
+      if (details) return details;
+    }
+    return this._localize("wizard.create_general_error");
   }
 }
 
