@@ -10,7 +10,7 @@ import {
 import { LitElement, css, html } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { localizeContext } from "../context/index.js";
+import { localizeContext, serverVersionContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -60,14 +60,29 @@ const LINKS = [
   },
 ] as const;
 
+const NEW_ISSUE_LABEL_KEY = "feedback.new_issue";
+const NEW_ISSUE_BASE_URL = "https://github.com/esphome/device-builder/issues/new";
+
 @customElement("esphome-feedback-dialog")
 export class ESPHomeFeedbackDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  @consume({ context: serverVersionContext, subscribe: true })
+  @state()
+  private _serverVersion = "";
+
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
+
+  private _newIssueHref(): string {
+    const params = new URLSearchParams({ template: "bug_report.yml" });
+    if (this._serverVersion) {
+      params.set("version", this._serverVersion);
+    }
+    return `${NEW_ISSUE_BASE_URL}?${params.toString()}`;
+  }
 
   static styles = [
     espHomeStyles,
@@ -211,7 +226,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
             (link) => html`
               <a
                 class="link"
-                href=${link.href}
+                href=${link.labelKey === NEW_ISSUE_LABEL_KEY
+                  ? this._newIssueHref()
+                  : link.href}
                 target="_blank"
                 rel="noopener noreferrer"
                 @click=${this.close}
