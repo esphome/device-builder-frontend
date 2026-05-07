@@ -22,6 +22,7 @@ import {
   mdiMemory,
   mdiMessage,
   mdiNetworkOutline,
+  mdiOpenInNew,
   mdiSync,
   mdiTagMultiple,
   mdiTextShort,
@@ -47,6 +48,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -79,6 +81,7 @@ registerMdiIcons({
   memory: mdiMemory,
   message: mdiMessage,
   "network-outline": mdiNetworkOutline,
+  "open-in-new": mdiOpenInNew,
   sync: mdiSync,
   "tag-multiple": mdiTagMultiple,
   "text-short": mdiTextShort,
@@ -324,6 +327,24 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         color: var(--wa-color-text-normal);
       }
       .ip-toggle wa-icon {
+        font-size: 14px;
+      }
+
+      .ip-value {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+      }
+      .ip-visit-link {
+        display: inline-flex;
+        align-items: center;
+        color: var(--wa-color-text-quiet);
+        text-decoration: none;
+      }
+      .ip-visit-link:hover {
+        color: var(--esphome-primary);
+      }
+      .ip-visit-link wa-icon {
         font-size: 14px;
       }
 
@@ -837,7 +858,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           </div>
           <div class="content">
             <div class="label">${label}</div>
-            <div class="value mono">${list[0]}</div>
+            ${this._renderIpValue(d, list[0])}
           </div>
         </div>
       `;
@@ -851,7 +872,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          <div class="value mono">${list[0]}</div>
+          ${this._renderIpValue(d, list[0])}
           ${expanded
             ? list
                 .slice(1)
@@ -874,6 +895,39 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               : this._localize("dashboard.drawer_ip_show_more", { n: extra })}
           </button>
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Render the primary IP cell, optionally suffixed with a "Visit web UI"
+   * icon-link.
+
+   * The link only renders when ``buildWebUiUrl`` returns a non-empty
+   * URL — i.e. the YAML enabled ``web_server`` and we have a host to
+   * point at. ``buildWebUiUrl`` is the single source of truth for the
+   * host/port/protocol logic shared with the table column and the
+   * row-menu, so the drawer can't drift out of sync with them.
+   */
+  private _renderIpValue(d: ConfiguredDevice, ip: string) {
+    const url = buildWebUiUrl(d);
+    if (!url) {
+      return html`<div class="value mono">${ip}</div>`;
+    }
+    const visitLabel = this._localize("dashboard.action_visit_web_ui");
+    return html`
+      <div class="value mono ip-value">
+        <span>${ip}</span>
+        <a
+          class="ip-visit-link"
+          href=${url}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label=${visitLabel}
+          title=${visitLabel}
+        >
+          <wa-icon library="mdi" name="open-in-new"></wa-icon>
+        </a>
       </div>
     `;
   }
