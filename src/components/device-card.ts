@@ -598,53 +598,45 @@ export class ESPHomeDeviceCard extends LitElement {
                   <wa-icon library="mdi" name="pencil"></wa-icon>
                   ${this._localize("dashboard.edit")}
                 </button>
-                ${this.hasUpdateAvailable
-                  ? html`
-                      <button
-                        class="action-btn action-btn--accent"
+                ${
+                  // Collapse the accent action (Update / Install) and
+                  // Logs to icon-only so only Edit keeps a label. In
+                  // long-language locales (French "Mettre à jour",
+                  // Dutch "Bijwerken"/"Bewerken") full-text Edit +
+                  // accent + Logs overflows the 300px-min card.
+                  // Edit stays labelled because it's the primary
+                  // action and the pencil alone is ambiguous; the
+                  // upload and console icons read clearly without one.
+                  this.hasUpdateAvailable
+                    ? html`<button
+                        class="action-btn action-btn--accent action-btn--tile"
                         ?disabled=${this.busy}
                         @click=${() => this._emit("update-device")}
+                        aria-label=${this._localize("dashboard.update")}
+                        title=${this._localize("dashboard.update")}
                       >
                         <wa-icon library="mdi" name="upload"></wa-icon>
-                        ${this._localize("dashboard.update")}
-                      </button>
-                    `
-                  : this.hasPendingChanges
-                    ? html`
-                        <button
-                          class="action-btn action-btn--accent"
+                      </button>`
+                    : this.hasPendingChanges
+                      ? html`<button
+                          class="action-btn action-btn--accent action-btn--tile"
                           ?disabled=${this.busy}
                           @click=${() => this._emit("install-device")}
+                          aria-label=${this._localize("dashboard.install")}
+                          title=${this._localize("dashboard.install")}
                         >
                           <wa-icon library="mdi" name="upload"></wa-icon>
-                          ${this._localize("dashboard.install")}
-                        </button>
-                      `
-                    : nothing}
-                ${
-                  // Collapse Logs to icon-only when an accent action
-                  // (Install/Update) is present — Edit + accent + Logs
-                  // + kebab overflows the 300px-min card in long-language
-                  // locales like Dutch ("Bewerken"/"Installeren"/"Logboek").
-                  // Logs collapses first since the console icon reads
-                  // clearly without a label.
-                  this.hasPendingChanges || this.hasUpdateAvailable
-                    ? html`<button
-                        class="action-btn action-btn--ghost action-btn--tile"
-                        @click=${() => this._emit("open-logs")}
-                        aria-label=${this._localize("dashboard.drawer_logs")}
-                        title=${this._localize("dashboard.drawer_logs")}
-                      >
-                        <wa-icon library="mdi" name="console"></wa-icon>
-                      </button>`
-                    : html`<button
-                        class="action-btn action-btn--ghost"
-                        @click=${() => this._emit("open-logs")}
-                      >
-                        <wa-icon library="mdi" name="console"></wa-icon>
-                        ${this._localize("dashboard.drawer_logs")}
-                      </button>`
+                        </button>`
+                      : nothing
                 }
+                <button
+                  class="action-btn action-btn--ghost action-btn--tile"
+                  @click=${() => this._emit("open-logs")}
+                  aria-label=${this._localize("dashboard.drawer_logs")}
+                  title=${this._localize("dashboard.drawer_logs")}
+                >
+                  <wa-icon library="mdi" name="console"></wa-icon>
+                </button>
                 ${this.webUrl
                   ? html`<a
                       class="action-btn action-btn--ghost action-btn--tile"
