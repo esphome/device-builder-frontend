@@ -115,35 +115,31 @@ export function normalizeHexValues(
   values: Record<string, unknown>,
   entries: ConfigEntry[],
 ): Record<string, unknown> {
-  let needsCopy = false;
+  let out: Record<string, unknown> | null = null;
   for (const entry of entries) {
     if (entry.display_format !== "hex") continue;
     const v = values[entry.key];
-    if (typeof v === "number") {
-      needsCopy = true;
-      break;
+    if (typeof v !== "number") continue;
+    const formatted = formatHexInt(v);
+    // ``formatHexInt`` returns ``""`` for non-finite / negative /
+    // non-integer numbers — leave those alone so the form's
+    // existing validation can flag them, no copy needed.
+    if (formatted === "") continue;
+    if (out === null) {
+      // Lazy copy on first actual rewrite. ``Object.create``-with-
+      // descriptors clones via ``defineProperty`` (no ``[[Set]]``
+      // triggers, so a hostile own ``__proto__`` key on an Object-
+      // proto source can't escalate to prototype mutation),
+      // preserving the input's prototype — null for the parser's
+      // null-proto defence, ``Object.prototype`` for fixtures.
+      out = Object.create(
+        Object.getPrototypeOf(values),
+        Object.getOwnPropertyDescriptors(values),
+      );
     }
+    out![entry.key] = formatted;
   }
-  if (!needsCopy) return values;
-  // Preserve the input's prototype so a null-prototype map (the
-  // defence in ``parseYamlSectionValues`` against user-keyed
-  // ``__proto__`` etc.) survives the copy.
-  const out: Record<string, unknown> = Object.assign(
-    Object.create(Object.getPrototypeOf(values)),
-    values,
-  );
-  for (const entry of entries) {
-    if (entry.display_format !== "hex") continue;
-    const v = out[entry.key];
-    if (typeof v === "number") {
-      const formatted = formatHexInt(v);
-      // ``formatHexInt`` returns ``""`` for non-finite / negative
-      // / non-integer numbers — leave those alone so the form's
-      // existing validation can flag them.
-      if (formatted !== "") out[entry.key] = formatted;
-    }
-  }
-  return out;
+  return out ?? values;
 }
 
 /**

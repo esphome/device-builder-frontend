@@ -121,13 +121,8 @@ function renderHexIntField(
   // clobbered by a re-render that reformats the empty/partial
   // parse back to `""`. Mirrors the float-with-unit pattern.
   const editingText = ctx.getEditingMagnitude(path);
-  const displayValue =
-    editingText ?? hexDisplayOrFallback(rawValue);
-  const placeholder =
-    formatHexInt(entry.default_value) ||
-    (entry.default_value === null || entry.default_value === undefined
-      ? ""
-      : String(entry.default_value));
+  const displayValue = editingText ?? hexDisplayOrFallback(rawValue);
+  const placeholder = hexDisplayOrFallback(entry.default_value);
   return renderFieldShell(
     entry,
     path,
@@ -147,26 +142,18 @@ function renderHexIntField(
           ctx.emitChange(path, "");
           return;
         }
-        const parsed = parseHexInt(raw);
-        const formatted = parsed === null ? "" : formatHexInt(parsed);
-        if (formatted === "") {
-          // Either ``parseHexInt`` couldn't parse the input
-          // (bare letters, ``0x`` with no digits, garbage) OR
-          // it parsed to a value ``formatHexInt`` rejects (a
-          // negative, NaN, fractional — none of which round-trip
-          // through the hex literal grammar). Emit the raw
-          // string in both cases so the inline validator flags
-          // the input instead of silently clearing the field
-          // and dropping the value from the YAML.
-          ctx.emitChange(path, raw);
-          return;
-        }
-        // Emit the canonical ``"0x..."`` string so the YAML
-        // serializer writes hex (``address: 0x76``) instead of
-        // decimal — matches what gets normalised at parse time
-        // for fields the user didn't touch. ESPHome's
-        // ``cv.hex_int`` accepts the string form.
-        ctx.emitChange(path, formatted);
+        // Try to parse + reformat. The canonical ``"0x..."``
+        // string (when both succeed) is what we want to land on
+        // disk — matches what ``normalizeHexValues`` writes for
+        // untouched fields, and ESPHome's ``cv.hex_int``
+        // accepts it. If either step fails — unparseable input
+        // (bare letters, ``0x`` with no digits) OR a parsed
+        // value ``formatHexInt`` rejects (negative, NaN,
+        // fractional — none round-trip through the hex literal
+        // grammar) — fall through to the raw string so the
+        // inline validator flags it instead of the form
+        // silently clearing the field.
+        ctx.emitChange(path, formatHexInt(parseHexInt(raw)) || raw);
       }}
       @blur=${() => ctx.clearEditingMagnitude(path)}
     />`,
