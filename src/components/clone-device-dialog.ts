@@ -186,8 +186,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         light-dismiss
       >
         <div class="field">
-          <label>${this._localize("dashboard.action_clone_name_label")}</label>
+          <label for="clone-new-name"
+            >${this._localize("dashboard.action_clone_name_label")}</label
+          >
           <input
+            id="clone-new-name"
             type="text"
             class=${err ? "invalid" : ""}
             .value=${this._name}
@@ -210,10 +213,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
               : nothing}
         </div>
         <div class="field">
-          <label
+          <label for="clone-friendly-name"
             >${this._localize("dashboard.action_clone_friendly_name_label")}</label
           >
           <input
+            id="clone-friendly-name"
             type="text"
             .value=${this._friendlyName}
             placeholder=${this._localize(
