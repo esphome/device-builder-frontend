@@ -137,7 +137,6 @@
     "action_friendly_name_success": "Renamed to \"{name}\"",
     "action_friendly_name_unchanged": "Friendly name unchanged",
     "action_friendly_name_failed": "Failed to rename \"{name}\": {reason}",
-    "action_friendly_name_install_failed": "Renamed \"{name}\" but install failed: {reason}",
     "action_api_key_title": "API Key",
     "action_api_key_show": "Show",
     "action_api_key_hide": "Hide",

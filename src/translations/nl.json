@@ -93,7 +93,6 @@
     "action_friendly_name_success": "Hernoemd naar \"{name}\"",
     "action_friendly_name_unchanged": "Vriendelijke naam ongewijzigd",
     "action_friendly_name_failed": "Hernoemen van \"{name}\" mislukt: {reason}",
-    "action_friendly_name_install_failed": "\"{name}\" hernoemd maar installatie mislukt: {reason}",
     "action_api_key_title": "API-sleutel",
     "action_api_key_show": "Tonen",
     "action_api_key_hide": "Verbergen",
