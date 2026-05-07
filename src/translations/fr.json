@@ -389,7 +389,8 @@
       "tuya": "Tuya",
       "shelly": "Shelly"
     },
-    "starter_kit": "À la une"
+    "starter_kit": "À la une",
+    "create_general_error": "La création du dispositif a échoué. Veuillez réessayer."
   },
   "device": {
     "navigator_title": "Navigateur d'appareil",

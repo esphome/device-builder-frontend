@@ -56,6 +56,18 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   @state()
   private _importError = "";
 
+  /** Catch-all error for the empty / basic create flows.
+   *
+   * Mirrors ``_importError`` but for the two paths that don't have
+   * their own bespoke "duplicate"/"invalid filename" messages. A
+   * backend ``CommandError`` (validation reject, name collision,
+   * unknown board, ...) lands here so the user sees something
+   * actionable on the dialog instead of the failure dropping
+   * silently to the browser console.
+   */
+  @state()
+  private _createError = "";
+
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
@@ -152,6 +164,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._importFile = null;
     this._submitting = false;
     this._importError = "";
+    this._createError = "";
     this._dialog.open = true;
   }
 
@@ -163,6 +176,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._importFile = null;
     this._submitting = false;
     this._importError = "";
+    this._createError = "";
     this._dialog.open = true;
   }
 
@@ -204,6 +218,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         ${this._renderStep()}
         ${this._importError
           ? html`<p class="error">${this._importError}</p>`
+          : nothing}
+        ${this._createError
+          ? html`<p class="error">${this._createError}</p>`
           : nothing}
       </wa-dialog>
     `;
@@ -301,6 +318,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (this._submitting) return;
     const { name } = e.detail;
     const slug = friendlyNameSlugify(name);
+    this._createError = "";
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
@@ -310,7 +328,13 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       });
       this._navigateToCreated(configuration);
     } catch (err) {
+      // Surface the backend's CommandError on the dialog rather
+      // than dropping it silently to the browser console — backend
+      // validation rejections (e.g. INVALID_ARGS for a YAML that
+      // doesn't validate) carry actionable messages the user needs
+      // to see.
       console.error("Failed to create empty config:", err);
+      this._createError = this._extractCreateErrorMessage(err);
     } finally {
       this._submitting = false;
     }
@@ -382,6 +406,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const { board, name, wifiSsid, wifiPassword } = e.detail;
     if (!board) return;
     const slug = friendlyNameSlugify(name);
+    this._createError = "";
     this._submitting = true;
     try {
       const { configuration } = await this._api.createDevice({
@@ -394,9 +419,31 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       this._navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
+      this._createError = this._extractCreateErrorMessage(err);
     } finally {
       this._submitting = false;
     }
+  }
+
+  /** Pull the user-facing message out of an APIError-shaped failure.
+   *
+   * Backend ``CommandError`` messages carry the actual validation
+   * detail (e.g. "Provide either board_id or file_content; ...");
+   * the WS client wraps them as ``APIError: <code>: <message>``.
+   * Strip the wrapper prefix(es) so the dialog renders just the
+   * message, not the protocol noise. Falls back to a localised
+   * generic when the error doesn't expose a message at all.
+   */
+  private _extractCreateErrorMessage(err: unknown): string {
+    const raw = err instanceof Error ? err.message : String(err);
+    if (!raw) return this._localize("wizard.create_general_error");
+    // Strip "APIError: " and the lowercase ErrorCode token
+    // (e.g. ``invalid_args:``, ``internal_error:``) so the
+    // surfaced text starts at the actual diagnostic.
+    return raw
+      .replace(/^APIError:\s*/, "")
+      .replace(/^[a-z_]+:\s*/, "")
+      .trim();
   }
 }
 

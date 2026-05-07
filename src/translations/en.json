@@ -485,7 +485,8 @@
       "sonoff": "Sonoff",
       "tuya": "Tuya",
       "shelly": "Shelly"
-    }
+    },
+    "create_general_error": "Failed to create the device. Please try again."
   },
   "device": {
     "navigator_title": "Device navigator",
