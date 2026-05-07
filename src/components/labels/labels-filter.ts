@@ -23,23 +23,19 @@ import {
   mdiTrashCanOutline,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
-import toast from "sonner-js";
-import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
+import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import {
   labelChipStyles,
 } from "../../util/label-chip-template.js";
-import { deleteConfirmKey } from "../../util/label-usage.js";
 import { labelChipStyleString } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "./label-form.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
@@ -60,23 +56,11 @@ export class ESPHomeLabelsFilter extends LitElement {
   @state()
   private _catalog: Label[] = [];
 
-  @consume({ context: apiContext })
-  @state()
-  private _api?: ESPHomeAPI;
-
   /** Currently-selected label ids. Source of truth lives on the
    *  parent (dashboard) so we don't drift with router state /
    *  query-string serialization later. */
   @property({ attribute: false })
   selected: string[] = [];
-
-  /** Per-label-id device count, fed from the dashboard which
-   *  already iterates the device list for filtering. Powers the
-   *  "this will remove the label from N devices" copy in the
-   *  delete-confirm dialog. Missing entries are treated as zero —
-   *  no warning if the label happens to be unused. */
-  @property({ attribute: false })
-  labelUsage: Record<string, number> = {};
 
   @state()
   private _open = false;
@@ -86,37 +70,13 @@ export class ESPHomeLabelsFilter extends LitElement {
   @state()
   private _editing: Label | null = null;
 
-  /** When non-null, a delete-confirm dialog is showing for this
-   *  label. The dialog stays mounted while in flight; cleared on
-   *  confirm / cancel / completion. */
-  @state()
-  private _pendingDelete: Label | null = null;
-
-  /** ``true`` while the delete API call is in flight. Disables the
-   *  confirm button so a double-click can't fire two deletes. */
-  @state()
-  private _deleting = false;
-
-  /** Snapshot of ``_editing.id`` taken when the form fires
-   *  ``submitting``. Used to drop a stale ``label-saved`` event
-   *  that resolves after the user has already navigated to a
-   *  different edit target — without this, the late event would
-   *  set ``_editing = null`` and kick the user out of the new
-   *  session. ``null`` means "no edit save in flight". */
-  private _pendingSaveFor: string | null = null;
-
-  @query("wa-dialog")
-  private _deleteDialog?: HTMLElement & { hide: () => Promise<void> };
-
   private _escape = new EscapeController(this, (e) => {
     e.preventDefault();
-    // Escape unwinds one level at a time: confirm → edit → close.
-    // Lets the user back out of a nested action without losing
-    // their place in the list.
-    if (this._pendingDelete) {
-      void this._dismissDeleteDialog();
-      return;
-    }
+    // Escape unwinds one level at a time: edit → close. The
+    // delete-confirm dialog isn't mounted by us — the dashboard
+    // owns it via the shared ``<esphome-confirm-dialog>`` — so
+    // its own light-dismiss / Escape handler closes it without
+    // our help.
     if (this._editing) {
       this._editing = null;
       return;
@@ -363,42 +323,6 @@ export class ESPHomeLabelsFilter extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
-      .delete-confirm-body {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-normal);
-        line-height: 1.5;
-      }
-
-      .delete-confirm-actions {
-        display: flex;
-        gap: var(--wa-space-xs);
-        justify-content: flex-end;
-        margin-top: var(--wa-space-m);
-      }
-
-      .delete-btn {
-        padding: 6px 14px;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        border-radius: var(--wa-border-radius-s);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
-        color: var(--wa-color-text-normal);
-        cursor: pointer;
-        font-family: inherit;
-      }
-
-      .delete-btn--danger {
-        background: var(--wa-color-danger-fill-loud);
-        color: var(--wa-color-danger-on-loud);
-        border-color: var(--wa-color-danger-fill-loud);
-      }
-
-      .delete-btn:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-      }
-
       .option-check {
         display: inline-flex;
         align-items: center;
@@ -454,22 +378,13 @@ export class ESPHomeLabelsFilter extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
-    if (changed.has("_catalog")) {
+    if (changed.has("_catalog") && this._editing) {
       // A push event from another client (or this one) may have
-      // dropped the label the user is currently editing or about to
-      // delete. Without this guard the form sits with a ``Label``
-      // that no longer exists, save would 404, and the delete
-      // confirm would warn about removing a label that's already
-      // gone. Bail out cleanly to the list mode instead.
-      if (this._editing && !this._catalog.some((l) => l.id === this._editing!.id)) {
+      // dropped the label the user is currently editing. Without
+      // this guard the form sits with a ``Label`` that no longer
+      // exists and save would 404. Bail out cleanly to list mode.
+      if (!this._catalog.some((l) => l.id === this._editing!.id)) {
         this._editing = null;
-        this._pendingSaveFor = null;
-      }
-      if (
-        this._pendingDelete &&
-        !this._catalog.some((l) => l.id === this._pendingDelete!.id)
-      ) {
-        this._pendingDelete = null;
       }
     }
   }
@@ -486,15 +401,6 @@ export class ESPHomeLabelsFilter extends LitElement {
 
   private _onDocumentClick = (e: MouseEvent) => {
     if (!this._open) return;
-    // wa-dialog portals into document.body on open; a click on its
-    // backdrop / cancel / delete buttons doesn't appear inside our
-    // shadow root, so the default "click outside" check would
-    // close the popover behind the dialog. Guard the popover-close
-    // for as long as the delete-confirm is showing — Escape /
-    // wa-after-hide / the dialog buttons all clear ``_pendingDelete``
-    // first, so this only suppresses the close while the dialog is
-    // genuinely active.
-    if (this._pendingDelete) return;
     if (e.composedPath().includes(this)) return;
     this._close();
   };
@@ -523,14 +429,6 @@ export class ESPHomeLabelsFilter extends LitElement {
           : nothing}
       </button>
       ${this._open ? this._renderPopover(selectedSet) : nothing}
-      ${/* Render the delete-confirm dialog at the trigger level
-            (outside the popover-conditional) so an in-flight
-            ``deleteLabel`` survives the user closing the popover —
-            wa-dialog portals into document.body either way, but
-            unmounting it mid-flight would leave the user with no
-            way to see a failure toast or know whether the request
-            had completed. */ ""}
-      ${this._renderDeleteDialog()}
     `;
   }
 
@@ -594,7 +492,20 @@ export class ESPHomeLabelsFilter extends LitElement {
                   title=${this._localize("dashboard.labels_delete")}
                   @click=${(e: Event) => {
                     e.stopPropagation();
-                    this._pendingDelete = label;
+                    // The actual confirm dialog + delete round
+                    // trip lives on the dashboard page, which
+                    // already owns one ``<esphome-confirm-dialog>``
+                    // instance shared across every destructive
+                    // action. Bubbling a request event keeps the
+                    // labels filter focused on filter / catalog
+                    // browse and avoids reinventing the dialog UX.
+                    this.dispatchEvent(
+                      new CustomEvent<Label>("request-delete-label", {
+                        detail: label,
+                        bubbles: true,
+                        composed: true,
+                      }),
+                    );
                   }}
                 >
                   <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
@@ -637,52 +548,9 @@ export class ESPHomeLabelsFilter extends LitElement {
         .existingNames=${this._catalog.map((l) => l.name)}
         .editing=${label}
         compact
-        @submitting=${this._onSaveSubmitting}
         @label-saved=${this._onLabelSaved}
         @editing-cancel=${this._exitEditMode}
       ></esphome-label-form>
-    `;
-  }
-
-  private _renderDeleteDialog() {
-    const target = this._pendingDelete;
-    if (!target) return nothing;
-    const usage = this.labelUsage[target.id] ?? 0;
-    const messageKey = deleteConfirmKey(usage);
-    return html`
-      <wa-dialog
-        open
-        light-dismiss
-        label=${this._localize("dashboard.labels_delete_title")}
-        @wa-after-hide=${() => {
-          // Don't drop ``_pendingDelete`` while the request is in
-          // flight — the dialog will re-render itself open if the
-          // call fails so the user can see the toast and retry.
-          if (!this._deleting) this._pendingDelete = null;
-        }}
-      >
-        <div class="delete-confirm-body">
-          ${this._localize(messageKey, { name: target.name, count: usage })}
-        </div>
-        <div class="delete-confirm-actions">
-          <button
-            type="button"
-            class="delete-btn"
-            ?disabled=${this._deleting}
-            @click=${() => void this._dismissDeleteDialog()}
-          >
-            ${this._localize("dashboard.labels_create_cancel")}
-          </button>
-          <button
-            type="button"
-            class="delete-btn delete-btn--danger"
-            ?disabled=${this._deleting}
-            @click=${() => void this._confirmDelete(target)}
-          >
-            ${this._localize("dashboard.labels_delete_submit")}
-          </button>
-        </div>
-      </wa-dialog>
     `;
   }
 
@@ -695,75 +563,25 @@ export class ESPHomeLabelsFilter extends LitElement {
     this._emit([...this.selected, id]);
   };
 
-  /** Snapshot the label the user just clicked Save on so a stale
-   *  ``label-saved`` event resolving after the user has already
-   *  navigated away can't flip the popover out of a fresh edit
-   *  session for a different label. Same shape as the editor's
-   *  device-swap race fix. */
-  private _onSaveSubmitting = () => {
-    this._pendingSaveFor = this._editing?.id ?? null;
-  };
-
   private _onLabelSaved = (e: CustomEvent<Label>) => {
-    const expected = this._pendingSaveFor;
-    this._pendingSaveFor = null;
-    // Drop late events from a previous edit session — the form
-    // bubbles ``label-saved`` whenever its ``updateLabel`` resolves,
-    // and a user who clicked Save → Back → opened a different
-    // label's edit form would otherwise be kicked out of the new
-    // session by the in-flight previous one. We also drop the
-    // event when ``_editing`` no longer matches the saved label
-    // (e.g. user backed out manually before the round trip
-    // returned).
-    if (expected !== e.detail.id) return;
+    // Drop late events that don't match the current edit target.
+    // Toggling between list and edit mode replaces the form
+    // element entirely (different conditional branches in the
+    // popover render), so a detached form's resolution event
+    // doesn't reach us in normal use — but if a future refactor
+    // collapses the two branches into a single reused form, this
+    // ``_editing.id`` check still keeps a stale resolution from
+    // kicking the user out of a fresh edit session.
     if (this._editing?.id !== e.detail.id) return;
-    // The form already round-tripped to ``labels/update`` and the
-    // backend's ``LABEL_UPDATED`` push will refresh the catalog
-    // through the labelsContext. Just return the popover to list
-    // mode so the user sees their renamed chip in the list.
+    // ``LABEL_UPDATED`` push refreshes the catalog through the
+    // labelsContext; just return the popover to list mode so the
+    // user sees their renamed chip in the list.
     this._editing = null;
   };
 
   private _exitEditMode = () => {
     this._editing = null;
-    this._pendingSaveFor = null;
   };
-
-  /** Hide the delete dialog through wa-dialog's own close path so
-   *  the hide animation plays. ``wa-after-hide`` clears
-   *  ``_pendingDelete`` once the animation finishes. Falls back to
-   *  the synchronous state clear if the dialog isn't mounted (e.g.
-   *  Escape fired before the first render). */
-  private async _dismissDeleteDialog() {
-    if (this._deleteDialog) {
-      await this._deleteDialog.hide();
-      return;
-    }
-    this._pendingDelete = null;
-  }
-
-  private async _confirmDelete(label: Label) {
-    if (!this._api || this._deleting) return;
-    this._deleting = true;
-    try {
-      await this._api.deleteLabel(label.id);
-      // Drop the deleted id from the active filter selection so a
-      // stale chip doesn't outlive the catalog entry — the
-      // alternative (silently keeping the id) leaves the filter
-      // matching nothing with no visible explanation.
-      if (this.selected.includes(label.id)) {
-        this._emit(this.selected.filter((id) => id !== label.id));
-      }
-      this._pendingDelete = null;
-    } catch (err) {
-      console.warn("label delete failed", err);
-      toast.error(this._localize("dashboard.labels_delete_failed"), {
-        richColors: true,
-      });
-    } finally {
-      this._deleting = false;
-    }
-  }
 
   private _toggle = () => {
     this._open = !this._open;
@@ -772,17 +590,10 @@ export class ESPHomeLabelsFilter extends LitElement {
   private _close() {
     if (!this._open) return;
     this._open = false;
-    // Reset transient sub-views so a subsequent re-open shows the
-    // catalog list. Without this, closing the popover via the
-    // trigger button while a delete-confirm or edit form was
-    // active would leave that state set, and the next open would
-    // reopen the dialog / edit form instead of the list — which is
-    // never what the user expects after explicitly closing.
+    // Reset to the list mode so a subsequent re-open shows the
+    // catalog rather than dropping the user back into a partial
+    // edit session they explicitly closed away from.
     this._editing = null;
-    this._pendingSaveFor = null;
-    if (this._pendingDelete && !this._deleting) {
-      this._pendingDelete = null;
-    }
   }
 
   private _emit(next: string[]) {
