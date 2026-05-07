@@ -4,6 +4,8 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
+import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -35,50 +37,11 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    modalDialogStyles,
+    dialogCloseButtonStyles,
     css`
       wa-dialog {
         --width: 420px;
-      }
-
-      wa-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      wa-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
-        padding: 0 var(--wa-space-l);
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
-      }
-
-      .body {
-        display: flex;
-        align-items: flex-start;
-        gap: var(--wa-space-m);
-        padding-bottom: var(--wa-space-m);
-      }
-
-      .icon-wrap {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        flex-shrink: 0;
       }
 
       .icon-wrap.destructive {
@@ -89,48 +52,6 @@ export class ESPHomeConfirmDialog extends LitElement {
       .icon-wrap:not(.destructive) {
         background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
         color: var(--esphome-primary);
-      }
-
-      .icon-wrap wa-icon {
-        font-size: 22px;
-      }
-
-      .text {
-        flex: 1;
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.5;
-      }
-
-      .actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
-      }
-
-      .btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 8px 18px;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition: background 0.12s;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover {
-        background: var(--wa-color-surface-border);
       }
 
       .btn--confirm {
