@@ -221,6 +221,43 @@ function _validateEntriesRecursive(
     // we don't want to require fields the user can't even see.
     if (!isEntryVisible(entry, values, presentComponents, targetPlatform)) continue;
 
+    if (entry.type === ConfigEntryType.NESTED && entry.multi_value) {
+      // List-form NESTED (``esphome.devices`` / ``esphome.areas``):
+      // validate each item independently with an array-index path
+      // segment so errors land at ``devices.0.id`` etc. — matching
+      // how the form looks errors up via ``path.join(".")``. An
+      // empty list on an optional field is fine (the user opted
+      // out by adding nothing); a required list with zero items
+      // surfaces a single error on the field itself.
+      const child = values[entry.key];
+      const items = Array.isArray(child) ? child : [];
+      if (items.length === 0) {
+        if (entry.required) {
+          const fullPath = [...pathPrefix, entry.key].join(".");
+          errors.set(fullPath, {
+            key: fullPath,
+            code: "validation.required",
+          });
+        }
+        continue;
+      }
+      items.forEach((item, idx) => {
+        const itemValues =
+          item !== null && typeof item === "object" && !Array.isArray(item)
+            ? (item as Record<string, unknown>)
+            : {};
+        _validateEntriesRecursive(
+          entry.config_entries ?? [],
+          itemValues,
+          presentComponents,
+          targetPlatform,
+          [...pathPrefix, entry.key, String(idx)],
+          errors,
+        );
+      });
+      continue;
+    }
+
     if (entry.type === ConfigEntryType.NESTED) {
       const child = values[entry.key];
       const childValues =

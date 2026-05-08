@@ -194,6 +194,91 @@ describe("validateEntries", () => {
     expect(errors.size).toBe(0);
   });
 
+  it("validates each item of a multi_value NESTED entry with index path segments", () => {
+    // ``esphome.devices`` / ``esphome.areas`` shape: the catalog
+    // marks the field optional but each item's ``id`` is required.
+    // Validation must visit every item and key errors at
+    // ``devices.<idx>.<child>`` so the form can look them up via
+    // ``path.join(".")`` against the renderer's per-item paths.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        required: false,
+        config_entries: [
+          makeEntry({ key: "id", required: true }),
+          makeEntry({ key: "name" }),
+        ],
+      }),
+    ];
+    const errors = validateEntries(entries, {
+      devices: [
+        { id: "front" },
+        {}, // missing required id
+        { id: "kitchen", name: "Kitchen" },
+      ],
+    });
+    expect(errors.get("devices.1.id")?.code).toBe("validation.required");
+    // Other items should be clean.
+    expect(errors.has("devices.0.id")).toBe(false);
+    expect(errors.has("devices.2.id")).toBe(false);
+  });
+
+  it("does not validate inside an empty optional multi_value NESTED entry", () => {
+    // Adding zero devices is fine for an optional field — forcing
+    // an item just to opt out would mirror the bug
+    // ``does not require nested children of an untouched optional
+    // group`` already pins for single-nested.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    expect(validateEntries(entries, {}).size).toBe(0);
+    expect(validateEntries(entries, { devices: [] }).size).toBe(0);
+  });
+
+  it("flags an empty required multi_value NESTED entry on the field itself", () => {
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        required: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, { devices: [] });
+    expect(errors.get("devices")?.code).toBe("validation.required");
+    // Items aren't there to validate, so no per-item errors.
+    expect(errors.size).toBe(1);
+  });
+
+  it("coerces non-object items to {} so each item is still validated cleanly", () => {
+    // js-yaml round-trips can briefly emit ``null`` items mid-edit
+    // (a stray ``-`` line). Validation should treat those as empty
+    // mappings — the recursion shouldn't blow up on
+    // ``Object.keys(null)``-style descents.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, {
+      devices: [null, "weird", { id: "real" }],
+    });
+    expect(errors.get("devices.0.id")?.code).toBe("validation.required");
+    expect(errors.get("devices.1.id")?.code).toBe("validation.required");
+    expect(errors.has("devices.2.id")).toBe(false);
+  });
+
   it("does not require nested children of an untouched optional group", () => {
     // web_server.auth in real life: the auth block is optional but
     // its username/password children are required. The user must be

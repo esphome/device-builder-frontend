@@ -85,6 +85,14 @@ function hasMaterialValue(
 ): boolean {
   const value = values[entry.key];
   if (entry.type === ConfigEntryType.NESTED) {
+    if (entry.multi_value) {
+      // Repeatable nested mapping (``esphome.devices`` /
+      // ``esphome.areas``): any non-empty array of items counts.
+      // We don't recurse — items are user-added, and a freshly
+      // added empty ``{}`` still represents user intent (the row
+      // exists because they clicked Add).
+      return Array.isArray(value) && value.length > 0;
+    }
     if (value === null || typeof value !== "object" || Array.isArray(value)) {
       return false;
     }
@@ -118,6 +126,15 @@ export function filterRenderable(
       !opts.showAdvanced &&
       !hasMaterialValue(entry, values)
     ) {
+      continue;
+    }
+    if (entry.type === ConfigEntryType.NESTED && entry.multi_value) {
+      // List-form NESTED always renders — the renderer paints the
+      // Add button even with zero items, and ``filterRenderable``
+      // is called per-item at render time with the item's own
+      // scope. Skipping based on the parent ``values`` shape would
+      // hide the field exactly when the user needs it.
+      out.push(entry);
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {
@@ -172,6 +189,28 @@ export function collectRenderablePaths(
   out: Set<string> = new Set(),
 ): Set<string> {
   for (const entry of filterRenderable(entries, values, opts)) {
+    if (entry.type === ConfigEntryType.NESTED && entry.multi_value) {
+      // List-form NESTED: emit one path tree per item with the
+      // index segment (``devices.0.id``) so ``_anyErrorIsVisible``
+      // can reconcile validation errors keyed on per-item leaves.
+      const child = values[entry.key];
+      const items = Array.isArray(child) ? child : [];
+      items.forEach((item, idx) => {
+        const itemValues =
+          item !== null && typeof item === "object" && !Array.isArray(item)
+            ? (item as Record<string, unknown>)
+            : {};
+        collectRenderablePaths(
+          entry.config_entries ?? [],
+          itemValues,
+          opts,
+          [...pathPrefix, entry.key, String(idx)],
+          out,
+        );
+      });
+      out.add([...pathPrefix, entry.key].join("."));
+      continue;
+    }
     if (entry.type === ConfigEntryType.NESTED) {
       const child = values[entry.key];
       const childValues =
