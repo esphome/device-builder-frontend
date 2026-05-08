@@ -37,7 +37,6 @@ const _BASE = {
   current_version: "",
   deployed_version: "",
   loaded_integrations: [],
-  directly_referenced_integrations: [],
   state: DeviceState.UNKNOWN,
   expected_config_hash: "",
   deployed_config_hash: "",

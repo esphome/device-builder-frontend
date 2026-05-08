@@ -26,7 +26,7 @@
  * Graceful-degrade signal: when the backend couldn't resolve
  * the YAML — mid-edit drafts, missing secrets — it emits an
  * empty `directly_referenced_integrations` array. We treat
- * that as "split is unknown" (`splitable: false`) and put
+ * that as "split is unknown" (`splittable: false`) and put
  * everything into `direct` so the drawer renders the original
  * flat list under its existing header. Per-call branch in the
  * drawer's render template stays a one-liner.
@@ -43,7 +43,7 @@ export interface IntegrationSplit {
    * `direct`" as a graceful degrade — the caller should hide
    * the indirect collapsible entirely in that case.
    */
-  splitable: boolean;
+  splittable: boolean;
 }
 
 export function splitIntegrations(
@@ -56,7 +56,7 @@ export function splitIntegrations(
     // Graceful degrade — backend doesn't know what's direct, so
     // we render everything as direct (matches the pre-#422
     // flat-list behaviour exactly).
-    return { direct: [...loadedList], indirect: [], splitable: false };
+    return { direct: [...loadedList], indirect: [], splittable: false };
   }
   const directSet = new Set(direct);
   const directBucket: string[] = [];
@@ -71,6 +71,6 @@ export function splitIntegrations(
   return {
     direct: directBucket,
     indirect: indirectBucket,
-    splitable: true,
+    splittable: true,
   };
 }

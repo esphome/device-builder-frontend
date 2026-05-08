@@ -111,12 +111,14 @@ export interface ConfiguredDevice {
    * ``mdns`` from ``api``, ``web_server_base`` from ``web_server``,
    * ``voltage_sampler`` from ADC sensors).
    *
-   * Empty array is the graceful-degrade signal — backend couldn't
-   * resolve the YAML (mid-edit drafts, missing secrets) so it
-   * doesn't know what's direct. The drawer falls back to
-   * rendering ``loaded_integrations`` as a flat list.
+   * Optional on the wire: older backends (pre-#425) don't emit
+   * the field at all, and a backend whose resolved-YAML parse
+   * failed mid-edit emits an empty array. Both are the
+   * graceful-degrade signal — the drawer falls back to rendering
+   * ``loaded_integrations`` as a flat list. ``splitIntegrations``
+   * accepts ``null`` / ``undefined`` / ``[]`` interchangeably.
    */
-  directly_referenced_integrations: string[];
+  directly_referenced_integrations?: string[];
   state: DeviceState;
   /**
    * 8-char hex hash of the YAML as last successfully compiled,

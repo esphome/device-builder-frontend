@@ -12,7 +12,7 @@
  *     normal path, validates ordering + bucket assignment.
  *  2. Empty ``directly_referenced_integrations`` (graceful
  *     degrade — backend couldn't resolve the YAML) — everything
- *     lands in ``direct`` with ``splitable: false`` so the
+ *     lands in ``direct`` with ``splittable: false`` so the
  *     drawer falls back to the pre-#422 flat-list rendering.
  *  3. Empty ``loaded_integrations`` — empty buckets either way.
  *  4. ``null`` / ``undefined`` inputs — defensive against the
@@ -72,7 +72,7 @@ describe("splitIntegrations", () => {
       "socket",
       "watchdog",
     ]);
-    expect(result.splitable).toBe(true);
+    expect(result.splittable).toBe(true);
   });
 
   it("preserves the input ordering within each bucket", () => {
@@ -103,7 +103,7 @@ describe("splitIntegrations", () => {
     const result = splitIntegrations(loaded, []);
     expect(result.direct).toEqual(["api", "wifi", "logger"]);
     expect(result.indirect).toEqual([]);
-    expect(result.splitable).toBe(false);
+    expect(result.splittable).toBe(false);
   });
 
   it("returns empty buckets for empty loaded_integrations", () => {
@@ -115,9 +115,9 @@ describe("splitIntegrations", () => {
     expect(result.indirect).toEqual([]);
     // ``directly_referenced_integrations`` was non-empty so the
     // backend DID compute a split — there just wasn't anything
-    // loaded to bucket. ``splitable: true`` is harmless either
+    // loaded to bucket. ``splittable: true`` is harmless either
     // way (the drawer hides the section anyway).
-    expect(result.splitable).toBe(true);
+    expect(result.splittable).toBe(true);
   });
 
   it("treats null / undefined as empty", () => {
@@ -127,17 +127,17 @@ describe("splitIntegrations", () => {
     expect(splitIntegrations(null, null)).toEqual({
       direct: [],
       indirect: [],
-      splitable: false,
+      splittable: false,
     });
     expect(splitIntegrations(undefined, undefined)).toEqual({
       direct: [],
       indirect: [],
-      splitable: false,
+      splittable: false,
     });
     expect(splitIntegrations(["api"], null)).toEqual({
       direct: ["api"],
       indirect: [],
-      splitable: false,
+      splittable: false,
     });
   });
 
@@ -153,6 +153,6 @@ describe("splitIntegrations", () => {
     const result = splitIntegrations(loaded, direct);
     expect(result.direct).toEqual(["api", "wifi"]);
     expect(result.indirect).toEqual([]);
-    expect(result.splitable).toBe(true);
+    expect(result.splittable).toBe(true);
   });
 });
