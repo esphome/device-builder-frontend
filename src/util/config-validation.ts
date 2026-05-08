@@ -5,26 +5,47 @@ import { parseFloatWithUnit } from "./float-with-unit.js";
 /**
  * Determine if a config entry is currently visible.
  *
- * Visibility is the AND of three checks:
+ * Visibility is the AND of four checks:
  *  1. `hidden === false`
  *  2. The `depends_on` predicate against the current form values
  *  3. `depends_on_component` is present in `presentComponents` (when given)
+ *  4. The device's target platform is in ``supported_platforms``
+ *     when the entry is platform-gated (when ``targetPlatform`` given)
  *
- * Pass `presentComponents` to honor the third check; when omitted the
- * cross-component dependency is treated as satisfied (callers without
- * device-wide context — e.g. add-component before insertion — should
- * leave it undefined).
+ * Pass `presentComponents` / `targetPlatform` to honor checks #3 / #4;
+ * when omitted those dependencies are treated as satisfied (callers
+ * without device-wide context — e.g. add-component before insertion
+ * with no board picked — should leave them undefined).
+ *
+ * Used by both ``filterRenderable`` (deciding what to paint) and
+ * ``validateEntries`` (deciding what to validate). Keeping the
+ * predicate in one place means a hidden-by-platform field can't be
+ * paint-skipped but still validated as required — the failure mode
+ * Copilot flagged on PR #226.
  */
 export function isEntryVisible(
   entry: ConfigEntry,
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
+  targetPlatform?: string | null,
 ): boolean {
   if (entry.hidden) return false;
 
   // Cross-component dependency: only check when caller provided context.
   if (entry.depends_on_component && presentComponents) {
     if (!presentComponents.has(entry.depends_on_component)) return false;
+  }
+
+  // Platform gate: only check when caller provided the target platform.
+  // Empty / missing ``supported_platforms`` is "no constraint" (the
+  // common case) and the field stays visible.
+  if (
+    targetPlatform &&
+    entry.supported_platforms &&
+    entry.supported_platforms.length > 0 &&
+    !entry.supported_platforms.includes(targetPlatform)
+  ) {
+    return false;
   }
 
   if (!entry.depends_on) return true;
@@ -167,9 +188,17 @@ export function validateEntries(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
+  targetPlatform?: string | null,
 ): Map<string, ValidationError> {
   const errors = new Map<string, ValidationError>();
-  _validateEntriesRecursive(entries, values, presentComponents, [], errors);
+  _validateEntriesRecursive(
+    entries,
+    values,
+    presentComponents,
+    targetPlatform,
+    [],
+    errors,
+  );
   return errors;
 }
 
@@ -183,13 +212,14 @@ function _validateEntriesRecursive(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   presentComponents: Set<string> | undefined,
+  targetPlatform: string | null | undefined,
   pathPrefix: string[],
   errors: Map<string, ValidationError>,
 ): void {
   for (const entry of entries) {
     // Skip hidden entries and those whose visibility predicates fail —
     // we don't want to require fields the user can't even see.
-    if (!isEntryVisible(entry, values, presentComponents)) continue;
+    if (!isEntryVisible(entry, values, presentComponents, targetPlatform)) continue;
 
     if (entry.type === ConfigEntryType.NESTED) {
       const child = values[entry.key];
@@ -212,6 +242,7 @@ function _validateEntriesRecursive(
         entry.config_entries ?? [],
         childValues,
         presentComponents,
+        targetPlatform,
         [...pathPrefix, entry.key],
         errors,
       );

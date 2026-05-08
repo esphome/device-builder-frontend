@@ -313,4 +313,84 @@ describe("validateEntries", () => {
     const values = { id: "i2c_1" };
     expect(validateEntries(i2cEntries, values).size).toBe(0);
   });
+
+  // ---------------------------------------------------------------------
+  // supported_platforms gate (mirrors the filterRenderable gate so a
+  // hidden-by-platform required field doesn't get flagged as missing —
+  // the bug Copilot caught on PR #226 before this lockstep was added).
+
+  it("does not require a platform-gated entry on an incompatible board", () => {
+    // ``sensor.debug.psram`` is required-only-on-esp32 in upstream's
+    // schema — when the user picks the debug component on an
+    // esp8266 board the form hides the field, so we must NOT
+    // surface a "required" error for it (the user can't see the
+    // input to fill it in).
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+    ];
+    expect(
+      validateEntries(entries, {}, undefined, "esp8266").size,
+    ).toBe(0);
+    // On the matching platform the gate is a no-op and the missing
+    // required field is still flagged.
+    expect(
+      validateEntries(entries, {}, undefined, "esp32").get("psram")?.code,
+    ).toBe("validation.required");
+  });
+
+  it("treats a null/undefined targetPlatform as 'no gate'", () => {
+    // The add-component dialog opens before a board is locked in;
+    // we don't have a target platform yet, so platform-gated fields
+    // stay visible *and* validatable. Once the user picks a board
+    // the validation re-runs with targetPlatform set and gated
+    // fields drop out of the required set.
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+    ];
+    expect(
+      validateEntries(entries, {}).get("psram")?.code,
+    ).toBe("validation.required");
+    expect(
+      validateEntries(entries, {}, undefined, null).get("psram")?.code,
+    ).toBe("validation.required");
+  });
+
+  it("recurses through NESTED groups with the platform gate", () => {
+    // Pin that the gate flows down — a required leaf inside a
+    // nested group, gated to esp32, should not be flagged on
+    // esp8266 even though the parent NESTED is unconstrained.
+    const entries = [
+      makeEntry({
+        key: "diagnostics",
+        type: ConfigEntryType.NESTED,
+        config_entries: [
+          makeEntry({
+            key: "psram",
+            required: true,
+            supported_platforms: ["esp32"],
+          }),
+        ],
+      }),
+    ];
+    // Provide a non-empty diagnostics dict so the "untouched optional
+    // group" short-circuit doesn't skip validation — we want to
+    // exercise the platform gate on the leaf.
+    const values = { diagnostics: { psram: undefined } };
+    expect(
+      validateEntries(entries, values, undefined, "esp8266").size,
+    ).toBe(0);
+    expect(
+      validateEntries(entries, values, undefined, "esp32").get(
+        "diagnostics.psram",
+      )?.code,
+    ).toBe("validation.required");
+  });
 });

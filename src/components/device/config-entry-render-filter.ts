@@ -49,19 +49,17 @@ export interface RenderFilterOptions {
   presentComponents?: Set<string>;
   /**
    * The device's target platform (``esp32`` / ``esp8266`` /
-   * ``rp2040`` / ...). When set, entries whose
-   * ``supported_platforms`` is non-empty AND doesn't include this
-   * value are filtered out — pre-emptively hiding fields that
-   * would fail validation at compile time on the user's selected
-   * board (see ``ConfigEntry.supported_platforms`` and the
-   * upstream ``cv.only_on`` validator they're derived from).
+   * ``rp2040`` / ...). Forwarded to ``isEntryVisible`` which
+   * applies the actual platform gate against
+   * ``ConfigEntry.supported_platforms``. Keeping the predicate
+   * inside ``isEntryVisible`` (rather than re-implementing it
+   * here) means ``validateEntries``, which also calls
+   * ``isEntryVisible``, stays in lockstep with what the form
+   * paints — no flagging required-and-platform-gated fields the
+   * user can't even see.
    *
    * ``null`` / ``undefined`` skips the gate — used by the
-   * add-component dialog when no board is selected yet. The
-   * cross-component validation-error visibility check
-   * (``collectRenderablePaths``) passes the same value so an
-   * error keyed on a hidden-by-platform field doesn't claim the
-   * paint exists.
+   * add-component dialog when no board is selected yet.
    */
   targetPlatform?: string | null;
 }
@@ -105,16 +103,14 @@ export function filterRenderable(
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   for (const entry of entries) {
-    if (!isEntryVisible(entry, values, opts.presentComponents)) continue;
     if (
-      entry.supported_platforms &&
-      entry.supported_platforms.length > 0 &&
-      opts.targetPlatform &&
-      !entry.supported_platforms.includes(opts.targetPlatform)
+      !isEntryVisible(
+        entry,
+        values,
+        opts.presentComponents,
+        opts.targetPlatform,
+      )
     ) {
-      // Field is platform-gated and the device's target chip isn't
-      // in the allowlist — hide it so the user can't fill in
-      // something that will fail compile.
       continue;
     }
     if (
