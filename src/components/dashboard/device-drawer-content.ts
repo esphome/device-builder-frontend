@@ -520,9 +520,20 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         margin-top: var(--wa-space-2xs);
       }
 
+      /* TXT keys are device-controlled — a malicious or
+         misbehaving firmware can broadcast an absurdly long key
+         that would otherwise expand the dt column under a plain
+         max-content sizing and squeeze the value column to
+         nothing (or push the drawer's horizontal scrollbar).
+         The minmax(0, max-content) lets the dt column shrink
+         below its natural size when the row would overflow, and
+         overflow-wrap: anywhere lets long keys break mid-string
+         so they actually wrap inside the shrunken column rather
+         than overflowing it. Same defensive shape on dd for
+         symmetry — TXT values are equally device-controlled. */
       .mdns-txt-list {
         display: grid;
-        grid-template-columns: max-content 1fr;
+        grid-template-columns: minmax(0, max-content) 1fr;
         column-gap: var(--wa-space-s);
         row-gap: 2px;
         margin: var(--wa-space-2xs) 0 0 0;
@@ -532,13 +543,13 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       .mdns-txt-list > dt {
         color: var(--wa-color-text-quiet);
         font-family: var(--wa-font-family-code, monospace);
-        white-space: nowrap;
+        overflow-wrap: anywhere;
       }
 
       .mdns-txt-list > dd {
         margin: 0;
         font-family: var(--wa-font-family-code, monospace);
-        word-break: break-all;
+        overflow-wrap: anywhere;
       }
 
       .status-badges {

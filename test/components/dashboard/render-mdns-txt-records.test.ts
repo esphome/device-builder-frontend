@@ -208,24 +208,37 @@ describe("renderMdnsTxtRecords", () => {
     expect(allValues).toContain("<key>");
   });
 
-  it("passes the record count to the localize call", () => {
-    // The summary label is "Show {count} mDNS TXT records" — pin
-    // that the count goes through the localize call so a
-    // translator's plural-aware substitution gets the actual
-    // entry count, not a hard-coded number.
+  it("uses the singular summary key for a single record", () => {
+    // Switch keys at the call site (matches the codebase's
+    // ``discovered_count_singular`` / ``_plural`` pattern) — a
+    // single-record summary picks the singular key, multi-record
+    // picks plural. Avoids the "Show 1 mDNS TXT records"
+    // ungrammatical fallback that a single-template
+    // ``record(s)`` shorthand would produce.
     const calls: Array<[string, Record<string, unknown> | undefined]> = [];
     const localize = (key: string, args?: Record<string, unknown>): string => {
       calls.push([key, args]);
       return key;
     };
-    renderMdnsTxtRecords(
-      { version: "1.0", mac: "aa:bb:cc" },
-      localize,
-    );
-    const summaryCall = calls.find(
-      ([key]) => key === "dashboard.drawer_show_mdns_txt_records",
-    );
-    expect(summaryCall).toBeDefined();
-    expect(summaryCall?.[1]).toEqual({ count: 2 });
+    renderMdnsTxtRecords({ version: "1.0" }, localize);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual([
+      "dashboard.drawer_show_mdns_txt_records_singular",
+      { count: 1 },
+    ]);
+  });
+
+  it("uses the plural summary key for two or more records", () => {
+    const calls: Array<[string, Record<string, unknown> | undefined]> = [];
+    const localize = (key: string, args?: Record<string, unknown>): string => {
+      calls.push([key, args]);
+      return key;
+    };
+    renderMdnsTxtRecords({ version: "1.0", mac: "aa:bb:cc" }, localize);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual([
+      "dashboard.drawer_show_mdns_txt_records_plural",
+      { count: 2 },
+    ]);
   });
 });
