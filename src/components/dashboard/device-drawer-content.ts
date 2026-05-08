@@ -50,7 +50,10 @@ import { formatFileSize } from "../../util/format-file-size.js";
 import { splitIntegrations } from "../../util/integration-split.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
-import { renderIpValue } from "./device-drawer-render.js";
+import {
+  renderIpValue,
+  renderMdnsTxtRecords,
+} from "./device-drawer-render.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -120,6 +123,14 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
+  /** Decoded TXT record key/value pairs from the device's
+   *  ``_esphomelib._tcp.local.`` announce, only set on the mDNS
+   *  row. The renderer drops a chevron-collapsible underneath
+   *  the row when this is present so users can debug what the
+   *  device is broadcasting (version mismatch, lost
+   *  ``api_encryption`` advertisement, stale ``mac``). ``null``
+   *  / omitted hides the section. */
+  txtRecords?: Record<string, string> | null;
 }
 
 @customElement("esphome-device-drawer-content")
@@ -499,6 +510,47 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
       .tags-wrap--auto-loaded {
         margin-top: var(--wa-space-2xs);
+      }
+
+      /* Same muted-summary treatment as the integrations
+         collapsible, but scoped to the reachability row's content
+         column. The TXT records are debug-only metadata; we don't
+         want them styled like another data row. */
+      .mdns-txt-details {
+        margin-top: var(--wa-space-2xs);
+      }
+
+      .mdns-txt-details > summary {
+        cursor: pointer;
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        padding: 2px 0;
+        user-select: none;
+      }
+
+      .mdns-txt-details > summary:hover {
+        color: var(--wa-color-text-normal);
+      }
+
+      .mdns-txt-list {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        column-gap: var(--wa-space-s);
+        row-gap: 2px;
+        margin: var(--wa-space-2xs) 0 0 0;
+        font-size: var(--wa-font-size-2xs);
+      }
+
+      .mdns-txt-list > dt {
+        color: var(--wa-color-text-quiet);
+        font-family: var(--wa-font-family-code, monospace);
+        white-space: nowrap;
+      }
+
+      .mdns-txt-list > dd {
+        margin: 0;
+        font-family: var(--wa-font-family-code, monospace);
+        word-break: break-all;
       }
 
       .status-badges {
@@ -1211,6 +1263,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         icon: "access-point-network",
         labelKey: "dashboard.drawer_source_mdns",
         age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
+        txtRecords: r.mdns_txt_records ?? null,
       },
       {
         source: "ping",
@@ -1287,6 +1340,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
               : nothing}
           </div>
+          ${renderMdnsTxtRecords(row.txtRecords, this._localize)}
         </div>
       </div>
     `;
