@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiEye, mdiEyeOff, mdiWifi } from "@mdi/js";
+import { mdiWifi } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -8,13 +8,15 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { type PasswordInputValueChange } from "./device/password-input-event.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/input/input.js";
+import "./device/password-input.js";
 
-registerMdiIcons({ eye: mdiEye, "eye-off": mdiEyeOff, wifi: mdiWifi });
+registerMdiIcons({ wifi: mdiWifi });
 
 /**
  * First-run Wi-Fi setup dialog.
@@ -53,9 +55,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   private _password = "";
 
   @state()
-  private _showPassword = false;
-
-  @state()
   private _saving = false;
 
   @state()
@@ -67,7 +66,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   open() {
     this._ssid = "";
     this._password = "";
-    this._showPassword = false;
     this._saving = false;
     this._error = null;
     this._dialog.open = true;
@@ -116,32 +114,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         color: var(--wa-color-text-normal);
       }
 
-      .password-row {
-        display: flex;
-        align-items: stretch;
-        gap: var(--wa-space-2xs);
-      }
-
-      .password-row wa-input {
-        flex: 1;
-      }
-
-      .reveal-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        background: transparent;
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-m);
-        padding: 0 12px;
-        color: var(--wa-color-text-quiet);
-        cursor: pointer;
-      }
-
-      .reveal-btn:hover {
-        color: var(--wa-color-text-normal);
-      }
-
       .error {
         color: var(--esphome-error);
         font-size: var(--wa-font-size-s);
@@ -186,36 +158,17 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
           </div>
           <div class="field">
             <label for="onboarding-password">${this._localize("onboarding.wifi.password_label")}</label>
-            <div class="password-row">
-              <wa-input
-                id="onboarding-password"
-                type=${this._showPassword ? "text" : "password"}
-                .value=${this._password}
-                maxlength="64"
-                placeholder=${this._localize("onboarding.wifi.password_placeholder")}
-                ?disabled=${this._saving}
-                @input=${(e: Event) => {
-                  this._password = (e.target as HTMLInputElement).value;
-                }}
-              ></wa-input>
-              <button
-                type="button"
-                class="reveal-btn"
-                title=${this._localize(
-                  this._showPassword
-                    ? "dashboard.action_api_key_hide"
-                    : "dashboard.action_api_key_show",
-                )}
-                @click=${() => {
-                  this._showPassword = !this._showPassword;
-                }}
-              >
-                <wa-icon
-                  library="mdi"
-                  name=${this._showPassword ? "eye-off" : "eye"}
-                ></wa-icon>
-              </button>
-            </div>
+            <esphome-password-input
+              id="onboarding-password"
+              .value=${this._password}
+              .placeholder=${this._localize("onboarding.wifi.password_placeholder")}
+              ?disabled=${this._saving}
+              @password-input-change=${(
+                e: CustomEvent<PasswordInputValueChange>,
+              ) => {
+                this._password = e.detail.value;
+              }}
+            ></esphome-password-input>
           </div>
           ${this._error
             ? html`<p class="error">${this._error}</p>`
