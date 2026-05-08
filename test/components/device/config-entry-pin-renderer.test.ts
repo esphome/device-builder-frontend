@@ -3,7 +3,7 @@ import {
   parsePinGpio,
   renderPinField,
 } from "../../../src/components/device/config-entry-pin-renderer.js";
-import { ConfigEntryType } from "../../../src/api/types.js";
+import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
@@ -102,5 +102,210 @@ describe("renderPinField wa-select binding", () => {
       ".value" in bindings,
       "wa-select must not have a property binding to .value alongside data-no-value-sync",
     ).toBe(false);
+  });
+});
+
+describe("renderPinField long-form Advanced disclosure", () => {
+  // The catalog's _pin_long_form_extras (esphome/device-builder#430)
+  // attaches mode-flag + inverted children to every type=pin entry.
+  // Without rendering them under an Advanced section the visual
+  // editor stays short-form-only and issue #420 (binary_sensor.gpio
+  // pullup not configurable) persists.
+
+  const makeLongFormChildren = (): ConfigEntry[] =>
+    [
+      {
+        key: "mode",
+        type: ConfigEntryType.NESTED,
+        label: "Mode",
+        config_entries: [
+          {
+            key: "input",
+            type: ConfigEntryType.BOOLEAN,
+            label: "Input",
+          } as ConfigEntry,
+          {
+            key: "pullup",
+            type: ConfigEntryType.BOOLEAN,
+            label: "Pullup",
+          } as ConfigEntry,
+        ],
+      } as ConfigEntry,
+      {
+        key: "inverted",
+        type: ConfigEntryType.BOOLEAN,
+        label: "Inverted",
+      } as ConfigEntry,
+    ] as never;
+
+  it("omits the Advanced toggle when the entry has no nested children", () => {
+    // Pre-#430 catalogs (or future entries that opt out by clearing
+    // config_entries) keep the simple short-form picker — no
+    // disclosure rendered, no surprise UI shift after a catalog
+    // regen.
+    const ctx = makeRenderCtx({ pin: 0 });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: null,
+      }),
+      ["pin"],
+      ctx,
+    );
+    expect(findTemplatesByAnchor(result, "<button").length).toBe(0);
+  });
+
+  it("renders an Advanced toggle when the entry carries long-form children", () => {
+    const ctx = makeRenderCtx({ pin: 0 });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const toggles = findTemplatesByAnchor(result, "<button");
+    expect(toggles.length, "Advanced toggle button must render").toBe(1);
+    // No call to renderEntry yet — children only render when the
+    // user opens the disclosure.
+    expect(ctx.renderEntry).not.toHaveBeenCalled();
+  });
+
+  it("renders the long-form children when the disclosure is open", () => {
+    // Toggle is keyed on `${path}:pin-advanced`; populating the
+    // open-set simulates the user having clicked open.
+    const openSet = new Set<string>(["pin:pin-advanced"]);
+    const ctx = makeRenderCtx(
+      { pin: { number: "GPIO5" } },
+      { overrides: { nestedOpenSections: openSet } },
+    );
+    const children = makeLongFormChildren();
+    renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: children,
+      }),
+      ["pin"],
+      ctx,
+    );
+    // ``mode`` and ``inverted`` both rendered, each at its nested
+    // path under the pin field. Order-sensitive — ``mode`` first
+    // matches the catalog's emission order, which the form's
+    // tab-order convention follows.
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(1, children[0], [
+      "pin",
+      "mode",
+    ]);
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(2, children[1], [
+      "pin",
+      "inverted",
+    ]);
+  });
+
+  it("promotes the pin value to long form when the user opens Advanced", () => {
+    // Short-form value: opening Advanced needs to rewrite ``pin: 5``
+    // to ``pin: { number: 5 }`` so the subsequent ``setIn`` on a
+    // nested flag (``pin.mode.pullup``) doesn't clobber the GPIO.
+    // Without this promotion, flipping the first flag would silently
+    // drop the user's pin selection.
+    const ctx = makeRenderCtx({ pin: "GPIO5" });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const toggle = findTemplatesByAnchor(result, "<button")[0];
+    const onClick = extractAttributeBindings(toggle)["@click"] as () => void;
+    onClick();
+    // Two effects in order: open the disclosure, then promote the
+    // value. The promotion's emitChange writes to the same path
+    // with the long-form mapping, preserving the existing GPIO.
+    expect(ctx.toggleNested).toHaveBeenCalledWith("pin:pin-advanced");
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], { number: "GPIO5" });
+  });
+
+  it("skips the promotion when the value is already long-form", () => {
+    // Reopening Advanced on an already-long-form pin must not
+    // overwrite the user's existing flags with ``{ number: ... }``
+    // — that would silently undo every Advanced setting they made.
+    const ctx = makeRenderCtx({
+      pin: { number: "GPIO5", mode: { pullup: true }, inverted: true },
+    });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const toggle = findTemplatesByAnchor(result, "<button")[0];
+    const onClick = extractAttributeBindings(toggle)["@click"] as () => void;
+    onClick();
+    // Toggle still fires (the user wants the disclosure to open),
+    // but no promotion event — the value already has the right
+    // shape.
+    expect(ctx.toggleNested).toHaveBeenCalledWith("pin:pin-advanced");
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("routes pin-select changes to ``path.number`` on a long-form value", () => {
+    // After the user has expanded Advanced and set a flag, the
+    // pin value is in long-form. A subsequent GPIO change from
+    // the picker has to write to ``pin.number`` — writing to bare
+    // ``pin`` would replace the whole mapping with the new GPIO
+    // string and drop every flag the user set.
+    const ctx = makeRenderCtx({
+      pin: { number: "GPIO5", mode: { pullup: true } },
+    });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const select = findTemplatesByAnchor(result, "<wa-select")[0];
+    const onChange = extractAttributeBindings(select)["@change"] as (
+      e: Event,
+    ) => void;
+    // Synthesise the pick event the way wa-select dispatches it.
+    onChange({ target: { value: "GPIO12" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "number"], "GPIO12");
+  });
+
+  it("routes pin-select changes to bare ``path`` on a short-form value", () => {
+    // Default short-form value: the picker writes to bare ``pin``
+    // (today's behaviour, preserved for every config that hasn't
+    // touched Advanced). A regression that always wrote to
+    // ``pin.number`` would silently break every existing pin field
+    // that doesn't have an open disclosure.
+    const ctx = makeRenderCtx({ pin: 0 });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const select = findTemplatesByAnchor(result, "<wa-select")[0];
+    const onChange = extractAttributeBindings(select)["@change"] as (
+      e: Event,
+    ) => void;
+    onChange({ target: { value: "GPIO12" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO12");
   });
 });

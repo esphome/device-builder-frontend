@@ -575,6 +575,7 @@
     "pin_occupied_by": "Reserved for {name}",
     "pin_used_by": "Already used by {name}",
     "pin_input_only": "Input only — can't be used as output",
+    "pin_advanced": "Advanced",
     "save": "Save",
     "save_yaml": "Save YAML",
     "validate": "Validate",

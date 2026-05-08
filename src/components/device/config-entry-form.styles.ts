@@ -403,6 +403,41 @@ export const configEntryFormStyles = css`
     font-style: normal;
   }
 
+  /* ─── Pin "Advanced" disclosure (long-form fields) ──────── */
+  /* Compact toggle that opens the long-form pin fields (mode
+     flags, inverted) attached by the catalog's
+     _pin_long_form_extras helper. Visually subordinate to the
+     primary GPIO picker — the user has to opt in to the
+     advanced fields per pin. */
+  .pin-advanced {
+    margin-top: var(--wa-space-2xs);
+  }
+
+  .pin-advanced-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    padding: 2px 0;
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-2xs);
+    cursor: pointer;
+  }
+
+  .pin-advanced-toggle:hover {
+    color: var(--wa-color-text-normal);
+  }
+
+  .pin-advanced-fields {
+    margin-top: var(--wa-space-xs);
+    padding-left: var(--wa-space-s);
+    border-left: 2px solid var(--wa-color-surface-border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
   /* ─── ID reference picker option layout ──────────────────── */
   .id-option-stack {
     display: inline-flex;

@@ -499,6 +499,7 @@
     "pin_occupied_by": "Gereserveerd voor {name}",
     "pin_used_by": "Al in gebruik door {name}",
     "pin_input_only": "Alleen invoer — kan niet als uitvoer worden gebruikt",
+    "pin_advanced": "Geavanceerd",
     "loading_components": "Componenten laden…",
     "missing_dependencies_title": "{name} vereist andere componenten",
     "missing_dependencies_body": "Configureer deze eerst, kom dan terug om deze toe te voegen:",

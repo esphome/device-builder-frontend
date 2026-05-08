@@ -499,6 +499,7 @@
     "pin_occupied_by": "Réservé pour {name}",
     "pin_used_by": "Déjà utilisé par {name}",
     "pin_input_only": "Entrée uniquement — ne peut pas être utilisé comme sortie",
+    "pin_advanced": "Avancé",
     "loading_components": "Chargement des composants…",
     "missing_dependencies_title": "{name} nécessite d'autres composants",
     "missing_dependencies_body": "Configurez d'abord ceux-ci, puis revenez ajouter celui-ci :",
