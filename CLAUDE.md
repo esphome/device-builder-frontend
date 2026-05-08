@@ -8,7 +8,7 @@ user-facing intro.
 ## What this project is
 
 The **frontend** for the ESPHome Device Builder dashboard, a Lit
-+ TypeScript SPA that ships **prebuilt and bundled** inside the
+and TypeScript SPA that ships **prebuilt and bundled** inside the
 backend wheel ([esphome/device-builder](https://github.com/esphome/device-builder)).
 End users never install this directly. A release of the frontend
 generates a versioned tarball that the backend's release workflow
