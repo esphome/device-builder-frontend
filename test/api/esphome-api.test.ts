@@ -610,7 +610,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    const payload = { enabled: true };
+    // Match the live wire shape — ``RemoteBuildSettings`` carries
+    // both ``enabled`` and ``manual_hosts``; mocking only
+    // ``{ enabled }`` here would let an accidental field-rename
+    // regression slip past this test.
+    const payload = { enabled: true, manual_hosts: [] };
     const pending = api.getRemoteBuildSettings();
     const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
     expect(sent.command).toBe("remote_build/get_settings");
@@ -626,8 +630,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
-    ws.receive({ message_id: sent.message_id, result: { enabled: true } });
-    await expect(pending).resolves.toEqual({ enabled: true });
+    // Same wire-shape rationale as ``getRemoteBuildSettings`` —
+    // the result includes ``manual_hosts``.
+    const result = { enabled: true, manual_hosts: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
   });
 
   it("addRemoteBuildManualHost sends remote_build/add_manual_host with hostname + port", async () => {

@@ -746,6 +746,7 @@
     "remote_build_add_manual_duplicate": "That dashboard is already in your list.",
     "remote_build_add_manual_failed": "Could not add manual dashboard.",
     "remote_build_remove_manual_failed": "Could not remove manual dashboard.",
+    "remote_build_refresh_failed": "Saved, but couldn't refresh the list — please reopen Settings.",
     "remote_build_save_failed": "Could not save remote build settings; the toggle was reverted.",
     "dark_mode": "Dark mode",
     "dark_mode_desc": "Use dark colors for the interface",

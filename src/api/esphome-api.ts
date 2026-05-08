@@ -1348,7 +1348,7 @@ export class ESPHomeAPI {
    *
    * Hostname is normalised to lowercase server-side, so a
    * case-different request still finds the entry. Raises
-   * ``NOT_FOUND`` when the entry isn't registered.
+   * ``ErrorCode.NOT_FOUND`` when the entry isn't registered.
    */
   async removeRemoteBuildManualHost(args: {
     hostname: string;

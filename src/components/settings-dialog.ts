@@ -129,23 +129,43 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _selectSection(section: Section) {
     this._section = section;
     if (section === "remote_build" && this._remoteBuildPeers === null) {
-      void this._loadRemoteBuildPeers();
+      void (async () => {
+        const ok = await this._loadRemoteBuildPeers();
+        if (!ok && this._remoteBuildPeers === null) {
+          // First-load fallback only — a fresh-open with no prior
+          // list still needs *something* renderable. The mutation
+          // path below leaves the prior list intact instead.
+          this._remoteBuildPeers = [];
+        }
+      })();
     }
   }
 
-  private async _loadRemoteBuildPeers() {
-    // Snapshot fetch, refreshed on first open of the Remote
-    // builder section and after every add / remove. mDNS rows
-    // are listed first by the backend; manual rows follow with
-    // ``source="manual"``.
+  /**
+   * Fetch the live peer list and update ``_remoteBuildPeers``.
+   *
+   * Returns ``true`` when the call landed cleanly so callers can
+   * distinguish "list is now fresh" from "couldn't refresh." On
+   * failure the previous list value is left in place — clobbering
+   * to ``[]`` after a successful add / remove was a real bug
+   * (mutation succeeded server-side but the UI showed an empty
+   * list, looking like the add had failed). The first-open caller
+   * in ``_selectSection`` does its own ``[]`` fallback for the
+   * "no prior list to preserve" case.
+   *
+   * mDNS rows are listed first by the backend; manual rows follow
+   * with ``source="manual"``.
+   */
+  private async _loadRemoteBuildPeers(): Promise<boolean> {
     if (this._api === undefined) {
-      return;
+      return false;
     }
     try {
       this._remoteBuildPeers = await this._api.listRemoteBuildHosts();
+      return true;
     } catch (err) {
       console.warn("Could not load remote-build hosts:", err);
-      this._remoteBuildPeers = [];
+      return false;
     }
   }
 
@@ -814,11 +834,22 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   /**
    * Run an add/remove mutation against the API and refresh the
-   * peer list on success. Returns ``true`` when the call landed
-   * cleanly so callers can chain "clear the input" /
-   * "close the row" UI steps. On failure, surfaces the toast
-   * message returned by ``classifyError`` and returns ``false``.
-   * No-op when the API context isn't wired (returns ``false``).
+   * peer list on success.
+   *
+   * Returns ``true`` when the *mutation* landed cleanly, which is
+   * the only signal callers chain "clear the input" / "close the
+   * row" UI steps off — independent of whether the post-mutation
+   * peer-list refresh succeeded. If the mutation succeeds but the
+   * refresh fails, the prior list stays visible (not clobbered to
+   * ``[]``) and a separate "saved but couldn't refresh" toast goes
+   * up so the user knows the list might be stale. Treating a
+   * refresh failure as a mutation failure used to mean a
+   * successful add looked like it had failed (input cleared, list
+   * empty); the split here is what fixes that.
+   *
+   * On mutation failure, surfaces the toast message returned by
+   * ``classifyError`` and returns ``false``. No-op when the API
+   * context isn't wired (returns ``false``).
    */
   private async _runManualHostMutation(
     call: (api: ESPHomeAPI) => Promise<unknown>,
@@ -829,12 +860,18 @@ export class ESPHomeSettingsDialog extends LitElement {
     }
     try {
       await call(this._api);
-      await this._loadRemoteBuildPeers();
-      return true;
     } catch (err) {
       toast.error(this._localize(classifyError(err)), { richColors: true });
       return false;
     }
+    const refreshed = await this._loadRemoteBuildPeers();
+    if (!refreshed) {
+      toast.warning(
+        this._localize("settings.remote_build_refresh_failed"),
+        { richColors: true },
+      );
+    }
+    return true;
   }
 
   private async _onAddManualHost(e: Event) {

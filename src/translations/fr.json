@@ -683,6 +683,7 @@
     "remote_build_add_manual_duplicate": "Ce tableau de bord est déjà dans votre liste.",
     "remote_build_add_manual_failed": "Impossible d'ajouter le tableau de bord manuel.",
     "remote_build_remove_manual_failed": "Impossible de supprimer le tableau de bord manuel.",
+    "remote_build_refresh_failed": "Enregistré, mais la liste n'a pas pu être actualisée — rouvrez les paramètres.",
     "remote_build_save_failed": "Impossible d'enregistrer les paramètres de compilation à distance ; le réglage a été annulé.",
     "dark_mode": "Mode sombre",
     "dark_mode_desc": "Utilise des couleurs sombres pour l'interface",
