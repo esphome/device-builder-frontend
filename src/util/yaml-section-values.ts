@@ -119,6 +119,126 @@ const childRegexFor = (indent: string) =>
 const listItemRegexFor = (indent: string) =>
   new RegExp(`^${indent}${ESPHOME_YAML_INDENT}-\\s+(.*)$`);
 
+/**
+ * Measure the leading whitespace on *line* — used to detect the
+ * actual indent the user's YAML uses for the first child of a
+ * section. The parser is tied to ESPHome's emit format (2 spaces
+ * per level) at write time, but reads must accept any consistent
+ * indent: a user-typed 4-space file is just as valid as the
+ * 2-space canonical form, and pasting one into the editor
+ * shouldn't silently come back empty.
+ */
+const _leadingIndent = (line: string): string =>
+  line.match(/^ */)![0];
+
+/**
+ * Walk forward from *startIdx* and return the indent of the first
+ * line that's a child of the section that starts at *startIdx*.
+ * "Child" means deeper-indented than the section's leading
+ * whitespace and not a sibling section header (a column-0
+ * identifier line). Returns the canonical 2-space indent when
+ * the section has no readable children — the empty case where
+ * the parser has nothing to learn from.
+ */
+const _detectSectionChildIndent = (
+  lines: string[],
+  startIdx: number,
+  isListItem: boolean,
+): string => {
+  // For list-item sections the dash sits at the section's leading
+  // whitespace, and child keys live one level deeper than the
+  // dash itself. Use the dash's column as the floor so a
+  // ``  - id: …`` section doesn't pick up the dash line as its
+  // own child indent.
+  const headLine = lines[startIdx];
+  const sectionLead = isListItem
+    ? _leadingIndent(headLine).length +
+      (headLine.indexOf("-") - _leadingIndent(headLine).length) +
+      1 // dash + space
+    : _leadingIndent(headLine).length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    if (/^[a-zA-Z]/.test(line)) break; // sibling section
+    const lead = _leadingIndent(line);
+    if (lead.length <= sectionLead) {
+      // For list-item sections, a sibling dash at the same
+      // column as ours terminates the section.
+      if (isListItem) break;
+      // For map sections, a back-out terminates without contributing.
+      break;
+    }
+    return lead;
+  }
+  // Fallback to canonical 2-space — keeps existing behaviour for
+  // empty sections / EOF.
+  return isListItem
+    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
+    : ESPHOME_YAML_INDENT;
+};
+
+/**
+ * Find the indent of the first sub-key inside a list item — the
+ * line just under ``${dashIndent}- key: …`` that starts at a
+ * deeper column. Returns ``null`` when the item has no
+ * follow-up sub-keys before the next sibling dash (a single-key
+ * item or a freshly-added bare-dash placeholder); the caller
+ * falls back to a canonical 2-space step in that case.
+ */
+const _detectListItemChildIndent = (
+  lines: string[],
+  startIdx: number,
+  dashIndent: string,
+): string | null => {
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const lead = _leadingIndent(line);
+    // A sibling dash (or shallower) terminates this item.
+    if (lead.length <= dashIndent.length) return null;
+    // Skip nested list items (``      - ``) under this item —
+    // those are not the item's own child keys.
+    if (line[lead.length] === "-") continue;
+    return lead;
+  }
+  return null;
+};
+
+/**
+ * True when *line* is a list-item dash at *dashIndent*. Accepts
+ * both ``${dashIndent}- ``  (item with content) and the bare
+ * ``${dashIndent}-`` followed by EOL (the placeholder shape the
+ * serializer emits for an empty mapping item — a freshly-added
+ * Add-button row the user hasn't filled in yet). Without the
+ * bare-dash branch the parser would skip the empty row on
+ * reload and the user's freshly-added item would silently
+ * vanish.
+ */
+const isListItemLine = (line: string, dashIndent: string): boolean => {
+  const prefix = `${dashIndent}-`;
+  if (!line.startsWith(prefix)) return false;
+  const trailing = line.slice(prefix.length);
+  return trailing === "" || trailing.startsWith(" ");
+};
+
+/**
+ * True when *line* is a list-item dash deeper than *parentIndent*.
+ * The exact dash column doesn't matter at peek time — that's
+ * detected later by ``parseListBlock`` from the actual line —
+ * so the peek check only needs to confirm "this is a child
+ * list of the current key, regardless of which indent step the
+ * user picked". 4-space YAML pastes work as a result.
+ */
+const isDeeperListItemLine = (
+  line: string,
+  parentIndent: string,
+): boolean => {
+  const lead = _leadingIndent(line);
+  if (lead.length <= parentIndent.length) return false;
+  const tail = line.slice(lead.length);
+  return tail === "-" || tail.startsWith("- ");
+};
+
 const stripQuotes = (s: string): string => {
   if (
     (s.startsWith('"') && s.endsWith('"')) ||
@@ -169,8 +289,11 @@ const collectBlockListItems = (
  * so both surfaces agree on the dispatch.
  *
  * ``parentIndent`` is the indent of the parent KEY (the one whose
- * value is the list). The dash is one ``ESPHOME_YAML_INDENT`` step
- * deeper, and child keys inside an item are two steps deeper.
+ * value is the list). The dash and child indents are detected
+ * from the first list-item line so 4-space (or other consistent)
+ * user YAML round-trips correctly — the editor's canonical
+ * 2-space emit applies on save, but reads accept any indent the
+ * user chose.
  *
  * Returns ``endIdx`` — the line after the block ends — so callers
  * can fast-forward their loop index. ``isEmptyScalarList`` lets
@@ -186,8 +309,27 @@ const parseListBlock = (
   endIdx: number;
   isEmptyScalarList: boolean;
 } => {
-  const dashIndent = `${parentIndent}${ESPHOME_YAML_INDENT}`;
-  const childIndent = `${dashIndent}${ESPHOME_YAML_INDENT}`;
+  // Find the first non-blank line to read the dash indent from.
+  let firstDashIdx = startIdx;
+  while (
+    firstDashIdx < lines.length &&
+    lines[firstDashIdx].trim() === ""
+  ) {
+    firstDashIdx++;
+  }
+  const dashIndent =
+    firstDashIdx < lines.length
+      ? lines[firstDashIdx].match(/^( *)-/)?.[1] ??
+        `${parentIndent}${ESPHOME_YAML_INDENT}`
+      : `${parentIndent}${ESPHOME_YAML_INDENT}`;
+  // Child keys inside an item live one indent step deeper than
+  // the dash. Detect from a follow-up sub-line when one's
+  // available; fall back to "dash + 2 spaces" (matches ESPHome's
+  // canonical emit) when the first item is bare or the only
+  // line.
+  const childIndent =
+    _detectListItemChildIndent(lines, firstDashIdx + 1, dashIndent) ??
+    `${dashIndent}${ESPHOME_YAML_INDENT}`;
   const { endIdx, isComplex } = _scanValueBlock(lines, startIdx, parentIndent);
   if (isComplex) {
     // Try parsing as a list of flat key:value mappings first
@@ -283,7 +425,21 @@ const collectBlockListMappings = (
       j++;
       continue;
     }
-    if (!line.startsWith(`${dashIndent}-`)) break;
+    if (!isListItemLine(line, dashIndent)) break;
+    // Same null-prototype defence as the surrounding parser — see
+    // the comment in ``parseYamlSectionValues``.
+    const item: Record<string, unknown> = Object.create(null);
+    // Bare ``${dashIndent}-`` (no inline key) is the serializer's
+    // placeholder for an empty mapping item — a freshly-added Add
+    // row the user saved before filling in any fields. Treat it
+    // as ``{}`` so the row survives the round-trip; the renderer
+    // re-paints it on reload and the user's "in-progress" item
+    // doesn't silently vanish.
+    if (line === `${dashIndent}-`) {
+      items.push(item);
+      j++;
+      continue;
+    }
     const headerMatch = line.match(itemHeaderRe);
     if (!headerMatch) return null;
     const headerField = parseFlatMappingField(
@@ -291,9 +447,6 @@ const collectBlockListMappings = (
       headerMatch[2].trim(),
     );
     if (!headerField) return null;
-    // Same null-prototype defence as the surrounding parser — see
-    // the comment in ``parseYamlSectionValues``.
-    const item: Record<string, unknown> = Object.create(null);
     item[headerField.key] = headerField.value;
     j++;
     while (j < lines.length) {
@@ -423,9 +576,12 @@ export function parseYamlSectionValues(
   if (startIdx < 0) return values;
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
-  const childIndent = isListItem
-    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
-    : ESPHOME_YAML_INDENT;
+  // Detect the indent the user actually picked for this
+  // section's children so 4-space (or other consistent) YAMLs
+  // round-trip through the editor without coming back empty.
+  // Falls back to ESPHome's canonical 2-space step on empty
+  // sections.
+  const childIndent = _detectSectionChildIndent(lines, startIdx, isListItem);
   const childRegex = childRegexFor(childIndent);
 
   // List-item form: the first child key may sit on the same line as
@@ -438,7 +594,6 @@ export function parseYamlSectionValues(
     }
   }
 
-  const listItemPrefix = `${childIndent}${ESPHOME_YAML_INDENT}- `;
   // For list-item-rooted sections: only sibling dashes at the
   // SAME indentation as the leading dash terminate the section.
   // A nested list inside a value (`on_press:` → `      - lambda:`)
@@ -487,7 +642,7 @@ export function parseYamlSectionValues(
       if (peek >= lines.length) continue;
       const peekLine = lines[peek];
 
-      if (peekLine.startsWith(listItemPrefix)) {
+      if (isDeeperListItemLine(peekLine, childIndent)) {
         const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,
@@ -500,9 +655,11 @@ export function parseYamlSectionValues(
         continue;
       }
 
-      const nestedIndent = `${childIndent}${ESPHOME_YAML_INDENT}`;
-      if (peekLine.startsWith(nestedIndent)) {
-        const result = parseNestedBlock(lines, i + 1, nestedIndent);
+      // Read the deeper indent from the peek line itself so a
+      // user-typed 4-space file recurses correctly.
+      const peekLead = _leadingIndent(peekLine);
+      if (peekLead.length > childIndent.length) {
+        const result = parseNestedBlock(lines, i + 1, peekLead);
         if (Object.keys(result.values).length > 0) {
           values[key] = result.values;
         }
@@ -528,7 +685,6 @@ function parseNestedBlock(
   indent: string,
 ): { values: Record<string, unknown>; endIdx: number } {
   const childRegex = childRegexFor(indent);
-  const listItemPrefix = `${indent}${ESPHOME_YAML_INDENT}- `;
   // Null-prototype — same prototype-pollution defense as the
   // top-level `parseYamlSectionValues` map; nested blocks recurse
   // into here so they need the same safety.
@@ -564,18 +720,23 @@ function parseNestedBlock(
     if (raw === "") {
       let peek = i + 1;
       while (peek < lines.length && lines[peek].trim() === "") peek++;
-      if (peek < lines.length && lines[peek].startsWith(listItemPrefix)) {
+      if (
+        peek < lines.length &&
+        isDeeperListItemLine(lines[peek], indent)
+      ) {
         const { value, endIdx } = parseListBlock(lines, i + 1, indent);
         values[key] = value;
         i = endIdx;
         continue;
       }
-      const deeper = `${indent}${ESPHOME_YAML_INDENT}`;
-      if (peek < lines.length && lines[peek].startsWith(deeper)) {
-        const sub = parseNestedBlock(lines, i + 1, deeper);
-        if (Object.keys(sub.values).length > 0) values[key] = sub.values;
-        i = sub.endIdx;
-        continue;
+      if (peek < lines.length) {
+        const peekLead = _leadingIndent(lines[peek]);
+        if (peekLead.length > indent.length) {
+          const sub = parseNestedBlock(lines, i + 1, peekLead);
+          if (Object.keys(sub.values).length > 0) values[key] = sub.values;
+          i = sub.endIdx;
+          continue;
+        }
       }
       i++;
       continue;
@@ -660,9 +821,11 @@ export function updateSectionInYaml(
   if (start < 0) return yaml;
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
-  const childIndent = isListItem
-    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
-    : ESPHOME_YAML_INDENT;
+  // Match the user's existing indent step on save so 4-space (or
+  // other consistent) YAML doesn't get re-emitted with a mixed
+  // 2-space slice. Falls back to the canonical 2-space step when
+  // the section is otherwise empty.
+  const childIndent = _detectSectionChildIndent(lines, start, isListItem);
   let toSerialize = values;
   let dashLine = lines[start];
   if (isListItem) {
@@ -741,9 +904,18 @@ export function updateSectionInYaml(
       }
     }
   }
+  // Derive the user's indent step from the detected childIndent so
+  // saves preserve their chosen step end-to-end (top-level fields
+  // AND nested mapping recursion AND list-item shapes).
+  const detectedStep = isListItem
+    ? " ".repeat(Math.max(2, childIndent.length / 2))
+    : childIndent || ESPHOME_YAML_INDENT;
   const newLines = [
     dashLine,
-    ...serializeYamlValues(toSerialize, childIndent, options),
+    ...serializeYamlValues(toSerialize, childIndent, {
+      ...options,
+      indentStep: options.indentStep ?? detectedStep,
+    }),
   ];
   lines.splice(start, end - start, ...newLines);
   return lines.join("\n");

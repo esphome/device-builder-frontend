@@ -1044,7 +1044,138 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(after).not.toContain("    - area_id:");
   });
 
-  it("skips null / undefined / empty-string fields inside a mapping item", () => {
+  it("re-parses a bare-dash list item as an empty mapping (round-trip stable)", () => {
+    // The serializer emits ``    -`` (no trailing key) for an
+    // empty mapping item — the placeholder shape for a
+    // freshly-added Add row the user saved before filling in any
+    // fields. The parser must accept the bare dash and rebuild
+    // ``{}`` so the row survives the round-trip; otherwise the
+    // user's in-progress item vanishes on reload.
+    const yaml = `esphome:
+  devices:
+    - id: kitchen
+      name: Kitchen
+    -
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      { id: "kitchen", name: "Kitchen" },
+      {},
+    ]);
+  });
+
+  it("re-parses a bare-dash item inside a parseNestedBlock recursion", () => {
+    // Same bare-dash handling at deeper indents — exercises the
+    // ``parseNestedBlock`` branch that ``parseYamlSectionValues``
+    // delegates to for nested mappings.
+    const yaml = `outer:
+  meta:
+    rows:
+      - id: first
+      -
+`;
+    const values = parseYamlSectionValues(yaml, "outer");
+    expect(values.meta).toEqual({ rows: [{ id: "first" }, {}] });
+  });
+
+  it("survives a full Add → save → reload cycle", () => {
+    // Drives the exact flow the user hits in the visual editor:
+    // start with one item, click Add, save (serializer emits
+    // bare dash for the new empty row), reload (parser rebuilds
+    // the array). Without the round-trip fix the second item
+    // disappears on reload.
+    const yaml = `esphome:
+  devices:
+    - id: kitchen
+      name: Kitchen
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values.devices as Record<string, unknown>[]).push({});
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    const reloaded = parseYamlSectionValues(after, "esphome");
+    expect(reloaded.devices).toEqual([{ id: "kitchen", name: "Kitchen" }, {}]);
+  });
+
+  it("reads a flat section with 4-space user indent", () => {
+    // The non-list path through ``parseYamlSectionValues`` —
+    // every leaf is a bare ``key: value`` and the section has
+    // no list-of-mappings child — must also detect indent.
+    const yaml = `wifi:
+    ssid: home
+    password: secret
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.ssid).toBe("home");
+    expect(values.password).toBe("secret");
+  });
+
+  it("reads nested mappings with 4-space user indent", () => {
+    // ``parseNestedBlock`` recursion must propagate the
+    // detected indent so a ``manual_ip:`` block with
+    // ``static_ip:`` underneath comes back as a structured
+    // sub-object, not undefined.
+    const yaml = `wifi:
+    ssid: home
+    manual_ip:
+        static_ip: 10.0.0.5
+        gateway: 10.0.0.1
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.manual_ip).toEqual({
+      static_ip: "10.0.0.5",
+      gateway: "10.0.0.1",
+    });
+  });
+
+  it("round-trips 4-space user YAML through update without mixing indents", () => {
+    // The save path detects the user's indent step and threads it
+    // through the serializer so the rewritten section keeps the
+    // user's 4-space style instead of splicing canonical 2-space
+    // content into a 4-space file (mixed indent inside one
+    // mapping is valid YAML but visually inconsistent).
+    const yaml = `esphome:
+    name: test
+    devices:
+        - id: kitchen
+          name: Kitchen
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values.devices as Record<string, unknown>[])[0].name = "Renamed";
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    // Top-level fields stay at 4-space.
+    expect(after).toContain("    name: test");
+    // Devices list keeps its 8-space dash indent (4 + 4) and
+    // 10-space sub-key indent.
+    expect(after).toContain("        - id: kitchen");
+    expect(after).toContain("          name: Renamed");
+    // No 2-space children sneaking in mid-section.
+    expect(after).not.toMatch(/^  [a-zA-Z]/m);
+  });
+
+  it("reads list-of-mappings with non-default user indent (4-space YAML)", () => {
+    // YAML allows any consistent indent step — a user-typed
+    // 4-space file is just as valid as ESPHome's canonical
+    // 2-space emit. The parser detects the actual indent from
+    // the first child line and propagates it down so the same
+    // ``esphome.devices`` list works regardless of the step
+    // the user chose.
+    const yaml = `esphome:
+    name: test
+    devices:
+        - id: kitchen
+          name: Kitchen
+        - id: front_door
+          name: "Front Door"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.name).toBe("test");
+    expect(values.devices).toEqual([
+      { id: "kitchen", name: "Kitchen" },
+      { id: "front_door", name: "Front Door" },
+    ]);
+  });
+
+  it("skips null / undefined / empty-string fields inside a mapping item — round-trip", () => {
     // Same skip semantics the top-level serializer applies, so a
     // partially-filled item written by ``renderNestedListField``
     // doesn't emit half-blank rows that re-parse as different
