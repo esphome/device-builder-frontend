@@ -557,7 +557,10 @@ export class ESPHomePageDevice extends LitElement {
     //
     // Network / backend failures fall through to the save —
     // we'd rather risk an unvalidated commit than block the user
-    // on a backend hiccup.
+    // on a backend hiccup. The fall-through stays silent (no
+    // ``toast.error`` here): the actual ``updateConfig`` call
+    // below is the authority on whether the save worked, and a
+    // toast at this layer would shout-down its result.
     if (this.id) {
       try {
         const res = await this._api.validateYaml(this.id, this._yaml);
@@ -584,8 +587,7 @@ export class ESPHomePageDevice extends LitElement {
       }
     }
 
-    this._doSaveYaml();
-    return true;
+    return this._doSaveYaml();
   };
 
   /** Commit the current ``_yaml`` to the backend.
@@ -595,24 +597,48 @@ export class ESPHomePageDevice extends LitElement {
    *  without re-validating. Both call sites have already
    *  verified ``_isYamlDirty``; this method intentionally does
    *  not re-check it.
+   *
+   *  Awaits the backend round-trip before toasting success — a
+   *  fire-and-forget toast would race with the rejection path
+   *  and the user would see "Saved" → "Failed to save" in
+   *  succession when the backend rejects an invalid YAML the
+   *  pre-validation step missed (issue #436). On failure
+   *  ``_savedYaml`` is rolled back so the dirty indicator
+   *  reappears and the user can retry.
    */
-  private _doSaveYaml() {
+  private _doSaveYaml = async (): Promise<boolean> => {
+    // Optimistic local commit: flip ``_savedYaml`` immediately so
+    // ``_isYamlDirty`` reads false while the backend write is in
+    // flight. Roll back if the write fails so the page doesn't
+    // claim "saved" against a buffer the backend rejected.
+    const prevSavedYaml = this._savedYaml;
     this._savedYaml = this._yaml;
-    toast.success(this._localize("device.yaml_saved"), { richColors: true });
-    this._api.updateConfig(this.id, this._yaml).catch((e) => {
-      // Only surface real errors, not command timeouts — the backend
-      // writes the file but may not send a response before the timeout.
+    let saved = true;
+    try {
+      await this._api.updateConfig(this.id, this._yaml);
+    } catch (e) {
       const msg = e instanceof Error ? e.message : "";
+      // Command timeouts get the success path: the backend
+      // likely wrote the file but its response didn't make it
+      // back before the WS timeout. Same lenient policy as
+      // before the issue #436 fix.
       if (!msg.includes("timed out")) {
+        saved = false;
+        // Genuine failure — restore the prior savedYaml so the
+        // dirty indicator returns and the user can fix and retry.
+        this._savedYaml = prevSavedYaml;
         console.error("Failed to save YAML:", e);
-        toast.error(this._localize("device.yaml_save_error"), { richColors: true });
       }
-    });
-  }
+    }
+    const message = saved ? "device.yaml_saved" : "device.yaml_save_error";
+    const variant = saved ? toast.success : toast.error;
+    variant(this._localize(message), { richColors: true });
+    return saved;
+  };
 
-  private _onValidationSaveAnyway = () => {
-    this._doSaveYaml();
-    this._resolveValidationPrompt(true);
+  private _onValidationSaveAnyway = async () => {
+    const saved = await this._doSaveYaml();
+    this._resolveValidationPrompt(saved);
   };
 
   /** Drop the user at the first failing diagnostic via the same
