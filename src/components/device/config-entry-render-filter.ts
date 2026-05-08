@@ -130,22 +130,20 @@ export function filterRenderable(
     ) {
       continue;
     }
-    if (entry.type === ConfigEntryType.NESTED && entry.multi_value) {
+    if (entry.type === ConfigEntryType.NESTED) {
       // List-form NESTED always renders — the renderer paints the
       // Add button even with zero items, and ``filterRenderable``
       // is called per-item at render time with the item's own
       // scope. Skipping based on the parent ``values`` shape would
       // hide the field exactly when the user needs it.
-      out.push(entry);
-      continue;
-    }
-    if (entry.type === ConfigEntryType.NESTED) {
-      const renderableChildren = filterRenderable(
-        entry.config_entries ?? [],
-        asRecord(values[entry.key]),
-        opts,
-      );
-      if (renderableChildren.length === 0) continue;
+      if (!entry.multi_value) {
+        const renderableChildren = filterRenderable(
+          entry.config_entries ?? [],
+          asRecord(values[entry.key]),
+          opts,
+        );
+        if (renderableChildren.length === 0) continue;
+      }
     } else if (
       opts.requiredOnly &&
       !entry.required &&
@@ -186,30 +184,31 @@ export function collectRenderablePaths(
   out: Set<string> = new Set(),
 ): Set<string> {
   for (const entry of filterRenderable(entries, values, opts)) {
-    if (entry.type === ConfigEntryType.NESTED && entry.multi_value) {
-      // List-form NESTED: emit one path tree per item with the
-      // index segment (``devices.0.id``) so ``_anyErrorIsVisible``
-      // can reconcile validation errors keyed on per-item leaves.
-      asMappingList(values[entry.key]).forEach((itemValues, idx) => {
+    if (entry.type === ConfigEntryType.NESTED) {
+      const childSchema = entry.config_entries ?? [];
+      if (entry.multi_value) {
+        // List-form NESTED: emit one path tree per item with the
+        // index segment (``devices.0.id``) so
+        // ``_anyErrorIsVisible`` can reconcile validation errors
+        // keyed on per-item leaves.
+        asMappingList(values[entry.key]).forEach((itemValues, idx) => {
+          collectRenderablePaths(
+            childSchema,
+            itemValues,
+            opts,
+            [...pathPrefix, entry.key, String(idx)],
+            out,
+          );
+        });
+      } else {
         collectRenderablePaths(
-          entry.config_entries ?? [],
-          itemValues,
+          childSchema,
+          asRecord(values[entry.key]),
           opts,
-          [...pathPrefix, entry.key, String(idx)],
+          [...pathPrefix, entry.key],
           out,
         );
-      });
-      out.add([...pathPrefix, entry.key].join("."));
-      continue;
-    }
-    if (entry.type === ConfigEntryType.NESTED) {
-      collectRenderablePaths(
-        entry.config_entries ?? [],
-        asRecord(values[entry.key]),
-        opts,
-        [...pathPrefix, entry.key],
-        out,
-      );
+      }
       out.add([...pathPrefix, entry.key].join("."));
       continue;
     }

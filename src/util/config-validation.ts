@@ -222,39 +222,39 @@ function _validateEntriesRecursive(
     // we don't want to require fields the user can't even see.
     if (!isEntryVisible(entry, values, presentComponents, targetPlatform)) continue;
 
-    if (entry.type === ConfigEntryType.NESTED && entry.multi_value) {
-      // List-form NESTED (``esphome.devices`` / ``esphome.areas``):
-      // validate each item independently with an array-index path
-      // segment so errors land at ``devices.0.id`` etc. — matching
-      // how the form looks errors up via ``path.join(".")``. An
-      // empty list on an optional field is fine (the user opted
-      // out by adding nothing); a required list with zero items
-      // surfaces a single error on the field itself.
-      const items = asMappingList(values[entry.key]);
-      if (items.length === 0) {
-        if (entry.required) {
-          const fullPath = [...pathPrefix, entry.key].join(".");
-          errors.set(fullPath, {
-            key: fullPath,
-            code: "validation.required",
-          });
+    if (entry.type === ConfigEntryType.NESTED) {
+      const childSchema = entry.config_entries ?? [];
+      if (entry.multi_value) {
+        // List-form NESTED (``esphome.devices`` / ``esphome.areas``):
+        // validate each item independently with an array-index path
+        // segment so errors land at ``devices.0.id`` etc. — matching
+        // how the form looks errors up via ``path.join(".")``. An
+        // empty list on an optional field is fine (the user opted
+        // out by adding nothing); a required list with zero items
+        // surfaces a single error on the field itself.
+        const items = asMappingList(values[entry.key]);
+        if (items.length === 0) {
+          if (entry.required) {
+            const fullPath = [...pathPrefix, entry.key].join(".");
+            errors.set(fullPath, {
+              key: fullPath,
+              code: "validation.required",
+            });
+          }
+          continue;
         }
+        items.forEach((itemValues, idx) => {
+          _validateEntriesRecursive(
+            childSchema,
+            itemValues,
+            presentComponents,
+            targetPlatform,
+            [...pathPrefix, entry.key, String(idx)],
+            errors,
+          );
+        });
         continue;
       }
-      items.forEach((itemValues, idx) => {
-        _validateEntriesRecursive(
-          entry.config_entries ?? [],
-          itemValues,
-          presentComponents,
-          targetPlatform,
-          [...pathPrefix, entry.key, String(idx)],
-          errors,
-        );
-      });
-      continue;
-    }
-
-    if (entry.type === ConfigEntryType.NESTED) {
       const childValues = asRecord(values[entry.key]);
       // Optional nested groups (e.g. `web_server.auth`) often have
       // required CHILDREN (`auth.username`, `auth.password`). Don't
@@ -268,7 +268,7 @@ function _validateEntriesRecursive(
         continue;
       }
       _validateEntriesRecursive(
-        entry.config_entries ?? [],
+        childSchema,
         childValues,
         presentComponents,
         targetPlatform,
