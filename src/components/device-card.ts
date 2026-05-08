@@ -502,8 +502,9 @@ export class ESPHomeDeviceCard extends LitElement {
       /* Compact icon-only button that sits inline with the labelled
          buttons — same visual size as the kebab but without the auto
          left-margin that pushes the kebab to the right edge. Used by
-         the Visit Web UI control (icon-only since the open-in-new
-         icon is self-explanatory). */
+         the Update / Install accent action, Logs, and the Visit Web
+         UI link — Edit is the only labelled action so the row still
+         fits in long-language locales (French / Dutch). */
       .action-btn--tile {
         padding: 5px;
         flex-shrink: 0;
