@@ -378,12 +378,14 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderEditor() {
-    // ``aria-labelledby`` is the string-attribute form (no
-    // ``?aria-checked=...`` boolean binding) so the attribute
-    // ships verbatim — Lit's ``?`` binding would omit the
-    // attribute entirely on ``false``, breaking both the
-    // ``[aria-checked="false"]`` CSS state and the
-    // screen-reader announcement.
+    // ``aria-checked`` is the string-attribute form
+    // (``aria-checked=${value}``) — Lit's ``?aria-checked=...``
+    // boolean binding would omit the attribute entirely on
+    // ``false``, breaking both the ``[aria-checked="false"]`` CSS
+    // state and the screen-reader announcement. ``aria-labelledby``
+    // points at the row title so the toggle has an accessible
+    // name; without it screen readers announce only "switch,
+    // checked" with no context.
     return html`
       <div class="row">
         <div class="row-label">
