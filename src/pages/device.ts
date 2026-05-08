@@ -18,6 +18,7 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
 import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
+import type { ESPHomeYamlValidationDialog } from "../components/yaml-validation-dialog.js";
 import {
   activeJobsContext,
   apiContext,
@@ -33,6 +34,7 @@ import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
+import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -43,6 +45,7 @@ import "../components/firmware-install-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/logs-dialog.js";
 import "../components/unsaved-changes-dialog.js";
+import "../components/yaml-validation-dialog.js";
 
 registerMdiIcons({
   "arrow-collapse-left": mdiArrowCollapseLeft,
@@ -168,6 +171,24 @@ export class ESPHomePageDevice extends LitElement {
   @query("esphome-logs-dialog")
   private _logsDialog!: ESPHomeLogsDialog;
 
+  @query("esphome-yaml-validation-dialog")
+  private _yamlValidationDialog!: ESPHomeYamlValidationDialog;
+
+  /** First-error / count snapshot driving the save-time validation
+   *  prompt. Reset before opening the dialog and read by it via
+   *  property bindings. */
+  @state()
+  private _validationErrorCount = 0;
+
+  @state()
+  private _validationFirstLine = 0;
+
+  @state()
+  private _validationFirstCol = 0;
+
+  @state()
+  private _validationFirstMessage = "";
+
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
   );
@@ -268,7 +289,15 @@ export class ESPHomePageDevice extends LitElement {
       dirty: this._isDirty,
       open: () => this._unsavedDialog?.open(),
       save: async () => {
-        if (this._isYamlDirty) this._saveYaml();
+        // ``_saveYaml`` may open the validation prompt and await
+        // the user's choice. If they pick Cancel or Go to error,
+        // it resolves ``false`` and we propagate that up — the
+        // user isn't done editing, so the page-leave guard
+        // shouldn't proceed with navigation.
+        if (this._isYamlDirty) {
+          const saved = await this._saveYaml();
+          if (!saved) return false;
+        }
         this._allowingLeave = true;
         return true;
       },
@@ -475,7 +504,36 @@ export class ESPHomePageDevice extends LitElement {
     this._scrollToHighlight = true;
   }
 
-  private _saveYaml = () => {
+  /** Promise resolver wired up while the validation dialog is open.
+   *
+   *  ``_saveYaml`` returns a Promise that the unsaved-changes guard
+   *  awaits; when validation passes (or the dialog isn't shown)
+   *  that Promise resolves immediately. When the dialog opens, the
+   *  resolution is deferred until the user picks an exit:
+   *  ``Save anyway`` → ``true`` (proceed with the leave),
+   *  ``Cancel`` / ``Go to error`` → ``false`` (stay put — the user
+   *  isn't done editing). */
+  private _pendingValidationResolve: ((saved: boolean) => void) | null = null;
+
+  /**
+   * Save the YAML buffer to the backend, gated by a save-time
+   * validation prompt when the backend reports errors.
+   *
+   * Resolves to ``true`` when the buffer was committed (either
+   * directly or via the prompt's "Save anyway"), ``false`` when
+   * the user cancelled the prompt or asked to be jumped to the
+   * error. The unsaved-changes page-leave guard reads this
+   * boolean to decide whether to proceed with navigation —
+   * silently proceeding on a deferred-or-cancelled save would
+   * leave the user with their dirty buffer abandoned on the
+   * other side of a page transition.
+   *
+   * Also resolves ``true`` for the no-op "save when not dirty"
+   * case (the guard treats that as "nothing to save, fine to
+   * leave"); the page's user-facing Save button doesn't read
+   * the return value.
+   */
+  private _saveYaml = async (): Promise<boolean> => {
     // Promote any in-flight form keystroke (still inside its 200ms
     // debounce window) into ``_yaml`` so the save commits exactly
     // what the user typed — not what was last flushed.
@@ -487,7 +545,58 @@ export class ESPHomePageDevice extends LitElement {
     // saved buffer (e.g. user typed and undid a character, or the
     // splice normalised to the same serialisation). Bail before
     // toasting / hitting the backend — neither has anything to do.
-    if (!this._isYamlDirty) return;
+    if (!this._isYamlDirty) return true;
+
+    // Re-validate against the backend before committing. The
+    // editor's inline linter runs the same call on a 600ms
+    // debounce, but a save click inside that window would
+    // otherwise commit invalid YAML against a stale "no
+    // diagnostics" snapshot. Authoritative re-check here, then
+    // the prompt only opens when the freshly-saved buffer really
+    // is invalid.
+    //
+    // Network / backend failures fall through to the save —
+    // we'd rather risk an unvalidated commit than block the user
+    // on a backend hiccup.
+    if (this.id) {
+      try {
+        const res = await this._api.validateYaml(this.id, this._yaml);
+        const summary = summarizeValidation(res);
+        if (summary.count > 0) {
+          this._validationErrorCount = summary.count;
+          this._validationFirstLine = summary.first?.line ?? 0;
+          this._validationFirstCol = summary.first?.col ?? 0;
+          this._validationFirstMessage = summary.first?.message ?? "";
+          // A previous prompt that's somehow still pending (the
+          // unsaved-guard already prevents overlapping page-leave
+          // dialogs, but a manual Save click reaches this branch
+          // unguarded) gets resolved as "not saved" before we
+          // reset the resolver — without this the prior caller
+          // would dangle forever.
+          this._pendingValidationResolve?.(false);
+          return new Promise<boolean>((resolve) => {
+            this._pendingValidationResolve = resolve;
+            this._yamlValidationDialog.open();
+          });
+        }
+      } catch (e) {
+        console.debug("[save-yaml] validate_yaml failed, saving anyway:", e);
+      }
+    }
+
+    this._doSaveYaml();
+    return true;
+  };
+
+  /** Commit the current ``_yaml`` to the backend.
+   *
+   *  Split out from ``_saveYaml`` so the save-time validation
+   *  prompt's "Save anyway" button can re-enter the same write
+   *  without re-validating. Both call sites have already
+   *  verified ``_isYamlDirty``; this method intentionally does
+   *  not re-check it.
+   */
+  private _doSaveYaml() {
     this._savedYaml = this._yaml;
     toast.success(this._localize("device.yaml_saved"), { richColors: true });
     this._api.updateConfig(this.id, this._yaml).catch((e) => {
@@ -499,7 +608,57 @@ export class ESPHomePageDevice extends LitElement {
         toast.error(this._localize("device.yaml_save_error"), { richColors: true });
       }
     });
+  }
+
+  private _onValidationSaveAnyway = () => {
+    this._doSaveYaml();
+    this._resolveValidationPrompt(true);
   };
+
+  /** Drop the user at the first failing diagnostic via the same
+   *  highlight + scroll-into-view path the dashboard's ``?line=N``
+   *  arrival uses. ``resolveSectionForUrlLine`` switches the
+   *  navigator's selection to the containing section so the user
+   *  isn't left looking at a different section's form panel after
+   *  the scroll lands. */
+  private _onValidationGoTo = (
+    e: CustomEvent<{ line: number; col: number }>,
+  ) => {
+    const line = e.detail.line;
+    if (line && line >= 1) {
+      // Sections-only layout would scroll a hidden editor — flip
+      // to the split view so the user actually sees where they're
+      // landing.
+      if (this._layout === "left") {
+        this._layout = "both";
+        localStorage.setItem("esphome-editor-layout", "both");
+      }
+      this._highlightRange = { fromLine: line, toLine: line };
+      this._scrollToHighlight = true;
+      const resolved = resolveSectionForUrlLine(this._yaml, line, null);
+      if (resolved) {
+        this._selectedSection = resolved.sectionKey;
+      }
+    }
+    // The user wants to fix the error, not leave with it unsaved
+    // — resolve as "not saved" so the page-leave guard stays put.
+    this._resolveValidationPrompt(false);
+  };
+
+  /** Light-dismiss / close-button / Cancel button on the
+   *  validation prompt — fall through here so the page-leave
+   *  guard sees a definitive "not saved" answer. Without this
+   *  the prompt's dismiss path would dangle the resolver
+   *  Promise forever. */
+  private _onValidationCancel = () => {
+    this._resolveValidationPrompt(false);
+  };
+
+  private _resolveValidationPrompt(saved: boolean) {
+    const resolve = this._pendingValidationResolve;
+    this._pendingValidationResolve = null;
+    resolve?.(saved);
+  }
 
   private _onValidateClick = () => {
     if (!this._device) return;
@@ -601,6 +760,15 @@ export class ESPHomePageDevice extends LitElement {
         @close=${this._installCtrl.onInstallMethodClose}
         @select-method=${this._installCtrl.onInstallMethodSelect}
       ></esphome-install-method-dialog>
+      <esphome-yaml-validation-dialog
+        .errorCount=${this._validationErrorCount}
+        .firstErrorLine=${this._validationFirstLine}
+        .firstErrorCol=${this._validationFirstCol}
+        .firstErrorMessage=${this._validationFirstMessage}
+        @save-anyway=${this._onValidationSaveAnyway}
+        @goto=${this._onValidationGoTo}
+        @cancel=${this._onValidationCancel}
+      ></esphome-yaml-validation-dialog>
     `;
   }
 

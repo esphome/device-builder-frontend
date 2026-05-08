@@ -414,6 +414,14 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("rename-device", e.detail);
         }}
+        @clone-device=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("clone-device", e.detail);
+        }}
+        @edit-friendly-name=${(e: CustomEvent) => {
+          e.stopPropagation();
+          this._forwardEvent("edit-friendly-name", e.detail);
+        }}
         @clean-build=${(e: CustomEvent) => {
           e.stopPropagation();
           this._forwardEvent("clean-build", e.detail);

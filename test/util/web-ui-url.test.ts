@@ -1,41 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { ConfiguredDevice } from "../../src/api/types.js";
-import { DeviceState } from "../../src/api/types.js";
 import { buildWebUiUrl, safeWebUiUrl } from "../../src/util/web-ui-url.js";
-
-const _baseDevice = {
-  name: "kitchen",
-  friendly_name: "Kitchen",
-  configuration: "kitchen.yaml",
-  comment: null,
-  area: "",
-  board_id: "esp32-c3-devkitm-1",
-  target_platform: "esp32",
-  address: "kitchen.local",
-  ip: "",
-  ip_addresses: [],
-  mac_address: "",
-  ethernet_mac: "",
-  bluetooth_mac: "",
-  build_size_bytes: 0,
-  labels: [],
-  web_port: null,
-  current_version: "",
-  deployed_version: "",
-  loaded_integrations: [],
-  state: DeviceState.UNKNOWN,
-  expected_config_hash: "",
-  deployed_config_hash: "",
-  has_pending_changes: false,
-  update_available: false,
-  api_enabled: false,
-  api_encrypted: false,
-  api_encryption_active: null,
-} satisfies ConfiguredDevice;
-
-function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
-  return { ..._baseDevice, ...overrides };
-}
+import { makeConfiguredDevice as _device } from "../_make-configured-device.js";
 
 describe("safeWebUiUrl", () => {
   it("accepts http URLs", () => {

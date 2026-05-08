@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import { APIError } from "../../api/api-error.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -55,6 +56,18 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   @state()
   private _importError = "";
+
+  /** Catch-all error for the empty / basic create flows.
+   *
+   * Mirrors ``_importError`` but for the two paths that don't have
+   * their own bespoke "duplicate"/"invalid filename" messages. A
+   * backend ``CommandError`` (validation reject, name collision,
+   * unknown board, ...) lands here so the user sees something
+   * actionable on the dialog instead of the failure dropping
+   * silently to the browser console.
+   */
+  @state()
+  private _createError = "";
 
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
@@ -147,23 +160,40 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   public open(startStep?: WizardStep) {
     this._step = startStep ?? "method";
-    this._creationMethod = "basic";
     this._selectedBoard = null;
-    this._importFile = null;
-    this._submitting = false;
-    this._importError = "";
-    this._dialog.open = true;
+    this._resetTransientState();
   }
 
   /** Open directly at the setup step with a pre-selected board. */
   public openWithBoard(board: BoardCatalogEntry) {
     this._step = "setup";
-    this._creationMethod = "basic";
     this._selectedBoard = board;
+    this._resetTransientState();
+  }
+
+  /** Clear submission / file / error state shared by the two
+   * ``open`` entry points so a re-open after a prior dismissal
+   * doesn't carry stale state across. ``_step`` /
+   * ``_selectedBoard`` are intentionally excluded — each entry
+   * point sets those to its own starting value before calling
+   * here. */
+  private _resetTransientState(): void {
+    this._creationMethod = "basic";
     this._importFile = null;
     this._submitting = false;
-    this._importError = "";
+    this._resetCreateErrors();
     this._dialog.open = true;
+  }
+
+  /** Clear both error slots so a stale message from a prior
+   * attempt (e.g. a failed import the user backed out of)
+   * doesn't sit alongside whatever this attempt produces. Both
+   * slots clear together because the two flows share the same
+   * dialog body — leaving ``_importError`` set while showing
+   * ``_createError`` would render two red bars stacked. */
+  private _resetCreateErrors(): void {
+    this._importError = "";
+    this._createError = "";
   }
 
   public close() {
@@ -204,6 +234,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         ${this._renderStep()}
         ${this._importError
           ? html`<p class="error">${this._importError}</p>`
+          : nothing}
+        ${this._createError
+          ? html`<p class="error">${this._createError}</p>`
           : nothing}
       </wa-dialog>
     `;
@@ -298,29 +331,22 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   }
 
   private async _onCreateEmptyConfig(e: CustomEvent<{ name: string }>) {
-    if (this._submitting) return;
     const { name } = e.detail;
-    const slug = friendlyNameSlugify(name);
-    this._submitting = true;
-    try {
-      const { configuration } = await this._api.createDevice({
-        name: slug,
+    await this._runCreate(
+      {
+        name: friendlyNameSlugify(name),
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
-      });
-      this._navigateToCreated(configuration);
-    } catch (err) {
-      console.error("Failed to create empty config:", err);
-    } finally {
-      this._submitting = false;
-    }
+      },
+      { board: this._selectedBoard ?? null },
+    );
   }
 
   private async _createImportedDevice() {
     if (this._submitting) return;
     if (!this._importFile) return;
 
-    this._importError = "";
+    this._resetCreateErrors();
 
     let fileContent: string;
     try {
@@ -378,25 +404,96 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       wifiPassword: string;
     }>
   ) {
-    if (this._submitting) return;
     const { board, name, wifiSsid, wifiPassword } = e.detail;
     if (!board) return;
-    const slug = friendlyNameSlugify(name);
-    this._submitting = true;
-    try {
-      const { configuration } = await this._api.createDevice({
-        name: slug,
+    await this._runCreate(
+      {
+        name: friendlyNameSlugify(name),
         board_id: board.id,
         config_type: "basic",
         ssid: wifiSsid,
         psk: wifiPassword,
-      });
+      },
+      { board },
+    );
+  }
+
+  /** Run a ``createDevice`` call with shared error-handling glue.
+   *
+   * Centralises the submitting flag, the dual error reset, the
+   * success navigation, and the catch-side error extraction so
+   * the empty- and basic-setup flows can't drift on which
+   * failure modes get surfaced to the user. The ``board``
+   * option, when provided, is woven into the error message so a
+   * template-generation failure tells the user *which* board
+   * they were on (the bug behind the "AquaPing for d1_mini"
+   * report — once the backend rejects a bad template, the
+   * dashboard should at least name the board the wizard tried
+   * to use).
+   */
+  private async _runCreate(
+    args: {
+      name: string;
+      board_id?: string;
+      config_type?: string;
+      ssid?: string;
+      psk?: string;
+      file_content?: string;
+    },
+    options: { board?: BoardCatalogEntry | null } = {},
+  ): Promise<void> {
+    if (this._submitting) return;
+    this._resetCreateErrors();
+    this._submitting = true;
+    try {
+      const { configuration } = await this._api.createDevice(args);
       this._navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
+      this._createError = this._extractCreateErrorMessage(
+        err,
+        options.board ?? null,
+      );
     } finally {
       this._submitting = false;
     }
+  }
+
+  /** Pull the user-facing message out of an APIError-shaped failure.
+   *
+   * Reads the structured ``details`` field directly when the WS
+   * client throws an :class:`APIError`, so we don't have to parse
+   * the formatted ``"<code>: <details>"`` message string back
+   * apart. Falls back to a localised generic for any non-APIError
+   * shape (transport failures, unexpected non-Error throws) and
+   * for the case where ``details`` is empty (e.g. ``invalid_args:``
+   * with no body — empty after trimming would otherwise render as
+   * a blank red bar on the dialog, which is worse than a generic
+   * "create failed").
+   *
+   * When ``board`` is provided, the result is wrapped with
+   * ``wizard.create_with_board_error`` so the displayed message
+   * names the board the wizard was trying to use. The basic-setup
+   * flow always passes a board; the empty-config flow only does
+   * when the user picked one (it's optional there).
+   */
+  private _extractCreateErrorMessage(
+    err: unknown,
+    board: BoardCatalogEntry | null,
+  ): string {
+    let message: string;
+    if (err instanceof APIError && err.details.trim()) {
+      message = err.details.trim();
+    } else {
+      message = this._localize("wizard.create_general_error");
+    }
+    if (board) {
+      return this._localize("wizard.create_with_board_error", {
+        board: board.name,
+        message,
+      });
+    }
+    return message;
   }
 }
 

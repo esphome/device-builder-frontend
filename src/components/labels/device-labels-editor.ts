@@ -44,8 +44,8 @@ import {
   resolveLabelIds,
 } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import "./label-create-form.js";
-import type { ESPHomeLabelCreateForm } from "./label-create-form.js";
+import "./label-form.js";
+import type { ESPHomeLabelForm } from "./label-form.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -116,8 +116,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   @query("wa-dialog")
   private _dialog?: HTMLElement & { open: boolean };
 
-  @query("esphome-label-create-form")
-  private _createForm?: ESPHomeLabelCreateForm;
+  @query("esphome-label-form")
+  private _createForm?: ESPHomeLabelForm;
 
   static styles = [
     espHomeStyles,
@@ -422,12 +422,12 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
                 })}
         </div>
         <div class="divider"></div>
-        <esphome-label-create-form
+        <esphome-label-form
           .existingNames=${this._catalog.map((l) => l.name)}
           .nameSeed=${this._filter}
           @submitting=${this._onCreateSubmitting}
           @label-created=${this._onCreateResolved}
-        ></esphome-label-create-form>
+        ></esphome-label-form>
       </wa-dialog>
     `;
   }

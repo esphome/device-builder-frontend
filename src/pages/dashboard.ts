@@ -20,6 +20,7 @@ import type {
   ArchivedDevice,
   ConfiguredDevice,
   FirmwareJob,
+  Label,
   YamlSearchHit,
 } from "../api/types.js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
@@ -36,6 +37,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import { computeLabelUsage, deleteConfirmKey } from "../util/label-usage.js";
 import {
   buildYamlSnippetBlocks,
   yamlEmptyMessageKey,
@@ -84,6 +86,10 @@ import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/install-method-dialog.js";
+import "../components/clone-device-dialog.js";
+import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
+import "../components/friendly-name-dialog.js";
+import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/discovered-device-card.js";
@@ -215,6 +221,7 @@ export class ESPHomePageDashboard extends LitElement {
     | { kind: "delete-bulk" }
     | { kind: "archive-single"; device: ConfiguredDevice }
     | { kind: "archive-bulk" }
+    | { kind: "delete-label"; label: Label }
     | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
@@ -240,6 +247,18 @@ export class ESPHomePageDashboard extends LitElement {
   private _sortedDevicesCache: {
     source: ConfiguredDevice[];
     sorted: ConfiguredDevice[];
+  } | null = null;
+  /** Cache for the per-label usage count map (mirrors
+   *  ``_sortedDevicesCache``'s reference-keyed shape). The map
+   *  rebuilds only when ``_devices`` is replaced — every WS event
+   *  that mutates the list does a full reassign — so the
+   *  delete-label confirm dialog's "removes from N devices" copy,
+   *  which calls ``_computeLabelUsage()`` on every render of
+   *  ``_confirmDialogCopy``, doesn't pay the count walk while the
+   *  dialog sits open over an unchanged device list. */
+  private _labelUsageCache: {
+    source: ConfiguredDevice[];
+    map: Record<string, number>;
   } | null = null;
   /** When false (default), discovered devices the user previously
    *  marked as Ignored are hidden from the banner and grid; the
@@ -268,6 +287,27 @@ export class ESPHomePageDashboard extends LitElement {
     // Load preferences once WS is connected (devices loaded means events are flowing)
     if (changed.has("_devicesLoaded") && this._devicesLoaded) {
       this._loadPreferences();
+    }
+    /* Re-bind the drawer's device reference when ``_devices``
+       updates. ``_toggleDrawerForDevice`` snapshots the device
+       object at click time, but the WS reducer in app-shell
+       replaces entries in ``_devices`` on every ``DEVICE_UPDATED``
+       push — without the re-bind, the drawer keeps showing the
+       fields it had at open time (stale ``friendly_name`` after
+       a rename, stale ``state`` after a flap, stale ``ip`` after
+       a DHCP renew). Lookup is by ``configuration`` since that's
+       the stable identity the WS reducer keys on too. */
+    if (changed.has("_devices") && this._drawerDevice) {
+      const live = this._devices.find(
+        (d) => d.configuration === this._drawerDevice!.configuration,
+      );
+      if (live && live !== this._drawerDevice) {
+        this._drawerDevice = live;
+      } else if (!live) {
+        // Device removed (delete / archive) — close the drawer.
+        this._drawerDevice = null;
+        this._drawerOpen = false;
+      }
     }
   }
 
@@ -373,6 +413,10 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog")
   private _createDialog!: ESPHomeCreateConfigDialog;
+  @query("esphome-clone-device-dialog")
+  private _cloneDialog!: ESPHomeCloneDeviceDialog;
+  @query("esphome-friendly-name-dialog")
+  private _friendlyNameDialog!: ESPHomeFriendlyNameDialog;
   @query("esphome-rename-device-dialog")
   private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
@@ -1089,11 +1133,31 @@ export class ESPHomePageDashboard extends LitElement {
     `;
   }
 
+  /** Per-label-id usage count across the current device list.
+   *  Read by ``_confirmDialogCopy`` when rendering the
+   *  delete-label confirm dialog so the prompt reads "this will
+   *  remove the label from N devices" before the cascade fires.
+   *  Reference-keyed cache off ``_devices`` so the dialog doesn't
+   *  pay the count walk twice if it re-renders while the list is
+   *  unchanged (which is most of the dialog's lifetime). */
+  private _computeLabelUsage(): Record<string, number> {
+    const source = this._devices;
+    if (this._labelUsageCache?.source === source) {
+      return this._labelUsageCache.map;
+    }
+    const map = computeLabelUsage(source);
+    this._labelUsageCache = { source, map };
+    return map;
+  }
+
   private _renderLabelsFilter() {
     return html`<esphome-labels-filter
       .selected=${this._selectedLabels}
       @labels-filter-change=${(e: CustomEvent<string[]>) => {
         this._selectedLabels = e.detail;
+      }}
+      @request-delete-label=${(e: CustomEvent<Label>) => {
+        this._openConfirm({ kind: "delete-label", label: e.detail });
       }}
     ></esphome-labels-filter>`;
   }
@@ -1255,6 +1319,9 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
+        @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openFriendlyName(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1350,6 +1417,9 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
+        @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openFriendlyName(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1472,6 +1542,18 @@ export class ESPHomePageDashboard extends LitElement {
           destructive: false,
         };
       }
+      case "delete-label": {
+        const usage = this._computeLabelUsage()[p.label.id] ?? 0;
+        return {
+          heading: t("dashboard.labels_delete_title"),
+          message: t(deleteConfirmKey(usage), {
+            name: p.label.name,
+            count: usage,
+          }),
+          confirm: t("dashboard.labels_delete_submit"),
+          destructive: true,
+        };
+      }
     }
   }
 
@@ -1495,6 +1577,12 @@ export class ESPHomePageDashboard extends LitElement {
         @confirm=${this._executeConfirm}
         @cancel=${() => (this._pendingConfirm = null)}
       ></esphome-confirm-dialog>
+      <esphome-clone-device-dialog
+        @clone-confirm=${this._executeClone}
+      ></esphome-clone-device-dialog>
+      <esphome-friendly-name-dialog
+        @friendly-name-confirm=${this._executeFriendlyName}
+      ></esphome-friendly-name-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
@@ -1795,6 +1883,116 @@ export class ESPHomePageDashboard extends LitElement {
   private _openRename(device: ConfiguredDevice) {
     this._actionDevice = device;
     this._renameDialog.open(device.name);
+  }
+
+  private _openClone(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._cloneDialog.open(device.name);
+  }
+
+  private _openFriendlyName(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._friendlyNameDialog.open(
+      device.name,
+      device.friendly_name || device.name,
+    );
+  }
+
+  private async _executeFriendlyName(
+    e: CustomEvent<{ newFriendlyName: string; install: boolean }>,
+  ) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const { newFriendlyName, install } = e.detail;
+    let result: Awaited<ReturnType<ESPHomeAPI["editFriendlyName"]>>;
+    try {
+      result = await this._api.editFriendlyName(
+        device.configuration,
+        newFriendlyName,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      toast.error(
+        this._localize("dashboard.action_friendly_name_failed", {
+          name: device.name,
+          reason,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    /* ``rewritten=false`` means the YAML already had this value —
+       skip the install (no firmware-level change) and just close
+       the toast with a quiet success message. */
+    if (!result.rewritten) {
+      toast.success(
+        this._localize("dashboard.action_friendly_name_unchanged"),
+        { richColors: true },
+      );
+      return;
+    }
+    if (!install) {
+      /* Edit-only path: the YAML now reflects the new label, the
+         next compile will pick it up. The "Install" pending-changes
+         badge will surface in the row's update column via
+         ``compute_has_pending_changes`` since the YAML's mtime
+         moved. */
+      toast.success(
+        this._localize("dashboard.action_friendly_name_success", {
+          name: newFriendlyName,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    /* Toast first so the user sees the rewrite landed, then route
+       through the install-method picker. The picker handles every
+       install path the dashboard already knows about — OTA when
+       the device is online, web-serial / USB-via-server when it's
+       not, web-download / binary-download for "I want to flash
+       from another machine." It's also the only place that knows
+       to disable the OTA row for a device with no ``ota:`` block
+       (offline / no-OTA state). Reusing it avoids a parallel
+       install path that would have to learn the same edge cases. */
+    toast.success(
+      this._localize("dashboard.action_friendly_name_success", {
+        name: newFriendlyName,
+      }),
+      { richColors: true },
+    );
+    this._openInstallMethod(device);
+  }
+
+  private async _executeClone(
+    e: CustomEvent<{ newName: string; newFriendlyName: string }>,
+  ) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const { newName, newFriendlyName } = e.detail;
+    try {
+      // Empty friendlyName → forward as ``undefined`` so the
+      // backend defaults to ``friendly_name_slugify(new_name)``.
+      // Sending ``""`` would tell the backend to leave the
+      // source's friendly_name untouched, which produces two list
+      // entries with the same label — confusing for the common
+      // "clone and tweak" workflow.
+      const friendly = newFriendlyName.length > 0 ? newFriendlyName : undefined;
+      await this._api.cloneDevice(device.configuration, newName, friendly);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      toast.error(
+        this._localize("dashboard.action_clone_failed", {
+          name: device.name,
+          reason,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    toast.success(
+      this._localize("dashboard.action_clone_success", { name: newName }),
+      { richColors: true },
+    );
   }
 
   private async _executeRename(e: CustomEvent<string>) {
@@ -2116,12 +2314,39 @@ export class ESPHomePageDashboard extends LitElement {
       case "archive-single":
         this._archiveDevice(p.device);
         return;
+      case "delete-label":
+        void this._deleteLabel(p.label);
+        return;
     }
   }
 
   private async _deleteArchivedDevice(device: ArchivedDevice) {
     if (await deleteArchivedDevice(device, this._api, this._localize)) {
       await this._archivedDialog?.refresh();
+    }
+  }
+
+  /** Round-trip ``labels/delete`` and surface a toast on failure.
+   *  The ``LABEL_DELETED`` push from the backend refreshes the
+   *  catalog through ``labelsContext`` — nothing to do locally on
+   *  success. The active filter selection is dropped synchronously
+   *  so a stale chip can't outlive the catalog entry; the alternative
+   *  (silently keeping the id) leaves the filter matching nothing
+   *  with no visible explanation. */
+  private async _deleteLabel(label: Label) {
+    if (!this._api) return;
+    try {
+      await this._api.deleteLabel(label.id);
+      if (this._selectedLabels.includes(label.id)) {
+        this._selectedLabels = this._selectedLabels.filter(
+          (id) => id !== label.id,
+        );
+      }
+    } catch (err) {
+      console.warn("label delete failed", err);
+      toast.error(this._localize("dashboard.labels_delete_failed"), {
+        richColors: true,
+      });
     }
   }
 }

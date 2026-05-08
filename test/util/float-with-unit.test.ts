@@ -115,6 +115,130 @@ describe("parseFloatWithUnit", () => {
         .toBe(raw);
     }
   });
+
+  // ESPHome's ``cv.frequency`` accepts the base ``Hz`` suffix
+  // case-insensitively (``Hz|HZ|hz``); the SI prefix (``m`` /
+  // ``M`` / ``k`` / ``G`` / …) IS case-significant per
+  // ``METRIC_SUFFIXES`` — ``m`` is milli, ``M`` is mega. The parser
+  // mirrors that: case-fold the base, preserve prefix case
+  // disambiguation when the input is case-mixed. Issue #213.
+  describe("case-variant base units", () => {
+    it("normalises lowercase 'hz' to canonical 'Hz'", () => {
+      expect(parseFloatWithUnit("60hz", FREQUENCY_UNITS)).toEqual({
+        value: 60,
+        unit: "Hz",
+      });
+    });
+
+    it("normalises uppercase 'HZ' to canonical 'Hz'", () => {
+      expect(parseFloatWithUnit("60HZ", FREQUENCY_UNITS)).toEqual({
+        value: 60,
+        unit: "Hz",
+      });
+    });
+
+    it("'Mhz' (capital prefix, lowercase base) → 'MHz' (mega)", () => {
+      // The trigger from #213: user typed `433.92Mhz` and saw the
+      // form snap to canonical `Hz` (zero) instead of recognising
+      // the mega-Hz value. Capital prefix M wins the score over
+      // lowercase prefix m.
+      expect(parseFloatWithUnit("433.92Mhz", FREQUENCY_UNITS)).toEqual({
+        value: 433.92,
+        unit: "MHz",
+      });
+    });
+
+    it("'MHZ' (capital prefix + uppercase base) → 'MHz' (mega)", () => {
+      expect(parseFloatWithUnit("433.92MHZ", FREQUENCY_UNITS)).toEqual({
+        value: 433.92,
+        unit: "MHz",
+      });
+    });
+
+    it("'mhz' (lowercase prefix + lowercase base) → 'mHz' (milli)", () => {
+      // ESPHome's METRIC_SUFFIXES distinguishes ``m`` (milli) from
+      // ``M`` (mega), so a lowercase prefix means milli regardless
+      // of the base unit's case. The score-based tiebreak picks
+      // ``mHz`` (m matches case → 1) over ``MHz`` (m≠M → 0). A
+      // user who meant mega should have typed ``Mhz`` / ``MHz``;
+      // we faithfully report what ESPHome would parse.
+      expect(parseFloatWithUnit("433.92mhz", FREQUENCY_UNITS)).toEqual({
+        value: 433.92,
+        unit: "mHz",
+      });
+    });
+
+    it("normalises lowercase 'khz' to canonical 'kHz'", () => {
+      expect(parseFloatWithUnit("50khz", FREQUENCY_UNITS)).toEqual({
+        value: 50,
+        unit: "kHz",
+      });
+    });
+
+    it("normalises lowercase 'ghz' to canonical 'GHz'", () => {
+      // Lowercase 'g' is NOT in ESPHome's METRIC_SUFFIXES (only G
+      // for giga). Both ``GHz`` and ``Hz`` match ``"2ghz"`` case-
+      // insensitively (both lowercase forms end the input), and
+      // both score 0 case-sensitive leading-match characters
+      // (``2`` ≠ ``G``, ``h`` ≠ ``H``). The length tie-break picks
+      // ``GHz`` (3 chars > 2) so the user's ``g`` prefix isn't
+      // stranded as part of the numeric portion. Round-trips
+      // through save as canonical ``GHz``.
+      expect(parseFloatWithUnit("2ghz", FREQUENCY_UNITS)).toEqual({
+        value: 2,
+        unit: "GHz",
+      });
+    });
+
+    it("preserves the user's case when it already matches an option", () => {
+      // Sanity check: case-sensitive matches still win when no
+      // case-variant ambiguity exists.
+      expect(parseFloatWithUnit("0.5mHz", FREQUENCY_UNITS)).toEqual({
+        value: 0.5,
+        unit: "mHz",
+      });
+      expect(parseFloatWithUnit("50MHz", FREQUENCY_UNITS)).toEqual({
+        value: 50,
+        unit: "MHz",
+      });
+    });
+
+    it("handles case-variant resistance suffixes", () => {
+      // Scope check: the bug is in ``cv.float_with_unit`` itself,
+      // not specific to ``cv.frequency``. Pin that resistance
+      // (which takes ``Ω|ohm|Ohm|OHM`` and various SI prefixes in
+      // its ESPHome regex) gets the same case-insensitive
+      // treatment for the BASE unit. The user can type the base
+      // in any case (``ohm``, ``Ohm``, ``OHM``) and the parser
+      // picks the right SI-prefixed option, normalising to the
+      // canonical-cased option on round-trip.
+      const resistanceUnits = ["Ohm", "kOhm", "MOhm"] as const;
+      // All-lowercase: ``k`` matches case (score 1) > ``Ohm``'s
+      // ``o`` ≠ ``O`` (score 0). Length tie-break would also pick
+      // ``kOhm`` over the bare ``Ohm`` if scores tied.
+      expect(parseFloatWithUnit("4.7kohm", resistanceUnits)).toEqual({
+        value: 4.7,
+        unit: "kOhm",
+      });
+      // Lowercase prefix + uppercase base: ``kOhm`` scores 2
+      // (k=k, O=O) vs ``Ohm``'s 1 (O=O, h≠H), so the SI prefix
+      // is preserved correctly even though the user uppercased
+      // the base.
+      expect(parseFloatWithUnit("4.7kOHM", resistanceUnits)).toEqual({
+        value: 4.7,
+        unit: "kOhm",
+      });
+    });
+
+    it("save round-trip normalises case-variant input to canonical", () => {
+      // Round-trip via parse → serialize. The user's lowercase
+      // ``Mhz`` becomes the canonical ``MHz`` on save — same shape
+      // ESPHome's emitter produces, so a YAML diff after save is
+      // limited to the casing fix.
+      const parsed = parseFloatWithUnit("433.92Mhz", FREQUENCY_UNITS);
+      expect(serializeFloatWithUnit(parsed)).toBe("433.92MHz");
+    });
+  });
 });
 
 describe("placeholderForFloatWithUnit", () => {

@@ -5,9 +5,11 @@ import {
   mdiCheckboxMultipleBlankOutline,
   mdiCheckDecagram,
   mdiConsole,
+  mdiContentDuplicate,
   mdiDelete,
   mdiDownload,
   mdiFileDownloadOutline,
+  mdiFormTextbox,
   mdiKeyVariant,
   mdiOpenInNew,
   mdiPencil,
@@ -32,9 +34,11 @@ registerMdiIcons({
   "checkbox-multiple-blank-outline": mdiCheckboxMultipleBlankOutline,
   "check-decagram": mdiCheckDecagram,
   console: mdiConsole,
+  "content-duplicate": mdiContentDuplicate,
   delete: mdiDelete,
   download: mdiDownload,
   "file-download-outline": mdiFileDownloadOutline,
+  "form-textbox": mdiFormTextbox,
   "key-variant": mdiKeyVariant,
   "open-in-new": mdiOpenInNew,
   pencil: mdiPencil,
@@ -248,10 +252,26 @@ export class ESPHomeTableRowMenu extends LitElement {
         </div>
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy
+            ? undefined
+            : () => this._emit("edit-friendly-name")}
+        >
+          <wa-icon library="mdi" name="form-textbox"></wa-icon>
+          ${this._localize("dashboard.action_edit_friendly_name")}
+        </div>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
           @click=${this.busy ? undefined : () => this._emit("rename-device")}
         >
           <wa-icon library="mdi" name="rename-outline"></wa-icon>
           ${this._localize("dashboard.action_rename")}
+        </div>
+        <div
+          class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("clone-device")}
+        >
+          <wa-icon library="mdi" name="content-duplicate"></wa-icon>
+          ${this._localize("dashboard.action_clone")}
         </div>
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"

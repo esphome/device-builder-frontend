@@ -16,8 +16,11 @@
  */
 import { consume } from "@lit/context";
 import {
+  mdiArrowLeft,
   mdiCheck,
+  mdiPencilOutline,
   mdiTagMultipleOutline,
+  mdiTrashCanOutline,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
@@ -31,13 +34,16 @@ import {
 } from "../../util/label-chip-template.js";
 import { labelChipStyleString } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import "./label-create-form.js";
+import "./label-form.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
+  "arrow-left": mdiArrowLeft,
   check: mdiCheck,
+  "pencil-outline": mdiPencilOutline,
   "tag-multiple-outline": mdiTagMultipleOutline,
+  "trash-can-outline": mdiTrashCanOutline,
 });
 
 @customElement("esphome-labels-filter")
@@ -59,8 +65,22 @@ export class ESPHomeLabelsFilter extends LitElement {
   @state()
   private _open = false;
 
+  /** When non-null, the popover swaps from list mode to a single
+   *  edit form for this label. Cleared on save / cancel / close. */
+  @state()
+  private _editing: Label | null = null;
+
   private _escape = new EscapeController(this, (e) => {
     e.preventDefault();
+    // Escape unwinds one level at a time: edit → close. The
+    // delete-confirm dialog isn't mounted by us — the dashboard
+    // owns it via the shared ``<esphome-confirm-dialog>`` — so
+    // its own light-dismiss / Escape handler closes it without
+    // our help.
+    if (this._editing) {
+      this._editing = null;
+      return;
+    }
     this._close();
   });
 
@@ -173,8 +193,26 @@ export class ESPHomeLabelsFilter extends LitElement {
         overflow-y: auto;
       }
 
+      /* Row wrapper holds the option-button + the per-row action
+         icons (rename / delete). The action icons stay tucked away
+         until the row is hovered or focused so the popover reads
+         as a quiet checkbox list at rest. */
+      .row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        border-radius: var(--wa-border-radius-s);
+      }
+
+      .row:hover,
+      .row:focus-within {
+        background: var(--wa-color-surface-lowered);
+      }
+
       .option {
         display: flex;
+        flex: 1;
+        min-width: 0;
         align-items: center;
         gap: 8px;
         padding: 4px 6px;
@@ -186,8 +224,103 @@ export class ESPHomeLabelsFilter extends LitElement {
         color: inherit;
       }
 
-      .option:hover {
+      .row-actions {
+        display: flex;
+        align-items: center;
+        gap: 0;
+        opacity: 0;
+        transition: opacity 0.12s;
+        padding-right: 2px;
+      }
+
+      .row:hover .row-actions,
+      .row:focus-within .row-actions {
+        opacity: 1;
+      }
+
+      /* On hoverless inputs (touchscreens) the per-row actions
+         would otherwise be unreachable — there's no hover to
+         reveal them, and a tap fires the option button (toggling
+         selection) before :focus-within would settle. Keep them
+         visible on those viewports so rename / delete stay usable
+         on mobile. The desktop UX (quiet rows at rest) is
+         preserved on devices that report hover support. */
+      @media (hover: none) {
+        .row-actions {
+          opacity: 1;
+        }
+      }
+
+      .row-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--wa-border-radius-s);
+        border: none;
+        background: transparent;
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .row-action:hover {
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text-normal);
+      }
+
+      .row-action:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 1px;
+        opacity: 1;
+        color: var(--wa-color-text-normal);
+      }
+
+      .row-action--danger:hover {
+        color: var(--wa-color-danger-fill-loud);
+      }
+
+      .row-action wa-icon {
+        font-size: 14px;
+      }
+
+      /* Edit-mode header: small back arrow + label so the popover
+         doesn't lose context when the catalog list is hidden. */
+      .edit-header {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+        padding: 2px 4px;
+      }
+
+      .edit-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--wa-border-radius-s);
+        border: none;
+        background: transparent;
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        padding: 0;
+      }
+
+      .edit-back:hover {
         background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
+      }
+
+      .edit-back wa-icon {
+        font-size: 16px;
+      }
+
+      .edit-title {
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-quiet);
       }
 
       .option-check {
@@ -245,6 +378,15 @@ export class ESPHomeLabelsFilter extends LitElement {
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
+    if (changed.has("_catalog") && this._editing) {
+      // A push event from another client (or this one) may have
+      // dropped the label the user is currently editing. Without
+      // this guard the form sits with a ``Label`` that no longer
+      // exists and save would 404. Bail out cleanly to list mode.
+      if (!this._catalog.some((l) => l.id === this._editing!.id)) {
+        this._editing = null;
+      }
+    }
   }
 
   override connectedCallback() {
@@ -291,20 +433,30 @@ export class ESPHomeLabelsFilter extends LitElement {
   }
 
   private _renderPopover(selectedSet: Set<string>) {
-    const isEmpty = this._catalog.length === 0;
     return html`
       <div
         class="popover"
         role="group"
         aria-label=${this._localize("dashboard.filter_labels")}
       >
-        ${isEmpty
-          ? html`<div class="empty">
-              ${this._localize("dashboard.labels_dialog_empty")}
-            </div>`
-          : this._catalog.map((label) => {
-              const checked = selectedSet.has(label.id);
-              return html`<button
+        ${this._editing
+          ? this._renderEditMode(this._editing)
+          : this._renderListMode(selectedSet)}
+      </div>
+    `;
+  }
+
+  private _renderListMode(selectedSet: Set<string>) {
+    const isEmpty = this._catalog.length === 0;
+    return html`
+      ${isEmpty
+        ? html`<div class="empty">
+            ${this._localize("dashboard.labels_dialog_empty")}
+          </div>`
+        : this._catalog.map((label) => {
+            const checked = selectedSet.has(label.id);
+            return html`<div class="row">
+              <button
                 class="option"
                 type="button"
                 role="checkbox"
@@ -319,21 +471,94 @@ export class ESPHomeLabelsFilter extends LitElement {
                 <span class="label-chip" style=${labelChipStyleString(label.color)}
                   >${label.name}</span
                 >
-              </button>`;
-            })}
-        ${this.selected.length > 0
-          ? html`<button class="clear" type="button" @click=${this._clear}>
-              ${this._localize("dashboard.filter_clear")}
-            </button>`
-          : nothing}
-        <div class="divider"></div>
-        <esphome-label-create-form
-          .existingNames=${this._catalog.map((l) => l.name)}
-          ?default-open=${isEmpty}
-          compact
-          @label-created=${this._onLabelCreated}
-        ></esphome-label-create-form>
+              </button>
+              <div class="row-actions">
+                <button
+                  class="row-action"
+                  type="button"
+                  aria-label=${this._localize("dashboard.labels_rename")}
+                  title=${this._localize("dashboard.labels_rename")}
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    this._editing = label;
+                  }}
+                >
+                  <wa-icon library="mdi" name="pencil-outline"></wa-icon>
+                </button>
+                <button
+                  class="row-action row-action--danger"
+                  type="button"
+                  aria-label=${this._localize("dashboard.labels_delete")}
+                  title=${this._localize("dashboard.labels_delete")}
+                  @click=${(e: Event) => {
+                    e.stopPropagation();
+                    // The actual confirm dialog + delete round
+                    // trip lives on the dashboard page, which
+                    // already owns one ``<esphome-confirm-dialog>``
+                    // instance shared across every destructive
+                    // action. Close the popover before bubbling
+                    // the request so the dashboard's confirm
+                    // dialog (which portals into ``document.body``
+                    // and would otherwise be "outside" us under
+                    // the document-click guard) doesn't trigger
+                    // the popover-close path on its first
+                    // interaction. Closing up front keeps the
+                    // dashboard view stable behind the dialog and
+                    // matches how the other destructive actions
+                    // (kebab Delete, bulk Delete, …) behave.
+                    this._close();
+                    this.dispatchEvent(
+                      new CustomEvent<Label>("request-delete-label", {
+                        detail: label,
+                        bubbles: true,
+                        composed: true,
+                      }),
+                    );
+                  }}
+                >
+                  <wa-icon library="mdi" name="trash-can-outline"></wa-icon>
+                </button>
+              </div>
+            </div>`;
+          })}
+      ${this.selected.length > 0
+        ? html`<button class="clear" type="button" @click=${this._clear}>
+            ${this._localize("dashboard.filter_clear")}
+          </button>`
+        : nothing}
+      <div class="divider"></div>
+      <esphome-label-form
+        .existingNames=${this._catalog.map((l) => l.name)}
+        ?default-open=${isEmpty}
+        compact
+        @label-created=${this._onLabelCreated}
+      ></esphome-label-form>
+    `;
+  }
+
+  private _renderEditMode(label: Label) {
+    return html`
+      <div class="edit-header">
+        <button
+          class="edit-back"
+          type="button"
+          aria-label=${this._localize("dashboard.labels_back")}
+          title=${this._localize("dashboard.labels_back")}
+          @click=${this._exitEditMode}
+        >
+          <wa-icon library="mdi" name="arrow-left"></wa-icon>
+        </button>
+        <span class="edit-title"
+          >${this._localize("dashboard.labels_edit_label")}</span
+        >
       </div>
+      <esphome-label-form
+        .existingNames=${this._catalog.map((l) => l.name)}
+        .editing=${label}
+        compact
+        @label-saved=${this._onLabelSaved}
+        @editing-cancel=${this._exitEditMode}
+      ></esphome-label-form>
     `;
   }
 
@@ -346,12 +571,37 @@ export class ESPHomeLabelsFilter extends LitElement {
     this._emit([...this.selected, id]);
   };
 
+  private _onLabelSaved = (e: CustomEvent<Label>) => {
+    // Drop late events that don't match the current edit target.
+    // Toggling between list and edit mode replaces the form
+    // element entirely (different conditional branches in the
+    // popover render), so a detached form's resolution event
+    // doesn't reach us in normal use — but if a future refactor
+    // collapses the two branches into a single reused form, this
+    // ``_editing.id`` check still keeps a stale resolution from
+    // kicking the user out of a fresh edit session.
+    if (this._editing?.id !== e.detail.id) return;
+    // ``LABEL_UPDATED`` push refreshes the catalog through the
+    // labelsContext; just return the popover to list mode so the
+    // user sees their renamed chip in the list.
+    this._editing = null;
+  };
+
+  private _exitEditMode = () => {
+    this._editing = null;
+  };
+
   private _toggle = () => {
     this._open = !this._open;
   };
 
   private _close() {
-    if (this._open) this._open = false;
+    if (!this._open) return;
+    this._open = false;
+    // Reset to the list mode so a subsequent re-open shows the
+    // catalog rather than dropping the user back into a partial
+    // edit session they explicitly closed away from.
+    this._editing = null;
   }
 
   private _emit(next: string[]) {

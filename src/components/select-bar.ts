@@ -53,11 +53,23 @@ export class ESPHomeSelectBar extends LitElement {
         align-items: center;
         justify-content: space-between;
         padding: var(--wa-space-m) var(--wa-space-xl);
+        height: var(--select-bar-height, 64px);
+        box-sizing: border-box;
+        /* Locked at exactly --select-bar-height so the table host's
+           padding-bottom reservation can never be undershot by a
+           shorter bar or overshot by a wrapping label — the labels
+           below all carry white-space:nowrap to back this guarantee. */
         background: var(--wa-color-surface-raised);
         border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
         z-index: 20;
         animation: slide-in 0.2s ease-out;
+      }
+
+      .select-bar .count,
+      .select-bar .toggle,
+      .select-bar .btn {
+        white-space: nowrap;
       }
 
       .left {

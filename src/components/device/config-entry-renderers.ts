@@ -21,12 +21,14 @@ import {
   placeholderForFloatWithUnit,
   serializeFloatWithUnit,
 } from "../../util/float-with-unit.js";
+import { formatHexInt, parseHexInt } from "../../util/hex-int.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
   labelFor,
   renderFieldError,
+  renderFieldShell,
   renderHelpLink,
   renderLabel,
   renderStringField,
@@ -57,31 +59,121 @@ export function renderNumberField(
   if (entry.suggestions && entry.suggestions.length > 0) {
     return renderStringField(entry, "number", path, ctx);
   }
+  if (entry.display_format === "hex") {
+    return renderHexIntField(entry, path, ctx);
+  }
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const min = entry.range ? String(entry.range[0]) : undefined;
   const max = entry.range ? String(entry.range[1]) : undefined;
   const disabled = effectiveDisabled(entry, ctx);
-  return html`
-    <div class="field" data-field-key=${path.join(".")}>
-      ${renderLabel(entry, ctx)}
-      <input
-        type="number"
-        class=${invalid ? "invalid" : ""}
-        .value=${value}
-        ?disabled=${disabled}
-        min=${min ?? ""}
-        max=${max ?? ""}
-        step=${entry.type === ConfigEntryType.FLOAT ? "any" : "1"}
-        placeholder=${String(entry.default_value ?? "")}
-        @input=${(e: Event) => {
-          const raw = (e.target as HTMLInputElement).value;
-          ctx.emitChange(path, raw === "" ? "" : Number(raw));
-        }}
-      />
-      ${renderFieldError(path, ctx)}
-    </div>
-  `;
+  return renderFieldShell(
+    entry,
+    path,
+    ctx,
+    html`<input
+      type="number"
+      class=${invalid ? "invalid" : ""}
+      .value=${value}
+      ?disabled=${disabled}
+      min=${min ?? ""}
+      max=${max ?? ""}
+      step=${entry.type === ConfigEntryType.FLOAT ? "any" : "1"}
+      placeholder=${String(entry.default_value ?? "")}
+      @input=${(e: Event) => {
+        const raw = (e.target as HTMLInputElement).value;
+        ctx.emitChange(path, raw === "" ? "" : Number(raw));
+      }}
+    />`,
+  );
+}
+
+/**
+ * Hex-typed integer input.
+ *
+ * `<input type="number">` (the default integer renderer above)
+ * rejects `0x...` literals at the browser level, so hex-typed
+ * fields (`ConfigEntry.display_format === "hex"`, populated for
+ * upstream `cv.hex_uint*_t` validators — every i2c address +
+ * register-address field) need a text input with explicit
+ * hex parsing and display formatting.
+ *
+ * Display: any underlying numeric value reformats to `"0x" + lower-
+ * hex` so `address: 119` from the YAML shows as `0x77` in the
+ * form (the BME280's default address, the way the user expects
+ * to see it).
+ *
+ * Input: accepts both `0x76` / `0X76` (hex) and `118` (decimal),
+ * matching ESPHome's own `cv.hex_int` validator behaviour. Empty
+ * input emits `""` so optional entries get stripped from the
+ * payload by the form's coerce pass.
+ */
+function renderHexIntField(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+) {
+  const rawValue = ctx.getAt(path);
+  const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
+  // Prefer the in-progress edit buffer over the formatted value
+  // so intermediate typing states (`"0x"`, `"0x7"`) aren't
+  // clobbered by a re-render that reformats the empty/partial
+  // parse back to `""`. Mirrors the float-with-unit pattern.
+  const editingText = ctx.getEditingMagnitude(path);
+  const displayValue = editingText ?? hexDisplayOrFallback(rawValue);
+  const placeholder = hexDisplayOrFallback(entry.default_value);
+  return renderFieldShell(
+    entry,
+    path,
+    ctx,
+    html`<input
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      class=${invalid ? "invalid" : ""}
+      .value=${displayValue}
+      ?disabled=${disabled}
+      placeholder=${placeholder}
+      @input=${(e: Event) => {
+        const raw = (e.target as HTMLInputElement).value;
+        ctx.setEditingMagnitude(path, raw);
+        if (raw === "") {
+          ctx.emitChange(path, "");
+          return;
+        }
+        // Try to parse + reformat. The canonical ``"0x..."``
+        // string (when both succeed) is what we want to land on
+        // disk — matches what ``normalizeHexValues`` writes for
+        // untouched fields, and ESPHome's ``cv.hex_int``
+        // accepts it. If either step fails — unparseable input
+        // (bare letters, ``0x`` with no digits) OR a parsed
+        // value ``formatHexInt`` rejects (negative, NaN,
+        // fractional — none round-trip through the hex literal
+        // grammar) — fall through to the raw string so the
+        // inline validator flags it instead of the form
+        // silently clearing the field.
+        ctx.emitChange(path, formatHexInt(parseHexInt(raw)) || raw);
+      }}
+      @blur=${() => ctx.clearEditingMagnitude(path)}
+    />`,
+  );
+}
+
+/**
+ * Format a raw form value as a hex literal, falling back to
+ * `String(value)` when the value is something `formatHexInt`
+ * can't represent (a `!lambda` block, a float, an arbitrary
+ * string the user pasted in).
+ *
+ * Returns `""` for nullish / empty values so the input clears
+ * normally; otherwise the user sees their actual content
+ * instead of a mysteriously empty field while editing — the
+ * inline-error mechanism still flags un-validatable shapes.
+ */
+function hexDisplayOrFallback(rawValue: unknown): string {
+  if (rawValue === null || rawValue === undefined || rawValue === "") return "";
+  return formatHexInt(rawValue) || String(rawValue);
 }
 
 /**

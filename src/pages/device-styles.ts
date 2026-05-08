@@ -8,14 +8,16 @@ export const devicePageStyles = css`
   .page {
     box-sizing: border-box;
     padding: var(--wa-space-l);
-    min-height: calc(100vh - var(--esphome-header-height));
+    min-height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
   }
 
   .layout-grid {
     display: grid;
     grid-template-columns: minmax(230px, 1fr) minmax(0, 5fr);
     gap: var(--wa-space-l);
-    height: calc(100vh - var(--esphome-header-height) - 2 * var(--wa-space-l));
+    height: calc(
+      100vh - var(--esphome-header-height) - var(--esphome-footer-height) - 2 * var(--wa-space-l)
+    );
     transition: grid-template-columns 0.25s ease;
   }
 
@@ -65,15 +67,15 @@ export const devicePageStyles = css`
        2 * var(--wa-space-l) subtracted and would leave a gap). */
     .page {
       padding: 0;
-      min-height: calc(100vh - var(--esphome-header-height));
-      min-height: calc(100dvh - var(--esphome-header-height));
+      min-height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
+      min-height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     }
 
     .layout-grid {
       grid-template-columns: 1fr;
       gap: 0;
-      height: calc(100vh - var(--esphome-header-height));
-      height: calc(100dvh - var(--esphome-header-height));
+      height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
+      height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     }
 
     .desktop-nav {

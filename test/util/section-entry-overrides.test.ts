@@ -21,9 +21,17 @@ import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 
 describe("MAP_SECTIONS", () => {
-  it("contains 'substitutions' and 'packages'", () => {
+  it("contains 'substitutions'", () => {
     expect(MAP_SECTIONS.has("substitutions")).toBe(true);
-    expect(MAP_SECTIONS.has("packages")).toBe(true);
+  });
+
+  it("does NOT contain 'packages' (#361 — list shape would corrupt)", () => {
+    // ``packages`` accepts both ``{name: pkg}`` and ``[pkg, pkg]``
+    // upstream. The dict-only ``renderMapField`` silently
+    // overwrote a list-shaped YAML with ``{}`` on save (#361).
+    // Routed through ``YAML_ONLY_SECTIONS`` instead so both
+    // shapes round-trip cleanly via the YAML pane.
+    expect(MAP_SECTIONS.has("packages")).toBe(false);
   });
 });
 
@@ -35,19 +43,16 @@ describe("resolveSectionEntries — MAP section shape", () => {
   // ``ctx.getAt`` / ``ctx.emitChange``. The value template must be
   // a string-shaped entry so primitive values (the common case)
   // get a text input.
-  it.each(["substitutions", "packages"])(
-    "%s resolves to a single empty-keyed MAP with a required string value template",
-    (sectionKey) => {
-      const entries = resolveSectionEntries(sectionKey, []);
-      expect(entries).toHaveLength(1);
-      expect(entries[0].key).toBe("");
-      expect(entries[0].type).toBe(ConfigEntryType.MAP);
-      const valueTemplate = entries[0].config_entries?.[0];
-      expect(valueTemplate).toBeDefined();
-      expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
-      expect(valueTemplate!.required).toBe(true);
-    },
-  );
+  it("substitutions resolves to a single empty-keyed MAP with a required string value template", () => {
+    const entries = resolveSectionEntries("substitutions", []);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].key).toBe("");
+    expect(entries[0].type).toBe(ConfigEntryType.MAP);
+    const valueTemplate = entries[0].config_entries?.[0];
+    expect(valueTemplate).toBeDefined();
+    expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
+    expect(valueTemplate!.required).toBe(true);
+  });
 });
 
 describe("resolveSectionEntries", () => {
@@ -81,18 +86,15 @@ describe("resolveSectionEntries", () => {
     expect(resolveSectionEntries("custom_unknown", [])).toEqual([]);
   });
 
-  it.each(["substitutions", "packages"])(
-    "is referentially stable for %s (same reference across calls)",
-    (sectionKey) => {
-      // The form re-renders on every state change; if the resolver
-      // built a new array each time, the form's ``.entries`` prop
-      // would change reference and Lit would re-mount the rows.
-      // Same reference → no churn.
-      const a = resolveSectionEntries(sectionKey, []);
-      const b = resolveSectionEntries(sectionKey, []);
-      expect(a).toBe(b);
-    },
-  );
+  it("is referentially stable for substitutions (same reference across calls)", () => {
+    // The form re-renders on every state change; if the resolver
+    // built a new array each time, the form's ``.entries`` prop
+    // would change reference and Lit would re-mount the rows.
+    // Same reference → no churn.
+    const a = resolveSectionEntries("substitutions", []);
+    const b = resolveSectionEntries("substitutions", []);
+    expect(a).toBe(b);
+  });
 });
 
 describe("device-section-config wiring", () => {
