@@ -278,6 +278,7 @@
     "filter_labels": "Labels",
     "filter_clear": "Clear filter",
     "drawer_loaded_integrations": "Loaded Integrations",
+    "drawer_auto_loaded_integrations": "Show {count} auto-loaded dependencies",
     "drawer_config_hash_title": "Config Hash",
     "drawer_config_hash_local": "Local",
     "drawer_config_hash_deployed": "Deployed",

@@ -47,6 +47,7 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
+import { splitIntegrations } from "../../util/integration-split.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { renderIpValue } from "./device-drawer-render.js";
@@ -472,6 +473,34 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         outline-offset: 2px;
       }
 
+      /* Auto-loaded-integrations collapsible. The drawer's primary
+         "Loaded Integrations" row shows the user-meaningful chips
+         inline; auto-loaded dependencies (the upstream AUTO_LOAD
+         chain — md5, mdns, web_server_base, etc.) tuck in here
+         so a 30-component config doesn't drown the panel in
+         framework noise. The summary row gets the muted text
+         colour so it reads as secondary metadata, not as another
+         tag-row header. */
+      .auto-loaded-details {
+        margin-top: var(--wa-space-s);
+      }
+
+      .auto-loaded-details > summary {
+        cursor: pointer;
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        padding: 2px 0;
+        user-select: none;
+      }
+
+      .auto-loaded-details > summary:hover {
+        color: var(--wa-color-text-normal);
+      }
+
+      .tags-wrap--auto-loaded {
+        margin-top: var(--wa-space-2xs);
+      }
+
       .status-badges {
         display: flex;
         flex-wrap: wrap;
@@ -642,28 +671,77 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
       ${this._renderConfigHashSection(d)}
 
-      ${d.loaded_integrations && d.loaded_integrations.length > 0
-        ? html`
-            <div class="section">
-              <h4 class="section-title">${this._localize("dashboard.drawer_loaded_integrations")}</h4>
-              <div class="tags-wrap">
-                ${d.loaded_integrations.map((i) => {
-                  const url = this._integrationDocs[i];
-                  return url && _isSafeDocsUrl(url)
-                    ? html`<a
-                        class="tag tag--link"
-                        href=${url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        >${i}</a
-                      >`
-                    : html`<span class="tag">${i}</span>`;
-                })}
-              </div>
-            </div>
-          `
-        : nothing}
+      ${this._renderLoadedIntegrationsSection(d)}
     `;
+  }
+
+  /**
+   * Render the "Loaded Integrations" section with a direct /
+   * auto-loaded split.
+   *
+   * `loaded_integrations` from the backend lumps every integration
+   * upstream ESPHome resolved at compile time — the user's
+   * top-level blocks, their `- platform: ...` references, AND the
+   * AUTO_LOAD chain those things drag in (`md5` from WPA2 password
+   * hashing, `mdns` from `api`, `web_server_base` from
+   * `web_server`, `voltage_sampler` from ADC sensors). For
+   * non-trivial configs the auto-loaded chain dominates, burying
+   * the user-meaningful entries.
+   *
+   * Backend's `directly_referenced_integrations` is the subset
+   * the user actually wrote (issue #422 fix); the complement is
+   * the auto-loaded chain. We render direct chips inline, and
+   * tuck auto-loaded ones inside a `<details>` collapsible the
+   * user can expand on demand.
+   *
+   * Falls back to rendering the flat `loaded_integrations` list
+   * when the backend couldn't compute the split — empty
+   * `directly_referenced_integrations` is the graceful-degrade
+   * signal (resolved-config parse failed mid-edit).
+   */
+  private _renderLoadedIntegrationsSection(d: ConfiguredDevice) {
+    if (!d.loaded_integrations || d.loaded_integrations.length === 0) {
+      return nothing;
+    }
+    const { direct, indirect } = splitIntegrations(
+      d.loaded_integrations,
+      d.directly_referenced_integrations,
+    );
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_loaded_integrations")}
+        </h4>
+        <div class="tags-wrap">${direct.map((i) => this._renderIntegrationTag(i))}</div>
+        ${indirect.length > 0
+          ? html`
+              <details class="auto-loaded-details">
+                <summary>
+                  ${this._localize("dashboard.drawer_auto_loaded_integrations", {
+                    count: String(indirect.length),
+                  })}
+                </summary>
+                <div class="tags-wrap tags-wrap--auto-loaded">
+                  ${indirect.map((i) => this._renderIntegrationTag(i))}
+                </div>
+              </details>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
+  private _renderIntegrationTag(name: string) {
+    const url = this._integrationDocs[name];
+    return url && _isSafeDocsUrl(url)
+      ? html`<a
+          class="tag tag--link"
+          href=${url}
+          target="_blank"
+          rel="noopener noreferrer"
+          >${name}</a
+        >`
+      : html`<span class="tag">${name}</span>`;
   }
 
   /**

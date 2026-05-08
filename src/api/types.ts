@@ -100,6 +100,23 @@ export interface ConfiguredDevice {
   current_version: string;
   deployed_version: string;
   loaded_integrations: string[];
+  /**
+   * Subset of ``loaded_integrations`` the user directly wrote in
+   * YAML — top-level keys (``api:``, ``wifi:``, ``sensor:``) plus
+   * the platform stems from ``- platform: <name>`` references
+   * (``gpio`` under ``binary_sensor``, ``homeassistant`` /
+   * ``sntp`` under ``time``, ``esphome`` under ``ota``). The
+   * complement against ``loaded_integrations`` is the auto-loaded
+   * dependency chain (``md5`` from WPA2 password hashing,
+   * ``mdns`` from ``api``, ``web_server_base`` from ``web_server``,
+   * ``voltage_sampler`` from ADC sensors).
+   *
+   * Empty array is the graceful-degrade signal — backend couldn't
+   * resolve the YAML (mid-edit drafts, missing secrets) so it
+   * doesn't know what's direct. The drawer falls back to
+   * rendering ``loaded_integrations`` as a flat list.
+   */
+  directly_referenced_integrations: string[];
   state: DeviceState;
   /**
    * 8-char hex hash of the YAML as last successfully compiled,
