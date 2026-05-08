@@ -1044,6 +1044,27 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(after).not.toContain("    - area_id:");
   });
 
+  it("preserves a list of only bare-dash placeholder items", () => {
+    // Regression for the bug Copilot caught: a list whose only
+    // items are bare-dash placeholders (the user clicked Add but
+    // hadn't filled any fields yet, then saved) used to drop the
+    // whole field. ``_scanValueBlock`` saw no ``- key:`` lines and
+    // returned ``isComplex=false``, so the scalar-list branch
+    // ran, the ``- `` regex missed the bare dash, items=0, and
+    // the key got omitted from the values dict — which then
+    // *deleted* the user's in-progress rows on the next save.
+    // The bare-dash regex is now part of the complexity signal,
+    // so the block routes through ``collectBlockListMappings``
+    // and rebuilds each placeholder as ``{}``.
+    const yaml = `esphome:
+  devices:
+    -
+    -
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([{}, {}]);
+  });
+
   it("re-parses a bare-dash list item as an empty mapping (round-trip stable)", () => {
     // The serializer emits ``    -`` (no trailing key) for an
     // empty mapping item — the placeholder shape for a

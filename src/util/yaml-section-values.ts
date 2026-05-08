@@ -99,6 +99,20 @@ const BLOCK_SCALAR_RE = /^[^"']*:\s*[|>][-+]?\s*(?:#.*)?$/;
 const BLOCK_SCALAR_INLINE_RE = /^[|>][-+]?$/;
 
 /**
+ * Match a bare-dash list item (``    -`` followed by EOL or only
+ * whitespace). The serializer emits this shape as a placeholder
+ * for an empty mapping item — a freshly-added Add row the user
+ * saved before filling fields. Without flagging it as a
+ * complexity signal the scalar-list branch in ``parseListBlock``
+ * runs (``- `` regex misses the bare dash, items=0), the key is
+ * dropped from the values dict, and the user's empty row vanishes
+ * on save. Marking it complex routes the block through
+ * ``collectBlockListMappings`` which already treats bare dashes
+ * as ``{}`` placeholders.
+ */
+const LIST_ITEM_BARE_DASH_RE = /^\s+-\s*$/;
+
+/**
  * Match a list item whose value is a key-style sub-dict header
  * (`- then:`, `- lambda:`, `- logger.log: pressed`,
  * `- switch.turn_on: relay`). The dash + key + colon shape is the
@@ -588,7 +602,11 @@ const _scanValueBlock = (
     const lead = line.match(/^ */)![0];
     if (lead.length <= keyIndent.length) return { endIdx: i, isComplex };
     if (!isComplex) {
-      if (BLOCK_SCALAR_RE.test(line) || LIST_ITEM_DICT_KEY_RE.test(line)) {
+      if (
+        BLOCK_SCALAR_RE.test(line) ||
+        LIST_ITEM_DICT_KEY_RE.test(line) ||
+        LIST_ITEM_BARE_DASH_RE.test(line)
+      ) {
         isComplex = true;
       }
     }

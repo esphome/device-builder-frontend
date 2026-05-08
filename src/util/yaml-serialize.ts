@@ -157,11 +157,6 @@ export interface SerializeYamlOptions {
 }
 
 /**
- * Serialize a values dict as YAML lines at the given indent.
- * Returns an array of lines (not a joined string) so callers can
- * splice them into existing YAML when needed.
- */
-/**
  * Serialize a single list item. Mapping items
  * (``esphome.devices`` / ``esphome.areas`` shape — the new
  * ``multi_value=true`` schema entries) emit as
@@ -220,6 +215,11 @@ function serializeListItem(
   return [`${dashIndent}- ${formatYamlScalar(item)}`];
 }
 
+/**
+ * Serialize a values dict as YAML lines at the given indent.
+ * Returns an array of lines (not a joined string) so callers can
+ * splice them into existing YAML when needed.
+ */
 export function serializeYamlValues(
   values: Record<string, unknown>,
   indent: string,
