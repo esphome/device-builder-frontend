@@ -7,6 +7,7 @@ import {
   validateEntry,
 } from "../../src/util/config-validation.js";
 import { makeConfigEntry as makeEntry } from "./_make-config-entry.js";
+import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 describe("validateDeviceName", () => {
   it("accepts valid slug", () => {
@@ -223,6 +224,29 @@ describe("validateEntries", () => {
     // Other items should be clean.
     expect(errors.has("devices.0.id")).toBe(false);
     expect(errors.has("devices.2.id")).toBe(false);
+  });
+
+  it("treats a YamlRawValue at a multi_value NESTED key as satisfied", () => {
+    // The parser preserves un-modellable list shapes as
+    // ``YamlRawValue`` (dotted keys, block scalars, etc.). The
+    // validator can't introspect items, so:
+    //   1. A required field whose value is a YamlRawValue is
+    //      satisfied by the YAML's existence — no
+    //      ``validation.required`` on the bare field.
+    //   2. Per-item rules can't run, so we skip recursion.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        required: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, {
+      devices: new YamlRawValue(["    - logger.log: hello"]),
+    });
+    expect(errors.size).toBe(0);
   });
 
   it("does not validate inside an empty optional multi_value NESTED entry", () => {

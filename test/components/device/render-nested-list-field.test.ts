@@ -24,6 +24,7 @@ import { renderNestedListField } from "../../../src/components/device/config-ent
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { getIn } from "../../../src/util/nested-values.js";
+import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 
 function makeListEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -205,5 +206,30 @@ describe("renderNestedListField", () => {
     expect(renderEntry).toHaveBeenCalledTimes(2);
     const keys = renderEntry.mock.calls.map((c) => (c[0] as ConfigEntry).key);
     expect(keys).not.toContain("area_id");
+  });
+
+  it("renders a YAML-only notice and disables Add/Remove for YamlRawValue", () => {
+    // The parser preserves a list block byte-for-byte as
+    // ``YamlRawValue`` when the items don't fit the flat-mapping
+    // contract (dotted keys, block scalars, nested mappings).
+    // The renderer must NOT coerce that to ``[]`` and offer Add /
+    // Remove — the next save would clobber the user's preserved
+    // YAML. Surface a notice instead, no Add/Remove, no children.
+    const entry = makeListEntry();
+    const { ctx, renderEntry } = makeCtx({
+      devices: new YamlRawValue([
+        "    - logger.log: hello",
+        "      switch.turn_on: relay_id",
+      ]),
+    });
+    const tpl = renderNestedListField(entry, ["devices"], ctx);
+    // No per-item children rendered.
+    expect(renderEntry).not.toHaveBeenCalled();
+    // The YAML-only translation key is in the template.
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(json).toContain("device.multi_value_yaml_only");
+    // No Add / Remove translation keys — those buttons aren't rendered.
+    expect(json).not.toContain("device.multi_value_add");
+    expect(json).not.toContain("device.multi_value_remove");
   });
 });

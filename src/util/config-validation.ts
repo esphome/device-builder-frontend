@@ -2,6 +2,7 @@ import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { asMappingList, asRecord } from "./nested-values.js";
+import { YamlRawValue } from "./yaml-serialize.js";
 
 /**
  * Determine if a config entry is currently visible.
@@ -232,7 +233,15 @@ function _validateEntriesRecursive(
         // empty list on an optional field is fine (the user opted
         // out by adding nothing); a required list with zero items
         // surfaces a single error on the field itself.
-        const items = asMappingList(values[entry.key]);
+        //
+        // ``YamlRawValue`` short-circuits — the parser preserved
+        // the block byte-for-byte because items don't fit the
+        // flat-mapping contract, so we can't introspect them. The
+        // user's YAML is present (treats a required field as
+        // satisfied) but unreachable for per-item validation.
+        const raw = values[entry.key];
+        if (raw instanceof YamlRawValue) continue;
+        const items = asMappingList(raw);
         if (items.length === 0) {
           if (entry.required) {
             const fullPath = [...pathPrefix, entry.key].join(".");

@@ -6,6 +6,7 @@ import {
   filterRenderable,
 } from "../../../src/components/device/config-entry-render-filter.js";
 import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
+import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 
 describe("ALWAYS_SHOWN_KEYS", () => {
   it("contains 'name' (the friendly-name leaf)", () => {
@@ -234,6 +235,31 @@ describe("filterRenderable", () => {
       { requiredOnly: false, showAdvanced: false },
     );
     expect(populated.map((e) => e.key)).toEqual(["devices"]);
+  });
+
+  it("treats a YamlRawValue at a multi_value NESTED key as material", () => {
+    // The parser falls back to ``YamlRawValue`` when the items
+    // can't fit the flat-mapping contract (dotted keys, block
+    // scalars, nested mappings). The user clearly has YAML
+    // there, so an advanced multi_value field with raw content
+    // must stay visible without a trip through the Advanced
+    // toggle — otherwise the visual editor would silently hide
+    // the user's data.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        advanced: true,
+        config_entries: [makeEntry({ key: "id" })],
+      }),
+    ];
+    const out = filterRenderable(
+      entries,
+      { devices: new YamlRawValue(["    - id: kitchen", "      filters:", "        delta: 0.5"]) },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(out.map((e) => e.key)).toEqual(["devices"]);
   });
 
   it("keeps an advanced multi_value NESTED entry with items, even when showAdvanced is off", () => {

@@ -489,6 +489,7 @@
     "multi_value_empty": "Aucun élément — cliquez sur + pour en ajouter un.",
     "multi_value_add": "Ajouter",
     "multi_value_remove": "Supprimer",
+    "multi_value_yaml_only": "Cette liste contient du YAML que l'éditeur visuel ne peut pas modéliser — modifiez-la directement dans le volet YAML à droite.",
     "map_empty": "Aucune entrée — cliquez sur + pour en ajouter une.",
     "map_add": "Ajouter une entrée",
     "map_remove": "Supprimer l'entrée",

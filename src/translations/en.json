@@ -566,6 +566,7 @@
     "multi_value_empty": "No items yet — click + to add one.",
     "multi_value_add": "Add",
     "multi_value_remove": "Remove",
+    "multi_value_yaml_only": "This list contains YAML the visual editor can't model — edit it directly in the YAML pane on the right.",
     "map_empty": "No entries yet — click + to add one.",
     "map_add": "Add entry",
     "map_remove": "Remove entry",

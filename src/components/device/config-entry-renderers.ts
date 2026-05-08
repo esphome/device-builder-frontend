@@ -793,7 +793,28 @@ export function renderNestedListField(
   path: string[],
   ctx: RenderCtx,
 ) {
-  const items = asMappingList(ctx.getAt(path));
+  // Bail to a YAML-only notice when the parser preserved the
+  // value as ``YamlRawValue`` (the catalog's flat-mapping
+  // contract didn't fit and the block round-trips byte-for-byte
+  // as raw lines). Without this, ``asMappingList`` would coerce
+  // the raw block to ``[]``, the renderer would show "No items
+  // yet" + an Add button, and the next save would replace the
+  // user's preserved YAML with whatever the renderer emits —
+  // silent data loss.
+  const raw = ctx.getAt(path);
+  if (raw instanceof YamlRawValue) {
+    return html`
+      <div class="nested-list" data-field-key=${path.join(".")}>
+        ${renderLabel(entry, ctx)}
+        <p class="field-description">
+          ${ctx.localize("device.multi_value_yaml_only")}
+        </p>
+        ${renderFieldError(path, ctx)}
+      </div>
+    `;
+  }
+
+  const items = asMappingList(raw);
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => ({}));
   const itemTitle = labelFor(entry, ctx);

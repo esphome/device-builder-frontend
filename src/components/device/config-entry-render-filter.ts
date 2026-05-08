@@ -29,6 +29,7 @@ import {
   asRecord,
   isPlainObject,
 } from "../../util/nested-values.js";
+import { YamlRawValue } from "../../util/yaml-serialize.js";
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -95,7 +96,12 @@ function hasMaterialValue(
       // ``esphome.areas``): any non-empty array of items counts.
       // We don't recurse — items are user-added, and a freshly
       // added empty ``{}`` still represents user intent (the row
-      // exists because they clicked Add).
+      // exists because they clicked Add). A ``YamlRawValue`` at
+      // this key (the parser preserved the block byte-for-byte
+      // because the items didn't fit the flat-mapping contract)
+      // also counts — the user's YAML must keep showing without
+      // a trip through the Advanced toggle.
+      if (value instanceof YamlRawValue) return true;
       return Array.isArray(value) && value.length > 0;
     }
     if (!isPlainObject(value)) return false;

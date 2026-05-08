@@ -303,26 +303,6 @@ const collectBlockListItems = (
 };
 
 /**
- * Dispatch a YAML list block (``key:\n  - …``) into the right
- * value shape: structured array of mappings for editor-friendly
- * lists (``esphome.devices`` / ``esphome.areas``), ``YamlRawValue``
- * for complex automation triggers, or ``string[]`` for scalar
- * lists. Shared between the top-level and nested-block parsers
- * so both surfaces agree on the dispatch.
- *
- * ``parentIndent`` is the indent of the parent KEY (the one whose
- * value is the list). The dash and child indents are detected
- * from the first list-item line so 4-space (or other consistent)
- * user YAML round-trips correctly — the editor's canonical
- * 2-space emit applies on save, but reads accept any indent the
- * user chose.
- *
- * Returns ``endIdx`` — the line after the block ends — so callers
- * can fast-forward their loop index. ``isEmptyScalarList`` lets
- * the top-level caller preserve its existing "skip the assignment
- * for an empty scalar list" semantic.
- */
-/**
  * Find the leading whitespace of the first list-item dash at or
  * after *startIdx*. Returns *fallback* when no dash is reachable
  * (the block is blank or terminates before any item) and the
@@ -349,6 +329,26 @@ const _detectFirstDashIndent = (
   return { dashIndent, firstDashIdx };
 };
 
+/**
+ * Dispatch a YAML list block (``key:\n  - …``) into the right
+ * value shape: structured array of mappings for editor-friendly
+ * lists (``esphome.devices`` / ``esphome.areas``), ``YamlRawValue``
+ * for complex automation triggers, or ``string[]`` for scalar
+ * lists. Shared between the top-level and nested-block parsers
+ * so both surfaces agree on the dispatch.
+ *
+ * ``parentIndent`` is the indent of the parent KEY (the one whose
+ * value is the list). The dash and child indents are detected
+ * from the first list-item line so 4-space (or other consistent)
+ * user YAML round-trips correctly — the editor's canonical
+ * 2-space emit applies on save, but reads accept any indent the
+ * user chose.
+ *
+ * Returns ``endIdx`` — the line after the block ends — so callers
+ * can fast-forward their loop index. ``isEmptyScalarList`` lets
+ * the top-level caller preserve its existing "skip the assignment
+ * for an empty scalar list" semantic.
+ */
 const parseListBlock = (
   lines: string[],
   startIdx: number,
