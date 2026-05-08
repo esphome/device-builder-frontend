@@ -1,18 +1,23 @@
 import { consume } from "@lit/context";
 import {
+  mdiClose,
   mdiPaletteOutline,
   mdiServerNetwork,
   mdiTranslate,
   mdiVectorDifference,
 } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
+import type { ESPHomeAPI } from "../api/esphome-api.js";
+import type { RemoteBuildPeer } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
 import { readStoredLocale } from "../common/localize.js";
 
 /** Sentinel meaning "follow browser locale" (no explicit override). */
 type LanguageChoice = SupportedLocale | "system";
 import {
+  apiContext,
   localizeContext,
   remoteBuildEnabledContext,
   yamlDiffButtonContext,
@@ -26,6 +31,7 @@ import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
+  close: mdiClose,
   "palette-outline": mdiPaletteOutline,
   "server-network": mdiServerNetwork,
   translate: mdiTranslate,
@@ -72,6 +78,25 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _remoteBuildEnabled = false;
 
+  @consume({ context: apiContext })
+  private _api?: ESPHomeAPI;
+
+  // Phase 2b — peer-list state for the Remote builder section.
+  // Loaded on dialog open; refreshed after every add / remove.
+  // ``null`` means "not yet loaded"; an empty array means "loaded
+  // and there are zero peers".
+  @state()
+  private _remoteBuildPeers: RemoteBuildPeer[] | null = null;
+
+  @state()
+  private _remoteBuildHostInput = "";
+
+  @state()
+  private _remoteBuildPortInput = "6052";
+
+  @state()
+  private _remoteBuildAddInFlight = false;
+
   @state()
   private _section: Section = "appearance";
 
@@ -88,11 +113,37 @@ export class ESPHomeSettingsDialog extends LitElement {
     this._theme = localStorage.getItem("esphome-theme") ?? "system";
     this._language = readStoredLocale() ?? "system";
     this._section = "appearance";
+    // Drop any stale peer list from a previous open so the user
+    // sees the loading state on each fresh dialog visit.
+    this._remoteBuildPeers = null;
     this._dialog.open = true;
   }
 
   close() {
     this._dialog.open = false;
+  }
+
+  private _selectSection(section: Section) {
+    this._section = section;
+    if (section === "remote_build" && this._remoteBuildPeers === null) {
+      void this._loadRemoteBuildPeers();
+    }
+  }
+
+  private async _loadRemoteBuildPeers() {
+    // Snapshot fetch — refreshed on first open of the Remote
+    // builder section and after every add / remove. mDNS rows
+    // are listed first by the backend; manual rows follow with
+    // ``source="manual"``.
+    if (this._api === undefined) {
+      return;
+    }
+    try {
+      this._remoteBuildPeers = await this._api.listRemoteBuildHosts();
+    } catch (err) {
+      console.warn("Could not load remote-build hosts:", err);
+      this._remoteBuildPeers = [];
+    }
   }
 
   static styles = [
@@ -280,6 +331,109 @@ export class ESPHomeSettingsDialog extends LitElement {
         transform: translateX(18px);
       }
 
+      /* Phase 2b — Remote builder section */
+
+      .section-heading {
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-semibold);
+        color: var(--wa-color-text-quiet);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        margin: var(--wa-space-l) 0 var(--wa-space-xs);
+        padding: 0 var(--wa-space-m);
+      }
+
+      .peer-row .row-title {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+      }
+
+      .peer-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .peer-badge--mdns {
+        background: var(--wa-color-surface-border);
+        color: var(--wa-color-text-quiet);
+      }
+
+      .peer-badge--manual {
+        background: var(--esphome-primary-soft, var(--wa-color-surface-border));
+        color: var(--esphome-primary);
+      }
+
+      .peer-remove {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+        border-radius: var(--wa-border-radius-s);
+        background: transparent;
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .peer-remove:hover,
+      .peer-remove:focus-visible {
+        background: var(--wa-color-surface-border);
+        color: var(--wa-color-text);
+      }
+
+      .manual-host-form {
+        display: flex;
+        gap: var(--wa-space-s);
+        padding: var(--wa-space-xs) var(--wa-space-m) var(--wa-space-m);
+        align-items: center;
+      }
+
+      .manual-host-input {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 36px;
+        padding: 0 var(--wa-space-s);
+        border: 1px solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text);
+        font: inherit;
+      }
+
+      .manual-host-port {
+        flex: 0 0 100px;
+      }
+
+      .manual-host-input:focus {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: -1px;
+      }
+
+      .manual-host-add {
+        height: 36px;
+        padding: 0 var(--wa-space-m);
+        border: none;
+        border-radius: var(--wa-border-radius-s);
+        background: var(--esphome-primary);
+        color: white;
+        font-weight: var(--wa-font-weight-semibold);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .manual-host-add:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
       @media (max-width: 700px) {
         .layout {
           flex-direction: column;
@@ -313,7 +467,7 @@ export class ESPHomeSettingsDialog extends LitElement {
                 (s) => html`
                   <button
                     class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
-                    @click=${() => (this._section = s.id)}
+                    @click=${() => this._selectSection(s.id)}
                   >
                     <wa-icon library="mdi" name=${s.icon}></wa-icon>
                     <span>${this._localize(s.labelKey)}</span>
@@ -408,17 +562,11 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderRemoteBuild() {
-    // Phase 2 of issue #106. The toggle is wired to the backend
-    // via the parent's ``set-remote-build-enabled`` handler; the
-    // discovered-peers list and per-host pairing UI come in
-    // phases 3+ — this section ships as the empty-state
-    // scaffolding so future phases have a UI surface to plug
-    // into.
-    //
-    // The "Discovered dashboards" row is presentational copy, not
-    // a setting control — wrap the placeholder in ``role="status"``
-    // so assistive tech reads it as an empty-state announcement
-    // rather than a settings row with a missing widget.
+    // Phase 2 of issue #106 lit the master toggle + the
+    // empty-state list scaffolding. Phase 2b fills in the actual
+    // peer list (mDNS-discovered + manually-added) plus the
+    // "add by IP / hostname" input for cross-subnet / non-mDNS
+    // LANs. Per-host pairing UI comes in phase 4.
     return html`
       <div class="row">
         <div class="row-label">
@@ -437,15 +585,130 @@ export class ESPHomeSettingsDialog extends LitElement {
           @click=${this._onToggleRemoteBuild}
         ></button>
       </div>
-      <div class="row" role="status">
+
+      <div class="section-heading">
+        ${this._localize("settings.remote_build_known_dashboards")}
+      </div>
+      ${this._renderRemoteBuildPeers()}
+
+      <div class="section-heading">
+        ${this._localize("settings.remote_build_add_manual")}
+      </div>
+      <div class="row">
         <div class="row-label">
-          <span class="row-title">
-            ${this._localize("settings.remote_build_discovered_dashboards")}
-          </span>
           <span class="row-desc">
-            ${this._localize("settings.remote_build_discovered_dashboards_desc")}
+            ${this._localize("settings.remote_build_add_manual_desc")}
           </span>
         </div>
+      </div>
+      <form class="manual-host-form" @submit=${this._onAddManualHost}>
+        <input
+          class="manual-host-input"
+          type="text"
+          inputmode="url"
+          autocomplete="off"
+          spellcheck="false"
+          required
+          placeholder=${this._localize(
+            "settings.remote_build_add_manual_host_placeholder"
+          )}
+          aria-label=${this._localize(
+            "settings.remote_build_add_manual_host_label"
+          )}
+          .value=${this._remoteBuildHostInput}
+          @input=${(e: InputEvent) => {
+            this._remoteBuildHostInput = (e.target as HTMLInputElement).value;
+          }}
+        />
+        <input
+          class="manual-host-input manual-host-port"
+          type="number"
+          min="1"
+          max="65535"
+          required
+          aria-label=${this._localize(
+            "settings.remote_build_add_manual_port_label"
+          )}
+          .value=${this._remoteBuildPortInput}
+          @input=${(e: InputEvent) => {
+            this._remoteBuildPortInput = (e.target as HTMLInputElement).value;
+          }}
+        />
+        <button
+          class="manual-host-add"
+          type="submit"
+          ?disabled=${this._remoteBuildAddInFlight}
+        >
+          ${this._localize("settings.remote_build_add_manual_submit")}
+        </button>
+      </form>
+    `;
+  }
+
+  private _renderRemoteBuildPeers() {
+    if (this._remoteBuildPeers === null) {
+      return html`
+        <div class="row" role="status">
+          <div class="row-label">
+            <span class="row-desc">
+              ${this._localize("settings.remote_build_peers_loading")}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+    if (this._remoteBuildPeers.length === 0) {
+      return html`
+        <div class="row" role="status">
+          <div class="row-label">
+            <span class="row-desc">
+              ${this._localize("settings.remote_build_peers_empty")}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+    return this._remoteBuildPeers.map((peer) => this._renderPeerRow(peer));
+  }
+
+  private _renderPeerRow(peer: RemoteBuildPeer) {
+    const isManual = peer.source === "manual";
+    const versionLine = peer.esphome_version
+      ? this._localize("settings.remote_build_peer_version_line", {
+          esphome: peer.esphome_version,
+        })
+      : nothing;
+    return html`
+      <div class="row peer-row">
+        <div class="row-label">
+          <span class="row-title">
+            ${peer.name}
+            <span class="peer-badge peer-badge--${peer.source}">
+              ${this._localize(
+                isManual
+                  ? "settings.remote_build_peer_source_manual"
+                  : "settings.remote_build_peer_source_mdns"
+              )}
+            </span>
+          </span>
+          <span class="row-desc">
+            ${peer.hostname}:${peer.port} ${versionLine}
+          </span>
+        </div>
+        ${isManual
+          ? html`
+              <button
+                class="peer-remove"
+                aria-label=${this._localize(
+                  "settings.remote_build_peer_remove",
+                  { hostname: peer.hostname }
+                )}
+                @click=${() => this._onRemoveManualHost(peer)}
+              >
+                <wa-icon library="mdi" name="close"></wa-icon>
+              </button>
+            `
+          : nothing}
       </div>
     `;
   }
@@ -491,6 +754,78 @@ export class ESPHomeSettingsDialog extends LitElement {
         bubbles: true,
         composed: true,
       })
+    );
+  }
+
+  /**
+   * Run an add/remove mutation against the API and refresh the
+   * peer list on success. Returns ``true`` when the call landed
+   * cleanly so callers can chain "clear the input" /
+   * "close the row" UI steps. On failure, surfaces the toast
+   * message returned by ``classifyError`` and returns ``false``.
+   * No-op when the API context isn't wired (returns ``false``).
+   */
+  private async _runManualHostMutation(
+    call: (api: ESPHomeAPI) => Promise<unknown>,
+    classifyError: (err: unknown) => string,
+  ): Promise<boolean> {
+    if (this._api === undefined) {
+      return false;
+    }
+    try {
+      await call(this._api);
+      await this._loadRemoteBuildPeers();
+      return true;
+    } catch (err) {
+      toast.error(this._localize(classifyError(err)), { richColors: true });
+      return false;
+    }
+  }
+
+  private async _onAddManualHost(e: Event) {
+    e.preventDefault();
+    if (this._remoteBuildAddInFlight) {
+      return;
+    }
+    const hostname = this._remoteBuildHostInput.trim();
+    const port = Number.parseInt(this._remoteBuildPortInput, 10);
+    if (!hostname || !Number.isFinite(port) || port < 1 || port > 65535) {
+      // Browser-side guard against the "user clicks Add with bad
+      // input before the server validates" path. Server-side
+      // validation in ``add_manual_host`` is still authoritative.
+      toast.error(
+        this._localize("settings.remote_build_add_manual_invalid"),
+        { richColors: true }
+      );
+      return;
+    }
+    this._remoteBuildAddInFlight = true;
+    const ok = await this._runManualHostMutation(
+      (api) => api.addRemoteBuildManualHost({ hostname, port }),
+      (err) => {
+        // The backend raises ``INVALID_ARGS`` for duplicates;
+        // surface that distinct from a generic failure so the
+        // user sees "this peer is already in your list" rather
+        // than a vague "couldn't save".
+        const msg = err instanceof Error ? err.message : "";
+        return msg.toLowerCase().includes("already registered")
+          ? "settings.remote_build_add_manual_duplicate"
+          : "settings.remote_build_add_manual_failed";
+      },
+    );
+    if (ok) {
+      this._remoteBuildHostInput = "";
+    }
+    this._remoteBuildAddInFlight = false;
+  }
+
+  private _onRemoveManualHost(peer: RemoteBuildPeer) {
+    return this._runManualHostMutation(
+      (api) => api.removeRemoteBuildManualHost({
+        hostname: peer.hostname,
+        port: peer.port,
+      }),
+      () => "settings.remote_build_remove_manual_failed",
     );
   }
 }

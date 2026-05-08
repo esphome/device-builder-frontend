@@ -630,6 +630,54 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual({ enabled: true });
   });
 
+  it("addRemoteBuildManualHost sends remote_build/add_manual_host with hostname + port", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.addRemoteBuildManualHost({
+      hostname: "10.0.0.5",
+      port: 6052,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/add_manual_host");
+    expect(sent.args).toEqual({ hostname: "10.0.0.5", port: 6052 });
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        enabled: false,
+        manual_hosts: [{ hostname: "10.0.0.5", port: 6052 }],
+      },
+    });
+    await expect(pending).resolves.toEqual({
+      enabled: false,
+      manual_hosts: [{ hostname: "10.0.0.5", port: 6052 }],
+    });
+  });
+
+  it("removeRemoteBuildManualHost sends remote_build/remove_manual_host with hostname + port", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.removeRemoteBuildManualHost({
+      hostname: "10.0.0.5",
+      port: 6052,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/remove_manual_host");
+    expect(sent.args).toEqual({ hostname: "10.0.0.5", port: 6052 });
+    ws.receive({
+      message_id: sent.message_id,
+      result: { enabled: false, manual_hosts: [] },
+    });
+    await expect(pending).resolves.toEqual({ enabled: false, manual_hosts: [] });
+  });
+
   it("listRemoteBuildHosts sends remote_build/list_hosts and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
@@ -638,9 +686,19 @@ describe("ESPHomeAPI — typed command wrappers", () => {
         name: "desktop",
         hostname: "desktop.local.",
         port: 6052,
+        source: "mdns",
         addresses: ["192.168.1.10"],
         server_version: "1.2.3",
         esphome_version: "2026.5.0",
+      },
+      {
+        name: "10.0.0.5",
+        hostname: "10.0.0.5",
+        port: 6052,
+        source: "manual",
+        addresses: [],
+        server_version: "",
+        esphome_version: "",
       },
     ];
     const pending = api.listRemoteBuildHosts();
