@@ -597,11 +597,14 @@ export class ESPHomeComponentCatalog extends LitElement {
          same-name catalog entries from different platforms --
          e.g. sensor.debug vs text_sensor.debug, both inheriting
          the upstream "Debug Component" name. Only shown under
-         the "All" sidebar filter; once the user narrows to a
-         specific category every visible card carries the same
-         badge and it just adds noise. Sits inline rather than
-         floated so it doesn't collide with the expand-button
-         on the header's right edge. */
+         the "All" and "Recommended"/Featured sidebar filters
+         (heterogeneous result sets where the chip earns its
+         place); once the user narrows to a specific category
+         every visible card carries the same badge and it just
+         adds noise. See shouldShowCategoryChip for the
+         exact rule. Sits inline rather than floated so it
+         doesn't collide with the expand-button on the header's
+         right edge. */
       .component-category-chip {
         display: inline-block;
         margin-top: 2px;
@@ -887,6 +890,13 @@ export class ESPHomeComponentCatalog extends LitElement {
   ) {
     const hasImage =
       !!component.image_url && !this._imageFailed.has(component.id);
+    // Compute once: skip the chip entirely when the label is empty
+    // (defensive against an API/schema regression that yields a
+    // missing or all-whitespace category id) so we don't render a
+    // blank pill.
+    const categoryLabel = shouldShowCategoryChip(this._category)
+      ? categoryChipLabel(component.category)
+      : "";
     return html`
       <article
         class="component-card ${expanded ? "component-card--expanded" : ""} ${featured ? "component-card--featured" : ""}"
@@ -907,10 +917,10 @@ export class ESPHomeComponentCatalog extends LitElement {
               </div>`}
           <div class="component-card-header-text">
             <h3 class="component-title">${component.name}</h3>
-            ${shouldShowCategoryChip(this._category)
-              ? html`<span class="component-category-chip">
-                  ${categoryChipLabel(component.category)}
-                </span>`
+            ${categoryLabel
+              ? html`<span class="component-category-chip"
+                  >${categoryLabel}</span
+                >`
               : nothing}
           </div>
           <button
