@@ -24,6 +24,7 @@ import {
 import { formatHexInt, parseHexInt } from "../../util/hex-int.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { YamlRawValue } from "../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   labelFor,
@@ -438,7 +439,15 @@ export function renderTextareaField(
   path: string[],
   ctx: RenderCtx,
 ) {
-  const value = String(ctx.getAt(path) ?? "");
+  // YAML block-scalar values (``lambda: |-``) come through the
+  // parser as ``YamlRawValue`` instances so the on-disk style
+  // round-trips. ``String(rawValue)`` now surfaces the dedented
+  // body via ``toString``; explicit detection here lets us re-wrap
+  // the user's edited text as a fresh ``YamlRawValue`` so the
+  // ``|-`` marker survives the next save (issue #428).
+  const raw = ctx.getAt(path);
+  const isRaw = raw instanceof YamlRawValue;
+  const value = isRaw ? raw.body : String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`
     <div class="field" data-field-key=${path.join(".")}>
@@ -449,8 +458,13 @@ export function renderTextareaField(
         ?disabled=${effectiveDisabled(entry, ctx)}
         .value=${value}
         placeholder=${String(entry.default_value ?? "")}
-        @input=${(e: Event) =>
-          ctx.emitChange(path, (e.target as HTMLTextAreaElement).value)}
+        @input=${(e: Event) => {
+          const text = (e.target as HTMLTextAreaElement).value;
+          ctx.emitChange(
+            path,
+            isRaw ? YamlRawValue.fromBodyText(text, raw) : text,
+          );
+        }}
       ></textarea>
       ${renderFieldError(path, ctx)}
     </div>

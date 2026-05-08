@@ -48,6 +48,82 @@ export class YamlRawValue {
     public readonly lines: readonly string[],
     public readonly inlineHeader?: string,
   ) {}
+
+  /**
+   * Common leading-whitespace prefix of every non-blank line, or
+   * empty string when there are no non-blank lines. Used by
+   * ``body`` to dedent the editor view and by edit handlers to
+   * re-indent a user's freshly-typed text on round-trip.
+   */
+  get indent(): string {
+    const nonBlank = this.lines.filter((line) => line.trim() !== "");
+    if (nonBlank.length === 0) return "";
+    let common = nonBlank[0].match(/^\s*/)?.[0] ?? "";
+    for (const line of nonBlank.slice(1)) {
+      const lead = line.match(/^\s*/)?.[0] ?? "";
+      // Walk backwards from the current common prefix shrinking
+      // until both lines agree.
+      while (common && !line.startsWith(common)) {
+        common = common.slice(0, -1);
+      }
+      // Defensive: if the loop above zeroed out, the lines disagree
+      // at column 0 — fall through to the empty string.
+      if (!common) return "";
+      // Cap at the new line's leading whitespace so we don't keep
+      // a longer prefix than this line actually has.
+      if (lead.length < common.length) common = lead;
+    }
+    return common;
+  }
+
+  /**
+   * The block-scalar body as the user typed it semantically,
+   * with the common indent stripped. ``YamlRawValue("    return foo;\n
+   * return bar;")`` displays as ``"return foo;\nreturn bar;"``
+   * — which is what a textarea / lambda editor wants to render.
+   *
+   * Round-trip pairing: ``new YamlRawValue.fromBodyText(body, original)``
+   * goes the other direction, re-applying the common indent so the
+   * resulting lines slot back into the YAML at the original depth.
+   */
+  get body(): string {
+    const indent = this.indent;
+    return this.lines.map((line) => line.slice(indent.length)).join("\n");
+  }
+
+  /**
+   * Coercion path so ``String(rawValue)`` and ``${rawValue}`` produce
+   * the dedented body instead of the default ``[object Object]`` —
+   * the bug behind issue #428 (the lambda field rendering as
+   * ``[object Object]`` for any block-scalar value the YAML parser
+   * captured into a ``YamlRawValue``).
+   */
+  toString(): string {
+    return this.body;
+  }
+
+  /**
+   * Build a new ``YamlRawValue`` from an editor-friendly body
+   * string, re-applying the original ``YamlRawValue``'s indent and
+   * preserving its inline header. Used when the user edits a
+   * lambda / multi-line block scalar in the form: feed in the
+   * textarea's value, get back a properly-indented round-trippable
+   * ``YamlRawValue`` to write into the form's values dict.
+   *
+   * When *original* has no inline header (list-rooted block) the
+   * caller probably shouldn't be using a textarea at all — that
+   * shape carries its own dash row inside ``lines`` — so this
+   * helper drops it on the floor and treats the value as a fresh
+   * inline-header-less block. Callers that care about the
+   * list-rooted shape should special-case it before calling this.
+   */
+  static fromBodyText(body: string, original: YamlRawValue): YamlRawValue {
+    const indent = original.indent;
+    const lines = body
+      .split("\n")
+      .map((line) => (line === "" ? "" : `${indent}${line}`));
+    return new YamlRawValue(lines, original.inlineHeader);
+  }
 }
 
 /** Options for ``serializeYamlValues``. */
