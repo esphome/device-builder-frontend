@@ -52,14 +52,28 @@ export function setIn(
  * is materialised). The returned array is a fresh copy on every
  * write — callers stay structural-sharing-safe.
  */
+/**
+ * Parse a path segment as a non-negative integer index into an
+ * array. Returns ``null`` for non-numeric, negative, or fractional
+ * segments — callers translate that to "skip this access" (read
+ * paths return ``undefined``, write paths leave the array
+ * unchanged). Centralised so the read and write sides agree on
+ * what counts as a valid array index — an inconsistency between
+ * them would let writes land at indices reads can't reach.
+ */
+function _parseArrayIndex(segment: string): number | null {
+  const idx = Number(segment);
+  return Number.isInteger(idx) && idx >= 0 ? idx : null;
+}
+
 function _setInArray(
   arr: readonly unknown[],
   path: string[],
   value: unknown,
 ): readonly unknown[] {
   const [head, ...rest] = path;
-  const idx = Number(head);
-  if (!Number.isInteger(idx) || idx < 0) return arr;
+  const idx = _parseArrayIndex(head);
+  if (idx === null) return arr;
   const copy = [...arr];
   if (rest.length === 0) {
     copy[idx] = value;
@@ -91,10 +105,8 @@ export function getIn(
       return undefined;
     }
     if (Array.isArray(cur)) {
-      const idx = Number(k);
-      if (!Number.isInteger(idx) || idx < 0 || idx >= cur.length) {
-        return undefined;
-      }
+      const idx = _parseArrayIndex(k);
+      if (idx === null || idx >= cur.length) return undefined;
       cur = cur[idx];
       continue;
     }
