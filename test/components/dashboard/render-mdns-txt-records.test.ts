@@ -208,37 +208,36 @@ describe("renderMdnsTxtRecords", () => {
     expect(allValues).toContain("<key>");
   });
 
-  it("uses the singular summary key for a single record", () => {
-    // Switch keys at the call site (matches the codebase's
-    // ``discovered_count_singular`` / ``_plural`` pattern) — a
-    // single-record summary picks the singular key, multi-record
-    // picks plural. Avoids the "Show 1 mDNS TXT records"
-    // ungrammatical fallback that a single-template
-    // ``record(s)`` shorthand would produce.
+  // Switch keys at the call site (matches the codebase's
+  // ``discovered_count_singular`` / ``_plural`` pattern) — a
+  // single-record summary picks the singular key, multi-record
+  // picks plural. Avoids the "Show 1 mDNS TXT records"
+  // ungrammatical fallback that a single-template ``record(s)``
+  // shorthand would produce. One parametrised test covers both
+  // branches so adding a third (e.g. zero-record, if we ever
+  // surface that) lands as a single row rather than another
+  // copy-pasted body.
+  it.each([
+    {
+      label: "singular for one record",
+      records: { version: "1.0" } as Record<string, string>,
+      expectedKey: "dashboard.drawer_show_mdns_txt_records_singular",
+      expectedCount: 1,
+    },
+    {
+      label: "plural for two or more records",
+      records: { version: "1.0", mac: "aa:bb:cc" } as Record<string, string>,
+      expectedKey: "dashboard.drawer_show_mdns_txt_records_plural",
+      expectedCount: 2,
+    },
+  ])("uses the $label summary key", ({ records, expectedKey, expectedCount }) => {
     const calls: Array<[string, Record<string, unknown> | undefined]> = [];
     const localize = (key: string, args?: Record<string, unknown>): string => {
       calls.push([key, args]);
       return key;
     };
-    renderMdnsTxtRecords({ version: "1.0" }, localize);
+    renderMdnsTxtRecords(records, localize);
     expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual([
-      "dashboard.drawer_show_mdns_txt_records_singular",
-      { count: 1 },
-    ]);
-  });
-
-  it("uses the plural summary key for two or more records", () => {
-    const calls: Array<[string, Record<string, unknown> | undefined]> = [];
-    const localize = (key: string, args?: Record<string, unknown>): string => {
-      calls.push([key, args]);
-      return key;
-    };
-    renderMdnsTxtRecords({ version: "1.0", mac: "aa:bb:cc" }, localize);
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toEqual([
-      "dashboard.drawer_show_mdns_txt_records_plural",
-      { count: 2 },
-    ]);
+    expect(calls[0]).toEqual([expectedKey, { count: expectedCount }]);
   });
 });
