@@ -31,10 +31,7 @@ export function setIn(
   const [head, ...rest] = path;
   if (rest.length === 0) return { ...obj, [head]: value };
   const child = obj[head];
-  const childObj =
-    child !== null && typeof child === "object" && !Array.isArray(child)
-      ? (child as Record<string, unknown>)
-      : {};
+  const childObj = isPlainObject(child) ? child : {};
   return { ...obj, [head]: setIn(childObj, rest, value) };
 }
 
@@ -87,4 +84,21 @@ export function isPrimitiveOrNullish(
   if (value === null || value === undefined) return true;
   const t = typeof value;
   return t === "string" || t === "number" || t === "boolean";
+}
+
+/**
+ * Narrowing predicate: is *value* a plain object (a YAML mapping
+ * candidate)? Excludes ``null``, primitives, and arrays. The
+ * pin renderer uses this to detect long-form pin values
+ * (``{ number: GPIO5, mode: { ... } }``) so it can route
+ * GPIO-picker edits to ``path.number`` instead of clobbering the
+ * mapping. ``setIn`` uses the same check to decide whether to
+ * descend into an existing child object or replace it with a
+ * fresh ``{}``. Centralised so both call sites can share one
+ * definition of "object I can deep-merge into".
+ */
+export function isPlainObject(
+  value: unknown,
+): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

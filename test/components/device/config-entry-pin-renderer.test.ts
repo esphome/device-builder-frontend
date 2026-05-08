@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   parsePinGpio,
   renderPinField,
@@ -307,5 +307,122 @@ describe("renderPinField long-form Advanced disclosure", () => {
     ) => void;
     onChange({ target: { value: "GPIO12" } } as never);
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO12");
+  });
+
+  it("disables the Advanced toggle when the field is disabled", () => {
+    // Locked board presets (Sonoff Basic's front-panel button etc.)
+    // mark the pin field disabled. The Advanced toggle has to
+    // mirror that — without the disabled binding the user can
+    // open the disclosure on a locked field, and the click handler
+    // would fire the promotion ``emitChange`` and rewrite the
+    // locked value.
+    const ctx = makeRenderCtx(
+      { pin: 5 },
+      { overrides: { disabled: true } },
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const toggle = findTemplatesByAnchor(result, "<button")[0];
+    const bindings = extractAttributeBindings(toggle);
+    expect(
+      "?disabled" in bindings,
+      "Advanced toggle must carry a ?disabled binding",
+    ).toBe(true);
+    expect(bindings["?disabled"], "binding must reflect the field-disabled state").toBe(
+      true,
+    );
+  });
+
+  it("does not promote or toggle when the disabled handler is invoked", () => {
+    // Defence-in-depth: even when ``?disabled`` is set the click
+    // handler is still wired (the framework / accessibility tooling
+    // / a synthetic event from a test could fire it). Confirm the
+    // handler short-circuits before mutating state.
+    const ctx = makeRenderCtx(
+      { pin: "GPIO5" },
+      { overrides: { disabled: true } },
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    const toggle = findTemplatesByAnchor(result, "<button")[0];
+    const onClick = extractAttributeBindings(toggle)["@click"] as () => void;
+    onClick();
+    expect(ctx.toggleNested).not.toHaveBeenCalled();
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("filters long-form children through ctx.filterRenderable", () => {
+    // Every other nested renderer applies ``filterRenderable`` so
+    // requiredOnly / showAdvanced / platform-visibility rules hide
+    // sub-fields the rest of the form has hidden. Skipping the
+    // filter here would let the long-form disclosure leak fields
+    // the catalog has marked advanced or gated by platform.
+    const openSet = new Set<string>(["pin:pin-advanced"]);
+    const filterMock = vi.fn(
+      (entries: ConfigEntry[]) => entries.slice(0, 1),
+    );
+    const ctx = makeRenderCtx(
+      { pin: { number: "GPIO5" } },
+      {
+        overrides: {
+          nestedOpenSections: openSet,
+          filterRenderable: filterMock as never,
+        },
+      },
+    );
+    const children = makeLongFormChildren();
+    renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: children,
+      }),
+      ["pin"],
+      ctx,
+    );
+    // Filter received the full children list; only the survivor
+    // (the first child) gets handed to renderEntry. A regression
+    // that bypassed ``filterRenderable`` would render both
+    // children and the assertion below would catch the second
+    // one.
+    expect(filterMock).toHaveBeenCalledWith(children, expect.anything());
+    expect(ctx.renderEntry).toHaveBeenCalledTimes(1);
+    expect(ctx.renderEntry).toHaveBeenCalledWith(children[0], ["pin", "mode"]);
+  });
+
+  it("omits the Advanced disclosure when filterRenderable hides every child", () => {
+    // requiredOnly mode (the add-component dialog) hides everything
+    // marked advanced. The pin extras are all advanced, so the
+    // whole disclosure should disappear — rendering an empty
+    // toggle would invite the user to expand into nothing.
+    const filterMock = vi.fn(() => [] as ConfigEntry[]);
+    const ctx = makeRenderCtx(
+      { pin: 0 },
+      { overrides: { filterRenderable: filterMock as never } },
+    );
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, {
+        key: "pin",
+        required: true,
+        config_entries: makeLongFormChildren(),
+      }),
+      ["pin"],
+      ctx,
+    );
+    expect(findTemplatesByAnchor(result, "<button").length).toBe(0);
   });
 });

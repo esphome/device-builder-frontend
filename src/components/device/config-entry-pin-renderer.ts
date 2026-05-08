@@ -12,7 +12,7 @@ import {
   findUsedPins,
   sectionEndLine,
 } from "../../util/config-entry-yaml-scan.js";
-import { isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
   renderFieldError,
@@ -173,10 +173,7 @@ export function renderPinField(
     sectionEndLine(ctx.yaml, ctx.fromLine),
   );
   const fieldDisabled = effectiveDisabled(entry, ctx);
-  const isLongForm =
-    rawValue !== null &&
-    typeof rawValue === "object" &&
-    !Array.isArray(rawValue);
+  const isLongForm = isPlainObject(rawValue);
 
   // Pin-select onChange routes to ``path.number`` when the field is
   // already in long form (the user expanded Advanced and set a flag,
@@ -232,7 +229,7 @@ export function renderPinField(
         })}
       </wa-select>
       ${renderFieldError(path, ctx)}
-      ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm)}
+      ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm, fieldDisabled)}
     </div>
   `;
 }
@@ -264,8 +261,18 @@ function renderPinAdvanced(
   ctx: RenderCtx,
   rawValue: unknown,
   isLongForm: boolean,
+  fieldDisabled: boolean,
 ): TemplateResult | typeof nothing {
-  const longFormFields = entry.config_entries ?? [];
+  // Apply the same visibility filter every other nested renderer
+  // uses so requiredOnly / showAdvanced / platform-gating rules
+  // hide long-form sub-fields the user shouldn't see (e.g. an
+  // analog-mode flag on a platform that lacks it). Skipping
+  // ``filterRenderable`` would let the long-form disclosure leak
+  // sub-fields the rest of the form has hidden.
+  const longFormFields = ctx.filterRenderable(
+    entry.config_entries ?? [],
+    ctx.scopeValues(path),
+  );
   if (longFormFields.length === 0) return nothing;
 
   const advancedKey = `${path.join(".")}:pin-advanced`;
@@ -277,6 +284,14 @@ function renderPinAdvanced(
   const isOpen = ctx.nestedOpenSections.has(advancedKey);
 
   const onAdvancedToggle = () => {
+    // Locked / disabled fields (board-preset pins, parent-disabled
+    // groups) must not mutate via Advanced — without this guard,
+    // opening the disclosure on a short-form locked pin would fire
+    // the promotion ``emitChange`` and rewrite the locked value to
+    // the long form. The toggle is also rendered ``disabled`` below,
+    // but defending in both places means a synthetic click event
+    // (test code, accessibility tooling) can't bypass the guard.
+    if (fieldDisabled) return;
     ctx.toggleNested(advancedKey);
     // When opening for the first time on a short-form pin value,
     // promote ``pin: GPIO5`` → ``pin: { number: GPIO5 }`` so a
@@ -299,6 +314,7 @@ function renderPinAdvanced(
         type="button"
         class="pin-advanced-toggle"
         aria-expanded=${isOpen}
+        ?disabled=${fieldDisabled}
         @click=${onAdvancedToggle}
       >
         <wa-icon

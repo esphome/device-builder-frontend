@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getIn,
+  isPlainObject,
   isPrimitiveOrNullish,
   setIn,
 } from "../../src/util/nested-values.js";
@@ -103,6 +104,47 @@ describe("isPrimitiveOrNullish", () => {
       // — TypeScript accepts ``String(value)`` without a cast.
       const s: string = String(value ?? "");
       expect(s).toBe("hello");
+    }
+  });
+});
+
+describe("isPlainObject", () => {
+  it("accepts plain objects (the deep-merge target shape)", () => {
+    expect(isPlainObject({})).toBe(true);
+    expect(isPlainObject({ a: 1 })).toBe(true);
+    expect(isPlainObject(Object.create(null))).toBe(true);
+  });
+
+  it("rejects null and undefined", () => {
+    // ``setIn`` and the pin renderer both treat null/undefined as
+    // "no existing object — start fresh". The check has to be
+    // explicit because ``typeof null === 'object'``.
+    expect(isPlainObject(null)).toBe(false);
+    expect(isPlainObject(undefined)).toBe(false);
+  });
+
+  it("rejects primitives", () => {
+    expect(isPlainObject("hello")).toBe(false);
+    expect(isPlainObject("")).toBe(false);
+    expect(isPlainObject(0)).toBe(false);
+    expect(isPlainObject(true)).toBe(false);
+  });
+
+  it("rejects arrays", () => {
+    // The pin renderer's long-form detection has to exclude arrays
+    // — ``pin: [GPIO5]`` is invalid YAML for an ESPHome pin field
+    // (and ``setIn`` treats arrays as "non-object child, replace
+    // with {}"), so descending into one would be wrong either way.
+    expect(isPlainObject([])).toBe(false);
+    expect(isPlainObject([1, 2, 3])).toBe(false);
+  });
+
+  it("narrows the type for the caller", () => {
+    const value: unknown = { a: 1 };
+    if (isPlainObject(value)) {
+      // ``value`` is now ``Record<string, unknown>`` — TypeScript
+      // accepts ``value.a`` without a cast.
+      expect(value.a).toBe(1);
     }
   });
 });
