@@ -470,17 +470,31 @@ export class ESPHomeApp extends LitElement {
     this._loadRemoteBuildSettings();
   }
 
+  // True while a ``setRemoteBuildSettings`` write is in flight. The
+  // reload path on (re)connect skips when this is set so a write
+  // racing with an auto-reconnect can't get clobbered by the
+  // server-side pre-toggle value.
+  private _remoteBuildSetInFlight = false;
+
   private async _loadRemoteBuildSettings() {
     // Receiver-side remote-build settings (issue #106 phase 2).
-    // Fail-soft: an older backend without the WS commands lands in
-    // the catch and the UI stays at the default ``false``, which
-    // matches a fresh receiver where the feature has never been
-    // enabled — same observable behaviour either way.
+    // The frontend is shipped bundled with the backend wheel, so
+    // every backend on the wire already knows these commands —
+    // no older-version path. A real failure here is a transient
+    // (broken WS, server bug), logged so it isn't silently
+    // masking ``false`` when the actual state is ``true``.
+    if (this._remoteBuildSetInFlight) {
+      // A user-initiated write is racing with this reload. Skip —
+      // the optimistic value is the source of truth until the
+      // write completes; the post-write state is what should
+      // persist, not the pre-write server snapshot.
+      return;
+    }
     try {
       const settings = await this._api.getRemoteBuildSettings();
       this._remoteBuildEnabled = settings.enabled;
-    } catch {
-      // Older backend or transient — ignore; defaults to false.
+    } catch (err) {
+      console.warn("Could not load remote-build settings:", err);
     }
   }
 
@@ -918,15 +932,32 @@ export class ESPHomeApp extends LitElement {
     this._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
   }
 
-  private _onSetRemoteBuildEnabled(e: CustomEvent<boolean>) {
-    // Optimistic: flip the context immediately so the toggle's
-    // visual state stays in sync with the click. If the round-trip
-    // fails the next ``_loadRemoteBuildSettings`` (on reconnect or
-    // explicit refresh) corrects the drift; phase 3+ adds a toast
-    // for the rare backend-rejection case.
+  private async _onSetRemoteBuildEnabled(e: CustomEvent<boolean>) {
+    // Optimistic flip — keeps the toggle's visual state in sync
+    // with the click. The backend round-trip happens after; if it
+    // fails we revert the optimistic value and surface a toast so
+    // the user sees their security-sensitive toggle didn't take
+    // effect (silent UI / disk divergence on a "trust this peer"
+    // toggle is a real bug, not a polish item).
+    //
+    // ``_remoteBuildSetInFlight`` gates ``_loadRemoteBuildSettings``
+    // so a reconnect that lands mid-write can't clobber the
+    // optimistic value with the pre-toggle server snapshot.
     const enabled = e.detail;
+    const previous = this._remoteBuildEnabled;
     this._remoteBuildEnabled = enabled;
-    this._api.setRemoteBuildSettings({ enabled }).catch(() => {});
+    this._remoteBuildSetInFlight = true;
+    try {
+      await this._api.setRemoteBuildSettings({ enabled });
+    } catch {
+      this._remoteBuildEnabled = previous;
+      toast.error(
+        this._localize("settings.remote_build_save_failed"),
+        { richColors: true }
+      );
+    } finally {
+      this._remoteBuildSetInFlight = false;
+    }
   }
 
   private async _onSetLanguage(

@@ -606,6 +606,50 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.command).toBe("config/set_preferences");
     expect(sent.args).toEqual({ theme: "dark" });
   });
+
+  it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = { enabled: true };
+    const pending = api.getRemoteBuildSettings();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_settings");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("setRemoteBuildSettings sends remote_build/set_settings with the args and returns the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setRemoteBuildSettings({ enabled: true });
+    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    expect(sent.command).toBe("remote_build/set_settings");
+    expect(sent.args).toEqual({ enabled: true });
+    ws.receive({ message_id: sent.message_id, result: { enabled: true } });
+    await expect(pending).resolves.toEqual({ enabled: true });
+  });
+
+  it("listRemoteBuildHosts sends remote_build/list_hosts and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = [
+      {
+        name: "desktop",
+        hostname: "desktop.local.",
+        port: 6052,
+        addresses: ["192.168.1.10"],
+        server_version: "1.2.3",
+        esphome_version: "2026.5.0",
+      },
+    ];
+    const pending = api.listRemoteBuildHosts();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/list_hosts");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
 });
 
 describe("ESPHomeAPI — auth", () => {

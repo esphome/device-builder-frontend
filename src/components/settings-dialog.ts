@@ -378,10 +378,16 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderEditor() {
+    // ``aria-labelledby`` is the string-attribute form (no
+    // ``?aria-checked=...`` boolean binding) so the attribute
+    // ships verbatim — Lit's ``?`` binding would omit the
+    // attribute entirely on ``false``, breaking both the
+    // ``[aria-checked="false"]`` CSS state and the
+    // screen-reader announcement.
     return html`
       <div class="row">
         <div class="row-label">
-          <span class="row-title">
+          <span id="yaml-diff-title" class="row-title">
             ${this._localize("settings.show_yaml_diff_button")}
           </span>
           <span class="row-desc">
@@ -391,6 +397,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         <button
           class="toggle"
           role="switch"
+          aria-labelledby="yaml-diff-title"
           aria-checked=${this._yamlDiffButton}
           @click=${this._onToggleDiff}
         ></button>
@@ -405,10 +412,15 @@ export class ESPHomeSettingsDialog extends LitElement {
     // phases 3+ — this section ships as the empty-state
     // scaffolding so future phases have a UI surface to plug
     // into.
+    //
+    // The "Discovered dashboards" row is presentational copy, not
+    // a setting control — wrap the placeholder in ``role="status"``
+    // so assistive tech reads it as an empty-state announcement
+    // rather than a settings row with a missing widget.
     return html`
       <div class="row">
         <div class="row-label">
-          <span class="row-title">
+          <span id="remote-build-enable-title" class="row-title">
             ${this._localize("settings.remote_build_enable")}
           </span>
           <span class="row-desc">
@@ -418,11 +430,12 @@ export class ESPHomeSettingsDialog extends LitElement {
         <button
           class="toggle"
           role="switch"
+          aria-labelledby="remote-build-enable-title"
           aria-checked=${this._remoteBuildEnabled}
           @click=${this._onToggleRemoteBuild}
         ></button>
       </div>
-      <div class="row">
+      <div class="row" role="status">
         <div class="row-label">
           <span class="row-title">
             ${this._localize("settings.remote_build_discovered_dashboards")}

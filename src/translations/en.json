@@ -726,6 +726,7 @@
     "remote_build_enable_desc": "Allow other dashboards on your network to send firmware compile jobs to this dashboard. Pairing with a peer grants it the ability to run code on this host — only enable for dashboards you already trust at a shell level.",
     "remote_build_discovered_dashboards": "Discovered dashboards",
     "remote_build_discovered_dashboards_desc": "Dashboards reachable on your network appear here in a future update. For now, this is the placeholder where peer dashboards will land once pairing support ships.",
+    "remote_build_save_failed": "Could not save remote build settings; the toggle was reverted.",
     "dark_mode": "Dark mode",
     "dark_mode_desc": "Use dark colors for the interface",
     "editor_layout": "Default layout",
