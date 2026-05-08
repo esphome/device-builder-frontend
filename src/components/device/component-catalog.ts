@@ -23,6 +23,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { categoryChipLabel } from "./component-card-category-label.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -588,6 +589,28 @@ export class ESPHomeComponentCatalog extends LitElement {
         text-overflow: ellipsis;
       }
 
+      /* Small badge under the title spelling out the category
+         (Sensor / Text Sensor / Switch / ...). Disambiguates
+         same-name catalog entries from different platforms --
+         e.g. sensor.debug vs text_sensor.debug, both inheriting
+         the upstream "Debug Component" name. Sits inline rather
+         than floated so it doesn't collide with the
+         expand-button on the header's right edge. */
+      .component-category-chip {
+        display: inline-block;
+        margin-top: 2px;
+        padding: 1px 8px;
+        font-size: var(--wa-font-size-3xs);
+        font-weight: var(--wa-font-weight-semibold);
+        line-height: 1.4;
+        color: var(--wa-color-text-quiet);
+        background: var(--wa-color-surface-raised);
+        border: 1px solid var(--wa-color-border);
+        border-radius: 999px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+
       .component-description {
         margin: 0;
         font-size: var(--wa-font-size-2xs);
@@ -878,6 +901,9 @@ export class ESPHomeComponentCatalog extends LitElement {
               </div>`}
           <div class="component-card-header-text">
             <h3 class="component-title">${component.name}</h3>
+            <span class="component-category-chip">
+              ${categoryChipLabel(component.category)}
+            </span>
           </div>
           <button
             class="expand-button"
