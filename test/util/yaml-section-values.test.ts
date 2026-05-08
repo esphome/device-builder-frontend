@@ -873,3 +873,200 @@ describe("updateSectionInYaml — keepEmptyStrings option", () => {
     expect(after).toMatch(/inner_empty:\s*""/);
   });
 });
+
+describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () => {
+  // Regression pin for issue #434: catalog entries marked
+  // ``type=nested, multi_value=true`` (``esphome.devices`` /
+  // ``esphome.areas``) must reach the renderer as structured
+  // arrays of objects, not as ``YamlRawValue``. The parser used to
+  // capture the whole block raw (because ``LIST_ITEM_DICT_KEY_RE``
+  // flagged any ``- key:`` line as "complex"), and the editor's
+  // nested-list renderer would then show "No items yet" even when
+  // the YAML had items.
+
+  it("parses esphome.devices into an array of plain objects", () => {
+    const yaml = `esphome:
+  name: test
+  devices:
+    - id: front_door_device
+      name: "Front Door Sensor"
+      area_id: entrance_area
+    - id: kitchen_motion_device
+      name: "Kitchen Motion"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.name).toBe("test");
+    expect(values.devices).toEqual([
+      {
+        id: "front_door_device",
+        name: "Front Door Sensor",
+        area_id: "entrance_area",
+      },
+      { id: "kitchen_motion_device", name: "Kitchen Motion" },
+    ]);
+    // Not a YamlRawValue — the editor must be able to recurse
+    // into per-item children, which it can't with raw text.
+    expect(values.devices).not.toBeInstanceOf(YamlRawValue);
+  });
+
+  it("parses esphome.areas alongside esphome.devices in the same section", () => {
+    const yaml = `esphome:
+  devices:
+    - id: front_door
+      name: "Front Door"
+  areas:
+    - id: entrance
+      name: "Entrance"
+    - id: kitchen
+      name: "Kitchen"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      { id: "front_door", name: "Front Door" },
+    ]);
+    expect(values.areas).toEqual([
+      { id: "entrance", name: "Entrance" },
+      { id: "kitchen", name: "Kitchen" },
+    ]);
+  });
+
+  it("falls back to YamlRawValue when items contain dotted-key automation actions", () => {
+    // ``- logger.log: pressed`` is automation-action shorthand,
+    // not a flat-mapping field. Capturing it as a structured
+    // ``{ "logger.log": "pressed" }`` would round-trip on save as
+    // ``- "logger.log": pressed``, corrupting the trigger.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - logger.log: pressed
+      - switch.turn_on: relay_id
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    expect(values.on_press).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("falls back to YamlRawValue when items contain block scalars", () => {
+    const yaml = `script:
+  - id: my_script
+    actions:
+      - lambda: |-
+          some_function();
+          another_line;
+`;
+    const values = parseYamlSectionValues(yaml, "script", 2);
+    expect(values.actions).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("falls back to YamlRawValue when items have nested mappings under a sub-key", () => {
+    // ``- key:\n      sub_key:`` (sub_key with empty raw, opening
+    // a deeper mapping) carries shape the flat-mapping helper
+    // can't model. The conservative bail-out keeps the block raw
+    // so the deeper content survives a round-trip.
+    const yaml = `sensor:
+  - platform: template
+    name: outside_temp
+    triggers:
+      - id: my_trigger
+        filters:
+          delta: 0.5
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.triggers).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("round-trips esphome.devices through update with edits to one item", () => {
+    const yaml = `esphome:
+  devices:
+    - id: front_door
+      name: "Front Door"
+    - id: kitchen
+      name: "Kitchen"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    const devices = values.devices as Record<string, unknown>[];
+    devices[0].name = "Front Entry";
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    // Both items survive; only the first item's name changed.
+    expect(after).toContain("- id: front_door");
+    expect(after).toContain("name: Front Entry");
+    expect(after).toContain("- id: kitchen");
+    expect(after).toContain("name: Kitchen");
+    // No double-quoted dotted-key corruption.
+    expect(after).not.toMatch(/"id":/);
+  });
+
+  it("round-trips a freshly-added empty item via the renderer's Add button", () => {
+    // ``renderNestedListField`` emits ``[..., {}]`` when the user
+    // clicks Add. The serializer should emit a bare dash
+    // placeholder so the YAML stays valid even before the user
+    // fills in a key.
+    const yaml = `esphome:
+  devices:
+    - id: existing
+      name: Existing
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    const devices = values.devices as Record<string, unknown>[];
+    devices.push({});
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    // The existing item still emits with its keys.
+    expect(after).toContain("- id: existing");
+    // The new empty item emits as a bare dash; the next compile
+    // will surface a real schema error if any required field is
+    // missing.
+    const lines = after.split("\n");
+    const dashLines = lines.filter((l) => /^\s+-/.test(l));
+    expect(dashLines).toHaveLength(2);
+    expect(dashLines[1].trim()).toBe("-");
+  });
+
+  it("emits new mapping items with the dash on the first key only", () => {
+    // The serializer's contract for list-of-mappings: the dash
+    // sits on the first sub-key's line; remaining keys live one
+    // indent step deeper, no leading dash. Matches what
+    // ``parseYamlSectionValues`` reads back so the round-trip is
+    // stable.
+    const yaml = `esphome:
+  name: test
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values as Record<string, unknown>).devices = [
+      { id: "front", name: "Front Door", area_id: "entrance" },
+    ];
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    expect(after).toContain("    - id: front");
+    expect(after).toContain("      name: Front Door");
+    expect(after).toContain("      area_id: entrance");
+    // The dash must NOT appear on the second / third sub-key's
+    // line — the parser would re-read those as new list items.
+    expect(after).not.toContain("    - name:");
+    expect(after).not.toContain("    - area_id:");
+  });
+
+  it("skips null / undefined / empty-string fields inside a mapping item", () => {
+    // Same skip semantics the top-level serializer applies, so a
+    // partially-filled item written by ``renderNestedListField``
+    // doesn't emit half-blank rows that re-parse as different
+    // values on the next round-trip.
+    const yaml = `esphome:
+  name: test
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values as Record<string, unknown>).devices = [
+      {
+        id: "front",
+        name: "Front Door",
+        area_id: null,
+        comment: undefined,
+        empty_field: "",
+      },
+    ];
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    expect(after).toContain("- id: front");
+    expect(after).toContain("name: Front Door");
+    expect(after).not.toContain("area_id:");
+    expect(after).not.toContain("comment:");
+    expect(after).not.toContain("empty_field:");
+  });
+});

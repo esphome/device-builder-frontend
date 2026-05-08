@@ -149,6 +149,50 @@ export interface SerializeYamlOptions {
  * Returns an array of lines (not a joined string) so callers can
  * splice them into existing YAML when needed.
  */
+/**
+ * Serialize a single list item. Mapping items
+ * (``esphome.devices`` / ``esphome.areas`` shape — the new
+ * ``multi_value=true`` schema entries) emit as
+ * ``${indent}  - first_key: value`` followed by
+ * ``${indent}    other_key: value`` for each remaining field;
+ * scalar items keep the legacy ``${indent}  - value`` shape.
+ *
+ * Mapping items are filtered through the same skip rules as the
+ * top-level serializer (``undefined`` / ``null`` / empty-string
+ * unless ``keepEmptyStrings``) so a freshly-added empty item
+ * doesn't emit a bare dash. ``YamlRawValue`` values inside an
+ * item are emitted with the same inline-header / body shape as
+ * the top-level branch.
+ */
+function serializeListItem(
+  item: unknown,
+  indent: string,
+  options: SerializeYamlOptions,
+): string[] {
+  const keepEmpty = options.keepEmptyStrings === true;
+  if (item !== null && typeof item === "object" && !Array.isArray(item)) {
+    const entries = Object.entries(item as Record<string, unknown>).filter(
+      ([, v]) => v !== undefined && v !== null && (v !== "" || keepEmpty),
+    );
+    if (entries.length === 0) return [`${indent}  -`];
+    const lines: string[] = [];
+    const dashIndent = `${indent}  `;
+    const childIndent = `${dashIndent}  `;
+    entries.forEach(([k, v], idx) => {
+      const prefix = idx === 0 ? `${dashIndent}- ` : childIndent;
+      if (v instanceof YamlRawValue) {
+        const header = v.inlineHeader ? ` ${v.inlineHeader}` : "";
+        lines.push(`${prefix}${k}:${header}`);
+        lines.push(...v.lines);
+        return;
+      }
+      lines.push(`${prefix}${k}: ${formatYamlScalar(v)}`);
+    });
+    return lines;
+  }
+  return [`${indent}  - ${formatYamlScalar(item)}`];
+}
+
 export function serializeYamlValues(
   values: Record<string, unknown>,
   indent: string,
@@ -176,7 +220,8 @@ export function serializeYamlValues(
       if (val.length === 0) continue;
       lines.push(`${indent}${key}:`);
       for (const item of val) {
-        lines.push(`${indent}  - ${formatYamlScalar(item)}`);
+        const itemLines = serializeListItem(item, indent, options);
+        lines.push(...itemLines);
       }
       continue;
     }

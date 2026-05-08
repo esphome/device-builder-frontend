@@ -7,6 +7,7 @@
  * read and write — not as a general YAML parser.
  */
 
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   YamlRawValue,
   formatYamlScalar,
@@ -116,7 +117,7 @@ const childRegexFor = (indent: string) =>
 // would over-match `KEY_PATTERN`'s purpose; that constraint
 // applies only to dict keys.
 const listItemRegexFor = (indent: string) =>
-  new RegExp(`^${indent}  -\\s+(.*)$`);
+  new RegExp(`^${indent}${ESPHOME_YAML_INDENT}-\\s+(.*)$`);
 
 const stripQuotes = (s: string): string => {
   if (
@@ -155,6 +156,164 @@ const collectBlockListItems = (
     const m = lines[j].match(itemRegex);
     if (!m) break;
     items.push(stripQuotes(m[1].trim()));
+  }
+  return { items, endIdx: j };
+};
+
+/**
+ * Dispatch a YAML list block (``key:\n  - …``) into the right
+ * value shape: structured array of mappings for editor-friendly
+ * lists (``esphome.devices`` / ``esphome.areas``), ``YamlRawValue``
+ * for complex automation triggers, or ``string[]`` for scalar
+ * lists. Shared between the top-level and nested-block parsers
+ * so both surfaces agree on the dispatch.
+ *
+ * ``parentIndent`` is the indent of the parent KEY (the one whose
+ * value is the list). The dash is one ``ESPHOME_YAML_INDENT`` step
+ * deeper, and child keys inside an item are two steps deeper.
+ *
+ * Returns ``endIdx`` — the line after the block ends — so callers
+ * can fast-forward their loop index. ``isEmptyScalarList`` lets
+ * the top-level caller preserve its existing "skip the assignment
+ * for an empty scalar list" semantic.
+ */
+const parseListBlock = (
+  lines: string[],
+  startIdx: number,
+  parentIndent: string,
+): {
+  value: YamlRawValue | Record<string, unknown>[] | string[];
+  endIdx: number;
+  isEmptyScalarList: boolean;
+} => {
+  const dashIndent = `${parentIndent}${ESPHOME_YAML_INDENT}`;
+  const childIndent = `${dashIndent}${ESPHOME_YAML_INDENT}`;
+  const { endIdx, isComplex } = _scanValueBlock(lines, startIdx, parentIndent);
+  if (isComplex) {
+    // Try parsing as a list of flat key:value mappings first
+    // (``esphome.devices`` / ``esphome.areas`` shape). Falls
+    // through to ``YamlRawValue`` when the block carries
+    // anything the editor can't round-trip cleanly — see
+    // ``collectBlockListMappings``.
+    const mapping = collectBlockListMappings(
+      lines,
+      startIdx,
+      dashIndent,
+      childIndent,
+    );
+    if (mapping) {
+      return {
+        value: mapping.items,
+        endIdx: mapping.endIdx,
+        isEmptyScalarList: false,
+      };
+    }
+    return {
+      value: new YamlRawValue(lines.slice(startIdx, endIdx)),
+      endIdx,
+      isEmptyScalarList: false,
+    };
+  }
+  const { items, endIdx: scalarEndIdx } = collectBlockListItems(
+    lines,
+    startIdx,
+    `${dashIndent}- `,
+    listItemRegexFor(parentIndent),
+  );
+  return {
+    value: items,
+    endIdx: scalarEndIdx,
+    isEmptyScalarList: items.length === 0,
+  };
+};
+
+/**
+ * Parse a single ``key: value`` field of a flat-mapping list item
+ * — used by ``collectBlockListMappings`` for both the inline header
+ * (``- key: value``) and the follow-up child lines. Returns
+ * ``null`` whenever the field carries anything outside the
+ * mapping-list contract (dotted automation-trigger keys, empty
+ * raw values that would open a nested mapping/list, block-scalar
+ * headers). Callers translate ``null`` into "bail out, fall back
+ * to YamlRawValue".
+ */
+const parseFlatMappingField = (
+  key: string,
+  raw: string,
+): { key: string; value: unknown } | null => {
+  // Dotted keys (``logger.log:``, ``switch.turn_on:``) are
+  // automation-action shorthand — not flat-mapping fields. Bail
+  // so the surrounding parser keeps the block as YamlRawValue
+  // and the serializer doesn't quote the dotted key on save.
+  if (key.includes(".")) return null;
+  if (raw === "" || BLOCK_SCALAR_INLINE_RE.test(raw)) return null;
+  return { key, value: parseScalar(raw) };
+};
+
+/**
+ * Collect a YAML list whose items are flat key:value mappings —
+ * ``esphome.devices`` / ``esphome.areas`` and similar
+ * ``multi_value=true`` schema entries — as ``Record<string, unknown>[]``.
+ * Each item starts with ``<dashIndent>-`` and continues at
+ * ``<childIndent>`` (one level deeper than the dash). Returns
+ * ``null`` when the block can't be parsed cleanly into a structured
+ * array — caller should fall back to ``YamlRawValue`` so complex
+ * shapes (block scalars, automation triggers, nested mappings)
+ * still round-trip.
+ *
+ * The helper is deliberately conservative: false negatives drop
+ * back to the existing raw path (no behaviour change), false
+ * positives would silently lose user content on save.
+ */
+const collectBlockListMappings = (
+  lines: string[],
+  startIdx: number,
+  dashIndent: string,
+  childIndent: string,
+): { items: Record<string, unknown>[]; endIdx: number } | null => {
+  const itemHeaderRe = new RegExp(
+    `^${dashIndent}-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
+  );
+  const childRe = new RegExp(`^${childIndent}(${KEY_PATTERN}):\\s*(.*)$`);
+  const items: Record<string, unknown>[] = [];
+  let j = startIdx;
+  while (j < lines.length) {
+    const line = lines[j];
+    if (line.trim() === "") {
+      j++;
+      continue;
+    }
+    if (!line.startsWith(`${dashIndent}-`)) break;
+    const headerMatch = line.match(itemHeaderRe);
+    if (!headerMatch) return null;
+    const headerField = parseFlatMappingField(
+      headerMatch[1],
+      headerMatch[2].trim(),
+    );
+    if (!headerField) return null;
+    // Same null-prototype defence as the surrounding parser — see
+    // the comment in ``parseYamlSectionValues``.
+    const item: Record<string, unknown> = Object.create(null);
+    item[headerField.key] = headerField.value;
+    j++;
+    while (j < lines.length) {
+      const sub = lines[j];
+      if (sub.trim() === "") {
+        j++;
+        continue;
+      }
+      if (!sub.startsWith(childIndent)) break;
+      // A line strictly deeper than ``childIndent`` is a nested
+      // mapping / list under a sub-key — bail.
+      if (sub.startsWith(`${childIndent} `)) return null;
+      const m = sub.match(childRe);
+      if (!m) return null;
+      const subField = parseFlatMappingField(m[1], m[2].trim());
+      if (!subField) return null;
+      item[subField.key] = subField.value;
+      j++;
+    }
+    items.push(item);
   }
   return { items, endIdx: j };
 };
@@ -264,7 +423,9 @@ export function parseYamlSectionValues(
   if (startIdx < 0) return values;
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
-  const childIndent = isListItem ? "    " : "  ";
+  const childIndent = isListItem
+    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
+    : ESPHOME_YAML_INDENT;
   const childRegex = childRegexFor(childIndent);
 
   // List-item form: the first child key may sit on the same line as
@@ -277,8 +438,7 @@ export function parseYamlSectionValues(
     }
   }
 
-  const listItemPrefix = `${childIndent}  - `;
-  const listItemRegex = listItemRegexFor(childIndent);
+  const listItemPrefix = `${childIndent}${ESPHOME_YAML_INDENT}- `;
   // For list-item-rooted sections: only sibling dashes at the
   // SAME indentation as the leading dash terminate the section.
   // A nested list inside a value (`on_press:` → `      - lambda:`)
@@ -328,39 +488,19 @@ export function parseYamlSectionValues(
       const peekLine = lines[peek];
 
       if (peekLine.startsWith(listItemPrefix)) {
-        // Find the full extent of this key's value-block AND its
-        // complexity in a single forward scan. Complexity can
-        // hide on a follow-up body line — `      - lambda: |-`
-        // looks parseable on its own; the next-line
-        // `          some_code();` body is what triggers raw-mode.
-        const { endIdx, isComplex } = _scanValueBlock(
+        const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,
           childIndent,
         );
-        if (isComplex) {
-          // Slice with `lines.slice(i + 1, endIdx)` to capture
-          // the lines verbatim (with trailing blank lines
-          // trimmed by `_scanValueBlock`'s "next non-blank line
-          // at keyIndent or shallower" terminator).
-          values[key] = new YamlRawValue(lines.slice(i + 1, endIdx));
+        if (!isEmptyScalarList) {
+          values[key] = value;
           i = endIdx - 1;
-          continue;
-        }
-        const { items, endIdx: listEndIdx } = collectBlockListItems(
-          lines,
-          i + 1,
-          listItemPrefix,
-          listItemRegex,
-        );
-        if (items.length > 0) {
-          values[key] = items;
-          i = listEndIdx - 1;
         }
         continue;
       }
 
-      const nestedIndent = `${childIndent}  `;
+      const nestedIndent = `${childIndent}${ESPHOME_YAML_INDENT}`;
       if (peekLine.startsWith(nestedIndent)) {
         const result = parseNestedBlock(lines, i + 1, nestedIndent);
         if (Object.keys(result.values).length > 0) {
@@ -388,8 +528,7 @@ function parseNestedBlock(
   indent: string,
 ): { values: Record<string, unknown>; endIdx: number } {
   const childRegex = childRegexFor(indent);
-  const listItemPrefix = `${indent}  - `;
-  const listItemRegex = listItemRegexFor(indent);
+  const listItemPrefix = `${indent}${ESPHOME_YAML_INDENT}- `;
   // Null-prototype — same prototype-pollution defense as the
   // top-level `parseYamlSectionValues` map; nested blocks recurse
   // into here so they need the same safety.
@@ -426,26 +565,12 @@ function parseNestedBlock(
       let peek = i + 1;
       while (peek < lines.length && lines[peek].trim() === "") peek++;
       if (peek < lines.length && lines[peek].startsWith(listItemPrefix)) {
-        // Same complex-block detection as the top-level parser:
-        // block scalars or sub-dict list items under a key get
-        // captured raw rather than mangled into `string[]`.
-        const { endIdx, isComplex } = _scanValueBlock(lines, i + 1, indent);
-        if (isComplex) {
-          values[key] = new YamlRawValue(lines.slice(i + 1, endIdx));
-          i = endIdx;
-          continue;
-        }
-        const { items, endIdx: listEndIdx } = collectBlockListItems(
-          lines,
-          i + 1,
-          listItemPrefix,
-          listItemRegex,
-        );
-        values[key] = items;
-        i = listEndIdx;
+        const { value, endIdx } = parseListBlock(lines, i + 1, indent);
+        values[key] = value;
+        i = endIdx;
         continue;
       }
-      const deeper = `${indent}  `;
+      const deeper = `${indent}${ESPHOME_YAML_INDENT}`;
       if (peek < lines.length && lines[peek].startsWith(deeper)) {
         const sub = parseNestedBlock(lines, i + 1, deeper);
         if (Object.keys(sub.values).length > 0) values[key] = sub.values;
@@ -535,7 +660,9 @@ export function updateSectionInYaml(
   if (start < 0) return yaml;
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
-  const childIndent = isListItem ? "    " : "  ";
+  const childIndent = isListItem
+    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
+    : ESPHOME_YAML_INDENT;
   let toSerialize = values;
   let dashLine = lines[start];
   if (isListItem) {
