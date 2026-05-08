@@ -333,6 +333,35 @@ export class ESPHomeSettingsDialog extends LitElement {
 
       /* Phase 2b — Remote builder section */
 
+      .phase-banner {
+        margin: 0 var(--wa-space-m) var(--wa-space-m);
+        padding: var(--wa-space-s) var(--wa-space-m);
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-warning-fill-quiet, #fff7e0);
+        color: var(--wa-color-warning-text-quiet, #6b4f00);
+        border-left: 3px solid
+          var(--wa-color-warning-border-loud, #f0b400);
+        font-size: var(--wa-font-size-s);
+      }
+
+      .role-section-heading {
+        font-size: var(--wa-font-size-l);
+        font-weight: var(--wa-font-weight-semibold);
+        margin: var(--wa-space-l) 0 var(--wa-space-2xs);
+        padding: 0 var(--wa-space-m);
+      }
+
+      .role-section-heading:first-of-type {
+        margin-top: 0;
+      }
+
+      .role-section-desc {
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-quiet);
+        margin: 0 0 var(--wa-space-s);
+        padding: 0 var(--wa-space-m);
+      }
+
       .section-heading {
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-semibold);
@@ -562,12 +591,28 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderRemoteBuild() {
-    // Phase 2 of issue #106 lit the master toggle + the
-    // empty-state list scaffolding. Phase 2b fills in the actual
-    // peer list (mDNS-discovered + manually-added) plus the
-    // "add by IP / hostname" input for cross-subnet / non-mDNS
-    // LANs. Per-host pairing UI comes in phase 4.
+    // Two distinct roles live in this section, so split them
+    // visually with explicit subheadings + descriptions to make
+    // the direction unambiguous: are we letting other dashboards
+    // build for us, or are we offloading our builds to them?
+    //
+    // Both halves are scaffolding right now; the active phases
+    // (1, 2, 2b) only persist state. The "not implemented yet"
+    // banners are deliberate — without them the UI looks
+    // functional but silently does nothing on click, which is
+    // worse than telling the user the feature isn't ready. The
+    // banners come down as phases 3-5 land.
     return html`
+      <div class="phase-banner" role="status">
+        ${this._localize("settings.remote_build_unimplemented_banner")}
+      </div>
+
+      <div class="role-section-heading">
+        ${this._localize("settings.remote_build_role_receive")}
+      </div>
+      <div class="role-section-desc">
+        ${this._localize("settings.remote_build_role_receive_desc")}
+      </div>
       <div class="row">
         <div class="row-label">
           <span id="remote-build-enable-title" class="row-title">
@@ -584,6 +629,13 @@ export class ESPHomeSettingsDialog extends LitElement {
           aria-checked=${this._remoteBuildEnabled}
           @click=${this._onToggleRemoteBuild}
         ></button>
+      </div>
+
+      <div class="role-section-heading">
+        ${this._localize("settings.remote_build_role_offload")}
+      </div>
+      <div class="role-section-desc">
+        ${this._localize("settings.remote_build_role_offload_desc")}
       </div>
 
       <div class="section-heading">
