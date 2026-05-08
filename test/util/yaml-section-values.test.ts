@@ -731,12 +731,23 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     // ``YamlRawValue.toString`` surfaces the dedented body for
     // display; the parser keeps the wrapper intact so the
     // serializer can paste the lines back unchanged.
+    //
+    // Byte-equality assertion (rather than substring presence) so
+    // a future drift — extra whitespace, indent change, missing
+    // ``|-`` marker — fails the test. The contract for "no edit"
+    // on the lambda is "no diff," so we slice the exact lambda
+    // block out of both the input and the output and compare them
+    // line-for-line. (The test fixture's ``name: "..."`` quoting
+    // gets stripped by the unrelated scalar serializer, so we
+    // can't byte-compare the WHOLE document — that's a separate
+    // pre-existing concern.)
+    const lambdaBlock = `    lambda: |-
+      return id(moving) && id(opening) && !id(opened).state ? true : false;`;
     const yaml = `binary_sensor:
   - platform: template
-    name: "Driveway Opening"
+    name: Driveway Opening
     id: opening_sensor
-    lambda: |-
-      return id(moving) && id(opening) && !id(opened).state ? true : false;
+${lambdaBlock}
 `;
     const values = parseYamlSectionValues(
       yaml,
@@ -745,17 +756,18 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     );
     // Parser wraps the block scalar so the on-disk style round-trips.
     expect(values.lambda).toBeInstanceOf(YamlRawValue);
-    // Re-save without editing: serializer pastes the lines back.
+    // Re-save without editing → byte-identical YAML.
     const after = updateSectionInYaml(
       yaml,
       "binary_sensor.template",
       values,
       2,
     );
-    expect(after).toContain("lambda: |-");
-    expect(after).toContain(
-      "return id(moving) && id(opening) && !id(opened).state ? true : false;",
-    );
+    expect(after).toBe(yaml);
+    // Belt + suspenders: even if a future serializer change
+    // reformats some surrounding key, the lambda block itself
+    // must survive byte-identical.
+    expect(after).toContain(lambdaBlock);
   });
 
   it("re-wraps an edited lambda body as a YamlRawValue with the same indent", () => {

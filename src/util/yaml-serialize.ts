@@ -78,13 +78,15 @@ export class YamlRawValue {
 
   /**
    * The block-scalar body as the user typed it semantically,
-   * with the common indent stripped. ``YamlRawValue("    return foo;\n
-   * return bar;")`` displays as ``"return foo;\nreturn bar;"``
-   * — which is what a textarea / lambda editor wants to render.
+   * with the common indent stripped — what a textarea / lambda
+   * editor wants to render. For example a ``YamlRawValue`` whose
+   * ``lines`` is ``["    return foo;", "    return bar;"]``
+   * displays as ``"return foo;\nreturn bar;"``.
    *
-   * Round-trip pairing: ``new YamlRawValue.fromBodyText(body, original)``
-   * goes the other direction, re-applying the common indent so the
-   * resulting lines slot back into the YAML at the original depth.
+   * Round-trip pairing: ``YamlRawValue.fromBodyText(body, original)``
+   * goes the other direction, re-applying the common indent so
+   * the resulting lines slot back into the YAML at the original
+   * depth.
    */
   get body(): string {
     const indent = this.indent;
