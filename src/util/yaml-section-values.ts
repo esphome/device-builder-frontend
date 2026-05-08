@@ -495,37 +495,43 @@ const collectBlockListMappings = (
   );
   const childRe = new RegExp(`^${childIndent}(${KEY_PATTERN}):\\s*(.*)$`);
   const bareDash = `${dashIndent}-`;
-  const items: Record<string, unknown>[] = [];
-  let j = startIdx;
 
-  while (j < lines.length) {
-    const line = lines[j];
-    if (line.trim() === "") {
-      j++;
-      continue;
-    }
-    if (!isListItemLine(line, dashIndent)) break;
-
+  /**
+   * Parse one list item starting at *at* (the dash line). Returns
+   * the new line index on success, ``null`` to bail. Bare-dash
+   * items (``${dashIndent}-`` with no inline key) are the
+   * serializer's placeholder for a freshly-added Add row the user
+   * saved before filling fields — we skip the header parse and let
+   * the sub-key walk find zero follow-ups, so the item stays
+   * ``{}`` and the row survives the round-trip.
+   */
+  const parseItem = (
+    at: number,
+  ): { item: Record<string, unknown>; endIdx: number } | null => {
     // Same null-prototype defence as the surrounding parser — see
     // the comment in ``parseYamlSectionValues``.
     const item: Record<string, unknown> = Object.create(null);
-
-    // Bare ``${dashIndent}-`` is the serializer's placeholder for
-    // an empty mapping item (a freshly-added Add row saved before
-    // any fields were filled in). The header parse runs only for
-    // the with-content shape; bare-dash items skip it and the
-    // sub-key walk finds no follow-ups, so the item stays ``{}``
-    // and the row survives the round-trip.
-    if (line !== bareDash) {
-      const header = _matchFlatMappingField(line, headerRe);
+    if (lines[at] !== bareDash) {
+      const header = _matchFlatMappingField(lines[at], headerRe);
       if (!header) return null;
       item[header.key] = header.value;
     }
+    const after = _parseItemSubKeys(lines, at + 1, childIndent, childRe, item);
+    return after === null ? null : { item, endIdx: after };
+  };
 
-    const after = _parseItemSubKeys(lines, j + 1, childIndent, childRe, item);
-    if (after === null) return null;
-    items.push(item);
-    j = after;
+  const items: Record<string, unknown>[] = [];
+  let j = startIdx;
+  while (j < lines.length) {
+    if (lines[j].trim() === "") {
+      j++;
+      continue;
+    }
+    if (!isListItemLine(lines[j], dashIndent)) break;
+    const parsed = parseItem(j);
+    if (!parsed) return null;
+    items.push(parsed.item);
+    j = parsed.endIdx;
   }
   return { items, endIdx: j };
 };
