@@ -484,42 +484,17 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         outline-offset: 2px;
       }
 
-      /* Auto-loaded-integrations collapsible. The drawer's primary
-         "Loaded Integrations" row shows the user-meaningful chips
-         inline; auto-loaded dependencies (the upstream AUTO_LOAD
-         chain — md5, mdns, web_server_base, etc.) tuck in here
-         so a 30-component config doesn't drown the panel in
-         framework noise. The summary row gets the muted text
-         colour so it reads as secondary metadata, not as another
-         tag-row header. */
-      .auto-loaded-details {
-        margin-top: var(--wa-space-s);
-      }
-
-      .auto-loaded-details > summary {
-        cursor: pointer;
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        padding: 2px 0;
-        user-select: none;
-      }
-
-      .auto-loaded-details > summary:hover {
-        color: var(--wa-color-text-normal);
-      }
-
-      .tags-wrap--auto-loaded {
-        margin-top: var(--wa-space-2xs);
-      }
-
-      /* Same muted-summary treatment as the integrations
-         collapsible, but scoped to the reachability row's content
-         column. The TXT records are debug-only metadata; we don't
-         want them styled like another data row. */
-      .mdns-txt-details {
-        margin-top: var(--wa-space-2xs);
-      }
-
+      /* Shared muted-disclosure treatment: a closed-by-default
+         <details> whose <summary> reads as secondary metadata
+         (small, quiet text colour) rather than as another data
+         row. Used by the auto-loaded integrations collapsible
+         below the primary chip row, and by the mDNS TXT-records
+         collapsible under the reachability row. The two have
+         different margin-top spacing because they sit beside
+         content of different vertical density — the integrations
+         row needs a clear gap, the reachability row only needs
+         a tight 2xs nudge. */
+      .auto-loaded-details > summary,
       .mdns-txt-details > summary {
         cursor: pointer;
         font-size: var(--wa-font-size-2xs);
@@ -528,8 +503,21 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         user-select: none;
       }
 
+      .auto-loaded-details > summary:hover,
       .mdns-txt-details > summary:hover {
         color: var(--wa-color-text-normal);
+      }
+
+      .auto-loaded-details {
+        margin-top: var(--wa-space-s);
+      }
+
+      .mdns-txt-details {
+        margin-top: var(--wa-space-2xs);
+      }
+
+      .tags-wrap--auto-loaded {
+        margin-top: var(--wa-space-2xs);
       }
 
       .mdns-txt-list {
