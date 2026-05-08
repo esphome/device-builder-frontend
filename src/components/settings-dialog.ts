@@ -9,6 +9,7 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
+import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { RemoteBuildPeer } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
@@ -81,10 +82,12 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: apiContext })
   private _api?: ESPHomeAPI;
 
-  // Phase 2b — peer-list state for the Remote builder section.
-  // Loaded on dialog open; refreshed after every add / remove.
-  // ``null`` means "not yet loaded"; an empty array means "loaded
-  // and there are zero peers".
+  // Phase 2b: peer-list state for the Remote builder section.
+  // Lazy-loaded the first time the user opens the section
+  // (via ``_selectSection`` / ``_loadRemoteBuildPeers``); refreshed
+  // after every add / remove. Reset to ``null`` on dialog open
+  // so a fresh visit re-fetches. ``null`` means "not yet loaded";
+  // an empty array means "loaded and there are zero peers".
   @state()
   private _remoteBuildPeers: RemoteBuildPeer[] | null = null;
 
@@ -131,7 +134,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private async _loadRemoteBuildPeers() {
-    // Snapshot fetch — refreshed on first open of the Remote
+    // Snapshot fetch, refreshed on first open of the Remote
     // builder section and after every add / remove. mDNS rows
     // are listed first by the backend; manual rows follow with
     // ``source="manual"``.
@@ -228,9 +231,9 @@ export class ESPHomeSettingsDialog extends LitElement {
       .nav-item--active {
         background: var(--wa-color-surface-lowered);
         color: var(--wa-color-text-normal);
-        /* Fake bold via text-shadow so the layout doesn't reflow on hover —
-           changing real font-weight widens the text, the cursor falls off the
-           element, the hover drops, and you get the flicker. */
+        /* Fake bold via text-shadow so the layout doesn't reflow on hover.
+           Changing real font-weight widens the text, the cursor falls off
+           the element, the hover drops, and you get the flicker. */
         text-shadow:
           0.4px 0 0 currentColor,
           -0.4px 0 0 currentColor;
@@ -331,7 +334,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         transform: translateX(18px);
       }
 
-      /* Phase 2b — Remote builder section */
+      /* Phase 2b: Remote builder section */
 
       .phase-banner {
         margin: 0 var(--wa-space-m) var(--wa-space-m);
@@ -562,7 +565,7 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   private _renderEditor() {
     // ``aria-checked`` is the string-attribute form
-    // (``aria-checked=${value}``) — Lit's ``?aria-checked=...``
+    // (``aria-checked=${value}``). Lit's ``?aria-checked=...``
     // boolean binding would omit the attribute entirely on
     // ``false``, breaking both the ``[aria-checked="false"]`` CSS
     // state and the screen-reader announcement. ``aria-labelledby``
@@ -598,7 +601,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     //
     // Both halves are scaffolding right now; the active phases
     // (1, 2, 2b) only persist state. The "not implemented yet"
-    // banners are deliberate — without them the UI looks
+    // banners are deliberate. Without them the UI looks
     // functional but silently does nothing on click, which is
     // worse than telling the user the feature isn't ready. The
     // banners come down as phases 3-5 land.
@@ -855,14 +858,15 @@ export class ESPHomeSettingsDialog extends LitElement {
     const ok = await this._runManualHostMutation(
       (api) => api.addRemoteBuildManualHost({ hostname, port }),
       (err) => {
-        // The backend raises ``INVALID_ARGS`` for duplicates;
-        // surface that distinct from a generic failure so the
-        // user sees "this peer is already in your list" rather
-        // than a vague "couldn't save".
-        const msg = err instanceof Error ? err.message : "";
-        return msg.toLowerCase().includes("already registered")
-          ? "settings.remote_build_add_manual_duplicate"
-          : "settings.remote_build_add_manual_failed";
+        // The backend raises ``ALREADY_EXISTS`` for duplicates so
+        // we can surface that distinct from a generic failure
+        // ("this peer is already in your list" rather than a
+        // vague "couldn't save") without string-matching the
+        // details field.
+        if (err instanceof APIError && err.errorCode === "already_exists") {
+          return "settings.remote_build_add_manual_duplicate";
+        }
+        return "settings.remote_build_add_manual_failed";
       },
     );
     if (ok) {
