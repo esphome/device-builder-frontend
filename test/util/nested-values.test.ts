@@ -44,6 +44,37 @@ describe("setIn", () => {
     expect(setIn({ a: 1 }, [], "wat")).toEqual({});
     expect(setIn({ a: 1 }, [], [1, 2])).toEqual({});
   });
+
+  it("descends into arrays via numeric path segments", () => {
+    // Editing ``esphome.devices[0].name`` from the nested-list
+    // renderer; the array slot must survive the write.
+    const before = { devices: [{ name: "old" }, { name: "kitchen" }] };
+    const after = setIn(before, ["devices", "0", "name"], "front");
+    expect(after).toEqual({
+      devices: [{ name: "front" }, { name: "kitchen" }],
+    });
+    // Untouched siblings keep identity (structural sharing).
+    expect((after.devices as unknown[])[1]).toBe(before.devices[1]);
+  });
+
+  it("creates intermediate objects inside an array slot", () => {
+    expect(setIn({ devices: [{}] }, ["devices", "0", "id", "x"], 1)).toEqual({
+      devices: [{ id: { x: 1 } }],
+    });
+  });
+
+  it("grows the array when writing past the end", () => {
+    // Newly-added nested-list items can write to their own slot
+    // before the placeholder object is materialised in form state.
+    const after = setIn({ devices: [] }, ["devices", "0", "name"], "front");
+    expect(after).toEqual({ devices: [{ name: "front" }] });
+  });
+
+  it("preserves array shape when replacing a slot", () => {
+    expect(
+      setIn({ devices: [{ name: "old" }] }, ["devices", "0"], { name: "new" }),
+    ).toEqual({ devices: [{ name: "new" }] });
+  });
 });
 
 describe("getIn", () => {
@@ -58,7 +89,21 @@ describe("getIn", () => {
 
   it("returns undefined when the path crosses a non-object", () => {
     expect(getIn({ a: "hello" }, ["a", "b"])).toBeUndefined();
-    expect(getIn({ a: [1, 2] }, ["a", "0"])).toBeUndefined();
+    expect(getIn({ a: 5 }, ["a", "b"])).toBeUndefined();
+  });
+
+  it("descends into arrays via numeric path segments", () => {
+    // Arrays are valid containers — the nested-list renderer needs
+    // to read child fields out of items at ``devices[0]``.
+    expect(getIn({ devices: [{ name: "front" }] }, ["devices", "0", "name"]))
+      .toBe("front");
+    expect(getIn({ a: [1, 2, 3] }, ["a", "2"])).toBe(3);
+  });
+
+  it("returns undefined for out-of-range / non-numeric array paths", () => {
+    expect(getIn({ a: [1, 2] }, ["a", "5"])).toBeUndefined();
+    expect(getIn({ a: [1, 2] }, ["a", "-1"])).toBeUndefined();
+    expect(getIn({ a: [1, 2] }, ["a", "name"])).toBeUndefined();
   });
 });
 

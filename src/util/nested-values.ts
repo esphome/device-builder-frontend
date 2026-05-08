@@ -10,7 +10,11 @@
  * Immutably set `value` at `path` inside an object, returning a new
  * object with structural sharing of untouched branches. Intermediate
  * objects are created when the path crosses missing or non-object
- * nodes (so a fresh form can write to nested fields).
+ * nodes (so a fresh form can write to nested fields). Array children
+ * are descended via numeric path segments (``["devices", "0",
+ * "name"]``), preserving the array shape — required by the
+ * nested-list renderer for ``esphome.devices`` / ``esphome.areas``
+ * and any future repeatable-mapping field.
  */
 export function setIn(
   obj: Record<string, unknown>,
@@ -24,21 +28,52 @@ export function setIn(
   // contract that this returns a Record<string, unknown> stays
   // intact.
   if (path.length === 0) {
-    return value !== null && typeof value === "object" && !Array.isArray(value)
-      ? (value as Record<string, unknown>)
-      : {};
+    return isPlainObject(value) ? value : {};
   }
   const [head, ...rest] = path;
   if (rest.length === 0) return { ...obj, [head]: value };
   const child = obj[head];
+  if (Array.isArray(child)) {
+    return { ...obj, [head]: _setInArray(child, rest, value) };
+  }
   const childObj = isPlainObject(child) ? child : {};
   return { ...obj, [head]: setIn(childObj, rest, value) };
 }
 
 /**
+ * Recurse into an array child of ``setIn``. ``path[0]`` is parsed
+ * as a numeric index; out-of-range indices grow the array (so the
+ * nested-list renderer can write to a freshly-added item before its
+ * placeholder object is materialised). The returned array is a
+ * fresh copy — callers stay structural-sharing-safe.
+ */
+function _setInArray(
+  arr: readonly unknown[],
+  path: string[],
+  value: unknown,
+): unknown[] {
+  const [head, ...rest] = path;
+  const idx = Number(head);
+  const copy = [...arr];
+  if (rest.length === 0) {
+    copy[idx] = value;
+    return copy;
+  }
+  const child = copy[idx];
+  if (Array.isArray(child)) {
+    copy[idx] = _setInArray(child, rest, value);
+  } else {
+    const childObj = isPlainObject(child) ? child : {};
+    copy[idx] = setIn(childObj, rest, value);
+  }
+  return copy;
+}
+
+/**
  * Read the value at `path` inside `obj`. Returns `undefined` for
- * missing paths or when the path crosses a non-object (e.g. trying to
- * descend into a string or array).
+ * missing paths or when the path crosses a non-object/non-array
+ * intermediate. Numeric path segments index into arrays (mirrors
+ * the array-aware writes in :func:`setIn`).
  */
 export function getIn(
   obj: Record<string, unknown>,
@@ -46,8 +81,16 @@ export function getIn(
 ): unknown {
   let cur: unknown = obj;
   for (const k of path) {
-    if (cur === null || typeof cur !== "object" || Array.isArray(cur)) {
+    if (cur === null || cur === undefined || typeof cur !== "object") {
       return undefined;
+    }
+    if (Array.isArray(cur)) {
+      const idx = Number(k);
+      if (!Number.isInteger(idx) || idx < 0 || idx >= cur.length) {
+        return undefined;
+      }
+      cur = cur[idx];
+      continue;
     }
     cur = (cur as Record<string, unknown>)[k];
   }

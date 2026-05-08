@@ -23,7 +23,7 @@ import {
 } from "../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../util/hex-int.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { YamlRawValue } from "../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -716,6 +716,101 @@ export function renderMapField(
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
         ${ctx.localize("device.map_add")}
+      </button>
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
+/**
+ * Render a repeatable nested-mapping list — used for
+ * ``esphome.devices`` / ``esphome.areas`` and any future
+ * ``type=nested, multi_value=true`` catalog entry. Each item is its
+ * own collapsible group with the same children as a single nested
+ * entry; the user can add and remove items at will.
+ *
+ * Storage shape: ``values[entry.key] = [ {child: value, ...}, ... ]``
+ * — a list of plain objects matching ``entry.config_entries``.
+ * Children write through array-aware ``setIn`` paths
+ * (``[..., entry.key, "0", "name"]``), so the array slot survives
+ * round-trips through the form-state reducer.
+ */
+export function renderNestedListField(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+) {
+  const raw = ctx.getAt(path);
+  const items: Record<string, unknown>[] = Array.isArray(raw)
+    ? raw.map((v) => (isPlainObject(v) ? v : {}))
+    : [];
+  const disabled = effectiveDisabled(entry, ctx);
+
+  const removeAt = (idx: number) => {
+    const cur = ctx.getAt(path);
+    const current = Array.isArray(cur) ? cur : [];
+    ctx.emitChange(
+      path,
+      current.filter((_, i) => i !== idx),
+    );
+  };
+  const addItem = () => {
+    const cur = ctx.getAt(path);
+    const current = Array.isArray(cur) ? cur : [];
+    ctx.emitChange(path, [...current, {}]);
+  };
+
+  const itemTitle = labelFor(entry, ctx);
+
+  return html`
+    <div class="nested-list" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      ${items.length === 0
+        ? html`<p class="field-description">
+            ${ctx.localize("device.multi_value_empty")}
+          </p>`
+        : nothing}
+      ${items.map((item, i) => {
+        const itemPath = [...path, String(i)];
+        const renderableChildren = ctx.filterRenderable(
+          entry.config_entries ?? [],
+          item,
+        );
+        return html`
+          <div
+            class="nested-list-item"
+            data-field-key=${itemPath.join(".")}
+          >
+            <div class="nested-list-item-header">
+              <span class="nested-list-item-title">
+                ${itemTitle} ${i + 1}
+              </span>
+              <button
+                type="button"
+                class="multi-btn"
+                ?disabled=${disabled}
+                aria-label=${ctx.localize("device.multi_value_remove")}
+                @click=${() => removeAt(i)}
+              >
+                <wa-icon library="mdi" name="close"></wa-icon>
+              </button>
+            </div>
+            <div class="nested-fields">
+              ${renderableChildren.map((child) =>
+                ctx.renderEntry(child, [...itemPath, child.key]),
+              )}
+            </div>
+          </div>
+        `;
+      })}
+      <button
+        type="button"
+        class="multi-btn multi-add"
+        ?disabled=${disabled}
+        @click=${addItem}
+      >
+        <wa-icon library="mdi" name="plus"></wa-icon>
+        ${ctx.localize("device.multi_value_add")}
       </button>
       ${renderFieldError(path, ctx)}
     </div>

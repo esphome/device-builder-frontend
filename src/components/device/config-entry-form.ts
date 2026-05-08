@@ -54,6 +54,7 @@ import {
   renderMapField,
   renderMultiValueField,
   renderNestedField,
+  renderNestedListField,
   renderNumberField,
   renderPinField,
   renderSelectField,
@@ -399,6 +400,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
       return html`<div class="alert-entry">${labelFor(entry, ctx)}</div>`;
     }
     if (entry.type === ConfigEntryType.NESTED) {
+      // Repeatable nested mapping (``esphome.devices``,
+      // ``esphome.areas``, …). The single-group renderer can't
+      // express the list shape, so route to the list renderer first.
+      if (entry.multi_value) {
+        return renderNestedListField(entry, path, ctx);
+      }
       return renderNestedField(entry, path, ctx);
     }
     if (entry.type === ConfigEntryType.MAP) {

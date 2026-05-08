@@ -167,6 +167,38 @@ export const configEntryFormStyles = css`
     padding-top: var(--wa-space-xs);
   }
 
+  /* ─── nested list (repeatable nested mapping) ───────────── */
+  .nested-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
+  .nested-list-item {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-xs);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    background: var(--wa-color-surface-lowered);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+  }
+
+  .nested-list-item-header {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+
+  .nested-list-item-title {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+
   /* ─── multi-value rows ──────────────────────────────────── */
   .multi-row {
     display: flex;
