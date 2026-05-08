@@ -41,19 +41,25 @@ export function setIn(
 }
 
 /**
- * Recurse into an array child of ``setIn``. ``path[0]`` is parsed
- * as a numeric index; out-of-range indices grow the array (so the
- * nested-list renderer can write to a freshly-added item before its
- * placeholder object is materialised). The returned array is a
- * fresh copy — callers stay structural-sharing-safe.
+ * Recurse into an array child of ``setIn``. ``path[0]`` must parse
+ * as a non-negative integer; non-numeric, negative, or fractional
+ * segments are dropped on the floor (the array is returned
+ * unchanged) — writing to ``arr["name"]`` or ``arr[-1]`` would
+ * silently set a string property on the array object, leaving
+ * ``.length`` stale and surprising every downstream consumer.
+ * Indices past the end grow the array (so the nested-list renderer
+ * can write to a freshly-added item before its placeholder object
+ * is materialised). The returned array is a fresh copy on every
+ * write — callers stay structural-sharing-safe.
  */
 function _setInArray(
   arr: readonly unknown[],
   path: string[],
   value: unknown,
-): unknown[] {
+): readonly unknown[] {
   const [head, ...rest] = path;
   const idx = Number(head);
+  if (!Number.isInteger(idx) || idx < 0) return arr;
   const copy = [...arr];
   if (rest.length === 0) {
     copy[idx] = value;

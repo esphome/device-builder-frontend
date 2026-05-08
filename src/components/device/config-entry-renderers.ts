@@ -494,44 +494,105 @@ export function renderIconField(
   `;
 }
 
+/**
+ * Read the array currently stored at *path* in form state. Returns
+ * an empty array (not ``undefined``) when nothing is there or the
+ * value isn't an array — every list-renderer mutation closure
+ * round-trips through this so the new array is always a clean copy
+ * of a known-array shape.
+ */
+function readArrayAt(ctx: RenderCtx, path: string[]): readonly unknown[] {
+  const cur = ctx.getAt(path);
+  return Array.isArray(cur) ? cur : [];
+}
+
+/**
+ * Build the add/remove closures shared by ``renderMultiValueField``
+ * (scalar items) and ``renderNestedListField`` (mapping items).
+ * The caller passes a factory for the new-item placeholder so each
+ * renderer chooses the empty shape that matches its children
+ * (``""`` for scalars, ``{}`` for nested mappings).
+ */
+function arrayItemHandlers(
+  ctx: RenderCtx,
+  path: string[],
+  makeNewItem: () => unknown,
+): { addItem: () => void; removeAt: (idx: number) => void } {
+  const removeAt = (idx: number) =>
+    ctx.emitChange(
+      path,
+      readArrayAt(ctx, path).filter((_, i) => i !== idx),
+    );
+  const addItem = () =>
+    ctx.emitChange(path, [...readArrayAt(ctx, path), makeNewItem()]);
+  return { addItem, removeAt };
+}
+
+/** Empty-state hint shared by both list renderers. */
+function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
+  return items.length === 0
+    ? html`<p class="field-description">
+        ${ctx.localize("device.multi_value_empty")}
+      </p>`
+    : nothing;
+}
+
+/** Per-item remove button shared by both list renderers. */
+function renderListRemoveButton(
+  ctx: RenderCtx,
+  disabled: boolean,
+  onClick: () => void,
+) {
+  return html`
+    <button
+      type="button"
+      class="multi-btn"
+      ?disabled=${disabled}
+      aria-label=${ctx.localize("device.multi_value_remove")}
+      @click=${onClick}
+    >
+      <wa-icon library="mdi" name="close"></wa-icon>
+    </button>
+  `;
+}
+
+/** Trailing Add button shared by both list renderers. */
+function renderListAddButton(
+  ctx: RenderCtx,
+  disabled: boolean,
+  onClick: () => void,
+) {
+  return html`
+    <button
+      type="button"
+      class="multi-btn multi-add"
+      ?disabled=${disabled}
+      @click=${onClick}
+    >
+      <wa-icon library="mdi" name="plus"></wa-icon>
+      ${ctx.localize("device.multi_value_add")}
+    </button>
+  `;
+}
+
 export function renderMultiValueField(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx,
 ) {
-  const raw = ctx.getAt(path);
-  const items: string[] = Array.isArray(raw) ? raw.map((v) => String(v)) : [];
+  const items: string[] = readArrayAt(ctx, path).map((v) => String(v));
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
-
+  const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => "");
   const updateAt = (idx: number, value: string) => {
-    const cur = ctx.getAt(path);
-    const current = Array.isArray(cur) ? [...cur] : [];
+    const current = [...readArrayAt(ctx, path)];
     current[idx] = value;
     ctx.emitChange(path, current);
-  };
-  const removeAt = (idx: number) => {
-    const cur = ctx.getAt(path);
-    const current = Array.isArray(cur) ? cur : [];
-    ctx.emitChange(
-      path,
-      current.filter((_, i) => i !== idx),
-    );
-  };
-  const addItem = () => {
-    const cur = ctx.getAt(path);
-    const current = Array.isArray(cur) ? cur : [];
-    ctx.emitChange(path, [...current, ""]);
   };
 
   return html`
     <div class="field" data-field-key=${path.join(".")}>
-      ${renderLabel(entry, ctx)}
-      ${items.length === 0
-        ? html`<p class="field-description">
-            ${ctx.localize("device.multi_value_empty")}
-          </p>`
-        : nothing}
+      ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
       ${items.map(
         (item, i) => html`
           <div class="multi-row">
@@ -543,27 +604,11 @@ export function renderMultiValueField(
               @input=${(e: Event) =>
                 updateAt(i, (e.target as HTMLInputElement).value)}
             />
-            <button
-              type="button"
-              class="multi-btn"
-              ?disabled=${disabled}
-              aria-label=${ctx.localize("device.multi_value_remove")}
-              @click=${() => removeAt(i)}
-            >
-              <wa-icon library="mdi" name="close"></wa-icon>
-            </button>
+            ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
           </div>
         `,
       )}
-      <button
-        type="button"
-        class="multi-btn multi-add"
-        ?disabled=${disabled}
-        @click=${addItem}
-      >
-        <wa-icon library="mdi" name="plus"></wa-icon>
-        ${ctx.localize("device.multi_value_add")}
-      </button>
+      ${renderListAddButton(ctx, disabled, addItem)}
       ${renderFieldError(path, ctx)}
     </div>
   `;
@@ -726,8 +771,13 @@ export function renderMapField(
  * Render a repeatable nested-mapping list — used for
  * ``esphome.devices`` / ``esphome.areas`` and any future
  * ``type=nested, multi_value=true`` catalog entry. Each item is its
- * own collapsible group with the same children as a single nested
- * entry; the user can add and remove items at will.
+ * own bordered group with the same children as a single nested
+ * entry, plus a per-item remove button; a single Add button at the
+ * bottom appends a new empty item. Items render expanded — there's
+ * no per-item collapse toggle, since the typical case is a handful
+ * of devices / areas the user wants to see at once. Long lists can
+ * still scroll, and a future revision could add a toggle on the
+ * per-item header without changing the storage shape.
  *
  * Storage shape: ``values[entry.key] = [ {child: value, ...}, ... ]``
  * — a list of plain objects matching ``entry.config_entries``.
@@ -740,60 +790,27 @@ export function renderNestedListField(
   path: string[],
   ctx: RenderCtx,
 ) {
-  const raw = ctx.getAt(path);
-  const items: Record<string, unknown>[] = Array.isArray(raw)
-    ? raw.map((v) => (isPlainObject(v) ? v : {}))
-    : [];
+  const items = readArrayAt(ctx, path).map((v) =>
+    isPlainObject(v) ? v : {},
+  );
   const disabled = effectiveDisabled(entry, ctx);
-
-  const removeAt = (idx: number) => {
-    const cur = ctx.getAt(path);
-    const current = Array.isArray(cur) ? cur : [];
-    ctx.emitChange(
-      path,
-      current.filter((_, i) => i !== idx),
-    );
-  };
-  const addItem = () => {
-    const cur = ctx.getAt(path);
-    const current = Array.isArray(cur) ? cur : [];
-    ctx.emitChange(path, [...current, {}]);
-  };
-
+  const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => ({}));
   const itemTitle = labelFor(entry, ctx);
+  const childrenSchema = entry.config_entries ?? [];
 
   return html`
     <div class="nested-list" data-field-key=${path.join(".")}>
-      ${renderLabel(entry, ctx)}
-      ${items.length === 0
-        ? html`<p class="field-description">
-            ${ctx.localize("device.multi_value_empty")}
-          </p>`
-        : nothing}
+      ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
       ${items.map((item, i) => {
         const itemPath = [...path, String(i)];
-        const renderableChildren = ctx.filterRenderable(
-          entry.config_entries ?? [],
-          item,
-        );
+        const renderableChildren = ctx.filterRenderable(childrenSchema, item);
         return html`
-          <div
-            class="nested-list-item"
-            data-field-key=${itemPath.join(".")}
-          >
+          <div class="nested-list-item" data-field-key=${itemPath.join(".")}>
             <div class="nested-list-item-header">
               <span class="nested-list-item-title">
                 ${itemTitle} ${i + 1}
               </span>
-              <button
-                type="button"
-                class="multi-btn"
-                ?disabled=${disabled}
-                aria-label=${ctx.localize("device.multi_value_remove")}
-                @click=${() => removeAt(i)}
-              >
-                <wa-icon library="mdi" name="close"></wa-icon>
-              </button>
+              ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
             </div>
             <div class="nested-fields">
               ${renderableChildren.map((child) =>
@@ -803,15 +820,7 @@ export function renderNestedListField(
           </div>
         `;
       })}
-      <button
-        type="button"
-        class="multi-btn multi-add"
-        ?disabled=${disabled}
-        @click=${addItem}
-      >
-        <wa-icon library="mdi" name="plus"></wa-icon>
-        ${ctx.localize("device.multi_value_add")}
-      </button>
+      ${renderListAddButton(ctx, disabled, addItem)}
       ${renderFieldError(path, ctx)}
     </div>
   `;

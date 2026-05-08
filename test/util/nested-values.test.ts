@@ -75,6 +75,17 @@ describe("setIn", () => {
       setIn({ devices: [{ name: "old" }] }, ["devices", "0"], { name: "new" }),
     ).toEqual({ devices: [{ name: "new" }] });
   });
+
+  it("ignores invalid array-index segments instead of writing string keys", () => {
+    // ``arr["name"] = ...`` would silently set a string property on
+    // the array object, leaving ``.length`` stale — every consumer
+    // downstream sees the array as untouched but ``Object.keys``
+    // surfaces the rogue key. The helper drops the write instead.
+    const before = { devices: [{ id: "kitchen" }] };
+    expect(setIn(before, ["devices", "name", "x"], 1)).toEqual(before);
+    expect(setIn(before, ["devices", "-1", "x"], 1)).toEqual(before);
+    expect(setIn(before, ["devices", "1.5", "x"], 1)).toEqual(before);
+  });
 });
 
 describe("getIn", () => {
