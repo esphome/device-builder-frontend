@@ -1044,6 +1044,69 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(after).not.toContain("    - area_id:");
   });
 
+  it("treats a bare dash with trailing whitespace as an empty placeholder", () => {
+    // Some editors emit ``    -  `` (dash + trailing spaces)
+    // when the user lands on a fresh dash line and pauses. The
+    // exact-match check (``lines[at] === bareDash``) used to
+    // miss this and bail to YamlRawValue, breaking the visual
+    // editor. ``LIST_ITEM_BARE_DASH_RE`` already accepts any
+    // trailing whitespace as a complexity signal — the parser
+    // now uses the same predicate inside ``parseItem`` so the
+    // two stay in lockstep.
+    const yaml = `esphome:
+  devices:
+    -
+    - id: kitchen
+      name: Kitchen
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      {},
+      { id: "kitchen", name: "Kitchen" },
+    ]);
+  });
+
+  it("parses a list-of-mappings with a comment line between key and items", () => {
+    // Regression for Copilot's catch: a comment between
+    // ``devices:`` and the first ``- id:`` line used to make
+    // ``peekLine`` land on the comment, fail
+    // ``isDeeperListItemLine``, and route through
+    // ``parseNestedBlock`` — which then skipped the list items
+    // entirely, returning an empty mapping. The field got
+    // dropped from values and deleted on save.
+    const yaml = `esphome:
+  devices:
+    # the kitchen sensor and the front door
+    - id: kitchen
+      name: Kitchen
+    - id: front_door
+      name: "Front Door"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      { id: "kitchen", name: "Kitchen" },
+      { id: "front_door", name: "Front Door" },
+    ]);
+  });
+
+  it("parses a nested mapping with a comment line between key and content", () => {
+    // Same comment-skip semantic in ``parseNestedBlock`` — the
+    // recursion path that handles deeper map blocks. A comment
+    // between ``manual_ip:`` and ``static_ip:`` would silently
+    // drop the manual_ip field from values.
+    const yaml = `wifi:
+  manual_ip:
+    # static IP for the office sensor
+    static_ip: 10.0.0.5
+    gateway: 10.0.0.1
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.manual_ip).toEqual({
+      static_ip: "10.0.0.5",
+      gateway: "10.0.0.1",
+    });
+  });
+
   it("preserves a list of only bare-dash placeholder items", () => {
     // Regression for the bug Copilot caught: a list whose only
     // items are bare-dash placeholders (the user clicked Add but

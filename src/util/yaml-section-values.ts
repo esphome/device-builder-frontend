@@ -148,6 +148,39 @@ const listItemRegexFor = (dashIndent: string) =>
   new RegExp(`^${dashIndent}-\\s+(.*)$`);
 
 /**
+ * True when *line* is structurally invisible to the key/value
+ * parser — blank, or a comment-only line whose first non-whitespace
+ * character is ``#``. Centralised so every "skip blank line"
+ * loop in this module also skips comments; otherwise a comment
+ * between ``key:`` and a child list/mapping (or interleaved with
+ * list items) makes the parser bail or terminate early, dropping
+ * the field from values and deleting it on the next save.
+ *
+ * This minimal parser doesn't preserve comments on round-trip
+ * either way — they're already silently dropped by the
+ * line-by-line serializer. Skipping them here just keeps comments
+ * from corrupting the structural read.
+ */
+const isBlankOrCommentLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  return trimmed === "" || trimmed.startsWith("#");
+};
+
+/**
+ * Walk forward from *startIdx* skipping blank and comment-only
+ * lines. Returns the first index that holds real content, or
+ * ``lines.length`` if none.
+ */
+const _skipBlankAndCommentLines = (
+  lines: string[],
+  startIdx: number,
+): number => {
+  let j = startIdx;
+  while (j < lines.length && isBlankOrCommentLine(lines[j])) j++;
+  return j;
+};
+
+/**
  * Measure the leading whitespace on *line* — used to detect the
  * actual indent the user's YAML uses for the first child of a
  * section. The parser is tied to ESPHome's emit format (2 spaces
@@ -187,7 +220,7 @@ const _detectSectionChildIndent = (
     : ESPHOME_YAML_INDENT;
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     // Column-0 identifier ⇒ sibling section, this section has no
     // children of its own.
     if (TOP_LEVEL_KEY_START_RE.test(line)) return fallback;
@@ -214,7 +247,7 @@ const _detectListItemChildIndent = (
 ): string | null => {
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     const lead = _leadingIndent(line);
     // A sibling dash (or shallower) terminates this item.
     if (lead.length <= dashIndent.length) return null;
@@ -293,7 +326,7 @@ const collectBlockListItems = (
   const items: string[] = [];
   let j = startIdx;
   for (; j < lines.length; j++) {
-    if (lines[j].trim() === "") continue;
+    if (isBlankOrCommentLine(lines[j])) continue;
     if (!lines[j].startsWith(prefix)) break;
     const m = lines[j].match(itemRegex);
     if (!m) break;
@@ -317,7 +350,7 @@ const _detectFirstDashIndent = (
   let firstDashIdx = startIdx;
   while (
     firstDashIdx < lines.length &&
-    lines[firstDashIdx].trim() === ""
+    isBlankOrCommentLine(lines[firstDashIdx])
   ) {
     firstDashIdx++;
   }
@@ -474,7 +507,7 @@ const _parseItemSubKeys = (
   let j = startIdx;
   while (j < lines.length) {
     const sub = lines[j];
-    if (sub.trim() === "") {
+    if (isBlankOrCommentLine(sub)) {
       j++;
       continue;
     }
@@ -515,16 +548,20 @@ const collectBlockListMappings = (
     `^${dashIndent}-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
   );
   const childRe = new RegExp(`^${childIndent}(${KEY_PATTERN}):\\s*(.*)$`);
-  const bareDash = `${dashIndent}-`;
 
   /**
    * Parse one list item starting at *at* (the dash line). Returns
    * the new line index on success, ``null`` to bail. Bare-dash
-   * items (``${dashIndent}-`` with no inline key) are the
-   * serializer's placeholder for a freshly-added Add row the user
-   * saved before filling fields — we skip the header parse and let
-   * the sub-key walk find zero follow-ups, so the item stays
-   * ``{}`` and the row survives the round-trip.
+   * items (``${dashIndent}-`` followed by EOL or only whitespace)
+   * are the serializer's placeholder for a freshly-added Add row
+   * the user saved before filling fields — we skip the header
+   * parse and let the sub-key walk find zero follow-ups, so the
+   * item stays ``{}`` and the row survives the round-trip. The
+   * trailing-whitespace shape (``    -  ``) is what some editors
+   * emit when the user's cursor lands on a fresh dash line, and
+   * also what ``LIST_ITEM_BARE_DASH_RE`` already accepts as a
+   * complexity signal — using the same regex here keeps the two
+   * predicates in lockstep.
    */
   const parseItem = (
     at: number,
@@ -532,7 +569,7 @@ const collectBlockListMappings = (
     // Same null-prototype defence as the surrounding parser — see
     // the comment in ``parseYamlSectionValues``.
     const item: Record<string, unknown> = Object.create(null);
-    if (lines[at] !== bareDash) {
+    if (!LIST_ITEM_BARE_DASH_RE.test(lines[at])) {
       const header = _matchFlatMappingField(lines[at], headerRe);
       if (!header) return null;
       item[header.key] = header.value;
@@ -544,7 +581,7 @@ const collectBlockListMappings = (
   const items: Record<string, unknown>[] = [];
   let j = startIdx;
   while (j < lines.length) {
-    if (lines[j].trim() === "") {
+    if (isBlankOrCommentLine(lines[j])) {
       j++;
       continue;
     }
@@ -598,7 +635,7 @@ const _scanValueBlock = (
   let isComplex = false;
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     const lead = line.match(/^ */)![0];
     if (lead.length <= keyIndent.length) return { endIdx: i, isComplex };
     if (!isComplex) {
@@ -697,7 +734,7 @@ export function parseYamlSectionValues(
 
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     if (isListItem) {
       const dashMatch = line.match(/^(\s*)-(\s|$)/);
       if (dashMatch && dashMatch[1].length === siblingDashIndent) break;
@@ -727,8 +764,7 @@ export function parseYamlSectionValues(
     }
 
     if (raw === "") {
-      let peek = i + 1;
-      while (peek < lines.length && lines[peek].trim() === "") peek++;
+      const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (peek >= lines.length) continue;
       const peekLine = lines[peek];
 
@@ -782,7 +818,7 @@ function parseNestedBlock(
   let i = startIdx;
   while (i < lines.length) {
     const line = lines[i];
-    if (line.trim() === "") {
+    if (isBlankOrCommentLine(line)) {
       i++;
       continue;
     }
@@ -808,8 +844,7 @@ function parseNestedBlock(
     }
 
     if (raw === "") {
-      let peek = i + 1;
-      while (peek < lines.length && lines[peek].trim() === "") peek++;
+      const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (
         peek < lines.length &&
         isDeeperListItemLine(lines[peek], indent)
