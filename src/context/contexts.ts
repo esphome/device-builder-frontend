@@ -113,3 +113,17 @@ export const integrationDocsContext = createContext<Record<string, string>>(
 export const labelsContext = createContext<Label[]>(
   Symbol("esphome-labels")
 );
+
+/**
+ * Context for whether onboarding still has work to do.
+ *
+ * App shell loads ``onboarding/get_state`` on (re)connect and
+ * provides ``true`` when any step is data-derived ``pending``
+ * (currently only the Wi-Fi step). Header-actions consumes it to
+ * render a small dot next to the Secrets menu item — the only
+ * persistent reminder for a user who declined the setup wizard
+ * with "I only use Ethernet" but might later switch to Wi-Fi.
+ */
+export const onboardingPendingContext = createContext<boolean>(
+  Symbol("esphome-onboarding-pending")
+);

@@ -35,6 +35,7 @@ import type {
   ResultMessage,
   SerialPort,
   ServerInfoMessage,
+  OnboardingState,
   StreamCallbacks,
   UpdateDeviceResponse,
   UserPreferences,
@@ -1284,6 +1285,45 @@ export class ESPHomeAPI {
   /** Get secret key names. */
   async getSecretKeys(): Promise<string[]> {
     return this.sendCommand<string[]>("config/get_secrets");
+  }
+
+  /**
+   * Onboarding state — current version, what the user has
+   * acknowledged, and per-step ``pending`` / ``done`` status. The
+   * dashboard hits this on app load to decide whether to surface
+   * the setup wizard and whether to show the secrets-menu badge.
+   */
+  async getOnboardingState(): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/get_state");
+  }
+
+  /**
+   * Save Wi-Fi credentials into the user's ``secrets.yaml``. The
+   * backend validates against ESPHome's own length limits
+   * (32 char SSID, 64 char password) and surfaces violations as
+   * ``CommandError(INVALID_ARGS)`` for the UI to render.
+   */
+  async setOnboardingWifi(
+    ssid: string,
+    password: string,
+  ): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>(
+      "onboarding/set_wifi_credentials",
+      { ssid, password },
+    );
+  }
+
+  /**
+   * Mark the current onboarding flow as acknowledged. Called when
+   * the user explicitly closes the wizard (either after saving
+   * credentials or after declining — e.g. an Ethernet-only user
+   * who'll never set Wi-Fi). The badge in the secrets menu stays
+   * if the underlying data is still un-configured; this only
+   * stops the wizard dialog from re-popping until a future
+   * onboarding-version bump.
+   */
+  async markOnboardingAcknowledged(): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/mark_acknowledged");
   }
 
   /**

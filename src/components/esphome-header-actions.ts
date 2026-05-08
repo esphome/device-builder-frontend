@@ -15,7 +15,11 @@ import { customElement, state } from "lit/decorators.js";
 import { JobStatus } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { firmwareJobsContext, localizeContext } from "../context/index.js";
+import {
+  firmwareJobsContext,
+  localizeContext,
+  onboardingPendingContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
@@ -54,6 +58,17 @@ export class ESPHomeHeaderActions extends LitElement {
    *  level settings. */
   @state()
   private _showIgnored = false;
+
+  /** True when onboarding still has work to do (currently:
+   *  Wi-Fi step pending — data-derived from ``secrets.yaml``).
+   *  Renders a small dot next to the Secrets menu item so a user
+   *  who's declined the onboarding wizard still has a visible
+   *  reminder that their credentials aren't set — important for
+   *  users who later switch from Ethernet to Wi-Fi.
+   *  Owned by the app shell, threaded via context. */
+  @consume({ context: onboardingPendingContext, subscribe: true })
+  @state()
+  private _onboardingPending = false;
 
   static styles = [
     espHomeStyles,
@@ -225,6 +240,18 @@ export class ESPHomeHeaderActions extends LitElement {
         text-align: center;
       }
 
+      /* Dot variant — surfaced next to a menu item that needs the
+         user's attention but has no useful count to display
+         (onboarding-pending Secrets, future similar nudges). */
+      .menu-item-dot {
+        margin-left: auto;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--esphome-primary);
+        flex-shrink: 0;
+      }
+
       .menu-divider {
         height: 1px;
         background: var(--wa-color-surface-border);
@@ -330,7 +357,13 @@ export class ESPHomeHeaderActions extends LitElement {
                 @keydown=${this._onMenuItemKeydown}
               >
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
-                ${this._localize("layout.secrets")}
+                <span class="menu-item-label">${this._localize("layout.secrets")}</span>
+                ${this._onboardingPending
+                  ? html`<span
+                      class="menu-item-dot"
+                      title=${this._localize("onboarding.secrets_dot_title")}
+                    ></span>`
+                  : nothing}
               </div>
               <div
                 class="menu-item ${this._showIgnored ? "menu-item--active" : ""}"

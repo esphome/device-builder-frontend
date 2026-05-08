@@ -520,6 +520,23 @@
     "discard_changes": "Negeren",
     "save_and_leave": "Opslaan"
   },
+  "onboarding": {
+    "secrets_dot_title": "Wi-Fi-inloggegevens moeten nog ingesteld worden in secrets.yaml",
+    "wifi": {
+      "title": "Wi-Fi-inloggegevens instellen",
+      "intro": "Uw apparaten gebruiken deze om verbinding te maken met uw netwerk. Ze worden één keer opgeslagen in secrets.yaml en gedeeld door elke configuratie die u maakt.",
+      "ssid_label": "Wi-Fi-netwerknaam (SSID)",
+      "ssid_placeholder": "MijnThuisWifi",
+      "password_label": "Wi-Fi-wachtwoord",
+      "password_placeholder": "Laat leeg voor een open netwerk",
+      "save": "Opslaan",
+      "saving": "Bezig met opslaan…",
+      "save_success": "Wi-Fi-inloggegevens opgeslagen",
+      "save_failed": "Wi-Fi-inloggegevens konden niet worden opgeslagen",
+      "dismiss_session": "Later misschien",
+      "decline_permanent": "Ik gebruik alleen Ethernet"
+    }
+  },
   "layout": {
     "secrets": "Geheimen",
     "update_all_started": "{count} apparaat-update(s) gestart",

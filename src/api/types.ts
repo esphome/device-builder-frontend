@@ -796,6 +796,50 @@ export interface UserPreferences {
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;
   table_sort_direction: SortDirection | null;
+  /** Highest onboarding-flow version the user has acknowledged.
+   *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
+   *  the wizard whenever this is below the server's
+   *  ``OnboardingState.current_version``. */
+  onboarding_completed_version: number;
+}
+
+/**
+ * Stable identifiers for onboarding steps. Keep in lockstep with
+ * the backend's ``OnboardingStepId`` enum — these strings flow
+ * through the wire as-is.
+ */
+export enum OnboardingStepId {
+  WIFI_CREDENTIALS = "wifi_credentials",
+}
+
+export enum OnboardingStepStatus {
+  PENDING = "pending",
+  DONE = "done",
+}
+
+export interface OnboardingStep {
+  id: OnboardingStepId;
+  status: OnboardingStepStatus;
+}
+
+/**
+ * Snapshot of the dashboard onboarding flow.
+ *
+ * ``current_version`` is the version of onboarding the server
+ * knows about; ``completed_version`` is what the user last
+ * acknowledged. The dashboard shows the wizard whenever the user
+ * is behind the current version OR a step is data-derived
+ * ``pending`` and the user hasn't dismissed for the session.
+ *
+ * Step status is computed from live on-disk state every call —
+ * never persisted — so the secrets-menu badge clears the moment
+ * the user configures the underlying data, even via a manual
+ * ``secrets.yaml`` edit.
+ */
+export interface OnboardingState {
+  current_version: number;
+  completed_version: number;
+  steps: OnboardingStep[];
 }
 
 /**

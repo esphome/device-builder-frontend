@@ -642,6 +642,23 @@
     "device_name_underscore": "Underscores work but aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks",
     "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks"
   },
+  "onboarding": {
+    "secrets_dot_title": "Wi-Fi credentials still need to be set in secrets.yaml",
+    "wifi": {
+      "title": "Set up Wi-Fi credentials",
+      "intro": "Your devices use these to join your network. They're stored once in secrets.yaml and shared across every config you create.",
+      "ssid_label": "Wi-Fi network name (SSID)",
+      "ssid_placeholder": "MyHomeWifi",
+      "password_label": "Wi-Fi password",
+      "password_placeholder": "Leave blank for an open network",
+      "save": "Save credentials",
+      "saving": "Saving…",
+      "save_success": "Wi-Fi credentials saved",
+      "save_failed": "Failed to save Wi-Fi credentials",
+      "dismiss_session": "Maybe later",
+      "decline_permanent": "I only use Ethernet"
+    }
+  },
   "layout": {
     "secrets": "Secrets",
     "update_all_started": "{count} device update(s) started",

@@ -15,4 +15,5 @@ export {
   remoteBuildEnabledContext,
   integrationDocsContext,
   labelsContext,
+  onboardingPendingContext,
 } from "./contexts.js";

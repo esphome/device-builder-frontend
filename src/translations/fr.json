@@ -520,6 +520,23 @@
     "discard_changes": "Annuler",
     "save_and_leave": "Enregistrer"
   },
+  "onboarding": {
+    "secrets_dot_title": "Les identifiants Wi-Fi doivent encore être renseignés dans secrets.yaml",
+    "wifi": {
+      "title": "Configurer les identifiants Wi-Fi",
+      "intro": "Vos appareils s'en servent pour rejoindre le réseau. Ils sont enregistrés une seule fois dans secrets.yaml et partagés entre toutes vos configurations.",
+      "ssid_label": "Nom du réseau Wi-Fi (SSID)",
+      "ssid_placeholder": "MonWifiMaison",
+      "password_label": "Mot de passe Wi-Fi",
+      "password_placeholder": "Laisser vide pour un réseau ouvert",
+      "save": "Enregistrer",
+      "saving": "Enregistrement…",
+      "save_success": "Identifiants Wi-Fi enregistrés",
+      "save_failed": "Échec de l'enregistrement des identifiants Wi-Fi",
+      "dismiss_session": "Plus tard",
+      "decline_permanent": "J'utilise uniquement l'Ethernet"
+    }
+  },
   "layout": {
     "secrets": "Secrets",
     "update_all_started": "{count} mise(s) à jour démarrée(s)",
