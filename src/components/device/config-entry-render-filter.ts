@@ -24,6 +24,11 @@
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import { isEntryVisible } from "../../util/config-validation.js";
+import {
+  asMappingList,
+  asRecord,
+  isPlainObject,
+} from "../../util/nested-values.js";
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -93,12 +98,9 @@ function hasMaterialValue(
       // exists because they clicked Add).
       return Array.isArray(value) && value.length > 0;
     }
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-      return false;
-    }
-    const childValues = value as Record<string, unknown>;
+    if (!isPlainObject(value)) return false;
     return (entry.config_entries ?? []).some((child) =>
-      hasMaterialValue(child, childValues),
+      hasMaterialValue(child, value),
     );
   }
   return value !== undefined;
@@ -138,14 +140,9 @@ export function filterRenderable(
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {
-      const child = values[entry.key];
-      const childValues =
-        child !== null && typeof child === "object" && !Array.isArray(child)
-          ? (child as Record<string, unknown>)
-          : {};
       const renderableChildren = filterRenderable(
         entry.config_entries ?? [],
-        childValues,
+        asRecord(values[entry.key]),
         opts,
       );
       if (renderableChildren.length === 0) continue;
@@ -193,13 +190,7 @@ export function collectRenderablePaths(
       // List-form NESTED: emit one path tree per item with the
       // index segment (``devices.0.id``) so ``_anyErrorIsVisible``
       // can reconcile validation errors keyed on per-item leaves.
-      const child = values[entry.key];
-      const items = Array.isArray(child) ? child : [];
-      items.forEach((item, idx) => {
-        const itemValues =
-          item !== null && typeof item === "object" && !Array.isArray(item)
-            ? (item as Record<string, unknown>)
-            : {};
+      asMappingList(values[entry.key]).forEach((itemValues, idx) => {
         collectRenderablePaths(
           entry.config_entries ?? [],
           itemValues,
@@ -212,14 +203,9 @@ export function collectRenderablePaths(
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {
-      const child = values[entry.key];
-      const childValues =
-        child !== null && typeof child === "object" && !Array.isArray(child)
-          ? (child as Record<string, unknown>)
-          : {};
       collectRenderablePaths(
         entry.config_entries ?? [],
-        childValues,
+        asRecord(values[entry.key]),
         opts,
         [...pathPrefix, entry.key],
         out,

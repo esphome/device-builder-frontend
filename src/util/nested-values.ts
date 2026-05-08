@@ -151,3 +151,31 @@ export function isPlainObject(
 ): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
+
+/**
+ * Coerce *value* to a ``Record<string, unknown>``, falling back to
+ * ``{}`` for ``null`` / undefined / primitives / arrays. Used by
+ * the filter and validator's NESTED branches when descending into
+ * a sub-mapping that the user might have left unset (or filled
+ * with mid-edit YAML stragglers like ``key: null``); the recursion
+ * keeps a stable shape instead of crashing on
+ * ``Object.keys(null)``.
+ */
+export function asRecord(value: unknown): Record<string, unknown> {
+  return isPlainObject(value) ? value : {};
+}
+
+/**
+ * Coerce *value* to a list of mapping items, each item coerced to
+ * a ``Record`` via :func:`asRecord`. Returns ``[]`` when ``value``
+ * isn't an array. Used by every NESTED + ``multi_value=true`` site
+ * (filter, validator, path collector, renderer) to iterate
+ * ``esphome.devices`` / ``esphome.areas`` rows as a stable
+ * ``Record<string, unknown>[]`` regardless of mid-edit YAML
+ * weirdness.
+ */
+export function asMappingList(
+  value: unknown,
+): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord) : [];
+}

@@ -1,6 +1,7 @@
 import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
+import { asMappingList, asRecord } from "./nested-values.js";
 
 /**
  * Determine if a config entry is currently visible.
@@ -229,8 +230,7 @@ function _validateEntriesRecursive(
       // empty list on an optional field is fine (the user opted
       // out by adding nothing); a required list with zero items
       // surfaces a single error on the field itself.
-      const child = values[entry.key];
-      const items = Array.isArray(child) ? child : [];
+      const items = asMappingList(values[entry.key]);
       if (items.length === 0) {
         if (entry.required) {
           const fullPath = [...pathPrefix, entry.key].join(".");
@@ -241,11 +241,7 @@ function _validateEntriesRecursive(
         }
         continue;
       }
-      items.forEach((item, idx) => {
-        const itemValues =
-          item !== null && typeof item === "object" && !Array.isArray(item)
-            ? (item as Record<string, unknown>)
-            : {};
+      items.forEach((itemValues, idx) => {
         _validateEntriesRecursive(
           entry.config_entries ?? [],
           itemValues,
@@ -259,11 +255,7 @@ function _validateEntriesRecursive(
     }
 
     if (entry.type === ConfigEntryType.NESTED) {
-      const child = values[entry.key];
-      const childValues =
-        child !== null && typeof child === "object" && !Array.isArray(child)
-          ? (child as Record<string, unknown>)
-          : {};
+      const childValues = asRecord(values[entry.key]);
       // Optional nested groups (e.g. `web_server.auth`) often have
       // required CHILDREN (`auth.username`, `auth.password`). Don't
       // flag those as missing when the user hasn't populated the
@@ -297,12 +289,8 @@ function _validateEntriesRecursive(
     // regex here would silently drift on any upstream change).
     if (entry.type === ConfigEntryType.MAP) {
       if (entry.required) {
-        const raw = values[entry.key];
-        const map =
-          raw !== null && typeof raw === "object" && !Array.isArray(raw)
-            ? (raw as Record<string, unknown>)
-            : null;
-        if (!map || Object.keys(map).length === 0) {
+        const map = asRecord(values[entry.key]);
+        if (Object.keys(map).length === 0) {
           const fullPath = [...pathPrefix, entry.key].join(".");
           errors.set(fullPath, {
             key: fullPath,

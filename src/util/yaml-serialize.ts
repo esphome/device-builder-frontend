@@ -14,6 +14,7 @@
  */
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { isPlainObject } from "./nested-values.js";
 
 /**
  * Opaque wrapper for a section-value block the parser couldn't fully
@@ -189,8 +190,8 @@ function serializeListItem(
   const keepEmpty = options.keepEmptyStrings === true;
   const step = options.indentStep ?? ESPHOME_YAML_INDENT;
   const dashIndent = `${indent}${step}`;
-  if (item !== null && typeof item === "object" && !Array.isArray(item)) {
-    const entries = Object.entries(item as Record<string, unknown>).filter(
+  if (isPlainObject(item)) {
+    const entries = Object.entries(item).filter(
       ([, v]) => v !== undefined && v !== null && (v !== "" || keepEmpty),
     );
     if (entries.length === 0) return [`${dashIndent}-`];

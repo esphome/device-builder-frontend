@@ -23,7 +23,11 @@ import {
 } from "../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../util/hex-int.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import {
+  asMappingList,
+  isPlainObject,
+  isPrimitiveOrNullish,
+} from "../../util/nested-values.js";
 import { YamlRawValue } from "../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -790,9 +794,7 @@ export function renderNestedListField(
   path: string[],
   ctx: RenderCtx,
 ) {
-  const items = readArrayAt(ctx, path).map((v) =>
-    isPlainObject(v) ? v : {},
-  );
+  const items = asMappingList(ctx.getAt(path));
   const disabled = effectiveDisabled(entry, ctx);
   const { addItem, removeAt } = arrayItemHandlers(ctx, path, () => ({}));
   const itemTitle = labelFor(entry, ctx);
