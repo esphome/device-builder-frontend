@@ -39,3 +39,23 @@ export function categoryChipLabel(category: string): string {
     })
     .join(" ");
 }
+
+/**
+ * Whether the catalog card should render the category chip
+ * given the current sidebar filter. Only useful under the
+ * "All" filter where the category VARIES across visible
+ * results — once the user has narrowed to a specific category
+ * (Sensors / Switches / ...) every card carries the same
+ * chip, which is pure noise.
+ *
+ * The "Recommended" / "featured" sidebar entry intentionally
+ * shows the chip too: featured cards are surfaced from
+ * different real categories (a featured sensor + a featured
+ * switch + ...) so the disambiguator still earns its place.
+ *
+ * Only the explicit single-category narrow case suppresses
+ * the chip.
+ */
+export function shouldShowCategoryChip(sidebarFilter: string): boolean {
+  return sidebarFilter === "all" || sidebarFilter === "featured";
+}

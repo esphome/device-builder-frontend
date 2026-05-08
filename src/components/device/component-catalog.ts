@@ -23,7 +23,10 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { categoryChipLabel } from "./component-card-category-label.js";
+import {
+  categoryChipLabel,
+  shouldShowCategoryChip,
+} from "./component-card-category-label.js";
 import {
   parseConfiguredPlatforms,
   parseTopLevelComponents,
@@ -904,7 +907,7 @@ export class ESPHomeComponentCatalog extends LitElement {
               </div>`}
           <div class="component-card-header-text">
             <h3 class="component-title">${component.name}</h3>
-            ${this._category === "all"
+            ${shouldShowCategoryChip(this._category)
               ? html`<span class="component-category-chip">
                   ${categoryChipLabel(component.category)}
                 </span>`

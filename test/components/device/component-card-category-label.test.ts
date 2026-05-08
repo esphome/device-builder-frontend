@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { categoryChipLabel } from "../../../src/components/device/component-card-category-label.js";
+import {
+  categoryChipLabel,
+  shouldShowCategoryChip,
+} from "../../../src/components/device/component-card-category-label.js";
 
 describe("categoryChipLabel", () => {
   it("title-cases a single-token category id", () => {
@@ -46,5 +49,35 @@ describe("categoryChipLabel", () => {
     expect(categoryChipLabel("_sensor")).toBe("Sensor");
     expect(categoryChipLabel("sensor_")).toBe("Sensor");
     expect(categoryChipLabel("sensor__platform")).toBe("Sensor Platform");
+  });
+});
+
+describe("shouldShowCategoryChip", () => {
+  it("shows the chip under the All filter", () => {
+    // Every card in the All result set might be from a
+    // different category, so the disambiguator earns its
+    // place.
+    expect(shouldShowCategoryChip("all")).toBe(true);
+  });
+
+  it("shows the chip under the Recommended (featured) filter", () => {
+    // Featured cards are surfaced from heterogeneous real
+    // categories (a featured sensor + a featured switch +
+    // ...), so the chip still earns its place when the user
+    // is on the Recommended row.
+    expect(shouldShowCategoryChip("featured")).toBe(true);
+  });
+
+  it("hides the chip when narrowed to a specific category", () => {
+    // Once the user has clicked into a single-category view
+    // every visible card carries the same category, so the
+    // chip is just noise. Pin a representative sample so a
+    // regression that flipped the predicate (e.g. defaulting
+    // to "show always") would fail loudly.
+    expect(shouldShowCategoryChip("sensor")).toBe(false);
+    expect(shouldShowCategoryChip("binary_sensor")).toBe(false);
+    expect(shouldShowCategoryChip("text_sensor")).toBe(false);
+    expect(shouldShowCategoryChip("switch")).toBe(false);
+    expect(shouldShowCategoryChip("misc")).toBe(false);
   });
 });
