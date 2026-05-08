@@ -1156,6 +1156,25 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(after).not.toMatch(/^ {2}[a-zA-Z]/m);
   });
 
+  it("treats an underscore-leading sibling section as a section terminator", () => {
+    // The terminator predicate has to mirror ``KEY_PATTERN``'s
+    // leading-character set (``[a-zA-Z_]``). A section header
+    // like ``_internal:`` wasn't matched by the older
+    // ``/^[a-zA-Z]/`` shape and could leak into the parent
+    // section's child walk, picking up its keys as siblings of
+    // the parent.
+    const yaml = `esphome:
+  name: test
+_internal:
+  hidden: true
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.name).toBe("test");
+    // The ``_internal`` section's children must not bleed into
+    // ``esphome``'s.
+    expect(values.hidden).toBeUndefined();
+  });
+
   it("reads list-of-mappings with non-default user indent (4-space YAML)", () => {
     // YAML allows any consistent indent step — a user-typed
     // 4-space file is just as valid as ESPHome's canonical

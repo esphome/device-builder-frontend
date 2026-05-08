@@ -36,6 +36,17 @@ import {
 const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
 
 /**
+ * Matches a line that begins a top-level YAML section (column-0
+ * identifier). Mirrors ``KEY_PATTERN``'s leading-character set —
+ * accepts ``_internal:`` and similar underscore-leading keys, not
+ * just ASCII letters. Used by every "stop at the next sibling
+ * section" terminator in this module so the predicate stays
+ * consistent — drift between sites would let one walk past a
+ * section header another walk treats as a hard stop.
+ */
+const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
+
+/**
  * Match the inline-key form on a YAML list-item line
  * (`  - platform: esphome`). Capture group 1 is the key.
  *
@@ -145,35 +156,30 @@ const _detectSectionChildIndent = (
   startIdx: number,
   isListItem: boolean,
 ): string => {
-  // The "floor" is the column a child line must beat to count as a
-  // child of this section. For non-list sections that's the
-  // section header's leading whitespace; for list-item sections
-  // it's one column past the dash itself, so a child key (which
-  // sits at ``dash + 2 columns``) clears the floor while a
-  // sibling dash (same column as ours) doesn't.
+  // The "floor" is the column a child line must strictly beat. For
+  // map sections that's the section header's leading whitespace;
+  // for list-item sections it's one column past the dash, so a
+  // child key (at ``dash + 2``) clears it while a sibling dash
+  // (same column as ours) doesn't.
   const headLine = lines[startIdx];
-  const sectionLead = isListItem
+  const floor = isListItem
     ? headLine.indexOf("-") + 1
     : _leadingIndent(headLine).length;
+  const fallback = isListItem
+    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
+    : ESPHOME_YAML_INDENT;
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
-    if (/^[a-zA-Z]/.test(line)) break; // sibling section
+    // Column-0 identifier ⇒ sibling section, this section has no
+    // children of its own.
+    if (TOP_LEVEL_KEY_START_RE.test(line)) return fallback;
     const lead = _leadingIndent(line);
-    if (lead.length <= sectionLead) {
-      // For list-item sections, a sibling dash at the same
-      // column as ours terminates the section.
-      if (isListItem) break;
-      // For map sections, a back-out terminates without contributing.
-      break;
-    }
-    return lead;
+    if (lead.length > floor) return lead;
+    // Sibling dash (list-item) or back-out (map) — done scanning.
+    return fallback;
   }
-  // Fallback to canonical 2-space — keeps existing behaviour for
-  // empty sections / EOF.
-  return isListItem
-    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
-    : ESPHOME_YAML_INDENT;
+  return fallback;
 };
 
 /**
@@ -299,6 +305,33 @@ const collectBlockListItems = (
  * the top-level caller preserve its existing "skip the assignment
  * for an empty scalar list" semantic.
  */
+/**
+ * Find the leading whitespace of the first list-item dash at or
+ * after *startIdx*. Returns *fallback* when no dash is reachable
+ * (the block is blank or terminates before any item) and the
+ * 0-indexed line of the first dash so the caller can hand it to
+ * :func:`_detectListItemChildIndent`.
+ */
+const _detectFirstDashIndent = (
+  lines: string[],
+  startIdx: number,
+  fallback: string,
+): { dashIndent: string; firstDashIdx: number } => {
+  let firstDashIdx = startIdx;
+  while (
+    firstDashIdx < lines.length &&
+    lines[firstDashIdx].trim() === ""
+  ) {
+    firstDashIdx++;
+  }
+  if (firstDashIdx >= lines.length) {
+    return { dashIndent: fallback, firstDashIdx };
+  }
+  const dashIndent =
+    lines[firstDashIdx].match(/^( *)-/)?.[1] ?? fallback;
+  return { dashIndent, firstDashIdx };
+};
+
 const parseListBlock = (
   lines: string[],
   startIdx: number,
@@ -308,34 +341,23 @@ const parseListBlock = (
   endIdx: number;
   isEmptyScalarList: boolean;
 } => {
-  // Find the first non-blank line to read the dash indent from.
-  let firstDashIdx = startIdx;
-  while (
-    firstDashIdx < lines.length &&
-    lines[firstDashIdx].trim() === ""
-  ) {
-    firstDashIdx++;
-  }
-  const dashIndent =
-    firstDashIdx < lines.length
-      ? lines[firstDashIdx].match(/^( *)-/)?.[1] ??
-        `${parentIndent}${ESPHOME_YAML_INDENT}`
-      : `${parentIndent}${ESPHOME_YAML_INDENT}`;
-  // Child keys inside an item live one indent step deeper than
-  // the dash. Detect from a follow-up sub-line when one's
-  // available; fall back to "dash + 2 spaces" (matches ESPHome's
-  // canonical emit) when the first item is bare or the only
-  // line.
+  const canonicalDashIndent = `${parentIndent}${ESPHOME_YAML_INDENT}`;
+  const { dashIndent, firstDashIdx } = _detectFirstDashIndent(
+    lines,
+    startIdx,
+    canonicalDashIndent,
+  );
   const childIndent =
     _detectListItemChildIndent(lines, firstDashIdx + 1, dashIndent) ??
     `${dashIndent}${ESPHOME_YAML_INDENT}`;
   const { endIdx, isComplex } = _scanValueBlock(lines, startIdx, parentIndent);
+
+  // Complex blocks are anything beyond a flat scalar list (block
+  // scalars, automation triggers, mapping items). Try the
+  // structured-mapping parse first (``esphome.devices`` /
+  // ``esphome.areas``); fall through to ``YamlRawValue`` for
+  // shapes the editor can't round-trip.
   if (isComplex) {
-    // Try parsing as a list of flat key:value mappings first
-    // (``esphome.devices`` / ``esphome.areas`` shape). Falls
-    // through to ``YamlRawValue`` when the block carries
-    // anything the editor can't round-trip cleanly — see
-    // ``collectBlockListMappings``.
     const mapping = collectBlockListMappings(
       lines,
       startIdx,
@@ -355,6 +377,8 @@ const parseListBlock = (
       isEmptyScalarList: false,
     };
   }
+
+  // Flat scalar list (``packages: [- a, - b]``).
   const { items, endIdx: scalarEndIdx } = collectBlockListItems(
     lines,
     startIdx,
@@ -410,6 +434,42 @@ const _matchFlatMappingField = (
 };
 
 /**
+ * Walk follow-up sub-key lines under a list-item dash and merge
+ * them into *item*. Stops at the next sibling dash, blank-then-EOF,
+ * or a back-out. Returns the line index after the last sub-key,
+ * or ``null`` if anything outside the flat-mapping contract turned
+ * up (line strictly deeper than ``childIndent`` ⇒ nested mapping;
+ * unmatched key shape; dotted key; block scalar; empty raw).
+ * Mutates *item* in place — keeps the caller's outer loop from
+ * having to thread two return values.
+ */
+const _parseItemSubKeys = (
+  lines: string[],
+  startIdx: number,
+  childIndent: string,
+  childRe: RegExp,
+  item: Record<string, unknown>,
+): number | null => {
+  let j = startIdx;
+  while (j < lines.length) {
+    const sub = lines[j];
+    if (sub.trim() === "") {
+      j++;
+      continue;
+    }
+    if (!sub.startsWith(childIndent)) break;
+    // Strictly deeper than ``childIndent`` ⇒ nested mapping/list
+    // under a sub-key — bail.
+    if (sub.startsWith(`${childIndent} `)) return null;
+    const field = _matchFlatMappingField(sub, childRe);
+    if (!field) return null;
+    item[field.key] = field.value;
+    j++;
+  }
+  return j;
+};
+
+/**
  * Collect a YAML list whose items are flat key:value mappings —
  * ``esphome.devices`` / ``esphome.areas`` and similar
  * ``multi_value=true`` schema entries — as ``Record<string, unknown>[]``.
@@ -451,34 +511,21 @@ const collectBlockListMappings = (
     const item: Record<string, unknown> = Object.create(null);
 
     // Bare ``${dashIndent}-`` is the serializer's placeholder for
-    // an empty mapping item (a freshly-added Add row the user saved
-    // before filling fields). Skip the header parse and let the
-    // child loop run — for a bare dash there are no sibling sub
-    // keys, so the item stays ``{}`` and the row survives the
-    // round-trip.
+    // an empty mapping item (a freshly-added Add row saved before
+    // any fields were filled in). The header parse runs only for
+    // the with-content shape; bare-dash items skip it and the
+    // sub-key walk finds no follow-ups, so the item stays ``{}``
+    // and the row survives the round-trip.
     if (line !== bareDash) {
       const header = _matchFlatMappingField(line, headerRe);
       if (!header) return null;
       item[header.key] = header.value;
     }
-    j++;
 
-    while (j < lines.length) {
-      const sub = lines[j];
-      if (sub.trim() === "") {
-        j++;
-        continue;
-      }
-      if (!sub.startsWith(childIndent)) break;
-      // A line strictly deeper than ``childIndent`` is a nested
-      // mapping / list under a sub-key — bail.
-      if (sub.startsWith(`${childIndent} `)) return null;
-      const child = _matchFlatMappingField(sub, childRe);
-      if (!child) return null;
-      item[child.key] = child.value;
-      j++;
-    }
+    const after = _parseItemSubKeys(lines, j + 1, childIndent, childRe, item);
+    if (after === null) return null;
     items.push(item);
+    j = after;
   }
   return { items, endIdx: j };
 };
@@ -623,8 +670,8 @@ export function parseYamlSectionValues(
     if (isListItem) {
       const dashMatch = line.match(/^(\s*)-(\s|$)/);
       if (dashMatch && dashMatch[1].length === siblingDashIndent) break;
-      if (/^[a-zA-Z]/.test(line)) break;
-    } else if (/^[a-zA-Z]/.test(line)) {
+      if (TOP_LEVEL_KEY_START_RE.test(line)) break;
+    } else if (TOP_LEVEL_KEY_START_RE.test(line)) {
       break;
     }
 
@@ -799,11 +846,11 @@ export function findSectionRange(
         end = i;
         break;
       }
-      if (/^[a-zA-Z]/.test(lines[i])) {
+      if (TOP_LEVEL_KEY_START_RE.test(lines[i])) {
         end = i;
         break;
       }
-    } else if (/^[a-zA-Z]/.test(lines[i])) {
+    } else if (TOP_LEVEL_KEY_START_RE.test(lines[i])) {
       end = i;
       break;
     }
@@ -974,14 +1021,14 @@ export function removeSectionFromYaml(
     // Walk backwards to the parent top-level key; if nothing but
     // blanks remain between it and the next sibling, drop it too.
     let parentIdx = start - 1;
-    while (parentIdx >= 0 && !/^[a-zA-Z]/.test(lines[parentIdx])) {
+    while (parentIdx >= 0 && !TOP_LEVEL_KEY_START_RE.test(lines[parentIdx])) {
       parentIdx--;
     }
     if (parentIdx >= 0) {
       let hasContent = false;
       let parentEnd = lines.length;
       for (let i = parentIdx + 1; i < lines.length; i++) {
-        if (/^[a-zA-Z]/.test(lines[i])) {
+        if (TOP_LEVEL_KEY_START_RE.test(lines[i])) {
           parentEnd = i;
           break;
         }

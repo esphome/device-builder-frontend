@@ -27,31 +27,11 @@ export function setIn(
   // empty object when value isn't object-shaped so the caller's
   // contract that this returns a Record<string, unknown> stays
   // intact.
-  if (path.length === 0) {
-    return isPlainObject(value) ? value : {};
-  }
+  if (path.length === 0) return isPlainObject(value) ? value : {};
   const [head, ...rest] = path;
-  if (rest.length === 0) return { ...obj, [head]: value };
-  const child = obj[head];
-  if (Array.isArray(child)) {
-    return { ...obj, [head]: _setInArray(child, rest, value) };
-  }
-  const childObj = isPlainObject(child) ? child : {};
-  return { ...obj, [head]: setIn(childObj, rest, value) };
+  return { ...obj, [head]: _newChild(obj[head], rest, value) };
 }
 
-/**
- * Recurse into an array child of ``setIn``. ``path[0]`` must parse
- * as a non-negative integer; non-numeric, negative, or fractional
- * segments are dropped on the floor (the array is returned
- * unchanged) — writing to ``arr["name"]`` or ``arr[-1]`` would
- * silently set a string property on the array object, leaving
- * ``.length`` stale and surprising every downstream consumer.
- * Indices past the end grow the array (so the nested-list renderer
- * can write to a freshly-added item before its placeholder object
- * is materialised). The returned array is a fresh copy on every
- * write — callers stay structural-sharing-safe.
- */
 /**
  * Parse a path segment as a non-negative integer index into an
  * array. Returns ``null`` for non-numeric, negative, or fractional
@@ -66,6 +46,39 @@ function _parseArrayIndex(segment: string): number | null {
   return Number.isInteger(idx) && idx >= 0 ? idx : null;
 }
 
+/**
+ * Compute the new child to install at the head of a path, given
+ * the existing child at that slot. Shared by ``setIn`` (Record
+ * containers) and ``_setInArray`` (Array containers); each caller
+ * handles its own container-shape spread/copy and just plugs the
+ * result of ``_newChild`` in. Empty ``rest`` ⇒ value goes in
+ * directly; otherwise descend via the appropriate sibling for the
+ * existing child's shape (Array → ``_setInArray``; anything else
+ * is coerced to ``{}`` and handed to ``setIn``).
+ */
+function _newChild(
+  currentChild: unknown,
+  rest: string[],
+  value: unknown,
+): unknown {
+  if (rest.length === 0) return value;
+  if (Array.isArray(currentChild)) {
+    return _setInArray(currentChild, rest, value);
+  }
+  return setIn(isPlainObject(currentChild) ? currentChild : {}, rest, value);
+}
+
+/**
+ * Recurse into an array child of ``setIn``. ``path[0]`` must parse
+ * as a non-negative integer (non-numeric, negative, or fractional
+ * segments leave the array unchanged — writing to ``arr["name"]``
+ * or ``arr[-1]`` would silently set a string property on the
+ * array, leaving ``.length`` stale). Indices past the end grow
+ * the array so the nested-list renderer can write to a
+ * freshly-added item before its placeholder object materialises.
+ * The returned array is a fresh copy on every write — callers
+ * stay structural-sharing-safe.
+ */
 function _setInArray(
   arr: readonly unknown[],
   path: string[],
@@ -75,17 +88,7 @@ function _setInArray(
   const idx = _parseArrayIndex(head);
   if (idx === null) return arr;
   const copy = [...arr];
-  if (rest.length === 0) {
-    copy[idx] = value;
-    return copy;
-  }
-  const child = copy[idx];
-  if (Array.isArray(child)) {
-    copy[idx] = _setInArray(child, rest, value);
-  } else {
-    const childObj = isPlainObject(child) ? child : {};
-    copy[idx] = setIn(childObj, rest, value);
-  }
+  copy[idx] = _newChild(arr[idx], rest, value);
   return copy;
 }
 
