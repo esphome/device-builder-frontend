@@ -72,6 +72,83 @@ describe("renderMdnsTxtRecords", () => {
     ]);
   });
 
+  it("keeps empty-string values visible (api_encryption= tri-state)", () => {
+    // The backend surfaces ``api_encryption=`` (the "device
+    // confirmed plaintext" tri-state signal) as ``""`` so the
+    // key stays visible in this debug view. The renderer must
+    // emit the dt/dd pair as it would for any other key — the
+    // diagnostic value is "this key IS being broadcast", and
+    // an empty ``<dd>`` makes the empty value visible at a
+    // glance. See backend issue #437 for the upstream context.
+    const records = {
+      version: "2025.4.0",
+      api_encryption: "",
+    };
+    const result = renderMdnsTxtRecords(records, _identityLocalize);
+    const rowTemplates = findTemplatesByAnchor(result, "<dt>");
+    expect(rowTemplates.length).toBe(2);
+    const pairs = rowTemplates.map((t) => [
+      t.values[0] as string,
+      t.values[1] as string,
+    ]);
+    expect(pairs).toEqual([
+      ["api_encryption", ""],
+      ["version", "2025.4.0"],
+    ]);
+  });
+
+  it("does not churn when the input order changes between snapshots", () => {
+    // The reachability snapshot fires once per second while the
+    // drawer is open. If the backend's TXT decode happens to
+    // walk the cached bytes in a different order on consecutive
+    // ticks (zeroconf preserves insertion order from the bytes,
+    // which can shift on a fresh announce), a naive renderer
+    // would emit a different ``values`` sequence each tick and
+    // Lit would re-create every ``<dt>`` / ``<dd>`` text node.
+    // The renderer's alphabetical sort is what stabilises this
+    // — pin the contract: two snapshots with the same content
+    // in different orders produce the same value sequence.
+    const ascending = {
+      api_encryption: "",
+      config_hash: "5a94a12d",
+      mac: "aabbccddeeff",
+      version: "2025.4.0",
+    };
+    const descending = {
+      version: "2025.4.0",
+      mac: "aabbccddeeff",
+      config_hash: "5a94a12d",
+      api_encryption: "",
+    };
+    const shuffled = {
+      mac: "aabbccddeeff",
+      version: "2025.4.0",
+      api_encryption: "",
+      config_hash: "5a94a12d",
+    };
+
+    const orderings = [ascending, descending, shuffled].map((records) => {
+      const result = renderMdnsTxtRecords(records, _identityLocalize);
+      return findTemplatesByAnchor(result, "<dt>").map((t) => [
+        t.values[0] as string,
+        t.values[1] as string,
+      ]);
+    });
+
+    // All three orderings collapse to the same alphabetised
+    // sequence; without the sort, the second and third would
+    // render differently and Lit would tear down + rebuild the
+    // dt/dd pairs every tick.
+    expect(orderings[0]).toEqual(orderings[1]);
+    expect(orderings[0]).toEqual(orderings[2]);
+    expect(orderings[0]).toEqual([
+      ["api_encryption", ""],
+      ["config_hash", "5a94a12d"],
+      ["mac", "aabbccddeeff"],
+      ["version", "2025.4.0"],
+    ]);
+  });
+
   it("returns nothing for null / undefined / empty inputs", () => {
     // Older backends that don't emit ``mdns_txt_records`` push
     // ``undefined`` on the wire — the drawer must render zero

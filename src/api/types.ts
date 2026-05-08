@@ -1015,8 +1015,12 @@ export interface ReachabilityStateEvent {
    *  expect?" without dropping to ``avahi-browse`` /
    *  ``dns-sd``. ``null`` when no TXT record is cached (drawer
    *  hides the section entirely); empty mapping is normalised
-   *  to ``null`` upstream. Optional because older backend
-   *  builds (pre-#TBD) don't emit the field — the drawer
+   *  to ``null`` upstream. Empty-string values are meaningful —
+   *  zeroconf collapses bare keys and ``key=`` empty-value
+   *  entries to the same shape, so the backend surfaces both as
+   *  ``""`` (the ``api_encryption=`` "device confirmed
+   *  plaintext" tri-state signal lives here). Optional because
+   *  older backend builds don't emit the field — the drawer
    *  treats undefined the same as ``null``. */
   mdns_txt_records?: Record<string, string> | null;
   ping_last_seen_seconds_ago: number | null;
