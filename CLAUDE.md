@@ -7,7 +7,7 @@ user-facing intro.
 
 ## What this project is
 
-The **frontend** for the ESPHome Device Builder dashboard — a Lit
+The **frontend** for the ESPHome Device Builder dashboard, a Lit
 + TypeScript SPA that ships **prebuilt and bundled** inside the
 backend wheel ([esphome/device-builder](https://github.com/esphome/device-builder)).
 End users never install this directly. A release of the frontend
@@ -18,7 +18,7 @@ picks up; that's the only deployment path.
 
 This is the load-bearing fact that shapes most of the rules below.
 The frontend in this repo and the backend that runs it always
-ship together — a given backend version pins a specific frontend
+ship together; a given backend version pins a specific frontend
 version via the wheel's bundled assets. There is no installation
 in the wild that runs frontend N with backend N±1.
 
@@ -33,7 +33,7 @@ Practical consequences:
   version drift.
 - **Don't probe for feature support before using a feature.** If
   the backend just landed `remote_build/list_hosts`, the frontend
-  PR that consumes it lands at the same time — there's no
+  PR that consumes it lands at the same time. There's no
   "feature flag" or "is this command available" check. Either
   the frontend uses it or it doesn't ship yet.
 - **Backend WS-command renames / shape changes are coordinated
@@ -43,7 +43,7 @@ Practical consequences:
   on the backend side.
 - **Old translation keys**: when removing a `_localize("foo")`
   call site, also delete the key from `src/translations/*.json`.
-  No legacy keys retained "in case some downstream uses them" —
+  No legacy keys retained "in case some downstream uses them":
   there is no downstream.
 
 A real failure path (WS dropped, server bug, validation rejection)
@@ -73,14 +73,14 @@ Frontend-backend deployment is lockstep") is the canonical reply.
   components both need a value (theme, locale, the labels
   catalog, the API instance, ...), provide it via Lit context
   from `app-shell` and consume it where it's needed. Avoid prop
-  drilling and avoid a global singleton — the context-based
+  drilling and avoid a global singleton; the context-based
   pattern is what lets `app-shell` own the WS lifecycle and
   every consumer pick up reconnect events for free.
 - **Styles** live in `src/styles/shared.ts` (`espHomeStyles`)
   for cross-component utilities; component-local rules go in
   the component's own `static styles = [espHomeStyles, css\`…\`]`
   array.
-- **Toasts** via `sonner-js` — `toast.error`, `toast.info`,
+- **Toasts** via `sonner-js`: `toast.error`, `toast.info`,
   `toast.success`. Use `richColors: true` for any toast a user
   needs to actually read. See `app-shell.ts` for the
   configuration call.
@@ -106,7 +106,7 @@ State for a setting flows through context:
 For security-sensitive toggles (e.g. anything that grants a peer
 permissions on this dashboard), the optimistic-update path MUST
 revert + toast on backend failure. Silent UI/disk divergence is
-a real bug on those controls — capture the previous value before
+a real bug on those controls. Capture the previous value before
 the optimistic flip, await the API call inside `try/catch`, and
 on failure assign the previous value back and surface a
 `toast.error`.
@@ -118,7 +118,7 @@ on failure assign the previous value back and surface a
   it an id). An empty `<button>` with no accessible name reads
   as "switch, checked" with no context to a screen-reader user.
 - `aria-checked` is the **string-attribute** form (`aria-checked=${value}`),
-  not Lit's `?aria-checked=${value}` boolean binding — boolean
+  not Lit's `?aria-checked=${value}` boolean binding. Boolean
   bindings omit the attribute on `false`, breaking both the
   `[aria-checked="false"]` CSS state and the screen-reader
   announcement.
@@ -131,9 +131,21 @@ on failure assign the previous value back and surface a
 - `src/translations/en.json` is the source-of-truth English copy.
   Other locales (`fr.json`, `nl.json`, ...) overlay on top with
   English fallback for missing keys.
-- Add new keys to `en.json`; non-English locales are translator
-  responsibility. Don't write placeholder translations into
-  `fr.json` — they ship to French users as wrong-language strings.
+- **Add new keys to every translation file at the same time.**
+  When you add a key to `en.json`, add a real translation to
+  `fr.json` and `nl.json` in the same PR. The library falls back
+  to English when a key is missing, which means a partially-
+  translated UI silently mixes English strings into French / Dutch
+  pages, which is worse than just shipping a less-polished
+  translation. Native speakers can refine later, but having the
+  keys in place is the load-bearing concern. Don't ship a PR that
+  adds an English key without the matching translations.
+- Don't write English copy verbatim into `fr.json` as a
+  placeholder; do an actual translation, even if it's
+  approximate. The fallback machinery already handles missing
+  keys; an English string copied into `fr.json` reads to a French
+  user as "this dashboard claims to be French but isn't,"
+  which is worse than the missing-key fallback.
 - Use the `_localize(key)` pattern from
   `src/common/localize.ts` consumed via `localizeContext`. Don't
   hardcode user-facing strings.
@@ -142,7 +154,7 @@ on failure assign the previous value back and surface a
 
 - **No `Co-Authored-By: Claude` trailer.** Project preference.
 - Imperative-mood subject line ("Add X", not "Added X").
-- Tick exactly one "Types of changes" box in the PR body — CI
+- Tick exactly one "Types of changes" box in the PR body. CI
   derives the label from it. The full template is in
   `.github/PULL_REQUEST_TEMPLATE.md`; the `pr-workflow` skill
   walks through filling it in.
@@ -172,6 +184,13 @@ on failure assign the previous value back and surface a
   `_localize("foo")` call site without removing the key from
   `en.json` leaves dead translations that have to be cleaned up
   later. Delete keys at the same time you remove the call.
+- **Skipping `fr.json` / `nl.json` when adding new keys.** If a
+  PR adds a key to `en.json` but not the other locale files, the
+  fallback machinery silently shows the English string to
+  French / Dutch users. The polished-but-mixed-language UI is
+  worse than a slightly-rough but consistently-localized one.
+  Always add real translations to every locale file when adding
+  new copy.
 
 ## Useful entry points
 
@@ -192,10 +211,17 @@ on failure assign the previous value back and surface a
 - **Don't add `Co-Authored-By: Claude` to commits.**
 - **Don't probe for feature support** before using a backend
   command.
-- **Don't write placeholder translations** into non-English
-  locale files.
+- **Don't ship a PR that adds new keys to `en.json` without
+  matching real translations in `fr.json` and `nl.json`.** The
+  fallback machinery hides the gap by silently rendering English
+  in the non-English UI; the result reads worse to a non-English
+  user than a slightly-rough translation would.
+- **Don't write English placeholders into non-English locale
+  files** as a workaround. The fallback already does that
+  silently; an explicit English string in `fr.json` is just an
+  unflagged shipping bug.
 - **Don't introduce new global singletons** for state that two
-  components both need — use Lit context.
+  components both need; use Lit context.
 - **Don't reorder existing public Lit element APIs** (props,
   events, slots) without a reason. They're the de-facto contract
   with `app-shell` and other consumers.
