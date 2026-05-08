@@ -1324,11 +1324,14 @@ export class ESPHomeAPI {
    * Add a user-supplied peer (cross-subnet / non-mDNS LANs).
    *
    * The backend validates ``hostname`` (non-empty, lowercased per
-   * RFC 1035 §2.3.3) and ``port`` (1-65535) and rejects duplicates
-   * with ``INVALID_ARGS`` so the UI can surface the error rather
-   * than silently no-op. Returns the post-write settings so the
-   * caller can re-render without a separate ``get_settings``
-   * round-trip.
+   * RFC 1035 §2.3.3) and ``port`` (1-65535). A bad hostname or
+   * bad port raises ``ErrorCode.INVALID_ARGS``; an attempt to add
+   * a ``(hostname, port)`` pair that's already registered raises
+   * ``ErrorCode.ALREADY_EXISTS`` so the UI can surface a
+   * "this dashboard is already in your list" message distinct
+   * from a generic validation failure. Returns the post-write
+   * settings so the caller can re-render without a separate
+   * ``get_settings`` round-trip.
    */
   async addRemoteBuildManualHost(args: {
     hostname: string;

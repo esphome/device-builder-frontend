@@ -11,7 +11,7 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { RemoteBuildPeer } from "../api/types.js";
+import { ErrorCode, type RemoteBuildPeer } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
 import { readStoredLocale } from "../common/localize.js";
 
@@ -863,7 +863,10 @@ export class ESPHomeSettingsDialog extends LitElement {
         // ("this peer is already in your list" rather than a
         // vague "couldn't save") without string-matching the
         // details field.
-        if (err instanceof APIError && err.errorCode === "already_exists") {
+        if (
+          err instanceof APIError &&
+          err.errorCode === ErrorCode.ALREADY_EXISTS
+        ) {
           return "settings.remote_build_add_manual_duplicate";
         }
         return "settings.remote_build_add_manual_failed";

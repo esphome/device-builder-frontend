@@ -51,6 +51,7 @@ export enum ErrorCode {
   UNKNOWN_COMMAND = "unknown_command",
   INVALID_ARGS = "invalid_args",
   NOT_FOUND = "not_found",
+  ALREADY_EXISTS = "already_exists",
   INTERNAL_ERROR = "internal_error",
   NOT_AUTHENTICATED = "not_authenticated",
   RATE_LIMITED = "rate_limited",
