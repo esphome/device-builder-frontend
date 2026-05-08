@@ -593,16 +593,19 @@ export class ESPHomeComponentCatalog extends LitElement {
          (Sensor / Text Sensor / Switch / ...). Disambiguates
          same-name catalog entries from different platforms --
          e.g. sensor.debug vs text_sensor.debug, both inheriting
-         the upstream "Debug Component" name. Sits inline rather
-         than floated so it doesn't collide with the
-         expand-button on the header's right edge. */
+         the upstream "Debug Component" name. Only shown under
+         the "All" sidebar filter; once the user narrows to a
+         specific category every visible card carries the same
+         badge and it just adds noise. Sits inline rather than
+         floated so it doesn't collide with the expand-button
+         on the header's right edge. */
       .component-category-chip {
         display: inline-block;
         margin-top: 2px;
-        padding: 1px 8px;
-        font-size: var(--wa-font-size-3xs);
+        padding: 0 6px;
+        font-size: 9px;
         font-weight: var(--wa-font-weight-semibold);
-        line-height: 1.4;
+        line-height: 1.6;
         color: var(--wa-color-text-quiet);
         background: var(--wa-color-surface-raised);
         border: 1px solid var(--wa-color-border);
@@ -901,9 +904,11 @@ export class ESPHomeComponentCatalog extends LitElement {
               </div>`}
           <div class="component-card-header-text">
             <h3 class="component-title">${component.name}</h3>
-            <span class="component-category-chip">
-              ${categoryChipLabel(component.category)}
-            </span>
+            ${this._category === "all"
+              ? html`<span class="component-category-chip">
+                  ${categoryChipLabel(component.category)}
+                </span>`
+              : nothing}
           </div>
           <button
             class="expand-button"
