@@ -106,8 +106,10 @@ State for a setting flows through context:
 For security-sensitive toggles (e.g. anything that grants a peer
 permissions on this dashboard), the optimistic-update path MUST
 revert + toast on backend failure. Silent UI/disk divergence is
-a real bug on those controls — see the comments around
-`_onSetRemoteBuildEnabled` in `app-shell.ts`.
+a real bug on those controls — capture the previous value before
+the optimistic flip, await the API call inside `try/catch`, and
+on failure assign the previous value back and surface a
+`toast.error`.
 
 ## ARIA / a11y
 
@@ -154,12 +156,14 @@ a real bug on those controls — see the comments around
   the UI showing the new value while the backend kept the old
   one. For security-sensitive toggles, the user has no idea
   their click didn't take effect. Always revert + toast.
-- **Reconnect race vs in-flight write.** `_onAuthenticated`
-  re-fetches state on every (re)connect; if a user-initiated
-  write is racing with the reconnect, the reload can clobber
-  the optimistic value with the pre-write server snapshot. Gate
-  the reload with an "in-flight" boolean (see
-  `_remoteBuildSetInFlight` in `app-shell.ts` for the pattern).
+- **Reconnect race vs in-flight write.** `app-shell` re-fetches
+  state on every (re)connect; if a user-initiated write is racing
+  with the reconnect, the reload can clobber the optimistic value
+  with the pre-write server snapshot. Gate the reload path with
+  an instance-level "in-flight" boolean that the optimistic-update
+  handler sets before the API call and clears in `finally`, so
+  the post-reconnect `_load*` short-circuits while a write is
+  outstanding.
 - **`?aria-checked=` boolean binding.** A drive-by "fix" that
   switches the string-attribute form to Lit's boolean binding
   silently breaks the toggle's CSS and a11y on `false`. Comment
@@ -174,7 +178,7 @@ a real bug on those controls — see the comments around
 | Path | What |
 |---|---|
 | `src/components/app-shell.ts` | Top-level component owning WS lifecycle, contexts, and most cross-component state |
-| `src/components/settings-dialog.ts` | Settings page (Appearance / Language / Editor / Remote builder) |
+| `src/components/settings-dialog.ts` | Settings page; sidebar pattern, one section per `_renderXxx()` method |
 | `src/api/esphome-api.ts` | WS client; typed wrappers for backend commands |
 | `src/api/types.ts` | All WS request/response types organized by domain |
 | `src/context/contexts.ts` | Lit context definitions (provided by `app-shell`, consumed everywhere) |
