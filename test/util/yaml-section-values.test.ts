@@ -1142,14 +1142,18 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     const values = parseYamlSectionValues(yaml, "esphome");
     (values.devices as Record<string, unknown>[])[0].name = "Renamed";
     const after = updateSectionInYaml(yaml, "esphome", values);
-    // Top-level fields stay at 4-space.
-    expect(after).toContain("    name: test");
-    // Devices list keeps its 8-space dash indent (4 + 4) and
-    // 10-space sub-key indent.
-    expect(after).toContain("        - id: kitchen");
-    expect(after).toContain("          name: Renamed");
+    // Top-level fields stay at 4-space — column 4, exactly.
+    expect(after).toMatch(/^ {4}name: test/m);
+    // Devices list keeps its 8-space dash indent (4 + 4 step) and
+    // sub-keys align with the inline first key — column 10
+    // (= dash col 8 + the literal 2-char ``- `` gap), NOT
+    // dash + step (which would be 12 on a 4-space file). Pin the
+    // exact column so a regression to ``${dashIndent}${step}``
+    // surfaces in CI instead of hiding behind a substring match.
+    expect(after).toMatch(/^ {8}- id: kitchen/m);
+    expect(after).toMatch(/^ {10}name: Renamed/m);
     // No 2-space children sneaking in mid-section.
-    expect(after).not.toMatch(/^  [a-zA-Z]/m);
+    expect(after).not.toMatch(/^ {2}[a-zA-Z]/m);
   });
 
   it("reads list-of-mappings with non-default user indent (4-space YAML)", () => {

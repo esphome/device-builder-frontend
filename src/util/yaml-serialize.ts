@@ -196,7 +196,15 @@ function serializeListItem(
     );
     if (entries.length === 0) return [`${dashIndent}-`];
     const lines: string[] = [];
-    const childIndent = `${dashIndent}${step}`;
+    // Follow-up sub-keys align with the inline first key (which
+    // sits at ``${dashIndent}- ``, a fixed two-character offset
+    // past the dash) — NOT at ``${dashIndent}${step}``. With a
+    // canonical 2-space step those happen to coincide, but on a
+    // 4-space user file ``${dashIndent}${step}`` lands sub-keys
+    // four columns deeper than the inline key, producing
+    // valid-but-misaligned YAML. ``ESPHOME_YAML_INDENT`` is the
+    // canonical 2-character "- " gap and stays fixed.
+    const childIndent = `${dashIndent}${ESPHOME_YAML_INDENT}`;
     entries.forEach(([k, v], idx) => {
       const prefix = idx === 0 ? `${dashIndent}- ` : childIndent;
       if (v instanceof YamlRawValue) {

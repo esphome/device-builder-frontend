@@ -145,16 +145,15 @@ const _detectSectionChildIndent = (
   startIdx: number,
   isListItem: boolean,
 ): string => {
-  // For list-item sections the dash sits at the section's leading
-  // whitespace, and child keys live one level deeper than the
-  // dash itself. Use the dash's column as the floor so a
-  // ``  - id: …`` section doesn't pick up the dash line as its
-  // own child indent.
+  // The "floor" is the column a child line must beat to count as a
+  // child of this section. For non-list sections that's the
+  // section header's leading whitespace; for list-item sections
+  // it's one column past the dash itself, so a child key (which
+  // sits at ``dash + 2 columns``) clears the floor while a
+  // sibling dash (same column as ours) doesn't.
   const headLine = lines[startIdx];
   const sectionLead = isListItem
-    ? _leadingIndent(headLine).length +
-      (headLine.indexOf("-") - _leadingIndent(headLine).length) +
-      1 // dash + space
+    ? headLine.indexOf("-") + 1
     : _leadingIndent(headLine).length;
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
@@ -393,6 +392,24 @@ const parseFlatMappingField = (
 };
 
 /**
+ * Match *line* against *re* (one of the two ``key: value`` regexes
+ * built by :func:`collectBlockListMappings`) and run the captured
+ * key + raw value through :func:`parseFlatMappingField`. Returns
+ * ``null`` for any failure — regex miss, dotted key, block scalar,
+ * empty raw — which all share the same "bail out, fall back to
+ * YamlRawValue" semantic at the caller. Centralised so the inline
+ * header (``- key: value``) and child-line (``  key: value``)
+ * paths share one match-and-validate step.
+ */
+const _matchFlatMappingField = (
+  line: string,
+  re: RegExp,
+): { key: string; value: unknown } | null => {
+  const m = line.match(re);
+  return m ? parseFlatMappingField(m[1], m[2].trim()) : null;
+};
+
+/**
  * Collect a YAML list whose items are flat key:value mappings —
  * ``esphome.devices`` / ``esphome.areas`` and similar
  * ``multi_value=true`` schema entries — as ``Record<string, unknown>[]``.
@@ -413,12 +430,14 @@ const collectBlockListMappings = (
   dashIndent: string,
   childIndent: string,
 ): { items: Record<string, unknown>[]; endIdx: number } | null => {
-  const itemHeaderRe = new RegExp(
+  const headerRe = new RegExp(
     `^${dashIndent}-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
   );
   const childRe = new RegExp(`^${childIndent}(${KEY_PATTERN}):\\s*(.*)$`);
+  const bareDash = `${dashIndent}-`;
   const items: Record<string, unknown>[] = [];
   let j = startIdx;
+
   while (j < lines.length) {
     const line = lines[j];
     if (line.trim() === "") {
@@ -426,29 +445,24 @@ const collectBlockListMappings = (
       continue;
     }
     if (!isListItemLine(line, dashIndent)) break;
+
     // Same null-prototype defence as the surrounding parser — see
     // the comment in ``parseYamlSectionValues``.
     const item: Record<string, unknown> = Object.create(null);
-    // Bare ``${dashIndent}-`` (no inline key) is the serializer's
-    // placeholder for an empty mapping item — a freshly-added Add
-    // row the user saved before filling in any fields. Treat it
-    // as ``{}`` so the row survives the round-trip; the renderer
-    // re-paints it on reload and the user's "in-progress" item
-    // doesn't silently vanish.
-    if (line === `${dashIndent}-`) {
-      items.push(item);
-      j++;
-      continue;
+
+    // Bare ``${dashIndent}-`` is the serializer's placeholder for
+    // an empty mapping item (a freshly-added Add row the user saved
+    // before filling fields). Skip the header parse and let the
+    // child loop run — for a bare dash there are no sibling sub
+    // keys, so the item stays ``{}`` and the row survives the
+    // round-trip.
+    if (line !== bareDash) {
+      const header = _matchFlatMappingField(line, headerRe);
+      if (!header) return null;
+      item[header.key] = header.value;
     }
-    const headerMatch = line.match(itemHeaderRe);
-    if (!headerMatch) return null;
-    const headerField = parseFlatMappingField(
-      headerMatch[1],
-      headerMatch[2].trim(),
-    );
-    if (!headerField) return null;
-    item[headerField.key] = headerField.value;
     j++;
+
     while (j < lines.length) {
       const sub = lines[j];
       if (sub.trim() === "") {
@@ -459,11 +473,9 @@ const collectBlockListMappings = (
       // A line strictly deeper than ``childIndent`` is a nested
       // mapping / list under a sub-key — bail.
       if (sub.startsWith(`${childIndent} `)) return null;
-      const m = sub.match(childRe);
-      if (!m) return null;
-      const subField = parseFlatMappingField(m[1], m[2].trim());
-      if (!subField) return null;
-      item[subField.key] = subField.value;
+      const child = _matchFlatMappingField(sub, childRe);
+      if (!child) return null;
+      item[child.key] = child.value;
       j++;
     }
     items.push(item);
@@ -904,12 +916,19 @@ export function updateSectionInYaml(
       }
     }
   }
-  // Derive the user's indent step from the detected childIndent so
-  // saves preserve their chosen step end-to-end (top-level fields
-  // AND nested mapping recursion AND list-item shapes).
-  const detectedStep = isListItem
-    ? " ".repeat(Math.max(2, childIndent.length / 2))
-    : childIndent || ESPHOME_YAML_INDENT;
+  // For non-list-item sections the user's indent step IS the
+  // section's child indent (top-level keys at column 0, children
+  // at one step deeper). Pass that through so nested-mapping
+  // recursion preserves the user's chosen step end-to-end.
+  //
+  // For list-item sections the picture is messier — child keys
+  // align with the inline first key after the dash, not at a
+  // step-multiple — and there's no clean "user step" to read off.
+  // Default to canonical 2-space; the round-trip stays
+  // valid-and-readable even when the surrounding file uses a
+  // different step elsewhere.
+  const detectedStep =
+    !isListItem && childIndent ? childIndent : ESPHOME_YAML_INDENT;
   const newLines = [
     dashLine,
     ...serializeYamlValues(toSerialize, childIndent, {
