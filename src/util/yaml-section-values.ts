@@ -126,9 +126,12 @@ const childRegexFor = (indent: string) =>
 // scalar (string with spaces, number, !secret reference) and we
 // just round-trip it. Validating the leading-token shape here
 // would over-match `KEY_PATTERN`'s purpose; that constraint
-// applies only to dict keys.
-const listItemRegexFor = (indent: string) =>
-  new RegExp(`^${indent}${ESPHOME_YAML_INDENT}-\\s+(.*)$`);
+// applies only to dict keys. The argument is the indent BEFORE
+// the dash (detected from the actual list content by the caller),
+// not the parent key's indent — a 4-space user file puts the
+// dash at ``parent + 4``, not the canonical ``parent + 2``.
+const listItemRegexFor = (dashIndent: string) =>
+  new RegExp(`^${dashIndent}-\\s+(.*)$`);
 
 /**
  * Measure the leading whitespace on *line* — used to detect the
@@ -378,12 +381,16 @@ const parseListBlock = (
     };
   }
 
-  // Flat scalar list (``packages: [- a, - b]``).
+  // Flat scalar list (``packages: [- a, - b]``). Both the
+  // startsWith prefix and the line regex use the detected
+  // ``dashIndent`` so 4-space user YAMLs round-trip — the older
+  // ``listItemRegexFor(parentIndent)`` hardcoded the canonical
+  // 2-space step and silently dropped scalar lists otherwise.
   const { items, endIdx: scalarEndIdx } = collectBlockListItems(
     lines,
     startIdx,
     `${dashIndent}- `,
-    listItemRegexFor(parentIndent),
+    listItemRegexFor(dashIndent),
   );
   return {
     value: items,

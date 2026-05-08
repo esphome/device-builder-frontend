@@ -1156,6 +1156,43 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(after).not.toMatch(/^ {2}[a-zA-Z]/m);
   });
 
+  it("reads a flat scalar list with 4-space user indent", () => {
+    // Regression pin for the bug Copilot caught:
+    // ``listItemRegexFor`` was building its regex from
+    // ``parentIndent + ESPHOME_YAML_INDENT``, hardcoding the dash
+    // at ``parent + 2`` even when the actual dash sat at
+    // ``parent + 4`` for a 4-space user file. The startsWith
+    // prefix check passed (it was already detected from the
+    // content) but the regex match failed, so
+    // ``collectBlockListItems`` returned ``[]`` and the list was
+    // silently dropped — and would have been deleted on save.
+    const yaml = `wifi:
+    networks:
+        - one
+        - two
+        - three
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.networks).toEqual(["one", "two", "three"]);
+  });
+
+  it("round-trips a 4-space scalar list through update without dropping items", () => {
+    // The save path would have spliced the empty parsed list back
+    // into the YAML, deleting the user's networks. Pin both the
+    // parse and the round-trip so a regression is caught at CI.
+    const yaml = `wifi:
+    networks:
+        - one
+        - two
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    (values.networks as string[]).push("three");
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after).toContain("- one");
+    expect(after).toContain("- two");
+    expect(after).toContain("- three");
+  });
+
   it("treats an underscore-leading sibling section as a section terminator", () => {
     // The terminator predicate has to mirror ``KEY_PATTERN``'s
     // leading-character set (``[a-zA-Z_]``). A section header

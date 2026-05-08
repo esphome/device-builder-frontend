@@ -25,7 +25,6 @@ import { formatHexInt, parseHexInt } from "../../util/hex-int.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import {
   asMappingList,
-  isPlainObject,
   isPrimitiveOrNullish,
 } from "../../util/nested-values.js";
 import { YamlRawValue } from "../../util/yaml-serialize.js";
