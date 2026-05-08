@@ -64,11 +64,18 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
+  /** True after the user has explicitly saved or declined inside
+   *  the current open() — suppresses the close-via-X session-
+   *  dismiss path so we don't both ``mark_acknowledged`` AND fire
+   *  ``onboarding-dismissed-session`` for the same close. */
+  private _exitedExplicitly = false;
+
   open() {
     this._ssid = "";
     this._password = "";
     this._saving = false;
     this._error = null;
+    this._exitedExplicitly = false;
     this._dialog.open = true;
   }
 
@@ -138,7 +145,10 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog label=${this._localize("onboarding.wifi.title")}>
+      <wa-dialog
+        label=${this._localize("onboarding.wifi.title")}
+        @wa-after-hide=${this._onAfterHide}
+      >
         <div class="body">
           <p class="intro">
             <wa-icon library="mdi" name="wifi"></wa-icon>
@@ -172,7 +182,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             ></esphome-password-input>
           </div>
           ${this._error
-            ? html`<p class="error">${this._error}</p>`
+            ? html`<p class="error" role="alert">${this._error}</p>`
             : nothing}
         </div>
         <div slot="footer" class="actions">
@@ -216,9 +226,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       // Acknowledge so the dialog doesn't re-pop on next load even
       // if the badge logic wants to keep the menu indicator.
       await this._api.markOnboardingAcknowledged();
-      toast.success(this._localize("onboarding.wifi.save_success"), {
-        richColors: true,
-      });
+      toast.success(this._localize("onboarding.wifi.save_success"));
+      this._exitedExplicitly = true;
       this._emitAcknowledged();
       this.close();
     } catch (err) {
@@ -232,12 +241,26 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._saving = true;
     try {
       await this._api.markOnboardingAcknowledged();
+      this._exitedExplicitly = true;
       this._emitAcknowledged();
       this.close();
     } catch (err) {
       this._error = this._formatError(err);
     } finally {
       this._saving = false;
+    }
+  }
+
+  /**
+   * Catch-all for any close that wasn't initiated via Save / Decline /
+   * the explicit "Maybe later" button — e.g. the dialog's built-in
+   * X, Escape, or a backdrop click. Treat it as a session dismiss
+   * so the badge stays accurate but the dialog doesn't re-open
+   * mid-session.
+   */
+  private _onAfterHide() {
+    if (!this._exitedExplicitly) {
+      this._dismissForSession();
     }
   }
 
@@ -259,7 +282,12 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     return this._localize("onboarding.wifi.save_failed");
   }
 
-  private _dismissForSession() {
+  private _dismissForSession = () => {
+    // Idempotent — wa-after-hide also routes here, and an explicit
+    // "Maybe later" tap fires this directly *and* synthesises an
+    // after-hide. Setting ``_exitedExplicitly`` first short-
+    // circuits the second pass through the after-hide handler.
+    this._exitedExplicitly = true;
     this.dispatchEvent(
       new CustomEvent("onboarding-dismissed-session", {
         bubbles: true,
@@ -267,7 +295,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       }),
     );
     this.close();
-  }
+  };
 
   private _emitAcknowledged() {
     this.dispatchEvent(

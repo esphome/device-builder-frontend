@@ -836,10 +836,12 @@ export interface OnboardingStep {
  * stops re-opening regardless of whether the data is now set.
  *
  * Step status drives a separate signal: the always-on badge in
- * the secrets kebab. It's computed from live on-disk state
- * every call — never persisted — so the badge clears the moment
- * the user configures the underlying data, even via a manual
- * ``secrets.yaml`` edit.
+ * the secrets kebab. It's computed from live on-disk state on
+ * every server-side ``get_state`` call — never persisted — and
+ * the dashboard re-fetches on (re)connect, so a manual
+ * ``secrets.yaml`` edit clears the badge no later than the next
+ * WS reconnect (or page reload). Within a single session the
+ * badge is a snapshot of the auth-time fetch.
  */
 export interface OnboardingState {
   current_version: number;

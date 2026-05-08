@@ -518,15 +518,17 @@ export class ESPHomeApp extends LitElement {
         userBehindCurrent && !this._onboardingSessionDismissed;
     } catch (err) {
       // Onboarding is non-critical — a transient WS failure here
-      // shouldn't block the rest of the dashboard. Logged for
-      // visibility; we explicitly clear both signals so a
-      // previously-true badge / dialog from an earlier successful
-      // load doesn't outlive the failure (the latest state is
-      // unknown — false reads as "no nudge", which is safer than
-      // a stale red indicator on data we can no longer verify).
+      // shouldn't block the rest of the dashboard. Clear the
+      // badge (the latest data is unknown, so reading as "no
+      // nudge" is safer than a stale red dot) but leave the
+      // dialog-show signal alone: a transient reload on a
+      // session-dismissed state must not cause a false→true
+      // transition that re-opens the wizard the user just
+      // closed. ``_onboardingSessionDismissed`` already prevents
+      // the *next* successful load from re-opening, but only if
+      // we don't toggle the show signal in between.
       console.warn("Failed to load onboarding state:", err);
       this._onboardingPending = false;
-      this._onboardingShouldShow = false;
     }
   }
 
