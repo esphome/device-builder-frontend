@@ -178,6 +178,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
+      targetPlatform: this.board?.esphome.platform ?? null,
     });
 
   protected render() {

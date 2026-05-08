@@ -525,6 +525,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         requiredOnly: true,
         showAdvanced: false,
         presentComponents,
+        targetPlatform: this.board?.esphome.platform ?? null,
       },
     );
     for (const key of errors.keys()) {

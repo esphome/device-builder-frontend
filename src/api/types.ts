@@ -636,6 +636,20 @@ export interface ConfigEntry {
    * "uart" buses. null = free-form ID input.
    */
   references_component: string | null;
+  /**
+   * Target chips this field is valid on. Empty list (or omitted) =
+   * no restriction (the common case); non-empty = the field is
+   * restricted to the listed chips. Same wire shape as
+   * `ComponentCatalogEntry.supported_platforms`, but at the
+   * single-field grain — a component may run on every platform
+   * while one of its fields (`sensor.debug.psram` is the canonical
+   * case, ESP32-only) does not. Form renderer hides the entry when
+   * the device's target platform isn't in this list.
+   *
+   * Recovered by the backend's sync script from upstream's
+   * declarative `cv.only_on` validators.
+   */
+  supported_platforms?: string[];
 
   // === pin selection (only meaningful when type == PIN) ===
   /** Pin capabilities required for this field. */

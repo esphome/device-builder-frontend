@@ -254,6 +254,140 @@ describe("filterRenderable", () => {
       }).map((e) => e.key),
     ).toEqual(["mqtt_topic", "name"]);
   });
+
+  // ────────── supported_platforms gate ──────────────────────
+
+  it("hides a platform-gated entry when targetPlatform isn't in the allowlist", () => {
+    // Mirrors ``sensor.debug.psram`` upstream — wrapped in
+    // ``cv.only_on_esp32``, so the backend stamps
+    // ``supported_platforms = ["esp32"]`` and we hide it on
+    // every other board.
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+      makeEntry({ key: "free", required: true }),
+    ];
+    const onEsp8266 = filterRenderable(entries, {}, {
+      requiredOnly: true,
+      showAdvanced: false,
+      targetPlatform: "esp8266",
+    });
+    expect(onEsp8266.map((e) => e.key)).toEqual(["free"]);
+    const onEsp32 = filterRenderable(entries, {}, {
+      requiredOnly: true,
+      showAdvanced: false,
+      targetPlatform: "esp32",
+    });
+    expect(onEsp32.map((e) => e.key)).toEqual(["psram", "free"]);
+  });
+
+  it("respects multi-platform allowlists (union from cv.Any)", () => {
+    // Mirrors ``sensor.debug.fragmentation`` upstream —
+    // ``cv.Any(cv.only_on_esp8266, cv.only_on_esp32)`` collapses
+    // to ``["esp32", "esp8266"]``. The entry shows on either chip,
+    // hides on others (e.g. rp2040).
+    const entries = [
+      makeEntry({
+        key: "fragmentation",
+        required: true,
+        supported_platforms: ["esp32", "esp8266"],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp32",
+      }).map((e) => e.key),
+    ).toEqual(["fragmentation"]);
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }).map((e) => e.key),
+    ).toEqual(["fragmentation"]);
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "rp2040",
+      }).map((e) => e.key),
+    ).toEqual([]);
+  });
+
+  it("does not gate when supported_platforms is empty (the common case)", () => {
+    // Empty list = no constraint — most fields don't carry a
+    // platform restriction so the gate must be a no-op for them.
+    const entries = [
+      makeEntry({ key: "loop_time", required: true, supported_platforms: [] }),
+      makeEntry({ key: "free", required: true }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }).map((e) => e.key),
+    ).toEqual(["loop_time", "free"]);
+  });
+
+  it("does not gate when targetPlatform is null/undefined", () => {
+    // Add-component dialog opens before a board is locked in;
+    // we don't have a target platform yet so we shouldn't pre-
+    // emptively hide gated fields. Empty-allowlist semantics
+    // stay (which means "every field is visible until a board
+    // is picked").
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: null,
+      }).map((e) => e.key),
+    ).toEqual(["psram"]);
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+      }).map((e) => e.key),
+    ).toEqual(["psram"]);
+  });
+
+  it("hides a NESTED group when its only child is platform-gated away", () => {
+    // The "skip empty groups" rule still applies — a NESTED
+    // whose only renderable child got platform-gated should also
+    // disappear, otherwise the form shows an empty header.
+    const entries = [
+      makeEntry({
+        key: "diagnostics",
+        type: ConfigEntryType.NESTED,
+        config_entries: [
+          makeEntry({
+            key: "psram",
+            required: true,
+            supported_platforms: ["esp32"],
+          }),
+        ],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }).map((e) => e.key),
+    ).toEqual([]);
+  });
 });
 
 describe("collectRenderablePaths", () => {
