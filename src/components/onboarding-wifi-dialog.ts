@@ -3,6 +3,7 @@ import { mdiWifi } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
+import { APIError } from "../api/index.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
@@ -221,10 +222,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       this._emitAcknowledged();
       this.close();
     } catch (err) {
-      this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("onboarding.wifi.save_failed");
+      this._error = this._formatError(err);
     } finally {
       this._saving = false;
     }
@@ -237,13 +235,28 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       this._emitAcknowledged();
       this.close();
     } catch (err) {
-      this._error =
-        err instanceof Error
-          ? err.message
-          : this._localize("onboarding.wifi.save_failed");
+      this._error = this._formatError(err);
     } finally {
       this._saving = false;
     }
+  }
+
+  /**
+   * Surface a backend error in user-facing prose. ``APIError``
+   * carries a structured ``errorCode`` + ``details`` pair; its
+   * ``Error.message`` is the wire form ``"INVALID_ARGS: …"`` —
+   * fine for logs, leaks an internal code into the dialog's
+   * inline error if rendered raw. Show ``details`` directly when
+   * we have an ``APIError``, fall back to ``message`` for native
+   * errors, and fall back to the localized generic when we have
+   * neither.
+   */
+  private _formatError(err: unknown): string {
+    if (err instanceof APIError) {
+      return err.details || this._localize("onboarding.wifi.save_failed");
+    }
+    if (err instanceof Error) return err.message;
+    return this._localize("onboarding.wifi.save_failed");
   }
 
   private _dismissForSession() {

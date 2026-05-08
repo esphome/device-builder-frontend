@@ -519,9 +519,14 @@ export class ESPHomeApp extends LitElement {
     } catch (err) {
       // Onboarding is non-critical — a transient WS failure here
       // shouldn't block the rest of the dashboard. Logged for
-      // visibility; the dialog stays closed (its absence is
-      // safer than a blank or broken-state render).
+      // visibility; we explicitly clear both signals so a
+      // previously-true badge / dialog from an earlier successful
+      // load doesn't outlive the failure (the latest state is
+      // unknown — false reads as "no nudge", which is safer than
+      // a stale red indicator on data we can no longer verify).
       console.warn("Failed to load onboarding state:", err);
+      this._onboardingPending = false;
+      this._onboardingShouldShow = false;
     }
   }
 

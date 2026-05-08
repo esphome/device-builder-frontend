@@ -827,12 +827,17 @@ export interface OnboardingStep {
  *
  * ``current_version`` is the version of onboarding the server
  * knows about; ``completed_version`` is what the user last
- * acknowledged. The dashboard shows the wizard whenever the user
- * is behind the current version OR a step is data-derived
- * ``pending`` and the user hasn't dismissed for the session.
+ * acknowledged. The dashboard shows the wizard when
+ * ``completed_version < current_version`` AND the user hasn't
+ * frontend-side session-dismissed it. The data-derived
+ * ``steps[].status`` doesn't gate the dialog — saving real
+ * values OR declining ("I only use Ethernet") both call
+ * ``mark_acknowledged`` to advance the version, so the dialog
+ * stops re-opening regardless of whether the data is now set.
  *
- * Step status is computed from live on-disk state every call —
- * never persisted — so the secrets-menu badge clears the moment
+ * Step status drives a separate signal: the always-on badge in
+ * the secrets kebab. It's computed from live on-disk state
+ * every call — never persisted — so the badge clears the moment
  * the user configures the underlying data, even via a manual
  * ``secrets.yaml`` edit.
  */

@@ -353,6 +353,9 @@ export class ESPHomeHeaderActions extends LitElement {
                 class="menu-item"
                 role="menuitem"
                 tabindex="0"
+                aria-label=${this._onboardingPending
+                  ? `${this._localize("layout.secrets")} — ${this._localize("onboarding.secrets_dot_title")}`
+                  : this._localize("layout.secrets")}
                 @click=${this._openSecrets}
                 @keydown=${this._onMenuItemKeydown}
               >
@@ -362,6 +365,7 @@ export class ESPHomeHeaderActions extends LitElement {
                   ? html`<span
                       class="menu-item-dot"
                       title=${this._localize("onboarding.secrets_dot_title")}
+                      aria-hidden="true"
                     ></span>`
                   : nothing}
               </div>
