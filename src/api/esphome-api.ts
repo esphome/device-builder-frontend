@@ -30,6 +30,8 @@ import type {
   FirmwareJob,
   PagedBoardsResponse,
   PagedComponentsResponse,
+  RemoteBuildPeer,
+  RemoteBuildSettings,
   ResultMessage,
   SerialPort,
   ServerInfoMessage,
@@ -1282,6 +1284,39 @@ export class ESPHomeAPI {
   /** Get secret key names. */
   async getSecretKeys(): Promise<string[]> {
     return this.sendCommand<string[]>("config/get_secrets");
+  }
+
+  /**
+   * Get the receiver-side remote-build settings.
+   *
+   * Phase 2 of issue #106 — only ``enabled`` is exposed; phase 3+
+   * adds artifact-retention TTL, the cert fingerprint, the token
+   * list, and the rest of the "Remote builder" Settings section.
+   */
+  async getRemoteBuildSettings(): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>("remote_build/get_settings");
+  }
+
+  /** Persist the receiver-side remote-build settings. */
+  async setRemoteBuildSettings(args: {
+    enabled: boolean;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/set_settings",
+      args
+    );
+  }
+
+  /**
+   * List peer dashboards discovered on the LAN via the
+   * ``_esphomebuilder._tcp.local.`` mDNS browse.
+   *
+   * Empty array when no peers have been seen yet (or when the
+   * receiver's zeroconf failed to bind). Phase 2 returns the raw
+   * discovery; phase 4+ will add paired-or-not state to each row.
+   */
+  async listRemoteBuildHosts(): Promise<RemoteBuildPeer[]> {
+    return this.sendCommand<RemoteBuildPeer[]>("remote_build/list_hosts");
   }
 
   /** Get compiled device metadata. */

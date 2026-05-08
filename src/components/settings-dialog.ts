@@ -1,5 +1,10 @@
 import { consume } from "@lit/context";
-import { mdiPaletteOutline, mdiTranslate, mdiVectorDifference } from "@mdi/js";
+import {
+  mdiPaletteOutline,
+  mdiServerNetwork,
+  mdiTranslate,
+  mdiVectorDifference,
+} from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
@@ -7,7 +12,11 @@ import { readStoredLocale } from "../common/localize.js";
 
 /** Sentinel meaning "follow browser locale" (no explicit override). */
 type LanguageChoice = SupportedLocale | "system";
-import { localizeContext, yamlDiffButtonContext } from "../context/index.js";
+import {
+  localizeContext,
+  remoteBuildEnabledContext,
+  yamlDiffButtonContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -18,11 +27,12 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
   "palette-outline": mdiPaletteOutline,
+  "server-network": mdiServerNetwork,
   translate: mdiTranslate,
   "vector-difference": mdiVectorDifference,
 });
 
-type Section = "appearance" | "language" | "editor";
+type Section = "appearance" | "language" | "editor" | "remote_build";
 
 interface SectionDef {
   id: Section;
@@ -34,6 +44,11 @@ const SECTIONS: SectionDef[] = [
   { id: "appearance", icon: "palette-outline", labelKey: "settings.appearance" },
   { id: "language", icon: "translate", labelKey: "settings.language" },
   { id: "editor", icon: "vector-difference", labelKey: "layout.editor" },
+  {
+    id: "remote_build",
+    icon: "server-network",
+    labelKey: "settings.remote_build",
+  },
 ];
 
 const LANGUAGES: { value: LanguageChoice; labelKey: string }[] = [
@@ -52,6 +67,10 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: yamlDiffButtonContext, subscribe: true })
   @state()
   private _yamlDiffButton = false;
+
+  @consume({ context: remoteBuildEnabledContext, subscribe: true })
+  @state()
+  private _remoteBuildEnabled = false;
 
   @state()
   private _section: Section = "appearance";
@@ -319,6 +338,8 @@ export class ESPHomeSettingsDialog extends LitElement {
         return this._renderLanguage();
       case "editor":
         return this._renderEditor();
+      case "remote_build":
+        return this._renderRemoteBuild();
     }
   }
 
@@ -377,6 +398,43 @@ export class ESPHomeSettingsDialog extends LitElement {
     `;
   }
 
+  private _renderRemoteBuild() {
+    // Phase 2 of issue #106. The toggle is wired to the backend
+    // via the parent's ``set-remote-build-enabled`` handler; the
+    // discovered-peers list and per-host pairing UI come in
+    // phases 3+ — this section ships as the empty-state
+    // scaffolding so future phases have a UI surface to plug
+    // into.
+    return html`
+      <div class="row">
+        <div class="row-label">
+          <span class="row-title">
+            ${this._localize("settings.remote_build_enable")}
+          </span>
+          <span class="row-desc">
+            ${this._localize("settings.remote_build_enable_desc")}
+          </span>
+        </div>
+        <button
+          class="toggle"
+          role="switch"
+          aria-checked=${this._remoteBuildEnabled}
+          @click=${this._onToggleRemoteBuild}
+        ></button>
+      </div>
+      <div class="row">
+        <div class="row-label">
+          <span class="row-title">
+            ${this._localize("settings.remote_build_discovered_dashboards")}
+          </span>
+          <span class="row-desc">
+            ${this._localize("settings.remote_build_discovered_dashboards_desc")}
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
   private _onThemeChange(e: Event) {
     const theme = (e.target as HTMLSelectElement).value;
     this._theme = theme;
@@ -405,6 +463,16 @@ export class ESPHomeSettingsDialog extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-yaml-diff-button", {
         detail: !this._yamlDiffButton,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private _onToggleRemoteBuild() {
+    this.dispatchEvent(
+      new CustomEvent("set-remote-build-enabled", {
+        detail: !this._remoteBuildEnabled,
         bubbles: true,
         composed: true,
       })

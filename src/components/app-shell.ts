@@ -56,6 +56,7 @@ import {
   isHaIngressContext,
   labelsContext,
   localizeContext,
+  remoteBuildEnabledContext,
   serverVersionContext,
   versionContext,
   yamlDiffButtonContext,
@@ -197,6 +198,15 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: yamlDiffButtonContext })
   @state()
   private _yamlDiffButton = false;
+
+  // Receiver-side master switch for the remote-build feature
+  // (issue #106 phase 2). Loaded from the backend on (re)connect;
+  // updated when the user toggles ``Settings → Remote builder``.
+  // Phase 2 only persists the flag — phase 3 wires the
+  // ``/remote-build/v1/*`` route registration to it.
+  @provide({ context: remoteBuildEnabledContext })
+  @state()
+  private _remoteBuildEnabled = false;
 
   // Frozen catalog-derived map; refreshed only with a backend release.
   // Cheap to leave at {} until the fetch lands — the device drawer
@@ -457,6 +467,21 @@ export class ESPHomeApp extends LitElement {
     this._loadIntegrationDocs();
     this._loadLabels();
     this._loadThemePreference();
+    this._loadRemoteBuildSettings();
+  }
+
+  private async _loadRemoteBuildSettings() {
+    // Receiver-side remote-build settings (issue #106 phase 2).
+    // Fail-soft: an older backend without the WS commands lands in
+    // the catch and the UI stays at the default ``false``, which
+    // matches a fresh receiver where the feature has never been
+    // enabled — same observable behaviour either way.
+    try {
+      const settings = await this._api.getRemoteBuildSettings();
+      this._remoteBuildEnabled = settings.enabled;
+    } catch {
+      // Older backend or transient — ignore; defaults to false.
+    }
   }
 
   /** Fetch the global label catalog. Called on every (re)connect so
@@ -822,6 +847,7 @@ export class ESPHomeApp extends LitElement {
       <esphome-settings-dialog
         @set-theme=${this._onSetTheme}
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
+        @set-remote-build-enabled=${this._onSetRemoteBuildEnabled}
         @set-language=${this._onSetLanguage}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
@@ -890,6 +916,17 @@ export class ESPHomeApp extends LitElement {
     const enabled = e.detail;
     this._yamlDiffButton = enabled;
     this._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
+  }
+
+  private _onSetRemoteBuildEnabled(e: CustomEvent<boolean>) {
+    // Optimistic: flip the context immediately so the toggle's
+    // visual state stays in sync with the click. If the round-trip
+    // fails the next ``_loadRemoteBuildSettings`` (on reconnect or
+    // explicit refresh) corrects the drift; phase 3+ adds a toast
+    // for the rare backend-rejection case.
+    const enabled = e.detail;
+    this._remoteBuildEnabled = enabled;
+    this._api.setRemoteBuildSettings({ enabled }).catch(() => {});
   }
 
   private async _onSetLanguage(

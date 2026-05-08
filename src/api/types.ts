@@ -1074,3 +1074,20 @@ export interface EditorValidateResponse {
   yaml_errors: EditorYamlError[];
   validation_errors: EditorValidationError[];
 }
+
+// Remote-build feature (issue #106).
+// Phase 2: peer dashboard discovery + receiver-side master switch.
+// Phase 3+ extends ``RemoteBuildSettings`` with token / cert / TTL knobs.
+
+export interface RemoteBuildSettings {
+  enabled: boolean;
+}
+
+export interface RemoteBuildPeer {
+  name: string;
+  hostname: string;
+  port: number;
+  addresses: string[];
+  server_version: string;
+  esphome_version: string;
+}

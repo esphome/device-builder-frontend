@@ -81,6 +81,21 @@ export const yamlDiffButtonContext = createContext<boolean>(
   Symbol("esphome-yaml-diff-button")
 );
 
+/**
+ * Context for the receiver-side remote-build master switch.
+ *
+ * Phase 2 of the remote-build feature (issue #106). Off by
+ * default; the value comes from the backend on startup via
+ * ``remote_build/get_settings`` and is updated when the user
+ * flips the toggle in Settings → Remote builder. Phase 3+ adds
+ * the rest of the receiver-side knobs (cert fingerprint, tokens,
+ * artifact-retention TTL, etc.) — this single boolean is the
+ * scaffolding the Settings UI plugs the rest into.
+ */
+export const remoteBuildEnabledContext = createContext<boolean>(
+  Symbol("esphome-remote-build-enabled")
+);
+
 /** Context for the integration → esphome.io docs URL map. Populated
  *  once on app load via ``components/get_integration_docs``; the
  *  drawer's loaded-integration tags consult it to decide whether to
