@@ -11,8 +11,11 @@
  *
  * - **YAML → form display**: any integer (`118`, `0x76`, `"0x76"`)
  *   resolves to a single number. We render it as
- *   `formatHexInt(value)` → `"0x76"` (lowercase canonical form,
- *   matching `repr()` and `cv.hex_int`'s own output formatter).
+ *   `formatHexInt(value)` → `"0x76"` (lowercase, no padding —
+ *   `value.toString(16)`-style; ESPHome's own `cv.hex_int`
+ *   formatter uses uppercase, but the dashboard standardised on
+ *   lowercase for user-facing display since that's what HA docs
+ *   and most i2c datasheets use).
  * - **Form input → emit**: `parseHexInt("0x76" | "0X76" | "118")`
  *   → number. Both hex (with explicit `0x` prefix) and decimal
  *   input are accepted; the user can type whichever is most
@@ -111,8 +114,14 @@ export function parseHexInt(raw: string): number | null {
  * prototype chain via ordinary property assignment). A naive
  * ``{ ...values }`` spread re-opens that attack surface by
  * promoting the result back to a regular ``Object``-prototype
- * object; we copy into ``Object.create(null)`` instead so a
- * crafted YAML can't escalate to prototype pollution.
+ * object; we clone via
+ * ``Object.create(getPrototypeOf(values),
+ * getOwnPropertyDescriptors(values))`` instead, which preserves
+ * whatever prototype the input had (null for the parser's
+ * defensive map, ``Object.prototype`` for plain test fixtures)
+ * and uses ``defineProperty`` semantics under the hood so a
+ * crafted ``__proto__`` key on the source can't trigger
+ * prototype mutation on the target.
  */
 import type { ConfigEntry } from "../api/types.js";
 

@@ -11,45 +11,11 @@
 
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
+import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { formatHexInt, normalizeHexValues, parseHexInt } from "../../src/util/hex-int.js";
 
-function entry(
-  key: string,
-  overrides: Partial<ConfigEntry> = {},
-): ConfigEntry {
-  return {
-    key,
-    type: ConfigEntryType.INTEGER,
-    label: key,
-    description: null,
-    required: false,
-    default_value: null,
-    options: null,
-    allow_custom_value: false,
-    range: null,
-    display_format: null,
-    unit_options: null,
-    multi_value: false,
-    templatable: false,
-    locked: false,
-    suggestions: null,
-    depends_on: null,
-    depends_on_value: null,
-    depends_on_value_not: null,
-    depends_on_component: null,
-    references_component: null,
-    pin_features: [],
-    pin_mode: null,
-    advanced: false,
-    hidden: false,
-    help_link: null,
-    translation_key: null,
-    translation_params: null,
-    config_entries: null,
-    platform_type: null,
-    ...overrides,
-  };
-}
+const entry = (key: string, overrides: Partial<ConfigEntry> = {}): ConfigEntry =>
+  makeConfigEntry({ key, type: ConfigEntryType.INTEGER, label: key, ...overrides });
 
 describe("parseHexInt", () => {
   it("parses 0x-prefixed lowercase hex", () => {
