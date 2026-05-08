@@ -50,7 +50,10 @@ import { formatFileSize } from "../../util/format-file-size.js";
 import { splitIntegrations } from "../../util/integration-split.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
-import { renderIpValue } from "./device-drawer-render.js";
+import {
+  renderIpValue,
+  renderMdnsTxtRecords,
+} from "./device-drawer-render.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -120,6 +123,14 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
+  /** Decoded TXT record key/value pairs from the device's
+   *  ``_esphomelib._tcp.local.`` announce, only set on the mDNS
+   *  row. The renderer drops a chevron-collapsible underneath
+   *  the row when this is present so users can debug what the
+   *  device is broadcasting (version mismatch, lost
+   *  ``api_encryption`` advertisement, stale ``mac``). ``null``
+   *  / omitted hides the section. */
+  txtRecords?: Record<string, string> | null;
 }
 
 @customElement("esphome-device-drawer-content")
@@ -473,19 +484,18 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         outline-offset: 2px;
       }
 
-      /* Auto-loaded-integrations collapsible. The drawer's primary
-         "Loaded Integrations" row shows the user-meaningful chips
-         inline; auto-loaded dependencies (the upstream AUTO_LOAD
-         chain — md5, mdns, web_server_base, etc.) tuck in here
-         so a 30-component config doesn't drown the panel in
-         framework noise. The summary row gets the muted text
-         colour so it reads as secondary metadata, not as another
-         tag-row header. */
-      .auto-loaded-details {
-        margin-top: var(--wa-space-s);
-      }
-
-      .auto-loaded-details > summary {
+      /* Shared muted-disclosure treatment: a closed-by-default
+         <details> whose <summary> reads as secondary metadata
+         (small, quiet text colour) rather than as another data
+         row. Used by the auto-loaded integrations collapsible
+         below the primary chip row, and by the mDNS TXT-records
+         collapsible under the reachability row. The two have
+         different margin-top spacing because they sit beside
+         content of different vertical density — the integrations
+         row needs a clear gap, the reachability row only needs
+         a tight 2xs nudge. */
+      .auto-loaded-details > summary,
+      .mdns-txt-details > summary {
         cursor: pointer;
         font-size: var(--wa-font-size-2xs);
         color: var(--wa-color-text-quiet);
@@ -493,12 +503,53 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         user-select: none;
       }
 
-      .auto-loaded-details > summary:hover {
+      .auto-loaded-details > summary:hover,
+      .mdns-txt-details > summary:hover {
         color: var(--wa-color-text-normal);
+      }
+
+      .auto-loaded-details {
+        margin-top: var(--wa-space-s);
+      }
+
+      .mdns-txt-details {
+        margin-top: var(--wa-space-2xs);
       }
 
       .tags-wrap--auto-loaded {
         margin-top: var(--wa-space-2xs);
+      }
+
+      /* TXT keys are device-controlled — a malicious or
+         misbehaving firmware can broadcast an absurdly long key
+         that would otherwise expand the dt column under a plain
+         max-content sizing and squeeze the value column to
+         nothing (or push the drawer's horizontal scrollbar).
+         The minmax(0, max-content) lets the dt column shrink
+         below its natural size when the row would overflow, and
+         overflow-wrap: anywhere lets long keys break mid-string
+         so they actually wrap inside the shrunken column rather
+         than overflowing it. Same defensive shape on dd for
+         symmetry — TXT values are equally device-controlled. */
+      .mdns-txt-list {
+        display: grid;
+        grid-template-columns: minmax(0, max-content) 1fr;
+        column-gap: var(--wa-space-s);
+        row-gap: 2px;
+        margin: var(--wa-space-2xs) 0 0 0;
+        font-size: var(--wa-font-size-2xs);
+      }
+
+      .mdns-txt-list > dt {
+        color: var(--wa-color-text-quiet);
+        font-family: var(--wa-font-family-code, monospace);
+        overflow-wrap: anywhere;
+      }
+
+      .mdns-txt-list > dd {
+        margin: 0;
+        font-family: var(--wa-font-family-code, monospace);
+        overflow-wrap: anywhere;
       }
 
       .status-badges {
@@ -1211,6 +1262,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         icon: "access-point-network",
         labelKey: "dashboard.drawer_source_mdns",
         age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
+        txtRecords: r.mdns_txt_records ?? null,
       },
       {
         source: "ping",
@@ -1287,6 +1339,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
               : nothing}
           </div>
+          ${renderMdnsTxtRecords(row.txtRecords, this._localize)}
         </div>
       </div>
     `;

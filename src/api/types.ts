@@ -1006,6 +1006,23 @@ export interface ReachabilityStateEvent {
    *  several windows already". ``null`` when ``mdns_last_seen``
    *  is null. */
   mdns_ttl_remaining_seconds: number | null;
+  /** Decoded TXT key/value pairs from the device's
+   *  ``_esphomelib._tcp.local.`` TXT record — same payload the
+   *  dashboard already mines for ``version`` / ``config_hash`` /
+   *  ``mac`` / ``api_encryption``. The drawer renders these
+   *  inside a chevron-collapsible under the mDNS row so users
+   *  can debug "is the device actually broadcasting what I
+   *  expect?" without dropping to ``avahi-browse`` /
+   *  ``dns-sd``. ``null`` when no TXT record is cached (drawer
+   *  hides the section entirely); empty mapping is normalised
+   *  to ``null`` upstream. Empty-string values are meaningful —
+   *  zeroconf collapses bare keys and ``key=`` empty-value
+   *  entries to the same shape, so the backend surfaces both as
+   *  ``""`` (the ``api_encryption=`` "device confirmed
+   *  plaintext" tri-state signal lives here). Optional because
+   *  older backend builds don't emit the field — the drawer
+   *  treats undefined the same as ``null``. */
+  mdns_txt_records?: Record<string, string> | null;
   ping_last_seen_seconds_ago: number | null;
   mqtt_last_seen_seconds_ago: number | null;
   ping_rtt_ms: number | null;
