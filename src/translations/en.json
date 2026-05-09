@@ -643,7 +643,7 @@
     "device_name_edge_hyphen": "Names starting or ending with a hyphen aren't valid mDNS hostnames — the device may not resolve on RFC-strict networks"
   },
   "onboarding": {
-    "secrets_dot_title": "Wi-Fi credentials still need to be set in secrets.yaml",
+    "menu_item_setup_wifi": "Set up Wi-Fi…",
     "wifi": {
       "title": "Set up Wi-Fi credentials",
       "intro": "Your devices use these to join your network. They're stored once in secrets.yaml and shared across every config you create.",

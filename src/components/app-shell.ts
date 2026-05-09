@@ -548,6 +548,15 @@ export class ESPHomeApp extends LitElement {
     this._onboardingShouldShow = false;
   };
 
+  /** User picked the "Set up Wi-Fi" kebab item. Re-launches the
+   *  wizard regardless of acknowledged-version / session-dismiss
+   *  — the kebab entry is the explicit "I want to do this now"
+   *  signal, so we override both gates. */
+  private _onOpenOnboarding = () => {
+    this._onboardingSessionDismissed = false;
+    this._onboardingDialog?.open();
+  };
+
   // True while a ``setRemoteBuildSettings`` write is in flight. The
   // reload path on (re)connect skips when this is set so a write
   // racing with an auto-reconnect can't get clobbered by the
@@ -928,6 +937,7 @@ export class ESPHomeApp extends LitElement {
         @open-firmware-jobs=${this._onOpenFirmwareJobs}
         @open-reset-build-env=${this._onOpenResetBuildEnv}
         @open-feedback=${this._onOpenFeedback}
+        @open-onboarding-wifi=${this._onOpenOnboarding}
       >
         ${this._router.outlet()}
       </esphome-layout>

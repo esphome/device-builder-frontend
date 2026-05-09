@@ -521,7 +521,7 @@
     "save_and_leave": "Opslaan"
   },
   "onboarding": {
-    "secrets_dot_title": "Wi-Fi-inloggegevens moeten nog ingesteld worden in secrets.yaml",
+    "menu_item_setup_wifi": "Wi-Fi instellen…",
     "wifi": {
       "title": "Wi-Fi-inloggegevens instellen",
       "intro": "Uw apparaten gebruiken deze om verbinding te maken met uw netwerk. Ze worden één keer opgeslagen in secrets.yaml en gedeeld door elke configuratie die u maakt.",

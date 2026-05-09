@@ -9,6 +9,7 @@ import {
   mdiEyeOutline,
   mdiKeyVariant,
   mdiPlaylistCheck,
+  mdiWifiCog,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -37,6 +38,7 @@ registerMdiIcons({
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
   "playlist-check": mdiPlaylistCheck,
+  "wifi-cog": mdiWifiCog,
 });
 
 @customElement("esphome-header-actions")
@@ -240,18 +242,6 @@ export class ESPHomeHeaderActions extends LitElement {
         text-align: center;
       }
 
-      /* Dot variant — surfaced next to a menu item that needs the
-         user's attention but has no useful count to display
-         (onboarding-pending Secrets, future similar nudges). */
-      .menu-item-dot {
-        margin-left: auto;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--esphome-primary);
-        flex-shrink: 0;
-      }
-
       .menu-divider {
         height: 1px;
         background: var(--wa-color-surface-border);
@@ -353,22 +343,26 @@ export class ESPHomeHeaderActions extends LitElement {
                 class="menu-item"
                 role="menuitem"
                 tabindex="0"
-                aria-label=${this._onboardingPending
-                  ? `${this._localize("layout.secrets")} — ${this._localize("onboarding.secrets_dot_title")}`
-                  : this._localize("layout.secrets")}
                 @click=${this._openSecrets}
                 @keydown=${this._onMenuItemKeydown}
               >
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
                 <span class="menu-item-label">${this._localize("layout.secrets")}</span>
-                ${this._onboardingPending
-                  ? html`<span
-                      class="menu-item-dot"
-                      title=${this._localize("onboarding.secrets_dot_title")}
-                      aria-hidden="true"
-                    ></span>`
-                  : nothing}
               </div>
+              ${this._onboardingPending
+                ? html`<div
+                    class="menu-item"
+                    role="menuitem"
+                    tabindex="0"
+                    @click=${this._openOnboarding}
+                    @keydown=${this._onMenuItemKeydown}
+                  >
+                    <wa-icon library="mdi" name="wifi-cog"></wa-icon>
+                    <span class="menu-item-label"
+                      >${this._localize("onboarding.menu_item_setup_wifi")}</span
+                    >
+                  </div>`
+                : nothing}
               <div
                 class="menu-item ${this._showIgnored ? "menu-item--active" : ""}"
                 role="menuitemcheckbox"
@@ -511,6 +505,21 @@ export class ESPHomeHeaderActions extends LitElement {
   private _openSecrets() {
     this._close();
     navigate("/secrets");
+  }
+
+  /** Re-launches the onboarding wizard on demand. The kebab item
+   *  is gated on ``_onboardingPending`` (data-derived from
+   *  ``secrets.yaml``), so it appears only when there's actually
+   *  something to onboard — a user who declined "I don't use Wi-Fi"
+   *  earlier sees the entry and can change their mind. */
+  private _openOnboarding() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-onboarding-wifi", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private _openFirmwareJobs() {

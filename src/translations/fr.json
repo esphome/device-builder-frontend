@@ -521,7 +521,7 @@
     "save_and_leave": "Enregistrer"
   },
   "onboarding": {
-    "secrets_dot_title": "Les identifiants Wi-Fi doivent encore être renseignés dans secrets.yaml",
+    "menu_item_setup_wifi": "Configurer le Wi-Fi…",
     "wifi": {
       "title": "Configurer les identifiants Wi-Fi",
       "intro": "Vos appareils s'en servent pour rejoindre le réseau. Ils sont enregistrés une seule fois dans secrets.yaml et partagés entre toutes vos configurations.",
