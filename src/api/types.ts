@@ -1202,7 +1202,7 @@ export interface RemoteBuildPeer {
  *
  * The cert + key PEMs are intentionally NOT included — only the
  * SPKI fingerprint (``pin_sha256``, lowercase hex SHA-256 of the
- * SubjectPublicKeyInfo) is safe to ship, and it's what an
+ * SubjectPublicKeyInfo) is safe to ship, and it's what a
  * sender pins against anyway. ``listener_bound`` reports
  * whether the ``/remote-build/v1/*`` HTTPS site is currently
  * serving traffic; lets the Settings UI distinguish "rotation

@@ -250,11 +250,26 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
             : "settings.build_server_token_reveal_title"
         )}
         @wa-after-hide=${this._onAfterHide}
+        @wa-request-close=${this._onRequestClose}
       >
         ${this._bearer === null ? this._renderForm() : this._renderReveal()}
       </wa-dialog>
     `;
   }
+
+  /**
+   * Block close while the ``addRemoteBuildToken`` round-trip is in
+   * flight. If the dialog closed mid-request, the backend would
+   * still create the token (we already POSTed the hash) but the
+   * user would never see the cleartext, stranding them with a
+   * token they can't paste anywhere. Same pattern as
+   * ``<esphome-adopt-dialog>``'s busy guard.
+   */
+  private _onRequestClose = (e: Event) => {
+    if (this._submitting) {
+      e.preventDefault();
+    }
+  };
 
   private _renderForm() {
     return html`
