@@ -557,6 +557,14 @@ export class ESPHomeApp extends LitElement {
     this._onboardingDialog?.open();
   };
 
+  /** Secrets editor finished a save. Refresh the onboarding
+   *  snapshot so the kebab entry appears / disappears in real
+   *  time when the user clears or fills in Wi-Fi credentials by
+   *  hand instead of going through the wizard. */
+  private _onSecretsSaved = () => {
+    this._loadOnboardingState();
+  };
+
   // True while a ``setRemoteBuildSettings`` write is in flight. The
   // reload path on (re)connect skips when this is set so a write
   // racing with an auto-reconnect can't get clobbered by the
@@ -938,6 +946,7 @@ export class ESPHomeApp extends LitElement {
         @open-reset-build-env=${this._onOpenResetBuildEnv}
         @open-feedback=${this._onOpenFeedback}
         @open-onboarding-wifi=${this._onOpenOnboarding}
+        @secrets-saved=${this._onSecretsSaved}
       >
         ${this._router.outlet()}
       </esphome-layout>

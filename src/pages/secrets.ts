@@ -270,12 +270,24 @@ export class ESPHomePageSecrets extends LitElement {
   private _save() {
     this._savedYaml = this._yaml;
     toast.success(this._localize("secrets.saved"), { richColors: true });
-    this._api.updateConfig(SECRETS_FILE, this._yaml).catch((e) => {
-      const msg = e instanceof Error ? e.message : "";
-      if (!msg.includes("timed out")) {
-        toast.error(this._localize("secrets.save_error"), { richColors: true });
-      }
-    });
+    this._api
+      .updateConfig(SECRETS_FILE, this._yaml)
+      .then(() => {
+        this.dispatchEvent(
+          new CustomEvent("secrets-saved", {
+            bubbles: true,
+            composed: true,
+          }),
+        );
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : "";
+        if (!msg.includes("timed out")) {
+          toast.error(this._localize("secrets.save_error"), {
+            richColors: true,
+          });
+        }
+      });
   }
 }
 
