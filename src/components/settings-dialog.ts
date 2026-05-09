@@ -1415,13 +1415,10 @@ export class ESPHomeSettingsDialog extends LitElement {
   /**
    * Render one row of the issued-tokens list.
    *
-   * Each row carries the user-facing label, a truncated
-   * ``token_id`` (the full id is 11 chars but visually it's
-   * still opaque hex; truncating the middle makes the row
-   * scannable while keeping enough chars on either side for
-   * the user to recognise their own token), the relative
-   * created-at, a bound-dashboard-id badge, and a Revoke
-   * button.
+   * Each row carries the user-facing label, the full
+   * ``token_id`` (11 chars; short enough not to need
+   * truncation), the created-at, a bound-dashboard-id
+   * badge, and a Revoke button.
    */
   private _renderTokenRow(token: TokenSummary) {
     const created = new Date(token.created_at * 1000);

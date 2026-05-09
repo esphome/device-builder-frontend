@@ -94,6 +94,16 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
     this._dialog.open = false;
   }
 
+  override disconnectedCallback() {
+    super.disconnectedCallback();
+    // Safety net for the case where the parent route changes
+    // (browser-back, link click outside the dialog) without
+    // wa-after-hide firing first. The element is about to be
+    // GC'd anyway; this just makes sure the cleartext doesn't
+    // sit in JS heap waiting for it.
+    this._bearer = null;
+  }
+
   static styles = [
     espHomeStyles,
     css`
