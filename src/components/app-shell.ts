@@ -231,10 +231,11 @@ export class ESPHomeApp extends LitElement {
 
   /** True when onboarding has any data-derived ``pending`` step.
    *  Derived in ``_loadOnboardingState`` from
-   *  ``onboarding/get_state``. Surfaced to header-actions for the
-   *  Secrets-menu dot. Dialog visibility uses a separate signal
-   *  (acknowledged-version + session-dismissal) — this context is
-   *  the always-on data signal that should outlive any dismissal. */
+   *  ``onboarding/get_state``. Surfaced to header-actions to gate
+   *  the conditional ``Set up Wi-Fi…`` kebab entry. Dialog
+   *  visibility uses a separate signal (acknowledged-version +
+   *  session-dismissal) — this context is the always-on data
+   *  signal that should outlive any dismissal. */
   @provide({ context: onboardingPendingContext })
   @state()
   private _onboardingPending = false;
@@ -507,12 +508,13 @@ export class ESPHomeApp extends LitElement {
   }
 
   /** Load the onboarding snapshot and update both the
-   *  always-on data signal (``_onboardingPending`` — drives the
-   *  Secrets-menu dot) and the dialog-show signal
-   *  (``_onboardingShouldShow`` — gated by acknowledged-version
-   *  + session-dismissal). Re-runs on reconnect; the dialog
-   *  doesn't re-open mid-session because
-   *  ``_onboardingSessionDismissed`` survives the refresh. */
+   *  always-on data signal (``_onboardingPending`` — gates the
+   *  ``Set up Wi-Fi…`` kebab entry in header-actions) and the
+   *  dialog-show signal (``_onboardingShouldShow`` — gated by
+   *  acknowledged-version + session-dismissal). Re-runs on
+   *  reconnect and after every secrets save; the dialog doesn't
+   *  re-open mid-session because ``_onboardingSessionDismissed``
+   *  survives the refresh. */
   private async _loadOnboardingState() {
     try {
       const state = await this._api.getOnboardingState();

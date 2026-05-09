@@ -300,6 +300,11 @@ export class ESPHomePageSecrets extends LitElement {
   }
 
   private _save() {
+    // Optimistic update: dirty-state UI flips back to "saved"
+    // immediately so the Save button disables. Snapshot the
+    // previous saved buffer first so a real (non-timeout)
+    // failure can revert and let the user retry.
+    const previousSaved = this._savedYaml;
     this._savedYaml = this._yaml;
     toast.success(this._localize("secrets.saved"), { richColors: true });
     this._api
@@ -315,7 +320,14 @@ export class ESPHomePageSecrets extends LitElement {
       })
       .catch((e) => {
         const msg = e instanceof Error ? e.message : "";
+        // WS commands may time out client-side while the server
+        // still completes the write — keep the optimistic buffer
+        // so the user isn't told their save failed when it
+        // probably succeeded. Any other error is a real failure:
+        // restore the previous saved buffer so the dirty state
+        // returns and the user can retry.
         if (!msg.includes("timed out")) {
+          this._savedYaml = previousSaved;
           toast.error(this._localize("secrets.save_error"), {
             richColors: true,
           });

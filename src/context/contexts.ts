@@ -118,11 +118,13 @@ export const labelsContext = createContext<Label[]>(
  * Context for whether onboarding still has work to do.
  *
  * App shell loads ``onboarding/get_state`` on (re)connect and
- * provides ``true`` when any step is data-derived ``pending``
- * (currently only the Wi-Fi step). Header-actions consumes it to
- * render a small dot next to the Secrets menu item — the only
- * persistent reminder for a user who declined the setup wizard
- * with "I only use Ethernet" but might later switch to Wi-Fi.
+ * after every ``secrets-saved`` event, providing ``true`` when
+ * any step is data-derived ``pending`` (currently only the
+ * Wi-Fi step). Header-actions consumes it to gate a dedicated
+ * ``Set up Wi-Fi…`` kebab entry — the persistent re-entry path
+ * for a user who declined the wizard with "I don't use Wi-Fi"
+ * but might later change their mind, or who hand-cleared
+ * ``wifi_ssid`` in the secrets editor.
  */
 export const onboardingPendingContext = createContext<boolean>(
   Symbol("esphome-onboarding-pending")

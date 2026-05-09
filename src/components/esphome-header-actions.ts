@@ -63,11 +63,14 @@ export class ESPHomeHeaderActions extends LitElement {
 
   /** True when onboarding still has work to do (currently:
    *  Wi-Fi step pending — data-derived from ``secrets.yaml``).
-   *  Renders a small dot next to the Secrets menu item so a user
-   *  who's declined the onboarding wizard still has a visible
-   *  reminder that their credentials aren't set — important for
-   *  users who later switch from Ethernet to Wi-Fi.
-   *  Owned by the app shell, threaded via context. */
+   *  Gates a dedicated ``Set up Wi-Fi…`` kebab entry so a user
+   *  who declined the wizard with "I don't use Wi-Fi" — or who
+   *  cleared the credentials by hand from the Secrets editor —
+   *  still has a one-click re-entry into the wizard. The entry
+   *  appears / disappears in real time as ``secrets.yaml``
+   *  changes (the app-shell re-fetches the snapshot on every
+   *  ``secrets-saved`` event). Owned by the app shell, threaded
+   *  via context. */
   @consume({ context: onboardingPendingContext, subscribe: true })
   @state()
   private _onboardingPending = false;
