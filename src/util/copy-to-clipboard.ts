@@ -35,53 +35,46 @@
  * Copy *text* to the user's clipboard, returning whether the
  * copy succeeded.
  *
- * Tries ``navigator.clipboard.writeText`` first (works in secure
- * contexts and in HA-addon ingress where the upstream proxy
- * negotiates HTTPS); falls back to a temporary ``<textarea>`` +
- * ``execCommand("copy")`` for plain-HTTP origins where the
- * modern API is unavailable. Suppresses thrown errors from
- * either path so the caller's toast logic can run on a single
- * ``false`` return.
+ * **Order matters.** Tries ``execCommand("copy")`` FIRST
+ * (synchronous, preserves the user-gesture token from the
+ * click handler that called us), falls back to
+ * ``navigator.clipboard.writeText`` only if that path failed.
+ * The reverse order — try the async API first, fall back to
+ * execCommand on failure — looks cleaner but loses the gesture
+ * token across the ``await``: by the time the async API
+ * rejects, ``execCommand("copy")`` returns ``true`` but
+ * doesn't actually write anything in some browsers (Chromium
+ * on plain-HTTP, notably). Going synchronous-first matches
+ * the pattern in the popular ``copy-to-clipboard`` library
+ * (4M+ downloads/week) and is what makes this work uniformly
+ * across the dashboard's deployment shapes.
  */
 export async function copyToClipboard(text: string): Promise<boolean> {
+  if (copyViaExecCommand(text)) return true;
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
-      // ``NotAllowedError`` (non-secure context) and other
-      // failures fall through to the legacy path. We don't
-      // distinguish — both indicate the modern API is
-      // unusable here and the fallback is the user's only
-      // remaining option.
+      // Both paths failed — caller surfaces the error toast.
     }
   }
-  return copyViaExecCommand(text);
+  return false;
 }
 
 /**
  * Legacy textarea + ``execCommand("copy")`` fallback.
  *
- * Several traps to avoid here, learned from the broken first
- * implementation that returned ``true`` from ``execCommand``
- * but didn't actually put text on the clipboard:
- *
- * * **Off-screen positioning, NOT ``opacity: 0``.** Some
- *   browsers treat ``opacity: 0`` as "not rendered" and
- *   silently break the selection range, after which
- *   ``execCommand("copy")`` returns ``true`` but copies
- *   nothing. Negative left + ``position: fixed`` keeps the
- *   textarea rendered (so selection works) but invisible.
- *
- * * **Explicit ``setSelectionRange``** on top of ``select()``.
- *   Some browsers (notably mobile Safari) ignore ``.select()``
- *   on a textarea with ``readonly``; the explicit range form
- *   works around this.
- *
- * * **Save and restore focus.** The click handler that called
- *   us had a focused element (the Copy button); the textarea
- *   focus we steal is brief, but skipping the restore would
- *   leave focus orphaned on the now-removed textarea.
+ * Pattern lifted from the proven ``copy-to-clipboard`` library:
+ * ``position: absolute; left: -9999px`` (off-screen but still
+ * laid out), simple ``.select()`` on a textarea, no
+ * ``contentEditable`` / ``setSelectionRange`` flourishes that
+ * sometimes interact badly with browser-specific focus quirks.
+ * The earlier ``opacity: 0`` + ``position: fixed`` combination
+ * caused the symptom the user reported: ``execCommand`` returned
+ * ``true`` but the system clipboard ended up empty because some
+ * browsers treat opacity-0 as not-rendered and silently break
+ * the selection.
  *
  * Removes the element regardless of success / failure path.
  */
@@ -89,27 +82,18 @@ function copyViaExecCommand(text: string): boolean {
   if (typeof document === "undefined") return false;
   const textarea = document.createElement("textarea");
   textarea.value = text;
-  // ``readonly`` keeps mobile keyboards from popping up
-  // during the brief moment the textarea is focused.
-  textarea.setAttribute("readonly", "");
-  textarea.style.position = "fixed";
-  textarea.style.top = "0";
-  // Off-screen rather than opacity-0: see header comment.
+  textarea.style.position = "absolute";
   textarea.style.left = "-9999px";
-  textarea.style.fontSize = "12pt";
-  const previouslyFocused = document.activeElement as HTMLElement | null;
+  textarea.style.top = "0";
   document.body.appendChild(textarea);
   let ok = false;
   try {
-    textarea.focus();
     textarea.select();
-    textarea.setSelectionRange(0, text.length);
     ok = document.execCommand("copy");
   } catch {
     ok = false;
   } finally {
     document.body.removeChild(textarea);
-    previouslyFocused?.focus?.();
   }
   return ok;
 }
