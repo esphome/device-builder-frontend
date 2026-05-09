@@ -27,17 +27,27 @@ function stubDocument(execReturn: boolean): {
       return el;
     },
   };
+  // Minimal Range + Selection stubs — the helper only calls
+  // ``selectNodeContents`` on the range and add/removeRanges
+  // on the selection.
+  const fakeSelection = {
+    rangeCount: 0,
+    getRangeAt: () => ({}),
+    removeAllRanges: () => undefined,
+    addRange: () => undefined,
+  };
   vi.stubGlobal("document", {
     createElement: () => ({
-      value: "",
+      textContent: "",
       setAttribute: () => undefined,
       style: {},
-      focus: () => undefined,
-      select: () => undefined,
-      setSelectionRange: () => undefined,
     }),
+    createRange: () => ({
+      selectNodeContents: () => undefined,
+      cloneRange: () => ({}),
+    }),
+    getSelection: () => fakeSelection,
     body: fakeBody,
-    activeElement: null,
     execCommand: execSpy,
   });
   return { execSpy, appended, removed };

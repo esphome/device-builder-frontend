@@ -63,37 +63,80 @@ export async function copyToClipboard(text: string): Promise<boolean> {
 }
 
 /**
- * Legacy textarea + ``execCommand("copy")`` fallback.
+ * Legacy ``execCommand("copy")`` fallback using a ``<span>`` +
+ * Selection API.
  *
- * Pattern lifted from the proven ``copy-to-clipboard`` library:
- * ``position: absolute; left: -9999px`` (off-screen but still
- * laid out), simple ``.select()`` on a textarea, no
- * ``contentEditable`` / ``setSelectionRange`` flourishes that
- * sometimes interact badly with browser-specific focus quirks.
- * The earlier ``opacity: 0`` + ``position: fixed`` combination
- * caused the symptom the user reported: ``execCommand`` returned
- * ``true`` but the system clipboard ended up empty because some
- * browsers treat opacity-0 as not-rendered and silently break
- * the selection.
+ * Pattern lifted from the proven ``copy-to-clipboard`` library
+ * (4M+ weekly downloads). A textarea with ``select()`` works
+ * sometimes but fails in subtle ways across browsers — earlier
+ * versions of this helper used a textarea and ``execCommand``
+ * returned ``true`` while the system clipboard ended up empty
+ * on Firefox + Chromium when the dashboard was reached on
+ * ``http://0.0.0.0:6052`` (non-secure context where
+ * ``navigator.clipboard.writeText`` rejects, leaving execCommand
+ * as the only path).
  *
- * Removes the element regardless of success / failure path.
+ * The span + Selection API approach sidesteps the textarea
+ * focus dance entirely — we create a span with the text as
+ * its content, range-select its contents into the document
+ * Selection, then fire ``execCommand("copy")``. The browser's
+ * native copy path reads from the active Selection and
+ * faithfully copies the text. ``style.all = unset`` is
+ * critical: the Settings dialog inherits ``user-select: none``
+ * for parts of its tree, and a default-styled span would
+ * inherit that and silently fail to be selectable.
+ *
+ * ``clip: rect(0, 0, 0, 0)`` hides the span without taking it
+ * out of layout (which ``opacity: 0`` and ``display: none``
+ * both do, breaking selection). Removes the element + restores
+ * the previous selection regardless of success.
  */
 function copyViaExecCommand(text: string): boolean {
   if (typeof document === "undefined") return false;
-  const textarea = document.createElement("textarea");
-  textarea.value = text;
-  textarea.style.position = "absolute";
-  textarea.style.left = "-9999px";
-  textarea.style.top = "0";
-  document.body.appendChild(textarea);
+  const selection = document.getSelection();
+  // Capture any current selection so we can restore it after
+  // our hijacked range. The "Copy" button in our Settings
+  // dialog is rare to land on with selected text, but it's
+  // cheap to be a good citizen.
+  const previousRange =
+    selection && selection.rangeCount > 0
+      ? selection.getRangeAt(0).cloneRange()
+      : null;
+  const span = document.createElement("span");
+  span.textContent = text;
+  span.setAttribute("aria-hidden", "true");
+  // Reset user styles inherited from the document tree;
+  // ``user-select: none`` on the dialog ancestor would
+  // otherwise propagate down and silently break the selection
+  // we're about to programmatically establish.
+  span.style.all = "unset";
+  span.style.position = "fixed";
+  span.style.top = "0";
+  span.style.clip = "rect(0, 0, 0, 0)";
+  // ``pre`` preserves whitespace exactly (the cert pin has no
+  // whitespace, but a generalised helper shouldn't lose
+  // newlines for callers passing multi-line text).
+  span.style.whiteSpace = "pre";
+  // Override any inherited ``user-select: none``.
+  span.style.userSelect = "text";
+  document.body.appendChild(span);
   let ok = false;
   try {
-    textarea.select();
+    const range = document.createRange();
+    range.selectNodeContents(span);
+    if (selection) {
+      selection.removeAllRanges();
+      selection.addRange(range);
+    }
     ok = document.execCommand("copy");
   } catch {
     ok = false;
   } finally {
-    document.body.removeChild(textarea);
+    document.body.removeChild(span);
+    if (selection) {
+      selection.removeAllRanges();
+      if (previousRange) selection.addRange(previousRange);
+    }
   }
   return ok;
 }
