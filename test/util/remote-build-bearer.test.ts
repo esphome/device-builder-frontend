@@ -61,6 +61,51 @@ describe("mintRemoteBuildBearer", () => {
     }
   });
 
+  it("encodes known bytes to the canonical base64url form", () => {
+    // Pin the encoder against a deterministic input so a bug in
+    // the alphabet replacement (e.g. only patching ``+`` and
+    // forgetting ``/``) or in the padding strip can't pass by
+    // luck on random bytes that happened not to trigger the
+    // buggy path. The 8-byte id and 32-byte secret here are
+    // chosen so the standard base64 output contains BOTH ``+``
+    // and ``/`` and a trailing ``=``; the base64url form
+    // transforms all three.
+    //
+    // Standard base64(0xfb,0xff,0xbf,0xfe,0xff,0xbf,0xfe,0xff)
+    //                        = "+/+//v+//v8="
+    // base64url (RFC 4648 §5) of the same:
+    //                        = "-_-__v-__v8"  (12 → 11 chars, padding stripped)
+    const idBytes = new Uint8Array([0xfb, 0xff, 0xbf, 0xfe, 0xff, 0xbf, 0xfe, 0xff]);
+    // For the secret, just repeat a non-trivial pattern long
+    // enough to fill 32 bytes; the goal is to exercise the
+    // encoder over the longer length, not to pin the exact
+    // string.
+    const secretBytes = new Uint8Array(32);
+    for (let i = 0; i < 32; i++) secretBytes[i] = (i * 37) & 0xff;
+
+    let call = 0;
+    const fakeCrypto = {
+      getRandomValues: <T extends ArrayBufferView>(view: T): T => {
+        const target = view as unknown as Uint8Array;
+        const src = call === 0 ? idBytes : secretBytes;
+        target.set(src);
+        call += 1;
+        return view;
+      },
+    };
+    vi.stubGlobal("crypto", fakeCrypto);
+    try {
+      const minted = mintRemoteBuildBearer();
+      expect(minted.token_id).toBe("-_-__v-__v8");
+      expect(minted.token_id).toMatch(/^[A-Za-z0-9_-]{11}$/);
+      // No '+', '/', or '=' in either half.
+      expect(minted.secret).not.toMatch(/[+/=]/);
+      expect(minted.bearer).toBe(`${minted.token_id}.${minted.secret}`);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("throws if crypto.getRandomValues is unavailable", () => {
     // The backend can verify only the hash's shape, not its
     // entropy, so falling back to ``Math.random`` would silently

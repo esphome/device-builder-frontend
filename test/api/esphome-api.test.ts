@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import { mintRemoteBuildBearer } from "../../src/util/remote-build-bearer.js";
 import {
   MockWebSocket,
   installMockWebSocket,
@@ -806,6 +807,47 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.args).toBeUndefined();
     ws.receive({ message_id: sent.message_id, result: payload });
     await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("addRemoteBuildToken accepts mintRemoteBuildBearer output as-is (chain contract)", async () => {
+    // Pin the integration the UI does end-to-end: the mint
+    // helper returns a shape that the wrapper accepts without
+    // any reformatting. A drift in either side's field naming
+    // (e.g. mint returns ``tokenId`` while the wrapper reads
+    // ``token_id``) would only surface in production today;
+    // this test catches it at unit-test time.
+    const minted = mintRemoteBuildBearer();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.addRemoteBuildToken({
+      label: "green",
+      token_id: minted.token_id,
+      secret_sha256: minted.secret_sha256,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/add_token");
+    expect(sent.args).toEqual({
+      label: "green",
+      token_id: minted.token_id,
+      secret_sha256: minted.secret_sha256,
+    });
+    // Belt and braces: explicitly assert no cleartext leaked.
+    expect(sent.args).not.toHaveProperty("secret");
+    expect(sent.args).not.toHaveProperty("bearer");
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        token_id: minted.token_id,
+        label: "green",
+        created_at: 1715212800,
+        bound_dashboard_id: null,
+      },
+    });
+    await pending;
   });
 
   it("rotateRemoteBuildIdentity sends remote_build/rotate_identity and unwraps the result", async () => {
