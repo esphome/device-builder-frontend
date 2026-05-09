@@ -12,7 +12,12 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import { ErrorCode, type IdentityView, type RemoteBuildPeer } from "../api/types.js";
+import {
+  ErrorCode,
+  type IdentityView,
+  type RemoteBuildPeer,
+  type TokenSummary,
+} from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
 import { readStoredLocale } from "../common/localize.js";
 
@@ -30,6 +35,8 @@ import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import "./generate-build-server-token-dialog.js";
+import type { ESPHomeGenerateBuildServerTokenDialog } from "./generate-build-server-token-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -174,8 +181,35 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _buildServerRotateInFlight = false;
 
+  // Phase 3c2c: tokens list state. Lazy-loaded on Build
+  // server section open via ``listRemoteBuildTokens``,
+  // refreshed after every Generate / Revoke. Same null /
+  // empty-array / load-failed shape as the identity load:
+  // ``null`` = not yet loaded, an empty array = loaded with
+  // zero tokens, the load-failed flag is tracked separately.
+  @state()
+  private _buildServerTokens: TokenSummary[] | null = null;
+
+  @state()
+  private _buildServerTokensLoadFailed = false;
+
+  /**
+   * Token id of the row whose Revoke button was just clicked.
+   * Captured here so the shared ``<esphome-confirm-dialog>``'s
+   * ``@confirm`` handler knows which row to remove. ``null``
+   * when no revoke is pending.
+   */
+  @state()
+  private _pendingRevokeTokenId: string | null = null;
+
   @query("#rotate-confirm")
   private _rotateConfirmDialog!: ESPHomeConfirmDialog;
+
+  @query("#revoke-confirm")
+  private _revokeConfirmDialog!: ESPHomeConfirmDialog;
+
+  @query("esphome-generate-build-server-token-dialog")
+  private _generateTokenDialog!: ESPHomeGenerateBuildServerTokenDialog;
 
   @state()
   private _section: Section = "appearance";
@@ -209,6 +243,9 @@ export class ESPHomeSettingsDialog extends LitElement {
     // ``<esphome-confirm-dialog>`` handles its own state, so
     // we only reset the flag here.
     this._buildServerRotateInFlight = false;
+    this._buildServerTokens = null;
+    this._buildServerTokensLoadFailed = false;
+    this._pendingRevokeTokenId = null;
     this._dialog.open = true;
   }
 
@@ -226,6 +263,9 @@ export class ESPHomeSettingsDialog extends LitElement {
     if (section === "build_server") {
       if (this._buildServerIdentity === null && !this._buildServerIdentityLoadFailed) {
         void this._loadBuildServerIdentity();
+      }
+      if (this._buildServerTokens === null && !this._buildServerTokensLoadFailed) {
+        void this._loadBuildServerTokens();
       }
     }
     if (section === "build_offload") {
@@ -303,10 +343,83 @@ export class ESPHomeSettingsDialog extends LitElement {
     }
   }
 
+  /**
+   * Fetch the issued-tokens list for the Build server section.
+   *
+   * Same null / empty / load-failed shape as the identity load.
+   * Called on section open and after a successful Generate /
+   * Revoke so the list reflects the post-mutation state.
+   */
+  private async _loadBuildServerTokens(): Promise<void> {
+    if (this._api === undefined) {
+      return;
+    }
+    try {
+      this._buildServerTokens = await this._api.listRemoteBuildTokens();
+      this._buildServerTokensLoadFailed = false;
+    } catch (err) {
+      console.warn("Could not load remote-build tokens:", err);
+      this._buildServerTokensLoadFailed = true;
+    }
+  }
+
+  private _onGenerateTokenRequest() {
+    this._generateTokenDialog?.open();
+  }
+
+  /**
+   * Handler for ``<esphome-generate-build-server-token-dialog>``'s
+   * ``token-issued`` event. Refresh the tokens list so the new
+   * row appears with the right ``created_at`` and
+   * ``bound_dashboard_id`` (still ``null`` until the sender
+   * uses it for the first time).
+   */
+  private _onTokenIssued() {
+    void this._loadBuildServerTokens();
+  }
+
+  private _onRevokeRequest(tokenId: string) {
+    this._pendingRevokeTokenId = tokenId;
+    this._revokeConfirmDialog?.open();
+  }
+
+  /**
+   * Handler for the revoke confirm dialog's ``@confirm`` event.
+   *
+   * Pulls ``_pendingRevokeTokenId`` (set by
+   * ``_onRevokeRequest``) so the shared confirm-dialog
+   * component doesn't need per-row state. Refreshes the list
+   * on success; toasts on failure.
+   */
+  private async _onRevokeConfirm() {
+    const tokenId = this._pendingRevokeTokenId;
+    this._pendingRevokeTokenId = null;
+    if (this._api === undefined || tokenId === null) {
+      return;
+    }
+    try {
+      await this._api.removeRemoteBuildToken({ token_id: tokenId });
+    } catch (err) {
+      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+        // Token already gone — could be a stale list (revoked
+        // from another tab between the user's click and our
+        // request). Still refresh to drop the row locally;
+        // soft-toast rather than error.
+        this._toast("warning", "settings.build_server_revoke_already_gone");
+      } else {
+        this._toast("error", "settings.build_server_revoke_failed");
+      }
+      void this._loadBuildServerTokens();
+      return;
+    }
+    this._toast("success", "settings.build_server_revoke_success");
+    void this._loadBuildServerTokens();
+  }
+
   private _onRotateRequest() {
     // Open the shared ``<esphome-confirm-dialog>`` rather than
     // rotating immediately. Rotation is a security-sensitive
-    // action that invalidates every paired offloader's pin;
+    // action that invalidates every paired sender's pin;
     // a single misclick shouldn't trigger that cascade. The
     // confirm dialog (shared component, destructive style)
     // spells out the consequence so the user has to
@@ -827,6 +940,75 @@ export class ESPHomeSettingsDialog extends LitElement {
         color: var(--wa-color-warning-on-quiet, #8a6d3b);
       }
 
+      /* Tokens list (3c2c) */
+
+      .token-row .row-desc {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: var(--wa-space-s);
+        margin-top: 4px;
+      }
+
+      .token-id {
+        font-family: var(--wa-font-family-mono, monospace);
+        font-size: var(--wa-font-size-xs);
+        background: var(--wa-color-surface-lowered);
+        padding: 1px 6px;
+        border-radius: var(--wa-border-radius-s);
+      }
+
+      .token-meta {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+      }
+
+      .token-bound-badge {
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        padding: 2px var(--wa-space-s);
+        border-radius: var(--wa-border-radius-pill, 999px);
+      }
+
+      .token-bound-unbound {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-quiet);
+      }
+
+      .token-bound-bound {
+        background: var(--wa-color-success-quiet, #d6f5dd);
+        color: var(--wa-color-success-on-quiet, #036a1c);
+      }
+
+      .token-revoke {
+        padding: 6px var(--wa-space-m);
+        background: var(--wa-color-surface-raised);
+        border: var(--wa-border-width-s) solid
+          var(--wa-color-danger-on-quiet, #b00020);
+        border-radius: var(--wa-border-radius-s);
+        color: var(--wa-color-danger-on-quiet, #b00020);
+        font: inherit;
+        font-size: var(--wa-font-size-s);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .tokens-actions {
+        margin-top: var(--wa-space-m);
+      }
+
+      .tokens-generate {
+        padding: 8px var(--wa-space-m);
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+        border: var(--wa-border-width-s) solid var(--esphome-primary);
+        border-radius: var(--wa-border-radius-s);
+        font: inherit;
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-semibold);
+        cursor: pointer;
+      }
+
       @media (max-width: 700px) {
         .layout {
           flex-direction: column;
@@ -995,6 +1177,14 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.build_server_card_desc")}
       </div>
       ${this._renderBuildServerCard()}
+
+      <div class="section-heading">
+        ${this._localize("settings.build_server_tokens_heading")}
+      </div>
+      <div class="section-intro">
+        ${this._localize("settings.build_server_tokens_desc")}
+      </div>
+      ${this._renderBuildServerTokens()}
     `;
   }
 
@@ -1159,6 +1349,119 @@ export class ESPHomeSettingsDialog extends LitElement {
         )}
         @confirm=${this._onRotateConfirm}
       ></esphome-confirm-dialog>
+    `;
+  }
+
+  private _renderBuildServerTokens() {
+    if (this._buildServerTokensLoadFailed) {
+      return html`
+        <div class="row" role="alert">
+          <div class="row-label">
+            <span class="row-desc">
+              ${this._localize("settings.build_server_tokens_load_failed")}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+    if (this._buildServerTokens === null) {
+      return html`
+        <div class="row" role="status">
+          <div class="row-label">
+            <span class="row-desc">
+              ${this._localize("settings.build_server_tokens_loading")}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+    return html`
+      ${this._buildServerTokens.length === 0
+        ? html`
+            <div class="row" role="status">
+              <div class="row-label">
+                <span class="row-desc">
+                  ${this._localize("settings.build_server_tokens_empty")}
+                </span>
+              </div>
+            </div>
+          `
+        : this._buildServerTokens.map((t) => this._renderTokenRow(t))}
+      <div class="tokens-actions">
+        <button
+          type="button"
+          class="tokens-generate"
+          @click=${this._onGenerateTokenRequest}
+        >
+          ${this._localize("settings.build_server_generate_token")}
+        </button>
+      </div>
+      <esphome-generate-build-server-token-dialog
+        @token-issued=${this._onTokenIssued}
+      ></esphome-generate-build-server-token-dialog>
+      <esphome-confirm-dialog
+        id="revoke-confirm"
+        destructive
+        heading=${this._localize("settings.build_server_revoke_confirm_title")}
+        message=${this._localize("settings.build_server_revoke_confirm_body")}
+        confirm-label=${this._localize(
+          "settings.build_server_revoke_confirm_confirm"
+        )}
+        @confirm=${this._onRevokeConfirm}
+      ></esphome-confirm-dialog>
+    `;
+  }
+
+  /**
+   * Render one row of the issued-tokens list.
+   *
+   * Each row carries the user-facing label, a truncated
+   * ``token_id`` (the full id is 11 chars but visually it's
+   * still opaque hex; truncating the middle makes the row
+   * scannable while keeping enough chars on either side for
+   * the user to recognise their own token), the relative
+   * created-at, a bound-dashboard-id badge, and a Revoke
+   * button.
+   */
+  private _renderTokenRow(token: TokenSummary) {
+    const created = new Date(token.created_at * 1000);
+    return html`
+      <div class="row token-row">
+        <div class="row-label">
+          <span class="row-title">${token.label}</span>
+          <span class="row-desc">
+            <code class="token-id">${token.token_id}</code>
+            <span class="token-meta">
+              ${this._localize("settings.build_server_token_created_at", {
+                date: created.toLocaleDateString(),
+              })}
+            </span>
+            <span
+              class=${`token-bound-badge ${
+                token.bound_dashboard_id === null
+                  ? "token-bound-unbound"
+                  : "token-bound-bound"
+              }`}
+            >
+              ${token.bound_dashboard_id === null
+                ? this._localize("settings.build_server_token_unbound")
+                : this._localize("settings.build_server_token_bound", {
+                    id: token.bound_dashboard_id,
+                  })}
+            </span>
+          </span>
+        </div>
+        <button
+          type="button"
+          class="token-revoke"
+          aria-label=${this._localize("settings.build_server_revoke_aria", {
+            label: token.label,
+          })}
+          @click=${() => this._onRevokeRequest(token.token_id)}
+        >
+          ${this._localize("settings.build_server_revoke")}
+        </button>
+      </div>
     `;
   }
 

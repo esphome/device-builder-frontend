@@ -55,7 +55,7 @@ describe("formatPinSha256", () => {
     // a divergence between frontend display and what the
     // receiver renders on its own card surfaces here at unit-
     // test time. The user's OOB-verification step is
-    // "compare what the offloader saw to what the receiver
+    // "compare what the sender saw to what the receiver
     // says"; if these two lines disagree on spacing /
     // grouping the user can't compare them.
     const pin = "deadbeefcafebabe1234567890abcdef".repeat(2); // 64 chars

@@ -20,7 +20,7 @@
  *
  * The frontend POSTs only ``{label, token_id, secret_sha256}`` to
  * ``remote_build/add_token``; the cleartext stays in local state
- * long enough for the user to copy it into the offloader and is
+ * long enough for the user to copy it into the sender and is
  * then discarded.
  *
  * RNG: ``crypto.getRandomValues`` is the ONLY acceptable source.
@@ -53,7 +53,7 @@ export const REMOTE_BUILD_SECRET_SHA256_CHARS = 64;
  *
  * ``token_id`` and ``secret_sha256`` are what we POST to the
  * backend via ``add_token``; ``secret`` is the cleartext half
- * the caller shows to the user once for copy-into-offloader.
+ * the caller shows to the user once for copy-into-sender.
  * The caller composes the wire bearer as
  * ``${token_id}.${secret}`` themselves at display time —
  * carrying a pre-composed ``bearer`` field here would put the

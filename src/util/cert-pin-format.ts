@@ -4,7 +4,7 @@
  * The wire form of ``pin_sha256`` is a contiguous 64-char
  * lowercase hex string. For OOB verification (the user reads
  * the fingerprint off the receiver's Build host card and
- * compares to what the offloader's pair dialog observed on the
+ * compares to what the sender's pair dialog observed on the
  * TLS handshake), space-separated byte pairs are easier to
  * scan visually:
  *

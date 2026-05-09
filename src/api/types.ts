@@ -1163,13 +1163,13 @@ export interface ManualHost {
  * matched against candidate cleartext bearers). The cleartext
  * bearer is generated client-side at ``add_token`` time and
  * never crosses the wire to the backend; this list is the
- * receiver's view of "which paired offloaders does this
+ * receiver's view of "which paired senders does this
  * dashboard recognise" — there's no path to recover the
  * cleartext from anywhere server-side.
  *
  * ``bound_dashboard_id`` starts ``null`` and is filled in by
  * phase 3b3's first-use binding the first time an authenticated
- * request lands carrying the offloader's ``X-Dashboard-ID``.
+ * request lands carrying the sender's ``X-Dashboard-ID``.
  * The Settings UI renders a "not yet bound" badge while ``null``
  * and a "bound to <id>" badge once set.
  */
@@ -1203,7 +1203,7 @@ export interface RemoteBuildPeer {
  * The cert + key PEMs are intentionally NOT included — only the
  * SPKI fingerprint (``pin_sha256``, lowercase hex SHA-256 of the
  * SubjectPublicKeyInfo) is safe to ship, and it's what an
- * offloader pins against anyway. ``listener_bound`` reports
+ * sender pins against anyway. ``listener_bound`` reports
  * whether the ``/remote-build/v1/*`` HTTPS site is currently
  * serving traffic; lets the Settings UI distinguish "rotation
  * succeeded AND the listener is back up" from "rotation
@@ -1250,7 +1250,7 @@ export type AddRemoteBuildTokenArgs = {
  * ``X-Dashboard-ID`` doesn't match the token's bound value.
  * ``race_loss`` distinguishes a concurrent first-use bind that
  * lost the race (likely an operator pasted the cleartext into
- * two offloaders by mistake; soften the wording) from a hit on
+ * two senders by mistake; soften the wording) from a hit on
  * an already-bound token (more suspicious — stolen bearer or
  * paste-into-wrong-machine; loud wording with an inline revoke
  * CTA).

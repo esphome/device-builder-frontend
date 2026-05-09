@@ -1429,7 +1429,7 @@ export class ESPHomeAPI {
    * hash; the cleartext bearer never crosses the wire to the
    * backend. The returned {@link TokenSummary} carries no
    * secret material (the cleartext lives only in the caller's
-   * local state until they paste it into the offloader, then
+   * local state until they paste it into the sender, then
    * it's discarded). Duplicate ``token_id`` rejected with
    * ``ErrorCode.ALREADY_EXISTS``.
    */
@@ -1441,7 +1441,7 @@ export class ESPHomeAPI {
    * Revoke a previously-issued token.
    *
    * Removing a bound token immediately disconnects the
-   * offloader it's paired to: the next request the offloader
+   * sender it's paired to: the next request the sender
    * sends presents a ``token_id`` the receiver no longer
    * recognises and gets a 401. Unknown ``token_id`` raises
    * ``ErrorCode.NOT_FOUND``.
@@ -1464,7 +1464,7 @@ export class ESPHomeAPI {
    * esphome_version, listener_bound}``. The cert + key PEMs are
    * intentionally NOT included; only the SPKI fingerprint
    * (``pin_sha256``, lowercase hex) is safe to ship to a
-   * frontend, and the fingerprint is what an offloader pins
+   * frontend, and the fingerprint is what an sender pins
    * against anyway. Idempotent (no rotation triggered by reads).
    * Lazy-creates the cert + key on first call if missing.
    */
@@ -1475,7 +1475,7 @@ export class ESPHomeAPI {
   /**
    * Mint a fresh cert + keypair, replacing whatever's on disk.
    *
-   * Forces every paired offloader to re-pair (the new SPKI
+   * Forces every paired sender to re-pair (the new SPKI
    * produces a new ``pin_sha256``); ``dashboard_id`` is
    * preserved across rotations. If the receiver listener is
    * currently bound, it gets torn down and rebuilt against the
