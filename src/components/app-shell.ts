@@ -19,9 +19,12 @@ import {
   ErrorCode,
   JobStatus,
   JobType,
-  OnboardingStepStatus,
   Theme,
 } from "../api/types.js";
+import {
+  isOnboardingPending,
+  shouldAutoShowOnboarding,
+} from "../util/onboarding-gate.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -518,13 +521,11 @@ export class ESPHomeApp extends LitElement {
   private async _loadOnboardingState() {
     try {
       const state = await this._api.getOnboardingState();
-      this._onboardingPending = state.steps.some(
-        (s) => s.status === OnboardingStepStatus.PENDING,
+      this._onboardingPending = isOnboardingPending(state);
+      this._onboardingShouldShow = shouldAutoShowOnboarding(
+        state,
+        this._onboardingSessionDismissed,
       );
-      const userBehindCurrent =
-        state.completed_version < state.current_version;
-      this._onboardingShouldShow =
-        userBehindCurrent && !this._onboardingSessionDismissed;
     } catch (err) {
       // Onboarding is non-critical — a transient WS failure here
       // shouldn't block the rest of the dashboard. Clear the
