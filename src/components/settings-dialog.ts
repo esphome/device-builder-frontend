@@ -294,7 +294,19 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private async _onCopyPin() {
-    if (this._remoteBuildIdentity === null) {
+    // Defensive: refuse to "successfully" copy an empty value.
+    // A stale ``_remoteBuildIdentity`` or a state-glitch where
+    // ``pin_sha256`` is briefly empty would otherwise produce
+    // a "Copied!" toast while putting nothing on the clipboard
+    // — exactly the failure mode that's confusing to debug
+    // because the toast lies. If the pin is missing, surface
+    // the same error toast as a true copy failure so the user
+    // knows to refresh.
+    const pin = this._remoteBuildIdentity?.pin_sha256;
+    if (!pin) {
+      toast.warning(this._localize("settings.remote_build_pin_copy_failed"), {
+        richColors: true,
+      });
       return;
     }
     // Copy the unformatted (no-spaces) pin so a paste into a
@@ -310,7 +322,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     // where ``navigator.clipboard`` is undefined or throws
     // ``NotAllowedError``. The helper falls back to a hidden
     // textarea + ``execCommand("copy")`` in those contexts.
-    const ok = await copyToClipboard(this._remoteBuildIdentity.pin_sha256);
+    const ok = await copyToClipboard(pin);
     if (ok) {
       toast.success(this._localize("settings.remote_build_pin_copied"), {
         richColors: true,
