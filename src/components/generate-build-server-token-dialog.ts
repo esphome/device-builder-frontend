@@ -39,6 +39,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { ErrorCode, type TokenSummary } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { warningBannerStyles } from "../styles/banners.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
@@ -108,6 +109,7 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    warningBannerStyles,
     css`
       wa-dialog {
         --width: 480px;
@@ -210,18 +212,9 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
         cursor: not-allowed;
       }
 
-      /* One-time-token reveal: warning banner shape mirrors
-         settings-dialog's .phase-banner; same colour stack
-         from the WA warning palette. Two copies for now,
-         extract to styles/ if a third lands. */
-      .reveal-warn {
+      /* Per-consumer spacing for warningBannerStyles' .warning-banner. */
+      .warning-banner {
         margin: 0 0 var(--wa-space-m);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-radius: var(--wa-border-radius-s);
-        background: var(--wa-color-warning-fill-quiet, #fff7e0);
-        color: var(--wa-color-warning-text-quiet, #6b4f00);
-        border-left: 3px solid var(--wa-color-warning-border-loud, #f0b400);
-        font-size: var(--wa-font-size-s);
       }
 
       .reveal-token-wrap {
@@ -322,7 +315,7 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
 
   private _renderReveal() {
     return html`
-      <p class="reveal-warn" role="alert">
+      <p class="warning-banner" role="alert">
         ${this._localize("settings.build_server_token_reveal_warn")}
       </p>
       <div class="reveal-token-wrap">

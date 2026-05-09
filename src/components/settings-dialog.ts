@@ -32,6 +32,7 @@ import {
   remoteBuildEnabledContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
+import { warningBannerStyles } from "../styles/banners.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
@@ -157,12 +158,6 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _buildServerIdentityRotationCounter = 0;
 
-  /** Last rotation-counter value we re-fetched identity for, so
-   *  we don't loop on every render. ``-1`` means "haven't seen
-   *  any value yet"; the first ``updated()`` callback aligns it
-   *  with whatever the context provides without firing a fetch. */
-  private _lastSeenIdentityRotationCounter = -1;
-
   @consume({ context: apiContext })
   private _api?: ESPHomeAPI;
 
@@ -277,26 +272,24 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   /**
-   * Cross-tab refresh hook. Watches the
-   * ``buildServerIdentityRotationCounterContext`` value
-   * app-shell bumps when ``remote_build_identity_rotated``
-   * fires; on every change, re-fetches the identity so this
-   * tab's card matches whatever the rotating tab landed on the
-   * disk. Also re-fetches the tokens list when a binding
-   * mismatch fires, since the receiver may have re-bound a
-   * token's ``bound_dashboard_id`` in the same race window.
+   * Cross-tab refresh hook for the Build server identity card.
+   * App-shell bumps ``buildServerIdentityRotationCounterContext``
+   * on every ``remote_build_identity_rotated`` event; the
+   * matching ``@consume`` field arrives in ``changed`` whenever
+   * its value changes. Re-fetches identity so this tab's card
+   * matches whatever the rotating tab landed on disk.
+   *
+   * The ``changed.get(...)`` returns the *previous* value, which
+   * is ``undefined`` on the very first sync (Lit's first call
+   * after the consumer connects to the provider). Skip that one
+   * — it's not a real rotation, just the initial value flowing
+   * through.
    */
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
-    if (
-      this._lastSeenIdentityRotationCounter !== this._buildServerIdentityRotationCounter
-    ) {
-      const first = this._lastSeenIdentityRotationCounter === -1;
-      this._lastSeenIdentityRotationCounter = this._buildServerIdentityRotationCounter;
-      // Skip the very first sync — the consumer's initial value
-      // is just "what the provider had at construction time"; it
-      // doesn't represent a rotation we need to react to.
-      if (!first && this._buildServerIdentity !== null) {
+    if (changed.has("_buildServerIdentityRotationCounter")) {
+      const prev = changed.get("_buildServerIdentityRotationCounter");
+      if (prev !== undefined && this._buildServerIdentity !== null) {
         void this._loadBuildServerIdentity();
       }
     }
@@ -574,6 +567,7 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    warningBannerStyles,
     css`
       wa-dialog {
         --width: min(800px, 95vw);
@@ -768,15 +762,9 @@ export class ESPHomeSettingsDialog extends LitElement {
          via .row: zero horizontal padding, rely on the
          container. */
 
-      .phase-banner {
+      /* Per-consumer spacing for warningBannerStyles' .warning-banner. */
+      .warning-banner {
         margin: 0 0 var(--wa-space-m);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-radius: var(--wa-border-radius-s);
-        background: var(--wa-color-warning-fill-quiet, #fff7e0);
-        color: var(--wa-color-warning-text-quiet, #6b4f00);
-        border-left: 3px solid
-          var(--wa-color-warning-border-loud, #f0b400);
-        font-size: var(--wa-font-size-s);
       }
 
       /* Binding-mismatch alert rows. Same shape as
@@ -1327,7 +1315,7 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   private _renderBuildServerAlert(evt: RemoteBuildBindingMismatchEventData) {
     const known = (this._buildServerTokens ?? []).find(
-      (t) => t.token_id === evt.token_id,
+      (t) => t.token_id === evt.token_id
     );
     const labelOrId = known
       ? known.label
@@ -1378,7 +1366,7 @@ export class ESPHomeSettingsDialog extends LitElement {
    */
   private _renderBuildOffload() {
     return html`
-      <div class="phase-banner" role="status">
+      <div class="warning-banner" role="status">
         ${this._localize("settings.build_offload_unimplemented_banner")}
       </div>
 
