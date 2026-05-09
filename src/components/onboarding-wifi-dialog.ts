@@ -163,7 +163,12 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               placeholder=${this._localize("onboarding.wifi.ssid_placeholder")}
               ?disabled=${this._saving}
               @input=${(e: Event) => {
-                this._ssid = (e.target as HTMLInputElement).value;
+                // Read from currentTarget so we get the wa-input
+                // host element's value rather than risking the
+                // retargeted inner native ``<input>`` (mirrors the
+                // pattern in ``label-form.ts``).
+                this._ssid = (e.currentTarget as unknown as { value: string })
+                  .value;
               }}
             ></wa-input>
           </div>
@@ -173,6 +178,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               id="onboarding-password"
               .value=${this._password}
               .placeholder=${this._localize("onboarding.wifi.password_placeholder")}
+              .maxlength=${64}
               ?disabled=${this._saving}
               @password-input-change=${(
                 e: CustomEvent<PasswordInputValueChange>,
@@ -239,6 +245,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   private async _declinePermanently() {
     this._saving = true;
+    this._error = null;
     try {
       await this._api.markOnboardingAcknowledged();
       this._exitedExplicitly = true;

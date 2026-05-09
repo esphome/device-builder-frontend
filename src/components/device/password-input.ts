@@ -11,7 +11,7 @@
 
 import { mdiEye, mdiEyeOff } from "@mdi/js";
 import { consume } from "@lit/context";
-import { css, html, LitElement } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
@@ -57,6 +57,14 @@ export class ESPHomePasswordInput extends LitElement {
 
   @property({ type: Boolean })
   invalid = false;
+
+  /** Optional client-side cap on input length. Mirrors the ``maxlength``
+   *  attribute on a native ``<input>``; surfaces immediate feedback
+   *  instead of round-tripping through a backend rejection for known
+   *  caps (e.g. ESPHome's 64-char WPA password). Default 0 (no cap)
+   *  so existing call sites stay unchanged. */
+  @property({ type: Number })
+  maxlength = 0;
 
   @state()
   private _revealed = false;
@@ -134,6 +142,7 @@ export class ESPHomePasswordInput extends LitElement {
           ?disabled=${this.disabled}
           placeholder=${this.placeholder}
           autocomplete="off"
+          maxlength=${this.maxlength > 0 ? this.maxlength : nothing}
           @input=${this._onInput}
         />
         <button
