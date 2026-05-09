@@ -6,6 +6,7 @@ import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -172,12 +173,20 @@ export class ESPHomeApiKeyDialog extends LitElement {
   }
 
   private async _copy() {
-    try {
-      await navigator.clipboard.writeText(this.apiKey);
-      toast.success(this._localize("dashboard.action_api_key_copied"), { richColors: true });
-    } catch {
-      // Clipboard API not available
+    // Goes through ``copyToClipboard`` so the button works on
+    // plain-HTTP origins where ``navigator.clipboard.writeText``
+    // throws (HA-addon direct port, container-on-LAN deploys
+    // reaching the dashboard via ``http://192.168.x.x:6052``).
+    if (await copyToClipboard(this.apiKey)) {
+      toast.success(this._localize("dashboard.action_api_key_copied"), {
+        richColors: true,
+      });
     }
+    // No failure toast here — the api-key dialog already
+    // displays the key in plain text inside the dialog body,
+    // so the user can select-and-copy manually if the button
+    // failed. Keeping the silent-on-failure contract that
+    // existed before the helper switch.
   }
 }
 
