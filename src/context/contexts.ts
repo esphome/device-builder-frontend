@@ -11,6 +11,7 @@ import type {
   ConfiguredDevice,
   FirmwareJob,
   Label,
+  RemoteBuildBindingMismatchEventData,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
@@ -128,4 +129,45 @@ export const labelsContext = createContext<Label[]>(
  */
 export const onboardingPendingContext = createContext<boolean>(
   Symbol("esphome-onboarding-pending")
+);
+
+/**
+ * Recent ``remote_build_binding_mismatch`` events captured live
+ * over the WS subscription. Phase 3c2d (#106).
+ *
+ * The receiver's auth middleware fires this event when an
+ * authenticated request carries an ``X-Dashboard-ID`` that
+ * doesn't match the ``bound_dashboard_id`` recorded against the
+ * presented token. ``race_loss=true`` is the soft case: two
+ * senders genuinely got paired with the same token at first-use
+ * and one lost the race; user wording stays gentle. ``false`` is
+ * the loud case: the binding was already locked in and a peer
+ * presented a non-matching ``dashboard_id`` (stolen / mis-pasted
+ * token); user wording is prominent and offers an inline revoke.
+ *
+ * App shell appends to a capped list as events arrive; the Build
+ * server Settings section consumes the list and renders one
+ * alert row per event. Session-only state — clears on
+ * page reload (the receiver still has the events in its bus
+ * history; the user can refresh to dismiss them all).
+ */
+export const buildServerBindingMismatchesContext = createContext<
+  RemoteBuildBindingMismatchEventData[]
+>(Symbol("esphome-build-server-binding-mismatches"));
+
+/**
+ * Counter that increments every time the receiver fires a
+ * ``remote_build_identity_rotated`` event. Phase 3c2d (#106).
+ *
+ * The Build server settings card consumes this and re-fetches
+ * its identity (``getRemoteBuildIdentity``) when the value
+ * changes, so a rotation triggered in another tab (or via the
+ * server's REST surface, eventually) refreshes the visible cert
+ * fingerprint here without a manual reload. A counter rather
+ * than the event payload because the IdentityView model carries
+ * fields the event payload doesn't (``listener_bound``,
+ * versions); a re-fetch is the simplest way to pick those up.
+ */
+export const buildServerIdentityRotationCounterContext = createContext<number>(
+  Symbol("esphome-build-server-identity-rotation-counter")
 );

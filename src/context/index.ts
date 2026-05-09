@@ -16,4 +16,6 @@ export {
   integrationDocsContext,
   labelsContext,
   onboardingPendingContext,
+  buildServerBindingMismatchesContext,
+  buildServerIdentityRotationCounterContext,
 } from "./contexts.js";

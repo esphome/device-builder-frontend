@@ -37,6 +37,7 @@ import type {
   Label,
   LabelDeletedEventData,
   LabelEventData,
+  RemoteBuildBindingMismatchEventData,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -53,6 +54,8 @@ import {
   devicesContext,
   devicesLoadedContext,
   activeJobsContext,
+  buildServerBindingMismatchesContext,
+  buildServerIdentityRotationCounterContext,
   recentJobsContext,
   firmwareJobsContext,
   importableDevicesContext,
@@ -242,6 +245,23 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: onboardingPendingContext })
   @state()
   private _onboardingPending = false;
+
+  /** Recent ``remote_build_binding_mismatch`` events captured over
+   *  the WS subscription. Capped at 10 — older events fall off the
+   *  end on append. The Build server Settings section consumes the
+   *  list to render one alert row per event; session-only state. */
+  @provide({ context: buildServerBindingMismatchesContext })
+  @state()
+  private _buildServerBindingMismatches: RemoteBuildBindingMismatchEventData[] = [];
+
+  /** Counter incremented on every ``remote_build_identity_rotated``
+   *  event. The Build server Settings card watches this through
+   *  the matching context and re-fetches its identity when the
+   *  value changes, so a rotation triggered in another tab
+   *  refreshes here without a manual reload. */
+  @provide({ context: buildServerIdentityRotationCounterContext })
+  @state()
+  private _buildServerIdentityRotationCounter = 0;
 
   /** True when the onboarding wizard should be shown. Computed
    *  from ``completed_version < current_version`` AND not
@@ -911,6 +931,26 @@ export class ESPHomeApp extends LitElement {
       case DeviceEventType.LABEL_DELETED: {
         const { label_id } = data as LabelDeletedEventData;
         this._labels = this._labels.filter((l) => l.id !== label_id);
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_BINDING_MISMATCH: {
+        // Append to a capped list. The Build server Settings
+        // section consumes the array via context and renders one
+        // alert row per entry. Cap = 10: enough to see a small
+        // burst, not so much that an attacker probing a stolen
+        // bearer can fill the user's screen.
+        const evt = data as RemoteBuildBindingMismatchEventData;
+        const next = [...this._buildServerBindingMismatches, evt];
+        if (next.length > 10) next.shift();
+        this._buildServerBindingMismatches = next;
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_IDENTITY_ROTATED: {
+        // Bump the counter. Settings dialog watches the matching
+        // context and re-fetches identity when the value changes,
+        // so a rotation triggered in another tab refreshes the
+        // visible cert fingerprint here.
+        this._buildServerIdentityRotationCounter += 1;
         break;
       }
     }
