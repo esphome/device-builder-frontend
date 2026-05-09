@@ -292,19 +292,16 @@ export class ESPHomeSettingsDialog extends LitElement {
    *   receiver, but the extra fetch is idempotent and the
    *   tokens list cap is small.
    *
-   * Both branches gate on ``_section === "build_server"`` rather
-   * than on the loaded-state of the field they refresh. A
-   * loaded-state guard ("only refetch if not null") would skip
-   * the event in two real cases:
+   * Each branch handles two cases:
    *
-   * 1. The initial ``_loadBuildServerIdentity`` is in flight when
-   *    the rotation event arrives — the field is still ``null``
-   *    so we'd skip, then the in-flight request lands with
-   *    pre-rotation data.
-   * 2. The user navigated away from the section since loading;
-   *    the field is non-null but stale.
-   *
-   * Section-active is the user-intent signal we actually want.
+   * - User is currently on the Build server section
+   *   (``_section === "build_server"``): refetch immediately
+   *   so the visible card / list shows fresh data.
+   * - User is on a different section: null the cached value
+   *   so the lazy-load in ``_selectSection`` fires a fresh
+   *   load when they navigate back. (A non-null value would
+   *   short-circuit the lazy-load and leave the user staring
+   *   at the pre-event snapshot.)
    *
    * For both: ``changed.get(...)`` returns the *previous*
    * value, which is ``undefined`` on the very first sync (Lit's
@@ -314,17 +311,26 @@ export class ESPHomeSettingsDialog extends LitElement {
    */
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
-    if (this._section !== "build_server") return;
     if (changed.has("_buildServerIdentityRotationCounter")) {
       const prev = changed.get("_buildServerIdentityRotationCounter");
       if (prev !== undefined) {
-        void this._loadBuildServerIdentity();
+        if (this._section === "build_server") {
+          void this._loadBuildServerIdentity();
+        } else {
+          this._buildServerIdentity = null;
+          this._buildServerIdentityLoadFailed = false;
+        }
       }
     }
     if (changed.has("_buildServerBindingMismatches")) {
       const prev = changed.get("_buildServerBindingMismatches");
       if (prev !== undefined) {
-        void this._loadBuildServerTokens();
+        if (this._section === "build_server") {
+          void this._loadBuildServerTokens();
+        } else {
+          this._buildServerTokens = null;
+          this._buildServerTokensLoadFailed = false;
+        }
       }
     }
   }
