@@ -381,6 +381,12 @@ export class ESPHomeApp extends LitElement {
     if ("serial" in navigator) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
     }
+    // ``secrets-saved`` is dispatched on ``window`` by every code
+    // path that writes ``secrets.yaml`` (the secrets editor, the
+    // onboarding wizard). Refresh the onboarding snapshot so the
+    // kebab "Set up Wi-Fi" entry tracks the on-disk state in real
+    // time regardless of which surface initiated the write.
+    window.addEventListener("secrets-saved", this._onSecretsSaved);
   }
 
   disconnectedCallback() {
@@ -390,6 +396,7 @@ export class ESPHomeApp extends LitElement {
     if ("serial" in navigator) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
     }
+    window.removeEventListener("secrets-saved", this._onSecretsSaved);
   }
 
   private _initDarkMode() {
@@ -946,7 +953,6 @@ export class ESPHomeApp extends LitElement {
         @open-reset-build-env=${this._onOpenResetBuildEnv}
         @open-feedback=${this._onOpenFeedback}
         @open-onboarding-wifi=${this._onOpenOnboarding}
-        @secrets-saved=${this._onSecretsSaved}
       >
         ${this._router.outlet()}
       </esphome-layout>

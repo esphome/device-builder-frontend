@@ -53,6 +53,25 @@ export class ESPHomePageSecrets extends LitElement {
 
   async connectedCallback() {
     super.connectedCallback();
+    window.addEventListener(
+      "secrets-saved",
+      this._onExternalSecretsSaved as EventListener,
+    );
+    await this._loadFromServer();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener(
+      "secrets-saved",
+      this._onExternalSecretsSaved as EventListener,
+    );
+    super.disconnectedCallback();
+  }
+
+  /** Pull `secrets.yaml` from the server and reset both buffers.
+   *  On read error (file missing) seeds the editor with the
+   *  localized header so the user has a starting point. */
+  private async _loadFromServer() {
     try {
       const yaml = await this._api.getConfig(SECRETS_FILE);
       this._yaml = yaml;
@@ -64,6 +83,19 @@ export class ESPHomePageSecrets extends LitElement {
     }
     this._loaded = true;
   }
+
+  /** Another component (typically the onboarding wizard) just
+   *  wrote `secrets.yaml`. Reload from the server so the editor
+   *  doesn't show stale content. Skip when this page initiated
+   *  the save (no work to do — buffers already reflect the new
+   *  content) and when the user has unsaved edits in the editor
+   *  (silently overwriting their typing would lose work; they'll
+   *  see the disk's view next time they reload the page or save). */
+  private _onExternalSecretsSaved = (e: CustomEvent<{ source: EventTarget }>) => {
+    if (e.detail?.source === this) return;
+    if (this._yaml !== this._savedYaml) return;
+    void this._loadFromServer();
+  };
 
   static styles = [
     espHomeStyles,
@@ -273,11 +305,12 @@ export class ESPHomePageSecrets extends LitElement {
     this._api
       .updateConfig(SECRETS_FILE, this._yaml)
       .then(() => {
-        this.dispatchEvent(
-          new CustomEvent("secrets-saved", {
-            bubbles: true,
-            composed: true,
-          }),
+        // Window-level so other mounted components (app-shell's
+        // onboarding-state refresh, peer secrets-page instances)
+        // can react regardless of where they live in the tree.
+        // ``detail.source`` lets self-listeners short-circuit.
+        window.dispatchEvent(
+          new CustomEvent("secrets-saved", { detail: { source: this } }),
         );
       })
       .catch((e) => {

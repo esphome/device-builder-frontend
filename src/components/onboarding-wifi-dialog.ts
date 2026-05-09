@@ -259,6 +259,16 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._error = null;
     try {
       await this._api.setOnboardingWifi(this._ssid, this._password);
+      // Notify any mounted secrets-editor instance (and app-shell's
+      // onboarding-state refresh) that secrets.yaml has changed on
+      // disk. Window-level so listeners can live anywhere in the
+      // tree; ``detail.source`` lets a future self-listener short-
+      // circuit. Fired before ``markOnboardingAcknowledged`` so a
+      // failure on the second call doesn't suppress the refresh
+      // — the wifi write is the user-visible state change.
+      window.dispatchEvent(
+        new CustomEvent("secrets-saved", { detail: { source: this } }),
+      );
       // Acknowledge so the dialog doesn't re-pop on next load even
       // if the badge logic wants to keep the menu indicator.
       await this._api.markOnboardingAcknowledged();
