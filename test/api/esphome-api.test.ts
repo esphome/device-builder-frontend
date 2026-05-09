@@ -1,4 +1,11 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { mintRemoteBuildBearer } from "../../src/util/remote-build-bearer.js";
@@ -60,11 +67,8 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("upgrades to wss:// when the page is https", async () => {
-    (
-      globalThis as unknown as {
-        window: { location: { protocol: string; host: string } };
-      }
-    ).window = { location: { protocol: "https:", host: "example.test" } };
+    (globalThis as unknown as { window: { location: { protocol: string; host: string } } }).window =
+      { location: { protocol: "https:", host: "example.test" } };
     const api = new ESPHomeAPI();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
@@ -193,7 +197,9 @@ describe("ESPHomeAPI — sendCommand", () => {
 
   it("throws when the socket is not open", async () => {
     const api = new ESPHomeAPI();
-    await expect(api.sendCommand("ping")).rejects.toThrow(/not connected/);
+    await expect(api.sendCommand("ping")).rejects.toThrow(
+      /not connected/,
+    );
   });
 
   it("assigns sequential message_ids", async () => {
@@ -230,7 +236,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
     const pending = api.cloneDevice(
       "kitchen.yaml",
       "bedroom-bulb",
-      "Bedroom Reading Lamp"
+      "Bedroom Reading Lamp",
     );
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
 
@@ -357,7 +363,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult }
+      { onOutput, onResult },
     );
     ws.receive({ message_id: messageId, event: "output", data: "line 1" });
     ws.receive({ message_id: messageId, event: "output", data: "line 2" });
@@ -374,7 +380,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult }
+      { onOutput, onResult },
     );
     ws.receive({
       message_id: messageId,
@@ -394,7 +400,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onError }
+      { onError },
     );
     ws.receive({
       message_id: messageId,
@@ -421,7 +427,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput: vi.fn(), onResult: vi.fn() }
+      { onOutput: vi.fn(), onResult: vi.fn() },
     );
 
     const pending = api.stopStream(streamId);
@@ -446,7 +452,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput, onResult }
+      { onOutput, onResult },
     );
 
     // Pre-stop: events flow normally.
@@ -490,7 +496,7 @@ describe("ESPHomeAPI — event subscriptions", () => {
     const ws = await connect(api);
     const received: Array<{ event: string; data: unknown }> = [];
     const subscribed = api.subscribeEvents((event, data) =>
-      received.push({ event, data })
+      received.push({ event, data }),
     );
     const msgId = ws.sentAs<{ message_id: string }>(0).message_id;
     ws.receive({ message_id: msgId, result: { subscribed: true } });
@@ -534,11 +540,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       component_id: "dht",
       fields: { pin: "GPIO4" },
     });
-    const sent = ws.sentAs<{
-      command: string;
-      message_id: string;
-      args: Record<string, unknown>;
-    }>(0);
+    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("devices/add_component");
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -626,11 +628,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const pending = api.setRemoteBuildSettings({ enabled: true });
-    const sent = ws.sentAs<{
-      command: string;
-      message_id: string;
-      args: Record<string, unknown>;
-    }>(0);
+    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
     // Same wire-shape rationale as ``getRemoteBuildSettings`` —
@@ -791,31 +789,13 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
-  it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
-    const ws = await connect(api);
-    const payload = {
-      dashboard_id: "abc123",
-      pin_sha256: "a".repeat(64),
-      server_version: "1.2.3",
-      esphome_version: "2026.5.0",
-      listener_bound: true,
-    };
-    const pending = api.getRemoteBuildIdentity();
-    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
-    expect(sent.command).toBe("remote_build/get_identity");
-    expect(sent.args).toBeUndefined();
-    ws.receive({ message_id: sent.message_id, result: payload });
-    await expect(pending).resolves.toEqual(payload);
-  });
-
   it("addRemoteBuildToken accepts mintRemoteBuildBearer output as-is (chain contract)", async () => {
     // Pin the integration the UI does end-to-end: the mint
-    // helper returns a shape that the wrapper accepts without
-    // any reformatting. A drift in either side's field naming
-    // (e.g. mint returns ``tokenId`` while the wrapper reads
-    // ``token_id``) would only surface in production today;
-    // this test catches it at unit-test time.
+    // helper returns a shape the wrapper accepts without any
+    // reformatting. A drift in either side's field naming
+    // (e.g. mint returns ``tokenId`` while the wrapper expects
+    // ``token_id``) would only surface in production today; this
+    // test catches it at unit-test time.
     const minted = mintRemoteBuildBearer();
     const api = new ESPHomeAPI();
     const ws = await connect(api);
@@ -835,7 +815,6 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       token_id: minted.token_id,
       secret_sha256: minted.secret_sha256,
     });
-    // Belt and braces: explicitly assert no cleartext leaked.
     expect(sent.args).not.toHaveProperty("secret");
     expect(sent.args).not.toHaveProperty("bearer");
     ws.receive({
@@ -848,6 +827,24 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       },
     });
     await pending;
+  });
+
+  it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      dashboard_id: "abc123",
+      pin_sha256: "a".repeat(64),
+      server_version: "1.2.3",
+      esphome_version: "2026.5.0",
+      listener_bound: true,
+    };
+    const pending = api.getRemoteBuildIdentity();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_identity");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
   });
 
   it("rotateRemoteBuildIdentity sends remote_build/rotate_identity and unwraps the result", async () => {
@@ -938,7 +935,7 @@ describe("ESPHomeAPI — auth", () => {
 
     // Fresh token persisted for the next reconnect.
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 })
+      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 }),
     );
   });
 
@@ -1001,7 +998,7 @@ describe("ESPHomeAPI — auth", () => {
     });
     await expect(api.ready).resolves.toBeUndefined();
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 })
+      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 }),
     );
   });
 

@@ -35,19 +35,17 @@ describe("mintRemoteBuildBearer", () => {
     expect(minted.secret_sha256).toBe(sha256(minted.secret));
   });
 
-  it("returns bearer in the canonical {token_id}.{secret} wire form", () => {
-    const minted = mintRemoteBuildBearer();
-    expect(minted.bearer).toBe(`${minted.token_id}.${minted.secret}`);
-  });
-
   it("produces distinct outputs across calls", () => {
     // Birthday-bound assertion: with 64+256 bits of entropy the
     // odds of two consecutive calls colliding are astronomical.
     // Run a small batch to catch a refactor that accidentally
-    // reuses the random buffer.
+    // reuses the random buffer. Hashing the (id, secret) pair
+    // — rather than just one half — catches a bug where one
+    // buffer is randomised and the other is reused stale.
     const seen = new Set<string>();
     for (let i = 0; i < 64; i++) {
-      seen.add(mintRemoteBuildBearer().bearer);
+      const m = mintRemoteBuildBearer();
+      seen.add(`${m.token_id}.${m.secret}`);
     }
     expect(seen.size).toBe(64);
   });
@@ -100,7 +98,6 @@ describe("mintRemoteBuildBearer", () => {
       expect(minted.token_id).toMatch(/^[A-Za-z0-9_-]{11}$/);
       // No '+', '/', or '=' in either half.
       expect(minted.secret).not.toMatch(/[+/=]/);
-      expect(minted.bearer).toBe(`${minted.token_id}.${minted.secret}`);
     } finally {
       vi.unstubAllGlobals();
     }

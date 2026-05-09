@@ -1226,15 +1226,22 @@ export interface IdentityView {
  * the wire to the backend. This closes the leak that would
  * otherwise occur on plain-HTTP standalone deployments where
  * the main port carries the WS API in cleartext.
+ *
+ * Type alias rather than ``interface`` so it satisfies
+ * ``Record<string, unknown>`` at the ``sendCommand`` call site;
+ * named interfaces lose the index-signature compatibility a
+ * structurally-typed object literal has, which would otherwise
+ * force a defensive ``{ ...args }`` spread that no other
+ * remote-build wrapper uses.
  */
-export interface AddRemoteBuildTokenArgs {
+export type AddRemoteBuildTokenArgs = {
   /** Display label, 1-128 chars. Duplicates allowed; ``token_id`` is the unique key. */
   label: string;
   /** Client-generated, exactly 11 base64url chars (8 random bytes encoded). */
   token_id: string;
   /** Lowercase hex SHA-256 of the cleartext secret half (64 chars). */
   secret_sha256: string;
-}
+};
 
 /**
  * Data payload for the ``remote_build_binding_mismatch`` event.
