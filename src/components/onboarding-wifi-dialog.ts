@@ -261,28 +261,44 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._error = null;
     try {
       await this._api.setOnboardingWifi(this._ssid, this._password);
-      // Notify any mounted secrets-editor instance (and app-shell's
-      // onboarding-state refresh) that secrets.yaml has changed on
-      // disk. Window-level so listeners can live anywhere in the
-      // tree; ``detail.source`` lets a future self-listener short-
-      // circuit. Fired before ``markOnboardingAcknowledged`` so a
-      // failure on the second call doesn't suppress the refresh
-      // — the wifi write is the user-visible state change.
-      window.dispatchEvent(
-        new CustomEvent("secrets-saved", { detail: { source: this } }),
-      );
+    } catch (err) {
+      // The wifi write itself failed — the user's credentials
+      // never landed on disk. Surface the error inline so they
+      // can correct and retry.
+      this._error = this._formatError(err, "onboarding.wifi.save_failed");
+      this._saving = false;
+      return;
+    }
+    // Notify any mounted secrets-editor instance (and app-shell's
+    // onboarding-state refresh) that secrets.yaml has changed on
+    // disk. Window-level so listeners can live anywhere in the
+    // tree; ``detail.source`` lets a future self-listener short-
+    // circuit. Fired before ``markOnboardingAcknowledged`` so a
+    // failure on the second call doesn't suppress the refresh
+    // — the wifi write is the user-visible state change.
+    window.dispatchEvent(
+      new CustomEvent("secrets-saved", { detail: { source: this } }),
+    );
+    try {
       // Acknowledge so the dialog doesn't re-pop on next load even
       // if the badge logic wants to keep the menu indicator.
       await this._api.markOnboardingAcknowledged();
-      toast.success(this._localize("onboarding.wifi.save_success"));
-      this._exitedExplicitly = true;
-      this._emitAcknowledged();
-      this.close();
     } catch (err) {
-      this._error = this._formatError(err);
-    } finally {
-      this._saving = false;
+      // Wifi WAS saved — the only consequence of a failed ack is
+      // that the wizard will re-pop on next load. Don't gate the
+      // success path on it: log + show a non-blocking warning
+      // toast, then close as if everything succeeded. Inline
+      // errors at this point would be misleading ("Couldn't save
+      // Wi-Fi credentials" while the credentials are now safely
+      // on disk).
+      console.warn("Failed to mark onboarding acknowledged:", err);
+      toast.warning(this._localize("onboarding.wifi.ack_failed"));
     }
+    toast.success(this._localize("onboarding.wifi.save_success"));
+    this._exitedExplicitly = true;
+    this._emitAcknowledged();
+    this.close();
+    this._saving = false;
   }
 
   private async _declinePermanently() {
@@ -294,7 +310,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       this._emitAcknowledged();
       this.close();
     } catch (err) {
-      this._error = this._formatError(err);
+      // Decline never writes secrets — only the ack call
+      // happened. Use the decline-specific fallback so the user
+      // doesn't see "Couldn't save Wi-Fi credentials" when
+      // nothing of theirs was being saved in the first place.
+      this._error = this._formatError(err, "onboarding.wifi.decline_failed");
     } finally {
       this._saving = false;
     }
@@ -335,15 +355,18 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
    * fine for logs, leaks an internal code into the dialog's
    * inline error if rendered raw. Show ``details`` directly when
    * we have an ``APIError``, fall back to ``message`` for native
-   * errors, and fall back to the localized generic when we have
-   * neither.
+   * errors, and fall back to the *caller-supplied* localization
+   * key when we have neither — different code paths (save vs
+   * decline) want different fallback copy so the user isn't told
+   * "Couldn't save Wi-Fi credentials" when the failing call
+   * wasn't the wifi save.
    */
-  private _formatError(err: unknown): string {
+  private _formatError(err: unknown, fallbackKey: string): string {
     if (err instanceof APIError) {
-      return err.details || this._localize("onboarding.wifi.save_failed");
+      return err.details || this._localize(fallbackKey);
     }
     if (err instanceof Error) return err.message;
-    return this._localize("onboarding.wifi.save_failed");
+    return this._localize(fallbackKey);
   }
 
   private _dismissForSession = () => {

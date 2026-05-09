@@ -655,6 +655,8 @@
       "saving": "Saving…",
       "save_success": "Wi-Fi credentials saved",
       "save_failed": "Failed to save Wi-Fi credentials",
+      "ack_failed": "Wi-Fi credentials saved, but the wizard couldn't be marked as completed — it may reappear next time.",
+      "decline_failed": "Couldn't update onboarding preferences",
       "dismiss_session": "Maybe later",
       "decline_permanent": "I don't use Wi-Fi — skip this step"
     }

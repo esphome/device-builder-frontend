@@ -533,6 +533,8 @@
       "saving": "Enregistrement…",
       "save_success": "Identifiants Wi-Fi enregistrés",
       "save_failed": "Échec de l'enregistrement des identifiants Wi-Fi",
+      "ack_failed": "Identifiants Wi-Fi enregistrés, mais l'assistant n'a pas pu être marqué comme terminé — il pourrait réapparaître la prochaine fois.",
+      "decline_failed": "Impossible de mettre à jour les préférences d'intégration",
       "dismiss_session": "Plus tard",
       "decline_permanent": "Je n'utilise pas le Wi-Fi — ignorer cette étape"
     }

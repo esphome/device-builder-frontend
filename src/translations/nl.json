@@ -533,6 +533,8 @@
       "saving": "Bezig met opslaan…",
       "save_success": "Wi-Fi-inloggegevens opgeslagen",
       "save_failed": "Wi-Fi-inloggegevens konden niet worden opgeslagen",
+      "ack_failed": "Wi-Fi-inloggegevens opgeslagen, maar de wizard kon niet als voltooid worden gemarkeerd — hij kan de volgende keer opnieuw verschijnen.",
+      "decline_failed": "Kan onboarding-voorkeuren niet bijwerken",
       "dismiss_session": "Later misschien",
       "decline_permanent": "Ik gebruik geen wifi — deze stap overslaan"
     }
