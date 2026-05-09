@@ -243,6 +243,20 @@ export class ESPHomeSettingsDialog extends LitElement {
     this._remoteBuildRotateConfirmOpen = false;
   }
 
+  /**
+   * Localised + ``richColors``-styled toast shorthand.
+   *
+   * The richColors-styled toast pattern repeats six times in
+   * the rotate / copy / mismatch flows; centralising it here
+   * keeps each call site to a single line and a single point
+   * of change for the styling contract. Existing pre-3c2
+   * callers in this file still spell out the long form
+   * inline; not migrated here to keep the 3c2b diff minimal.
+   */
+  private _toast(level: "success" | "warning" | "error", key: string) {
+    toast[level](this._localize(key), { richColors: true });
+  }
+
   private async _onRotateConfirm() {
     if (this._api === undefined || this._remoteBuildRotateInFlight) {
       return;
@@ -257,20 +271,15 @@ export class ESPHomeSettingsDialog extends LitElement {
     try {
       this._remoteBuildIdentity = await this._api.rotateRemoteBuildIdentity();
       this._remoteBuildIdentityLoadFailed = false;
-      const fresh = this._remoteBuildIdentity;
-      if (fresh.listener_bound) {
-        toast.success(this._localize("settings.remote_build_rotate_success"), {
-          richColors: true,
-        });
+      if (this._remoteBuildIdentity.listener_bound) {
+        this._toast("success", "settings.remote_build_rotate_success");
       } else {
         // Listener didn't come back up after the rebuild.
         // Backend's ``reload_remote_build_identity`` is
         // fail-soft; the operator should check logs. Surface
         // this distinct from generic failure so they don't
         // think the rotation didn't happen.
-        toast.warning(this._localize("settings.remote_build_rotate_listener_down"), {
-          richColors: true,
-        });
+        this._toast("warning", "settings.remote_build_rotate_listener_down");
       }
     } catch (err) {
       if (err instanceof APIError && err.errorCode === ErrorCode.ALREADY_EXISTS) {
@@ -279,14 +288,9 @@ export class ESPHomeSettingsDialog extends LitElement {
         // while ``_remoteBuildRotateInFlight`` is true on this
         // tab, but not the other tab's. Toast distinct from
         // generic failure so the user knows to wait, not retry.
-        toast.warning(
-          this._localize("settings.remote_build_rotate_already_in_progress"),
-          { richColors: true }
-        );
+        this._toast("warning", "settings.remote_build_rotate_already_in_progress");
       } else {
-        toast.error(this._localize("settings.remote_build_rotate_failed"), {
-          richColors: true,
-        });
+        this._toast("error", "settings.remote_build_rotate_failed");
       }
     } finally {
       this._remoteBuildRotateInFlight = false;
@@ -304,9 +308,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     // knows to refresh.
     const pin = this._remoteBuildIdentity?.pin_sha256;
     if (!pin) {
-      toast.warning(this._localize("settings.remote_build_pin_copy_failed"), {
-        richColors: true,
-      });
+      this._toast("warning", "settings.remote_build_pin_copy_failed");
       return;
     }
     // Copy the unformatted (no-spaces) pin so a paste into a
@@ -322,18 +324,13 @@ export class ESPHomeSettingsDialog extends LitElement {
     // where ``navigator.clipboard`` is undefined or throws
     // ``NotAllowedError``. The helper falls back to a hidden
     // textarea + ``execCommand("copy")`` in those contexts.
-    const ok = await copyToClipboard(pin);
-    if (ok) {
-      toast.success(this._localize("settings.remote_build_pin_copied"), {
-        richColors: true,
-      });
+    if (await copyToClipboard(pin)) {
+      this._toast("success", "settings.remote_build_pin_copied");
     } else {
       // Surface the failure rather than silently no-op; the
       // user clicked a button and deserves feedback. They can
       // still read the pin off the card and copy it manually.
-      toast.warning(this._localize("settings.remote_build_pin_copy_failed"), {
-        richColors: true,
-      });
+      this._toast("warning", "settings.remote_build_pin_copy_failed");
     }
   }
 
