@@ -39,6 +39,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { ErrorCode, type TokenSummary } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { mintRemoteBuildBearer } from "../util/remote-build-bearer.js";
@@ -106,6 +107,7 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    inputStyles,
     css`
       wa-dialog {
         --width: 480px;
@@ -118,10 +120,17 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
       wa-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-normal);
+      }
+
+      wa-dialog::part(close-button__base) {
+        background: transparent;
+        border: none;
+        box-shadow: none;
       }
 
       wa-dialog::part(body) {
-        padding: 0 var(--wa-space-l) var(--wa-space-l);
+        padding: 0 var(--wa-space-l);
       }
 
       wa-dialog::part(footer) {
@@ -138,67 +147,84 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
       .field {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-2xs);
-        margin-bottom: var(--wa-space-m);
+        gap: var(--wa-space-xs);
+        padding-bottom: var(--wa-space-m);
       }
 
       .field label {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        color: var(--wa-color-text-quiet);
       }
 
-      .field input {
-        padding: 8px 10px;
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-s);
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        font: inherit;
-      }
-
-      .form-error {
-        font-size: var(--wa-font-size-s);
+      .field-error {
         color: var(--esphome-error);
-        margin: 0 0 var(--wa-space-m);
+        font-size: var(--wa-font-size-xs);
+        margin-top: var(--wa-space-2xs);
       }
 
+      /* Action row + button styles match the rest of the
+         form-style dialogs (friendly-name, clone-device,
+         adopt). Inlined per-dialog like those — there's no
+         shared form-dialog stylesheet yet. */
       .actions {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
+        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+        margin: 0 calc(-1 * var(--wa-space-l));
       }
 
       .btn {
-        padding: 8px var(--wa-space-m);
-        border-radius: var(--wa-border-radius-s);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-raised);
-        color: var(--wa-color-text-normal);
-        font: inherit;
+        padding: 8px 18px;
+        border-radius: var(--wa-border-radius-m);
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
         cursor: pointer;
+        border: none;
+        transition: background 0.12s;
+      }
+
+      .btn--cancel {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
+      .btn--cancel:hover {
+        background: var(--wa-color-surface-border);
       }
 
       .btn--primary {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        border-color: var(--esphome-primary);
       }
 
-      .btn:disabled {
-        opacity: 0.6;
+      .btn--primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+      }
+
+      .btn--primary:disabled {
+        opacity: 0.5;
         cursor: not-allowed;
       }
 
-      .bearer-warn {
-        margin: 0 0 var(--wa-space-s);
+      /* One-time-token reveal: warning banner shape mirrors
+         settings-dialog's .phase-banner; same colour stack
+         from the WA warning palette. Two copies for now,
+         extract to styles/ if a third lands. */
+      .reveal-warn {
+        margin: 0 0 var(--wa-space-m);
         padding: var(--wa-space-s) var(--wa-space-m);
-        border-left: 3px solid var(--wa-color-warning-border-loud, #f0b400);
+        border-radius: var(--wa-border-radius-s);
         background: var(--wa-color-warning-fill-quiet, #fff7e0);
         color: var(--wa-color-warning-text-quiet, #6b4f00);
+        border-left: 3px solid var(--wa-color-warning-border-loud, #f0b400);
         font-size: var(--wa-font-size-s);
       }
 
-      .bearer-wrap {
+      .reveal-token-wrap {
         padding: 10px 14px;
         background: var(--wa-color-surface-lowered);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
@@ -206,7 +232,7 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
         margin-bottom: var(--wa-space-m);
       }
 
-      .bearer-value {
+      .reveal-token-value {
         font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
         font-size: var(--wa-font-size-xs);
         word-break: break-all;
@@ -254,12 +280,12 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
           />
         </div>
         ${this._formError !== null
-          ? html`<p class="form-error" role="alert">${this._formError}</p>`
+          ? html`<p class="field-error" role="alert">${this._formError}</p>`
           : nothing}
         <div class="actions">
           <button
             type="button"
-            class="btn"
+            class="btn btn--cancel"
             ?disabled=${this._submitting}
             @click=${this.close}
           >
@@ -281,14 +307,14 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
 
   private _renderReveal() {
     return html`
-      <p class="bearer-warn" role="alert">
+      <p class="reveal-warn" role="alert">
         ${this._localize("settings.build_server_token_reveal_warn")}
       </p>
-      <div class="bearer-wrap">
-        <div class="bearer-value">${this._bearer}</div>
+      <div class="reveal-token-wrap">
+        <div class="reveal-token-value">${this._bearer}</div>
       </div>
       <div class="actions">
-        <button type="button" class="btn" @click=${this._onCopy}>
+        <button type="button" class="btn btn--cancel" @click=${this._onCopy}>
           ${this._localize("settings.build_server_token_reveal_copy")}
         </button>
         <button type="button" class="btn btn--primary" @click=${this.close}>
