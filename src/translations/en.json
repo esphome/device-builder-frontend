@@ -784,7 +784,6 @@
     "remote_build_rotate_in_progress": "Rotating…",
     "remote_build_rotate_confirm_title": "Rotate this dashboard's certificate?",
     "remote_build_rotate_confirm_body": "Every paired offloader will see a different cert fingerprint on its next connection and will need to be re-paired. Do this if you suspect the cert was compromised, or if you're rotating as part of a regular hygiene schedule.",
-    "remote_build_rotate_confirm_cancel": "Cancel",
     "remote_build_rotate_confirm_confirm": "Rotate certificate",
     "remote_build_rotate_success": "Certificate rotated. Every paired offloader needs to be re-paired.",
     "remote_build_rotate_listener_down": "Certificate rotated, but the receiver listener didn't come back up. Check the dashboard logs.",

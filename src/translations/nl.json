@@ -721,7 +721,6 @@
     "remote_build_rotate_in_progress": "Vernieuwen…",
     "remote_build_rotate_confirm_title": "Certificaat van dit dashboard vernieuwen?",
     "remote_build_rotate_confirm_body": "Elke gekoppelde offloader ziet bij de volgende verbinding een andere certificaatvingerafdruk en moet opnieuw worden gekoppeld. Doe dit als u vermoedt dat het certificaat is gecompromitteerd, of als onderdeel van een reguliere rotatie.",
-    "remote_build_rotate_confirm_cancel": "Annuleren",
     "remote_build_rotate_confirm_confirm": "Certificaat vernieuwen",
     "remote_build_rotate_success": "Certificaat vernieuwd. Elke gekoppelde offloader moet opnieuw worden gekoppeld.",
     "remote_build_rotate_listener_down": "Certificaat vernieuwd, maar de ontvangerservice is niet teruggekeerd. Controleer de dashboardlogs.",

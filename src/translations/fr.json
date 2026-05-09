@@ -721,7 +721,6 @@
     "remote_build_rotate_in_progress": "Renouvellement…",
     "remote_build_rotate_confirm_title": "Renouveler le certificat de ce tableau de bord ?",
     "remote_build_rotate_confirm_body": "Chaque déchargeur appairé verra une empreinte différente lors de sa prochaine connexion et devra être ré-appairé. Procédez ainsi si vous suspectez une compromission du certificat, ou dans le cadre d'une rotation de routine.",
-    "remote_build_rotate_confirm_cancel": "Annuler",
     "remote_build_rotate_confirm_confirm": "Renouveler le certificat",
     "remote_build_rotate_success": "Certificat renouvelé. Chaque déchargeur appairé doit être ré-appairé.",
     "remote_build_rotate_listener_down": "Certificat renouvelé, mais le service de réception n'est pas revenu en ligne. Consultez les journaux du tableau de bord.",

@@ -27,6 +27,8 @@ import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import "./confirm-dialog.js";
+import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -122,8 +124,8 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _remoteBuildRotateInFlight = false;
 
-  @state()
-  private _remoteBuildRotateConfirmOpen = false;
+  @query("#rotate-confirm")
+  private _rotateConfirmDialog!: ESPHomeConfirmDialog;
 
   @state()
   private _section: Section = "appearance";
@@ -229,18 +231,16 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _onRotateRequest() {
-    // Open the confirmation dialog rather than rotating
-    // immediately. Rotation is a security-sensitive action
-    // that invalidates every paired offloader's pin; a single
-    // misclick shouldn't trigger that cascade. The
-    // confirmation dialog spells out the consequence so the
-    // user has to acknowledge it before the actual rotate
-    // fires.
-    this._remoteBuildRotateConfirmOpen = true;
-  }
-
-  private _onRotateCancel() {
-    this._remoteBuildRotateConfirmOpen = false;
+    // Open the shared ``<esphome-confirm-dialog>`` rather than
+    // rotating immediately. Rotation is a security-sensitive
+    // action that invalidates every paired offloader's pin;
+    // a single misclick shouldn't trigger that cascade. The
+    // confirm dialog (shared component, destructive style)
+    // spells out the consequence so the user has to
+    // acknowledge it; the rotate body lives in
+    // ``_onRotateConfirm`` and is wired via the dialog's
+    // ``@confirm`` event.
+    this._rotateConfirmDialog?.open();
   }
 
   /**
@@ -267,7 +267,6 @@ export class ESPHomeSettingsDialog extends LitElement {
     // there's nothing we can pre-fill. Just gate the button
     // on ``_remoteBuildRotateInFlight`` and toast the result.
     this._remoteBuildRotateInFlight = true;
-    this._remoteBuildRotateConfirmOpen = false;
     try {
       this._remoteBuildIdentity = await this._api.rotateRemoteBuildIdentity();
       this._remoteBuildIdentityLoadFailed = false;
@@ -752,65 +751,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         color: var(--wa-color-warning-on-quiet, #8a6d3b);
       }
 
-      .rotate-confirm-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.45);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-      }
-
-      .rotate-confirm {
-        max-width: min(440px, 90vw);
-        background: var(--wa-color-surface-default);
-        border-radius: var(--wa-border-radius-m);
-        padding: var(--wa-space-l);
-        box-shadow: var(--wa-shadow-l);
-      }
-
-      .rotate-confirm-title {
-        margin: 0 0 var(--wa-space-s) 0;
-        font-size: var(--wa-font-size-l);
-      }
-
-      .rotate-confirm-body {
-        margin: 0 0 var(--wa-space-m) 0;
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
-      }
-
-      .rotate-confirm-actions {
-        display: flex;
-        justify-content: flex-end;
-        gap: var(--wa-space-s);
-      }
-
-      .rotate-confirm-cancel,
-      .rotate-confirm-confirm {
-        padding: 8px var(--wa-space-m);
-        border-radius: var(--wa-border-radius-s);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-raised);
-        color: var(--wa-color-text-normal);
-        font-family: inherit;
-        font-size: var(--wa-font-size-s);
-        cursor: pointer;
-      }
-
-      .rotate-confirm-confirm {
-        background: var(--wa-color-danger-on-quiet, #b00020);
-        color: var(--wa-color-on-danger, #fff);
-        border-color: var(--wa-color-danger-on-quiet, #b00020);
-      }
-
-      .rotate-confirm-confirm:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-      }
-
       @media (max-width: 700px) {
         .layout {
           flex-direction: column;
@@ -1130,50 +1070,16 @@ export class ESPHomeSettingsDialog extends LitElement {
           </button>
         </div>
       </div>
-      ${this._renderRotateConfirm()}
-    `;
-  }
-
-  private _renderRotateConfirm() {
-    if (!this._remoteBuildRotateConfirmOpen) return nothing;
-    return html`
-      <div
-        class="rotate-confirm-backdrop"
-        role="presentation"
-        @click=${this._onRotateCancel}
-      >
-        <div
-          class="rotate-confirm"
-          role="alertdialog"
-          aria-labelledby="rotate-confirm-title"
-          aria-describedby="rotate-confirm-body"
-          @click=${(e: Event) => e.stopPropagation()}
-        >
-          <h2 id="rotate-confirm-title" class="rotate-confirm-title">
-            ${this._localize("settings.remote_build_rotate_confirm_title")}
-          </h2>
-          <p id="rotate-confirm-body" class="rotate-confirm-body">
-            ${this._localize("settings.remote_build_rotate_confirm_body")}
-          </p>
-          <div class="rotate-confirm-actions">
-            <button
-              type="button"
-              class="rotate-confirm-cancel"
-              @click=${this._onRotateCancel}
-            >
-              ${this._localize("settings.remote_build_rotate_confirm_cancel")}
-            </button>
-            <button
-              type="button"
-              class="rotate-confirm-confirm"
-              ?disabled=${this._remoteBuildRotateInFlight}
-              @click=${this._onRotateConfirm}
-            >
-              ${this._localize("settings.remote_build_rotate_confirm_confirm")}
-            </button>
-          </div>
-        </div>
-      </div>
+      <esphome-confirm-dialog
+        id="rotate-confirm"
+        destructive
+        heading=${this._localize("settings.remote_build_rotate_confirm_title")}
+        message=${this._localize("settings.remote_build_rotate_confirm_body")}
+        confirm-label=${this._localize(
+          "settings.remote_build_rotate_confirm_confirm"
+        )}
+        @confirm=${this._onRotateConfirm}
+      ></esphome-confirm-dialog>
     `;
   }
 
