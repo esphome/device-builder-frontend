@@ -49,6 +49,8 @@ function stubDocument(execReturn: boolean): {
     getSelection: () => fakeSelection,
     body: fakeBody,
     execCommand: execSpy,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
   });
   return { execSpy, appended, removed };
 }

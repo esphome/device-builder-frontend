@@ -93,33 +93,53 @@ export async function copyToClipboard(text: string): Promise<boolean> {
  */
 function copyViaExecCommand(text: string): boolean {
   if (typeof document === "undefined") return false;
+
+  // Belt-and-braces approach: also hook the ``copy`` event and
+  // override its ``clipboardData`` with our text. Selection-
+  // based copy is brittle when a ``<dialog>`` element is open
+  // (the dialog's focus trap can suppress the document-level
+  // selection that ``execCommand("copy")`` reads from), AND
+  // when shadow-DOM-rooted user-select rules collide with the
+  // light-DOM target. The event-listener fallback ensures the
+  // text lands on the clipboard even when the selection
+  // mechanism silently failed. Pattern from the
+  // ``copy-to-clipboard`` library (4M+ downloads/week).
+  const onCopy = (e: ClipboardEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.clipboardData?.setData("text/plain", text);
+  };
+  document.addEventListener("copy", onCopy);
+
   const selection = document.getSelection();
   // Capture any current selection so we can restore it after
-  // our hijacked range. The "Copy" button in our Settings
-  // dialog is rare to land on with selected text, but it's
-  // cheap to be a good citizen.
+  // our hijacked range. Cheap to be a good citizen — the user
+  // might have text selected before clicking Copy.
   const previousRange =
     selection && selection.rangeCount > 0
       ? selection.getRangeAt(0).cloneRange()
       : null;
+
+  // ``execCommand("copy")`` won't fire the ``copy`` event
+  // without an active non-empty selection. Use a hidden span
+  // with the same text as content so the selection is
+  // realistic (works even if the event listener isn't honored
+  // for some reason). ``clip: rect(0, 0, 0, 0)`` hides without
+  // taking the element out of layout (``opacity: 0`` /
+  // ``display: none`` both break selection in some browsers).
+  // ``style.all = "unset"`` strips inherited ``user-select:
+  // none`` from any ancestor that might be in our path.
   const span = document.createElement("span");
   span.textContent = text;
   span.setAttribute("aria-hidden", "true");
-  // Reset user styles inherited from the document tree;
-  // ``user-select: none`` on the dialog ancestor would
-  // otherwise propagate down and silently break the selection
-  // we're about to programmatically establish.
   span.style.all = "unset";
   span.style.position = "fixed";
   span.style.top = "0";
   span.style.clip = "rect(0, 0, 0, 0)";
-  // ``pre`` preserves whitespace exactly (the cert pin has no
-  // whitespace, but a generalised helper shouldn't lose
-  // newlines for callers passing multi-line text).
   span.style.whiteSpace = "pre";
-  // Override any inherited ``user-select: none``.
   span.style.userSelect = "text";
   document.body.appendChild(span);
+
   let ok = false;
   try {
     const range = document.createRange();
@@ -132,6 +152,7 @@ function copyViaExecCommand(text: string): boolean {
   } catch {
     ok = false;
   } finally {
+    document.removeEventListener("copy", onCopy);
     document.body.removeChild(span);
     if (selection) {
       selection.removeAllRanges();
