@@ -615,7 +615,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     // both ``enabled`` and ``manual_hosts``; mocking only
     // ``{ enabled }`` here would let an accidental field-rename
     // regression slip past this test.
-    const payload = { enabled: true, manual_hosts: [] };
+    const payload = { enabled: true, manual_hosts: [], tokens: [] };
     const pending = api.getRemoteBuildSettings();
     const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
     expect(sent.command).toBe("remote_build/get_settings");
@@ -632,8 +632,8 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
     // Same wire-shape rationale as ``getRemoteBuildSettings`` —
-    // the result includes ``manual_hosts``.
-    const result = { enabled: true, manual_hosts: [] };
+    // the result includes ``manual_hosts`` and ``tokens``.
+    const result = { enabled: true, manual_hosts: [], tokens: [] };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
   });
@@ -657,11 +657,13 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       result: {
         enabled: false,
         manual_hosts: [{ hostname: "10.0.0.5", port: 6052 }],
+        tokens: [],
       },
     });
     await expect(pending).resolves.toEqual({
       enabled: false,
       manual_hosts: [{ hostname: "10.0.0.5", port: 6052 }],
+      tokens: [],
     });
   });
 
@@ -681,9 +683,13 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.args).toEqual({ hostname: "10.0.0.5", port: 6052 });
     ws.receive({
       message_id: sent.message_id,
-      result: { enabled: false, manual_hosts: [] },
+      result: { enabled: false, manual_hosts: [], tokens: [] },
     });
-    await expect(pending).resolves.toEqual({ enabled: false, manual_hosts: [] });
+    await expect(pending).resolves.toEqual({
+      enabled: false,
+      manual_hosts: [],
+      tokens: [],
+    });
   });
 
   it("listRemoteBuildHosts sends remote_build/list_hosts and unwraps the result", async () => {

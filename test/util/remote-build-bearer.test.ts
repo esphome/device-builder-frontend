@@ -108,14 +108,21 @@ describe("mintRemoteBuildBearer", () => {
     // entropy, so falling back to ``Math.random`` would silently
     // produce predictable bearers the backend would accept.
     // Refusing here surfaces the environment problem instead.
-    const original = globalThis.crypto;
+    //
+    // Cleanup uses ``vi.unstubAllGlobals()`` rather than
+    // re-stubbing with the original — Vitest tracks stubs in an
+    // internal stack, and a second ``stubGlobal`` push leaves
+    // stack state dirty and can fail to restore the original
+    // property descriptor on globals that were defined as
+    // non-configurable. Same pattern as the
+    // ``encodes known bytes`` test above.
     try {
       vi.stubGlobal("crypto", undefined);
       expect(() => mintRemoteBuildBearer()).toThrow(
         /crypto\.getRandomValues is unavailable/
       );
     } finally {
-      vi.stubGlobal("crypto", original);
+      vi.unstubAllGlobals();
     }
   });
 });
