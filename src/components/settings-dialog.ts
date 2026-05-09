@@ -272,18 +272,31 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   /**
-   * Cross-tab refresh hook for the Build server identity card.
-   * App-shell bumps ``buildServerIdentityRotationCounterContext``
-   * on every ``remote_build_identity_rotated`` event; the
-   * matching ``@consume`` field arrives in ``changed`` whenever
-   * its value changes. Re-fetches identity so this tab's card
-   * matches whatever the rotating tab landed on disk.
+   * Cross-tab refresh hook. Two distinct triggers:
    *
-   * The ``changed.get(...)`` returns the *previous* value, which
-   * is ``undefined`` on the very first sync (Lit's first call
-   * after the consumer connects to the provider). Skip that one
-   * — it's not a real rotation, just the initial value flowing
-   * through.
+   * - ``_buildServerIdentityRotationCounter`` increments via
+   *   the matching context whenever app-shell receives a
+   *   ``remote_build_identity_rotated`` event. On change,
+   *   re-fetch the identity so this tab's card matches
+   *   whatever the rotating tab landed on disk.
+   *
+   * - ``_buildServerBindingMismatches`` (the array reference)
+   *   changes whenever app-shell appends a new
+   *   ``remote_build_binding_mismatch`` event. On change,
+   *   re-fetch the tokens list. ``race_loss=true`` actually
+   *   transitions the token's ``bound_dashboard_id`` from
+   *   ``null`` to the winning sender's id; without this
+   *   refresh, the token row's "Waiting for first use" badge
+   *   stays stale until the user closes and reopens Settings.
+   *   ``race_loss=false`` doesn't mutate state on the
+   *   receiver, but the extra fetch is idempotent and the
+   *   tokens list cap is small.
+   *
+   * For both: ``changed.get(...)`` returns the *previous*
+   * value, which is ``undefined`` on the very first sync (Lit's
+   * first callback after the consumer connects to the
+   * provider). Skip that one — it's the initial value flowing
+   * through, not a real event.
    */
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
@@ -291,6 +304,12 @@ export class ESPHomeSettingsDialog extends LitElement {
       const prev = changed.get("_buildServerIdentityRotationCounter");
       if (prev !== undefined && this._buildServerIdentity !== null) {
         void this._loadBuildServerIdentity();
+      }
+    }
+    if (changed.has("_buildServerBindingMismatches")) {
+      const prev = changed.get("_buildServerBindingMismatches");
+      if (prev !== undefined && this._buildServerTokens !== null) {
+        void this._loadBuildServerTokens();
       }
     }
   }
