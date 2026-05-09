@@ -36,15 +36,28 @@ export type EncryptionState =
  */
 export function getEncryptionState(d: EncryptionInputs): EncryptionState {
   if (!d.api_enabled) return "none";
-  if (!d.api_encrypted) return "plaintext";
   const observed = d.api_encryption_active;
-  /* mDNS confirms encryption is *actually* running on the device
-     (e.g. ``Noise_NNpsk0_25519_ChaChaPoly_SHA256``). Truth on the
-     wire trumps everything else — a YAML edit elsewhere
-     (whitespace, comment, sensor tweak) doesn't disable the
-     encryption that's already live, so the indicator stays green
-     even when ``has_pending_changes`` is set. */
+  /* Truth on the wire trumps the YAML signal. A truthy
+     ``api_encryption_active`` (e.g.
+     ``Noise_NNpsk0_25519_ChaChaPoly_SHA256``) is the running
+     firmware reporting "encryption is on right now" — a YAML
+     edit elsewhere (whitespace, comment, sensor tweak) doesn't
+     disable that, so the indicator stays green even when
+     ``has_pending_changes`` is set.
+
+     Checked BEFORE the ``!api_encrypted`` short-circuit on
+     purpose: dashboard issue #437 surfaces a config where
+     encryption is configured via ESPHome's Jinja-templated
+     packages (``api: |\\n  # set ns = ... ${ns.cfg}``), which
+     the dashboard's ``yaml_util.load_yaml`` doesn't render. The
+     YAML pass therefore comes back as ``api_encrypted=false``,
+     but the device's mDNS broadcast carries the live cipher
+     string. Honouring the wire here keeps the indicator
+     correct for any future ESPHome preprocessor feature the
+     dashboard doesn't reproduce, not just this one Jinja
+     case. */
   if (observed) return "active";
+  if (!d.api_encrypted) return "plaintext";
   /* From here ``observed`` is either ``""`` (mDNS seen, TXT
      absent — device is plaintext) or ``null`` / ``undefined``
      (mDNS not seen yet). In both cases the running firmware is
