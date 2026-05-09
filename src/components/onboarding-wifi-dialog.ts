@@ -127,17 +127,41 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
         font-size: var(--wa-font-size-s);
       }
 
+      /* Decline-permanent is rendered as a low-emphasis text link
+         under the body fields rather than a third button in the
+         footer — a button on the same row as Save / Maybe later
+         drew the eye away from the primary action and looked
+         visually heavier than its real weight. The link styling
+         keeps it accessible and discoverable without competing
+         with the buttons. */
+      .opt-out {
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        text-align: center;
+        margin: 0;
+      }
+
+      .opt-out button {
+        background: none;
+        border: none;
+        padding: 0;
+        font-family: inherit;
+        font-size: inherit;
+        color: var(--esphome-primary);
+        cursor: pointer;
+        text-decoration: underline;
+      }
+
+      .opt-out button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
       .actions {
         display: flex;
         flex-direction: row;
-        justify-content: space-between;
+        justify-content: flex-end;
         align-items: center;
-        gap: var(--wa-space-s);
-        flex-wrap: wrap;
-      }
-
-      .actions-secondary {
-        display: flex;
         gap: var(--wa-space-s);
       }
     `,
@@ -190,33 +214,33 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
           ${this._error
             ? html`<p class="error" role="alert">${this._error}</p>`
             : nothing}
+          <p class="opt-out">
+            <button
+              type="button"
+              ?disabled=${this._saving}
+              @click=${this._declinePermanently}
+            >
+              ${this._localize("onboarding.wifi.decline_permanent")}
+            </button>
+          </p>
         </div>
         <div slot="footer" class="actions">
           <wa-button
             appearance="plain"
             ?disabled=${this._saving}
-            @click=${this._declinePermanently}
+            @click=${this._dismissForSession}
           >
-            ${this._localize("onboarding.wifi.decline_permanent")}
+            ${this._localize("onboarding.wifi.dismiss_session")}
           </wa-button>
-          <div class="actions-secondary">
-            <wa-button
-              appearance="plain"
-              ?disabled=${this._saving}
-              @click=${this._dismissForSession}
-            >
-              ${this._localize("onboarding.wifi.dismiss_session")}
-            </wa-button>
-            <wa-button
-              variant="brand"
-              ?disabled=${this._saving || !this._ssid.trim()}
-              @click=${this._save}
-            >
-              ${this._saving
-                ? this._localize("onboarding.wifi.saving")
-                : this._localize("onboarding.wifi.save")}
-            </wa-button>
-          </div>
+          <wa-button
+            variant="brand"
+            ?disabled=${this._saving || !this._ssid.trim()}
+            @click=${this._save}
+          >
+            ${this._saving
+              ? this._localize("onboarding.wifi.saving")
+              : this._localize("onboarding.wifi.save")}
+          </wa-button>
         </div>
       </wa-dialog>
     `;

@@ -534,7 +534,7 @@
       "save_success": "Identifiants Wi-Fi enregistrés",
       "save_failed": "Échec de l'enregistrement des identifiants Wi-Fi",
       "dismiss_session": "Plus tard",
-      "decline_permanent": "J'utilise uniquement l'Ethernet"
+      "decline_permanent": "Je n'utilise pas le Wi-Fi — ignorer cette étape"
     }
   },
   "layout": {

@@ -656,7 +656,7 @@
       "save_success": "Wi-Fi credentials saved",
       "save_failed": "Failed to save Wi-Fi credentials",
       "dismiss_session": "Maybe later",
-      "decline_permanent": "I only use Ethernet"
+      "decline_permanent": "I don't use Wi-Fi — skip this step"
     }
   },
   "layout": {

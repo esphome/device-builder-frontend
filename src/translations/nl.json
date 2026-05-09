@@ -534,7 +534,7 @@
       "save_success": "Wi-Fi-inloggegevens opgeslagen",
       "save_failed": "Wi-Fi-inloggegevens konden niet worden opgeslagen",
       "dismiss_session": "Later misschien",
-      "decline_permanent": "Ik gebruik alleen Ethernet"
+      "decline_permanent": "Ik gebruik geen wifi — deze stap overslaan"
     }
   },
   "layout": {
