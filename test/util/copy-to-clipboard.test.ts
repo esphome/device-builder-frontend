@@ -9,20 +9,27 @@ import { copyToClipboard } from "../../src/util/copy-to-clipboard.js";
  * so tests can assert on DOM lifecycle without needing a real
  * document body.
  */
+interface FakeElement {
+  tag: string;
+  textContent: string;
+  setAttribute: (...args: unknown[]) => void;
+  style: Record<string, string>;
+}
+
 function stubDocument(execReturn: boolean): {
   execSpy: ReturnType<typeof vi.fn>;
-  appended: object[];
-  removed: object[];
+  appended: FakeElement[];
+  removed: FakeElement[];
 } {
-  const appended: object[] = [];
-  const removed: object[] = [];
+  const appended: FakeElement[] = [];
+  const removed: FakeElement[] = [];
   const execSpy = vi.fn(() => execReturn);
   const fakeBody = {
-    appendChild: <T extends object>(el: T): T => {
+    appendChild: (el: FakeElement): FakeElement => {
       appended.push(el);
       return el;
     },
-    removeChild: <T extends object>(el: T): T => {
+    removeChild: (el: FakeElement): FakeElement => {
       removed.push(el);
       return el;
     },
@@ -37,7 +44,15 @@ function stubDocument(execReturn: boolean): {
     addRange: () => undefined,
   };
   vi.stubGlobal("document", {
-    createElement: () => ({
+    // Record the tag passed in so tests can pin "the helper
+    // creates a span, not a textarea" rather than just
+    // "the helper creates AN element". A refactor that
+    // switches back to textarea (which the docstring warns
+    // against — see the load-bearing reasons in
+    // ``copy-to-clipboard.ts``) would silently regress
+    // without this assertion.
+    createElement: (tag: string): FakeElement => ({
+      tag,
       textContent: "",
       setAttribute: () => undefined,
       style: {},
@@ -112,15 +127,21 @@ describe("copyToClipboard", () => {
     expect(writeText).toHaveBeenCalledWith("text");
   });
 
-  it("removes the textarea even on the failure path", async () => {
-    // The legacy path injects a hidden ``<textarea>`` into the
-    // DOM. Pin that it gets removed in both success and
-    // failure cases — a stale textarea would accumulate per
-    // click and eventually become visible on a flaky scroll.
+  it("appends a hidden <span> and removes it even on the failure path", async () => {
+    // The legacy path injects a hidden ``<span>`` (NOT a
+    // textarea — see the load-bearing reasons in the helper's
+    // docstring) into the DOM. Pin both the element tag and
+    // that it gets removed in success / failure cases — a
+    // stale span would accumulate per click and eventually
+    // become visible on a flaky scroll, AND a refactor that
+    // switches back to textarea would silently regress the
+    // ``<dialog>``-trapped-context bug we hit on
+    // ``http://0.0.0.0:6052``.
     vi.stubGlobal("navigator", {});
     const { appended, removed } = stubDocument(false);
     await copyToClipboard("text");
     expect(appended.length).toBe(1);
+    expect(appended[0].tag).toBe("span");
     expect(removed.length).toBe(1);
     expect(appended[0]).toBe(removed[0]);
   });

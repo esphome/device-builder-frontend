@@ -16,13 +16,18 @@
  * ``js-sha256`` for hashing). The clipboard problem is the
  * UI-layer counterpart.
  *
- * Fallback: create a hidden ``<textarea>`` containing the text,
- * select it, fire ``document.execCommand("copy")``, remove the
- * textarea. Deprecated but still implemented in every browser
- * the dashboard supports — and unlike the modern API it works
- * regardless of secure-context status because it goes through
- * the same code path as a manual user-initiated copy from a
- * selected text range.
+ * Fallback: a hidden ``<span>`` containing the text + the
+ * Selection API range-select + a one-shot ``copy`` event
+ * listener that overrides ``clipboardData`` directly.
+ * ``execCommand("copy")`` triggers the chain. Deprecated but
+ * still implemented in every browser the dashboard supports;
+ * works regardless of secure-context status because it goes
+ * through the same code path as a manual user-initiated copy
+ * from a selected text range. We use ``<span>`` rather than
+ * ``<textarea>`` so an inherited ``user-select: none`` from
+ * the dialog tree doesn't silently break the selection — see
+ * ``copyViaExecCommand``'s docstring for the load-bearing
+ * details.
  *
  * Returns ``true`` on success, ``false`` if both paths failed
  * (e.g. user has clipboard access denied at the browser level,
@@ -104,10 +109,18 @@ function copyViaExecCommand(text: string): boolean {
   // text lands on the clipboard even when the selection
   // mechanism silently failed. Pattern from the
   // ``copy-to-clipboard`` library (4M+ downloads/week).
+  //
+  // ``preventDefault`` only fires when ``clipboardData`` is
+  // present AND we successfully set the override; in browsers
+  // where ``clipboardData`` is null on the copy event, falling
+  // through to the browser's default selection-based copy is
+  // strictly better than blocking it.
   const onCopy = (e: ClipboardEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.clipboardData?.setData("text/plain", text);
+    if (e.clipboardData) {
+      e.clipboardData.setData("text/plain", text);
+      e.preventDefault();
+      e.stopPropagation();
+    }
   };
   document.addEventListener("copy", onCopy);
 

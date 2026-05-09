@@ -152,6 +152,13 @@ export class ESPHomeSettingsDialog extends LitElement {
     this._remoteBuildPeers = null;
     this._remoteBuildIdentity = null;
     this._remoteBuildIdentityLoadFailed = false;
+    // Reset rotate-in-flight too — the user could have closed
+    // the dialog mid-rotate (or while the confirm modal was
+    // open), and a stale ``true`` would leave the Rotate
+    // button disabled on the next visit. The shared
+    // ``<esphome-confirm-dialog>`` handles its own state, so
+    // we only reset the flag here.
+    this._remoteBuildRotateInFlight = false;
     this._dialog.open = true;
   }
 
@@ -216,6 +223,15 @@ export class ESPHomeSettingsDialog extends LitElement {
    * state. Tracks failure separately from the null-while-loading
    * state so the UI can render an explicit error message rather
    * than spinning forever.
+   *
+   * **Cross-tab gap**: a rotation triggered from another tab
+   * won't refresh this tab's card until the user closes and
+   * reopens Settings. 3c2c will set up the
+   * ``remote_build_identity_rotated`` event subscription to
+   * cover that case; binding-mismatch alerts in 3c2c MUST
+   * fire while the user sits on the page (so the events
+   * plumbing is mandatory there), and the identity-refresh
+   * piggybacks on the same wiring.
    */
   private async _loadRemoteBuildIdentity(): Promise<void> {
     if (this._api === undefined) {
@@ -249,9 +265,15 @@ export class ESPHomeSettingsDialog extends LitElement {
    * The richColors-styled toast pattern repeats six times in
    * the rotate / copy / mismatch flows; centralising it here
    * keeps each call site to a single line and a single point
-   * of change for the styling contract. Existing pre-3c2
-   * callers in this file still spell out the long form
-   * inline; not migrated here to keep the 3c2b diff minimal.
+   * of change for the styling contract.
+   *
+   * TODO: pre-3c2 callers in this file (the manual-host
+   * mutation paths, the master-toggle revert) still spell out
+   * the long form inline — they should be migrated to this
+   * helper as a separate cleanup PR. Doing it here would
+   * balloon the 3c2b diff for no behavior change. Risk if not
+   * migrated: the ``richColors: true`` styling contract
+   * silently drifts between call sites over time.
    */
   private _toast(level: "success" | "warning" | "error", key: string) {
     toast[level](this._localize(key), { richColors: true });
@@ -322,7 +344,8 @@ export class ESPHomeSettingsDialog extends LitElement {
     // LAN IPs (HA-addon direct port, container deployments)
     // where ``navigator.clipboard`` is undefined or throws
     // ``NotAllowedError``. The helper falls back to a hidden
-    // textarea + ``execCommand("copy")`` in those contexts.
+    // ``<span>`` + Selection API + ``execCommand("copy")`` in
+    // those contexts (see ``util/copy-to-clipboard.ts``).
     if (await copyToClipboard(pin)) {
       this._toast("success", "settings.remote_build_pin_copied");
     } else {
