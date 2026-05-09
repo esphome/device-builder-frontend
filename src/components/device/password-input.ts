@@ -66,6 +66,16 @@ export class ESPHomePasswordInput extends LitElement {
   @property({ type: Number })
   maxlength = 0;
 
+  /** Optional accessible name forwarded to the inner ``<input>`` as
+   *  ``aria-label``. Custom elements aren't labelable form controls,
+   *  so an external ``<label for="...">`` won't reliably bind to
+   *  the inner input — pass the label text in here when the visible
+   *  label lives outside this component. Default empty (no
+   *  ``aria-label`` attribute) so existing call sites are
+   *  unchanged. */
+  @property()
+  label = "";
+
   @state()
   private _revealed = false;
 
@@ -143,6 +153,7 @@ export class ESPHomePasswordInput extends LitElement {
           placeholder=${this.placeholder}
           autocomplete="off"
           maxlength=${this.maxlength > 0 ? this.maxlength : nothing}
+          aria-label=${this.label || nothing}
           @input=${this._onInput}
         />
         <button

@@ -186,6 +186,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               .value=${this._ssid}
               maxlength="32"
               placeholder=${this._localize("onboarding.wifi.ssid_placeholder")}
+              aria-label=${this._localize("onboarding.wifi.ssid_label")}
               ?disabled=${this._saving}
               @input=${(e: Event) => {
                 // Read from currentTarget so we get the wa-input
@@ -204,6 +205,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               .value=${this._password}
               .placeholder=${this._localize("onboarding.wifi.password_placeholder")}
               .maxlength=${64}
+              .label=${this._localize("onboarding.wifi.password_label")}
               ?disabled=${this._saving}
               @password-input-change=${(
                 e: CustomEvent<PasswordInputValueChange>,
