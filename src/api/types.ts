@@ -967,6 +967,9 @@ export enum DeviceEventType {
   JOB_OUTPUT = "job_output",
   JOB_COMPLETED = "job_completed",
   JOB_FAILED = "job_failed",
+  // Remote-build receiver-side events.
+  REMOTE_BUILD_BINDING_MISMATCH = "remote_build_binding_mismatch",
+  REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -1142,7 +1145,8 @@ export interface EditorValidateResponse {
 // Remote-build feature (issue #106).
 // Phase 2: peer dashboard discovery + receiver-side master switch.
 // Phase 2b: user-supplied manual hosts for cross-subnet / non-mDNS LANs.
-// Phase 3+ extends ``RemoteBuildSettings`` with token / cert / TTL knobs.
+// Phase 3b1+: receiver-issued bearer tokens.
+// Phase 3c1: receiver dashboard identity + cert rotation.
 
 export type RemoteBuildPeerSource = "mdns" | "manual";
 
@@ -1151,9 +1155,35 @@ export interface ManualHost {
   port: number;
 }
 
+/**
+ * Public-facing token row from ``remote_build/list_tokens``.
+ *
+ * Mirrors the backend's ``TokenSummary`` (drops the on-disk
+ * ``secret_sha256`` so a leaked frontend snapshot can't be
+ * matched against candidate cleartext bearers). The cleartext
+ * bearer is generated client-side at ``add_token`` time and
+ * never crosses the wire to the backend; this list is the
+ * receiver's view of "which paired offloaders does this
+ * dashboard recognise" — there's no path to recover the
+ * cleartext from anywhere server-side.
+ *
+ * ``bound_dashboard_id`` starts ``null`` and is filled in by
+ * phase 3b3's first-use binding the first time an authenticated
+ * request lands carrying the offloader's ``X-Dashboard-ID``.
+ * The Settings UI renders a "not yet bound" badge while ``null``
+ * and a "bound to <id>" badge once set.
+ */
+export interface TokenSummary {
+  token_id: string;
+  label: string;
+  created_at: number;
+  bound_dashboard_id: string | null;
+}
+
 export interface RemoteBuildSettings {
   enabled: boolean;
   manual_hosts: ManualHost[];
+  tokens: TokenSummary[];
 }
 
 export interface RemoteBuildPeer {
@@ -1164,4 +1194,81 @@ export interface RemoteBuildPeer {
   addresses: string[];
   server_version: string;
   esphome_version: string;
+}
+
+/**
+ * Receiver's stable identity, returned from
+ * ``remote_build/get_identity`` and ``remote_build/rotate_identity``.
+ *
+ * The cert + key PEMs are intentionally NOT included — only the
+ * SPKI fingerprint (``pin_sha256``, lowercase hex SHA-256 of the
+ * SubjectPublicKeyInfo) is safe to ship, and it's what an
+ * offloader pins against anyway. ``listener_bound`` reports
+ * whether the ``/remote-build/v1/*`` HTTPS site is currently
+ * serving traffic; lets the Settings UI distinguish "rotation
+ * succeeded AND the listener is back up" from "rotation
+ * succeeded but the rebuild fail-softed; check logs".
+ */
+export interface IdentityView {
+  dashboard_id: string;
+  pin_sha256: string;
+  server_version: string;
+  esphome_version: string;
+  listener_bound: boolean;
+}
+
+/**
+ * Args for ``remote_build/add_token``.
+ *
+ * **The cleartext bearer is generated client-side** (see
+ * ``mintRemoteBuildBearer``). The frontend POSTs only the
+ * SHA-256 hash of the secret half; the cleartext never crosses
+ * the wire to the backend. This closes the leak that would
+ * otherwise occur on plain-HTTP standalone deployments where
+ * the main port carries the WS API in cleartext.
+ */
+export interface AddRemoteBuildTokenArgs {
+  /** Display label, 1-128 chars. Duplicates allowed; ``token_id`` is the unique key. */
+  label: string;
+  /** Client-generated, exactly 11 base64url chars (8 random bytes encoded). */
+  token_id: string;
+  /** Lowercase hex SHA-256 of the cleartext secret half (64 chars). */
+  secret_sha256: string;
+}
+
+/**
+ * Data payload for the ``remote_build_binding_mismatch`` event.
+ *
+ * Fires when an authenticated ``/remote-build/v1/*`` request's
+ * ``X-Dashboard-ID`` doesn't match the token's bound value.
+ * ``race_loss`` distinguishes a concurrent first-use bind that
+ * lost the race (likely an operator pasted the cleartext into
+ * two offloaders by mistake; soften the wording) from a hit on
+ * an already-bound token (more suspicious — stolen bearer or
+ * paste-into-wrong-machine; loud wording with an inline revoke
+ * CTA).
+ */
+export interface RemoteBuildBindingMismatchEventData {
+  token_id: string;
+  presented_dashboard_id: string;
+  bound_dashboard_id: string;
+  peer_ip: string;
+  race_loss: boolean;
+}
+
+/**
+ * Data payload for the ``remote_build_identity_rotated`` event.
+ *
+ * Fires when the operator triggers ``rotate_identity``. Lets the
+ * Settings UI refresh its cached pin without polling
+ * ``get_identity`` (the dashboard might've been rotated from
+ * another tab, or via the WS API directly). Only the rotated
+ * fields are carried; ``server_version`` and
+ * ``esphome_version`` don't change on rotation, and the
+ * ``listener_bound`` state is best read via a fresh
+ * ``get_identity`` call on the receiving tab.
+ */
+export interface RemoteBuildIdentityRotatedEventData {
+  dashboard_id: string;
+  pin_sha256: string;
 }

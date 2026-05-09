@@ -28,11 +28,14 @@ import type {
   ReachabilitySubscription,
   FirmwareDownload,
   FirmwareJob,
+  AddRemoteBuildTokenArgs,
+  IdentityView,
   PagedBoardsResponse,
   PagedComponentsResponse,
   RemoteBuildPeer,
   RemoteBuildSettings,
   ResultMessage,
+  TokenSummary,
   SerialPort,
   ServerInfoMessage,
   OnboardingState,
@@ -585,7 +588,7 @@ export class ESPHomeAPI {
    */
   async subscribeDeviceReachability(
     deviceName: string,
-    callback: (state: ReachabilityStateEvent) => void,
+    callback: (state: ReachabilityStateEvent) => void
   ): Promise<ReachabilitySubscription> {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
@@ -633,9 +636,7 @@ export class ESPHomeAPI {
         const timer = setTimeout(() => {
           this._pendingRequests.delete(messageId);
           reject(
-            new Error(
-              `subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`,
-            ),
+            new Error(`subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`)
           );
         }, SUBSCRIBE_TIMEOUT_MS);
         this._pendingRequests.set(messageId, {
@@ -776,9 +777,7 @@ export class ESPHomeAPI {
     return this.sendCommand<{ configuration: string }>("devices/clone", {
       configuration,
       new_name: newName,
-      ...(newFriendlyName !== undefined
-        ? { new_friendly_name: newFriendlyName }
-        : {}),
+      ...(newFriendlyName !== undefined ? { new_friendly_name: newFriendlyName } : {}),
     });
   }
 
@@ -947,7 +946,7 @@ export class ESPHomeAPI {
    *  state without waiting for the ``device_updated`` event. */
   async setDeviceLabels(
     configuration: string,
-    labelIds: string[],
+    labelIds: string[]
   ): Promise<ConfiguredDevice> {
     return this.sendCommand<ConfiguredDevice>("devices/set_labels", {
       configuration,
@@ -965,10 +964,7 @@ export class ESPHomeAPI {
   /** Create a new label. ``name`` 1-50 chars, unique
    *  case-insensitively. ``color`` is ``#rrggbb`` (lowercased on
    *  save) or ``null`` / omitted for "no explicit color". */
-  async createLabel(args: {
-    name: string;
-    color?: string | null;
-  }): Promise<Label> {
+  async createLabel(args: { name: string; color?: string | null }): Promise<Label> {
     return this.sendCommand<Label>("labels/create", args);
   }
 
@@ -1303,14 +1299,11 @@ export class ESPHomeAPI {
    * (32 char SSID, 64 char password) and surfaces violations as
    * ``CommandError(INVALID_ARGS)`` for the UI to render.
    */
-  async setOnboardingWifi(
-    ssid: string,
-    password: string,
-  ): Promise<OnboardingState> {
-    return this.sendCommand<OnboardingState>(
-      "onboarding/set_wifi_credentials",
-      { ssid, password },
-    );
+  async setOnboardingWifi(ssid: string, password: string): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/set_wifi_credentials", {
+      ssid,
+      password,
+    });
   }
 
   /**
@@ -1338,13 +1331,8 @@ export class ESPHomeAPI {
   }
 
   /** Persist the receiver-side remote-build settings. */
-  async setRemoteBuildSettings(args: {
-    enabled: boolean;
-  }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/set_settings",
-      args
-    );
+  async setRemoteBuildSettings(args: { enabled: boolean }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>("remote_build/set_settings", args);
   }
 
   /**
@@ -1377,10 +1365,7 @@ export class ESPHomeAPI {
     hostname: string;
     port: number;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/add_manual_host",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/add_manual_host", args);
   }
 
   /**
@@ -1394,10 +1379,94 @@ export class ESPHomeAPI {
     hostname: string;
     port: number;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/remove_manual_host",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/remove_manual_host", args);
+  }
+
+  // ─── Remote build: receiver-issued tokens (phase 3b1 / 3b3) ──
+
+  /**
+   * List the receiver-issued bearer tokens this dashboard recognises.
+   *
+   * Each row is a ``TokenSummary`` (label + token_id +
+   * created_at + bound_dashboard_id). The on-disk
+   * ``secret_sha256`` is intentionally projected out; the
+   * cleartext bearer was generated client-side at
+   * ``addRemoteBuildToken`` time and never crossed the wire to
+   * the backend, so the cleartext can't be recovered from this
+   * list (or anywhere server-side). The Settings UI renders one
+   * row per token with revoke + bound-dashboard-id badges.
+   */
+  async listRemoteBuildTokens(): Promise<TokenSummary[]> {
+    return this.sendCommand<TokenSummary[]>("remote_build/list_tokens");
+  }
+
+  /**
+   * Register a client-generated bearer token under *label*.
+   *
+   * Caller MUST mint the bearer client-side via
+   * :func:`mintRemoteBuildBearer` and POST only the SHA-256
+   * hash; the cleartext bearer never crosses the wire to the
+   * backend. The returned ``TokenSummary`` carries no secret
+   * material (the cleartext lives only in the caller's local
+   * state until they paste it into the offloader, then it's
+   * discarded). Duplicate ``token_id`` rejected with
+   * ``ErrorCode.ALREADY_EXISTS``.
+   */
+  async addRemoteBuildToken(args: AddRemoteBuildTokenArgs): Promise<TokenSummary> {
+    return this.sendCommand<TokenSummary>("remote_build/add_token", { ...args });
+  }
+
+  /**
+   * Revoke a previously-issued token.
+   *
+   * Removing a bound token immediately disconnects the
+   * offloader it's paired to: the next request the offloader
+   * sends presents a ``token_id`` the receiver no longer
+   * recognises and gets a 401. Unknown ``token_id`` raises
+   * ``ErrorCode.NOT_FOUND``.
+   */
+  async removeRemoteBuildToken(args: { token_id: string }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>("remote_build/remove_token", args);
+  }
+
+  // ─── Remote build: receiver identity (phase 3c1) ──────────
+
+  /**
+   * Read this dashboard's stable identity for the Settings card.
+   *
+   * Returns ``{dashboard_id, pin_sha256, server_version,
+   * esphome_version, listener_bound}``. The cert + key PEMs are
+   * intentionally NOT included; only the SPKI fingerprint
+   * (``pin_sha256``, lowercase hex) is safe to ship to a
+   * frontend, and the fingerprint is what an offloader pins
+   * against anyway. Idempotent (no rotation triggered by reads).
+   * Lazy-creates the cert + key on first call if missing.
+   */
+  async getRemoteBuildIdentity(): Promise<IdentityView> {
+    return this.sendCommand<IdentityView>("remote_build/get_identity");
+  }
+
+  /**
+   * Mint a fresh cert + keypair, replacing whatever's on disk.
+   *
+   * Forces every paired offloader to re-pair (the new SPKI
+   * produces a new ``pin_sha256``); ``dashboard_id`` is
+   * preserved across rotations. If the receiver listener is
+   * currently bound, it gets torn down and rebuilt against the
+   * new cert; the returned ``IdentityView.listener_bound``
+   * reflects the rebuild outcome (``false`` means the rebuild
+   * fail-softed; the operator should check the dashboard logs
+   * before assuming the rotation took effect end-to-end).
+   *
+   * Concurrent calls are rejected with
+   * ``ErrorCode.ALREADY_EXISTS``; the caller is expected to
+   * confirm before each click. Fires a
+   * ``remote_build_identity_rotated`` event on the bus carrying
+   * ``{dashboard_id, pin_sha256}`` so other tabs / subscribers
+   * refresh without polling.
+   */
+  async rotateRemoteBuildIdentity(): Promise<IdentityView> {
+    return this.sendCommand<IdentityView>("remote_build/rotate_identity");
   }
 
   /** Get compiled device metadata. */

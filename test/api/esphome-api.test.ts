@@ -1,11 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import {
@@ -66,8 +59,11 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("upgrades to wss:// when the page is https", async () => {
-    (globalThis as unknown as { window: { location: { protocol: string; host: string } } }).window =
-      { location: { protocol: "https:", host: "example.test" } };
+    (
+      globalThis as unknown as {
+        window: { location: { protocol: string; host: string } };
+      }
+    ).window = { location: { protocol: "https:", host: "example.test" } };
     const api = new ESPHomeAPI();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
@@ -196,9 +192,7 @@ describe("ESPHomeAPI — sendCommand", () => {
 
   it("throws when the socket is not open", async () => {
     const api = new ESPHomeAPI();
-    await expect(api.sendCommand("ping")).rejects.toThrow(
-      /not connected/,
-    );
+    await expect(api.sendCommand("ping")).rejects.toThrow(/not connected/);
   });
 
   it("assigns sequential message_ids", async () => {
@@ -235,7 +229,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
     const pending = api.cloneDevice(
       "kitchen.yaml",
       "bedroom-bulb",
-      "Bedroom Reading Lamp",
+      "Bedroom Reading Lamp"
     );
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
 
@@ -362,7 +356,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
     ws.receive({ message_id: messageId, event: "output", data: "line 1" });
     ws.receive({ message_id: messageId, event: "output", data: "line 2" });
@@ -379,7 +373,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
     ws.receive({
       message_id: messageId,
@@ -399,7 +393,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onError },
+      { onError }
     );
     ws.receive({
       message_id: messageId,
@@ -426,7 +420,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput: vi.fn(), onResult: vi.fn() },
+      { onOutput: vi.fn(), onResult: vi.fn() }
     );
 
     const pending = api.stopStream(streamId);
@@ -451,7 +445,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
 
     // Pre-stop: events flow normally.
@@ -495,7 +489,7 @@ describe("ESPHomeAPI — event subscriptions", () => {
     const ws = await connect(api);
     const received: Array<{ event: string; data: unknown }> = [];
     const subscribed = api.subscribeEvents((event, data) =>
-      received.push({ event, data }),
+      received.push({ event, data })
     );
     const msgId = ws.sentAs<{ message_id: string }>(0).message_id;
     ws.receive({ message_id: msgId, result: { subscribed: true } });
@@ -539,7 +533,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       component_id: "dht",
       fields: { pin: "GPIO4" },
     });
-    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
     expect(sent.command).toBe("devices/add_component");
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -627,7 +625,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const pending = api.setRemoteBuildSettings({ enabled: true });
-    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
     // Same wire-shape rationale as ``getRemoteBuildSettings`` —
@@ -715,6 +717,114 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     ws.receive({ message_id: sent.message_id, result: payload });
     await expect(pending).resolves.toEqual(payload);
   });
+
+  it("listRemoteBuildTokens sends remote_build/list_tokens and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = [
+      {
+        token_id: "abcdefghijk",
+        label: "green",
+        created_at: 1715212800,
+        bound_dashboard_id: null,
+      },
+      {
+        token_id: "lmnopqrstuv",
+        label: "laptop",
+        created_at: 1715212900,
+        bound_dashboard_id: "laptop-dashboard-id",
+      },
+    ];
+    const pending = api.listRemoteBuildTokens();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/list_tokens");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("addRemoteBuildToken sends label + token_id + secret_sha256 (no cleartext)", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const args = {
+      label: "green",
+      token_id: "abcdefghijk",
+      secret_sha256: "f".repeat(64),
+    };
+    const pending = api.addRemoteBuildToken(args);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/add_token");
+    // Pin the wire shape: only label + token_id + secret_sha256.
+    // No "secret" or "bearer" key — the cleartext stays
+    // client-side and never lands in this payload.
+    expect(sent.args).toEqual(args);
+    expect(sent.args).not.toHaveProperty("secret");
+    expect(sent.args).not.toHaveProperty("bearer");
+    const result = {
+      token_id: args.token_id,
+      label: args.label,
+      created_at: 1715212800,
+      bound_dashboard_id: null,
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("removeRemoteBuildToken sends remote_build/remove_token with token_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.removeRemoteBuildToken({ token_id: "abcdefghijk" });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/remove_token");
+    expect(sent.args).toEqual({ token_id: "abcdefghijk" });
+    const result = { enabled: true, manual_hosts: [], tokens: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      dashboard_id: "abc123",
+      pin_sha256: "a".repeat(64),
+      server_version: "1.2.3",
+      esphome_version: "2026.5.0",
+      listener_bound: true,
+    };
+    const pending = api.getRemoteBuildIdentity();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_identity");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("rotateRemoteBuildIdentity sends remote_build/rotate_identity and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      dashboard_id: "abc123",
+      pin_sha256: "b".repeat(64),
+      server_version: "1.2.3",
+      esphome_version: "2026.5.0",
+      listener_bound: true,
+    };
+    const pending = api.rotateRemoteBuildIdentity();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/rotate_identity");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
 });
 
 describe("ESPHomeAPI — auth", () => {
@@ -786,7 +896,7 @@ describe("ESPHomeAPI — auth", () => {
 
     // Fresh token persisted for the next reconnect.
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 }),
+      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 })
     );
   });
 
@@ -849,7 +959,7 @@ describe("ESPHomeAPI — auth", () => {
     });
     await expect(api.ready).resolves.toBeUndefined();
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 }),
+      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 })
     );
   });
 
