@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiClose,
   mdiPaletteOutline,
+  mdiSendOutline,
   mdiServerNetwork,
   mdiTranslate,
   mdiVectorDifference,
@@ -38,12 +39,28 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 registerMdiIcons({
   close: mdiClose,
   "palette-outline": mdiPaletteOutline,
+  "send-outline": mdiSendOutline,
   "server-network": mdiServerNetwork,
   translate: mdiTranslate,
   "vector-difference": mdiVectorDifference,
 });
 
-type Section = "appearance" | "language" | "editor" | "remote_build";
+// "Remote builder" used to be one section with two role
+// subheadings (Receive / Offload). Split into two sidebar
+// entries because the two roles share no state (different
+// WS commands, different mental model — operators rarely do
+// both) and the Receive half is growing fast (master toggle
+// + build-server identity card + tokens list + binding-
+// mismatch alerts in 3c2c+). Each operator typically uses
+// one or the other, not both, so collapsing into two
+// distinct destinations matches how they think about the
+// feature.
+type Section =
+  | "appearance"
+  | "language"
+  | "editor"
+  | "build_server"
+  | "build_offload";
 
 interface SectionDef {
   id: Section;
@@ -56,9 +73,21 @@ const SECTIONS: SectionDef[] = [
   { id: "language", icon: "translate", labelKey: "settings.language" },
   { id: "editor", icon: "vector-difference", labelKey: "layout.editor" },
   {
-    id: "remote_build",
+    // "Build server" = Receive role: this dashboard offering
+    // its CPU to other dashboards on the network. We use
+    // "build server" rather than "build host" because the
+    // CI/CD term is broadly recognised; "build host" reads
+    // as jargon for users who haven't seen it before.
+    id: "build_server",
     icon: "server-network",
-    labelKey: "settings.remote_build",
+    labelKey: "settings.build_server",
+  },
+  {
+    // "Send builds" = Offload role: this dashboard
+    // dispatching its compiles to another dashboard.
+    id: "build_offload",
+    icon: "send-outline",
+    labelKey: "settings.build_offload",
   },
 ];
 
@@ -168,7 +197,17 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   private _selectSection(section: Section) {
     this._section = section;
-    if (section === "remote_build") {
+    // Each role lazy-loads only its own state — opening the
+    // Build server section doesn't need the manual-host list,
+    // and vice versa. Both sections may be visited in the
+    // same dialog open; their state lives independently and
+    // doesn't refetch unless the dialog reopens.
+    if (section === "build_server") {
+      if (this._remoteBuildIdentity === null && !this._remoteBuildIdentityLoadFailed) {
+        void this._loadRemoteBuildIdentity();
+      }
+    }
+    if (section === "build_offload") {
       if (this._remoteBuildPeers === null) {
         void (async () => {
           const ok = await this._loadRemoteBuildPeers();
@@ -179,9 +218,6 @@ export class ESPHomeSettingsDialog extends LitElement {
             this._remoteBuildPeers = [];
           }
         })();
-      }
-      if (this._remoteBuildIdentity === null && !this._remoteBuildIdentityLoadFailed) {
-        void this._loadRemoteBuildIdentity();
       }
     }
   }
@@ -673,7 +709,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         cursor: not-allowed;
       }
 
-      .build-host-card {
+      .build-server-card {
         display: flex;
         flex-direction: column;
         gap: var(--wa-space-s);
@@ -684,56 +720,56 @@ export class ESPHomeSettingsDialog extends LitElement {
         border-radius: var(--wa-border-radius-m);
       }
 
-      .build-host-row {
+      .build-server-row {
         display: flex;
         align-items: baseline;
         gap: var(--wa-space-s);
         flex-wrap: wrap;
       }
 
-      .build-host-label {
+      .build-server-label {
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-semibold);
         color: var(--wa-color-text-quiet);
         min-width: 110px;
       }
 
-      .build-host-pin {
+      .build-server-pin {
         font-family: var(--wa-font-family-mono, monospace);
         font-size: var(--wa-font-size-xs);
         word-break: break-all;
         flex: 1;
       }
 
-      .build-host-dashboard-id {
+      .build-server-dashboard-id {
         font-family: var(--wa-font-family-mono, monospace);
         font-size: var(--wa-font-size-s);
         word-break: break-all;
         flex: 1;
       }
 
-      .build-host-versions {
+      .build-server-versions {
         display: flex;
         gap: var(--wa-space-l);
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
       }
 
-      .build-host-versions code {
+      .build-server-versions code {
         font-family: var(--wa-font-family-mono, monospace);
         color: var(--wa-color-text-normal);
         margin-left: var(--wa-space-xs);
       }
 
-      .build-host-actions {
+      .build-server-actions {
         display: flex;
         gap: var(--wa-space-s);
         align-items: center;
         flex-wrap: wrap;
       }
 
-      .build-host-copy,
-      .build-host-rotate {
+      .build-server-copy,
+      .build-server-rotate {
         padding: 6px var(--wa-space-m);
         background: var(--wa-color-surface-raised);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
@@ -744,18 +780,18 @@ export class ESPHomeSettingsDialog extends LitElement {
         cursor: pointer;
       }
 
-      .build-host-rotate {
+      .build-server-rotate {
         color: var(--wa-color-danger-on-quiet, #b00020);
         border-color: var(--wa-color-danger-on-quiet, #b00020);
       }
 
-      .build-host-rotate:disabled,
-      .build-host-copy:disabled {
+      .build-server-rotate:disabled,
+      .build-server-copy:disabled {
         opacity: 0.6;
         cursor: not-allowed;
       }
 
-      .build-host-listener-badge {
+      .build-server-listener-badge {
         display: inline-flex;
         align-items: center;
         padding: 2px var(--wa-space-s);
@@ -764,12 +800,12 @@ export class ESPHomeSettingsDialog extends LitElement {
         font-weight: var(--wa-font-weight-semibold);
       }
 
-      .build-host-listener-up {
+      .build-server-listener-up {
         background: var(--wa-color-success-quiet, #d6f5dd);
         color: var(--wa-color-success-on-quiet, #036a1c);
       }
 
-      .build-host-listener-down {
+      .build-server-listener-down {
         background: var(--wa-color-warning-quiet, #fff3cd);
         color: var(--wa-color-warning-on-quiet, #8a6d3b);
       }
@@ -832,8 +868,10 @@ export class ESPHomeSettingsDialog extends LitElement {
         return this._renderLanguage();
       case "editor":
         return this._renderEditor();
-      case "remote_build":
-        return this._renderRemoteBuild();
+      case "build_server":
+        return this._renderBuildServer();
+      case "build_offload":
+        return this._renderBuildOffload();
     }
   }
 
@@ -901,28 +939,20 @@ export class ESPHomeSettingsDialog extends LitElement {
     `;
   }
 
-  private _renderRemoteBuild() {
-    // Two distinct roles live in this section, so split them
-    // visually with explicit subheadings + descriptions to make
-    // the direction unambiguous: are we letting other dashboards
-    // build for us, or are we offloading our builds to them?
-    //
-    // Both halves are scaffolding right now; the active phases
-    // (1, 2, 2b) only persist state. The "not implemented yet"
-    // banners are deliberate. Without them the UI looks
-    // functional but silently does nothing on click, which is
-    // worse than telling the user the feature isn't ready. The
-    // banners come down as phases 3-5 land.
+  /**
+   * Receive role: this dashboard letting other dashboards
+   * use it to compile firmware. Master enable toggle plus
+   * the build-server identity card (cert fingerprint +
+   * listener-bound + rotate). Tokens list + binding-
+   * mismatch alerts land here in 3c2c. No "not implemented
+   * yet" banner — 3b / 3c1 / 3c2b made this half functional
+   * end-to-end (the listener binds, fingerprint is real,
+   * rotation rotates, tokens authenticate).
+   */
+  private _renderBuildServer() {
     return html`
-      <div class="phase-banner" role="status">
-        ${this._localize("settings.remote_build_unimplemented_banner")}
-      </div>
-
-      <div class="role-section-heading">
-        ${this._localize("settings.remote_build_role_receive")}
-      </div>
       <div class="role-section-desc">
-        ${this._localize("settings.remote_build_role_receive_desc")}
+        ${this._localize("settings.build_server_intro")}
       </div>
       <div class="row">
         <div class="row-label">
@@ -943,18 +973,30 @@ export class ESPHomeSettingsDialog extends LitElement {
       </div>
 
       <div class="section-heading">
-        ${this._localize("settings.remote_build_build_host")}
+        ${this._localize("settings.build_server_card_heading")}
       </div>
       <div class="role-section-desc">
-        ${this._localize("settings.remote_build_build_host_desc")}
+        ${this._localize("settings.build_server_card_desc")}
       </div>
-      ${this._renderBuildHostCard()}
+      ${this._renderBuildServerCard()}
+    `;
+  }
 
-      <div class="role-section-heading">
-        ${this._localize("settings.remote_build_role_offload")}
+  /**
+   * Offload role: this dashboard sending its compiles to
+   * another dashboard on the network. Manual host entry +
+   * discovered-peers list. Pairing + peer-link + scheduler
+   * land in phases 4 / 5 / 7; until then the section is
+   * scaffolding and the in-section banner says so.
+   */
+  private _renderBuildOffload() {
+    return html`
+      <div class="phase-banner" role="status">
+        ${this._localize("settings.build_offload_unimplemented_banner")}
       </div>
+
       <div class="role-section-desc">
-        ${this._localize("settings.remote_build_role_offload_desc")}
+        ${this._localize("settings.build_offload_intro")}
       </div>
 
       <div class="section-heading">
@@ -1016,7 +1058,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     `;
   }
 
-  private _renderBuildHostCard() {
+  private _renderBuildServerCard() {
     if (this._remoteBuildIdentityLoadFailed) {
       return html`
         <div class="row" role="alert">
@@ -1042,19 +1084,19 @@ export class ESPHomeSettingsDialog extends LitElement {
     const identity = this._remoteBuildIdentity;
     const formattedPin = formatPinSha256(identity.pin_sha256);
     return html`
-      <div class="build-host-card">
-        <div class="build-host-row">
-          <span class="build-host-label">
+      <div class="build-server-card">
+        <div class="build-server-row">
+          <span class="build-server-label">
             ${this._localize("settings.remote_build_pin_label")}
           </span>
-          <code class="build-host-pin">${formattedPin}</code>
+          <code class="build-server-pin">${formattedPin}</code>
         </div>
-        <div class="build-host-actions">
-          <button class="build-host-copy" type="button" @click=${this._onCopyPin}>
+        <div class="build-server-actions">
+          <button class="build-server-copy" type="button" @click=${this._onCopyPin}>
             ${this._localize("settings.remote_build_pin_copy")}
           </button>
           <span
-            class=${`build-host-listener-badge build-host-listener-${
+            class=${`build-server-listener-badge build-server-listener-${
               identity.listener_bound ? "up" : "down"
             }`}
             role="status"
@@ -1064,13 +1106,13 @@ export class ESPHomeSettingsDialog extends LitElement {
               : this._localize("settings.remote_build_listener_down")}
           </span>
         </div>
-        <div class="build-host-row">
-          <span class="build-host-label">
+        <div class="build-server-row">
+          <span class="build-server-label">
             ${this._localize("settings.remote_build_dashboard_id_label")}
           </span>
-          <code class="build-host-dashboard-id">${identity.dashboard_id}</code>
+          <code class="build-server-dashboard-id">${identity.dashboard_id}</code>
         </div>
-        <div class="build-host-row build-host-versions">
+        <div class="build-server-row build-server-versions">
           <span>
             ${this._localize("settings.remote_build_server_version_label")}
             <code>${identity.server_version}</code>
@@ -1080,9 +1122,9 @@ export class ESPHomeSettingsDialog extends LitElement {
             <code>${identity.esphome_version}</code>
           </span>
         </div>
-        <div class="build-host-actions">
+        <div class="build-server-actions">
           <button
-            class="build-host-rotate"
+            class="build-server-rotate"
             type="button"
             ?disabled=${this._remoteBuildRotateInFlight}
             @click=${this._onRotateRequest}
