@@ -117,7 +117,7 @@ describe("getEncryptionState", () => {
        reflect the encryption that's already running on the
        hardware (e.g. firmware sourced from a backup, a config
        restore that lost the secret). The wire signal is the
-       authoritative one; surfacing "plaintext" there mislead
+       authoritative one; surfacing "plaintext" there misled
        operators into reflashing devices that didn't need it. */
     expect(
       getEncryptionState(

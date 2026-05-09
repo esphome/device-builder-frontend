@@ -14,11 +14,18 @@ export interface EncryptionInputs {
 export type EncryptionState =
   /** No native API exposed — no indicator at all. */
   | "none"
-  /** YAML disabled encryption; device either confirmed plaintext or
-   *  mDNS hasn't been seen. The lock-open warning indicator. */
+  /** Encryption is not in effect on the device. Either the YAML
+   *  disabled it AND the wire didn't contradict, OR mDNS confirmed
+   *  plaintext directly. The lock-open warning indicator. */
   | "plaintext"
-  /** YAML enables encryption; mDNS confirms the device is running it,
-   *  or mDNS hasn't been seen and we trust the YAML. */
+  /** Encryption is in effect. Either mDNS reports a truthy cipher
+   *  string (the running firmware is broadcasting Noise — wire
+   *  authoritative), or the YAML enables encryption and the wire
+   *  hasn't contradicted it (mDNS not seen yet → trust the YAML).
+   *  The wire-authoritative arm catches configs whose YAML pass
+   *  diverges from the running firmware (issue #437: ESPHome's
+   *  Jinja-templated packages aren't run by the dashboard's
+   *  ``yaml_util.load_yaml``). */
   | "active"
   /** YAML enables encryption but the device is broadcasting plaintext
    *  AND ``has_pending_changes`` is set — we know the user just edited
