@@ -1404,10 +1404,10 @@ export class ESPHomeAPI {
     );
   }
 
-  // ─── Remote build: receiver-issued tokens (phase 3b1 / 3b3) ──
+  // ─── Remote build: receiver-side pairing inbox (phase 4a-r1) ──
 
   /**
-   * List the receiver-issued bearer tokens this dashboard recognises.
+   * List the offloaders this dashboard recognises (paired or pending).
    *
    * Each row is a {@link PeerSummary} (dashboard_id + pin_sha256
    * + label + paired_at + status). Includes both PENDING (in the
