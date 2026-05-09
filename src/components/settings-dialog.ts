@@ -45,16 +45,16 @@ registerMdiIcons({
   "vector-difference": mdiVectorDifference,
 });
 
-// "Remote builder" used to be one section with two role
-// subheadings (Receive / Offload). Split into two sidebar
-// entries because the two roles share no state (different
-// WS commands, different mental model — operators rarely do
-// both) and the Receive half is growing fast (master toggle
-// + build-server identity card + tokens list + binding-
-// mismatch alerts in 3c2c+). Each operator typically uses
-// one or the other, not both, so collapsing into two
-// distinct destinations matches how they think about the
-// feature.
+// "Remote builder" used to be one section with two roles
+// presented as subheadings (Receive / Offload). Split into
+// two sidebar entries because the two roles share no state
+// (different WS commands, different mental model —
+// operators rarely do both) and the Receive half is growing
+// fast (master toggle + build-server identity card + tokens
+// list + binding-mismatch alerts in 3c2c+). Each operator
+// typically uses one or the other, not both, so collapsing
+// into two distinct destinations matches how they think
+// about the feature.
 type Section =
   | "appearance"
   | "language"
