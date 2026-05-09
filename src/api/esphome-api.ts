@@ -1464,7 +1464,7 @@ export class ESPHomeAPI {
    * esphome_version, listener_bound}``. The cert + key PEMs are
    * intentionally NOT included; only the SPKI fingerprint
    * (``pin_sha256``, lowercase hex) is safe to ship to a
-   * frontend, and the fingerprint is what an sender pins
+   * frontend, and the fingerprint is what a sender pins
    * against anyway. Idempotent (no rotation triggered by reads).
    * Lazy-creates the cert + key on first call if missing.
    */

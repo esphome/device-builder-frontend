@@ -335,7 +335,20 @@ export class ESPHomeGenerateBuildServerTokenDialog extends LitElement {
     // to the backend (3b3 contract). The backend stores only
     // the SHA-256 hash; we keep the cleartext in this
     // component's local state until the user clicks Done.
-    const minted = mintRemoteBuildBearer();
+    // ``mintRemoteBuildBearer`` throws when
+    // ``crypto.getRandomValues`` is unavailable (modern browsers
+    // expose it everywhere, including http://, but a hardened /
+    // sandboxed runtime could legitimately lack it). Catch and
+    // surface a typed message so the dialog doesn't get stuck
+    // in ``_submitting=true`` with no feedback.
+    let minted: ReturnType<typeof mintRemoteBuildBearer>;
+    try {
+      minted = mintRemoteBuildBearer();
+    } catch {
+      this._submitting = false;
+      this._formError = this._localize("settings.build_server_generate_token_failed");
+      return;
+    }
     let issued: TokenSummary;
     try {
       issued = await this._api.addRemoteBuildToken({
