@@ -292,6 +292,20 @@ export class ESPHomeSettingsDialog extends LitElement {
    *   receiver, but the extra fetch is idempotent and the
    *   tokens list cap is small.
    *
+   * Both branches gate on ``_section === "build_server"`` rather
+   * than on the loaded-state of the field they refresh. A
+   * loaded-state guard ("only refetch if not null") would skip
+   * the event in two real cases:
+   *
+   * 1. The initial ``_loadBuildServerIdentity`` is in flight when
+   *    the rotation event arrives — the field is still ``null``
+   *    so we'd skip, then the in-flight request lands with
+   *    pre-rotation data.
+   * 2. The user navigated away from the section since loading;
+   *    the field is non-null but stale.
+   *
+   * Section-active is the user-intent signal we actually want.
+   *
    * For both: ``changed.get(...)`` returns the *previous*
    * value, which is ``undefined`` on the very first sync (Lit's
    * first callback after the consumer connects to the
@@ -300,15 +314,16 @@ export class ESPHomeSettingsDialog extends LitElement {
    */
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
+    if (this._section !== "build_server") return;
     if (changed.has("_buildServerIdentityRotationCounter")) {
       const prev = changed.get("_buildServerIdentityRotationCounter");
-      if (prev !== undefined && this._buildServerIdentity !== null) {
+      if (prev !== undefined) {
         void this._loadBuildServerIdentity();
       }
     }
     if (changed.has("_buildServerBindingMismatches")) {
       const prev = changed.get("_buildServerBindingMismatches");
-      if (prev !== undefined && this._buildServerTokens !== null) {
+      if (prev !== undefined) {
         void this._loadBuildServerTokens();
       }
     }
