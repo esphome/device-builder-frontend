@@ -827,21 +827,33 @@ export interface OnboardingStep {
  *
  * ``current_version`` is the version of onboarding the server
  * knows about; ``completed_version`` is what the user last
- * acknowledged. The dashboard shows the wizard when
- * ``completed_version < current_version`` AND the user hasn't
- * frontend-side session-dismissed it. The data-derived
- * ``steps[].status`` doesn't gate the dialog — saving real
- * values OR declining ("I only use Ethernet") both call
- * ``mark_acknowledged`` to advance the version, so the dialog
- * stops re-opening regardless of whether the data is now set.
+ * acknowledged. The wizard auto-pops when ALL of the following
+ * are true: ``completed_version < current_version`` (user is
+ * behind a newer onboarding version), at least one
+ * ``steps[].status`` is ``pending`` (there's actually
+ * something to do), and the user hasn't frontend-side
+ * session-dismissed it. A version bump alone isn't enough —
+ * pre-wizard installs all started at ``completed_version = 0``
+ * and asking a user with already-configured secrets to re-enter
+ * them is friction with no payoff. The exact gate lives in
+ * ``src/util/onboarding-gate.ts`` (``shouldAutoShowOnboarding``)
+ * with unit-test coverage of every branch.
  *
- * Step status drives a separate signal: the always-on badge in
- * the secrets kebab. It's computed from live on-disk state on
- * every server-side ``get_state`` call — never persisted — and
- * the dashboard re-fetches on (re)connect, so a manual
- * ``secrets.yaml`` edit clears the badge no later than the next
- * WS reconnect (or page reload). Within a single session the
- * badge is a snapshot of the auth-time fetch.
+ * Manual entry via the ``Set up Wi-Fi…`` kebab item bypasses
+ * both the version-bump gate and the session-dismiss flag —
+ * the click IS the explicit "I want to do this now" signal —
+ * but is itself only visible when ``isOnboardingPending`` is
+ * true (so the user never sees the entry when there's nothing
+ * to do).
+ *
+ * Step status also drives the kebab entry's visibility
+ * directly. It's computed from live on-disk state on every
+ * server-side ``get_state`` call — never persisted — and the
+ * dashboard re-fetches on (re)connect AND on every
+ * ``secrets-saved`` event, so an in-app save (wizard or
+ * Secrets editor) updates the entry in real time and an
+ * out-of-band ``secrets.yaml`` edit clears it no later than
+ * the next WS reconnect.
  */
 export interface OnboardingState {
   current_version: number;
