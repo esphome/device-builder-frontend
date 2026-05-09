@@ -223,12 +223,17 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   private async _save() {
-    const ssid = this._ssid.trim();
-    if (!ssid) return;
+    // IEEE 802.11 SSIDs may legally contain leading/trailing
+    // whitespace, so don't ``trim()`` the value being sent —
+    // mutating it would silently change the network name and
+    // the device would fail to associate. The Save button is
+    // already disabled on all-whitespace input via the same
+    // check below.
+    if (!this._ssid.trim()) return;
     this._saving = true;
     this._error = null;
     try {
-      await this._api.setOnboardingWifi(ssid, this._password);
+      await this._api.setOnboardingWifi(this._ssid, this._password);
       // Acknowledge so the dialog doesn't re-pop on next load even
       // if the badge logic wants to keep the menu indicator.
       await this._api.markOnboardingAcknowledged();
