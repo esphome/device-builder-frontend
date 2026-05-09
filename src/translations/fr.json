@@ -679,8 +679,6 @@
     "show_yaml_diff_button_desc": "Activez pour afficher le bouton de diff YAML dans la barre d'outils de l'éditeur. Il vous permet de comparer vos modifications non enregistrées à la dernière version enregistrée.",
     "build_server": "Serveur de compilation",
     "build_offload": "Envoyer les compilations",
-    "build_server_intro": "Permettez à d'autres tableaux de bord ESPHome de votre réseau d'utiliser ce tableau de bord pour compiler des firmwares. Le bouton ci-dessous active l'écoute du récepteur ; la carte en dessous affiche l'empreinte du certificat que les pairs appairés devront confirmer hors bande lors de leur appairage avec ce tableau de bord.",
-    "build_offload_intro": "Déchargez les compilations de firmware de ce tableau de bord vers un autre tableau de bord ESPHome de votre réseau. Utile pour libérer le CPU et la RAM, accélérer les compilations volumineuses, ou simplement garder ce tableau de bord réactif pendant qu'une longue compilation s'exécute.",
     "build_offload_unimplemented_banner": "L'envoi de compilations à un autre tableau de bord n'est pas encore implémenté. Les noms d'hôte ajoutés ici sont mémorisés, mais aucune tâche de compilation n'est dispatchée tant que l'appairage n'est pas livré dans une version ultérieure.",
     "remote_build_enable": "Activer la compilation à distance",
     "remote_build_enable_desc": "Permettre à d'autres tableaux de bord de votre réseau d'envoyer des tâches de compilation de firmware à ce tableau de bord. L'appairage avec un pair lui donne la possibilité d'exécuter du code sur cet hôte ; n'activez que pour les tableaux de bord auxquels vous faites déjà confiance au niveau shell.",

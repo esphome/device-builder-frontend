@@ -577,10 +577,19 @@ export class ESPHomeSettingsDialog extends LitElement {
         transform: translateX(18px);
       }
 
-      /* Phase 2b: Remote builder section */
+      /* Remote builder sections (Build server / Send builds).
+         No per-element horizontal padding — .content-body
+         already pads the section's left/right edges via
+         padding: 0 var(--wa-space-l). Adding more horizontal
+         padding here would compound on top of that, leaving
+         the content visually crammed against a thick gutter
+         (the symptom that prompted this cleanup). The
+         Appearance / Editor sections use the same pattern
+         via .row: zero horizontal padding, rely on the
+         container. */
 
       .phase-banner {
-        margin: 0 var(--wa-space-m) var(--wa-space-m);
+        margin: 0 0 var(--wa-space-m);
         padding: var(--wa-space-s) var(--wa-space-m);
         border-radius: var(--wa-border-radius-s);
         background: var(--wa-color-warning-fill-quiet, #fff7e0);
@@ -594,7 +603,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         font-size: var(--wa-font-size-l);
         font-weight: var(--wa-font-weight-semibold);
         margin: var(--wa-space-l) 0 var(--wa-space-2xs);
-        padding: 0 var(--wa-space-m);
       }
 
       .role-section-heading:first-of-type {
@@ -605,7 +613,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         font-size: var(--wa-font-size-s);
         color: var(--wa-color-text-quiet);
         margin: 0 0 var(--wa-space-s);
-        padding: 0 var(--wa-space-m);
       }
 
       .section-heading {
@@ -615,7 +622,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         text-transform: uppercase;
         letter-spacing: 0.04em;
         margin: var(--wa-space-l) 0 var(--wa-space-xs);
-        padding: 0 var(--wa-space-m);
       }
 
       .peer-row .row-title {
@@ -944,16 +950,15 @@ export class ESPHomeSettingsDialog extends LitElement {
    * use it to compile firmware. Master enable toggle plus
    * the build-server identity card (cert fingerprint +
    * listener-bound + rotate). Tokens list + binding-
-   * mismatch alerts land here in 3c2c. No "not implemented
-   * yet" banner — 3b / 3c1 / 3c2b made this half functional
-   * end-to-end (the listener binds, fingerprint is real,
-   * rotation rotates, tokens authenticate).
+   * mismatch alerts land here in 3c2c. Each row carries
+   * its own inline description rather than a section
+   * intro paragraph — matches the visual rhythm of the
+   * Appearance / Editor sections (label + short desc +
+   * control inline) and avoids the wall-of-text feel the
+   * earlier intro paragraph had.
    */
   private _renderBuildServer() {
     return html`
-      <div class="role-section-desc">
-        ${this._localize("settings.build_server_intro")}
-      </div>
       <div class="row">
         <div class="row-label">
           <span id="remote-build-enable-title" class="row-title">
@@ -987,16 +992,14 @@ export class ESPHomeSettingsDialog extends LitElement {
    * another dashboard on the network. Manual host entry +
    * discovered-peers list. Pairing + peer-link + scheduler
    * land in phases 4 / 5 / 7; until then the section is
-   * scaffolding and the in-section banner says so.
+   * scaffolding and the in-section banner says so. The
+   * manual-host form's existing inline description carries
+   * the "why" — no separate section intro needed.
    */
   private _renderBuildOffload() {
     return html`
       <div class="phase-banner" role="status">
         ${this._localize("settings.build_offload_unimplemented_banner")}
-      </div>
-
-      <div class="role-section-desc">
-        ${this._localize("settings.build_offload_intro")}
       </div>
 
       <div class="section-heading">
