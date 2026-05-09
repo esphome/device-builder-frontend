@@ -28,14 +28,15 @@ import type {
   ReachabilitySubscription,
   FirmwareDownload,
   FirmwareJob,
-  AddRemoteBuildTokenArgs,
   IdentityView,
   PagedBoardsResponse,
   PagedComponentsResponse,
+  PairingSummary,
+  PairingWindowState,
+  PeerSummary,
   RemoteBuildPeer,
   RemoteBuildSettings,
   ResultMessage,
-  TokenSummary,
   SerialPort,
   ServerInfoMessage,
   OnboardingState,
@@ -1408,51 +1409,173 @@ export class ESPHomeAPI {
   /**
    * List the receiver-issued bearer tokens this dashboard recognises.
    *
-   * Each row is a {@link TokenSummary} (label + token_id +
-   * created_at + bound_dashboard_id). The on-disk
-   * ``secret_sha256`` is intentionally projected out; the
-   * cleartext bearer was generated client-side at
-   * ``addRemoteBuildToken`` time and never crossed the wire to
-   * the backend, so the cleartext can't be recovered from this
-   * list (or anywhere server-side). The Settings UI renders one
-   * row per token with revoke + bound-dashboard-id badges.
+   * Each row is a {@link PeerSummary} (dashboard_id + pin_sha256
+   * + label + paired_at + status). Includes both PENDING (in the
+   * receiver's in-memory dict, awaiting Accept / Reject) and
+   * APPROVED (persisted) rows. The Settings UI renders the
+   * Pairing requests inbox from the PENDING rows and the
+   * Approved peers list from the APPROVED rows.
    */
-  async listRemoteBuildTokens(): Promise<TokenSummary[]> {
-    return this.sendCommand<TokenSummary[]>("remote_build/list_tokens");
+  async listRemoteBuildPeers(): Promise<PeerSummary[]> {
+    return this.sendCommand<PeerSummary[]>("remote_build/list_peers");
   }
 
   /**
-   * Register a client-generated bearer token under *label*.
+   * Promote a PENDING peer to APPROVED.
    *
-   * Caller MUST mint the bearer client-side via
-   * {@link mintRemoteBuildBearer} and POST only the SHA-256
-   * hash; the cleartext bearer never crosses the wire to the
-   * backend. The returned {@link TokenSummary} carries no
-   * secret material (the cleartext lives only in the caller's
-   * local state until they paste it into the sender, then
-   * it's discarded). Duplicate ``token_id`` rejected with
-   * ``ErrorCode.ALREADY_EXISTS``.
-   */
-  async addRemoteBuildToken(args: AddRemoteBuildTokenArgs): Promise<TokenSummary> {
-    return this.sendCommand<TokenSummary>("remote_build/add_token", args);
-  }
-
-  /**
-   * Revoke a previously-issued token.
-   *
-   * Removing a bound token immediately disconnects the
-   * sender it's paired to: the next request the sender
-   * sends presents a ``token_id`` the receiver no longer
-   * recognises and gets a 401. Unknown ``token_id`` raises
+   * The receiver-side admin clicks Accept on a row in the
+   * Pairing requests inbox; the call promotes the in-memory
+   * row to a persisted ``StoredPeer``, fires
+   * ``remote_build_pair_status_changed`` with
+   * ``status="approved"``, and wakes any offloader currently
+   * long-polling ``intent="pair_status"`` against this
+   * ``dashboard_id``. Unknown ``dashboard_id`` rejects with
    * ``ErrorCode.NOT_FOUND``.
    */
-  async removeRemoteBuildToken(args: {
-    token_id: string;
+  async approveRemoteBuildPeer(args: {
+    dashboard_id: string;
   }): Promise<RemoteBuildSettings> {
     return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/remove_token",
+      "remote_build/approve_peer",
       args
     );
+  }
+
+  /**
+   * Drop a peer row by ``dashboard_id``.
+   *
+   * Works for both PENDING (in-memory) and APPROVED (persisted)
+   * rows. Fires ``remote_build_pair_status_changed`` with
+   * ``status="removed"`` for either case so any offloader
+   * long-polling pair_status sees the cancellation. Unknown
+   * ``dashboard_id`` rejects with ``ErrorCode.NOT_FOUND``.
+   */
+  async removeRemoteBuildPeer(args: {
+    dashboard_id: string;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/remove_peer",
+      args
+    );
+  }
+
+  /**
+   * Open or close the pairing window for the calling WS client.
+   *
+   * The pairing window narrows when ``intent="pair_request"``
+   * Noise frames are accepted: only while at least one client
+   * has called this with ``open: true`` and is keeping the
+   * extend timestamp fresh. Refcounted across clients with a
+   * 5-minute idle timeout; a graceful ``open: false`` removes
+   * just the calling client (other tabs / users still keep the
+   * window open if any of them is extending). Fires
+   * ``remote_build_pairing_window_changed`` on transitions and
+   * on every successful ``open: true`` extend.
+   *
+   * The frontend's Pairing requests screen calls ``open: true``
+   * on mount + on each user-activity tick (debounced to once
+   * per 30s on the wire), and ``open: false`` on unmount.
+   */
+  async setRemoteBuildPairingWindow(args: {
+    open: boolean;
+  }): Promise<PairingWindowState> {
+    return this.sendCommand<PairingWindowState>(
+      "remote_build/set_pairing_window",
+      args
+    );
+  }
+
+  // ─── Remote build: offloader-side pair flow (phase 4a-o) ──
+
+  /**
+   * Open a brief Noise XX WS to the receiver and capture its
+   * pin for OOB-display.
+   *
+   * The offloader runs ``intent="preview"`` to capture the
+   * receiver's static X25519 pubkey from the Noise handshake
+   * transcript before committing to pair. The frontend renders
+   * the returned ``pin_sha256`` for the user to OOB-verify
+   * against the receiver's "Build server" Settings card; only
+   * after that confirmation does the offloader call
+   * {@link requestRemoteBuildPair}. Read-only on the receiver
+   * (no state mutated). Transport / handshake / decode failures
+   * surface as ``ErrorCode.UNAVAILABLE``.
+   */
+  async previewRemoteBuildPair(args: {
+    hostname: string;
+    port: number;
+  }): Promise<{ pin_sha256: string }> {
+    return this.sendCommand<{ pin_sha256: string }>(
+      "remote_build/preview_pair",
+      args
+    );
+  }
+
+  /**
+   * Send ``intent="pair_request"`` and persist a local
+   * ``StoredPairing`` row.
+   *
+   * Re-handshakes the receiver (defends against TOCTOU between
+   * preview and confirm) and sends ``{label: offloader_label,
+   * dashboard_id}`` in the encrypted msg3 payload. The
+   * receiver's response decides what state the local row lands
+   * in: PENDING (typical first pair, awaiting admin Accept) or
+   * APPROVED (re-pair against existing trust the receiver still
+   * remembers).
+   *
+   * Two distinct labels because the offloader-side and
+   * receiver-side rows mean different things:
+   * ``receiver_label`` is the offloader's local name for the
+   * receiver (lands on the offloader's ``StoredPairing.label``);
+   * ``offloader_label`` is the offloader's self-identification
+   * sent to the receiver in msg3 for *their* pairing-requests
+   * inbox.
+   *
+   * Errors:
+   * - ``ErrorCode.PRECONDITION_FAILED`` — pin mismatch (TOCTOU
+   *   between preview and confirm) or receiver-side REJECTED.
+   * - ``ErrorCode.NO_PAIRING_WINDOW`` — receiver's pairing
+   *   window is closed; UI should prompt the user to ask the
+   *   receiving dashboard's admin to open the Pairing requests
+   *   screen.
+   * - ``ErrorCode.UNAVAILABLE`` — transport / handshake / decode
+   *   failure.
+   * - ``ErrorCode.INVALID_ARGS`` — host / port / pin / label
+   *   shape rejection.
+   */
+  async requestRemoteBuildPair(args: {
+    hostname: string;
+    port: number;
+    pin_sha256: string;
+    receiver_label: string;
+    offloader_label: string;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
+  }
+
+  /**
+   * Drop the local pairing row for ``(hostname, port)``.
+   *
+   * Idempotent — returns ``{removed: false}`` when no row
+   * matches. Cancels the row's pair-status listener task if
+   * any (the open Noise WS to the receiver closes promptly
+   * without waiting on disk I/O). Fires
+   * ``offloader_pair_status_changed`` with ``status="removed"``
+   * so other tabs / clients on the global ``subscribe_events``
+   * stream see the removal.
+   *
+   * Receiver-side state is NOT notified — the receiver's
+   * ``StoredPeer`` row stays until the receiver admin clicks
+   * Remove on their own inbox; that's the receiver's ownership
+   * concern. Phase 8's re-auth wizard surfaces the
+   * "stale on receiver, removed locally" case as a UI
+   * affordance for the receiver-side admin.
+   */
+  async unpairRemoteBuild(args: {
+    hostname: string;
+    port: number;
+  }): Promise<{ removed: boolean }> {
+    return this.sendCommand<{ removed: boolean }>("remote_build/unpair", args);
   }
 
   // ─── Remote build: receiver identity (phase 3c1) ──────────

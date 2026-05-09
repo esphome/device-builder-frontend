@@ -8,7 +8,6 @@ import {
 } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
-import { mintRemoteBuildBearer } from "../../src/util/remote-build-bearer.js";
 import {
   MockWebSocket,
   installMockWebSocket,
@@ -723,116 +722,151 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(payload);
   });
 
-  it("listRemoteBuildTokens sends remote_build/list_tokens and unwraps the result", async () => {
+  it("listRemoteBuildPeers sends remote_build/list_peers and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const payload = [
       {
-        token_id: "abcdefghijk",
+        dashboard_id: "green",
+        pin_sha256: "a".repeat(64),
         label: "green",
-        created_at: 1715212800,
-        bound_dashboard_id: null,
+        paired_at: 1715212800,
+        status: "approved",
       },
       {
-        token_id: "lmnopqrstuv",
+        dashboard_id: "laptop",
+        pin_sha256: "b".repeat(64),
         label: "laptop",
-        created_at: 1715212900,
-        bound_dashboard_id: "laptop-dashboard-id",
+        paired_at: 1715212900,
+        status: "pending",
       },
     ];
-    const pending = api.listRemoteBuildTokens();
+    const pending = api.listRemoteBuildPeers();
     const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
-    expect(sent.command).toBe("remote_build/list_tokens");
+    expect(sent.command).toBe("remote_build/list_peers");
     expect(sent.args).toBeUndefined();
     ws.receive({ message_id: sent.message_id, result: payload });
     await expect(pending).resolves.toEqual(payload);
   });
 
-  it("addRemoteBuildToken sends label + token_id + secret_sha256 (no cleartext)", async () => {
+  it("approveRemoteBuildPeer sends remote_build/approve_peer with dashboard_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.approveRemoteBuildPeer({ dashboard_id: "green" });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/approve_peer");
+    expect(sent.args).toEqual({ dashboard_id: "green" });
+    const result = { enabled: true, manual_hosts: [], peers: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("removeRemoteBuildPeer sends remote_build/remove_peer with dashboard_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.removeRemoteBuildPeer({ dashboard_id: "green" });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/remove_peer");
+    expect(sent.args).toEqual({ dashboard_id: "green" });
+    const result = { enabled: true, manual_hosts: [], peers: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setRemoteBuildPairingWindow sends remote_build/set_pairing_window with open flag", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setRemoteBuildPairingWindow({ open: true });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_pairing_window");
+    expect(sent.args).toEqual({ open: true });
+    const result = { open: true, expires_in_seconds: 300 };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("previewRemoteBuildPair sends remote_build/preview_pair and unwraps the pin", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.previewRemoteBuildPair({
+      hostname: "build.local",
+      port: 6055,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/preview_pair");
+    expect(sent.args).toEqual({ hostname: "build.local", port: 6055 });
+    const result = { pin_sha256: "a".repeat(64) };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("requestRemoteBuildPair sends host + pin + both labels (TOCTOU + dual label)", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const args = {
-      label: "green",
-      token_id: "abcdefghijk",
-      secret_sha256: "f".repeat(64),
+      hostname: "build.local",
+      port: 6055,
+      pin_sha256: "a".repeat(64),
+      receiver_label: "build server",
+      offloader_label: "green",
     };
-    const pending = api.addRemoteBuildToken(args);
+    const pending = api.requestRemoteBuildPair(args);
     const sent = ws.sentAs<{
       command: string;
       message_id: string;
       args: Record<string, unknown>;
     }>(0);
-    expect(sent.command).toBe("remote_build/add_token");
-    // Pin the wire shape: only label + token_id + secret_sha256.
-    // No "secret" or "bearer" key — the cleartext stays
-    // client-side and never lands in this payload.
+    expect(sent.command).toBe("remote_build/request_pair");
+    // Pin the wire shape: both labels go through; the receiver
+    // sees ``offloader_label`` and the local ``StoredPairing``
+    // gets ``receiver_label``. Conflating them would let a
+    // receiver-side rename retro-rewrite the offloader's row.
     expect(sent.args).toEqual(args);
-    expect(sent.args).not.toHaveProperty("secret");
-    expect(sent.args).not.toHaveProperty("bearer");
     const result = {
-      token_id: args.token_id,
-      label: args.label,
-      created_at: 1715212800,
-      bound_dashboard_id: null,
+      receiver_hostname: "build.local",
+      receiver_port: 6055,
+      pin_sha256: args.pin_sha256,
+      label: "build server",
+      paired_at: 1715212800,
+      status: "pending",
     };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
   });
 
-  it("removeRemoteBuildToken sends remote_build/remove_token with token_id", async () => {
+  it("unpairRemoteBuild sends remote_build/unpair with hostname + port", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    const pending = api.removeRemoteBuildToken({ token_id: "abcdefghijk" });
+    const pending = api.unpairRemoteBuild({
+      hostname: "build.local",
+      port: 6055,
+    });
     const sent = ws.sentAs<{
       command: string;
       message_id: string;
       args: Record<string, unknown>;
     }>(0);
-    expect(sent.command).toBe("remote_build/remove_token");
-    expect(sent.args).toEqual({ token_id: "abcdefghijk" });
-    const result = { enabled: true, manual_hosts: [], tokens: [] };
+    expect(sent.command).toBe("remote_build/unpair");
+    expect(sent.args).toEqual({ hostname: "build.local", port: 6055 });
+    const result = { removed: true };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
-  });
-
-  it("addRemoteBuildToken accepts mintRemoteBuildBearer output as-is (chain contract)", async () => {
-    // Pin the integration the UI does end-to-end: the mint
-    // helper returns a shape the wrapper accepts without any
-    // reformatting. A drift in either side's field naming
-    // (e.g. mint returns ``tokenId`` while the wrapper expects
-    // ``token_id``) would only surface in production today; this
-    // test catches it at unit-test time.
-    const minted = mintRemoteBuildBearer();
-    const api = new ESPHomeAPI();
-    const ws = await connect(api);
-    const pending = api.addRemoteBuildToken({
-      label: "green",
-      token_id: minted.token_id,
-      secret_sha256: minted.secret_sha256,
-    });
-    const sent = ws.sentAs<{
-      command: string;
-      message_id: string;
-      args: Record<string, unknown>;
-    }>(0);
-    expect(sent.command).toBe("remote_build/add_token");
-    expect(sent.args).toEqual({
-      label: "green",
-      token_id: minted.token_id,
-      secret_sha256: minted.secret_sha256,
-    });
-    expect(sent.args).not.toHaveProperty("secret");
-    expect(sent.args).not.toHaveProperty("bearer");
-    ws.receive({
-      message_id: sent.message_id,
-      result: {
-        token_id: minted.token_id,
-        label: "green",
-        created_at: 1715212800,
-        bound_dashboard_id: null,
-      },
-    });
-    await pending;
   });
 
   it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {

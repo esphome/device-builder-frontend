@@ -967,9 +967,15 @@ export enum DeviceEventType {
   JOB_OUTPUT = "job_output",
   JOB_COMPLETED = "job_completed",
   JOB_FAILED = "job_failed",
-  // Remote-build receiver-side events.
-  REMOTE_BUILD_BINDING_MISMATCH = "remote_build_binding_mismatch",
+  // Remote-build events.
   REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
+  REMOTE_BUILD_PAIR_REQUEST_RECEIVED = "remote_build_pair_request_received",
+  REMOTE_BUILD_PAIR_STATUS_CHANGED = "remote_build_pair_status_changed",
+  REMOTE_BUILD_PAIRING_WINDOW_CHANGED = "remote_build_pairing_window_changed",
+  // Offloader-side counterpart to ``REMOTE_BUILD_PAIR_STATUS_CHANGED``;
+  // fires from the offloader's pair-status listener task and from
+  // ``remote_build/unpair``.
+  OFFLOADER_PAIR_STATUS_CHANGED = "offloader_pair_status_changed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -991,6 +997,16 @@ export interface InitialStateEventData {
    *  ``IMPORTABLE_DEVICE_ADDED`` / ``_REMOVED`` events for changes
    *  after subscription. */
   importable: AdoptableDevice[];
+  /** Offloader-side pairings snapshot the backend pushes once at
+   *  subscribe time so the Send-builds initial paint matches what
+   *  ``OFFLOADER_PAIR_STATUS_CHANGED`` events will subsequently
+   *  mutate against. Carries both PENDING and APPROVED rows from
+   *  the controller's in-RAM ``_pairings`` dict (sync read; no
+   *  wire calls, no disk I/O). Optional because not every
+   *  dashboard has a remote-build controller wired up — when
+   *  the controller is absent the field is omitted entirely
+   *  rather than sent as an empty list. */
+  pairings?: PairingSummary[];
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
@@ -1145,8 +1161,9 @@ export interface EditorValidateResponse {
 // Remote-build feature (issue #106).
 // Phase 2: peer dashboard discovery + receiver-side master switch.
 // Phase 2b: user-supplied manual hosts for cross-subnet / non-mDNS LANs.
-// Phase 3b1+: receiver-issued bearer tokens.
 // Phase 3c1: receiver dashboard identity + cert rotation.
+// Phase 4a: Noise XX peer-link replaces the bearer-token surface;
+//           offloader-side pair flow + receiver-side pairing inbox.
 
 export type RemoteBuildPeerSource = "mdns" | "manual";
 
@@ -1156,34 +1173,81 @@ export interface ManualHost {
 }
 
 /**
- * Public-facing token row from ``remote_build/list_tokens``.
+ * Lifecycle position of a paired (or pending) peer / pairing.
  *
- * Mirrors the backend's ``TokenSummary`` (drops the on-disk
- * ``secret_sha256`` so a leaked frontend snapshot can't be
- * matched against candidate cleartext bearers). The cleartext
- * bearer is generated client-side at ``add_token`` time and
- * never crosses the wire to the backend; this list is the
- * receiver's view of "which paired senders does this
- * dashboard recognise" — there's no path to recover the
- * cleartext from anywhere server-side.
- *
- * ``bound_dashboard_id`` starts ``null`` and is filled in by
- * phase 3b3's first-use binding the first time an authenticated
- * request lands carrying the sender's ``X-Dashboard-ID``.
- * The Settings UI renders a "not yet bound" badge while ``null``
- * and a "bound to <id>" badge once set.
+ * Mirrors the backend's ``PeerStatus`` StrEnum. ``pending`` rows
+ * land via the pair_request flow and live in-memory only on the
+ * receiver (admin hasn't accepted yet); ``approved`` rows are
+ * persisted and grant full peer-link access. There is no
+ * explicit ``rejected`` terminal state — Reject deletes the row.
  */
-export interface TokenSummary {
-  token_id: string;
+export type PeerStatus = "pending" | "approved";
+
+/**
+ * Receiver-side wire view of a paired offloader (``StoredPeer``).
+ *
+ * Drops the raw 32-byte X25519 pubkey; ``pin_sha256`` is the
+ * wire-friendly form (lowercase-hex SHA-256 of the pubkey)
+ * that UIs render for OOB-verification. ``status`` is supplied
+ * by the controller because the receiver-side ``StoredPeer``
+ * itself doesn't carry one (PENDING peers live in the
+ * controller's in-memory dict; persisted peers are implicitly
+ * APPROVED).
+ */
+export interface PeerSummary {
+  dashboard_id: string;
+  pin_sha256: string;
   label: string;
-  created_at: number;
-  bound_dashboard_id: string | null;
+  paired_at: number;
+  status: PeerStatus;
+}
+
+/**
+ * Offloader-side wire view of a pinned receiver
+ * (``StoredPairing``).
+ *
+ * Mirror of ``PeerSummary`` for the offloader side: drops the
+ * raw X25519 pubkey, keys on the receiver coordinates the user
+ * entered (rather than the receiver's ``dashboard_id``, which
+ * the offloader doesn't track). ``status`` reflects the
+ * row's lifecycle in the unified ``_pairings`` dict on the
+ * controller; the disk filter strips PENDING rows at serialise
+ * time so APPROVED is the on-disk shape.
+ */
+export interface PairingSummary {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  label: string;
+  paired_at: number;
+  status: PeerStatus;
+}
+
+/**
+ * Receiver-side pairing-window state.
+ *
+ * Returned from ``remote_build/set_pairing_window`` and
+ * delivered as the ``remote_build_pairing_window_changed``
+ * event payload. The window narrows when ``intent="pair_request"``
+ * Noise frames are accepted: only while the receiver's Pairing
+ * requests screen is mounted. ``expires_in_seconds`` is
+ * ``null`` when ``open`` is ``false``; otherwise it's the
+ * remaining lifetime against the latest activity-driven extend
+ * (frontend renders the live countdown from this value and ticks
+ * locally between events).
+ */
+export interface PairingWindowState {
+  open: boolean;
+  expires_in_seconds: number | null;
 }
 
 export interface RemoteBuildSettings {
   enabled: boolean;
   manual_hosts: ManualHost[];
-  tokens: TokenSummary[];
+  /** Receiver-side pinned offloaders. Includes both PENDING (in
+   *  the receiver's ``_pending_peers`` dict) and APPROVED
+   *  (persisted) rows, projected through ``PeerSummary``. */
+  peers: PeerSummary[];
 }
 
 export interface RemoteBuildPeer {
@@ -1202,12 +1266,12 @@ export interface RemoteBuildPeer {
  *
  * The cert + key PEMs are intentionally NOT included — only the
  * SPKI fingerprint (``pin_sha256``, lowercase hex SHA-256 of the
- * SubjectPublicKeyInfo) is safe to ship, and it's what a
- * sender pins against anyway. ``listener_bound`` reports
- * whether the ``/remote-build/v1/*`` HTTPS site is currently
- * serving traffic; lets the Settings UI distinguish "rotation
- * succeeded AND the listener is back up" from "rotation
- * succeeded but the rebuild fail-softed; check logs".
+ * SubjectPublicKeyInfo) is safe to ship, and it's what a peer
+ * pins against anyway. ``listener_bound`` reports whether the
+ * peer-link Noise WS is currently serving traffic; lets the
+ * Settings UI distinguish "rotation succeeded AND the listener
+ * is back up" from "rotation succeeded but the rebuild
+ * fail-softed; check logs".
  */
 export interface IdentityView {
   dashboard_id: string;
@@ -1218,49 +1282,69 @@ export interface IdentityView {
 }
 
 /**
- * Args for ``remote_build/add_token``.
+ * Data payload for the ``remote_build_pair_request_received`` event.
  *
- * **The cleartext bearer is generated client-side** (see
- * ``mintRemoteBuildBearer``). The frontend POSTs only the
- * SHA-256 hash of the secret half; the cleartext never crosses
- * the wire to the backend. This closes the leak that would
- * otherwise occur on plain-HTTP standalone deployments where
- * the main port carries the WS API in cleartext.
- *
- * Type alias rather than ``interface`` so it satisfies
- * ``Record<string, unknown>`` at the ``sendCommand`` call site;
- * named interfaces lose the index-signature compatibility a
- * structurally-typed object literal has, which would otherwise
- * force a defensive ``{ ...args }`` spread that no other
- * remote-build wrapper uses.
+ * Fires on the receiver-side bus when a fresh
+ * ``intent="pair_request"`` Noise frame lands inside an open
+ * pairing window. The Settings UI surfaces the row in the
+ * Pairing requests inbox; ``peer_ip`` lets the operator
+ * sanity-check the source against expectations before
+ * OOB-confirming the pin.
  */
-export type AddRemoteBuildTokenArgs = {
-  /** Display label, 1-128 chars. Duplicates allowed; ``token_id`` is the unique key. */
+export interface RemoteBuildPairRequestReceivedEventData {
+  dashboard_id: string;
+  pin_sha256: string;
   label: string;
-  /** Client-generated, exactly 11 base64url chars (8 random bytes encoded). */
-  token_id: string;
-  /** Lowercase hex SHA-256 of the cleartext secret half (64 chars). */
-  secret_sha256: string;
-};
+  peer_ip: string;
+}
 
 /**
- * Data payload for the ``remote_build_binding_mismatch`` event.
+ * Data payload for the ``remote_build_pair_status_changed`` event.
  *
- * Fires when an authenticated ``/remote-build/v1/*`` request's
- * ``X-Dashboard-ID`` doesn't match the token's bound value.
- * ``race_loss`` distinguishes a concurrent first-use bind that
- * lost the race (likely an operator pasted the cleartext into
- * two senders by mistake; soften the wording) from a hit on
- * an already-bound token (more suspicious — stolen bearer or
- * paste-into-wrong-machine; loud wording with an inline revoke
- * CTA).
+ * Receiver-side. Fires from three paths: ``approve_peer``
+ * promoting a PENDING dict entry to APPROVED
+ * (``status="approved"``); ``remove_peer`` dropping either a
+ * PENDING dict entry or an APPROVED list row
+ * (``status="removed"``); pairing-window-close clearing the
+ * in-memory PENDING dict (``status="removed"`` per cleared
+ * entry). The ``status="removed"`` event is what wakes any
+ * in-flight ``intent="pair_status"`` long-poll on a paired
+ * offloader so its listener task drops the offloader's local
+ * state.
  */
-export interface RemoteBuildBindingMismatchEventData {
-  token_id: string;
-  presented_dashboard_id: string;
-  bound_dashboard_id: string;
-  peer_ip: string;
-  race_loss: boolean;
+export interface RemoteBuildPairStatusChangedEventData {
+  dashboard_id: string;
+  status: "approved" | "removed";
+}
+
+/**
+ * Data payload for the ``remote_build_pairing_window_changed``
+ * event.
+ *
+ * Receiver-side. Fires whenever the in-process pairing window
+ * opens, extends, or closes. Same shape as
+ * ``PairingWindowState``; the Settings UI re-syncs its local
+ * countdown against ``expires_in_seconds`` on every event tick.
+ */
+export type RemoteBuildPairingWindowChangedEventData = PairingWindowState;
+
+/**
+ * Data payload for the ``offloader_pair_status_changed`` event.
+ *
+ * Offloader-side counterpart to
+ * ``RemoteBuildPairStatusChangedEventData``. Fired by the
+ * offloader's per-row pair-status listener task
+ * (``_apply_pair_status_result`` → ``_fire_offloader_pair_status_changed``)
+ * and by ``remote_build/unpair`` when the user removes a row.
+ * Keys on the receiver coordinates (``hostname`` /
+ * ``port``) the user dialled because the offloader's
+ * ``StoredPairing`` doesn't store the receiver's
+ * ``dashboard_id``.
+ */
+export interface OffloaderPairStatusChangedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  status: "approved" | "removed";
 }
 
 /**

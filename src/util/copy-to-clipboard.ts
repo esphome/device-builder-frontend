@@ -12,9 +12,10 @@
  * making any "Copy" button silently no-op.
  *
  * Same secure-context restriction applies to ``crypto.subtle``
- * (which is why ``src/util/remote-build-bearer.ts`` uses
- * ``js-sha256`` for hashing). The clipboard problem is the
- * UI-layer counterpart.
+ * — anywhere the dashboard needs to hash without a secure
+ * context, the helper has to fall back to a userland
+ * implementation. The clipboard problem is the UI-layer
+ * counterpart of that constraint.
  *
  * Fallback: a hidden ``<span>`` containing the text + the
  * Selection API range-select + a one-shot ``copy`` event

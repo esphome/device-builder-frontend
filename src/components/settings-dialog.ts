@@ -15,9 +15,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
   ErrorCode,
   type IdentityView,
-  type RemoteBuildBindingMismatchEventData,
   type RemoteBuildPeer,
-  type TokenSummary,
 } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
 import { readStoredLocale } from "../common/localize.js";
@@ -26,7 +24,6 @@ import { readStoredLocale } from "../common/localize.js";
 type LanguageChoice = SupportedLocale | "system";
 import {
   apiContext,
-  buildServerBindingMismatchesContext,
   buildServerIdentityRotationCounterContext,
   localizeContext,
   remoteBuildEnabledContext,
@@ -39,8 +36,6 @@ import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
-import "./generate-build-server-token-dialog.js";
-import type { ESPHomeGenerateBuildServerTokenDialog } from "./generate-build-server-token-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -144,13 +139,6 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _remoteBuildEnabled = false;
 
-  // Phase 3c2d: live alert + cross-tab refresh signals from
-  // app-shell. Both come from the WS event subscription that
-  // app-shell already runs.
-  @consume({ context: buildServerBindingMismatchesContext, subscribe: true })
-  @state()
-  private _buildServerBindingMismatches: RemoteBuildBindingMismatchEventData[] = [];
-
   @consume({
     context: buildServerIdentityRotationCounterContext,
     subscribe: true,
@@ -199,35 +187,8 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _buildServerRotateInFlight = false;
 
-  // Phase 3c2c: tokens list state. Lazy-loaded on Build
-  // server section open via ``listRemoteBuildTokens``,
-  // refreshed after every Generate / Revoke. Same null /
-  // empty-array / load-failed shape as the identity load:
-  // ``null`` = not yet loaded, an empty array = loaded with
-  // zero tokens, the load-failed flag is tracked separately.
-  @state()
-  private _buildServerTokens: TokenSummary[] | null = null;
-
-  @state()
-  private _buildServerTokensLoadFailed = false;
-
-  /**
-   * Token id of the row whose Revoke button was just clicked.
-   * Captured here so the shared ``<esphome-confirm-dialog>``'s
-   * ``@confirm`` handler knows which row to remove. ``null``
-   * when no revoke is pending.
-   */
-  @state()
-  private _pendingRevokeTokenId: string | null = null;
-
   @query("#rotate-confirm")
   private _rotateConfirmDialog!: ESPHomeConfirmDialog;
-
-  @query("#revoke-confirm")
-  private _revokeConfirmDialog!: ESPHomeConfirmDialog;
-
-  @query("esphome-generate-build-server-token-dialog")
-  private _generateTokenDialog!: ESPHomeGenerateBuildServerTokenDialog;
 
   @state()
   private _section: Section = "appearance";
@@ -261,9 +222,6 @@ export class ESPHomeSettingsDialog extends LitElement {
     // ``<esphome-confirm-dialog>`` handles its own state, so
     // we only reset the flag here.
     this._buildServerRotateInFlight = false;
-    this._buildServerTokens = null;
-    this._buildServerTokensLoadFailed = false;
-    this._pendingRevokeTokenId = null;
     this._dialog.open = true;
   }
 
@@ -272,42 +230,24 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   /**
-   * Cross-tab refresh hook. Two distinct triggers:
+   * Cross-tab refresh hook for the receiver identity.
    *
-   * - ``_buildServerIdentityRotationCounter`` increments via
-   *   the matching context whenever app-shell receives a
-   *   ``remote_build_identity_rotated`` event. On change,
-   *   re-fetch the identity so this tab's card matches
-   *   whatever the rotating tab landed on disk.
+   * ``_buildServerIdentityRotationCounter`` increments via the
+   * matching context whenever app-shell receives a
+   * ``remote_build_identity_rotated`` event. On change, re-fetch
+   * the identity so this tab's card matches whatever the
+   * rotating tab landed on disk. Two cases:
    *
-   * - ``_buildServerBindingMismatches`` (the array reference)
-   *   changes whenever app-shell appends a new
-   *   ``remote_build_binding_mismatch`` event. On change,
-   *   re-fetch the tokens list. ``race_loss=true`` actually
-   *   transitions the token's ``bound_dashboard_id`` from
-   *   ``null`` to the winning sender's id; without this
-   *   refresh, the token row's "Waiting for first use" badge
-   *   stays stale until the user closes and reopens Settings.
-   *   ``race_loss=false`` doesn't mutate state on the
-   *   receiver, but the extra fetch is idempotent and the
-   *   tokens list cap is small.
+   * - User is currently on the Build server section: refetch
+   *   immediately so the visible card shows fresh data.
+   * - User is on a different section: null the cached value so
+   *   the lazy-load in ``_selectSection`` fires a fresh load
+   *   when they navigate back.
    *
-   * Each branch handles two cases:
-   *
-   * - User is currently on the Build server section
-   *   (``_section === "build_server"``): refetch immediately
-   *   so the visible card / list shows fresh data.
-   * - User is on a different section: null the cached value
-   *   so the lazy-load in ``_selectSection`` fires a fresh
-   *   load when they navigate back. (A non-null value would
-   *   short-circuit the lazy-load and leave the user staring
-   *   at the pre-event snapshot.)
-   *
-   * For both: ``changed.get(...)`` returns the *previous*
-   * value, which is ``undefined`` on the very first sync (Lit's
-   * first callback after the consumer connects to the
-   * provider). Skip that one — it's the initial value flowing
-   * through, not a real event.
+   * ``changed.get(...)`` returns the *previous* value, which is
+   * ``undefined`` on the very first sync (Lit's first callback
+   * after the consumer connects to the provider). Skip that one
+   * — it's the initial value flowing through, not a real event.
    */
   protected updated(changed: Map<string, unknown>) {
     super.updated(changed);
@@ -319,17 +259,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         } else {
           this._buildServerIdentity = null;
           this._buildServerIdentityLoadFailed = false;
-        }
-      }
-    }
-    if (changed.has("_buildServerBindingMismatches")) {
-      const prev = changed.get("_buildServerBindingMismatches");
-      if (prev !== undefined) {
-        if (this._section === "build_server") {
-          void this._loadBuildServerTokens();
-        } else {
-          this._buildServerTokens = null;
-          this._buildServerTokensLoadFailed = false;
         }
       }
     }
@@ -345,9 +274,6 @@ export class ESPHomeSettingsDialog extends LitElement {
     if (section === "build_server") {
       if (this._buildServerIdentity === null && !this._buildServerIdentityLoadFailed) {
         void this._loadBuildServerIdentity();
-      }
-      if (this._buildServerTokens === null && !this._buildServerTokensLoadFailed) {
-        void this._loadBuildServerTokens();
       }
     }
     if (section === "build_offload") {
@@ -420,79 +346,6 @@ export class ESPHomeSettingsDialog extends LitElement {
       console.warn("Could not load remote-build identity:", err);
       this._buildServerIdentityLoadFailed = true;
     }
-  }
-
-  /**
-   * Fetch the issued-tokens list for the Build server section.
-   *
-   * Same null / empty / load-failed shape as the identity load.
-   * Called on section open and after a successful Generate /
-   * Revoke so the list reflects the post-mutation state.
-   */
-  private async _loadBuildServerTokens(): Promise<void> {
-    if (this._api === undefined) {
-      return;
-    }
-    try {
-      this._buildServerTokens = await this._api.listRemoteBuildTokens();
-      this._buildServerTokensLoadFailed = false;
-    } catch (err) {
-      console.warn("Could not load remote-build tokens:", err);
-      this._buildServerTokensLoadFailed = true;
-    }
-  }
-
-  private _onGenerateTokenRequest() {
-    this._generateTokenDialog?.open();
-  }
-
-  /**
-   * Handler for ``<esphome-generate-build-server-token-dialog>``'s
-   * ``token-issued`` event. Refresh the tokens list so the new
-   * row appears with the right ``created_at`` and
-   * ``bound_dashboard_id`` (still ``null`` until the sender
-   * uses it for the first time).
-   */
-  private _onTokenIssued() {
-    void this._loadBuildServerTokens();
-  }
-
-  private _onRevokeRequest(tokenId: string) {
-    this._pendingRevokeTokenId = tokenId;
-    this._revokeConfirmDialog?.open();
-  }
-
-  /**
-   * Handler for the revoke confirm dialog's ``@confirm`` event.
-   *
-   * Pulls ``_pendingRevokeTokenId`` (set by
-   * ``_onRevokeRequest``) so the shared confirm-dialog
-   * component doesn't need per-row state. Refreshes the list
-   * on success; toasts on failure.
-   */
-  private async _onRevokeConfirm() {
-    const tokenId = this._pendingRevokeTokenId;
-    this._pendingRevokeTokenId = null;
-    if (this._api === undefined || tokenId === null) {
-      return;
-    }
-    try {
-      await this._api.removeRemoteBuildToken({ token_id: tokenId });
-    } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
-        // Token already gone — could be a stale list (revoked
-        // from another tab between the user's click and our
-        // request). Still refresh to drop the row locally;
-        // soft-toast rather than error.
-        this._toast("warning", "settings.build_server_revoke_already_gone");
-      } else {
-        this._toast("error", "settings.build_server_revoke_failed");
-      }
-      void this._loadBuildServerTokens();
-      return;
-    }
-    this._toast("success", "settings.build_server_revoke_success");
-    void this._loadBuildServerTokens();
   }
 
   private _onRotateRequest() {
@@ -1280,21 +1133,20 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   /**
-   * Receive role: this dashboard letting other dashboards
-   * use it to compile firmware. Master enable toggle plus
-   * the build-server identity card (cert fingerprint +
-   * listener-bound + rotate), tokens list, and binding-
-   * mismatch alerts. Each row carries its own inline
-   * description rather than a section intro paragraph —
-   * matches the visual rhythm of the Appearance / Editor
-   * sections (label + short desc + control inline) and
-   * avoids the wall-of-text feel the earlier intro
-   * paragraph had.
+   * Receive role: this dashboard letting other dashboards use
+   * it to compile firmware. Master enable toggle + the
+   * build-server identity card (cert fingerprint +
+   * listener-bound + rotate). The pairing-requests inbox UI
+   * and approved-peers list land in phase 4b-2; the
+   * pin-mismatch / peer-revoked alert reshape lands in 4b-4.
+   * Each row carries its own inline description rather than a
+   * section intro paragraph — matches the visual rhythm of
+   * the Appearance / Editor sections (label + short desc +
+   * control inline) and avoids the wall-of-text feel the
+   * earlier intro paragraph had.
    */
   private _renderBuildServer() {
     return html`
-      ${this._renderBuildServerAlerts()}
-
       <div class="row">
         <div class="row-label">
           <span id="remote-build-enable-title" class="row-title">
@@ -1320,78 +1172,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.build_server_card_desc")}
       </div>
       ${this._renderBuildServerCard()}
-
-      <div class="section-heading">
-        ${this._localize("settings.build_server_tokens_heading")}
-      </div>
-      <div class="section-intro">
-        ${this._localize("settings.build_server_tokens_desc")}
-      </div>
-      ${this._renderBuildServerTokens()}
-    `;
-  }
-
-  /**
-   * One alert row per recent ``remote_build_binding_mismatch``
-   * event from app-shell's context. ``race_loss=true`` is the
-   * soft case (concurrent first-use; both senders may be
-   * legitimate); ``race_loss=false`` is the loud case (token
-   * was already bound; this is a wrong / stolen bearer) and
-   * carries an inline Revoke CTA. Token labels come from the
-   * loaded tokens list when available; falls back to the bare
-   * token_id if the tokens list hasn't loaded yet (or if the
-   * token has been revoked since the event fired).
-   */
-  private _renderBuildServerAlerts() {
-    if (this._buildServerBindingMismatches.length === 0) return nothing;
-    return html`
-      <div class="binding-alerts">
-        ${this._buildServerBindingMismatches.map((evt) =>
-          this._renderBuildServerAlert(evt)
-        )}
-      </div>
-    `;
-  }
-
-  private _renderBuildServerAlert(evt: RemoteBuildBindingMismatchEventData) {
-    const known = (this._buildServerTokens ?? []).find(
-      (t) => t.token_id === evt.token_id
-    );
-    const labelOrId = known
-      ? known.label
-      : this._localize("settings.build_server_alert_label_unknown", {
-          token_id: evt.token_id,
-        });
-    const titleKey = evt.race_loss
-      ? "settings.build_server_alert_race_loss_title"
-      : "settings.build_server_alert_mismatch_title";
-    const bodyKey = evt.race_loss
-      ? "settings.build_server_alert_race_loss_body"
-      : "settings.build_server_alert_mismatch_body";
-    const severity = evt.race_loss ? "warning" : "danger";
-    return html`
-      <div class="binding-alert" role="alert" data-severity=${severity}>
-        <div class="binding-alert-body">
-          <div class="binding-alert-title">${this._localize(titleKey)}</div>
-          <div class="binding-alert-desc">
-            ${this._localize(bodyKey, {
-              label: labelOrId,
-              peer_ip: evt.peer_ip,
-            })}
-          </div>
-        </div>
-        ${!evt.race_loss && known !== undefined
-          ? html`
-              <button
-                type="button"
-                class="binding-alert-revoke"
-                @click=${() => this._onRevokeRequest(evt.token_id)}
-              >
-                ${this._localize("settings.build_server_alert_revoke")}
-              </button>
-            `
-          : nothing}
-      </div>
     `;
   }
 
@@ -1556,116 +1336,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         )}
         @confirm=${this._onRotateConfirm}
       ></esphome-confirm-dialog>
-    `;
-  }
-
-  private _renderBuildServerTokens() {
-    if (this._buildServerTokensLoadFailed) {
-      return html`
-        <div class="row" role="alert">
-          <div class="row-label">
-            <span class="row-desc">
-              ${this._localize("settings.build_server_tokens_load_failed")}
-            </span>
-          </div>
-        </div>
-      `;
-    }
-    if (this._buildServerTokens === null) {
-      return html`
-        <div class="row" role="status">
-          <div class="row-label">
-            <span class="row-desc">
-              ${this._localize("settings.build_server_tokens_loading")}
-            </span>
-          </div>
-        </div>
-      `;
-    }
-    return html`
-      ${this._buildServerTokens.length === 0
-        ? html`
-            <div class="row" role="status">
-              <div class="row-label">
-                <span class="row-desc">
-                  ${this._localize("settings.build_server_tokens_empty")}
-                </span>
-              </div>
-            </div>
-          `
-        : this._buildServerTokens.map((t) => this._renderTokenRow(t))}
-      <div class="tokens-actions">
-        <button
-          type="button"
-          class="tokens-generate"
-          @click=${this._onGenerateTokenRequest}
-        >
-          ${this._localize("settings.build_server_generate_token")}
-        </button>
-      </div>
-      <esphome-generate-build-server-token-dialog
-        @token-issued=${this._onTokenIssued}
-      ></esphome-generate-build-server-token-dialog>
-      <esphome-confirm-dialog
-        id="revoke-confirm"
-        destructive
-        heading=${this._localize("settings.build_server_revoke_confirm_title")}
-        message=${this._localize("settings.build_server_revoke_confirm_body")}
-        confirm-label=${this._localize(
-          "settings.build_server_revoke_confirm_confirm"
-        )}
-        @confirm=${this._onRevokeConfirm}
-      ></esphome-confirm-dialog>
-    `;
-  }
-
-  /**
-   * Render one row of the issued-tokens list.
-   *
-   * Each row carries the user-facing label, the full
-   * ``token_id`` (11 chars; short enough not to need
-   * truncation), the created-at, a bound-dashboard-id
-   * badge, and a Revoke button.
-   */
-  private _renderTokenRow(token: TokenSummary) {
-    const created = new Date(token.created_at * 1000);
-    return html`
-      <div class="row token-row">
-        <div class="row-label">
-          <span class="row-title">${token.label}</span>
-          <span class="row-desc">
-            <code class="token-id">${token.token_id}</code>
-            <span class="token-meta">
-              ${this._localize("settings.build_server_token_created_at", {
-                date: created.toLocaleDateString(),
-              })}
-            </span>
-            <span
-              class=${`token-bound-badge ${
-                token.bound_dashboard_id === null
-                  ? "token-bound-unbound"
-                  : "token-bound-bound"
-              }`}
-            >
-              ${token.bound_dashboard_id === null
-                ? this._localize("settings.build_server_token_unbound")
-                : this._localize("settings.build_server_token_bound", {
-                    id: token.bound_dashboard_id,
-                  })}
-            </span>
-          </span>
-        </div>
-        <button
-          type="button"
-          class="token-revoke"
-          aria-label=${this._localize("settings.build_server_revoke_aria", {
-            label: token.label,
-          })}
-          @click=${() => this._onRevokeRequest(token.token_id)}
-        >
-          ${this._localize("settings.build_server_revoke")}
-        </button>
-      </div>
     `;
   }
 
