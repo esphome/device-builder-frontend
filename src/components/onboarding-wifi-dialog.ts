@@ -171,6 +171,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     return html`
       <wa-dialog
         label=${this._localize("onboarding.wifi.title")}
+        @wa-request-close=${this._onRequestClose}
         @wa-after-hide=${this._onAfterHide}
       >
         <div class="body">
@@ -299,6 +300,21 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       this._dismissForSession();
     }
   }
+
+  /**
+   * Block close requests while a save / decline is in flight. The
+   * X / Escape / backdrop-click would otherwise hide the dialog
+   * before the network round-trip resolves; a failed save would
+   * then route through ``_onAfterHide`` → session-dismiss with
+   * the user never seeing the inline error. Same pattern as
+   * ``adopt-dialog`` (``_onRequestClose`` + ``e.preventDefault()``
+   * gate on its ``_busy`` flag).
+   */
+  private _onRequestClose = (e: Event) => {
+    if (this._saving) {
+      e.preventDefault();
+    }
+  };
 
   /**
    * Surface a backend error in user-facing prose. ``APIError``
