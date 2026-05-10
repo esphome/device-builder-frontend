@@ -1027,16 +1027,14 @@ export class ESPHomeApp extends LitElement {
         if (remote_jobs !== undefined) {
           const seeded = new Map<string, RemoteBuildJobState>();
           for (const entry of remote_jobs) {
+            // ``stubRemoteBuildJobState`` already returns the
+            // empty-defaults shape (display fields + output
+            // buffer + started_at=0); the snapshot only overrides
+            // the two fields it actually carries on the wire.
             seeded.set(entry.job_id, {
-              job_id: entry.job_id,
-              pin_sha256: entry.pin_sha256,
-              receiver_label: "",
-              configuration: "",
-              target: JobType.COMPILE as RemoteBuildSubmitTarget,
+              ...stubRemoteBuildJobState(entry.job_id, entry.pin_sha256),
               status: entry.status,
               error_message: entry.error_message,
-              output: [],
-              started_at: 0,
             });
           }
           this._buildOffloadJobs = seeded;
