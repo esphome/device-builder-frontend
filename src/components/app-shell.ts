@@ -38,6 +38,8 @@ import type {
   LabelDeletedEventData,
   LabelEventData,
   OffloaderAlertSnapshotEntry,
+  OffloaderJobOutputEventData,
+  OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
   OffloaderPairPeerRevokedEventData,
   OffloaderPairPinMismatchEventData,
@@ -53,6 +55,7 @@ import type {
   RemoteBuildPairRequestReceivedEventData,
   RemoteBuildPairStatusChangedEventData,
   RemoteBuildPeer,
+  RemoteBuildSubmitTarget,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -71,6 +74,7 @@ import {
   activeJobsContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
+  buildOffloadJobsContext,
   buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
@@ -88,6 +92,7 @@ import {
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { BASE_PATH, withBase } from "../util/base-path.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
@@ -350,6 +355,20 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null =
     null;
+
+  /** Active + recently-terminal remote-build jobs the offloader's
+   *  user dispatched via remote_build/submit_job, keyed on
+   *  job_id. Seeded as an empty Map on app boot (no backend
+   *  snapshot today; tabs that subscribe mid-build pick up
+   *  state on the next event). Mutated by
+   *  ``OFFLOADER_JOB_STATE_CHANGED`` / ``OFFLOADER_JOB_OUTPUT``
+   *  events on the global subscribe_events stream, plus a
+   *  fresh ``submit_job`` returning ack on the offloader UI's
+   *  click path (the dispatch helper seeds the entry's
+   *  display fields the wire frames don't carry). */
+  @provide({ context: buildOffloadJobsContext })
+  @state()
+  private _buildOffloadJobs: Map<string, RemoteBuildJobState> = new Map();
 
   /** True when the onboarding wizard should be shown. Computed
    *  from ``completed_version < current_version`` AND not
@@ -1285,7 +1304,138 @@ export class ESPHomeApp extends LitElement {
         this._buildOffloadAlerts = next;
         break;
       }
+      case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
+        // Lifecycle transition for a remote-build job we
+        // submitted: queued / running / completed / failed /
+        // cancelled. The wire frame doesn't carry the display
+        // fields (configuration / target / receiver_label) so
+        // we either upsert into an entry the dispatch helper
+        // already seeded (typical path: submit_job returned
+        // ack first, then state events follow), or stamp
+        // empty-string display fields on a brand-new entry
+        // (event raced ahead of submit_job's return, or a
+        // late-subscribing tab joins mid-build). Settings
+        // dialog tolerates the empty display fields and
+        // shows them as "(unknown)" until the dispatch
+        // helper backfills.
+        const evt = data as OffloaderJobStateChangedEventData;
+        const next = new Map(this._buildOffloadJobs);
+        const existing = next.get(evt.job_id);
+        if (existing === undefined) {
+          next.set(evt.job_id, {
+            job_id: evt.job_id,
+            pin_sha256: evt.pin_sha256,
+            receiver_label: "",
+            configuration: "",
+            target: JobType.COMPILE as RemoteBuildSubmitTarget,
+            status: evt.status,
+            error_message: evt.error_message,
+            output: [],
+            started_at: 0,
+          });
+        } else {
+          next.set(evt.job_id, {
+            ...existing,
+            status: evt.status,
+            error_message: evt.error_message,
+          });
+        }
+        this._buildOffloadJobs = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
+        // Per-line stdout / stderr from the receiver's
+        // running build. High-rate path during an active
+        // compile; the Map.set + array spread is the
+        // straightforward shape for now (the existing
+        // ansi-log component re-renders on its own throttle).
+        // Same brand-new-entry tolerance as STATE_CHANGED:
+        // an output frame arriving before submit_job's ack
+        // returns lands on a stub entry the dispatch helper
+        // backfills.
+        const evt = data as OffloaderJobOutputEventData;
+        const next = new Map(this._buildOffloadJobs);
+        const existing = next.get(evt.job_id);
+        if (existing === undefined) {
+          next.set(evt.job_id, {
+            job_id: evt.job_id,
+            pin_sha256: evt.pin_sha256,
+            receiver_label: "",
+            configuration: "",
+            target: JobType.COMPILE as RemoteBuildSubmitTarget,
+            status: JobStatus.RUNNING,
+            error_message: "",
+            output: [evt.line],
+            started_at: 0,
+          });
+        } else {
+          next.set(evt.job_id, {
+            ...existing,
+            output: [...existing.output, evt.line],
+          });
+        }
+        this._buildOffloadJobs = next;
+        break;
+      }
     }
+  }
+
+  /**
+   * Stamp / refresh the in-flight remote-build job map with
+   * the display fields the wire events don't carry.
+   *
+   * Called by the submit-job dialog right after the WS ack
+   * returns: backend's response gives us the canonical
+   * job_id; the dialog already has the configuration /
+   * target / receiver_label the user picked. Merging both
+   * here lets the renderer show "kitchen.yaml on desktop"
+   * instead of falling back to the empty defaults the
+   * event-only path stamps.
+   *
+   * If a state-changed or output event already raced ahead
+   * (and stamped an entry with empty display fields), we
+   * preserve its accumulated state and only fill in the
+   * missing display fields.
+   */
+  registerRemoteBuildJob(seed: {
+    job_id: string;
+    pin_sha256: string;
+    receiver_label: string;
+    configuration: string;
+    target: RemoteBuildSubmitTarget;
+  }): void {
+    const next = new Map(this._buildOffloadJobs);
+    const existing = next.get(seed.job_id);
+    next.set(seed.job_id, {
+      job_id: seed.job_id,
+      pin_sha256: seed.pin_sha256,
+      receiver_label: seed.receiver_label,
+      configuration: seed.configuration,
+      target: seed.target,
+      status: existing?.status ?? JobStatus.QUEUED,
+      error_message: existing?.error_message ?? "",
+      output: existing?.output ?? [],
+      started_at: existing?.started_at ?? Date.now(),
+    });
+    this._buildOffloadJobs = next;
+  }
+
+  /**
+   * Drop a finished remote-build job from the in-flight map.
+   *
+   * Called by the progress dialog's Close button on a
+   * terminal job (completed / failed / cancelled). The
+   * receiver doesn't echo a "row removed" event the way
+   * pair-status does, so the offloader-side cleanup is
+   * client-driven.
+   */
+  dismissRemoteBuildJob(job_id: string): void {
+    if (!this._buildOffloadJobs.has(job_id)) {
+      return;
+    }
+    const next = new Map(this._buildOffloadJobs);
+    next.delete(job_id);
+    this._buildOffloadJobs = next;
   }
 
 
@@ -1346,6 +1496,7 @@ export class ESPHomeApp extends LitElement {
         @set-remote-build-enabled=${this._onSetRemoteBuildEnabled}
         @set-language=${this._onSetLanguage}
         @pair-request-sent=${this._onPairRequestSent}
+        @remote-build-job-submitted=${this._onRemoteBuildJobSubmitted}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${this._onFirmwareHistoryCleared}
@@ -1491,6 +1642,23 @@ export class ESPHomeApp extends LitElement {
     const next = new Map(this._buildOffloadPairings ?? []);
     next.set(summary.pin_sha256, summary);
     this._buildOffloadPairings = next;
+  }
+
+  /** Stamp the in-flight remote-jobs map's display fields when
+   *  the submit dialog completes its WS round-trip. The wire
+   *  events don't echo configuration / target / receiver_label
+   *  back; without this seed the progress view would render
+   *  empty placeholders until the user dismisses. */
+  private _onRemoteBuildJobSubmitted(
+    e: CustomEvent<{
+      job_id: string;
+      pin_sha256: string;
+      receiver_label: string;
+      configuration: string;
+      target: RemoteBuildSubmitTarget;
+    }>,
+  ): void {
+    this.registerRemoteBuildJob(e.detail);
   }
 
   private async _onSetLanguage(

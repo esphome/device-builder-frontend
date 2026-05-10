@@ -923,6 +923,15 @@ export enum JobType {
   RENAME = "rename",
 }
 
+/** Output stream discriminator on a single line of build output. */
+export enum JobStream {
+  STDOUT = "stdout",
+  STDERR = "stderr",
+}
+
+/** Subset of {@link JobType} the remote-build submit_job WS arg accepts. */
+export type RemoteBuildSubmitTarget = JobType.COMPILE | JobType.UPLOAD;
+
 export interface FirmwareJob {
   job_id: string;
   configuration: string;
@@ -1011,6 +1020,21 @@ export enum DeviceEventType {
   // the discriminator is the event type itself.
   OFFLOADER_PEER_LINK_OPENED = "offloader_peer_link_opened",
   OFFLOADER_PEER_LINK_CLOSED = "offloader_peer_link_closed",
+  // Offloader-side remote-build job lifecycle. Fired by the
+  // offloader's PeerLinkClient receive loop when an inbound
+  // job_state_changed / job_output frame lands from the
+  // paired receiver this dashboard submitted the job to. The
+  // offloader doesn't own a FirmwareJob row for these (the
+  // receiver runs the build); it just fans the wire frames
+  // onto its local bus so subscribe_events re-broadcasts to
+  // frontend tabs. Settings dialog's Send-builds section
+  // consumes both to render the live progress drawer per
+  // in-flight remote job: STATE_CHANGED drives the lifecycle
+  // pill (queued / running / completed / failed / cancelled),
+  // OUTPUT appends each per-line stdout / stderr chunk to the
+  // ansi-log buffer. Phase 5c-3 wired the backend.
+  OFFLOADER_JOB_STATE_CHANGED = "offloader_job_state_changed",
+  OFFLOADER_JOB_OUTPUT = "offloader_job_output",
   // mDNS-discovered peer dashboards. Replaces the deleted
   // ``remote_build/list_hosts`` WS command — the controller fires
   // these events as its mDNS browser callback resolves /
@@ -1534,6 +1558,52 @@ export interface OffloaderPeerLinkSessionEventData {
   receiver_hostname: string;
   receiver_port: number;
   pin_sha256: string;
+}
+
+/**
+ * Data payload for offloader_job_state_changed.
+ *
+ * Fired on the offloader's bus per inbound job_state_changed
+ * frame from the paired receiver this dashboard submitted
+ * job_id to. status mirrors the wire literal exactly
+ * (queued / running / completed / failed / cancelled);
+ * error_message is empty on non-terminal states and on
+ * completed, populated on failed / cancelled.
+ *
+ * Receiver coords + pin_sha256 are carried so subscribers
+ * routing across multiple paired receivers can disambiguate;
+ * the in-flight jobs map keys on job_id (which is unique per
+ * peer-link session, so collisions across receivers don't
+ * happen in practice).
+ */
+export interface OffloaderJobStateChangedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  job_id: string;
+  status: JobStatus;
+  error_message: string;
+}
+
+/**
+ * Data payload for offloader_job_output.
+ *
+ * Fired per inbound job_output frame. line preserves its
+ * trailing terminator (\n / \r / \r\n) so the existing
+ * ansi-log renderer's carriage-return-overwrite contract
+ * works byte-identical to local JOB_OUTPUT events.
+ *
+ * High-rate path during an active build (one frame per line
+ * of compiler / linker output). Subscribers should batch
+ * downstream rendering rather than re-render per event.
+ */
+export interface OffloaderJobOutputEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  job_id: string;
+  stream: JobStream;
+  line: string;
 }
 
 /**

@@ -10,12 +10,14 @@ import type {
   AdoptableDevice,
   ConfiguredDevice,
   FirmwareJob,
+  JobStatus,
   Label,
   OffloaderAlertSnapshotEntry,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
   RemoteBuildPeer,
+  RemoteBuildSubmitTarget,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
@@ -296,3 +298,52 @@ export const buildOffloadPairingsContext = createContext<
 export const buildOffloadAlertsContext = createContext<
   Map<string, OffloaderAlertSnapshotEntry> | null
 >(Symbol("esphome-build-offload-alerts"));
+
+/**
+ * One in-flight (or recently terminal) remote-build job the
+ * offloader's user dispatched via remote_build/submit_job.
+ *
+ * The receiver runs the build; the offloader doesn't own a
+ * FirmwareJob row for these. App-shell maintains a Map keyed
+ * on job_id, upserting on OFFLOADER_JOB_STATE_CHANGED and
+ * appending output on OFFLOADER_JOB_OUTPUT.
+ *
+ * Display fields (configuration, target, receiver_label) come
+ * from the submit_job call site rather than the wire frame
+ * because the receiver doesn't echo them back; app-shell
+ * gets them by listening to the submit dialog's success event
+ * (or by retaining what submit_job's caller passed in).
+ *
+ * No snapshot seeding from initial_state today: the offloader
+ * controller doesn't keep an in-flight remote-jobs cache (the
+ * receiver owns queue state). A page reload mid-build means
+ * the user has to wait for the next OFFLOADER_JOB_OUTPUT line
+ * to repopulate; the lifecycle pill picks up on the next
+ * STATE_CHANGED. Backend snapshot is a follow-up.
+ */
+export interface RemoteBuildJobState {
+  job_id: string;
+  pin_sha256: string;
+  receiver_label: string;
+  configuration: string;
+  target: RemoteBuildSubmitTarget;
+  status: JobStatus;
+  error_message: string;
+  output: string[];
+  /** Client-side monotonic timestamp; absent until the
+   *  submit dialog seeds the entry (live event before
+   *  seeding leaves it 0). */
+  started_at: number;
+}
+
+/**
+ * Context for in-flight remote-build jobs the offloader's
+ * user dispatched. Keyed on job_id. ``null`` until app-shell
+ * initialises (always immediately on app boot today, but
+ * keeps the same null-vs-empty distinction sibling contexts
+ * use for "still loading" vs "loaded but empty").
+ */
+export const buildOffloadJobsContext = createContext<Map<
+  string,
+  RemoteBuildJobState
+> | null>(Symbol("esphome-build-offload-jobs"));

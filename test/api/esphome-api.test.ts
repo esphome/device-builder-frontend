@@ -8,6 +8,7 @@ import {
 } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import { JobType } from "../../src/api/types.js";
 import {
   MockWebSocket,
   installMockWebSocket,
@@ -755,6 +756,44 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.command).toBe("remote_build/unpair");
     expect(sent.args).toEqual({ pin_sha256: "a".repeat(64) });
     const result = { removed: true };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("submitRemoteBuildJob sends remote_build/submit_job with pin + configuration + target", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.submitRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      configuration: "kitchen.yaml",
+      target: JobType.COMPILE,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/submit_job");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      configuration: "kitchen.yaml",
+      target: JobType.COMPILE,
+    });
+    const result = { job_id: "abc123", accepted: true };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("submitRemoteBuildJob surfaces a rejection with reason", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.submitRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      configuration: "kitchen.yaml",
+      target: JobType.UPLOAD,
+    });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    const result = { job_id: "abc123", accepted: false, reason: "queue_full" };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
   });

@@ -22,4 +22,6 @@ export {
   buildOffloadDiscoveredHostsContext,
   buildOffloadPairingsContext,
   buildOffloadAlertsContext,
+  buildOffloadJobsContext,
 } from "./contexts.js";
+export type { RemoteBuildJobState } from "./contexts.js";
