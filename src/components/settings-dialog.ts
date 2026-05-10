@@ -44,6 +44,10 @@ import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import {
+  normalizeHostnameForCompare,
+  trimTrailingDot,
+} from "../util/hostname.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./accept-peer-dialog.js";
 import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
@@ -1865,7 +1869,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     }
     return this._localize("settings.unpair_confirm_body_named", {
       label: this._pendingUnpair.label,
-      hostname: this._pendingUnpair.hostname,
+      hostname: trimTrailingDot(this._pendingUnpair.hostname),
       port: String(this._pendingUnpair.port),
     });
   }
@@ -2045,49 +2049,38 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderPairingRow(pairing: PairingSummary) {
-    const statusKey =
-      pairing.status === "approved"
-        ? "settings.pairing_status_approved"
-        : "settings.pairing_status_pending";
-    const statusClass =
-      pairing.status === "approved"
-        ? "pairing-status-approved"
-        : "pairing-status-pending";
-    // Connection-state pill renders next to the status pill on
-    // APPROVED rows so the operator sees at a glance whether the
-    // offloader's long-lived PeerLinkClient currently has an
-    // open Noise WS to the receiver. Fed by
-    // OFFLOADER_PEER_LINK_OPENED / _CLOSED events on app-shell,
-    // with the snapshot (initial_state.pairings) seeding the
-    // initial paint. PENDING rows hide the pill: the offloader
-    // doesn't spawn a peer-link client until the receiver flips
-    // APPROVED, so a "Disconnected" pill on PENDING would just
-    // be noise next to "Pending".
-    const showConnection = pairing.status === "approved";
-    const connectedClass = pairing.connected
-      ? "peer-connection-connected"
-      : "peer-connection-disconnected";
-    const connectedLabel = pairing.connected
-      ? this._localize("settings.build_offload_pairing_connected")
-      : this._localize("settings.build_offload_pairing_disconnected");
+    // One pill per row, picked to convey the most informative
+    // state: an APPROVED + connected pairing reads as
+    // "Connected" (the connection state implies approval, so
+    // showing "Approved + Connected" both is just noise);
+    // APPROVED + disconnected reads as "Disconnected"; PENDING
+    // reads as "Pending" (offloader hasn't spawned a peer-link
+    // client yet, so connection state isn't meaningful).
+    // Connection state is fed by OFFLOADER_PEER_LINK_OPENED /
+    // _CLOSED events on app-shell, with the
+    // ``initial_state.pairings`` snapshot seeding the initial
+    // paint.
+    let pillClass: string;
+    let pillLabel: string;
+    if (pairing.status !== "approved") {
+      pillClass = "pairing-status-pill pairing-status-pending";
+      pillLabel = this._localize("settings.pairing_status_pending");
+    } else if (pairing.connected) {
+      pillClass = "peer-connection-pill peer-connection-connected";
+      pillLabel = this._localize("settings.build_offload_pairing_connected");
+    } else {
+      pillClass = "peer-connection-pill peer-connection-disconnected";
+      pillLabel = this._localize("settings.build_offload_pairing_disconnected");
+    }
     return html`
       <div class="row peer-row pairing-row">
         <div class="row-label">
           <span class="row-title">
             ${pairing.label}
-            <span class=${`pairing-status-pill ${statusClass}`}>
-              ${this._localize(statusKey)}
-            </span>
-            ${showConnection
-              ? html`
-                  <span class=${`peer-connection-pill ${connectedClass}`}>
-                    ${connectedLabel}
-                  </span>
-                `
-              : null}
+            <span class=${pillClass}>${pillLabel}</span>
           </span>
           <span class="row-desc">
-            ${pairing.receiver_hostname}:${pairing.receiver_port}
+            ${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}
           </span>
         </div>
         <button
@@ -2295,7 +2288,17 @@ export class ESPHomeSettingsDialog extends LitElement {
         </div>
       `;
     }
-    const peers = Array.from(this._buildOffloadDiscoveredHosts.values());
+    // Hide hosts the user has already paired with — they're
+    // listed in the "Paired build servers" section above with
+    // their actual peer-link port and an Unpair affordance, so
+    // also showing them here would just be confusing
+    // duplication. ``_hasPairingFor`` does the case + trailing
+    // dot normalisation so a discovered ``MyDashboard.local.``
+    // row is correctly recognised as the same host as a
+    // persisted ``mydashboard.local`` pairing.
+    const peers = Array.from(this._buildOffloadDiscoveredHosts.values()).filter(
+      (peer) => !this._hasPairingFor(peer.hostname),
+    );
     if (peers.length === 0) {
       return html`
         <div class="row" role="status">
@@ -2319,33 +2322,32 @@ export class ESPHomeSettingsDialog extends LitElement {
     // The Pair button pre-fills only the hostname. The row's
     // ``peer.port`` is the dashboard's HTTP port from the SRV
     // record (default 6052), not the peer-link Noise WS port
-    // (default 6055) — pre-filling SRV port would land a
+    // (default 6055); pre-filling SRV port would land a
     // ``UNAVAILABLE`` on the very first preview round-trip.
     // Until the backend surfaces the receiver's peer-link
     // ``remote_build_port`` from TXT, the dialog falls back to
     // its 6055 default and the user can edit if the receiver
-    // overrode ``--remote-build-port``.
-    const alreadyPaired = this._hasPairingFor(peer.hostname);
+    // overrode ``--remote-build-port``. Already-paired hosts
+    // never reach this renderer; ``_renderRemoteBuildPeers``
+    // filters them out one level up so the list is just
+    // unpaired discovered hosts.
     return html`
       <div class="row peer-row">
         <div class="row-label">
-          <span class="row-title">${peer.name}</span>
+          <span class="row-title">${trimTrailingDot(peer.name)}</span>
           <span class="row-desc">
-            ${peer.hostname}:${peer.port} ${versionLine}
+            ${trimTrailingDot(peer.hostname)}:${peer.port} ${versionLine}
           </span>
         </div>
         <button
           type="button"
           class="btn-pair-build-server btn-pair-row"
-          ?disabled=${alreadyPaired}
           aria-label=${this._localize("settings.pair_build_server_row_aria", {
-            name: peer.name,
+            name: trimTrailingDot(peer.name),
           })}
           @click=${() => this._onPairDiscoveredHost(peer)}
         >
-          ${alreadyPaired
-            ? this._localize("settings.pair_build_server_row_already_paired")
-            : this._localize("settings.pair_build_server_row_action")}
+          ${this._localize("settings.pair_build_server_row_action")}
         </button>
       </div>
     `;
@@ -2357,11 +2359,15 @@ export class ESPHomeSettingsDialog extends LitElement {
       return false;
     }
     // Match on hostname only — the user could have paired the
-    // same host on a non-default peer-link port. The Pair
-    // button on the row should still disable so the user can't
-    // start a duplicate flow without first unpairing.
+    // same host on a non-default peer-link port. Compare via the
+    // normalised form so case-drift between persisted pairings
+    // (typically the dot-less ``mydashboard.local`` the user
+    // typed into the wizard) and the freshly-discovered mDNS row
+    // (typically ``MyDashboard.local.`` with mDNS's canonical
+    // trailing dot) doesn't miss the dedupe.
+    const target = normalizeHostnameForCompare(hostname);
     for (const pairing of pairings.values()) {
-      if (pairing.receiver_hostname === hostname) {
+      if (normalizeHostnameForCompare(pairing.receiver_hostname) === target) {
         return true;
       }
     }
