@@ -987,6 +987,7 @@ export class ESPHomeApp extends LitElement {
           hosts,
           pairings,
           offloader_alerts,
+          remote_jobs,
         } = data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
@@ -1009,6 +1010,37 @@ export class ESPHomeApp extends LitElement {
           offloader_alerts === undefined
             ? null
             : new Map(offloader_alerts.map((a) => [a.pin_sha256, a]));
+        // ``remote_jobs`` is the offloader-side in-flight
+        // remote-build snapshot. Replaces (not merges) the
+        // current map so a reconnect-driven re-subscribe
+        // resyncs against the backend's view rather than
+        // accumulating stale local entries that the receiver
+        // already considers terminal. Display fields and
+        // output buffer are absent from the wire shape — the
+        // re-attach view tolerates empty defaults; the next
+        // OFFLOADER_JOB_OUTPUT line repopulates from the
+        // subscribe point forward. Skips the rebuild when
+        // the field is absent (controller not wired up) so
+        // a previously-seeded map from a different connection
+        // isn't lost on a reconnect against a backend that
+        // dropped the remote-build controller.
+        if (remote_jobs !== undefined) {
+          const seeded = new Map<string, RemoteBuildJobState>();
+          for (const entry of remote_jobs) {
+            seeded.set(entry.job_id, {
+              job_id: entry.job_id,
+              pin_sha256: entry.pin_sha256,
+              receiver_label: "",
+              configuration: "",
+              target: JobType.COMPILE as RemoteBuildSubmitTarget,
+              status: entry.status,
+              error_message: entry.error_message,
+              output: [],
+              started_at: 0,
+            });
+          }
+          this._buildOffloadJobs = seeded;
+        }
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {

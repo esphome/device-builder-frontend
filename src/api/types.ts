@@ -1119,6 +1119,44 @@ export interface InitialStateEventData {
    *  for the same reason as ``pairings`` / ``peers`` —
    *  absent controller, omitted field. */
   offloader_alerts?: OffloaderAlertSnapshotEntry[];
+  /** Offloader-side in-flight remote-build jobs snapshot.
+   *  RAM-only on the backend; populated as
+   *  ``OFFLOADER_JOB_STATE_CHANGED`` events upsert rows by
+   *  ``job_id`` and dropped when a terminal event (completed /
+   *  failed / cancelled) fires. Lets a tab subscribing AFTER
+   *  a ``running`` transition (page reload mid-build, second
+   *  tab opened after dispatch) repaint the live build
+   *  without waiting for the next event. Output buffer isn't
+   *  in the snapshot — the receiver doesn't replay; the next
+   *  ``OFFLOADER_JOB_OUTPUT`` line repopulates from the
+   *  point-of-subscribe forward. Display fields
+   *  (configuration / target / receiver_label) aren't carried
+   *  either — the receiver doesn't echo them, so reload-time
+   *  rows show empty strings until terminal (the dialog's
+   *  re-attach view tolerates them). Optional for the same
+   *  reason as ``pairings`` / ``peers`` — absent controller,
+   *  omitted field. */
+  remote_jobs?: OffloaderRemoteJobSnapshotEntry[];
+}
+
+/**
+ * Snapshot row in the offloader-side in-flight remote-build
+ * jobs cache. Mirror of the backend's
+ * :class:`OffloaderRemoteJobSnapshotEntry` TypedDict (see
+ * ``models/remote_build.py``). Carries enough to render the
+ * lifecycle pill on a late-subscribing tab; display fields
+ * (configuration / target / receiver_label) and the output
+ * buffer are deliberately absent — the receiver doesn't echo
+ * the display fields back through the wire, and the output
+ * buffer would balloon the snapshot for any in-flight build.
+ */
+export interface OffloaderRemoteJobSnapshotEntry {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  job_id: string;
+  status: JobStatus;
+  error_message: string;
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */

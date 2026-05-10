@@ -315,12 +315,20 @@ export const buildOffloadAlertsContext = createContext<
  * gets them by listening to the submit dialog's success event
  * (or by retaining what submit_job's caller passed in).
  *
- * No snapshot seeding from initial_state today: the offloader
- * controller doesn't keep an in-flight remote-jobs cache (the
- * receiver owns queue state). A page reload mid-build means
- * the user has to wait for the next OFFLOADER_JOB_OUTPUT line
- * to repopulate; the lifecycle pill picks up on the next
- * STATE_CHANGED. Backend snapshot is a follow-up.
+ * Snapshot-seeded from
+ * ``subscribe_events.initial_state.remote_jobs`` so a page
+ * reload mid-build paints the lifecycle pill immediately
+ * instead of waiting for the next event. The snapshot doesn't
+ * carry the output buffer (would balloon for any in-flight
+ * compile) or the display fields (configuration / target /
+ * receiver_label — the receiver doesn't echo them through the
+ * wire), so reload-time rows start with an empty output buffer
+ * and empty display strings; the dialog's re-attach view
+ * tolerates the empty fields and live OFFLOADER_JOB_OUTPUT
+ * events repopulate from the subscribe point forward. The
+ * cache is offloader-side: receiver owns the underlying
+ * FirmwareJob row, the offloader keeps a thin projection of
+ * what's needed to render its in-flight UI.
  */
 export interface RemoteBuildJobState {
   job_id: string;
