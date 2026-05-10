@@ -17,6 +17,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
+import { friendlyHostname, trimTrailingDot } from "../util/hostname.js";
 import "./pin-emoji-grid.js";
 
 /**
@@ -80,19 +81,6 @@ import "./pin-emoji-grid.js";
  * a parent can trigger a follow-up toast or re-render its
  * pairings list.
  */
-/** Strip the trailing ``.local`` / ``.local.`` mDNS suffix from
- *  *host* so the result reads as a friendly label. Returns the
- *  input unchanged if no suffix matches (IP literals, plain
- *  short names, manual entries that don't look like mDNS). Also
- *  trims surrounding whitespace and a trailing dot — typical
- *  mDNS hostnames are FQDN-shape with the root dot. */
-function friendlyHostname(host: string): string {
-  let s = host.trim();
-  if (s.endsWith(".")) s = s.slice(0, -1);
-  if (s.toLowerCase().endsWith(".local")) s = s.slice(0, -".local".length);
-  return s;
-}
-
 @customElement("esphome-pair-build-server-dialog")
 export class ESPHomePairBuildServerDialog extends LitElement {
   @consume({ context: apiContext, subscribe: true })
@@ -604,7 +592,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         </details>
         <span class="pin-card-target">
           ${this._localize("settings.pair_build_server_target", {
-            hostname: this._hostname,
+            hostname: trimTrailingDot(this._hostname),
             port: this._port,
           })}
         </span>
