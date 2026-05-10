@@ -11,6 +11,7 @@ import type {
   ConfiguredDevice,
   FirmwareJob,
   Label,
+  PairingSummary,
   PairingWindowState,
   PeerSummary,
   RemoteBuildPeer,
@@ -222,3 +223,34 @@ export const buildServerPairingWindowStateContext =
 export const buildOffloadDiscoveredHostsContext = createContext<
   Map<string, RemoteBuildPeer> | null
 >(Symbol("esphome-build-offload-discovered-hosts"));
+
+/**
+ * Offloader-side pairings (PENDING + APPROVED rows from the
+ * controller's in-RAM ``_pairings`` dict, projected to
+ * ``PairingSummary``). Seeded from
+ * ``subscribe_events.initial_state.pairings`` at subscribe
+ * time and mutated locally as ``OFFLOADER_PAIR_STATUS_CHANGED``
+ * events arrive (status flip on ``"approved"``, row drop on
+ * ``"removed"``).
+ *
+ * Keyed on ``${hostname}:${port}`` because that's what the
+ * backend's ``StoredPairing`` is keyed on (the receiver's
+ * ``dashboard_id`` isn't visible to the offloader; the
+ * receiver coordinates the user typed are the stable id).
+ * :class:`Map` for the same reasons
+ * :member:`buildOffloadDiscoveredHostsContext` is — these are
+ * user-supplied or network-supplied strings, and we want
+ * insertion-ordered iteration without prototype-key
+ * footguns.
+ *
+ * ``null`` until the initial-state snapshot lands so consumers
+ * can distinguish "no controller / still loading" from "loaded
+ * with zero rows". The Send-builds Settings subsection
+ * consumes this directly to render the paired-receivers list,
+ * and the pair dialog consumes it to auto-close on a matching
+ * ``OFFLOADER_PAIR_STATUS_CHANGED`` after a sent
+ * ``request_pair``.
+ */
+export const buildOffloadPairingsContext = createContext<
+  Map<string, PairingSummary> | null
+>(Symbol("esphome-build-offload-pairings"));

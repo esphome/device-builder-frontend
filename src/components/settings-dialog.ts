@@ -15,6 +15,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
   ErrorCode,
   type IdentityView,
+  type PairingSummary,
   type PairingWindowState,
   type PeerSummary,
   type RemoteBuildPeer,
@@ -27,6 +28,7 @@ type LanguageChoice = SupportedLocale | "system";
 import {
   apiContext,
   buildOffloadDiscoveredHostsContext,
+  buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
@@ -172,6 +174,30 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _buildOffloadDiscoveredHosts: Map<string, RemoteBuildPeer> | null =
     null;
 
+  // Offloader-side pairings (PENDING + APPROVED). App-shell
+  // maintains the canonical map (seeded from
+  // ``initial_state.pairings`` + mutated on
+  // ``OFFLOADER_PAIR_STATUS_CHANGED``); the Send-builds section
+  // renders one row per entry under "Paired build servers".
+  // Keyed on ``${hostname}:${port}`` to match the backend's
+  // ``StoredPairing``. ``null`` until the snapshot lands so
+  // the UI can distinguish "no controller" from "loaded with
+  // zero rows".
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
+
+  // Pending Unpair confirmation: receiver coordinates of the
+  // row whose Unpair button was clicked. Captured here so the
+  // shared destructive-confirm dialog's @confirm handler knows
+  // which row to drop. ``null`` when no Unpair is pending.
+  @state()
+  private _pendingUnpair: {
+    hostname: string;
+    port: number;
+    label: string;
+  } | null = null;
+
   // Phase 3c2b: receiver identity (cert pin + listener-bound + versions).
   // Lazy-loaded the first time the user opens the section,
   // refreshed after a successful rotate. ``null`` means
@@ -234,6 +260,9 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   @query("esphome-pair-build-server-dialog")
   private _pairBuildServerDialog!: ESPHomePairBuildServerDialog;
+
+  @query("#unpair-confirm")
+  private _unpairConfirmDialog!: ESPHomeConfirmDialog;
 
   @state()
   private _section: Section = "appearance";
@@ -925,8 +954,72 @@ export class ESPHomeSettingsDialog extends LitElement {
         flex-shrink: 0;
       }
 
-      .btn-pair-build-server:hover {
+      .btn-pair-build-server:hover:not(:disabled) {
         background: color-mix(in srgb, var(--esphome-primary), black 10%);
+      }
+
+      .btn-pair-build-server:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .btn-pair-row {
+        height: 32px;
+        font-size: var(--wa-font-size-xs);
+      }
+
+      .btn-unpair {
+        height: 32px;
+        padding: 0 var(--wa-space-m);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text-quiet);
+        font: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .btn-unpair:hover {
+        background: color-mix(in srgb, var(--esphome-error), white 90%);
+        color: var(--esphome-error);
+        border-color: var(--esphome-error);
+      }
+
+      .pairing-row {
+        align-items: center;
+        gap: var(--wa-space-s);
+      }
+
+      .pairing-status-pill {
+        display: inline-block;
+        padding: 1px 6px;
+        margin-left: var(--wa-space-xs);
+        border-radius: 4px;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .pairing-status-pending {
+        background: color-mix(
+          in srgb,
+          var(--esphome-warning, #f59e0b),
+          transparent 80%
+        );
+        color: var(--esphome-warning, #f59e0b);
+      }
+
+      .pairing-status-approved {
+        background: color-mix(
+          in srgb,
+          var(--esphome-success, #16a34a),
+          transparent 80%
+        );
+        color: var(--esphome-success, #16a34a);
       }
 
       .peer-remove {
@@ -1529,20 +1622,36 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   /**
    * Offload role: this dashboard sending its compiles to
-   * another dashboard on the network. Renders the mDNS-
-   * discovered build-server dashboards. Cross-subnet / non-
-   * mDNS receivers are reached by typing the hostname / port
-   * into the (forthcoming 4b-3) pair dialog directly — no
-   * intermediate "save manual host" surface here. Pairing +
-   * peer-link + scheduler land in phases 4 / 5 / 7; until then
-   * the section is scaffolding and the in-section banner says
-   * so.
+   * another dashboard on the network. Renders three blocks:
+   *
+   * 1. Paired build servers — the offloader-side pairings the
+   *    user already authorised (PENDING + APPROVED). Each row
+   *    shows the local label + receiver coords + a status
+   *    pill, with an Unpair button per row.
+   * 2. Known dashboards — mDNS-discovered build servers on the
+   *    LAN. Each row gets a Pair button that opens the wizard
+   *    pre-filled with the row's hostname / peer-link port.
+   * 3. Pair-by-hostname — the typed-hostname fallback for
+   *    cross-subnet / non-mDNS receivers.
+   *
+   * Pairing-window + peer-link + scheduler land across phases
+   * 4 / 5 / 7; the in-section banner still says "not
+   * implemented yet" because no compile job is actually
+   * dispatched until phase 5+ wires the build session.
    */
   private _renderBuildOffload() {
     return html`
       <div class="warning-banner" role="status">
         ${this._localize("settings.build_offload_unimplemented_banner")}
       </div>
+
+      <div class="section-heading">
+        ${this._localize("settings.paired_build_servers_heading")}
+      </div>
+      <div class="section-intro">
+        ${this._localize("settings.paired_build_servers_desc")}
+      </div>
+      ${this._renderOffloaderPairings()}
 
       <div class="section-heading">
         ${this._localize("settings.remote_build_known_dashboards")}
@@ -1571,25 +1680,168 @@ export class ESPHomeSettingsDialog extends LitElement {
       </div>
       <esphome-pair-build-server-dialog
         @pair-request-sent=${this._onPairRequestSent}
+        @pair-approved=${this._onPairApproved}
+        @pair-rejected=${this._onPairRejected}
       ></esphome-pair-build-server-dialog>
+      <esphome-confirm-dialog
+        id="unpair-confirm"
+        destructive
+        heading=${this._localize("settings.unpair_confirm_title")}
+        message=${this._unpairConfirmMessage()}
+        confirm-label=${this._localize("settings.unpair_confirm_confirm")}
+        @confirm=${this._onUnpairConfirm}
+      ></esphome-confirm-dialog>
     `;
   }
+
+  private _unpairConfirmMessage(): string {
+    if (this._pendingUnpair === null) {
+      return this._localize("settings.unpair_confirm_body");
+    }
+    return this._localize("settings.unpair_confirm_body_named", {
+      label: this._pendingUnpair.label,
+      hostname: this._pendingUnpair.hostname,
+      port: String(this._pendingUnpair.port),
+    });
+  }
+
+  private _renderOffloaderPairings() {
+    if (this._buildOffloadPairings === null) {
+      return html`
+        <div class="row" role="status">
+          <div class="row-label">
+            <span class="row-desc">
+              ${this._localize("settings.paired_build_servers_loading")}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+    if (this._buildOffloadPairings.size === 0) {
+      return html`
+        <div class="row" role="status">
+          <div class="row-label">
+            <span class="row-desc">
+              ${this._localize("settings.paired_build_servers_empty")}
+            </span>
+          </div>
+        </div>
+      `;
+    }
+    return Array.from(this._buildOffloadPairings.values()).map((p) =>
+      this._renderPairingRow(p),
+    );
+  }
+
+  private _renderPairingRow(pairing: PairingSummary) {
+    const statusKey =
+      pairing.status === "approved"
+        ? "settings.pairing_status_approved"
+        : "settings.pairing_status_pending";
+    const statusClass =
+      pairing.status === "approved"
+        ? "pairing-status-approved"
+        : "pairing-status-pending";
+    return html`
+      <div class="row peer-row pairing-row">
+        <div class="row-label">
+          <span class="row-title">
+            ${pairing.label}
+            <span class=${`pairing-status-pill ${statusClass}`}>
+              ${this._localize(statusKey)}
+            </span>
+          </span>
+          <span class="row-desc">
+            ${pairing.receiver_hostname}:${pairing.receiver_port}
+          </span>
+        </div>
+        <button
+          type="button"
+          class="peer-remove btn-unpair"
+          aria-label=${this._localize("settings.unpair_aria", {
+            label: pairing.label,
+          })}
+          @click=${() => this._onUnpairRequest(pairing)}
+        >
+          ${this._localize("settings.unpair_action")}
+        </button>
+      </div>
+    `;
+  }
+
+  private _onUnpairRequest = (pairing: PairingSummary): void => {
+    this._pendingUnpair = {
+      hostname: pairing.receiver_hostname,
+      port: pairing.receiver_port,
+      label: pairing.label,
+    };
+    this._unpairConfirmDialog?.open();
+  };
+
+  private _onUnpairConfirm = async (): Promise<void> => {
+    const pending = this._pendingUnpair;
+    this._pendingUnpair = null;
+    if (this._api === undefined || pending === null) {
+      return;
+    }
+    try {
+      await this._api.unpairRemoteBuild({
+        hostname: pending.hostname,
+        port: pending.port,
+      });
+    } catch (err) {
+      // Log to the dashboard console for diagnostics; the
+      // user-visible outcome is the same as the success path
+      // (row drops on the bus event regardless), so a soft
+      // toast on real errors is enough.
+      console.warn("unpair failed:", err);
+      this._toast("error", "settings.unpair_failed", { label: pending.label });
+      return;
+    }
+    // Backend fires ``OFFLOADER_PAIR_STATUS_CHANGED`` with
+    // ``status="removed"``; app-shell drops the row from the
+    // pairings map automatically.
+    this._toast("success", "settings.unpair_success", {
+      label: pending.label,
+    });
+  };
+
+  private _onPairApproved = (
+    e: CustomEvent<{ hostname: string; port: number }>,
+  ): void => {
+    this._toast("success", "settings.pair_build_server_approved_toast", {
+      hostname: e.detail.hostname,
+      port: String(e.detail.port),
+    });
+  };
+
+  private _onPairRejected = (
+    e: CustomEvent<{ hostname: string; port: number }>,
+  ): void => {
+    this._toast("warning", "settings.pair_build_server_rejected_toast", {
+      hostname: e.detail.hostname,
+      port: String(e.detail.port),
+    });
+  };
 
   private _onPairBuildServerClick = (): void => {
     this._pairBuildServerDialog?.open();
   };
 
   private _onPairRequestSent = (
-    e: CustomEvent<{ hostname: string; port: number }>,
+    e: CustomEvent<{ summary: PairingSummary }>,
   ): void => {
     // Surface a confirmation toast at the dialog-host level.
     // The dialog already shows the "open the receiver's
     // pairing requests page" copy on its sent step; this toast
     // is the breadcrumb the user sees after they close the
-    // dialog so the action they took stays visible.
+    // dialog so the action they took stays visible. App-shell
+    // catches the same event (event bubbles past) and seeds
+    // the new pending row into ``_buildOffloadPairings`` so
+    // the dialog's auto-close watcher has a baseline.
     this._toast("success", "settings.pair_build_server_sent_toast", {
-      hostname: e.detail.hostname,
-      port: String(e.detail.port),
+      hostname: e.detail.summary.receiver_hostname,
+      port: String(e.detail.summary.receiver_port),
     });
   };
 
@@ -1716,6 +1968,16 @@ export class ESPHomeSettingsDialog extends LitElement {
           esphome: peer.esphome_version,
         })
       : nothing;
+    // The Pair button pre-fills only the hostname. The row's
+    // ``peer.port`` is the dashboard's HTTP port from the SRV
+    // record (default 6052), not the peer-link Noise WS port
+    // (default 6055) — pre-filling SRV port would land a
+    // ``UNAVAILABLE`` on the very first preview round-trip.
+    // Until the backend surfaces the receiver's peer-link
+    // ``remote_build_port`` from TXT, the dialog falls back to
+    // its 6055 default and the user can edit if the receiver
+    // overrode ``--remote-build-port``.
+    const alreadyPaired = this._hasPairingFor(peer.hostname);
     return html`
       <div class="row peer-row">
         <div class="row-label">
@@ -1724,9 +1986,43 @@ export class ESPHomeSettingsDialog extends LitElement {
             ${peer.hostname}:${peer.port} ${versionLine}
           </span>
         </div>
+        <button
+          type="button"
+          class="btn-pair-build-server btn-pair-row"
+          ?disabled=${alreadyPaired}
+          aria-label=${this._localize("settings.pair_build_server_row_aria", {
+            name: peer.name,
+          })}
+          @click=${() => this._onPairDiscoveredHost(peer)}
+        >
+          ${alreadyPaired
+            ? this._localize("settings.pair_build_server_row_already_paired")
+            : this._localize("settings.pair_build_server_row_action")}
+        </button>
       </div>
     `;
   }
+
+  private _hasPairingFor(hostname: string): boolean {
+    const pairings = this._buildOffloadPairings;
+    if (pairings === null || pairings.size === 0) {
+      return false;
+    }
+    // Match on hostname only — the user could have paired the
+    // same host on a non-default peer-link port. The Pair
+    // button on the row should still disable so the user can't
+    // start a duplicate flow without first unpairing.
+    for (const pairing of pairings.values()) {
+      if (pairing.receiver_hostname === hostname) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private _onPairDiscoveredHost = (peer: RemoteBuildPeer): void => {
+    this._pairBuildServerDialog?.open({ hostname: peer.hostname });
+  };
 
   private _onThemeChange(e: Event) {
     const theme = (e.target as HTMLSelectElement).value;

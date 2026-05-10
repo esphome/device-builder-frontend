@@ -20,4 +20,5 @@ export {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   buildOffloadDiscoveredHostsContext,
+  buildOffloadPairingsContext,
 } from "./contexts.js";

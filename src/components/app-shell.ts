@@ -37,6 +37,8 @@ import type {
   Label,
   LabelDeletedEventData,
   LabelEventData,
+  OffloaderPairStatusChangedEventData,
+  PairingSummary,
   PairingWindowState,
   PeerSummary,
   RemoteBuildHostAddedEventData,
@@ -62,6 +64,7 @@ import {
   devicesLoadedContext,
   activeJobsContext,
   buildOffloadDiscoveredHostsContext,
+  buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
@@ -304,6 +307,26 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _buildOffloadDiscoveredHosts: Map<string, RemoteBuildPeer> | null =
     null;
+
+  /** Offloader-side pairings (PENDING + APPROVED), keyed on
+   *  ``${hostname}:${port}`` (matches the backend's
+   *  ``StoredPairing`` key — receiver `dashboard_id` isn't
+   *  visible offloader-side, so the receiver coordinates the
+   *  user typed are the stable id). Seeded from
+   *  ``initial_state.pairings``; mutated locally on
+   *  ``OFFLOADER_PAIR_STATUS_CHANGED`` (status flip on
+   *  ``"approved"``, drop on ``"removed"``). The Send-builds
+   *  Settings subsection reads this directly to render the
+   *  paired-receivers list, and the pair dialog reads it to
+   *  auto-close on a matching event after a sent
+   *  ``request_pair``. ``Map`` for the same reasons
+   *  ``_buildOffloadDiscoveredHosts`` is — these are
+   *  user/network-supplied strings; insertion-order matters;
+   *  prototype-key collisions on a plain object don't. ``null``
+   *  until the snapshot lands. */
+  @provide({ context: buildOffloadPairingsContext })
+  @state()
+  private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
 
   /** True when the onboarding wizard should be shown. Computed
    *  from ``completed_version < current_version`` AND not
@@ -883,21 +906,30 @@ export class ESPHomeApp extends LitElement {
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
-        const { devices, importable, peers, hosts } =
+        const { devices, importable, peers, hosts, pairings } =
           data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
         this._devicesLoaded = true;
-        // ``peers`` / ``hosts`` are optional — backend omits the
-        // fields when no remote-build controller is wired up.
-        // ``[]`` would imply "controller present, no rows" which
-        // is a distinct state. Default to ``null`` (still / not
-        // loading) when absent.
+        // ``peers`` / ``hosts`` / ``pairings`` are optional —
+        // backend omits the fields when no remote-build
+        // controller is wired up. ``[]`` would imply "controller
+        // present, no rows" which is a distinct state. Default
+        // to ``null`` (still / not loading) when absent.
         this._buildServerPeers = peers ?? null;
         this._buildOffloadDiscoveredHosts =
           hosts === undefined
             ? null
             : new Map(hosts.map((h) => [h.name, h]));
+        this._buildOffloadPairings =
+          pairings === undefined
+            ? null
+            : new Map(
+                pairings.map((p) => [
+                  this._pairingKey(p.receiver_hostname, p.receiver_port),
+                  p,
+                ]),
+              );
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {
@@ -1087,7 +1119,50 @@ export class ESPHomeApp extends LitElement {
         this._buildOffloadDiscoveredHosts = next;
         break;
       }
+      case DeviceEventType.OFFLOADER_PAIR_STATUS_CHANGED: {
+        // Two cases keyed on ``status``:
+        // - ``approved``: flip the matching pairing row's status
+        //   to "approved". Other fields stay valid (the receiver-
+        //   side approval doesn't mutate label / pin / paired_at;
+        //   the row's identity is the receiver coordinates the
+        //   user typed). If the row isn't in the map yet (event
+        //   raced ahead of the snapshot), skip the flip — the
+        //   next initial-state push reseeds.
+        // - ``removed``: drop the row by key. ``unpair`` /
+        //   receiver-side reject / receiver-rotated-out-from-
+        //   under-us all funnel through this event.
+        const evt = data as OffloaderPairStatusChangedEventData;
+        if (this._buildOffloadPairings === null) {
+          break;
+        }
+        const key = this._pairingKey(
+          evt.receiver_hostname,
+          evt.receiver_port,
+        );
+        const next = new Map(this._buildOffloadPairings);
+        if (evt.status === "removed") {
+          next.delete(key);
+        } else {
+          const existing = next.get(key);
+          if (existing === undefined) {
+            break;
+          }
+          next.set(key, { ...existing, status: "approved" });
+        }
+        this._buildOffloadPairings = next;
+        break;
+      }
     }
+  }
+
+  /** Compose the pairings-map key from receiver coordinates.
+   *
+   *  ``${hostname}:${port}`` matches the backend's
+   *  ``StoredPairing`` key shape. Hostname is lowercase already
+   *  (backend normalises to RFC 1035 §2.3.3 on persist), so a
+   *  case-flip on either side wouldn't desync the lookup. */
+  private _pairingKey(hostname: string, port: number): string {
+    return `${hostname}:${port}`;
   }
 
   // ─── Render ──────────────────────────────────────────────
@@ -1146,6 +1221,7 @@ export class ESPHomeApp extends LitElement {
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
         @set-remote-build-enabled=${this._onSetRemoteBuildEnabled}
         @set-language=${this._onSetLanguage}
+        @pair-request-sent=${this._onPairRequestSent}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${this._onFirmwareHistoryCleared}
@@ -1258,6 +1334,32 @@ export class ESPHomeApp extends LitElement {
     } finally {
       this._remoteBuildSetInFlight = false;
     }
+  }
+
+  /** Upsert a freshly-created pairing into the offloader
+   *  pairings map.
+   *
+   *  Fired by the pair-build-server dialog after a successful
+   *  ``request_pair``. The backend persists the row but doesn't
+   *  fire ``OFFLOADER_PAIR_STATUS_CHANGED`` for the create
+   *  (events only mark status flips), so the dialog's
+   *  auto-close watcher needs the row in the map locally as a
+   *  baseline for the next event. The ``PairingSummary``
+   *  shape here is identical to what
+   *  ``initial_state.pairings`` carries, so re-using the same
+   *  ``${hostname}:${port}`` key keeps snapshot and live-event
+   *  paths aligned. */
+  private _onPairRequestSent(
+    e: CustomEvent<{ summary: PairingSummary }>,
+  ): void {
+    const summary = e.detail.summary;
+    const key = this._pairingKey(
+      summary.receiver_hostname,
+      summary.receiver_port,
+    );
+    const next = new Map(this._buildOffloadPairings ?? []);
+    next.set(key, summary);
+    this._buildOffloadPairings = next;
   }
 
   private async _onSetLanguage(

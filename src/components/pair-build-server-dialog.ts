@@ -7,8 +7,12 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { APIError } from "../api/api-error.js";
-import { ErrorCode } from "../api/types.js";
-import { apiContext, localizeContext } from "../context/index.js";
+import { ErrorCode, type PairingSummary } from "../api/types.js";
+import {
+  apiContext,
+  buildOffloadPairingsContext,
+  localizeContext,
+} from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
@@ -83,6 +87,19 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** Auto-close hook for the ``sent`` terminal step. Watches
+   *  the offloader pairings map for the row matching this
+   *  dialog's submitted ``${hostname}:${port}`` and auto-
+   *  closes when its status flips to ``approved`` (the
+   *  receiver admin clicked Accept). The receiver-side reject
+   *  / unpair path drops the row via
+   *  ``OFFLOADER_PAIR_STATUS_CHANGED status="removed"``; the
+   *  dialog catches that case via ``willUpdate`` and surfaces a
+   *  rejection toast before closing. */
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
 
   @state()
   private _step: "input" | "confirm" | "sent" = "input";
@@ -278,20 +295,104 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     `,
   ];
 
-  open(): void {
+  /** Open the dialog. Optional prefills land on the input
+   *  step's hostname / port fields so a "Pair" click on a
+   *  discovered-host row can skip retyping the address. The
+   *  user can still edit either field before clicking
+   *  Continue — the prefill is a starting point, not a lock. */
+  open(prefill?: { hostname?: string; port?: number }): void {
     this._step = "input";
     this._busy = false;
-    this._hostname = "";
-    this._port = "6055";
+    this._hostname = prefill?.hostname ?? "";
+    this._port =
+      prefill?.port !== undefined ? String(prefill.port) : "6055";
     this._previewedPin = "";
     this._receiverLabel = "";
     this._offloaderLabel = "";
     this._error = null;
+    // Reset the auto-close watch key from any prior open. Set
+    // again on a successful ``request_pair`` once we know the
+    // exact ``${hostname}:${port}`` the row landed under.
+    this._sentKey = null;
     this._dialog.open = true;
   }
 
   close(): void {
     this._dialog.open = false;
+  }
+
+  /** Key the dialog watches for an auto-close approval after
+   *  ``request_pair`` lands. Set to
+   *  ``${hostname}:${port}`` of the submitted request; cleared
+   *  on the next ``open()``. ``null`` outside the ``sent``
+   *  step. Mirrors the backend's ``StoredPairing`` key
+   *  (receiver coordinates the user typed). */
+  @state()
+  private _sentKey: string | null = null;
+
+  protected willUpdate(changed: Map<string, unknown>): void {
+    super.willUpdate(changed);
+    // Auto-close on a matching ``OFFLOADER_PAIR_STATUS_CHANGED``
+    // event reaching the offloader pairings map: the receiver
+    // admin clicked Accept (status flipped to "approved"), or
+    // the receiver rejected / dropped the row before we got an
+    // approval (the row leaves the map entirely). Either
+    // outcome is the operator's "I can stop watching the dialog
+    // now" signal — surface a toast at the dialog level and
+    // close.
+    if (
+      this._sentKey === null ||
+      this._step !== "sent" ||
+      !changed.has("_buildOffloadPairings")
+    ) {
+      return;
+    }
+    const row = this._buildOffloadPairings?.get(this._sentKey);
+    if (row !== undefined && row.status === "approved") {
+      this.dispatchEvent(
+        new CustomEvent<{ hostname: string; port: number }>(
+          "pair-approved",
+          {
+            detail: this._parseSentKey(this._sentKey),
+            bubbles: true,
+            composed: true,
+          },
+        ),
+      );
+      this._sentKey = null;
+      this.close();
+      return;
+    }
+    if (row === undefined && this._buildOffloadPairings !== null) {
+      // Row went away before we got an approval — receiver
+      // admin clicked Reject, OR the user clicked Unpair on
+      // another tab, OR the receiver-side rotated identity
+      // and the offloader's status listener task pushed a
+      // ``removed`` event. The dialog can't tell which, but
+      // the user-visible outcome is the same ("the request
+      // didn't land"); fire a generic ``pair-rejected``
+      // event for the parent toast.
+      this.dispatchEvent(
+        new CustomEvent<{ hostname: string; port: number }>(
+          "pair-rejected",
+          {
+            detail: this._parseSentKey(this._sentKey),
+            bubbles: true,
+            composed: true,
+          },
+        ),
+      );
+      this._sentKey = null;
+      this.close();
+    }
+  }
+
+  private _parseSentKey(key: string): { hostname: string; port: number } {
+    const idx = key.lastIndexOf(":");
+    return {
+      hostname: key.slice(0, idx),
+      port: Number.parseInt(key.slice(idx + 1), 10),
+    };
   }
 
   protected render() {
@@ -574,7 +675,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._busy = true;
     this._error = null;
     try {
-      await this._api.requestRemoteBuildPair({
+      const summary = await this._api.requestRemoteBuildPair({
         hostname,
         port,
         pin_sha256: this._previewedPin,
@@ -582,15 +683,26 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         offloader_label: offloaderLabel,
       });
       this._step = "sent";
+      // Pin the key the auto-close watcher in ``willUpdate``
+      // checks against the offloader pairings map. Same shape
+      // the backend's ``StoredPairing`` is keyed on.
+      this._sentKey = `${hostname}:${port}`;
+      // Backend persists the new ``StoredPairing`` row but
+      // doesn't fire ``OFFLOADER_PAIR_STATUS_CHANGED`` for the
+      // create — only on subsequent status flips. Seed the row
+      // into the offloader pairings map via ``pair-request-sent``
+      // so the auto-close watcher has a baseline to flip from
+      // (without it, the next event would arrive against an
+      // empty map slot and the dialog would mistake "first
+      // approval" for "row went away → rejection"). The
+      // ``PairingSummary`` returned from ``request_pair`` is
+      // the same shape the snapshot delivers.
       this.dispatchEvent(
-        new CustomEvent<{ hostname: string; port: number }>(
-          "pair-request-sent",
-          {
-            detail: { hostname, port },
-            bubbles: true,
-            composed: true,
-          },
-        ),
+        new CustomEvent<{ summary: PairingSummary }>("pair-request-sent", {
+          detail: { summary },
+          bubbles: true,
+          composed: true,
+        }),
       );
     } catch (err) {
       this._error = this._requestErrorMessage(err);
