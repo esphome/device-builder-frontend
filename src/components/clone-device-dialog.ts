@@ -6,6 +6,7 @@ import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
+import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
@@ -203,9 +204,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
             }}
           />
           ${err
-            ? html`<span class="field-error"
-                >${this._localize(err.code, err.params)}</span
-              >`
+            ? renderInlineError(this._localize(err.code, err.params))
             : warning
               ? html`<span class="field-warning"
                   >${this._localize(warning.code, warning.params)}</span

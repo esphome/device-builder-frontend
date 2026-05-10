@@ -27,6 +27,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { jobStatusPillStyles } from "../styles/job-status-pill.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
+import { renderErrorBanner } from "../util/render-error.js";
 
 import "./ansi-log.js";
 
@@ -323,16 +324,6 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     if (this._expandedJobId === job_id) this._expandedJobId = "";
   };
 
-  /** Render an error banner row, or ``nothing`` when *message*
-   *  is empty. Centralises the field-error markup so the input
-   *  step's submit-error, each row's per-job ``error_message``
-   *  (terminal failures from the receiver), and per-row
-   *  cancel-errors all share one visual shape. */
-  private _renderErrorBanner(message: string | undefined) {
-    if (!message) return nothing;
-    return html`<div class="field-error" role="alert">${message}</div>`;
-  }
-
   private _formatCancelError(err: unknown): string {
     if (err instanceof APIError) {
       switch (err.errorCode) {
@@ -416,7 +407,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           </option>
         </select>
       </div>
-      ${this._renderErrorBanner(this._submitErrorMessage)}
+      ${renderErrorBanner(this._submitErrorMessage)}
       <div class="actions">
         <button class="btn-secondary" type="button" @click=${this._close}>
           ${this._localize("layout.close")}
@@ -516,8 +507,8 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         ${expanded
           ? html`
               <div class="job-body">
-                ${this._renderErrorBanner(job.error_message)}
-                ${this._renderErrorBanner(row.errorMessage)}
+                ${renderErrorBanner(job.error_message)}
+                ${renderErrorBanner(row.errorMessage)}
                 <div class="logs-container">
                   <esphome-ansi-log
                     .lines=${job.output}

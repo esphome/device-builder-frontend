@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
@@ -213,9 +214,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
             }}
           />
           ${err
-            ? html`<span class="field-error"
-                >${this._localize(err.code)}</span
-              >`
+            ? renderInlineError(this._localize(err.code))
             : html`<span class="helper"
                 >${this._localize(
                   "dashboard.action_friendly_name_helper",

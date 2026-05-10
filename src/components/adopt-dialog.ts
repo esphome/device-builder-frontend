@@ -10,6 +10,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
+import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
@@ -320,11 +321,11 @@ export class ESPHomeAdoptDialog extends LitElement {
                     if (e.key === "Enter" && canSubmit) this._submit();
                   }}
                 />
-                ${nameErr
-                  ? html`<span class="field-error"
-                      >${this._localize(nameErr.code, nameErr.params)}</span
-                    >`
-                  : nothing}
+                ${renderInlineError(
+                  nameErr
+                    ? this._localize(nameErr.code, nameErr.params)
+                    : undefined,
+                )}
               </div>
 
               <div class="field">

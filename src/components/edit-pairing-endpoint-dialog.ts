@@ -17,6 +17,7 @@ import {
   parsePortInput,
   trimTrailingDot,
 } from "../util/hostname.js";
+import { renderErrorBanner } from "../util/render-error.js";
 
 /**
  * Edit a paired build server's hostname / port without re-pairing.
@@ -300,11 +301,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
             @input=${this._onPortInput}
           />
         </div>
-        ${this._errorMessage
-          ? html`<div class="field-error" role="alert">
-              ${this._errorMessage}
-            </div>`
-          : nothing}
+        ${renderErrorBanner(this._errorMessage)}
         <div class="actions">
           <button
             class="btn-secondary"

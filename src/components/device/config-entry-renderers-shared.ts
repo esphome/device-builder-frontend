@@ -13,6 +13,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { renderInlineError } from "../../util/render-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 registerMdiIcons({
@@ -174,8 +175,9 @@ export function renderLabel(
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {
   const err = ctx.errorAt(path);
-  if (!err) return nothing;
-  return html`<span class="field-error">${ctx.localize(err.code, err.params)}</span>`;
+  return renderInlineError(
+    err ? ctx.localize(err.code, err.params) : undefined,
+  );
 }
 
 /**
