@@ -1382,6 +1382,36 @@ export interface PairingSummary {
    * APPROVED.
    */
   connected: boolean;
+  /**
+   * Whether the offloader's per-pairing peer-link client task
+   * is alive but has no open session right now. Covers the
+   * very first connect attempt and every subsequent reconnect
+   * cycle inside the run loop's backoff window. Goes false on
+   * `connected` (post-handshake open) and on the orphan paths
+   * (pin mismatch / superseded) where the run loop won't retry
+   * — operator's recovery there is re-pair / unpair, not
+   * "wait for reconnect," so both `connected` and `connecting`
+   * report false on those states.
+   *
+   * UI uses the tri-state to render Connected / Connecting… /
+   * Disconnected; pair an empty `last_connect_error` with
+   * `connecting=true` and the row is the steady-state
+   * reconnect cycle, while a non-empty error there + both
+   * flags false is the orphaned terminal case.
+   */
+  connecting: boolean;
+  /**
+   * One-line description of the most recent connection failure
+   * (`"<ExceptionType>: <message>"` for transport / Noise
+   * errors, `"auth rejected"`, `"pin mismatch"`). Cleared when
+   * a session reaches the post-handshake open state so a
+   * stale message can't outlive a successful reconnect.
+   *
+   * Live updates ride on `OFFLOADER_PEER_LINK_CLOSED.error_detail`;
+   * the snapshot here is the post-load value for tabs that
+   * subscribe after an in-flight failure.
+   */
+  last_connect_error: string;
 }
 
 /**
@@ -1540,24 +1570,75 @@ export interface ReceiverPeerLinkSessionEventData {
 }
 
 /**
- * Data payload for offloader_peer_link_opened and
- * offloader_peer_link_closed.
+ * Data payload for offloader_peer_link_opened.
  *
- * Fires on the offloader-side bus whenever the long-lived
- * PeerLinkClient enters / leaves its post-handshake parked
- * state. Drives the PairingSummary.connected indicator:
- * app-shell flips the matching row's connected flag in the
- * local _buildOffloadPairings map keyed by pin_sha256. Both
- * events share the same shape; the discriminator is the event
- * type itself. Receiver coords are carried as display fields
- * the renderer can use without a follow-up lookup, but they're
- * ignored when keying the map (4a-o part 6; pin_sha256 is the
- * canonical row identity).
+ * Fires on the offloader-side bus when the long-lived
+ * PeerLinkClient enters its post-handshake parked state.
+ * Drives the PairingSummary.connected indicator: app-shell
+ * flips the matching row's connected flag in the local
+ * _buildOffloadPairings map keyed by pin_sha256. Receiver
+ * coords are carried as display fields the renderer can use
+ * without a follow-up lookup, but they're ignored when keying
+ * the map (4a-o part 6; pin_sha256 is the canonical row
+ * identity).
  */
 export interface OffloaderPeerLinkSessionEventData {
   receiver_hostname: string;
   receiver_port: number;
   pin_sha256: string;
+}
+
+/**
+ * Close-reason category for `OFFLOADER_PEER_LINK_CLOSED`.
+ *
+ * Mirrors the backend's union of receiver-driven
+ * `TerminateReason` enum values (`superseded` /
+ * `server_shutting_down` / `heartbeat_timeout` /
+ * `malformed_frame` — the wire form of a structured `terminate`
+ * frame) and the offloader-side reasons (`transport_error` /
+ * `client_stopped` / `peer_hung_up` / `auth_rejected` /
+ * `pin_mismatch` — what `PeerLinkClient` infers when our side
+ * detects the close before the wire does). Two reasons in this
+ * union are *orphan* close reasons where the run loop won't
+ * reconnect: `superseded` and `pin_mismatch`. App-shell branches
+ * on the literal — keeping it as a union (rather than `string`)
+ * lets TypeScript catch typos before they land as silently-broken
+ * UI state.
+ */
+export type PeerLinkCloseReason =
+  | "superseded"
+  | "server_shutting_down"
+  | "heartbeat_timeout"
+  | "malformed_frame"
+  | "transport_error"
+  | "client_stopped"
+  | "peer_hung_up"
+  | "auth_rejected"
+  | "pin_mismatch";
+
+/**
+ * Data payload for offloader_peer_link_closed.
+ *
+ * Same identity fields as OffloaderPeerLinkSessionEventData
+ * (the OPENED counterpart) plus the close-classification:
+ *
+ * - `reason`: category code, see `PeerLinkCloseReason`.
+ * - `error_detail`: one-line human-readable description for
+ *   the categories that have one (transport / Noise exception
+ *   text, `"auth rejected"`, `"pin mismatch"`). Empty for
+ *   clean closes where the category itself is the explanation
+ *   (`client_stopped`, `superseded`, receiver-driven
+ *   `terminate`).
+ *
+ * App-shell uses both fields to update the matching row's
+ * `last_connect_error` (set to `error_detail`) and `connecting`
+ * (true on non-orphan reasons; false on `pin_mismatch` /
+ * `superseded` where the run loop won't retry).
+ */
+export interface OffloaderPeerLinkClosedEventData
+  extends OffloaderPeerLinkSessionEventData {
+  reason: PeerLinkCloseReason;
+  error_detail: string;
 }
 
 /**

@@ -44,6 +44,7 @@ import type {
   OffloaderPairPeerRevokedEventData,
   OffloaderPairPinMismatchEventData,
   OffloaderPairStatusChangedEventData,
+  OffloaderPeerLinkClosedEventData,
   OffloaderPeerLinkSessionEventData,
   PairingSummary,
   PairingWindowState,
@@ -946,6 +947,36 @@ export class ESPHomeApp extends LitElement {
     this._recentJobTimers.set(job.configuration, timer);
   }
 
+  /**
+   * Merge a partial diff into the matching offloader pairing
+   * row keyed by `pin`.
+   *
+   * Centralises the null-check + missing-row guard + Map clone
+   * pattern that every connection-state transition shares
+   * (PAIR_STATUS_CHANGED, PEER_LINK_OPENED, PEER_LINK_CLOSED).
+   * `_buildOffloadPairings === null` means the
+   * `subscribe_events` snapshot hasn't seeded yet; a missing
+   * row means the event raced ahead of the snapshot or fired
+   * against a pairing the backend just dropped. Both no-op
+   * because the next initial_state reseed carries the right
+   * state and we'd rather skip than synthesise a partial row.
+   */
+  private _patchOffloadPairing(
+    pin: string,
+    diff: Partial<PairingSummary>,
+  ): void {
+    if (this._buildOffloadPairings === null) {
+      return;
+    }
+    const existing = this._buildOffloadPairings.get(pin);
+    if (existing === undefined) {
+      return;
+    }
+    const next = new Map(this._buildOffloadPairings);
+    next.set(pin, { ...existing, ...diff });
+    this._buildOffloadPairings = next;
+  }
+
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
@@ -1210,46 +1241,67 @@ export class ESPHomeApp extends LitElement {
         //   receiver-side reject / receiver-rotated-out-from-
         //   under-us all funnel through this event.
         const evt = data as OffloaderPairStatusChangedEventData;
-        if (this._buildOffloadPairings === null) {
-          break;
-        }
-        const next = new Map(this._buildOffloadPairings);
         if (evt.status === "removed") {
-          next.delete(evt.pin_sha256);
-        } else {
-          const existing = next.get(evt.pin_sha256);
-          if (existing === undefined) {
+          // ``removed`` is a row-drop, not a row-patch, so the
+          // shared ``_patchOffloadPairing`` doesn't apply.
+          if (this._buildOffloadPairings === null) {
             break;
           }
-          next.set(evt.pin_sha256, { ...existing, status: "approved" });
+          const next = new Map(this._buildOffloadPairings);
+          next.delete(evt.pin_sha256);
+          this._buildOffloadPairings = next;
+          break;
         }
-        this._buildOffloadPairings = next;
+        // PENDING→APPROVED flips ``connecting`` to true: the
+        // backend spawns the long-lived peer-link client at
+        // the same moment, so the next thing the operator sees
+        // should be a "Connecting…" pill on the row until the
+        // first OFFLOADER_PEER_LINK_OPENED lands.
+        // ``last_connect_error`` resets to empty for the same
+        // reason — the previous-pairing's error history is
+        // unrelated to the freshly-approved row.
+        this._patchOffloadPairing(evt.pin_sha256, {
+          status: "approved",
+          connecting: true,
+          connected: false,
+          last_connect_error: "",
+        });
         break;
       }
-      case DeviceEventType.OFFLOADER_PEER_LINK_OPENED:
-      case DeviceEventType.OFFLOADER_PEER_LINK_CLOSED: {
-        // Flip 'connected' on the matching APPROVED row. Keyed
-        // on pin_sha256 (the same wire-canonical identity
-        // OFFLOADER_PAIR_STATUS_CHANGED uses). Both events share
-        // the same payload shape; the discriminator is the event
-        // type itself. _buildOffloadPairings may be null
-        // (snapshot not yet seeded) or missing the row (event
-        // raced ahead of the snapshot, or fired against a
-        // pairing the backend just dropped). In both cases the
-        // next initial_state reseed carries the right state, so
-        // skip rather than synthesise a partial row.
-        if (this._buildOffloadPairings === null) {
-          break;
-        }
+      case DeviceEventType.OFFLOADER_PEER_LINK_OPENED: {
+        // OPENED clears the failure record: a successful
+        // session-open invalidates whatever caused the previous
+        // close. Mirrors the backend's
+        // ``PeerLinkClient._last_connect_error`` clear at the
+        // same moment.
         const evt = data as OffloaderPeerLinkSessionEventData;
-        const existing = this._buildOffloadPairings.get(evt.pin_sha256);
-        if (existing === undefined) {
-          break;
-        }
-        const connected = event === DeviceEventType.OFFLOADER_PEER_LINK_OPENED;
-        const next = new Map(this._buildOffloadPairings);
-        next.set(evt.pin_sha256, { ...existing, connected });
-        this._buildOffloadPairings = next;
+        this._patchOffloadPairing(evt.pin_sha256, {
+          connected: true,
+          connecting: false,
+          last_connect_error: "",
+        });
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PEER_LINK_CLOSED: {
+        // CLOSED has the same identity fields as OPENED plus
+        // the close classification: ``reason`` is the category,
+        // ``error_detail`` is the human-readable specific.
+        // Orphan reasons (``superseded`` / ``pin_mismatch``) are
+        // the run loop's terminal stops: the offloader's
+        // PeerLinkClient won't reconnect, so the row should NOT
+        // show "Connecting…" in the UI — it should show the
+        // last error and wait for the operator to re-pair or
+        // unpair. Every other reason is a transient close where
+        // the run loop is about to back off and try again, so
+        // ``connecting`` flips back to true.
+        const evt = data as OffloaderPeerLinkClosedEventData;
+        const orphaned =
+          evt.reason === "superseded" || evt.reason === "pin_mismatch";
+        this._patchOffloadPairing(evt.pin_sha256, {
+          connected: false,
+          connecting: !orphaned,
+          last_connect_error: evt.error_detail,
+        });
         break;
       }
       case DeviceEventType.OFFLOADER_PAIR_PIN_MISMATCH: {

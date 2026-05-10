@@ -1431,6 +1431,33 @@ export class ESPHomeSettingsDialog extends LitElement {
         color: var(--wa-color-neutral-500, #6b7280);
       }
 
+      /* Same warning-tint as Pending: the row is between
+         states (Connecting…) and the operator's prompt is
+         "wait" rather than "act," same posture Pending
+         conveys. Distinct class so a future colour shift on
+         either pill doesn't drag the other along. */
+      .peer-connection-connecting {
+        background: color-mix(
+          in srgb,
+          var(--esphome-warning, #f59e0b),
+          transparent 80%
+        );
+        color: var(--esphome-warning, #f59e0b);
+      }
+
+      /* Sub-line under any not-currently-connected APPROVED row
+         showing the backend's last_connect_error so the operator
+         sees the specific failure (e.g. "ConnectionRefusedError:
+         [Errno 61] Connection refused") without trawling logs.
+         Renders during both Connecting… (run loop is retrying)
+         and the orphan-disconnected case. Quiet styling — same
+         font as the existing row-desc but italic for visual
+         grouping with the line above. */
+      .pairing-last-error {
+        font-style: italic;
+        word-break: break-word;
+      }
+
       .pairing-status-pending {
         background: color-mix(
           in srgb,
@@ -2380,15 +2407,27 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   private _renderPairingRow(pairing: PairingSummary) {
     // One pill per row, picked to convey the most informative
-    // state: an APPROVED + connected pairing reads as
-    // "Connected" (the connection state implies approval, so
-    // showing "Approved + Connected" both is just noise);
-    // APPROVED + disconnected reads as "Disconnected"; PENDING
-    // reads as "Pending" (offloader hasn't spawned a peer-link
-    // client yet, so connection state isn't meaningful).
-    // Connection state is fed by OFFLOADER_PEER_LINK_OPENED /
-    // _CLOSED events on app-shell, with the
-    // ``initial_state.pairings`` snapshot seeding the initial
+    // state. APPROVED branches into three sub-states keyed off
+    // the live connection-state fields from the backend:
+    //
+    //   * ``connected``: Connected (the steady state).
+    //   * ``connecting``: Connecting… (the run loop is alive
+    //     but no session is open right now — first attempt or
+    //     reconnect-backoff cycle).
+    //   * neither: Disconnected (the run loop is orphaned via
+    //     pin_mismatch / superseded; operator's recovery is
+    //     re-pair or unpair).
+    //
+    // PENDING reads as "Pending" — the offloader hasn't spawned
+    // a peer-link client yet, so connection state isn't
+    // meaningful.
+    //
+    // ``last_connect_error`` rides on the row when non-empty so
+    // the operator sees the specific failure (e.g.
+    // "ConnectionRefusedError: …") under the pill rather than
+    // having to trawl logs for it. Live updates flow on
+    // OFFLOADER_PEER_LINK_OPENED / _CLOSED; the
+    // ``initial_state.pairings`` snapshot seeds the initial
     // paint.
     let pillClass: string;
     let pillLabel: string;
@@ -2398,6 +2437,9 @@ export class ESPHomeSettingsDialog extends LitElement {
     } else if (pairing.connected) {
       pillClass = "peer-connection-pill peer-connection-connected";
       pillLabel = this._localize("settings.build_offload_pairing_connected");
+    } else if (pairing.connecting) {
+      pillClass = "peer-connection-pill peer-connection-connecting";
+      pillLabel = this._localize("settings.build_offload_pairing_connecting");
     } else {
       pillClass = "peer-connection-pill peer-connection-disconnected";
       pillLabel = this._localize("settings.build_offload_pairing_disconnected");
@@ -2412,6 +2454,25 @@ export class ESPHomeSettingsDialog extends LitElement {
           <span class="row-desc">
             ${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}
           </span>
+          ${pairing.status === "approved" && !pairing.connected && pairing.last_connect_error
+            ? // Render the most recent failure as a sub-line on
+              // any APPROVED row that isn't currently connected
+              // — covers both Connecting… (operator wants to
+              // know what's failing while the run loop retries)
+              // and the orphan disconnected case (the message is
+              // *the* diagnostic since the run loop won't
+              // recover on its own). PENDING rows never carry a
+              // last error, so the ``status === approved`` guard
+              // is redundant against the empty-string check but
+              // kept as a defence in depth.
+              html`
+                <span class="row-desc pairing-last-error" role="status">
+                  ${this._localize("settings.build_offload_pairing_last_error", {
+                    detail: pairing.last_connect_error,
+                  })}
+                </span>
+              `
+            : nothing}
         </div>
         ${pairing.status === "approved" && pairing.connected
           ? html`
