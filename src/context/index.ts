@@ -17,4 +17,6 @@ export {
   labelsContext,
   onboardingPendingContext,
   buildServerIdentityRotationCounterContext,
+  buildServerPairingWindowStateContext,
+  buildServerPeersContext,
 } from "./contexts.js";

@@ -1406,19 +1406,14 @@ export class ESPHomeAPI {
 
   // ─── Remote build: receiver-side pairing inbox (phase 4a-r1) ──
 
-  /**
-   * List the offloaders this dashboard recognises (paired or pending).
-   *
-   * Each row is a {@link PeerSummary} (dashboard_id + pin_sha256
-   * + label + paired_at + status). Includes both PENDING (in the
-   * receiver's in-memory dict, awaiting Accept / Reject) and
-   * APPROVED (persisted) rows. The Settings UI renders the
-   * Pairing requests inbox from the PENDING rows and the
-   * Approved peers list from the APPROVED rows.
-   */
-  async listRemoteBuildPeers(): Promise<PeerSummary[]> {
-    return this.sendCommand<PeerSummary[]>("remote_build/list_peers");
-  }
+  // Note: there's no ``listRemoteBuildPeers`` wrapper. The
+  // receiver-side peer list (PENDING + APPROVED) ships through
+  // ``subscribe_events``'s ``initial_state.peers`` field at
+  // subscribe time + the three live events
+  // (``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` /
+  // ``REMOTE_BUILD_PAIR_STATUS_CHANGED``) drive every mutation.
+  // A separate ``list_peers`` snapshot read would be a redundant
+  // round-trip on the WS the frontend already has open.
 
   /**
    * Promote a PENDING peer to APPROVED.

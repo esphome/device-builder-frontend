@@ -722,32 +722,9 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(payload);
   });
 
-  it("listRemoteBuildPeers sends remote_build/list_peers and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
-    const ws = await connect(api);
-    const payload = [
-      {
-        dashboard_id: "green",
-        pin_sha256: "a".repeat(64),
-        label: "green",
-        paired_at: 1715212800,
-        status: "approved",
-      },
-      {
-        dashboard_id: "laptop",
-        pin_sha256: "b".repeat(64),
-        label: "laptop",
-        paired_at: 1715212900,
-        status: "pending",
-      },
-    ];
-    const pending = api.listRemoteBuildPeers();
-    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
-    expect(sent.command).toBe("remote_build/list_peers");
-    expect(sent.args).toBeUndefined();
-    ws.receive({ message_id: sent.message_id, result: payload });
-    await expect(pending).resolves.toEqual(payload);
-  });
+  // No ``listRemoteBuildPeers`` test — there's no wrapper. The
+  // receiver-side peer list arrives via ``subscribe_events``'s
+  // ``initial_state.peers`` field plus the live event stream.
 
   it("approveRemoteBuildPeer sends remote_build/approve_peer with dashboard_id", async () => {
     const api = new ESPHomeAPI();

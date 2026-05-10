@@ -1007,6 +1007,15 @@ export interface InitialStateEventData {
    *  the controller is absent the field is omitted entirely
    *  rather than sent as an empty list. */
   pairings?: PairingSummary[];
+  /** Receiver-side peers snapshot. Carries both PENDING (in the
+   *  receiver's in-memory ``_pending_peers`` dict, awaiting
+   *  Accept / Reject) and APPROVED (persisted) rows. Live updates
+   *  flow through the same ``subscribe_events`` stream as
+   *  ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` (upsert),
+   *  ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` (status flip / row
+   *  drop) events. Optional for the same reason as
+   *  ``pairings`` — absent controller, omitted field. */
+  peers?: PeerSummary[];
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
@@ -1290,12 +1299,19 @@ export interface IdentityView {
  * Pairing requests inbox; ``peer_ip`` lets the operator
  * sanity-check the source against expectations before
  * OOB-confirming the pin.
+ *
+ * ``paired_at`` carries the receiver-clock timestamp the row
+ * was created at — same value the receiver writes to
+ * ``StoredPeer.paired_at``. Sent on the event so the frontend
+ * can construct a complete ``PeerSummary``-equivalent row from
+ * the event alone (no follow-up read).
  */
 export interface RemoteBuildPairRequestReceivedEventData {
   dashboard_id: string;
   pin_sha256: string;
   label: string;
   peer_ip: string;
+  paired_at: number;
 }
 
 /**

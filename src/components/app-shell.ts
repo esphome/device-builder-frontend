@@ -37,6 +37,11 @@ import type {
   Label,
   LabelDeletedEventData,
   LabelEventData,
+  PairingWindowState,
+  PeerSummary,
+  RemoteBuildPairingWindowChangedEventData,
+  RemoteBuildPairRequestReceivedEventData,
+  RemoteBuildPairStatusChangedEventData,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -54,6 +59,8 @@ import {
   devicesLoadedContext,
   activeJobsContext,
   buildServerIdentityRotationCounterContext,
+  buildServerPairingWindowStateContext,
+  buildServerPeersContext,
   recentJobsContext,
   firmwareJobsContext,
   importableDevicesContext,
@@ -252,6 +259,28 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: buildServerIdentityRotationCounterContext })
   @state()
   private _buildServerIdentityRotationCounter = 0;
+
+  /** Receiver-side peer list (PENDING + APPROVED). Seeded from
+   *  the ``initial_state.peers`` snapshot the backend pushes
+   *  once at subscribe time; mutated locally as
+   *  ``remote_build_pair_request_received`` (upsert) and
+   *  ``remote_build_pair_status_changed`` (status flip / row
+   *  drop) events arrive. ``null`` until the snapshot lands so
+   *  consumers can distinguish "no controller / still loading"
+   *  from "loaded with zero rows". Phase 4b-2 (#106). */
+  @provide({ context: buildServerPeersContext })
+  @state()
+  private _buildServerPeers: PeerSummary[] | null = null;
+
+  /** Latest receiver-side pairing-window state. ``null`` until
+   *  the first ``remote_build_pairing_window_changed`` event lands
+   *  (or until the Settings dialog's Build server section runs
+   *  its initial ``setRemoteBuildPairingWindow`` call). The
+   *  Settings UI renders an open/closed status pill plus the
+   *  remaining lifetime when open. Phase 4b-2 (#106). */
+  @provide({ context: buildServerPairingWindowStateContext })
+  @state()
+  private _buildServerPairingWindowState: PairingWindowState | null = null;
 
   /** True when the onboarding wizard should be shown. Computed
    *  from ``completed_version < current_version`` AND not
@@ -831,10 +860,16 @@ export class ESPHomeApp extends LitElement {
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
-        const { devices, importable } = data as InitialStateEventData;
+        const { devices, importable, peers } = data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
         this._devicesLoaded = true;
+        // ``peers`` is optional — backend omits the field when no
+        // remote-build controller is wired up. ``[]`` would
+        // imply "controller present, no rows" which is a
+        // distinct state. Default to ``null`` (still / not
+        // loading) when absent.
+        this._buildServerPeers = peers ?? null;
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {
@@ -929,6 +964,66 @@ export class ESPHomeApp extends LitElement {
         // so a rotation triggered in another tab refreshes the
         // visible cert fingerprint here.
         this._buildServerIdentityRotationCounter += 1;
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_PAIR_REQUEST_RECEIVED: {
+        // Upsert a PENDING row keyed on ``dashboard_id``. Carries
+        // every field needed for a complete ``PeerSummary``-shape
+        // (the receiver fires this event with ``paired_at`` so
+        // the frontend doesn't need a follow-up read). A re-pair
+        // by the same offloader before admin clicked Accept lands
+        // a fresh event with the new pin / pubkey / paired_at;
+        // upsert overwrites in place. ``peer_ip`` is for inbox
+        // display only, not stored on the row.
+        const evt = data as RemoteBuildPairRequestReceivedEventData;
+        const incoming: PeerSummary = {
+          dashboard_id: evt.dashboard_id,
+          pin_sha256: evt.pin_sha256,
+          label: evt.label,
+          paired_at: evt.paired_at,
+          status: "pending",
+        };
+        const current = this._buildServerPeers ?? [];
+        const idx = current.findIndex(
+          (p) => p.dashboard_id === incoming.dashboard_id
+        );
+        this._buildServerPeers =
+          idx === -1
+            ? [...current, incoming]
+            : [...current.slice(0, idx), incoming, ...current.slice(idx + 1)];
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_PAIR_STATUS_CHANGED: {
+        // Two cases keyed on ``status``:
+        // - ``approved``: flip the matching row's ``status`` from
+        //   pending to approved. The other fields stay valid (no
+        //   command mutates an APPROVED row in production today;
+        //   the receiver event carries only dashboard_id +
+        //   status by design).
+        // - ``removed``: drop the row. Reaches the frontend when
+        //   admin clicked Remove or when the pairing-window
+        //   auto-close cleared a stale PENDING entry.
+        const evt = data as RemoteBuildPairStatusChangedEventData;
+        const current = this._buildServerPeers ?? [];
+        if (evt.status === "removed") {
+          this._buildServerPeers = current.filter(
+            (p) => p.dashboard_id !== evt.dashboard_id
+          );
+        } else {
+          this._buildServerPeers = current.map((p) =>
+            p.dashboard_id === evt.dashboard_id
+              ? { ...p, status: "approved" as const }
+              : p
+          );
+        }
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_PAIRING_WINDOW_CHANGED: {
+        // Mirror the receiver's pairing-window state directly.
+        // The event payload IS the state shape, so the assignment
+        // is a passthrough.
+        this._buildServerPairingWindowState =
+          data as RemoteBuildPairingWindowChangedEventData;
         break;
       }
     }

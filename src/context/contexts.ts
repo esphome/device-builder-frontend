@@ -11,6 +11,8 @@ import type {
   ConfiguredDevice,
   FirmwareJob,
   Label,
+  PairingWindowState,
+  PeerSummary,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
@@ -146,3 +148,43 @@ export const onboardingPendingContext = createContext<boolean>(
 export const buildServerIdentityRotationCounterContext = createContext<number>(
   Symbol("esphome-build-server-identity-rotation-counter")
 );
+
+/**
+ * Receiver-side peer list (PENDING + APPROVED), seeded from
+ * ``subscribe_events``'s ``initial_state.peers`` snapshot at
+ * subscribe time and mutated locally as events arrive
+ * (``remote_build_pair_request_received`` upserts;
+ * ``remote_build_pair_status_changed`` flips a row's status to
+ * approved or drops it on removed). Phase 4b-2 (#106).
+ *
+ * ``null`` until the initial-state snapshot lands so the
+ * Settings UI can distinguish "no controller" / "still
+ * loading" from "loaded with zero rows". The Settings dialog's
+ * Pairing requests subsection consumes this directly — no
+ * separate refetch path.
+ */
+export const buildServerPeersContext = createContext<PeerSummary[] | null>(
+  Symbol("esphome-build-server-peers")
+);
+
+/**
+ * Latest receiver-side pairing-window state, sourced from
+ * ``remote_build_pairing_window_changed`` events. Phase 4b-2
+ * (#106).
+ *
+ * ``null`` until the first event lands (or until the Settings
+ * dialog's Build server section runs its initial
+ * ``setRemoteBuildPairingWindow`` call); thereafter mirrors the
+ * receiver's view: ``open: true`` while at least one client is
+ * extending, ``open: false`` once everyone backs off and the
+ * idle timer expires. Settings UI renders an "open / closed"
+ * pill plus the remaining lifetime when open. The frontend
+ * uses this for read-only display; mutations (open / close /
+ * extend) go through the WS command directly so the wire
+ * acknowledgement is round-tripped before the local state
+ * updates.
+ */
+export const buildServerPairingWindowStateContext =
+  createContext<PairingWindowState | null>(
+    Symbol("esphome-build-server-pairing-window-state")
+  );

@@ -15,6 +15,8 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
   ErrorCode,
   type IdentityView,
+  type PairingWindowState,
+  type PeerSummary,
   type RemoteBuildPeer,
 } from "../api/types.js";
 import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
@@ -25,6 +27,8 @@ type LanguageChoice = SupportedLocale | "system";
 import {
   apiContext,
   buildServerIdentityRotationCounterContext,
+  buildServerPairingWindowStateContext,
+  buildServerPeersContext,
   localizeContext,
   remoteBuildEnabledContext,
   yamlDiffButtonContext,
@@ -187,8 +191,39 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _buildServerRotateInFlight = false;
 
+  // Phase 4b-2: receiver-side peer list (PENDING + APPROVED).
+  // App-shell maintains the canonical list — seeded from
+  // ``initial_state.peers`` at subscribe time, mutated locally on
+  // each ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` (upsert) /
+  // ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` (status flip / row
+  // drop) event. Settings dialog consumes via context; no
+  // separate fetch path.
+  @consume({ context: buildServerPeersContext, subscribe: true })
+  @state()
+  private _buildServerPeers: PeerSummary[] | null = null;
+
+  /**
+   * dashboard_id of the row whose Reject / Remove button was
+   * just clicked. Captured here so the shared
+   * ``<esphome-confirm-dialog>``'s ``@confirm`` handler knows
+   * which row to drop. ``null`` when no destructive action is
+   * pending.
+   */
+  @state()
+  private _pendingPeerActionDashboardId: string | null = null;
+
+  // Latest pairing-window state (open / closed / remaining
+  // lifetime). ``null`` until the first event lands or the
+  // section's ``setRemoteBuildPairingWindow`` opens it.
+  @consume({ context: buildServerPairingWindowStateContext, subscribe: true })
+  @state()
+  private _buildServerPairingWindowState: PairingWindowState | null = null;
+
   @query("#rotate-confirm")
   private _rotateConfirmDialog!: ESPHomeConfirmDialog;
+
+  @query("#peer-action-confirm")
+  private _peerActionConfirmDialog!: ESPHomeConfirmDialog;
 
   @state()
   private _section: Section = "appearance";
@@ -222,10 +257,30 @@ export class ESPHomeSettingsDialog extends LitElement {
     // ``<esphome-confirm-dialog>`` handles its own state, so
     // we only reset the flag here.
     this._buildServerRotateInFlight = false;
+    // ``_buildServerPeers`` is provided by app-shell via
+    // context; nothing to reset here. The pending-action key
+    // does need clearing — a stale value would mis-target the
+    // confirm dialog on the next visit.
+    this._pendingPeerActionDashboardId = null;
     this._dialog.open = true;
   }
 
   close() {
+    // If the user closed the dialog while the Build server
+    // section was open, the pairing window is still open
+    // server-side. Send the close-our-client tick so the
+    // window's refcount drops; the receiver will auto-close
+    // after the idle timeout regardless, but a prompt close is
+    // less surprising. Fire-and-forget — the WS may already be
+    // tearing down on the dashboard's own logout / navigation.
+    if (this._section === "build_server" && this._api !== undefined) {
+      void this._api
+        .setRemoteBuildPairingWindow({ open: false })
+        .catch(() => {
+          // Ignore: dialog is closing; if the call failed the
+          // receiver's idle timer cleans up.
+        });
+    }
     this._dialog.open = false;
   }
 
@@ -262,10 +317,30 @@ export class ESPHomeSettingsDialog extends LitElement {
         }
       }
     }
+    // Receiver-side peer list flows in via app-shell's context
+    // directly; no refetch hook needed here.
   }
 
   private _selectSection(section: Section) {
+    const previousSection = this._section;
     this._section = section;
+    // Leaving Build server: close the pairing window we opened
+    // on entry (refcounted server-side; a graceful close drops
+    // our client immediately rather than waiting on the 5min
+    // idle timer). Fire-and-forget — the receiver's idle
+    // cleanup is the safety net.
+    if (
+      previousSection === "build_server" &&
+      section !== "build_server" &&
+      this._api !== undefined
+    ) {
+      void this._api
+        .setRemoteBuildPairingWindow({ open: false })
+        .catch(() => {
+          // Ignore: section change shouldn't block on a window
+          // close failure; idle timer cleans up.
+        });
+    }
     // Each role lazy-loads only its own state — opening the
     // Build server section doesn't need the manual-host list,
     // and vice versa. Both sections may be visited in the
@@ -274,6 +349,29 @@ export class ESPHomeSettingsDialog extends LitElement {
     if (section === "build_server") {
       if (this._buildServerIdentity === null && !this._buildServerIdentityLoadFailed) {
         void this._loadBuildServerIdentity();
+      }
+      // Open the pairing window so ``intent="pair_request"``
+      // Noise frames are accepted while the admin is on this
+      // screen. Refcounted server-side; the receiver auto-closes
+      // 5min after the most recent open/extend tick from any
+      // client. The frontend doesn't periodically extend in this
+      // PR — typical accept/reject sessions are well under 5min;
+      // a follow-up can add activity-driven extends if user
+      // workflows need longer.
+      if (this._api !== undefined) {
+        void this._api
+          .setRemoteBuildPairingWindow({ open: true })
+          .catch(() => {
+            // Soft-toast on failure rather than crashing the
+            // section render — admin can re-enter the section to
+            // retry, or the receiver-side state becomes visible
+            // via the ``_buildServerPairingWindowState`` context
+            // either way.
+            this._toast(
+              "warning",
+              "settings.build_server_pairing_window_open_failed"
+            );
+          });
       }
     }
     if (section === "build_offload") {
@@ -346,6 +444,84 @@ export class ESPHomeSettingsDialog extends LitElement {
       console.warn("Could not load remote-build identity:", err);
       this._buildServerIdentityLoadFailed = true;
     }
+  }
+
+  /**
+   * Approve a PENDING peer.
+   *
+   * Idempotent on the backend (already-approved → no-op
+   * success); returning ``ErrorCode.NOT_FOUND`` if the row is
+   * gone (concurrent reject in another tab) is soft-toasted
+   * because the user-visible outcome — the row drops from the
+   * inbox — is the same as if the approve had succeeded against
+   * a no-longer-pending row. Subsequent
+   * ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` event re-syncs the
+   * list either way.
+   */
+  private async _onApprovePeer(dashboardId: string) {
+    if (this._api === undefined) {
+      return;
+    }
+    try {
+      await this._api.approveRemoteBuildPeer({ dashboard_id: dashboardId });
+    } catch (err) {
+      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+        this._toast(
+          "warning",
+          "settings.build_server_peer_approve_already_gone"
+        );
+      } else {
+        this._toast("error", "settings.build_server_peer_approve_failed");
+      }
+      // The list mutates automatically via the
+      // ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` event the backend
+      // fires on success; nothing to refetch on failure either
+      // — the visible row is still the pre-error pending row,
+      // and a follow-up event (concurrent admin in another tab)
+      // would update it through the same path.
+      return;
+    }
+    this._toast("success", "settings.build_server_peer_approve_success");
+  }
+
+  /**
+   * Open the shared confirm-dialog for a destructive peer action.
+   *
+   * Same dialog handles Reject (PENDING peer) and Remove
+   * (APPROVED peer) — both end in a ``removePeer`` call. The
+   * dialog wording is parameterised by the peer's status; the
+   * confirmed action lives in :meth:`_onPeerActionConfirm`,
+   * which pulls ``_pendingPeerActionDashboardId`` to know which
+   * row to drop.
+   */
+  private _onPeerActionRequest(dashboardId: string) {
+    this._pendingPeerActionDashboardId = dashboardId;
+    this._peerActionConfirmDialog?.open();
+  }
+
+  private async _onPeerActionConfirm() {
+    const dashboardId = this._pendingPeerActionDashboardId;
+    this._pendingPeerActionDashboardId = null;
+    if (this._api === undefined || dashboardId === null) {
+      return;
+    }
+    try {
+      await this._api.removeRemoteBuildPeer({ dashboard_id: dashboardId });
+    } catch (err) {
+      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+        // Row already gone (concurrent action in another tab).
+        // Soft-toast; the visible-state-after is the same as a
+        // successful remove, so the user doesn't need to retry.
+        this._toast("warning", "settings.build_server_peer_remove_already_gone");
+      } else {
+        this._toast("error", "settings.build_server_peer_remove_failed");
+      }
+      return;
+    }
+    // ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` with
+    // ``status="removed"`` from the backend will drop the row
+    // from the context-provided list automatically.
+    this._toast("success", "settings.build_server_peer_remove_success");
   }
 
   private _onRotateRequest() {
@@ -1172,6 +1348,204 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.build_server_card_desc")}
       </div>
       ${this._renderBuildServerCard()}
+      ${this._renderPairingRequests()}
+      ${this._renderApprovedPeers()}
+      <esphome-confirm-dialog
+        id="peer-action-confirm"
+        destructive
+        heading=${this._localize(
+          "settings.build_server_peer_remove_confirm_title"
+        )}
+        message=${this._localize(
+          "settings.build_server_peer_remove_confirm_body"
+        )}
+        confirm-label=${this._localize(
+          "settings.build_server_peer_remove_confirm_confirm"
+        )}
+        @confirm=${this._onPeerActionConfirm}
+      ></esphome-confirm-dialog>
+    `;
+  }
+
+  /**
+   * Pairing requests inbox.
+   *
+   * Renders one row per PENDING ``StoredPeer`` the receiver
+   * holds in its in-memory dict, plus a header carrying the
+   * pairing-window status pill (open / closed / countdown).
+   * Each row shows label + offloader's pin + peer-IP for sanity-
+   * check, with ``[Accept] [Reject]`` buttons. Reject routes
+   * through the shared confirm-dialog (destructive).
+   *
+   * The empty-state message changes depending on window state:
+   * "no requests yet" when the window is open (admin is waiting
+   * for an offloader to connect); "open the window to receive
+   * pair requests" when closed (something blocked
+   * ``setRemoteBuildPairingWindow({open:true})`` on section
+   * enter).
+   */
+  private _renderPairingRequests() {
+    const peers = this._buildServerPeers ?? [];
+    const pending = peers.filter((p) => p.status === "pending");
+    return html`
+      <div class="section-heading">
+        ${this._localize("settings.build_server_pairing_requests_heading")}
+        ${this._renderPairingWindowStatus()}
+      </div>
+      <div class="section-intro">
+        ${this._localize("settings.build_server_pairing_requests_desc")}
+      </div>
+      ${pending.length === 0
+        ? html`
+            <div class="row" role="status">
+              <div class="row-label">
+                <span class="row-desc">
+                  ${this._localize(
+                    "settings.build_server_pairing_requests_empty"
+                  )}
+                </span>
+              </div>
+            </div>
+          `
+        : pending.map((p) => this._renderPendingPeerRow(p))}
+    `;
+  }
+
+  /**
+   * Status pill next to the Pairing requests heading.
+   *
+   * Mirrors what the backend's
+   * ``remote_build_pairing_window_changed`` event reported. The
+   * pill is rendered as a sibling to the heading text so the
+   * user sees "Pairing requests · Open · 4:32 left" at a
+   * glance. Hidden when state is null (settings dialog hasn't
+   * opened the section yet, or the section has just been
+   * entered and the first event hasn't landed).
+   */
+  private _renderPairingWindowStatus() {
+    const state = this._buildServerPairingWindowState;
+    if (state === null) return nothing;
+    if (!state.open) {
+      return html`
+        <span class="pairing-window-pill pairing-window-closed">
+          ${this._localize("settings.build_server_pairing_window_closed")}
+        </span>
+      `;
+    }
+    return html`
+      <span class="pairing-window-pill pairing-window-open">
+        ${this._localize("settings.build_server_pairing_window_open")}
+      </span>
+    `;
+  }
+
+  /**
+   * Approved peers list: one row per ``status="approved"``
+   * ``StoredPeer``. Each row carries the peer's label,
+   * dashboard_id, paired-at relative time, and a Remove
+   * button that routes through the same confirm-dialog as
+   * Reject (both end in a ``removeRemoteBuildPeer`` call).
+   */
+  private _renderApprovedPeers() {
+    const peers = this._buildServerPeers ?? [];
+    const approved = peers.filter((p) => p.status === "approved");
+    return html`
+      <div class="section-heading">
+        ${this._localize("settings.build_server_paired_senders_heading")}
+      </div>
+      <div class="section-intro">
+        ${this._localize("settings.build_server_paired_senders_desc")}
+      </div>
+      ${this._buildServerPeers === null
+        ? html`
+            <div class="row" role="status">
+              <div class="row-label">
+                <span class="row-desc">
+                  ${this._localize(
+                    "settings.build_server_paired_senders_loading"
+                  )}
+                </span>
+              </div>
+            </div>
+          `
+        : approved.length === 0
+          ? html`
+              <div class="row" role="status">
+                <div class="row-label">
+                  <span class="row-desc">
+                    ${this._localize(
+                      "settings.build_server_paired_senders_empty"
+                    )}
+                  </span>
+                </div>
+              </div>
+            `
+          : approved.map((p) => this._renderApprovedPeerRow(p))}
+    `;
+  }
+
+  private _renderPendingPeerRow(peer: PeerSummary) {
+    const formattedPin = formatPinSha256(peer.pin_sha256);
+    return html`
+      <div class="row peer-row peer-row-pending">
+        <div class="row-label">
+          <span class="row-title">${peer.label}</span>
+          <span class="row-desc">
+            <code class="peer-dashboard-id">${peer.dashboard_id}</code>
+          </span>
+          <span class="row-desc">
+            <code class="peer-pin">${formattedPin}</code>
+          </span>
+        </div>
+        <div class="peer-actions">
+          <button
+            type="button"
+            class="peer-approve"
+            aria-label=${this._localize(
+              "settings.build_server_peer_approve_aria",
+              { label: peer.label }
+            )}
+            @click=${() => this._onApprovePeer(peer.dashboard_id)}
+          >
+            ${this._localize("settings.build_server_peer_approve")}
+          </button>
+          <button
+            type="button"
+            class="peer-reject"
+            aria-label=${this._localize(
+              "settings.build_server_peer_reject_aria",
+              { label: peer.label }
+            )}
+            @click=${() => this._onPeerActionRequest(peer.dashboard_id)}
+          >
+            ${this._localize("settings.build_server_peer_reject")}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private _renderApprovedPeerRow(peer: PeerSummary) {
+    return html`
+      <div class="row peer-row peer-row-approved">
+        <div class="row-label">
+          <span class="row-title">${peer.label}</span>
+          <span class="row-desc">
+            <code class="peer-dashboard-id">${peer.dashboard_id}</code>
+          </span>
+        </div>
+        <button
+          type="button"
+          class="peer-remove"
+          aria-label=${this._localize(
+            "settings.build_server_peer_remove_aria",
+            { label: peer.label }
+          )}
+          @click=${() => this._onPeerActionRequest(peer.dashboard_id)}
+        >
+          ${this._localize("settings.build_server_peer_remove")}
+        </button>
+      </div>
     `;
   }
 
