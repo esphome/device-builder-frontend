@@ -55,6 +55,22 @@ export enum ErrorCode {
   INTERNAL_ERROR = "internal_error",
   NOT_AUTHENTICATED = "not_authenticated",
   RATE_LIMITED = "rate_limited",
+  /** Receiver reachable, but the operation can't proceed in the
+   *  current state — pin mismatch on ``request_pair`` (TOCTOU
+   *  between preview and confirm), receiver-side ``REJECTED``,
+   *  etc. Distinct from ``UNAVAILABLE`` (transport failure). */
+  PRECONDITION_FAILED = "precondition_failed",
+  /** Transport / handshake / decode failure on a peer-link
+   *  round-trip. The receiver was unreachable or the Noise
+   *  handshake didn't complete cleanly — distinct from
+   *  ``PRECONDITION_FAILED`` where the receiver explicitly
+   *  rejected the operation. */
+  UNAVAILABLE = "unavailable",
+  /** Receiver-side pairing window is closed.
+   *  ``request_pair`` raises this when the receiver admin
+   *  hasn't opened the Pairing requests screen — UI should
+   *  prompt the user to coordinate with the receiver admin. */
+  NO_PAIRING_WINDOW = "no_pairing_window",
 }
 
 // ─── Paged Responses ─────────────────────────────────────────

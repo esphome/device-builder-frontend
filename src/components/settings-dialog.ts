@@ -41,6 +41,8 @@ import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import "./pair-build-server-dialog.js";
+import type { ESPHomePairBuildServerDialog } from "./pair-build-server-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -229,6 +231,9 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   @query("#peer-action-confirm")
   private _peerActionConfirmDialog!: ESPHomeConfirmDialog;
+
+  @query("esphome-pair-build-server-dialog")
+  private _pairBuildServerDialog!: ESPHomePairBuildServerDialog;
 
   @state()
   private _section: Section = "appearance";
@@ -527,8 +532,12 @@ export class ESPHomeSettingsDialog extends LitElement {
    * keeps each call site to a single line and a single point
    * of change for the styling contract.
    */
-  private _toast(level: "success" | "warning" | "error", key: string) {
-    toast[level](this._localize(key), { richColors: true });
+  private _toast(
+    level: "success" | "warning" | "error",
+    key: string,
+    values?: Record<string, string | number>,
+  ) {
+    toast[level](this._localize(key, values), { richColors: true });
   }
 
   private async _onRotateConfirm() {
@@ -896,6 +905,28 @@ export class ESPHomeSettingsDialog extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--wa-space-xs);
+      }
+
+      .pair-build-server-row {
+        align-items: center;
+        gap: var(--wa-space-s);
+      }
+
+      .btn-pair-build-server {
+        height: 36px;
+        padding: 0 var(--wa-space-m);
+        border: none;
+        border-radius: var(--wa-border-radius-s);
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+        font: inherit;
+        font-weight: var(--wa-font-weight-semibold);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .btn-pair-build-server:hover {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
       }
 
       .peer-remove {
@@ -1517,8 +1548,50 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.remote_build_known_dashboards")}
       </div>
       ${this._renderRemoteBuildPeers()}
+
+      <div class="section-heading">
+        ${this._localize("settings.pair_build_server_section_heading")}
+      </div>
+      <div class="section-intro">
+        ${this._localize("settings.pair_build_server_section_desc")}
+      </div>
+      <div class="row pair-build-server-row">
+        <div class="row-label">
+          <span class="row-desc">
+            ${this._localize("settings.pair_build_server_row_helper")}
+          </span>
+        </div>
+        <button
+          class="btn-pair-build-server"
+          type="button"
+          @click=${this._onPairBuildServerClick}
+        >
+          ${this._localize("settings.pair_build_server_open_action")}
+        </button>
+      </div>
+      <esphome-pair-build-server-dialog
+        @pair-request-sent=${this._onPairRequestSent}
+      ></esphome-pair-build-server-dialog>
     `;
   }
+
+  private _onPairBuildServerClick = (): void => {
+    this._pairBuildServerDialog?.open();
+  };
+
+  private _onPairRequestSent = (
+    e: CustomEvent<{ hostname: string; port: number }>,
+  ): void => {
+    // Surface a confirmation toast at the dialog-host level.
+    // The dialog already shows the "open the receiver's
+    // pairing requests page" copy on its sent step; this toast
+    // is the breadcrumb the user sees after they close the
+    // dialog so the action they took stays visible.
+    this._toast("success", "settings.pair_build_server_sent_toast", {
+      hostname: e.detail.hostname,
+      port: String(e.detail.port),
+    });
+  };
 
   private _renderBuildServerCard() {
     if (this._buildServerIdentityLoadFailed) {
