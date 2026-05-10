@@ -1070,6 +1070,40 @@ export class ESPHomeSettingsDialog extends LitElement {
         letter-spacing: 0.05em;
       }
 
+      /* Same shape as .pairing-status-pill, separate class so
+         the receiver-side Paired-senders connection pill can
+         track the offloader-side pairing-status pill stylistic
+         changes without one accidentally inheriting the
+         other's colour palette. */
+      .peer-connection-pill {
+        display: inline-block;
+        padding: 1px 6px;
+        margin-left: var(--wa-space-xs);
+        border-radius: 4px;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+
+      .peer-connection-connected {
+        background: color-mix(
+          in srgb,
+          var(--esphome-success, #16a34a),
+          transparent 80%
+        );
+        color: var(--esphome-success, #16a34a);
+      }
+
+      .peer-connection-disconnected {
+        background: color-mix(
+          in srgb,
+          var(--wa-color-neutral-500, #6b7280),
+          transparent 80%
+        );
+        color: var(--wa-color-neutral-500, #6b7280);
+      }
+
       .pairing-status-pending {
         background: color-mix(
           in srgb,
@@ -1662,10 +1696,27 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderApprovedPeerRow(peer: PeerSummary) {
+    // Connection-state pill renders next to the label so the
+    // operator sees at a glance whether the paired sender
+    // currently has an active 5a-2 peer-link session. The
+    // value is fed by ``RECEIVER_PEER_LINK_SESSION_OPENED`` /
+    // ``_CLOSED`` events on app-shell, with the snapshot
+    // (``initial_state.peers``) seeding the initial paint.
+    const connectedClass = peer.connected
+      ? "peer-connection-connected"
+      : "peer-connection-disconnected";
+    const connectedLabel = peer.connected
+      ? this._localize("settings.build_server_peer_connected")
+      : this._localize("settings.build_server_peer_disconnected");
     return html`
       <div class="row peer-row peer-row-approved">
         <div class="row-label">
-          <span class="row-title">${peer.label}</span>
+          <span class="row-title">
+            ${peer.label}
+            <span class=${`peer-connection-pill ${connectedClass}`}>
+              ${connectedLabel}
+            </span>
+          </span>
           <span class="row-desc">
             <code class="peer-dashboard-id">${peer.dashboard_id}</code>
           </span>

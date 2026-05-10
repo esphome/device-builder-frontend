@@ -992,6 +992,16 @@ export enum DeviceEventType {
   // fires from the offloader's pair-status listener task and from
   // ``remote_build/unpair``.
   OFFLOADER_PAIR_STATUS_CHANGED = "offloader_pair_status_changed",
+  // Receiver-side peer-link session lifecycle. Fired by the
+  // receiver's ``register_peer_link_session`` /
+  // ``unregister_peer_link_session`` hooks when a 5a-2 offloader
+  // client connects / disconnects. Drives the
+  // ``PeerSummary.connected`` indicator on the receiver-side
+  // Paired senders list. Payload is just the ``dashboard_id``;
+  // the matching row is found by lookup against
+  // ``_buildServerPeers``.
+  RECEIVER_PEER_LINK_SESSION_OPENED = "receiver_peer_link_session_opened",
+  RECEIVER_PEER_LINK_SESSION_CLOSED = "receiver_peer_link_session_closed",
   // mDNS-discovered peer dashboards. Replaces the deleted
   // ``remote_build/list_hosts`` WS command — the controller fires
   // these events as its mDNS browser callback resolves /
@@ -1280,6 +1290,28 @@ export interface PeerSummary {
   paired_at: number;
   status: PeerStatus;
   peer_ip: string;
+  /**
+   * Whether the receiver currently has an active 5a-2 peer-link
+   * session for this peer (``dashboard_id`` membership in the
+   * receiver's ``_peer_link_sessions`` registry). Defaults
+   * ``false`` for legacy backends that pre-date the field —
+   * a missing field deserialises as ``false`` so the renderer
+   * just shows "offline" rather than crashing.
+   *
+   * Live updates flow through
+   * ``RECEIVER_PEER_LINK_SESSION_OPENED`` /
+   * ``RECEIVER_PEER_LINK_SESSION_CLOSED`` bus events on the
+   * ``subscribe_events`` stream; the snapshot
+   * (``initial_state.peers``) carries the current value at
+   * subscribe time so a reconnecting tab paints the right
+   * state without waiting for the next event.
+   *
+   * Always ``false`` for PENDING rows: peer-link is gated on
+   * APPROVED status server-side via ``lookup_peer_for_session``,
+   * so a PENDING peer can never legitimately have a registered
+   * session.
+   */
+  connected: boolean;
 }
 
 /**
@@ -1431,6 +1463,22 @@ export interface OffloaderPairStatusChangedEventData {
   receiver_hostname: string;
   receiver_port: number;
   status: "approved" | "removed";
+}
+
+/**
+ * Data payload for ``receiver_peer_link_session_opened`` and
+ * ``receiver_peer_link_session_closed``.
+ *
+ * Fires on the receiver-side bus whenever an APPROVED peer's
+ * 5a-2 ``PeerLinkClient`` connects or disconnects. Drives the
+ * ``PeerSummary.connected`` indicator: app-shell flips the
+ * matching row's ``connected`` flag in the local
+ * ``_buildServerPeers`` list. Both events share the same shape
+ * (just the ``dashboard_id``); the discriminator is the event
+ * type itself.
+ */
+export interface ReceiverPeerLinkSessionEventData {
+  dashboard_id: string;
 }
 
 /**

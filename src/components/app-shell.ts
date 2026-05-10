@@ -45,6 +45,7 @@ import type {
   PairingSummary,
   PairingWindowState,
   PeerSummary,
+  ReceiverPeerLinkSessionEventData,
   RemoteBuildHostAddedEventData,
   RemoteBuildHostRemovedEventData,
   RemoteBuildPairingWindowChangedEventData,
@@ -1081,6 +1082,11 @@ export class ESPHomeApp extends LitElement {
           paired_at: evt.paired_at,
           status: "pending",
           peer_ip: evt.peer_ip,
+          // PENDING peers are always offline; peer-link is gated
+          // on APPROVED status server-side via
+          // ``lookup_peer_for_session``, so the receiver won't
+          // register a session for this row until admin accepts.
+          connected: false,
         };
         const current = this._buildServerPeers ?? [];
         const idx = current.findIndex(
@@ -1115,6 +1121,28 @@ export class ESPHomeApp extends LitElement {
               : p
           );
         }
+        break;
+      }
+      case DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED:
+      case DeviceEventType.RECEIVER_PEER_LINK_SESSION_CLOSED: {
+        // Flip ``connected`` on the matching APPROVED row.
+        // Both events share the same payload shape; the
+        // discriminator is the event type itself.
+        // ``_buildServerPeers`` may be ``null`` (snapshot not
+        // yet seeded) or missing the row entirely (event raced
+        // ahead of the snapshot, or fired against a peer the
+        // backend just dropped). In both cases the next
+        // ``initial_state`` reseed carries the right state, so
+        // skip rather than synthesise a partial row.
+        if (this._buildServerPeers === null) {
+          break;
+        }
+        const evt = data as ReceiverPeerLinkSessionEventData;
+        const connected =
+          event === DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED;
+        this._buildServerPeers = this._buildServerPeers.map((p) =>
+          p.dashboard_id === evt.dashboard_id ? { ...p, connected } : p
+        );
         break;
       }
       case DeviceEventType.REMOTE_BUILD_PAIRING_WINDOW_CHANGED: {

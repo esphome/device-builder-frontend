@@ -798,6 +798,8 @@
     "build_server_peer_reject_success": "Koppelingsverzoek geweigerd.",
     "build_server_peer_reject_already_gone": "Dat koppelingsverzoek staat niet meer in de wacht.",
     "build_server_peer_reject_failed": "Kan het koppelingsverzoek niet weigeren.",
+    "build_server_peer_connected": "Verbonden",
+    "build_server_peer_disconnected": "Niet verbonden",
     "build_server_peer_remove": "Verwijderen",
     "build_server_peer_remove_aria": "Gekoppelde afzender {label} verwijderen",
     "build_server_peer_remove_confirm_title": "Deze afzender verwijderen?",
