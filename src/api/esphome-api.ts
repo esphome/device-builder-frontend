@@ -1352,57 +1352,17 @@ export class ESPHomeAPI {
   }
 
   /**
-   * List peer dashboards known to this receiver.
-   *
-   * Merges mDNS-discovered peers (placed first, ``source=mdns``)
-   * with user-supplied manual hosts (``source=manual``). Manual
-   * rows have empty version / address fields until phase 4
-   * attempts the connection. Empty array when no peers have been
-   * seen yet and no manual hosts have been added.
-   */
-  async listRemoteBuildHosts(): Promise<RemoteBuildPeer[]> {
-    return this.sendCommand<RemoteBuildPeer[]>("remote_build/list_hosts");
-  }
-
-  /**
-   * Add a user-supplied peer (cross-subnet / non-mDNS LANs).
-   *
-   * The backend validates ``hostname`` (non-empty, lowercased per
-   * RFC 1035 §2.3.3) and ``port`` (1-65535). A bad hostname or
-   * bad port raises ``ErrorCode.INVALID_ARGS``; an attempt to add
-   * a ``(hostname, port)`` pair that's already registered raises
-   * ``ErrorCode.ALREADY_EXISTS`` so the UI can surface a
-   * "this dashboard is already in your list" message distinct
-   * from a generic validation failure. Returns the post-write
-   * settings so the caller can re-render without a separate
-   * ``get_settings`` round-trip.
-   */
-  async addRemoteBuildManualHost(args: {
-    hostname: string;
-    port: number;
-  }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/add_manual_host",
-      args
-    );
-  }
-
-  /**
-   * Remove a previously-added manual peer.
-   *
-   * Hostname is normalised to lowercase server-side, so a
-   * case-different request still finds the entry. Raises
-   * ``ErrorCode.NOT_FOUND`` when the entry isn't registered.
-   */
-  async removeRemoteBuildManualHost(args: {
-    hostname: string;
-    port: number;
-  }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/remove_manual_host",
-      args
-    );
-  }
+  // Note: there's no ``listRemoteBuildHosts`` /
+  // ``addRemoteBuildManualHost`` / ``removeRemoteBuildManualHost``
+  // wrapper. mDNS-discovered hosts ship through
+  // ``subscribe_events``'s ``initial_state.hosts`` field at
+  // subscribe time + the two live events
+  // (``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``)
+  // drive every mutation. Manual-host entries were dropped
+  // entirely in lockstep with the backend rip-out — the
+  // offloader-side pair flow accepts a typed hostname / port
+  // directly via ``request_pair`` without an intermediate
+  // "save manual host" step.
 
   // ─── Remote build: receiver-side pairing inbox (phase 4a-r1) ──
 

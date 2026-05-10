@@ -19,4 +19,5 @@ export {
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
+  buildOffloadDiscoveredHostsContext,
 } from "./contexts.js";

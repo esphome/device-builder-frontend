@@ -26,6 +26,7 @@ import { readStoredLocale } from "../common/localize.js";
 type LanguageChoice = SupportedLocale | "system";
 import {
   apiContext,
+  buildOffloadDiscoveredHostsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
@@ -153,23 +154,21 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: apiContext })
   private _api?: ESPHomeAPI;
 
-  // Phase 2b: peer-list state for the Send builds section.
-  // Lazy-loaded the first time the user opens the section
-  // (via ``_selectSection`` / ``_loadBuildOffloadPeers``); refreshed
-  // after every add / remove. Reset to ``null`` on dialog open
-  // so a fresh visit re-fetches. ``null`` means "not yet loaded";
-  // an empty array means "loaded and there are zero peers".
+  // mDNS-discovered offload-target dashboards. App-shell
+  // maintains the canonical map (seeded from
+  // ``initial_state.hosts`` + mutated on
+  // ``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``
+  // events); the Send builds section consumes it directly. The
+  // shape is keyed on the mDNS service-instance ``name`` so
+  // re-announces / TXT refreshes overwrite cleanly. Render order
+  // is determined at render time (insertion order from the map);
+  // a future "alphabetical" toggle would sort there. ``null``
+  // until the snapshot lands so the UI can distinguish "no
+  // controller" from "loaded with zero rows".
+  @consume({ context: buildOffloadDiscoveredHostsContext, subscribe: true })
   @state()
-  private _buildOffloadPeers: RemoteBuildPeer[] | null = null;
-
-  @state()
-  private _buildOffloadHostInput = "";
-
-  @state()
-  private _buildOffloadPortInput = "6052";
-
-  @state()
-  private _buildOffloadAddInFlight = false;
+  private _buildOffloadDiscoveredHosts: Record<string, RemoteBuildPeer> | null =
+    null;
 
   // Phase 3c2b: receiver identity (cert pin + listener-bound + versions).
   // Lazy-loaded the first time the user opens the section,
@@ -247,13 +246,13 @@ export class ESPHomeSettingsDialog extends LitElement {
     this._theme = localStorage.getItem("esphome-theme") ?? "system";
     this._language = readStoredLocale() ?? "system";
     this._section = "appearance";
-    // Drop any stale peer list / identity from a previous open
-    // so the user sees the loading state on each fresh dialog
-    // visit. Identity in particular can change between opens
-    // (operator rotated the cert from another tab); the
-    // rotate flow refreshes locally, so a stale value here
-    // would look correct without actually being live.
-    this._buildOffloadPeers = null;
+    // Drop any stale identity from a previous open so the user
+    // sees the loading state on each fresh dialog visit.
+    // Identity can change between opens (operator rotated the
+    // cert from another tab); the rotate flow refreshes
+    // locally, so a stale value here would look correct without
+    // actually being live. Discovered hosts come from app-shell
+    // via context; nothing to reset.
     this._buildServerIdentity = null;
     this._buildServerIdentityLoadFailed = false;
     // Reset rotate-in-flight too — the user could have closed
@@ -347,11 +346,13 @@ export class ESPHomeSettingsDialog extends LitElement {
           // close failure; idle timer cleans up.
         });
     }
-    // Each role lazy-loads only its own state — opening the
-    // Build server section doesn't need the manual-host list,
-    // and vice versa. Both sections may be visited in the
-    // same dialog open; their state lives independently and
-    // doesn't refetch unless the dialog reopens.
+    // Each role lazy-loads only the receiver-identity card on
+    // section enter; discovered hosts and receiver-side peers
+    // are pushed via context (seeded from
+    // ``subscribe_events`` initial-state, mutated on events) so
+    // there's no per-section refetch. Both sections may be
+    // visited in the same dialog open without re-hitting the
+    // backend.
     if (section === "build_server") {
       if (this._buildServerIdentity === null && !this._buildServerIdentityLoadFailed) {
         void this._loadBuildServerIdentity();
@@ -380,47 +381,11 @@ export class ESPHomeSettingsDialog extends LitElement {
           });
       }
     }
-    if (section === "build_offload") {
-      if (this._buildOffloadPeers === null) {
-        void (async () => {
-          const ok = await this._loadBuildOffloadPeers();
-          if (!ok && this._buildOffloadPeers === null) {
-            // First-load fallback only — a fresh-open with no prior
-            // list still needs *something* renderable. The mutation
-            // path below leaves the prior list intact instead.
-            this._buildOffloadPeers = [];
-          }
-        })();
-      }
-    }
-  }
-
-  /**
-   * Fetch the live peer list and update ``_buildOffloadPeers``.
-   *
-   * Returns ``true`` when the call landed cleanly so callers can
-   * distinguish "list is now fresh" from "couldn't refresh." On
-   * failure the previous list value is left in place — clobbering
-   * to ``[]`` after a successful add / remove was a real bug
-   * (mutation succeeded server-side but the UI showed an empty
-   * list, looking like the add had failed). The first-open caller
-   * in ``_selectSection`` does its own ``[]`` fallback for the
-   * "no prior list to preserve" case.
-   *
-   * mDNS rows are listed first by the backend; manual rows follow
-   * with ``source="manual"``.
-   */
-  private async _loadBuildOffloadPeers(): Promise<boolean> {
-    if (this._api === undefined) {
-      return false;
-    }
-    try {
-      this._buildOffloadPeers = await this._api.listRemoteBuildHosts();
-      return true;
-    } catch (err) {
-      console.warn("Could not load remote-build hosts:", err);
-      return false;
-    }
+    // Send-builds section consumes ``_buildOffloadDiscoveredHosts``
+    // directly via context — app-shell seeded it from
+    // ``initial_state.hosts`` on subscribe and mutates it on
+    // ``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``.
+    // Nothing to fetch on section enter.
   }
 
   /**
@@ -561,14 +526,6 @@ export class ESPHomeSettingsDialog extends LitElement {
    * the rotate / copy / mismatch flows; centralising it here
    * keeps each call site to a single line and a single point
    * of change for the styling contract.
-   *
-   * TODO: pre-3c2 callers in this file (the manual-host
-   * mutation paths, the master-toggle revert) still spell out
-   * the long form inline — they should be migrated to this
-   * helper as a separate cleanup PR. Doing it here would
-   * balloon the 3c2b diff for no behavior change. Risk if not
-   * migrated: the ``richColors: true`` styling contract
-   * silently drifts between call sites over time.
    */
   private _toast(level: "success" | "warning" | "error", key: string) {
     toast[level](this._localize(key), { richColors: true });
@@ -941,26 +898,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         gap: var(--wa-space-xs);
       }
 
-      .peer-badge {
-        display: inline-block;
-        padding: 1px 6px;
-        border-radius: 4px;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-semibold);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      .peer-badge--mdns {
-        background: var(--wa-color-surface-border);
-        color: var(--wa-color-text-quiet);
-      }
-
-      .peer-badge--manual {
-        background: var(--esphome-primary-soft, var(--wa-color-surface-border));
-        color: var(--esphome-primary);
-      }
-
       .peer-remove {
         display: inline-flex;
         align-items: center;
@@ -979,51 +916,6 @@ export class ESPHomeSettingsDialog extends LitElement {
       .peer-remove:focus-visible {
         background: var(--wa-color-surface-border);
         color: var(--wa-color-text);
-      }
-
-      .manual-host-form {
-        display: flex;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-xs) var(--wa-space-m) var(--wa-space-m);
-        align-items: center;
-      }
-
-      .manual-host-input {
-        flex: 1 1 auto;
-        min-width: 0;
-        height: 36px;
-        padding: 0 var(--wa-space-s);
-        border: 1px solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-s);
-        background: var(--wa-color-surface-default);
-        color: var(--wa-color-text);
-        font: inherit;
-      }
-
-      .manual-host-port {
-        flex: 0 0 100px;
-      }
-
-      .manual-host-input:focus {
-        outline: 2px solid var(--esphome-primary);
-        outline-offset: -1px;
-      }
-
-      .manual-host-add {
-        height: 36px;
-        padding: 0 var(--wa-space-m);
-        border: none;
-        border-radius: var(--wa-border-radius-s);
-        background: var(--esphome-primary);
-        color: white;
-        font-weight: var(--wa-font-weight-semibold);
-        cursor: pointer;
-        flex-shrink: 0;
-      }
-
-      .manual-host-add:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
       }
 
       .build-server-card {
@@ -1606,12 +1498,14 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   /**
    * Offload role: this dashboard sending its compiles to
-   * another dashboard on the network. Manual host entry +
-   * discovered-peers list. Pairing + peer-link + scheduler
-   * land in phases 4 / 5 / 7; until then the section is
-   * scaffolding and the in-section banner says so. The
-   * manual-host form's existing inline description carries
-   * the "why" — no separate section intro needed.
+   * another dashboard on the network. Renders the mDNS-
+   * discovered build-server dashboards. Cross-subnet / non-
+   * mDNS receivers are reached by typing the hostname / port
+   * into the (forthcoming 4b-3) pair dialog directly — no
+   * intermediate "save manual host" surface here. Pairing +
+   * peer-link + scheduler land in phases 4 / 5 / 7; until then
+   * the section is scaffolding and the in-section banner says
+   * so.
    */
   private _renderBuildOffload() {
     return html`
@@ -1623,58 +1517,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.remote_build_known_dashboards")}
       </div>
       ${this._renderRemoteBuildPeers()}
-
-      <div class="section-heading">
-        ${this._localize("settings.remote_build_add_manual")}
-      </div>
-      <div class="row">
-        <div class="row-label">
-          <span class="row-desc">
-            ${this._localize("settings.remote_build_add_manual_desc")}
-          </span>
-        </div>
-      </div>
-      <form class="manual-host-form" @submit=${this._onAddManualHost}>
-        <input
-          class="manual-host-input"
-          type="text"
-          inputmode="url"
-          autocomplete="off"
-          spellcheck="false"
-          required
-          placeholder=${this._localize(
-            "settings.remote_build_add_manual_host_placeholder"
-          )}
-          aria-label=${this._localize(
-            "settings.remote_build_add_manual_host_label"
-          )}
-          .value=${this._buildOffloadHostInput}
-          @input=${(e: InputEvent) => {
-            this._buildOffloadHostInput = (e.target as HTMLInputElement).value;
-          }}
-        />
-        <input
-          class="manual-host-input manual-host-port"
-          type="number"
-          min="1"
-          max="65535"
-          required
-          aria-label=${this._localize(
-            "settings.remote_build_add_manual_port_label"
-          )}
-          .value=${this._buildOffloadPortInput}
-          @input=${(e: InputEvent) => {
-            this._buildOffloadPortInput = (e.target as HTMLInputElement).value;
-          }}
-        />
-        <button
-          class="manual-host-add"
-          type="submit"
-          ?disabled=${this._buildOffloadAddInFlight}
-        >
-          ${this._localize("settings.remote_build_add_manual_submit")}
-        </button>
-      </form>
     `;
   }
 
@@ -1769,7 +1611,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderRemoteBuildPeers() {
-    if (this._buildOffloadPeers === null) {
+    if (this._buildOffloadDiscoveredHosts === null) {
       return html`
         <div class="row" role="status">
           <div class="row-label">
@@ -1780,7 +1622,8 @@ export class ESPHomeSettingsDialog extends LitElement {
         </div>
       `;
     }
-    if (this._buildOffloadPeers.length === 0) {
+    const peers = Object.values(this._buildOffloadDiscoveredHosts);
+    if (peers.length === 0) {
       return html`
         <div class="row" role="status">
           <div class="row-label">
@@ -1791,11 +1634,10 @@ export class ESPHomeSettingsDialog extends LitElement {
         </div>
       `;
     }
-    return this._buildOffloadPeers.map((peer) => this._renderPeerRow(peer));
+    return peers.map((peer) => this._renderPeerRow(peer));
   }
 
   private _renderPeerRow(peer: RemoteBuildPeer) {
-    const isManual = peer.source === "manual";
     const versionLine = peer.esphome_version
       ? this._localize("settings.remote_build_peer_version_line", {
           esphome: peer.esphome_version,
@@ -1804,34 +1646,11 @@ export class ESPHomeSettingsDialog extends LitElement {
     return html`
       <div class="row peer-row">
         <div class="row-label">
-          <span class="row-title">
-            ${peer.name}
-            <span class="peer-badge peer-badge--${peer.source}">
-              ${this._localize(
-                isManual
-                  ? "settings.remote_build_peer_source_manual"
-                  : "settings.remote_build_peer_source_mdns"
-              )}
-            </span>
-          </span>
+          <span class="row-title">${peer.name}</span>
           <span class="row-desc">
             ${peer.hostname}:${peer.port} ${versionLine}
           </span>
         </div>
-        ${isManual
-          ? html`
-              <button
-                class="peer-remove"
-                aria-label=${this._localize(
-                  "settings.remote_build_peer_remove",
-                  { hostname: peer.hostname }
-                )}
-                @click=${() => this._onRemoveManualHost(peer)}
-              >
-                <wa-icon library="mdi" name="close"></wa-icon>
-              </button>
-            `
-          : nothing}
       </div>
     `;
   }
@@ -1880,96 +1699,6 @@ export class ESPHomeSettingsDialog extends LitElement {
     );
   }
 
-  /**
-   * Run an add/remove mutation against the API and refresh the
-   * peer list on success.
-   *
-   * Returns ``true`` when the *mutation* landed cleanly, which is
-   * the only signal callers chain "clear the input" / "close the
-   * row" UI steps off — independent of whether the post-mutation
-   * peer-list refresh succeeded. If the mutation succeeds but the
-   * refresh fails, the prior list stays visible (not clobbered to
-   * ``[]``) and a separate "saved but couldn't refresh" toast goes
-   * up so the user knows the list might be stale. Treating a
-   * refresh failure as a mutation failure used to mean a
-   * successful add looked like it had failed (input cleared, list
-   * empty); the split here is what fixes that.
-   *
-   * On mutation failure, surfaces the toast message returned by
-   * ``classifyError`` and returns ``false``. No-op when the API
-   * context isn't wired (returns ``false``).
-   */
-  private async _runManualHostMutation(
-    call: (api: ESPHomeAPI) => Promise<unknown>,
-    classifyError: (err: unknown) => string,
-  ): Promise<boolean> {
-    if (this._api === undefined) {
-      return false;
-    }
-    try {
-      await call(this._api);
-    } catch (err) {
-      toast.error(this._localize(classifyError(err)), { richColors: true });
-      return false;
-    }
-    const refreshed = await this._loadBuildOffloadPeers();
-    if (!refreshed) {
-      toast.warning(
-        this._localize("settings.remote_build_refresh_failed"),
-        { richColors: true },
-      );
-    }
-    return true;
-  }
-
-  private async _onAddManualHost(e: Event) {
-    e.preventDefault();
-    if (this._buildOffloadAddInFlight) {
-      return;
-    }
-    const hostname = this._buildOffloadHostInput.trim();
-    const port = Number.parseInt(this._buildOffloadPortInput, 10);
-    if (!hostname || !Number.isFinite(port) || port < 1 || port > 65535) {
-      // Browser-side guard against the "user clicks Add with bad
-      // input before the server validates" path. Server-side
-      // validation in ``add_manual_host`` is still authoritative.
-      toast.error(
-        this._localize("settings.remote_build_add_manual_invalid"),
-        { richColors: true }
-      );
-      return;
-    }
-    this._buildOffloadAddInFlight = true;
-    const ok = await this._runManualHostMutation(
-      (api) => api.addRemoteBuildManualHost({ hostname, port }),
-      (err) => {
-        // The backend raises ``ALREADY_EXISTS`` for duplicates so
-        // we can surface that distinct from a generic failure
-        // ("this peer is already in your list" rather than a
-        // vague "couldn't save") without string-matching the
-        // details field.
-        if (err instanceof APIError && err.errorCode === ErrorCode.ALREADY_EXISTS) {
-          return "settings.remote_build_add_manual_duplicate";
-        }
-        return "settings.remote_build_add_manual_failed";
-      }
-    );
-    if (ok) {
-      this._buildOffloadHostInput = "";
-    }
-    this._buildOffloadAddInFlight = false;
-  }
-
-  private _onRemoveManualHost(peer: RemoteBuildPeer) {
-    return this._runManualHostMutation(
-      (api) =>
-        api.removeRemoteBuildManualHost({
-          hostname: peer.hostname,
-          port: peer.port,
-        }),
-      () => "settings.remote_build_remove_manual_failed"
-    );
-  }
 }
 
 declare global {

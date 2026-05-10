@@ -976,6 +976,14 @@ export enum DeviceEventType {
   // fires from the offloader's pair-status listener task and from
   // ``remote_build/unpair``.
   OFFLOADER_PAIR_STATUS_CHANGED = "offloader_pair_status_changed",
+  // mDNS-discovered peer dashboards. Replaces the deleted
+  // ``remote_build/list_hosts`` WS command — the controller fires
+  // these events as its mDNS browser callback resolves /
+  // forgets entries, and the ``subscribe_events`` initial-state
+  // push carries the current set under ``hosts`` so a fresh tab
+  // paints without a round-trip.
+  REMOTE_BUILD_HOST_ADDED = "remote_build_host_added",
+  REMOTE_BUILD_HOST_REMOVED = "remote_build_host_removed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -1016,6 +1024,15 @@ export interface InitialStateEventData {
    *  drop) events. Optional for the same reason as
    *  ``pairings`` — absent controller, omitted field. */
   peers?: PeerSummary[];
+  /** Receiver-side mDNS-discovered hosts snapshot. RAM-only on
+   *  the backend; a sibling-of-RAM map populated by the
+   *  ``_esphomebuilder._tcp.local.`` browser callback. Replaces
+   *  the deleted ``remote_build/list_hosts`` command. Live
+   *  updates flow through ``REMOTE_BUILD_HOST_ADDED`` (upsert
+   *  by ``name``) and ``REMOTE_BUILD_HOST_REMOVED`` (drop by
+   *  ``name``). Optional for the same reason as ``pairings`` /
+   *  ``peers`` — absent controller, omitted field. */
+  hosts?: RemoteBuildPeer[];
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
@@ -1169,17 +1186,21 @@ export interface EditorValidateResponse {
 
 // Remote-build feature (issue #106).
 // Phase 2: peer dashboard discovery + receiver-side master switch.
-// Phase 2b: user-supplied manual hosts for cross-subnet / non-mDNS LANs.
 // Phase 3c1: receiver dashboard identity + cert rotation.
 // Phase 4a: Noise XX peer-link replaces the bearer-token surface;
 //           offloader-side pair flow + receiver-side pairing inbox.
 
-export type RemoteBuildPeerSource = "mdns" | "manual";
-
-export interface ManualHost {
-  hostname: string;
-  port: number;
-}
+/**
+ * Origin of a discovered :class:`RemoteBuildPeer`. Collapsed to a
+ * single ``"mdns"`` value after the manual-hosts surface was
+ * deleted (the offloader-side pair flow accepts a typed hostname
+ * + port directly without an intermediate "save" step). The
+ * single-value union is kept rather than removed because the
+ * backend's ``RemoteBuildPeer.source`` field still discriminates
+ * for forward-compat (e.g. a future "configured" / "static"
+ * source).
+ */
+export type RemoteBuildPeerSource = "mdns";
 
 /**
  * Lifecycle position of a paired (or pending) peer / pairing.
@@ -1259,7 +1280,6 @@ export interface PairingWindowState {
 
 export interface RemoteBuildSettings {
   enabled: boolean;
-  manual_hosts: ManualHost[];
   /** Receiver-side pinned offloaders. Includes both PENDING (in
    *  the receiver's ``_pending_peers`` dict) and APPROVED
    *  (persisted) rows, projected through ``PeerSummary``. */
@@ -1385,4 +1405,37 @@ export interface OffloaderPairStatusChangedEventData {
 export interface RemoteBuildIdentityRotatedEventData {
   dashboard_id: string;
   pin_sha256: string;
+}
+
+/**
+ * Data payload for ``REMOTE_BUILD_HOST_ADDED`` event.
+ *
+ * Carries the full :class:`RemoteBuildPeer` shape — same keys
+ * the ``subscribe_events`` ``initial_state.hosts`` snapshot uses
+ * — so the frontend can construct (or upsert) a complete row
+ * from the event alone. Fires from the controller's mDNS
+ * browse-callback cache-hit branch and from the async
+ * resolve-success path. Upsert semantics: subscribers key on
+ * ``name`` and replace an existing row with the same key.
+ */
+export interface RemoteBuildHostAddedEventData {
+  name: string;
+  hostname: string;
+  port: number;
+  source: RemoteBuildPeerSource;
+  addresses: string[];
+  server_version: string;
+  esphome_version: string;
+}
+
+/**
+ * Data payload for ``REMOTE_BUILD_HOST_REMOVED`` event.
+ *
+ * Fires when zeroconf delivers a ``Removed`` callback (TTL
+ * expiry without renewal, or an explicit goodbye). ``name``
+ * matches the corresponding ``REMOTE_BUILD_HOST_ADDED`` event's
+ * ``name`` field.
+ */
+export interface RemoteBuildHostRemovedEventData {
+  name: string;
 }

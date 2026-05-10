@@ -610,11 +610,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
   it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
-    // Match the live wire shape — ``RemoteBuildSettings`` carries
-    // both ``enabled`` and ``manual_hosts``; mocking only
-    // ``{ enabled }`` here would let an accidental field-rename
-    // regression slip past this test.
-    const payload = { enabled: true, manual_hosts: [], tokens: [] };
+    const payload = { enabled: true, peers: [] };
     const pending = api.getRemoteBuildSettings();
     const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
     expect(sent.command).toBe("remote_build/get_settings");
@@ -630,101 +626,19 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
-    // Same wire-shape rationale as ``getRemoteBuildSettings`` —
-    // the result includes ``manual_hosts`` and ``tokens``.
-    const result = { enabled: true, manual_hosts: [], tokens: [] };
+    const result = { enabled: true, peers: [] };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
   });
 
-  it("addRemoteBuildManualHost sends remote_build/add_manual_host with hostname + port", async () => {
-    const api = new ESPHomeAPI();
-    const ws = await connect(api);
-    const pending = api.addRemoteBuildManualHost({
-      hostname: "10.0.0.5",
-      port: 6052,
-    });
-    const sent = ws.sentAs<{
-      command: string;
-      message_id: string;
-      args: Record<string, unknown>;
-    }>(0);
-    expect(sent.command).toBe("remote_build/add_manual_host");
-    expect(sent.args).toEqual({ hostname: "10.0.0.5", port: 6052 });
-    ws.receive({
-      message_id: sent.message_id,
-      result: {
-        enabled: false,
-        manual_hosts: [{ hostname: "10.0.0.5", port: 6052 }],
-        tokens: [],
-      },
-    });
-    await expect(pending).resolves.toEqual({
-      enabled: false,
-      manual_hosts: [{ hostname: "10.0.0.5", port: 6052 }],
-      tokens: [],
-    });
-  });
-
-  it("removeRemoteBuildManualHost sends remote_build/remove_manual_host with hostname + port", async () => {
-    const api = new ESPHomeAPI();
-    const ws = await connect(api);
-    const pending = api.removeRemoteBuildManualHost({
-      hostname: "10.0.0.5",
-      port: 6052,
-    });
-    const sent = ws.sentAs<{
-      command: string;
-      message_id: string;
-      args: Record<string, unknown>;
-    }>(0);
-    expect(sent.command).toBe("remote_build/remove_manual_host");
-    expect(sent.args).toEqual({ hostname: "10.0.0.5", port: 6052 });
-    ws.receive({
-      message_id: sent.message_id,
-      result: { enabled: false, manual_hosts: [], tokens: [] },
-    });
-    await expect(pending).resolves.toEqual({
-      enabled: false,
-      manual_hosts: [],
-      tokens: [],
-    });
-  });
-
-  it("listRemoteBuildHosts sends remote_build/list_hosts and unwraps the result", async () => {
-    const api = new ESPHomeAPI();
-    const ws = await connect(api);
-    const payload = [
-      {
-        name: "desktop",
-        hostname: "desktop.local.",
-        port: 6052,
-        source: "mdns",
-        addresses: ["192.168.1.10"],
-        server_version: "1.2.3",
-        esphome_version: "2026.5.0",
-      },
-      {
-        name: "10.0.0.5",
-        hostname: "10.0.0.5",
-        port: 6052,
-        source: "manual",
-        addresses: [],
-        server_version: "",
-        esphome_version: "",
-      },
-    ];
-    const pending = api.listRemoteBuildHosts();
-    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
-    expect(sent.command).toBe("remote_build/list_hosts");
-    expect(sent.args).toBeUndefined();
-    ws.receive({ message_id: sent.message_id, result: payload });
-    await expect(pending).resolves.toEqual(payload);
-  });
-
-  // No ``listRemoteBuildPeers`` test — there's no wrapper. The
-  // receiver-side peer list arrives via ``subscribe_events``'s
-  // ``initial_state.peers`` field plus the live event stream.
+  // No ``listRemoteBuildHosts`` / ``addRemoteBuildManualHost`` /
+  // ``removeRemoteBuildManualHost`` tests — the wrappers were
+  // deleted in lockstep with the backend rip-out. Discovered
+  // hosts ship via ``subscribe_events`` initial-state +
+  // ``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``;
+  // manual hosts went away as a UI surface (the pair dialog
+  // accepts a typed hostname / port directly). Same shape as
+  // the ``listRemoteBuildPeers`` deletion in #248.
 
   it("approveRemoteBuildPeer sends remote_build/approve_peer with dashboard_id", async () => {
     const api = new ESPHomeAPI();
@@ -737,7 +651,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     }>(0);
     expect(sent.command).toBe("remote_build/approve_peer");
     expect(sent.args).toEqual({ dashboard_id: "green" });
-    const result = { enabled: true, manual_hosts: [], peers: [] };
+    const result = { enabled: true, peers: [] };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
   });
@@ -753,7 +667,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     }>(0);
     expect(sent.command).toBe("remote_build/remove_peer");
     expect(sent.args).toEqual({ dashboard_id: "green" });
-    const result = { enabled: true, manual_hosts: [], peers: [] };
+    const result = { enabled: true, peers: [] };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
   });

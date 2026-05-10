@@ -39,9 +39,12 @@ import type {
   LabelEventData,
   PairingWindowState,
   PeerSummary,
+  RemoteBuildHostAddedEventData,
+  RemoteBuildHostRemovedEventData,
   RemoteBuildPairingWindowChangedEventData,
   RemoteBuildPairRequestReceivedEventData,
   RemoteBuildPairStatusChangedEventData,
+  RemoteBuildPeer,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -58,6 +61,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   activeJobsContext,
+  buildOffloadDiscoveredHostsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
@@ -281,6 +285,20 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: buildServerPairingWindowStateContext })
   @state()
   private _buildServerPairingWindowState: PairingWindowState | null = null;
+
+  /** mDNS-discovered offload-target dashboards, keyed on the
+   *  service-instance ``name`` for fast upsert / delete. Seeded
+   *  from ``initial_state.hosts`` on subscribe; live updates
+   *  flow through ``REMOTE_BUILD_HOST_ADDED`` (upsert) /
+   *  ``REMOTE_BUILD_HOST_REMOVED`` (drop). Replaces the deleted
+   *  ``listRemoteBuildHosts`` pull surface. ``null`` until the
+   *  initial-state snapshot lands so consumers can distinguish
+   *  "no controller / still loading" from "loaded with zero
+   *  rows". */
+  @provide({ context: buildOffloadDiscoveredHostsContext })
+  @state()
+  private _buildOffloadDiscoveredHosts: Record<string, RemoteBuildPeer> | null =
+    null;
 
   /** True when the onboarding wizard should be shown. Computed
    *  from ``completed_version < current_version`` AND not
@@ -860,16 +878,21 @@ export class ESPHomeApp extends LitElement {
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
-        const { devices, importable, peers } = data as InitialStateEventData;
+        const { devices, importable, peers, hosts } =
+          data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
         this._devicesLoaded = true;
-        // ``peers`` is optional — backend omits the field when no
-        // remote-build controller is wired up. ``[]`` would
-        // imply "controller present, no rows" which is a
-        // distinct state. Default to ``null`` (still / not
+        // ``peers`` / ``hosts`` are optional — backend omits the
+        // fields when no remote-build controller is wired up.
+        // ``[]`` would imply "controller present, no rows" which
+        // is a distinct state. Default to ``null`` (still / not
         // loading) when absent.
         this._buildServerPeers = peers ?? null;
+        this._buildOffloadDiscoveredHosts =
+          hosts === undefined
+            ? null
+            : Object.fromEntries(hosts.map((h) => [h.name, h]));
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {
@@ -1027,6 +1050,34 @@ export class ESPHomeApp extends LitElement {
         // is a passthrough.
         this._buildServerPairingWindowState =
           data as RemoteBuildPairingWindowChangedEventData;
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_HOST_ADDED: {
+        // Upsert a discovered-host row keyed on ``name`` (the
+        // mDNS service-instance label). The same event fires for
+        // both the cache-hit branch and the async resolve-success
+        // branch on the backend, plus on TXT refreshes mid-
+        // session, so overwrite-by-name handles all three paths.
+        const evt = data as RemoteBuildHostAddedEventData;
+        this._buildOffloadDiscoveredHosts = {
+          ...(this._buildOffloadDiscoveredHosts ?? {}),
+          [evt.name]: evt,
+        };
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_HOST_REMOVED: {
+        // Drop the row keyed on ``name``. Backend only fires this
+        // when ``self._peers.pop`` actually returned a row, so
+        // unknown-name events would already be filtered server-
+        // side; the defensive ``delete`` here just keeps the
+        // mutation immutable-friendly.
+        const evt = data as RemoteBuildHostRemovedEventData;
+        if (this._buildOffloadDiscoveredHosts === null) {
+          break;
+        }
+        const next = { ...this._buildOffloadDiscoveredHosts };
+        delete next[evt.name];
+        this._buildOffloadDiscoveredHosts = next;
         break;
       }
     }
