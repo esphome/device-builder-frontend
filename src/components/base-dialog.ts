@@ -80,6 +80,19 @@ import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
  *   plain ``<div class="actions">`` at the end of the
  *   body, and forcing them to migrate to a slotted footer
  *   would balloon the diff for no behaviour change.
+ *
+ * **Part forwarding**. The inner ``<wa-dialog>`` is wrapped
+ * in this element's shadow DOM, so consumer styles that
+ * targeted ``wa-dialog::part(...)`` directly won't reach
+ * through. ``exportparts="..."`` on the inner element
+ * re-exposes the parts under the same names, addressable
+ * from a migrating consumer as
+ * ``esphome-base-dialog::part(header)`` etc. The
+ * forwarded parts are the ones currently overridden across
+ * the codebase: ``dialog``, ``header``, ``title``, ``body``,
+ * ``footer``, ``close-button``, ``close-button__base``.
+ * Consumers swap ``wa-dialog::part(X)`` →
+ * ``esphome-base-dialog::part(X)`` at migration time.
  */
 @customElement("esphome-base-dialog")
 export class ESPHomeBaseDialog extends LitElement {
@@ -146,6 +159,7 @@ export class ESPHomeBaseDialog extends LitElement {
   protected render() {
     return html`
       <wa-dialog
+        exportparts="dialog,header,title,body,footer,close-button,close-button__base"
         ?open=${this.open}
         ?light-dismiss=${!this.busy}
         @wa-request-close=${this._onWaRequestClose}
