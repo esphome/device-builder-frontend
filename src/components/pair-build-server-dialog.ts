@@ -78,6 +78,19 @@ import { formatPinSha256 } from "../util/cert-pin-format.js";
  * a parent can trigger a follow-up toast or re-render its
  * pairings list.
  */
+/** Strip the trailing ``.local`` / ``.local.`` mDNS suffix from
+ *  *host* so the result reads as a friendly label. Returns the
+ *  input unchanged if no suffix matches (IP literals, plain
+ *  short names, manual entries that don't look like mDNS). Also
+ *  trims surrounding whitespace and a trailing dot — typical
+ *  mDNS hostnames are FQDN-shape with the root dot. */
+function friendlyHostname(host: string): string {
+  let s = host.trim();
+  if (s.endsWith(".")) s = s.slice(0, -1);
+  if (s.toLowerCase().endsWith(".local")) s = s.slice(0, -".local".length);
+  return s;
+}
+
 @customElement("esphome-pair-build-server-dialog")
 export class ESPHomePairBuildServerDialog extends LitElement {
   @consume({ context: apiContext, subscribe: true })
@@ -118,6 +131,12 @@ export class ESPHomePairBuildServerDialog extends LitElement {
 
   @state()
   private _receiverLabel = "";
+
+  /** True once the user has typed in the receiver-label field
+   *  so we stop auto-deriving from the hostname. Resets on
+   *  ``open()`` so the next pair attempt re-derives. */
+  @state()
+  private _receiverLabelTouched = false;
 
   @state()
   private _offloaderLabel = "";
@@ -320,8 +339,18 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._port =
       prefill?.port !== undefined ? String(prefill.port) : "6055";
     this._previewedPin = "";
-    this._receiverLabel = "";
-    this._offloaderLabel = "";
+    // Pre-fill both labels with sensible defaults derived from
+    // the hostnames we already know. The user can edit either
+    // before submitting; ``_receiverLabelTouched`` gates the
+    // reactive auto-fill on hostname-field input so manual
+    // edits aren't clobbered. The offloader label is set once
+    // here from ``window.location.hostname`` (the URL the user
+    // typed to reach this dashboard); it doesn't auto-update
+    // afterwards because the page can't reload mid-dialog
+    // without losing the form state anyway.
+    this._receiverLabel = friendlyHostname(this._hostname);
+    this._receiverLabelTouched = false;
+    this._offloaderLabel = friendlyHostname(window.location.hostname);
     this._error = null;
     // Reset the auto-close watch key from any prior open. Set
     // again on a successful ``request_pair`` once we know the
@@ -483,6 +512,13 @@ export class ESPHomePairBuildServerDialog extends LitElement {
             .value=${this._hostname}
             @input=${(e: Event) => {
               this._hostname = (e.target as HTMLInputElement).value;
+              // Track the receiver label off the hostname until
+              // the user manually edits it. Saves a redundant
+              // type for the typical "name = host" case without
+              // overwriting a deliberate edit.
+              if (!this._receiverLabelTouched) {
+                this._receiverLabel = friendlyHostname(this._hostname);
+              }
               this._error = null;
             }}
           />
@@ -571,6 +607,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
           )}
           @input=${(e: Event) => {
             this._receiverLabel = (e.target as HTMLInputElement).value;
+            this._receiverLabelTouched = true;
             this._error = null;
           }}
         />
@@ -700,9 +737,19 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       });
       this._step = "sent";
       // Pin the key the auto-close watcher in ``willUpdate``
-      // checks against the offloader pairings map. Same shape
-      // the backend's ``StoredPairing`` is keyed on.
-      this._sentKey = `${hostname}:${port}`;
+      // checks against the offloader pairings map. Built from
+      // the response, NOT the form fields, because the backend
+      // normalises hostname (lowercase via
+      // ``_validate_hostname``) and that's the form
+      // ``summary.receiver_hostname`` carries — which is what
+      // app-shell's ``_onPairRequestSent`` keys the map on. A
+      // user who types ``MacBook-Pro.local.`` would otherwise
+      // build ``_sentKey`` mixed-case while the map landed
+      // lowercase, the watcher's ``map.get(_sentKey)`` would
+      // return undefined, and the dialog would mistake "row
+      // arrived under the canonical key" for "row never landed
+      // → rejected".
+      this._sentKey = `${summary.receiver_hostname}:${summary.receiver_port}`;
       // Backend persists the new ``StoredPairing`` row but
       // doesn't fire ``OFFLOADER_PAIR_STATUS_CHANGED`` for the
       // create — only on subsequent status flips. Seed the row
