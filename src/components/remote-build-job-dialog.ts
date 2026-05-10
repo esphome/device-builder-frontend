@@ -288,6 +288,17 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     }
   };
 
+  /** Render an error banner row, or ``nothing`` when *message*
+   *  is empty. Centralises the field-error markup so the input
+   *  step's submit-error, the running step's per-job
+   *  ``error_message`` (terminal failures from the receiver),
+   *  and the running step's local cancel-error all share one
+   *  visual shape. */
+  private _renderErrorBanner(message: string | undefined) {
+    if (!message) return nothing;
+    return html`<div class="field-error" role="alert">${message}</div>`;
+  }
+
   private _formatCancelError(err: unknown): string {
     if (err instanceof APIError) {
       switch (err.errorCode) {
@@ -371,11 +382,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           </option>
         </select>
       </div>
-      ${this._errorMessage
-        ? html`<div class="field-error" role="alert">
-            ${this._errorMessage}
-          </div>`
-        : nothing}
+      ${this._renderErrorBanner(this._errorMessage)}
       <div class="actions">
         <button class="btn-secondary" type="button" @click=${this._close}>
           ${this._localize("layout.close")}
@@ -428,14 +435,8 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           ${this._localize(`settings.remote_build_submit_target_${this._target}`)}
         </span>
       </div>
-      ${job?.error_message
-        ? html`<div class="field-error" role="alert">${job.error_message}</div>`
-        : nothing}
-      ${this._errorMessage
-        ? html`<div class="field-error" role="alert">
-            ${this._errorMessage}
-          </div>`
-        : nothing}
+      ${this._renderErrorBanner(job?.error_message)}
+      ${this._renderErrorBanner(this._errorMessage)}
       <div class="logs-container">
         <esphome-ansi-log
           .lines=${job?.output ?? []}
