@@ -1293,10 +1293,10 @@ export interface PeerSummary {
   /**
    * Whether the receiver currently has an active 5a-2 peer-link
    * session for this peer (``dashboard_id`` membership in the
-   * receiver's ``_peer_link_sessions`` registry). Defaults
-   * ``false`` for legacy backends that pre-date the field —
-   * a missing field deserialises as ``false`` so the renderer
-   * just shows "offline" rather than crashing.
+   * receiver's ``_peer_link_sessions`` registry). Legacy
+   * backends that pre-date the field may omit it; in that case,
+   * the renderer treats the missing value as falsy and shows
+   * "Disconnected" rather than crashing.
    *
    * Live updates flow through
    * ``RECEIVER_PEER_LINK_SESSION_OPENED`` /
