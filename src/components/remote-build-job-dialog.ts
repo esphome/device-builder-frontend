@@ -107,6 +107,25 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
   }
 
   private _close = () => {
+    // Closing on a terminal job (completed / failed /
+    // cancelled) is the operator's "I've seen the result"
+    // signal — drop the entry from buildOffloadJobsContext so
+    // it doesn't accumulate forever. Closing on a still-
+    // running job is "minimise": the receiver keeps building
+    // and the entry stays in the map (the user may re-open
+    // the dialog to see live progress until terminal). The
+    // dispatch helper backfills display fields on submit
+    // success, so a re-opened dialog finds the row intact.
+    const job = this._job;
+    if (job && isTerminalJobStatus(job.status)) {
+      this.dispatchEvent(
+        new CustomEvent("remote-build-job-dismissed", {
+          bubbles: true,
+          composed: true,
+          detail: { job_id: job.job_id },
+        }),
+      );
+    }
     this._open = false;
     this._errorMessage = "";
   };

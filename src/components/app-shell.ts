@@ -1460,6 +1460,7 @@ export class ESPHomeApp extends LitElement {
         @set-language=${this._onSetLanguage}
         @pair-request-sent=${this._onPairRequestSent}
         @remote-build-job-submitted=${this._onRemoteBuildJobSubmitted}
+        @remote-build-job-dismissed=${this._onRemoteBuildJobDismissed}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${this._onFirmwareHistoryCleared}
@@ -1622,6 +1623,19 @@ export class ESPHomeApp extends LitElement {
     }>,
   ): void {
     this.registerRemoteBuildJob(e.detail);
+  }
+
+  /** Drop a terminal remote-build job from the in-flight map
+   *  when the user closes its progress dialog. The dialog
+   *  only fires this for terminal status (completed / failed
+   *  / cancelled); non-terminal closes are "minimise" and
+   *  leave the entry in place. Without this, terminal jobs
+   *  would accumulate in buildOffloadJobsContext across
+   *  every submit cycle. */
+  private _onRemoteBuildJobDismissed(
+    e: CustomEvent<{ job_id: string }>,
+  ): void {
+    this.dismissRemoteBuildJob(e.detail.job_id);
   }
 
   private async _onSetLanguage(
