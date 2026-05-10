@@ -40,6 +40,7 @@ import {
 } from "../context/index.js";
 import { warningBannerStyles } from "../styles/banners.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
+import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
@@ -49,6 +50,7 @@ import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import "./pair-build-server-dialog.js";
+import "./pin-emoji-grid.js";
 import type { ESPHomePairBuildServerDialog } from "./pair-build-server-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -715,6 +717,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     espHomeStyles,
     warningBannerStyles,
     dialogCloseButtonStyles,
+    pinHexStyles,
     css`
       wa-dialog {
         --width: min(800px, 95vw);
@@ -1214,6 +1217,24 @@ export class ESPHomeSettingsDialog extends LitElement {
         word-break: break-all;
         flex: 1;
       }
+
+      /* Pin label sits next to the emoji grid + collapsible
+         hex; the row needs to stack vertically rather than
+         wrap inline so the emoji grid gets its own line. */
+      .build-server-row--pin {
+        align-items: flex-start;
+      }
+
+      .build-server-pin-display {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      /* .pin-hex disclosure styling lives in styles/pin-hex.ts;
+         no per-component extras needed here. */
 
       .build-server-dashboard-id {
         font-family: var(--wa-font-family-mono, monospace);
@@ -2188,11 +2209,21 @@ export class ESPHomeSettingsDialog extends LitElement {
     const formattedPin = formatPinSha256(identity.pin_sha256);
     return html`
       <div class="build-server-card">
-        <div class="build-server-row">
+        <div class="build-server-row build-server-row--pin">
           <span class="build-server-label">
             ${this._localize("settings.remote_build_pin_label")}
           </span>
-          <code class="build-server-pin">${formattedPin}</code>
+          <div class="build-server-pin-display">
+            <esphome-pin-emoji-grid
+              .pin=${identity.pin_sha256}
+            ></esphome-pin-emoji-grid>
+            <details class="pin-hex">
+              <summary>
+                ${this._localize("settings.remote_build_pin_hex_summary")}
+              </summary>
+              <code class="build-server-pin">${formattedPin}</code>
+            </details>
+          </div>
         </div>
         <div class="build-server-actions">
           <button class="build-server-copy" type="button" @click=${this._onCopyPin}>

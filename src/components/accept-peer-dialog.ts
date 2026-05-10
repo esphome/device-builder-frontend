@@ -5,11 +5,13 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { PeerSummary } from "../api/types.js";
 import { localizeContext } from "../context/index.js";
+import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import "./pin-emoji-grid.js";
 
 // Register the shield-alert icon so the shared confirm-dialog's
 // destructive icon-wrap can resolve it via the icon override; the
@@ -53,6 +55,7 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    pinHexStyles,
     css`
       .warning {
         font-weight: var(--wa-font-weight-semibold);
@@ -122,6 +125,23 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
       .peer-pin {
         font-size: var(--wa-font-size-s);
         line-height: 1.5;
+      }
+
+      /* Hex bytes collapsed under a disclosure so the emoji row
+         is the primary signal; the hex stays one click away for
+         operators who want to verify the cryptographic form,
+         without competing for attention with the picture row.
+         Base styling lives in styles/pin-hex.ts; the rules
+         below are dialog-specific extras (separator margin
+         above the disclosure, monospace + word-break for the
+         hex bytes themselves). */
+      .pin-hex {
+        margin-top: var(--wa-space-s);
+      }
+
+      .pin-hex code {
+        font-family: var(--wa-font-family-mono, monospace);
+        word-break: break-all;
       }
     `,
   ];
@@ -198,7 +218,17 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
                         "settings.build_server_peer_accept_confirm_pin_label"
                       )}
                     </span>
-                    <code class="peer-pin">${formattedPin}</code>
+                    <esphome-pin-emoji-grid
+                      .pin=${peer.pin_sha256}
+                    ></esphome-pin-emoji-grid>
+                    <details class="pin-hex">
+                      <summary>
+                        ${this._localize(
+                          "settings.build_server_peer_accept_confirm_pin_hex_summary"
+                        )}
+                      </summary>
+                      <code class="peer-pin">${formattedPin}</code>
+                    </details>
                   </div>
                 </div>
               `

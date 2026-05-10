@@ -14,8 +14,10 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
+import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
+import "./pin-emoji-grid.js";
 
 /**
  * Wizard for pairing this dashboard with a build server (receiver)
@@ -150,6 +152,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    pinHexStyles,
     css`
       wa-dialog {
         --width: 500px;
@@ -241,6 +244,9 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         font-size: var(--wa-font-size-xs);
         word-break: break-all;
       }
+
+      /* .pin-hex disclosure styling lives in styles/pin-hex.ts;
+         no per-component extras needed here. */
 
       .pin-card-target {
         font-family: var(--wa-font-family-mono, monospace);
@@ -587,7 +593,15 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         <span class="pin-card-label">
           ${this._localize("settings.pair_build_server_pin_label")}
         </span>
-        <code>${formatPinSha256(this._previewedPin)}</code>
+        <esphome-pin-emoji-grid
+          .pin=${this._previewedPin}
+        ></esphome-pin-emoji-grid>
+        <details class="pin-hex">
+          <summary>
+            ${this._localize("settings.pair_build_server_pin_hex_summary")}
+          </summary>
+          <code>${formatPinSha256(this._previewedPin)}</code>
+        </details>
         <span class="pin-card-target">
           ${this._localize("settings.pair_build_server_target", {
             hostname: this._hostname,
