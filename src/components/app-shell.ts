@@ -1011,28 +1011,39 @@ export class ESPHomeApp extends LitElement {
             ? null
             : new Map(offloader_alerts.map((a) => [a.pin_sha256, a]));
         // ``remote_jobs`` is the offloader-side in-flight
-        // remote-build snapshot. Replaces (not merges) the
-        // current map so a reconnect-driven re-subscribe
-        // resyncs against the backend's view rather than
-        // accumulating stale local entries that the receiver
-        // already considers terminal. Display fields and
-        // output buffer are absent from the wire shape — the
-        // re-attach view tolerates empty defaults; the next
-        // OFFLOADER_JOB_OUTPUT line repopulates from the
-        // subscribe point forward. Skips the rebuild when
-        // the field is absent (controller not wired up) so
-        // a previously-seeded map from a different connection
-        // isn't lost on a reconnect against a backend that
-        // dropped the remote-build controller.
+        // remote-build snapshot. The backend's view is
+        // authoritative for which jobs exist (terminal entries
+        // are already dropped on the receiver) and for the
+        // status / error_message fields the wire carries; for
+        // each snapshot entry we MERGE onto whatever the local
+        // map had so a WS reconnect doesn't wipe the
+        // dispatch-side display fields (configuration / target /
+        // receiver_label) the submit dialog stamped, the
+        // accumulated output buffer, or the started_at the
+        // dispatch helper recorded. Local entries the backend
+        // doesn't include in the snapshot get dropped — they're
+        // either terminal-and-cleaned-up (correct: receiver no
+        // longer has them) or never existed on the receiver
+        // (correct: they shouldn't survive a reconnect into
+        // the new connection's reality). Display fields stay
+        // empty on a fresh page load mid-build (no prior
+        // dispatch in this session); the re-attach view
+        // tolerates the empty defaults and the next
+        // OFFLOADER_JOB_OUTPUT line repopulates the buffer
+        // from the subscribe point forward. Skips the rebuild
+        // when the field is absent (controller not wired up)
+        // so a previously-seeded map isn't lost on a reconnect
+        // against a backend that dropped the controller.
         if (remote_jobs !== undefined) {
           const seeded = new Map<string, RemoteBuildJobState>();
           for (const entry of remote_jobs) {
-            // ``stubRemoteBuildJobState`` already returns the
-            // empty-defaults shape (display fields + output
-            // buffer + started_at=0); the snapshot only overrides
-            // the two fields it actually carries on the wire.
+            const existing = this._buildOffloadJobs.get(entry.job_id);
+            const base =
+              existing ??
+              stubRemoteBuildJobState(entry.job_id, entry.pin_sha256);
             seeded.set(entry.job_id, {
-              ...stubRemoteBuildJobState(entry.job_id, entry.pin_sha256),
+              ...base,
+              pin_sha256: entry.pin_sha256,
               status: entry.status,
               error_message: entry.error_message,
             });
