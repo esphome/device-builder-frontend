@@ -798,6 +798,48 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
+  it("cancelRemoteBuildJob sends remote_build/cancel_job with pin + job_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.cancelRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      job_id: "abc123",
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/cancel_job");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      job_id: "abc123",
+    });
+    const result = { sent: true };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("cancelRemoteBuildJob surfaces sent=false on a same-tick wire failure", async () => {
+    // ``sent: false`` is the documented signal for a Noise-encrypt
+    // / WS-send failure on the offloader side — the cancel never
+    // reached the wire. The frontend treats it the same as a
+    // typed error toast (the receiver's JOB_CANCELLED-driven
+    // status flip won't fire), but the API client wrapper
+    // itself just returns the literal payload; mapping happens
+    // in the dialog.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.cancelRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      job_id: "abc123",
+    });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    const result = { sent: false };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);

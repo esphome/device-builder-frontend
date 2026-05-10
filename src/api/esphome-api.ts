@@ -1587,6 +1587,40 @@ export class ESPHomeAPI {
     }>("remote_build/submit_job", args);
   }
 
+  /**
+   * Send a cooperative cancel for a remote build job (phase 5d).
+   *
+   * Routes through ``remote_build/cancel_job`` to the paired
+   * receiver behind *pin_sha256*; the receiver maps *job_id*
+   * (the offloader-local id ``submitRemoteBuildJob`` returned)
+   * back to its local ``FirmwareJob`` and dispatches the same
+   * cancel primitive an operator-driven cancel uses.
+   *
+   * Fire-and-forget on the wire — the resolved boolean reflects
+   * whether the cancel frame made it onto the peer-link wire
+   * (Noise encrypt + WS send succeeded), not whether the
+   * receiver acted on it. The actual confirmation rides the
+   * existing ``OFFLOADER_JOB_STATE_CHANGED`` event stream as a
+   * ``status: "cancelled"`` transition, so callers should
+   * watch ``buildOffloadJobsContext`` for the terminal flip
+   * rather than treating the resolve as completion.
+   *
+   * Errors:
+   * - INVALID_ARGS: bad pin or empty job_id.
+   * - NOT_FOUND: no pairing for the given pin.
+   * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
+   *   peer-link session isn't currently live.
+   */
+  async cancelRemoteBuildJob(args: {
+    pin_sha256: string;
+    job_id: string;
+  }): Promise<{ sent: boolean }> {
+    return this.sendCommand<{ sent: boolean }>(
+      "remote_build/cancel_job",
+      args,
+    );
+  }
+
   // ─── Remote build: receiver identity (phase 3c1) ──────────
 
   /**

@@ -46,11 +46,13 @@ type Step = "input" | "submitting" | "running";
  * OFFLOADER_JOB_STATE_CHANGED / OFFLOADER_JOB_OUTPUT events
  * through buildOffloadJobsContext.
  *
- * Cancellation while running isn't supported here; the
- * cancel_job reverse-direction control message is deferred
- * to phase 5d. Closing the dialog mid-build leaves the job
- * running on the receiver; the user can re-open to see
- * live progress until terminal.
+ * Cancel button (phase 5d) routes through
+ * ``remote_build/cancel_job``. Fire-and-forget on the wire;
+ * the terminal ``status: "cancelled"`` flip arrives via the
+ * existing ``OFFLOADER_JOB_STATE_CHANGED`` event stream the
+ * dialog already watches. Closing the dialog mid-build (with
+ * or without cancelling) leaves the receiver alone; the user
+ * can re-open to see live progress until terminal.
  *
  * Dispatches remote-build-job-submitted with the job seed
  * (pin / receiver_label / configuration / target / job_id)
@@ -89,6 +91,19 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
   @state() private _target: RemoteBuildSubmitTarget = JobType.COMPILE;
   @state() private _jobId = "";
   @state() private _errorMessage = "";
+  /** True between the user clicking Cancel and the cancel_job
+   *  WS round-trip resolving. Disables the button so a
+   *  double-click can't fire a second frame; the running
+   *  status pill stays "running" until the receiver's
+   *  JOB_CANCELLED-driven state-change event flips it through
+   *  the OFFLOADER_JOB_STATE_CHANGED plumbing. */
+  @state() private _cancelInFlight = false;
+  /** True once the cancel_job WS round-trip has resolved
+   *  successfully on a still-non-terminal job. Keeps the
+   *  Cancel button disabled (and re-labelled) while we wait
+   *  for the terminal cancelled flip — a re-click would just
+   *  fire a duplicate frame the receiver would silently drop. */
+  @state() private _cancelRequested = false;
 
   /** Open the dialog targeting *pairing*, defaulting the
    *  configuration to the first device on the list (or empty
@@ -102,6 +117,8 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     this._target = JobType.COMPILE;
     this._jobId = "";
     this._errorMessage = "";
+    this._cancelInFlight = false;
+    this._cancelRequested = false;
     this._step = "input";
     this._open = true;
   }
@@ -131,6 +148,15 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     this._configuration = job.configuration;
     this._target = job.target;
     this._errorMessage = "";
+    this._cancelInFlight = false;
+    // A re-attached job that's still non-terminal might already
+    // have an in-flight cancel in another tab, but we've got no
+    // visibility into that. Keep the button enabled and let the
+    // receiver's idempotent silent-drop on duplicate cancel
+    // (unknown-correlation path or terminal-job CommandError)
+    // absorb a redundant click — same shape as the e2e
+    // unknown-correlation test pins.
+    this._cancelRequested = false;
     this._step = "running";
     this._open = true;
   }
@@ -224,6 +250,59 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
       this._step = "input";
     }
   };
+
+  private _onCancel = async () => {
+    if (
+      this._api === undefined ||
+      !this._pinSha256 ||
+      !this._jobId ||
+      this._cancelInFlight ||
+      this._cancelRequested
+    ) {
+      return;
+    }
+    const job = this._job;
+    if (job && isTerminalJobStatus(job.status)) return;
+    this._errorMessage = "";
+    this._cancelInFlight = true;
+    try {
+      await this._api.cancelRemoteBuildJob({
+        pin_sha256: this._pinSha256,
+        job_id: this._jobId,
+      });
+      // On the wire 'sent: false' only fires on a same-tick
+      // channel failure (Noise encrypt / WS send) — the
+      // backend raises CommandError for the cases the operator
+      // can act on (no pairing, peer-link down). The receiver's
+      // JOB_CANCELLED-driven flip is what eventually moves the
+      // status pill regardless, so a same-tick wire failure
+      // here is observable only via the absence of that flip;
+      // the next dialog interaction (re-click Cancel after the
+      // peer-link recovers, or close) reflects whatever state
+      // the receiver actually reached.
+      this._cancelRequested = true;
+    } catch (err) {
+      this._errorMessage = this._formatCancelError(err);
+    } finally {
+      this._cancelInFlight = false;
+    }
+  };
+
+  private _formatCancelError(err: unknown): string {
+    if (err instanceof APIError) {
+      switch (err.errorCode) {
+        case ErrorCode.PRECONDITION_FAILED:
+          return this._localize(
+            "settings.remote_build_cancel_precondition_failed",
+          );
+        case ErrorCode.NOT_FOUND:
+          return this._localize("settings.remote_build_cancel_not_found");
+        default:
+          return this._localize("settings.remote_build_cancel_generic_error");
+      }
+    }
+    return this._localize("settings.remote_build_cancel_generic_error");
+  }
 
   private _formatSubmitError(err: unknown): string {
     if (err instanceof APIError) {
@@ -327,6 +406,18 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     const job = this._job;
     const status = job?.status ?? JobStatus.QUEUED;
     const terminal = isTerminalJobStatus(status);
+    // Cancel hides on terminal status (the job's done; nothing
+    // to cancel) and stays disabled during the cancel_job WS
+    // round-trip and after a successful send while we wait for
+    // the receiver's JOB_CANCELLED-driven status flip. Re-clicks
+    // would just fire a duplicate frame the receiver silently
+    // drops on the unknown-correlation path.
+    const cancelDisabled = this._cancelInFlight || this._cancelRequested;
+    const cancelLabelKey = this._cancelRequested
+      ? "settings.remote_build_cancel_pending"
+      : this._cancelInFlight
+        ? "settings.remote_build_cancel_in_flight"
+        : "settings.remote_build_cancel_action";
     return html`
       <div class="job-meta">
         <span class=${`status-pill status-${status}`}>
@@ -340,6 +431,11 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
       ${job?.error_message
         ? html`<div class="field-error" role="alert">${job.error_message}</div>`
         : nothing}
+      ${this._errorMessage
+        ? html`<div class="field-error" role="alert">
+            ${this._errorMessage}
+          </div>`
+        : nothing}
       <div class="logs-container">
         <esphome-ansi-log
           .lines=${job?.output ?? []}
@@ -352,6 +448,16 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
             terminal ? "layout.close" : "settings.remote_build_running_minimize",
           )}
         </button>
+        ${terminal
+          ? nothing
+          : html`<button
+              class="btn-danger"
+              type="button"
+              ?disabled=${cancelDisabled}
+              @click=${this._onCancel}
+            >
+              ${this._localize(cancelLabelKey)}
+            </button>`}
       </div>
     `;
   }
@@ -431,6 +537,36 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         color: var(--esphome-error);
         font-size: var(--wa-font-size-s);
         margin-top: var(--wa-space-xs);
+      }
+
+      /* Destructive variant for the in-dialog Cancel-this-job
+         button. Mirrors confirm-dialog's destructive btn tint
+         without dragging the whole confirm-dialog style block in.
+         The other two buttons in this dialog (.btn-primary /
+         .btn-secondary) inherit browser-default chrome — leaving
+         them alone here to keep the diff focused on the Cancel
+         affordance; a button-style normalisation pass would be a
+         separate cleanup. */
+      .btn-danger {
+        background: var(--esphome-error);
+        color: var(--esphome-on-primary);
+        border: var(--wa-border-width-s) solid var(--esphome-error);
+        border-radius: var(--wa-border-radius-m);
+        padding: 0 var(--wa-space-m);
+        min-height: var(--wa-form-control-height);
+        font-family: inherit;
+        font-size: var(--wa-font-size-s);
+        cursor: pointer;
+      }
+
+      .btn-danger:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-error), black 10%);
+        border-color: color-mix(in srgb, var(--esphome-error), black 10%);
+      }
+
+      .btn-danger:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
       }
 
       .actions {
