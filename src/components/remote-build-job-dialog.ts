@@ -266,21 +266,30 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     this._errorMessage = "";
     this._cancelInFlight = true;
     try {
-      await this._api.cancelRemoteBuildJob({
+      const result = await this._api.cancelRemoteBuildJob({
         pin_sha256: this._pinSha256,
         job_id: this._jobId,
       });
-      // On the wire 'sent: false' only fires on a same-tick
-      // channel failure (Noise encrypt / WS send) — the
-      // backend raises CommandError for the cases the operator
-      // can act on (no pairing, peer-link down). The receiver's
-      // JOB_CANCELLED-driven flip is what eventually moves the
-      // status pill regardless, so a same-tick wire failure
-      // here is observable only via the absence of that flip;
-      // the next dialog interaction (re-click Cancel after the
-      // peer-link recovers, or close) reflects whatever state
-      // the receiver actually reached.
-      this._cancelRequested = true;
+      if (result.sent) {
+        // Frame made it onto the peer-link wire. Lock the
+        // button to "Cancel sent" while we wait for the
+        // receiver's JOB_CANCELLED-driven flip through
+        // OFFLOADER_JOB_STATE_CHANGED — a re-click would just
+        // fire a duplicate frame the receiver silently drops
+        // on the unknown-correlation path.
+        this._cancelRequested = true;
+      } else {
+        // sent=false is the documented signal for a same-tick
+        // Noise-encrypt / WS-send failure on the offloader
+        // side. The receiver never saw the cancel, so locking
+        // the button to "Cancel sent" would be a lie. Surface
+        // it as a generic error and leave the button enabled
+        // so the user can retry once the underlying transport
+        // settles.
+        this._errorMessage = this._localize(
+          "settings.remote_build_cancel_generic_error",
+        );
+      }
     } catch (err) {
       this._errorMessage = this._formatCancelError(err);
     } finally {

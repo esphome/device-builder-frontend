@@ -1596,14 +1596,18 @@ export class ESPHomeAPI {
    * back to its local ``FirmwareJob`` and dispatches the same
    * cancel primitive an operator-driven cancel uses.
    *
-   * Fire-and-forget on the wire — the resolved boolean reflects
-   * whether the cancel frame made it onto the peer-link wire
-   * (Noise encrypt + WS send succeeded), not whether the
-   * receiver acted on it. The actual confirmation rides the
-   * existing ``OFFLOADER_JOB_STATE_CHANGED`` event stream as a
+   * Fire-and-forget on the wire — the resolved payload's
+   * ``sent`` flag reflects whether the cancel frame made it
+   * onto the peer-link wire (Noise encrypt + WS send
+   * succeeded), not whether the receiver acted on it. A
+   * ``sent: false`` resolve means a same-tick channel failure
+   * on the offloader side; the cancel never reached the
+   * receiver and the caller should treat it as an error.
+   * The actual cancel confirmation rides the existing
+   * ``OFFLOADER_JOB_STATE_CHANGED`` event stream as a
    * ``status: "cancelled"`` transition, so callers should
    * watch ``buildOffloadJobsContext`` for the terminal flip
-   * rather than treating the resolve as completion.
+   * rather than treating ``sent: true`` as completion.
    *
    * Errors:
    * - INVALID_ARGS: bad pin or empty job_id.
