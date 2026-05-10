@@ -1,14 +1,14 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { renderInlineError } from "../util/render-error.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
+import "./base-dialog.js";
 
 /**
  * Edit-friendly-name dialog. Single input + an "Install
@@ -48,38 +48,32 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
   @state()
   private _install = true;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   static styles = [
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 460px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -173,12 +167,19 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     // want a YAML-only edit (offline device, batch later) can
     // toggle off — but the common case is "rename and apply."
     this._install = true;
-    this._dialog.open = true;
+    this._open = true;
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  private _onAfterHide = (): void => {
+    // wa-dialog finished its hide sequence (after Esc /
+    // outside-click / X). Flip our local open flag so the
+    // next render's ``?open`` binding matches.
+    this._open = false;
+  };
 
   protected render() {
     const trimmed = this._value.trim();
@@ -190,11 +191,12 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     const canSubmit = !empty && !unchanged && !err;
 
     return html`
-      <wa-dialog
-        label=${this._localize("dashboard.action_friendly_name_title", {
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("dashboard.action_friendly_name_title", {
           name: this.deviceName,
         })}
-        light-dismiss
+        @after-hide=${this._onAfterHide}
       >
         <div class="field">
           <label for="friendly-name-input"
@@ -253,7 +255,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
             ${this._localize("dashboard.action_friendly_name_confirm")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 

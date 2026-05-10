@@ -5,7 +5,7 @@ import {
   mdiTrashCanOutline,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ArchivedDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -13,8 +13,8 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "archive-arrow-up-outline": mdiArchiveArrowUpOutline,
@@ -58,14 +58,12 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
   @state() private _devices: ArchivedDevice[] = [];
   @state() private _loading = false;
   @state() private _error: string | null = null;
-
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state() private _open = false;
 
   static styles = [
     espHomeStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 560px;
       }
 
@@ -75,31 +73,25 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
          itself scrolls (see the .body rule below) so the visible
          chrome (header / desc / footer) always fits in the
          remaining space. */
-      wa-dialog::part(dialog) {
+      esphome-base-dialog::part(dialog) {
         max-block-size: calc(100vh - 160px);
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0;
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -249,13 +241,20 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
 
   /** Open the dialog and (re)fetch the archive list. */
   async open() {
-    this._dialog.open = true;
+    this._open = true;
     await this.refresh();
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  private _onAfterHide = (): void => {
+    // wa-dialog finished its hide sequence (after Esc /
+    // outside-click / X). Flip our local open flag so the
+    // next render's ``?open`` binding matches.
+    this._open = false;
+  };
 
   /** Re-pull the list. Caller invokes after unarchive / delete to
    *  reflect the new state without closing the dialog. */
@@ -276,9 +275,10 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog
-        label=${this._localize("dashboard.archived_dialog_title")}
-        light-dismiss
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("dashboard.archived_dialog_title")}
+        @after-hide=${this._onAfterHide}
       >
         <div class="body">
           <p class="desc">${this._localize("dashboard.archived_dialog_desc")}</p>
@@ -289,7 +289,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
             ${this._localize("dashboard.archived_dialog_close")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
