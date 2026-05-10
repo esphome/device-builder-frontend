@@ -24,42 +24,63 @@ import {
 import type { LocalizeFunc } from "../common/localize.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { inputStyles } from "../styles/inputs.js";
+import { jobStatusPillStyles } from "../styles/job-status-pill.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 
 import "./ansi-log.js";
 
-type Step = "input" | "submitting" | "running";
+type Step = "input" | "submitting" | "list";
+
+/** Per-row UI state for the cancel button. Lives only in the
+ *  dialog; the shared buildOffloadJobsContext map doesn't carry
+ *  these because they're transient per-tab concerns (an in-flight
+ *  cancel_job WS call doesn't outlive the dialog and isn't visible
+ *  to a different tab). */
+interface JobRowUIState {
+  cancelInFlight: boolean;
+  cancelRequested: boolean;
+  errorMessage: string;
+}
+
+const FRESH_ROW_STATE: JobRowUIState = {
+  cancelInFlight: false,
+  cancelRequested: false,
+  errorMessage: "",
+};
 
 /**
- * Dispatch + watch a remote build on a paired build server.
+ * Dispatch + watch remote builds on paired build servers.
  *
- * Two-step dialog: pick configuration + target (compile /
- * upload), then watch the receiver's build run live with a
- * lifecycle pill + ansi-log of the streamed output.
+ * Two entry points share one dialog instance:
  *
- * Triggered from settings-dialog's Send-builds section: the
- * caller invokes open(pairing) with the target pin +
- * label, the dialog shows the input form, hits
- * remote_build/submit_job on confirm, then transitions
- * to the live progress view that consumes
- * OFFLOADER_JOB_STATE_CHANGED / OFFLOADER_JOB_OUTPUT events
- * through buildOffloadJobsContext.
+ *   open({pin_sha256, receiver_label}) — lands on the input
+ *   step pre-targeted at *pairing*; on submit transitions to
+ *   the list step with the new job's row auto-expanded so the
+ *   submitter sees the running build immediately.
  *
- * Cancel button (phase 5d) routes through
- * ``remote_build/cancel_job``. Fire-and-forget on the wire;
- * the terminal ``status: "cancelled"`` flip arrives via the
- * existing ``OFFLOADER_JOB_STATE_CHANGED`` event stream the
- * dialog already watches. Closing the dialog mid-build (with
- * or without cancelling) leaves the receiver alone; the user
- * can re-open to see live progress until terminal.
+ *   openForJob(job_id) — skips the input step and opens the
+ *   list step with *job_id* auto-expanded.
+ *
+ * The list step renders every entry in buildOffloadJobsContext
+ * as a row sorted newest-first, with a status pill plus a
+ * collapsible body carrying the receiver's streamed output.
+ * Per-row Cancel routes through ``remote_build/cancel_job``;
+ * the receiver's JOB_CANCELLED event flips the row's pill
+ * through the existing OFFLOADER_JOB_STATE_CHANGED stream.
+ *
+ * Closing the list step dismisses every terminal entry in the
+ * map (mirrors the "operator's I've seen the result" semantics
+ * that the single-job dialog applied to its one tracked job).
+ * Non-terminal entries stay in the map so re-opening picks
+ * back up on the live build.
  *
  * Dispatches remote-build-job-submitted with the job seed
- * (pin / receiver_label / configuration / target / job_id)
- * on a successful ack so the parent app-shell can stamp the
- * in-flight jobs map's display fields. The wire frames
- * don't carry those fields; without the dispatch the
- * progress view falls back to "(unknown)" placeholders.
+ * (pin / receiver_label / configuration / target / job_id) on
+ * a successful ack so app-shell stamps the in-flight jobs map's
+ * display fields. Wire frames don't carry those fields;
+ * without the dispatch the list view would fall back to empty
+ * placeholders.
  */
 @customElement("esphome-remote-build-job-dialog")
 export class ESPHomeRemoteBuildJobDialog extends LitElement {
@@ -85,116 +106,77 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
 
   @state() private _open = false;
   @state() private _step: Step = "input";
+  /** Pin + label of the pairing the input step is targeting.
+   *  Empty when the dialog was opened via openForJob (list-only
+   *  flow has no associated "submit a new build for X" context). */
   @state() private _pinSha256 = "";
   @state() private _receiverLabel = "";
   @state() private _configuration = "";
   @state() private _target: RemoteBuildSubmitTarget = JobType.COMPILE;
-  @state() private _jobId = "";
-  @state() private _errorMessage = "";
-  /** True between the user clicking Cancel and the cancel_job
-   *  WS round-trip resolving. Disables the button so a
-   *  double-click can't fire a second frame; the running
-   *  status pill stays "running" until the receiver's
-   *  JOB_CANCELLED-driven state-change event flips it through
-   *  the OFFLOADER_JOB_STATE_CHANGED plumbing. */
-  @state() private _cancelInFlight = false;
-  /** True once the cancel_job WS round-trip has resolved
-   *  successfully on a still-non-terminal job. Keeps the
-   *  Cancel button disabled (and re-labelled) while we wait
-   *  for the terminal cancelled flip — a re-click would just
-   *  fire a duplicate frame the receiver would silently drop. */
-  @state() private _cancelRequested = false;
+  @state() private _submitErrorMessage = "";
+  /** job_id of the row currently expanded in the list view, or
+   *  empty when no row is expanded. Single-expand keeps the
+   *  ansi-log render cost bounded to one busy job at a time. */
+  @state() private _expandedJobId = "";
+  /** Transient per-row UI state for the Cancel button. Pruned
+   *  when an entry leaves the shared jobs map so a re-submitted
+   *  job_id (theoretical) can't inherit a stale cancelRequested. */
+  @state() private _rowState: Map<string, JobRowUIState> = new Map();
 
   /** Open the dialog targeting *pairing*, defaulting the
    *  configuration to the first device on the list (or empty
-   *  if no devices are configured). The caller passes the
-   *  target pin + display label; everything else is
-   *  user-driven from there. */
+   *  if no devices are configured). After a successful submit
+   *  the dialog transitions to the list step with the new
+   *  job's row auto-expanded. */
   open(args: { pin_sha256: string; receiver_label: string }): void {
     this._pinSha256 = args.pin_sha256;
     this._receiverLabel = args.receiver_label;
     this._configuration = this._devices[0]?.configuration ?? "";
     this._target = JobType.COMPILE;
-    this._jobId = "";
-    this._errorMessage = "";
-    this._cancelInFlight = false;
-    this._cancelRequested = false;
+    this._submitErrorMessage = "";
     this._step = "input";
     this._open = true;
   }
 
-  /** Open the dialog re-attached to an existing remote-build
-   *  job, skipping the input form and landing directly on the
-   *  running view. Used by settings-dialog's per-row "View
-   *  build" affordance to let the user check on a running
-   *  build (or last result) after closing the dialog without
-   *  losing access to the live output buffer.
-   *
-   *  Display fields (configuration / target / receiver_label)
-   *  come from the job entry itself; the entry was stamped
-   *  on the original submit's success bubble through
-   *  registerRemoteBuildJob, so a job that originated in this
-   *  tab carries full display fields. A job whose state was
-   *  observed only via wire events (events arrived before the
-   *  ack landed, or a different tab dispatched it) carries
-   *  empty display strings — the running view tolerates them
-   *  and shows the live status / output regardless. */
+  /** Open the dialog on the list step with *job_id* auto-
+   *  expanded. Used by settings-dialog's per-row "View build"
+   *  affordance to drop the user into the running view for
+   *  the job they just clicked, without losing access to
+   *  the other in-flight jobs visible in the same list. */
   openForJob(job_id: string): void {
-    const job = this._jobs?.get(job_id);
-    if (!job) return;
-    this._jobId = job_id;
-    this._pinSha256 = job.pin_sha256;
-    this._receiverLabel = job.receiver_label;
-    this._configuration = job.configuration;
-    this._target = job.target;
-    this._errorMessage = "";
-    this._cancelInFlight = false;
-    // A re-attached job that's still non-terminal might already
-    // have an in-flight cancel in another tab, but we've got no
-    // visibility into that. Keep the button enabled and let the
-    // receiver's idempotent silent-drop on duplicate cancel
-    // (unknown-correlation path or terminal-job CommandError)
-    // absorb a redundant click — same shape as the e2e
-    // unknown-correlation test pins.
-    this._cancelRequested = false;
-    this._step = "running";
+    this._pinSha256 = "";
+    this._receiverLabel = "";
+    this._submitErrorMessage = "";
+    this._expandedJobId = job_id;
+    this._step = "list";
     this._open = true;
   }
 
   private _close = () => {
-    // Idempotent: bound to the close-button @click AND the
-    // wa-dialog @wa-after-hide, which fires when ?open flips
-    // to false — so without this guard the second invocation
-    // would re-fire the dismiss event. dismissRemoteBuildJob
-    // is idempotent itself, but double-emitting an event the
-    // parent listens to is observable and risks future
-    // side-effects on subscribers.
     if (!this._open) return;
-    // Closing on a terminal job (completed / failed /
-    // cancelled) is the operator's "I've seen the result"
-    // signal — drop the entry from buildOffloadJobsContext so
-    // it doesn't accumulate forever. Closing on a still-
-    // running job only hides this dialog; the receiver keeps
-    // building and the job entry stays in the shared map
-    // until it reaches a terminal state and is explicitly
-    // dismissed.
-    const job = this._job;
-    if (job && isTerminalJobStatus(job.status)) {
-      this.dispatchEvent(
-        new CustomEvent("remote-build-job-dismissed", {
-          bubbles: true,
-          composed: true,
-          detail: { job_id: job.job_id },
-        }),
-      );
+    // Dismiss every terminal entry in the shared jobs map when
+    // the operator closes the list step. Mirrors the original
+    // single-job dialog's "closing on terminal == I've seen the
+    // result" semantics applied across the list. Non-terminal
+    // entries stay so a re-open picks back up on the live build.
+    if (this._step === "list" && this._jobs) {
+      for (const job of this._jobs.values()) {
+        if (isTerminalJobStatus(job.status)) {
+          this.dispatchEvent(
+            new CustomEvent("remote-build-job-dismissed", {
+              bubbles: true,
+              composed: true,
+              detail: { job_id: job.job_id },
+            }),
+          );
+        }
+      }
     }
     this._open = false;
-    this._errorMessage = "";
+    this._submitErrorMessage = "";
+    this._rowState = new Map();
+    this._expandedJobId = "";
   };
-
-  private get _job(): RemoteBuildJobState | undefined {
-    return this._jobId ? this._jobs?.get(this._jobId) : undefined;
-  }
 
   private _onConfigurationChange = (e: Event) => {
     this._configuration = (e.target as HTMLSelectElement).value;
@@ -208,7 +190,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     if (this._api === undefined || !this._pinSha256 || !this._configuration) {
       return;
     }
-    this._errorMessage = "";
+    this._submitErrorMessage = "";
     this._step = "submitting";
     try {
       const result = await this._api.submitRemoteBuildJob({
@@ -219,17 +201,16 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
       if (!result.accepted) {
         // Receiver rejected the job (queue full, manifest
         // mismatch, hash mismatch). reason carries the code.
-        this._errorMessage = this._localize(
+        this._submitErrorMessage = this._localize(
           "settings.remote_build_submit_rejected",
           { reason: result.reason ?? "" },
         );
         this._step = "input";
         return;
       }
-      this._jobId = result.job_id;
       // Bubble the seed up so app-shell stamps the in-flight
       // jobs map's display fields. Wire frames don't carry
-      // them; the progress view would otherwise read empty
+      // them; the list view would otherwise read empty
       // strings until the user dismisses.
       this.dispatchEvent(
         new CustomEvent("remote-build-job-submitted", {
@@ -244,31 +225,24 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           },
         }),
       );
-      this._step = "running";
+      this._expandedJobId = result.job_id;
+      this._step = "list";
     } catch (err) {
-      this._errorMessage = this._formatSubmitError(err);
+      this._submitErrorMessage = this._formatSubmitError(err);
       this._step = "input";
     }
   };
 
-  private _onCancel = async () => {
-    if (
-      this._api === undefined ||
-      !this._pinSha256 ||
-      !this._jobId ||
-      this._cancelInFlight ||
-      this._cancelRequested
-    ) {
-      return;
-    }
-    const job = this._job;
-    if (job && isTerminalJobStatus(job.status)) return;
-    this._errorMessage = "";
-    this._cancelInFlight = true;
+  private _onCancel = async (job: RemoteBuildJobState) => {
+    if (this._api === undefined) return;
+    const row = this._rowState.get(job.job_id) ?? FRESH_ROW_STATE;
+    if (row.cancelInFlight || row.cancelRequested) return;
+    if (isTerminalJobStatus(job.status)) return;
+    this._patchRowState(job.job_id, { errorMessage: "", cancelInFlight: true });
     try {
       const result = await this._api.cancelRemoteBuildJob({
-        pin_sha256: this._pinSha256,
-        job_id: this._jobId,
+        pin_sha256: job.pin_sha256,
+        job_id: job.job_id,
       });
       if (result.sent) {
         // Frame made it onto the peer-link wire. Lock the
@@ -277,7 +251,10 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         // OFFLOADER_JOB_STATE_CHANGED — a re-click would just
         // fire a duplicate frame the receiver silently drops
         // on the unknown-correlation path.
-        this._cancelRequested = true;
+        this._patchRowState(job.job_id, {
+          cancelInFlight: false,
+          cancelRequested: true,
+        });
       } else {
         // sent=false is the documented signal for a same-tick
         // Noise-encrypt / WS-send failure on the offloader
@@ -286,23 +263,55 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         // it as a generic error and leave the button enabled
         // so the user can retry once the underlying transport
         // settles.
-        this._errorMessage = this._localize(
-          "settings.remote_build_cancel_generic_error",
-        );
+        this._patchRowState(job.job_id, {
+          cancelInFlight: false,
+          errorMessage: this._localize(
+            "settings.remote_build_cancel_generic_error",
+          ),
+        });
       }
     } catch (err) {
-      this._errorMessage = this._formatCancelError(err);
-    } finally {
-      this._cancelInFlight = false;
+      this._patchRowState(job.job_id, {
+        cancelInFlight: false,
+        errorMessage: this._formatCancelError(err),
+      });
     }
+  };
+
+  /** Merge *diff* into the row state for *job_id*, falling back
+   *  to a fresh row if no entry exists yet. Clones the map so
+   *  Lit picks up the change. */
+  private _patchRowState(job_id: string, diff: Partial<JobRowUIState>): void {
+    const next = new Map(this._rowState);
+    const existing = next.get(job_id) ?? FRESH_ROW_STATE;
+    next.set(job_id, { ...existing, ...diff });
+    this._rowState = next;
+  }
+
+  /** Toggle the expanded row. Clicking the already-expanded row
+   *  collapses it; clicking a different row expands that one
+   *  (single-expand bounds the ansi-log render cost to one
+   *  active output panel at a time). */
+  private _onToggleRow = (job_id: string) => {
+    this._expandedJobId = this._expandedJobId === job_id ? "" : job_id;
+  };
+
+  private _onDismissRow = (job_id: string) => {
+    this.dispatchEvent(
+      new CustomEvent("remote-build-job-dismissed", {
+        bubbles: true,
+        composed: true,
+        detail: { job_id },
+      }),
+    );
+    if (this._expandedJobId === job_id) this._expandedJobId = "";
   };
 
   /** Render an error banner row, or ``nothing`` when *message*
    *  is empty. Centralises the field-error markup so the input
-   *  step's submit-error, the running step's per-job
-   *  ``error_message`` (terminal failures from the receiver),
-   *  and the running step's local cancel-error all share one
-   *  visual shape. */
+   *  step's submit-error, each row's per-job ``error_message``
+   *  (terminal failures from the receiver), and per-row
+   *  cancel-errors all share one visual shape. */
   private _renderErrorBanner(message: string | undefined) {
     if (!message) return nothing;
     return html`<div class="field-error" role="alert">${message}</div>`;
@@ -391,7 +400,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           </option>
         </select>
       </div>
-      ${this._renderErrorBanner(this._errorMessage)}
+      ${this._renderErrorBanner(this._submitErrorMessage)}
       <div class="actions">
         <button class="btn-secondary" type="button" @click=${this._close}>
           ${this._localize("layout.close")}
@@ -418,57 +427,115 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     `;
   }
 
-  private _renderRunning() {
-    const job = this._job;
-    const status = job?.status ?? JobStatus.QUEUED;
-    const terminal = isTerminalJobStatus(status);
-    // Cancel hides on terminal status (the job's done; nothing
-    // to cancel) and stays disabled during the cancel_job WS
-    // round-trip and after a successful send while we wait for
-    // the receiver's JOB_CANCELLED-driven status flip. Re-clicks
-    // would just fire a duplicate frame the receiver silently
-    // drops on the unknown-correlation path.
-    const cancelDisabled = this._cancelInFlight || this._cancelRequested;
-    const cancelLabelKey = this._cancelRequested
-      ? "settings.remote_build_cancel_pending"
-      : this._cancelInFlight
-        ? "settings.remote_build_cancel_in_flight"
-        : "settings.remote_build_cancel_action";
+  /** Sort *jobs* newest-first by started_at. Entries that were
+   *  seeded via an event-before-submit race carry 0; they sort
+   *  to the bottom, which is fine because they're rare and the
+   *  display-field backfill on the next dispatch repairs the
+   *  ordering. */
+  private _sortedJobs(): RemoteBuildJobState[] {
+    if (!this._jobs) return [];
+    return [...this._jobs.values()].sort(
+      (a, b) => b.started_at - a.started_at,
+    );
+  }
+
+  private _renderList() {
+    const jobs = this._sortedJobs();
+    if (jobs.length === 0) {
+      return html`
+        <p class="empty">
+          ${this._localize("settings.remote_build_list_empty")}
+        </p>
+        <div class="actions">
+          <button class="btn-secondary" type="button" @click=${this._close}>
+            ${this._localize("layout.close")}
+          </button>
+        </div>
+      `;
+    }
     return html`
-      <div class="job-meta">
-        <span class=${`status-pill status-${status}`}>
-          ${this._localize(`settings.remote_build_status_${status}`)}
-        </span>
-        <span class="job-meta-line">
-          ${job?.configuration || this._configuration} &middot;
-          ${this._localize(`settings.remote_build_submit_target_${this._target}`)}
-        </span>
-      </div>
-      ${this._renderErrorBanner(job?.error_message)}
-      ${this._renderErrorBanner(this._errorMessage)}
-      <div class="logs-container">
-        <esphome-ansi-log
-          .lines=${job?.output ?? []}
-          ?light=${!this._darkMode}
-        ></esphome-ansi-log>
-      </div>
+      <ul class="job-list" role="list">
+        ${jobs.map((job) => this._renderJobRow(job))}
+      </ul>
       <div class="actions">
         <button class="btn-secondary" type="button" @click=${this._close}>
-          ${this._localize(
-            terminal ? "layout.close" : "settings.remote_build_running_minimize",
-          )}
+          ${this._localize("layout.close")}
         </button>
-        ${terminal
-          ? nothing
-          : html`<button
-              class="btn-danger"
-              type="button"
-              ?disabled=${cancelDisabled}
-              @click=${this._onCancel}
-            >
-              ${this._localize(cancelLabelKey)}
-            </button>`}
       </div>
+    `;
+  }
+
+  private _renderJobRow(job: RemoteBuildJobState) {
+    const terminal = isTerminalJobStatus(job.status);
+    const expanded = this._expandedJobId === job.job_id;
+    const row = this._rowState.get(job.job_id) ?? FRESH_ROW_STATE;
+    const headerLabel = job.receiver_label ||
+      this._localize("settings.remote_build_unknown_receiver");
+    const headerConfig = job.configuration ||
+      this._localize("settings.remote_build_unknown_configuration");
+    return html`
+      <li class="job-row">
+        <button
+          class="job-summary"
+          type="button"
+          aria-expanded=${expanded ? "true" : "false"}
+          @click=${() => this._onToggleRow(job.job_id)}
+        >
+          <span class=${`status-pill status-${job.status}`}>
+            ${this._localize(`settings.remote_build_status_${job.status}`)}
+          </span>
+          <span class="job-summary-text">
+            <span class="job-receiver">${headerLabel}</span>
+            <span class="job-meta-line">
+              ${headerConfig} &middot;
+              ${this._localize(
+                `settings.remote_build_submit_target_${job.target}`,
+              )}
+            </span>
+          </span>
+          <span class="chevron" aria-hidden="true">
+            ${expanded ? "▾" : "▸"}
+          </span>
+        </button>
+        ${expanded
+          ? html`
+              <div class="job-body">
+                ${this._renderErrorBanner(job.error_message)}
+                ${this._renderErrorBanner(row.errorMessage)}
+                <div class="logs-container">
+                  <esphome-ansi-log
+                    .lines=${job.output}
+                    ?light=${!this._darkMode}
+                  ></esphome-ansi-log>
+                </div>
+                <div class="row-actions">
+                  ${terminal
+                    ? html`<button
+                        class="btn-secondary"
+                        type="button"
+                        @click=${() => this._onDismissRow(job.job_id)}
+                      >
+                        ${this._localize("settings.remote_build_dismiss_row")}
+                      </button>`
+                    : html`<button
+                        class="btn-danger"
+                        type="button"
+                        ?disabled=${row.cancelInFlight || row.cancelRequested}
+                        @click=${() => this._onCancel(job)}
+                      >
+                        ${this._localize(
+                          row.cancelRequested
+                            ? "settings.remote_build_cancel_pending"
+                            : row.cancelInFlight
+                              ? "settings.remote_build_cancel_in_flight"
+                              : "settings.remote_build_cancel_action",
+                        )}
+                      </button>`}
+                </div>
+              </div>
+            `
+          : nothing}
+      </li>
     `;
   }
 
@@ -489,11 +556,9 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         });
         body = this._renderSubmitting();
         break;
-      case "running":
-        title = this._localize("settings.remote_build_running_title", {
-          label: this._receiverLabel,
-        });
-        body = this._renderRunning();
+      case "list":
+        title = this._localize("settings.remote_build_list_title");
+        body = this._renderList();
         break;
     }
     // Gate light-dismiss while the submit_job WS round-trip
@@ -535,7 +600,12 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     dialogCloseButtonStyles,
+    jobStatusPillStyles,
     css`
+      wa-dialog {
+        --width: 560px;
+      }
+
       .field {
         display: flex;
         flex-direction: column;
@@ -549,14 +619,11 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         margin-top: var(--wa-space-xs);
       }
 
-      /* Destructive variant for the in-dialog Cancel-this-job
+      /* Destructive variant for the per-row Cancel-this-job
          button. Mirrors confirm-dialog's destructive btn tint
          without dragging the whole confirm-dialog style block in.
          The other two buttons in this dialog (.btn-primary /
-         .btn-secondary) inherit browser-default chrome — leaving
-         them alone here to keep the diff focused on the Cancel
-         affordance; a button-style normalisation pass would be a
-         separate cleanup. */
+         .btn-secondary) inherit browser-default chrome. */
       .btn-danger {
         background: var(--esphome-error);
         color: var(--esphome-on-primary);
@@ -586,53 +653,90 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         margin-top: var(--wa-space-m);
       }
 
+      .row-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: var(--wa-space-s);
+        margin-top: var(--wa-space-s);
+      }
+
       .empty {
         color: var(--wa-color-neutral-500);
         margin: var(--wa-space-m) 0;
       }
 
-      .job-meta {
+      .job-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-s);
+      }
+
+      .job-row {
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        background: var(--wa-color-surface-lowered);
+      }
+
+      .job-summary {
         display: flex;
         align-items: center;
         gap: var(--wa-space-s);
-        margin-bottom: var(--wa-space-s);
+        width: 100%;
+        padding: var(--wa-space-s) var(--wa-space-m);
+        background: transparent;
+        border: 0;
+        border-radius: var(--wa-border-radius-m);
+        font-family: inherit;
+        text-align: left;
+        cursor: pointer;
+        color: inherit;
+      }
+
+      .job-summary:hover {
+        background: var(--wa-color-surface-border);
+      }
+
+      .job-summary-text {
+        display: flex;
+        flex-direction: column;
+        flex: 1;
+        min-width: 0;
+        gap: 2px;
+      }
+
+      .job-receiver {
+        font-weight: var(--wa-font-weight-semibold);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
       .job-meta-line {
         color: var(--wa-color-neutral-500);
         font-size: var(--wa-font-size-s);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      .status-pill {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 4px;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-semibold);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+      .chevron {
+        color: var(--wa-color-neutral-500);
+        font-size: var(--wa-font-size-s);
       }
 
-      .status-queued,
-      .status-running {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
-        color: var(--esphome-primary);
-      }
-
-      .status-completed {
-        background: color-mix(in srgb, var(--esphome-success), transparent 80%);
-        color: var(--esphome-success);
-      }
-
-      .status-failed,
-      .status-cancelled {
-        background: color-mix(in srgb, var(--esphome-error), transparent 80%);
-        color: var(--esphome-error);
+      .job-body {
+        padding: 0 var(--wa-space-m) var(--wa-space-m);
+        border-top: var(--wa-border-width-s) solid
+          var(--wa-color-surface-border);
       }
 
       .logs-container {
         height: 320px;
         overflow: hidden;
+        margin-top: var(--wa-space-s);
       }
 
       esphome-ansi-log {
