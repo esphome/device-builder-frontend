@@ -23,19 +23,19 @@ export const jobStatusPillStyles = css`
     flex-shrink: 0;
   }
 
-  .status-queued,
-  .status-running {
+  .status-pill.status-queued,
+  .status-pill.status-running {
     background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
     color: var(--esphome-primary);
   }
 
-  .status-completed {
+  .status-pill.status-completed {
     background: color-mix(in srgb, var(--esphome-success), transparent 80%);
     color: var(--esphome-success);
   }
 
-  .status-failed,
-  .status-cancelled {
+  .status-pill.status-failed,
+  .status-pill.status-cancelled {
     background: color-mix(in srgb, var(--esphome-error), transparent 80%);
     color: var(--esphome-error);
   }

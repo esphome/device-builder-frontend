@@ -1,7 +1,7 @@
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/index.js";
@@ -122,6 +122,22 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
    *  when an entry leaves the shared jobs map so a re-submitted
    *  job_id (theoretical) can't inherit a stale cancelRequested. */
   @state() private _rowState: Map<string, JobRowUIState> = new Map();
+
+  /** Prune _rowState entries whose job_id no longer appears in
+   *  the shared jobs map (entry dismissed elsewhere, or a stale
+   *  row from a previous open). Keeps the Map's lifetime tied
+   *  to the data it annotates so a re-submitted job_id can't
+   *  inherit a stale cancelRequested. */
+  protected updated(changed: PropertyValues): void {
+    if (!changed.has("_jobs")) return;
+    if (this._rowState.size === 0) return;
+    if (!this._jobs) return;
+    const pruned = new Map<string, JobRowUIState>();
+    for (const [job_id, state] of this._rowState) {
+      if (this._jobs.has(job_id)) pruned.set(job_id, state);
+    }
+    if (pruned.size !== this._rowState.size) this._rowState = pruned;
+  }
 
   /** Open the dialog targeting *pairing*, defaulting the
    *  configuration to the first device on the list (or empty
