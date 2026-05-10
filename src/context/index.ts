@@ -23,5 +23,6 @@ export {
   buildOffloadPairingsContext,
   buildOffloadAlertsContext,
   buildOffloadJobsContext,
+  stubRemoteBuildJobState,
 } from "./contexts.js";
 export type { RemoteBuildJobState } from "./contexts.js";

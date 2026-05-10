@@ -6,18 +6,19 @@
  */
 import { createContext } from "@lit/context";
 import { ESPHomeAPI } from "../api/index.js";
-import type {
-  AdoptableDevice,
-  ConfiguredDevice,
-  FirmwareJob,
+import {
   JobStatus,
-  Label,
-  OffloaderAlertSnapshotEntry,
-  PairingSummary,
-  PairingWindowState,
-  PeerSummary,
-  RemoteBuildPeer,
-  RemoteBuildSubmitTarget,
+  JobType,
+  type AdoptableDevice,
+  type ConfiguredDevice,
+  type FirmwareJob,
+  type Label,
+  type OffloaderAlertSnapshotEntry,
+  type PairingSummary,
+  type PairingWindowState,
+  type PeerSummary,
+  type RemoteBuildPeer,
+  type RemoteBuildSubmitTarget,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
@@ -347,3 +348,30 @@ export const buildOffloadJobsContext = createContext<Map<
   string,
   RemoteBuildJobState
 > | null>(Symbol("esphome-build-offload-jobs"));
+
+/**
+ * Build a fresh ``RemoteBuildJobState`` with empty display
+ * fields, used by app-shell when an event arrives before the
+ * dispatch dialog has stamped the entry.
+ *
+ * The dispatch helper (``registerRemoteBuildJob`` on app-
+ * shell) backfills configuration / target / receiver_label /
+ * started_at on its success bubble; until then the dialog
+ * tolerates the empty strings.
+ */
+export function stubRemoteBuildJobState(
+  job_id: string,
+  pin_sha256: string,
+): RemoteBuildJobState {
+  return {
+    job_id,
+    pin_sha256,
+    receiver_label: "",
+    configuration: "",
+    target: JobType.COMPILE as RemoteBuildSubmitTarget,
+    status: JobStatus.QUEUED,
+    error_message: "",
+    output: [],
+    started_at: 0,
+  };
+}

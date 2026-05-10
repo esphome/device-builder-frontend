@@ -89,6 +89,7 @@ import {
   onboardingPendingContext,
   remoteBuildEnabledContext,
   serverVersionContext,
+  stubRemoteBuildJobState,
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
@@ -1307,74 +1308,36 @@ export class ESPHomeApp extends LitElement {
       case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
         // Lifecycle transition for a remote-build job we
         // submitted: queued / running / completed / failed /
-        // cancelled. The wire frame doesn't carry the display
-        // fields (configuration / target / receiver_label) so
-        // we either upsert into an entry the dispatch helper
-        // already seeded (typical path: submit_job returned
-        // ack first, then state events follow), or stamp
-        // empty-string display fields on a brand-new entry
-        // (event raced ahead of submit_job's return, or a
-        // late-subscribing tab joins mid-build). Settings
-        // dialog tolerates the empty display fields and
-        // shows them as "(unknown)" until the dispatch
-        // helper backfills.
+        // cancelled. Either upsert an existing entry (the
+        // dispatch helper already seeded display fields), or
+        // start one with empty display fields (event raced
+        // ahead of submit_job's return, or a late-subscribing
+        // tab joined mid-build). The dialog tolerates empty
+        // display fields and the dispatch helper backfills
+        // them on its success bubble.
         const evt = data as OffloaderJobStateChangedEventData;
-        const next = new Map(this._buildOffloadJobs);
-        const existing = next.get(evt.job_id);
-        if (existing === undefined) {
-          next.set(evt.job_id, {
-            job_id: evt.job_id,
-            pin_sha256: evt.pin_sha256,
-            receiver_label: "",
-            configuration: "",
-            target: JobType.COMPILE as RemoteBuildSubmitTarget,
-            status: evt.status,
-            error_message: evt.error_message,
-            output: [],
-            started_at: 0,
-          });
-        } else {
-          next.set(evt.job_id, {
-            ...existing,
-            status: evt.status,
-            error_message: evt.error_message,
-          });
-        }
-        this._buildOffloadJobs = next;
+        const base = this._buildOffloadJobs.get(evt.job_id) ??
+          stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
+        this._buildOffloadJobs = new Map(this._buildOffloadJobs).set(evt.job_id, {
+          ...base,
+          status: evt.status,
+          error_message: evt.error_message,
+        });
         break;
       }
       case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
-        // Per-line stdout / stderr from the receiver's
-        // running build. High-rate path during an active
-        // compile; the Map.set + array spread is the
-        // straightforward shape for now (the existing
-        // ansi-log component re-renders on its own throttle).
-        // Same brand-new-entry tolerance as STATE_CHANGED:
-        // an output frame arriving before submit_job's ack
-        // returns lands on a stub entry the dispatch helper
-        // backfills.
+        // Per-line stdout / stderr from the receiver's running
+        // build. High-rate path during an active compile; the
+        // existing ansi-log component re-renders on its own
+        // throttle. Same brand-new-entry tolerance as
+        // STATE_CHANGED above (event-before-ack race).
         const evt = data as OffloaderJobOutputEventData;
-        const next = new Map(this._buildOffloadJobs);
-        const existing = next.get(evt.job_id);
-        if (existing === undefined) {
-          next.set(evt.job_id, {
-            job_id: evt.job_id,
-            pin_sha256: evt.pin_sha256,
-            receiver_label: "",
-            configuration: "",
-            target: JobType.COMPILE as RemoteBuildSubmitTarget,
-            status: JobStatus.RUNNING,
-            error_message: "",
-            output: [evt.line],
-            started_at: 0,
-          });
-        } else {
-          next.set(evt.job_id, {
-            ...existing,
-            output: [...existing.output, evt.line],
-          });
-        }
-        this._buildOffloadJobs = next;
+        const base = this._buildOffloadJobs.get(evt.job_id) ??
+          stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
+        this._buildOffloadJobs = new Map(this._buildOffloadJobs).set(evt.job_id, {
+          ...base,
+          output: [...base.output, evt.line],
+        });
         break;
       }
     }
