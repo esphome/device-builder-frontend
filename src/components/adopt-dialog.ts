@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { AdoptableDevice } from "../api/types.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -12,7 +12,7 @@ import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { renderInlineError } from "../util/render-error.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
+import "./base-dialog.js";
 
 @customElement("esphome-adopt-dialog")
 export class ESPHomeAdoptDialog extends LitElement {
@@ -35,39 +35,31 @@ export class ESPHomeAdoptDialog extends LitElement {
   @state() private _encryption = true;
   @state() private _busy = false;
   @state() private _error: string | null = null;
-
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state() private _open = false;
 
   static styles = [
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 460px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -250,37 +242,32 @@ export class ESPHomeAdoptDialog extends LitElement {
     this._encryption = true;
     this._busy = false;
     this._error = null;
-    this._dialog.open = true;
+    this._open = true;
   }
 
   close = () => {
     /* Arrow function so ``@click=${this.close}`` from the cancel
        button keeps ``this`` bound to the dialog. With a plain method,
        Lit hands the listener to ``addEventListener`` which calls it
-       with ``this === undefined`` (strict mode) and the
-       ``this._dialog`` access blows up. */
-    this._dialog.open = false;
+       with ``this === undefined`` (strict mode) and the property
+       access below would blow up. */
+    this._open = false;
   };
 
-  /** Block dialog dismissal while the import request is in flight,
-   *  so a stray click outside / Esc keypress can't hide an error
-   *  that's about to surface. ``light-dismiss`` is also gated on
-   *  ``!_busy`` for belt-and-suspenders, but the close-request hook
-   *  catches Esc and the close-button-base too. */
-  private _onRequestClose = (e: Event) => {
-    if (this._busy) {
-      e.preventDefault();
-    }
+  private _onAfterHide = (): void => {
+    // wa-dialog finished its hide sequence; flip our local
+    // open flag so the next render's ?open binding matches.
+    this._open = false;
   };
 
   protected render() {
-    /* Always render the wa-dialog with the same template shape, even
-       before a device is set. Returning a different template
-       (``<wa-dialog></wa-dialog>``) on the first render and then a
-       fully-populated one on the second made Lit swap the wa-dialog
-       instance — so the ``_dialog.open = true`` we set in ``open()``
-       was applied to a wa-dialog that was about to be thrown away,
-       and the user had to click Take Control twice for the dialog to
+    /* Always render the dialog with the same template shape,
+       even before a device is set. Returning a different
+       template on the first render and then a fully-populated
+       one on the second made Lit swap the element instance —
+       so the open-flag flip we set in ``open()`` was applied
+       to an element that was about to be thrown away, and the
+       user had to click Take Control twice for the dialog to
        actually appear. */
     const device = this._device;
     const nameTrimmed = this._name.trim();
@@ -289,10 +276,11 @@ export class ESPHomeAdoptDialog extends LitElement {
     const displayName = device ? device.friendly_name || device.name : "";
 
     return html`
-      <wa-dialog
-        label=${this._localize("dashboard.adopt_title")}
-        ?light-dismiss=${!this._busy}
-        @wa-request-close=${this._onRequestClose}
+      <esphome-base-dialog
+        ?open=${this._open}
+        ?busy=${this._busy}
+        .label=${this._localize("dashboard.adopt_title")}
+        @after-hide=${this._onAfterHide}
       >
         ${device
           ? html`
@@ -391,7 +379,7 @@ export class ESPHomeAdoptDialog extends LitElement {
               </div>
             `
           : nothing}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
