@@ -1418,6 +1418,27 @@ export interface RemoteBuildPeer {
   addresses: string[];
   server_version: string;
   esphome_version: string;
+  /**
+   * SHA-256 of the receiver's static X25519 peer-link pubkey,
+   * lowercase hex, parsed off the mDNS TXT record. Empty string
+   * for receivers that haven't bound the peer-link listener at
+   * announce time (default-off mode). The offloader's mDNS
+   * auto-rebind path matches this against persisted pairings;
+   * the discovered-row Pair button doesn't read it (the wizard
+   * runs `preview_pair` against the chosen endpoint and OOBs
+   * the live fingerprint).
+   */
+  pin_sha256: string;
+  /**
+   * Receiver's peer-link Noise WS port from the TXT
+   * `remote_build_port` key, NOT the SRV-advertised dashboard
+   * HTTP port (`port` above). The discovered-row Pair button
+   * pre-fills this into the wizard so operators on a non-default
+   * `--remote-build-port` don't have to retype it on every pair.
+   * `0` for receivers that haven't bound the peer-link listener
+   * yet; the wizard falls back to its 6055 default in that case.
+   */
+  remote_build_port: number;
 }
 
 /**

@@ -2726,18 +2726,19 @@ export class ESPHomeSettingsDialog extends LitElement {
           esphome: peer.esphome_version,
         })
       : nothing;
-    // The Pair button pre-fills only the hostname. The row's
-    // ``peer.port`` is the dashboard's HTTP port from the SRV
-    // record (default 6052), not the peer-link Noise WS port
-    // (default 6055); pre-filling SRV port would land a
-    // ``UNAVAILABLE`` on the very first preview round-trip.
-    // Until the backend surfaces the receiver's peer-link
-    // ``remote_build_port`` from TXT, the dialog falls back to
-    // its 6055 default and the user can edit if the receiver
-    // overrode ``--remote-build-port``. Already-paired hosts
-    // never reach this renderer; ``_renderRemoteBuildPeers``
-    // filters them out one level up so the list is just
-    // unpaired discovered hosts.
+    // The Pair button pre-fills the hostname AND the peer-link
+    // port. The row's ``peer.port`` is the dashboard's HTTP port
+    // from the SRV record (default 6052), NOT the peer-link
+    // Noise WS port (default 6055); the wizard wants the latter.
+    // ``peer.remote_build_port`` carries that value off the mDNS
+    // TXT ``remote_build_port`` key — non-zero whenever the
+    // receiver's peer-link listener is bound, ``0`` for receivers
+    // that haven't published it (default-off mode);
+    // ``_onPairDiscoveredHost`` falls back to the wizard's 6055
+    // default in the latter case. Already-paired hosts never
+    // reach this renderer; ``_renderRemoteBuildPeers`` filters
+    // them out one level up so the list is just unpaired
+    // discovered hosts.
     return html`
       <div class="row peer-row">
         <div class="row-label">
@@ -2782,7 +2783,18 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _onPairDiscoveredHost = (peer: RemoteBuildPeer): void => {
-    this._pairBuildServerDialog?.open({ hostname: peer.hostname });
+    // Pre-fill the wizard's port from the receiver's TXT
+    // ``remote_build_port`` (the actual peer-link Noise WS port)
+    // when present; ``0`` means the receiver hasn't published it
+    // (peer-link listener unbound at announce time), so let the
+    // wizard fall back to its 6055 default. Pre-filling the
+    // SRV-advertised ``peer.port`` would land an ``UNAVAILABLE``
+    // on the very first ``preview_pair`` round-trip — that's the
+    // dashboard HTTP port, not the peer-link WS port.
+    this._pairBuildServerDialog?.open({
+      hostname: peer.hostname,
+      port: peer.remote_build_port > 0 ? peer.remote_build_port : undefined,
+    });
   };
 
   private _onThemeChange(e: Event) {
