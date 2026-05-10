@@ -295,12 +295,33 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   }
 
   protected render() {
+    // Gate ``light-dismiss`` while a ``preview_pair`` /
+    // ``request_pair`` round-trip is in flight: outside-click /
+    // Esc / close-button can't hide an error that's about to
+    // surface, and (more importantly) can't dismiss the dialog
+    // between submitting and the request completing — that race
+    // would let a successful ``request_pair`` fire its
+    // ``pair-request-sent`` event + success toast against an
+    // already-closed dialog. ``@wa-request-close`` catches Esc /
+    // close-button while ``light-dismiss`` only blocks
+    // outside-click, so both gates are present (same shape as
+    // ``adopt-dialog``).
     return html`
-      <wa-dialog label=${this._dialogTitle()} light-dismiss>
+      <wa-dialog
+        label=${this._dialogTitle()}
+        ?light-dismiss=${!this._busy}
+        @wa-request-close=${this._onRequestClose}
+      >
         ${this._renderStep()}
       </wa-dialog>
     `;
   }
+
+  private _onRequestClose = (e: Event): void => {
+    if (this._busy) {
+      e.preventDefault();
+    }
+  };
 
   private _dialogTitle(): string {
     if (this._step === "sent") {
@@ -341,6 +362,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
             inputmode="url"
             autocomplete="off"
             spellcheck="false"
+            ?disabled=${this._busy}
             placeholder=${this._localize(
               "settings.pair_build_server_hostname_placeholder",
             )}
@@ -360,6 +382,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
             type="number"
             min="1"
             max="65535"
+            ?disabled=${this._busy}
             .value=${this._port}
             @input=${(e: Event) => {
               this._port = (e.target as HTMLInputElement).value;
@@ -375,7 +398,11 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         ? html`<div class="step-error" role="alert">${this._error}</div>`
         : nothing}
       <div class="actions">
-        <button class="btn btn--cancel" @click=${this.close}>
+        <button
+          class="btn btn--cancel"
+          ?disabled=${this._busy}
+          @click=${this.close}
+        >
           ${this._localize("layout.cancel")}
         </button>
         <button
@@ -420,6 +447,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
           id="pair-receiver-label"
           type="text"
           autocomplete="off"
+          ?disabled=${this._busy}
           .value=${this._receiverLabel}
           placeholder=${this._localize(
             "settings.pair_build_server_receiver_label_placeholder",
@@ -441,6 +469,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
           id="pair-offloader-label"
           type="text"
           autocomplete="off"
+          ?disabled=${this._busy}
           .value=${this._offloaderLabel}
           placeholder=${this._localize(
             "settings.pair_build_server_offloader_label_placeholder",
