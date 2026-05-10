@@ -2,7 +2,7 @@ import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
 import { consume } from "@lit/context";
 import { LitElement, css, html } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
@@ -29,22 +29,47 @@ import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
  * **Busy gate**. When ``?busy=true``:
  *
  * - ``<wa-dialog>``'s ``?light-dismiss`` is disabled, so
- *   outside-click / Esc can't dismiss while a WS round-trip
- *   is in flight.
+ *   outside-click can't dismiss while a WS round-trip is
+ *   in flight.
  * - The close-button is ``disabled``.
- * - Hosts that want to *also* veto programmatic close
- *   (``dialog.close()`` from a parent) can still listen for
- *   ``@request-close`` and call ``e.preventDefault()`` on
- *   their own logic.
+ * - The wrapper proactively ``preventDefault()``s
+ *   ``wa-request-close`` so Escape / programmatic close
+ *   are blocked too, even when the consumer doesn't wire
+ *   their own ``@request-close`` veto handler. The busy
+ *   gate is comprehensive — consumers don't have to
+ *   double-cover it.
  *
  * **Events re-emitted**:
  *
  * - ``@request-close`` mirrors ``wa-dialog``'s
  *   ``wa-request-close`` (cancellable; ``preventDefault()``
- *   to veto).
+ *   to veto for host-side reasons like unsaved changes).
+ *   Not fired when the wrapper vetoes for ``busy`` — the
+ *   host can't override the busy gate.
  * - ``@after-hide`` mirrors ``wa-dialog``'s
  *   ``wa-after-hide`` (fires once the dialog has fully
- *   hidden; consumers reset local state here).
+ *   hidden; consumers reset local state and flip their
+ *   own ``_open = false`` here so the next render's
+ *   ``?open`` binding matches the wrapper's state).
+ *
+ * **Close paths**:
+ *
+ * All close paths flow through ``wa-request-close`` so
+ * busy gate + host veto are evaluated uniformly:
+ *
+ * - Escape key / outside-click → ``wa-dialog`` fires
+ *   ``wa-request-close`` directly.
+ * - Custom X button click → wrapper calls
+ *   ``waDialog.hide()`` which fires ``wa-request-close``.
+ * - Reactive ``?open`` flip → ``wa-dialog`` fires
+ *   ``wa-request-close`` as part of its hide sequence.
+ *
+ * The wrapper never mutates its own ``open`` property in
+ * response to user actions; closing is the host's
+ * responsibility via ``?open=${false}`` (typically wired
+ * inside the ``@after-hide`` listener). This keeps a
+ * single source of truth on the host so a re-render
+ * mid-close can't reopen the dialog.
  *
  * **Slots**:
  *
@@ -75,11 +100,22 @@ export class ESPHomeBaseDialog extends LitElement {
    *  flight; don't let the user orphan it". */
   @property({ type: Boolean }) busy = false;
 
+  @query("wa-dialog")
+  private _waDialog?: HTMLElement & { hide?: () => void };
+
   private _onWaRequestClose = (e: Event): void => {
-    // Re-emit as ``request-close``; preserve cancellation
-    // semantics so a host that calls preventDefault() on
-    // the re-emitted event vetoes the close on the
-    // underlying wa-dialog too.
+    // Busy gate first: refuse close regardless of source
+    // (Esc / outside-click / X / programmatic) while a WS
+    // round-trip is in flight. Consumers don't have to
+    // wire their own veto — the wrapper handles it.
+    if (this.busy) {
+      e.preventDefault();
+      return;
+    }
+    // Re-emit as ``request-close`` so host can veto for
+    // its own reasons (unsaved changes, mid-step flow,
+    // …). preventDefault() on the re-emitted event
+    // vetoes the close on the underlying wa-dialog too.
     const passthrough = new CustomEvent("request-close", {
       cancelable: true,
       bubbles: false,
@@ -96,12 +132,15 @@ export class ESPHomeBaseDialog extends LitElement {
   };
 
   private _onCloseClick = (): void => {
-    // Mirrors the explicit ``_close()`` handler every
-    // consumer used to wire. wa-dialog's after-hide fires
-    // afterwards so the host's state cleanup still runs
-    // via the @after-hide listener.
-    if (this.busy) return;
-    this.open = false;
+    // Drive close through wa-dialog's hide() so the entire
+    // close flow (busy gate via wa-request-close + host
+    // veto + after-hide cleanup) runs uniformly. Mutating
+    // ``this.open`` directly would (a) bypass the host's
+    // veto opportunity and (b) desync with a state-driven
+    // host whose own ``_open`` is still true — a host
+    // re-render mid-close would flip ``?open`` back to
+    // true and re-open the dialog.
+    this._waDialog?.hide?.();
   };
 
   protected render() {
