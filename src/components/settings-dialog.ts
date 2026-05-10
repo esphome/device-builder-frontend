@@ -204,10 +204,11 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null =
     null;
 
-  // Pending Unpair confirmation: receiver coordinates of the
-  // row whose Unpair button was clicked. Captured here so the
-  // shared destructive-confirm dialog's @confirm handler knows
-  // which row to drop. ``null`` when no Unpair is pending.
+  // Pending Unpair confirmation. Identified by ``pin_sha256``
+  // (the wire-canonical row id sent to ``unpairRemoteBuild``);
+  // ``hostname`` / ``port`` / ``label`` are retained for display
+  // in the destructive-confirm dialog only. ``null`` when no
+  // Unpair is pending.
   @state()
   private _pendingUnpair: {
     pin_sha256: string;

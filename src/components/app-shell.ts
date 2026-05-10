@@ -1174,14 +1174,17 @@ export class ESPHomeApp extends LitElement {
         break;
       }
       case DeviceEventType.OFFLOADER_PAIR_STATUS_CHANGED: {
-        // Two cases keyed on ``status``:
+        // Two cases keyed on ``status``. The map (and event) is
+        // keyed by ``pin_sha256`` (the receiver's static
+        // X25519 pubkey hash), the wire-canonical stable row
+        // identity — receiver hostname/port are display-only
+        // and can change without remapping (4a-o part 6).
         // - ``approved``: flip the matching pairing row's status
         //   to "approved". Other fields stay valid (the receiver-
-        //   side approval doesn't mutate label / pin / paired_at;
-        //   the row's identity is the receiver coordinates the
-        //   user typed). If the row isn't in the map yet (event
-        //   raced ahead of the snapshot), skip the flip — the
-        //   next initial-state push reseeds.
+        //   side approval doesn't mutate label / pin / paired_at).
+        //   If the row isn't in the map yet (event raced ahead
+        //   of the snapshot), skip the flip — the next
+        //   initial-state push reseeds.
         // - ``removed``: drop the row by key. ``unpair`` /
         //   receiver-side reject / receiver-rotated-out-from-
         //   under-us all funnel through this event.
