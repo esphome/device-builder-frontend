@@ -339,7 +339,7 @@ export interface RemoteBuildJobState {
 
 /**
  * Context for in-flight remote-build jobs the offloader's
- * user dispatched. Keyed on job_id. ``null`` until app-shell
+ * user dispatched. Keyed on job_id. null until app-shell
  * initialises (always immediately on app boot today, but
  * keeps the same null-vs-empty distinction sibling contexts
  * use for "still loading" vs "loaded but empty").
@@ -350,12 +350,12 @@ export const buildOffloadJobsContext = createContext<Map<
 > | null>(Symbol("esphome-build-offload-jobs"));
 
 /**
- * Build a fresh ``RemoteBuildJobState`` with empty display
+ * Build a fresh RemoteBuildJobState with empty display
  * fields, used by app-shell when an event arrives before the
  * dispatch dialog has stamped the entry.
  *
- * The dispatch helper (``registerRemoteBuildJob`` on app-
- * shell) backfills configuration / target / receiver_label /
+ * The dispatch helper (registerRemoteBuildJob on app-shell)
+ * backfills configuration / target / receiver_label /
  * started_at on its success bubble; until then the dialog
  * tolerates the empty strings.
  */

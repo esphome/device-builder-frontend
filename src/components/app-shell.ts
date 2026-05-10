@@ -362,11 +362,11 @@ export class ESPHomeApp extends LitElement {
    *  job_id. Seeded as an empty Map on app boot (no backend
    *  snapshot today; tabs that subscribe mid-build pick up
    *  state on the next event). Mutated by
-   *  ``OFFLOADER_JOB_STATE_CHANGED`` / ``OFFLOADER_JOB_OUTPUT``
-   *  events on the global subscribe_events stream, plus a
-   *  fresh ``submit_job`` returning ack on the offloader UI's
-   *  click path (the dispatch helper seeds the entry's
-   *  display fields the wire frames don't carry). */
+   *  OFFLOADER_JOB_STATE_CHANGED / OFFLOADER_JOB_OUTPUT events
+   *  on the global subscribe_events stream, plus a fresh
+   *  submit_job returning ack on the offloader UI's click
+   *  path (the dispatch helper seeds the entry's display
+   *  fields the wire frames don't carry). */
   @provide({ context: buildOffloadJobsContext })
   @state()
   private _buildOffloadJobs: Map<string, RemoteBuildJobState> = new Map();
