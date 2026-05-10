@@ -59,8 +59,10 @@ import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import "./pair-build-server-dialog.js";
 import "./pin-emoji-grid.js";
+import "./reauth-wizard-dialog.js";
 import "./remote-build-job-dialog.js";
 import type { ESPHomePairBuildServerDialog } from "./pair-build-server-dialog.js";
+import type { ESPHomeReauthWizardDialog } from "./reauth-wizard-dialog.js";
 import type { ESPHomeRemoteBuildJobDialog } from "./remote-build-job-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -352,6 +354,9 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   @query("esphome-pair-build-server-dialog")
   private _pairBuildServerDialog!: ESPHomePairBuildServerDialog;
+
+  @query("esphome-reauth-wizard-dialog")
+  private _reauthWizardDialog!: ESPHomeReauthWizardDialog;
 
   @query("esphome-remote-build-job-dialog")
   private _remoteBuildDialog!: ESPHomeRemoteBuildJobDialog;
@@ -2208,6 +2213,9 @@ export class ESPHomeSettingsDialog extends LitElement {
         @pair-approved=${this._onPairApproved}
         @pair-rejected=${this._onPairRejected}
       ></esphome-pair-build-server-dialog>
+      <esphome-reauth-wizard-dialog
+        @reauth-confirmed=${this._onReauthConfirmed}
+      ></esphome-reauth-wizard-dialog>
       <esphome-remote-build-job-dialog></esphome-remote-build-job-dialog>
       <esphome-confirm-dialog
         id="unpair-confirm"
@@ -2345,19 +2353,43 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _onAlertRepair = (
     alert: OffloaderAlertSnapshotEntry,
   ): void => {
-    // Open the pair wizard pre-filled with the alert's
-    // hostname AND port — the alert carries the exact
-    // coordinates the user originally paired against, so the
-    // peer-link port is known here (unlike the discovered-
-    // host Pair flow which only has the SRV port). A
-    // successful ``request_pair`` for the same coordinates
-    // auto-resolves the alert backend-side (fires
-    // ``OFFLOADER_PAIR_ALERT_DISMISSED``); app-shell catches
-    // that event and drops the row from the alerts map, so
-    // the alert disappears without any extra work here.
+    // Pin-mismatch alerts route through the re-auth wizard
+    // (8a): the operator needs the structured walk-through
+    // before they commit to re-pairing against a freshly
+    // observed identity. The wizard renders the
+    // expected-vs-observed fingerprints, frames the two
+    // possible causes (legitimate rotation vs impersonation),
+    // and gates the Re-pair button on an OOB-verification
+    // checkbox; on confirm it fires ``reauth-confirmed`` and
+    // we open the existing pair wizard pre-filled below
+    // (``_onReauthConfirmed``). A successful ``request_pair``
+    // for the same coordinates auto-resolves the alert
+    // backend-side (fires ``OFFLOADER_PAIR_ALERT_DISMISSED``);
+    // app-shell catches that event and drops the row.
+    //
+    // Any future alert kind that grows a Re-pair affordance
+    // can fall through to the legacy direct-open path until
+    // we decide whether it needs its own wizard.
+    if (alert.kind === "pin_mismatch") {
+      this._reauthWizardDialog?.open(alert);
+      return;
+    }
     this._pairBuildServerDialog?.open({
       hostname: alert.receiver_hostname,
       port: alert.receiver_port,
+    });
+  };
+
+  /** Re-auth wizard cleared the user's OOB-verification gate;
+   *  hand off to the existing pair-build-server-dialog with
+   *  the alert's hostname + port pre-filled, same shape the
+   *  pre-wizard direct-open path used. */
+  private _onReauthConfirmed = (
+    e: CustomEvent<{ hostname: string; port: number }>,
+  ): void => {
+    this._pairBuildServerDialog?.open({
+      hostname: e.detail.hostname,
+      port: e.detail.port,
     });
   };
 
