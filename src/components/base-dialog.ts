@@ -1,11 +1,9 @@
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 
-import { consume } from "@lit/context";
 import { LitElement, css, html } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property } from "lit/decorators.js";
 
-import type { LocalizeFunc } from "../common/localize.js";
-import { localizeContext } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 
 /**
  * Thin shared wrapper around ``<wa-dialog>``.
@@ -13,10 +11,10 @@ import { localizeContext } from "../context/index.js";
  * Every dialog in the app spent ~20 lines on identical
  * scaffolding — the ``?open`` binding, the
  * ``?light-dismiss`` busy-gate, the ``@wa-request-close``
- * / ``@wa-after-hide`` wiring, and a custom dialog-close X
- * button in ``slot="header-actions"`` with a disabled-when-
- * busy contract. This element bundles all of that into one
- * place so consumers carry just the dialog title and body.
+ * / ``@wa-after-hide`` wiring, and ``dialogCloseButtonStyles``
+ * to dress the built-in close button. This element bundles
+ * all of that into one place so consumers carry just the
+ * dialog title and body.
  *
  * Reactive open/close: consumers pass ``?open=${this._open}``
  * and listen for ``@after-hide`` to clear local state. The
@@ -30,13 +28,17 @@ import { localizeContext } from "../context/index.js";
  * - ``<wa-dialog>``'s ``?light-dismiss`` is disabled, so
  *   outside-click can't dismiss while a WS round-trip is
  *   in flight.
- * - The close-button is ``disabled``.
  * - The wrapper proactively ``preventDefault()``s
- *   ``wa-request-close`` so Escape / programmatic close
- *   are blocked too, even when the consumer doesn't wire
- *   their own ``@request-close`` veto handler. The busy
- *   gate is comprehensive — consumers don't have to
- *   double-cover it.
+ *   ``wa-request-close`` so Escape / X-button click /
+ *   programmatic close are all silently absorbed, even
+ *   when the consumer doesn't wire their own
+ *   ``@request-close`` veto handler. The busy gate is
+ *   comprehensive — consumers don't have to double-cover
+ *   it.
+ * - The built-in close button is visually dimmed via
+ *   ``:host([busy]) wa-dialog::part(close-button__base)``
+ *   so the silent absorption doesn't read as a broken
+ *   button.
  *
  * **Events re-emitted**:
  *
@@ -56,19 +58,19 @@ import { localizeContext } from "../context/index.js";
  * All close paths flow through ``wa-request-close`` so
  * busy gate + host veto are evaluated uniformly:
  *
- * - Escape key / outside-click → ``wa-dialog`` fires
- *   ``wa-request-close`` directly.
- * - Custom X button click → wrapper calls
- *   ``waDialog.hide()`` which fires ``wa-request-close``.
- * - Reactive ``?open`` flip → ``wa-dialog`` fires
- *   ``wa-request-close`` as part of its hide sequence.
+ * - Escape key / outside-click / built-in X button →
+ *   ``wa-dialog`` fires ``wa-request-close`` directly.
+ * - Reactive ``?open`` flip from the host → ``wa-dialog``
+ *   fires ``wa-request-close`` as part of its hide
+ *   sequence.
  *
  * The wrapper never mutates its own ``open`` property in
- * response to user actions; closing is the host's
- * responsibility via ``?open=${false}`` (typically wired
- * inside the ``@after-hide`` listener). This keeps a
- * single source of truth on the host so a re-render
- * mid-close can't reopen the dialog.
+ * response to user actions. After a non-vetoed close,
+ * wa-dialog finishes hiding and fires ``wa-after-hide``;
+ * the host's ``@after-hide`` listener is the place to
+ * flip ``_open = false`` and clear local state, which
+ * flows back through the reactive ``?open`` binding so
+ * the next render's ``?open`` matches.
  *
  * **Slots**:
  *
@@ -95,10 +97,6 @@ import { localizeContext } from "../context/index.js";
  */
 @customElement("esphome-base-dialog")
 export class ESPHomeBaseDialog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
-
   /** Dialog title rendered in the header. Consumers pass
    *  the already-localised string. */
   @property() label = "";
@@ -111,9 +109,6 @@ export class ESPHomeBaseDialog extends LitElement {
    *  close-button is greyed out. Use for "WS round-trip in
    *  flight; don't let the user orphan it". */
   @property({ type: Boolean }) busy = false;
-
-  @query("wa-dialog")
-  private _waDialog?: HTMLElement & { hide?: () => void };
 
   private _onWaRequestClose = (e: Event): void => {
     // Busy gate first: refuse close regardless of source
@@ -143,18 +138,6 @@ export class ESPHomeBaseDialog extends LitElement {
     );
   };
 
-  private _onCloseClick = (): void => {
-    // Drive close through wa-dialog's hide() so the entire
-    // close flow (busy gate via wa-request-close + host
-    // veto + after-hide cleanup) runs uniformly. Mutating
-    // ``this.open`` directly would (a) bypass the host's
-    // veto opportunity and (b) desync with a state-driven
-    // host whose own ``_open`` is still true — a host
-    // re-render mid-close would flip ``?open`` back to
-    // true and re-open the dialog.
-    this._waDialog?.hide?.();
-  };
-
   protected render() {
     return html`
       <wa-dialog
@@ -165,77 +148,29 @@ export class ESPHomeBaseDialog extends LitElement {
         @wa-after-hide=${this._onWaAfterHide}
       >
         <header slot="label">${this.label}</header>
-        <button
-          class="dialog-close"
-          slot="header-actions"
-          aria-label=${this._localize("layout.close")}
-          ?disabled=${this.busy}
-          @click=${this._onCloseClick}
-        >
-          ✕
-        </button>
         <slot></slot>
       </wa-dialog>
     `;
   }
 
   static styles = [
+    dialogCloseButtonStyles,
     css`
       :host {
         display: contents;
       }
 
-      /* Hide wa-dialog's built-in close button — we render
-         our own in slot="header-actions" so we can bind
-         ?disabled to busy and gate the click through the
-         same close flow as Esc / outside-click. Without
-         this rule, both buttons render side-by-side
-         (header-actions content is additive next to the
-         built-in, not a replacement). The custom button
-         picks up its own styling from the .dialog-close
-         block below; dialogCloseButtonStyles is
-         intentionally NOT bundled here because it targets
-         wa-dialog::part(close-button__base) which we just
-         hid. */
-      wa-dialog::part(close-button) {
-        display: none;
-      }
-
-      /* Custom close button styling. Mirrors the shape
-         dialogCloseButtonStyles applies to wa-dialog's
-         built-in close (40x40 hit target, tinted hover /
-         focus background, currentColor focus outline) so
-         the visual is unchanged from the pre-base-dialog
-         shape every consumer used. */
-      .dialog-close {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-        font-size: 18px;
-      }
-
-      .dialog-close:hover:not(:disabled),
-      .dialog-close:focus-visible {
-        background: color-mix(
-          in srgb,
-          var(--esphome-on-primary),
-          transparent 85%
-        );
-      }
-
-      .dialog-close:focus-visible {
-        outline: 2px solid currentColor;
-        outline-offset: -2px;
-      }
-
-      .dialog-close:disabled {
+      /* Busy visual on wa-dialog's built-in close. The
+         functional gate is the wa-request-close veto
+         above — clicking the X while busy silently
+         absorbs the event and the dialog stays open. The
+         CSS here is the user-facing cue (button looks
+         disabled) so the silent absorption doesn't read
+         as a broken button. */
+      :host([busy]) wa-dialog::part(close-button__base) {
         opacity: 0.4;
         cursor: not-allowed;
+        pointer-events: none;
       }
     `,
   ];
