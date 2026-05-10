@@ -107,6 +107,14 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
   }
 
   private _close = () => {
+    // Idempotent: bound to the close-button @click AND the
+    // wa-dialog @wa-after-hide, which fires when ?open flips
+    // to false — so without this guard the second invocation
+    // would re-fire the dismiss event. dismissRemoteBuildJob
+    // is idempotent itself, but double-emitting an event the
+    // parent listens to is observable and risks future
+    // side-effects on subscribers.
+    if (!this._open) return;
     // Closing on a terminal job (completed / failed /
     // cancelled) is the operator's "I've seen the result"
     // signal — drop the entry from buildOffloadJobsContext so
