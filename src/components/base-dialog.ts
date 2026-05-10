@@ -6,7 +6,6 @@ import { customElement, property, query, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 
 /**
  * Thin shared wrapper around ``<wa-dialog>``.
@@ -181,10 +180,62 @@ export class ESPHomeBaseDialog extends LitElement {
   }
 
   static styles = [
-    dialogCloseButtonStyles,
     css`
       :host {
         display: contents;
+      }
+
+      /* Hide wa-dialog's built-in close button — we render
+         our own in slot="header-actions" so we can bind
+         ?disabled to busy and gate the click through the
+         same close flow as Esc / outside-click. Without
+         this rule, both buttons render side-by-side
+         (header-actions content is additive next to the
+         built-in, not a replacement). The custom button
+         picks up its own styling from the .dialog-close
+         block below; dialogCloseButtonStyles is
+         intentionally NOT bundled here because it targets
+         wa-dialog::part(close-button__base) which we just
+         hid. */
+      wa-dialog::part(close-button) {
+        display: none;
+      }
+
+      /* Custom close button styling. Mirrors the shape
+         dialogCloseButtonStyles applies to wa-dialog's
+         built-in close (40x40 hit target, tinted hover /
+         focus background, currentColor focus outline) so
+         the visual is unchanged from the pre-base-dialog
+         shape every consumer used. */
+      .dialog-close {
+        background: transparent;
+        border: none;
+        box-shadow: none;
+        padding: 0;
+        width: 40px;
+        height: 40px;
+        color: var(--esphome-on-primary);
+        cursor: pointer;
+        font-size: 18px;
+      }
+
+      .dialog-close:hover:not(:disabled),
+      .dialog-close:focus-visible {
+        background: color-mix(
+          in srgb,
+          var(--esphome-on-primary),
+          transparent 85%
+        );
+      }
+
+      .dialog-close:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: -2px;
+      }
+
+      .dialog-close:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
     `,
   ];
