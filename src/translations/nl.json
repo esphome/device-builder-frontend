@@ -705,6 +705,7 @@
     "pair_build_server_preview_failed": "Kan de identiteit van de ontvanger niet vooraf bekijken. Probeer het opnieuw of controleer de dashboardlogs.",
     "pair_build_server_confirm_title": "Ontvanger bevestigen",
     "pair_build_server_confirm_desc": "Open op het ontvangende dashboard Instellingen → Build-server en vergelijk de onderstaande vingerafdruk met die welke daar wordt getoond. Ze MOETEN overeenkomen voordat u doorgaat; alleen zo kan een man-in-the-middle bij de eerste verbinding worden gedetecteerd.",
+    "pair_build_server_trust_warning": "Een gekoppelde build-server leest uw YAML en uw secrets, en maakt de firmware die op uw apparaten draait; koppel alleen met build-servers die u volledig vertrouwt.",
     "pair_build_server_pin_label": "Vingerafdruk ontvanger (SHA-256)",
     "pair_build_server_target": "Verbonden met {hostname}:{port}",
     "pair_build_server_receiver_label_label": "Naam voor deze ontvanger",

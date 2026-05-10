@@ -705,6 +705,7 @@
     "pair_build_server_preview_failed": "Impossible de prévisualiser l'identité du destinataire. Réessayez ou consultez les journaux du tableau de bord.",
     "pair_build_server_confirm_title": "Confirmer le destinataire",
     "pair_build_server_confirm_desc": "Sur le tableau de bord destinataire, ouvrez Paramètres → Serveur de compilation et comparez l'empreinte ci-dessous à celle qui y est affichée. Elles DOIVENT correspondre avant de continuer ; cette vérification est le seul moyen de détecter une attaque de l'homme du milieu lors de la première connexion.",
+    "pair_build_server_trust_warning": "Un serveur de compilation appairé lit votre YAML et vos secrets, et produit le firmware exécuté par vos appareils ; n'appairez que des serveurs auxquels vous faites entièrement confiance.",
     "pair_build_server_pin_label": "Empreinte du destinataire (SHA-256)",
     "pair_build_server_target": "Connecté à {hostname}:{port}",
     "pair_build_server_receiver_label_label": "Nom de ce destinataire",

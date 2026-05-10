@@ -283,6 +283,19 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         padding: var(--wa-space-s) 0;
       }
 
+      .trust-warning {
+        margin-bottom: var(--wa-space-m);
+        padding: var(--wa-space-s) var(--wa-space-m);
+        border-left: 3px solid var(--esphome-warning, #f59e0b);
+        background: color-mix(
+          in srgb,
+          var(--esphome-warning, #f59e0b),
+          transparent 90%
+        );
+        color: var(--wa-color-text-normal);
+        font-size: var(--wa-font-size-s);
+      }
+
       .sent-body {
         padding-bottom: var(--wa-space-m);
         font-size: var(--wa-font-size-s);
@@ -539,6 +552,9 @@ export class ESPHomePairBuildServerDialog extends LitElement {
             port: this._port,
           })}
         </span>
+      </div>
+      <div class="trust-warning" role="alert">
+        ${this._localize("settings.pair_build_server_trust_warning")}
       </div>
       <div class="field">
         <label for="pair-receiver-label">

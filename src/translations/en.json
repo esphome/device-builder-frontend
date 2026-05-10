@@ -768,6 +768,7 @@
     "pair_build_server_preview_failed": "Couldn't preview the receiver's identity. Try again or check the dashboard logs.",
     "pair_build_server_confirm_title": "Confirm receiver",
     "pair_build_server_confirm_desc": "On the receiving dashboard, open Settings → Build server and compare the fingerprint below to the one shown there. They MUST match before you continue — that check is the only way to detect a man-in-the-middle on the first connection.",
+    "pair_build_server_trust_warning": "A paired build server reads your YAML and your secrets, and produces the firmware your devices run; only pair build servers you trust completely.",
     "pair_build_server_pin_label": "Receiver fingerprint (SHA-256)",
     "pair_build_server_target": "Connected to {hostname}:{port}",
     "pair_build_server_receiver_label_label": "Name for this receiver",
