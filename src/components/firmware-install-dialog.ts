@@ -19,6 +19,7 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { chipNameToVariant } from "../util/chip-variant.js";
+import { downloadBase64Binary } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -999,14 +1000,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         device.configuration,
         flashable.file
       );
-      const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-      const blob = new Blob([bytes], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = result.filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBase64Binary(result.data, result.filename);
       this._downloadedFilename = result.filename;
     } catch {
       this._fail(this._localize("firmware.download_failed"));

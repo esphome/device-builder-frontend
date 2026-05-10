@@ -37,6 +37,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import { downloadBase64Binary } from "../util/download-text.js";
 import { computeLabelUsage, deleteConfirmKey } from "../util/label-usage.js";
 import {
   buildYamlSnippetBlocks,
@@ -2056,14 +2057,7 @@ export class ESPHomePageDashboard extends LitElement {
       }
       const binary = binaries[0];
       const result = await this._api.firmwareDownload(device.configuration, binary.file);
-      const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-      const blob = new Blob([bytes], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = result.filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBase64Binary(result.data, result.filename);
     } catch {
       toast.error(this._localize("dashboard.download_firmware_failed", { name }), {
         richColors: true,
