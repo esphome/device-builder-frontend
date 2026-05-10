@@ -797,6 +797,7 @@
     "build_server_paired_senders_desc": "Other dashboards approved to send compile jobs to this one.",
     "build_server_paired_senders_loading": "Loading pairings…",
     "build_server_paired_senders_empty": "No paired senders yet.",
+    "build_server_peer_ip_label": "From IP",
     "build_server_peer_approve": "Accept",
     "build_server_peer_approve_aria": "Accept pairing request from {label}",
     "build_server_peer_approve_success": "Sender approved.",

@@ -1541,6 +1541,14 @@ export class ESPHomeSettingsDialog extends LitElement {
           <span class="row-desc">
             <code class="peer-pin">${formattedPin}</code>
           </span>
+          ${peer.peer_ip
+            ? html`
+                <span class="row-desc">
+                  ${this._localize("settings.build_server_peer_ip_label")}
+                  <code class="peer-ip">${peer.peer_ip}</code>
+                </span>
+              `
+            : nothing}
         </div>
         <div class="peer-actions">
           <button

@@ -734,6 +734,7 @@
     "build_server_paired_senders_desc": "Autres tableaux de bord autorisés à envoyer des compilations à celui-ci.",
     "build_server_paired_senders_loading": "Chargement des appairages…",
     "build_server_paired_senders_empty": "Aucun expéditeur appairé pour le moment.",
+    "build_server_peer_ip_label": "Depuis l'IP",
     "build_server_peer_approve": "Accepter",
     "build_server_peer_approve_aria": "Accepter la demande d'appairage de {label}",
     "build_server_peer_approve_success": "Expéditeur approuvé.",

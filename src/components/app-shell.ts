@@ -982,6 +982,7 @@ export class ESPHomeApp extends LitElement {
           label: evt.label,
           paired_at: evt.paired_at,
           status: "pending",
+          peer_ip: evt.peer_ip,
         };
         const current = this._buildServerPeers ?? [];
         const idx = current.findIndex(

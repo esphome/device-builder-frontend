@@ -734,6 +734,7 @@
     "build_server_paired_senders_desc": "Andere dashboards die compilatieopdrachten naar dit dashboard mogen sturen.",
     "build_server_paired_senders_loading": "Koppelingen laden…",
     "build_server_paired_senders_empty": "Nog geen gekoppelde afzenders.",
+    "build_server_peer_ip_label": "Vanaf IP",
     "build_server_peer_approve": "Accepteren",
     "build_server_peer_approve_aria": "Koppelingsverzoek van {label} accepteren",
     "build_server_peer_approve_success": "Afzender goedgekeurd.",

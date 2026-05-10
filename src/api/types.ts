@@ -1201,7 +1201,13 @@ export type PeerStatus = "pending" | "approved";
  * by the controller because the receiver-side ``StoredPeer``
  * itself doesn't carry one (PENDING peers live in the
  * controller's in-memory dict; persisted peers are implicitly
- * APPROVED).
+ * APPROVED). ``peer_ip`` is the source IP observed at
+ * pair_request time and persisted on ``StoredPeer``; the
+ * receiver Settings inbox renders it next to the pin so the
+ * operator can clone-risk-sanity-check the source against
+ * expectations. Empty string for legacy on-disk rows from
+ * receivers that pre-date the persisted ``peer_ip`` field —
+ * the renderer hides the row line in that case.
  */
 export interface PeerSummary {
   dashboard_id: string;
@@ -1209,6 +1215,7 @@ export interface PeerSummary {
   label: string;
   paired_at: number;
   status: PeerStatus;
+  peer_ip: string;
 }
 
 /**
