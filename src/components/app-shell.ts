@@ -1378,7 +1378,15 @@ export class ESPHomeApp extends LitElement {
       status: existing?.status ?? JobStatus.QUEUED,
       error_message: existing?.error_message ?? "",
       output: existing?.output ?? [],
-      started_at: existing?.started_at ?? Date.now(),
+      // ``||`` not ``??``: stubRemoteBuildJobState seeds 0 as
+      // the "unset" sentinel, and ``??`` would preserve it
+      // here (?? only falls through on null / undefined). Any
+      // existing>0 wins (the entry was stamped on a previous
+      // submit's bubble); a 0 from an events-only stub gets
+      // replaced with the current dispatch time so consumers
+      // sorting by started_at (settings-dialog's
+      // _latestRemoteBuildJobForPin) reliably pick the newest.
+      started_at: existing?.started_at || Date.now(),
     });
     this._buildOffloadJobs = next;
   }
