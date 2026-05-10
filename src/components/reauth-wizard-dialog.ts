@@ -143,7 +143,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
             ${this._localize("settings.reauth_wizard_expected_label")}
           </div>
           <esphome-pin-emoji-grid
-            pin=${alert.expected_pin}
+            .pin=${alert.expected_pin}
           ></esphome-pin-emoji-grid>
           <details class="pin-hex">
             <summary>
@@ -157,7 +157,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
             ${this._localize("settings.reauth_wizard_observed_label")}
           </div>
           <esphome-pin-emoji-grid
-            pin=${alert.observed_pin}
+            .pin=${alert.observed_pin}
           ></esphome-pin-emoji-grid>
           <details class="pin-hex">
             <summary>
@@ -208,7 +208,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           ${this._localize("settings.reauth_wizard_observed_label")}
         </div>
         <esphome-pin-emoji-grid
-          pin=${alert.observed_pin}
+          .pin=${alert.observed_pin}
         ></esphome-pin-emoji-grid>
         <details class="pin-hex">
           <summary>
