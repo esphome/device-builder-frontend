@@ -1410,23 +1410,18 @@ export interface RemoteBuildIdentityRotatedEventData {
 /**
  * Data payload for ``REMOTE_BUILD_HOST_ADDED`` event.
  *
- * Carries the full :class:`RemoteBuildPeer` shape — same keys
- * the ``subscribe_events`` ``initial_state.hosts`` snapshot uses
- * — so the frontend can construct (or upsert) a complete row
- * from the event alone. Fires from the controller's mDNS
- * browse-callback cache-hit branch and from the async
- * resolve-success path. Upsert semantics: subscribers key on
- * ``name`` and replace an existing row with the same key.
+ * Aliases :type:`RemoteBuildPeer` directly (the backend fires
+ * ``peer.to_dict()`` from ``_upsert_host``, identical to what
+ * ``hosts_snapshot`` projects into
+ * ``subscribe_events.initial_state.hosts``). Aliasing rather
+ * than duplicating the field list keeps the event payload from
+ * drifting out of shape when ``RemoteBuildPeer`` gains a field.
+ * Fires from the controller's mDNS browse-callback cache-hit
+ * branch and from the async resolve-success path. Upsert
+ * semantics: subscribers key on ``name`` and replace an
+ * existing row with the same key.
  */
-export interface RemoteBuildHostAddedEventData {
-  name: string;
-  hostname: string;
-  port: number;
-  source: RemoteBuildPeerSource;
-  addresses: string[];
-  server_version: string;
-  esphome_version: string;
-}
+export type RemoteBuildHostAddedEventData = RemoteBuildPeer;
 
 /**
  * Data payload for ``REMOTE_BUILD_HOST_REMOVED`` event.

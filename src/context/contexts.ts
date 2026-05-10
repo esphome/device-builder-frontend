@@ -206,10 +206,19 @@ export const buildServerPairingWindowStateContext =
  * can distinguish "no controller / still loading" from "loaded
  * with zero discovered hosts". The Send-builds Settings
  * subsection (and the future offloader-side pair dialog)
- * consume this directly. The shape is keyed on ``name`` (the
- * leftmost mDNS service-instance label) so re-announces /
- * TXT refreshes overwrite cleanly.
+ * consume this directly. The shape is a :class:`Map` (rather
+ * than a plain object) keyed on ``name`` (the leftmost mDNS
+ * service-instance label) for two reasons: (a) ``name`` comes
+ * off the network and a malicious mDNS responder broadcasting
+ * a service-instance label like ``__proto__`` or
+ * ``constructor`` would collide with prototype keys on a plain
+ * ``{}``; (b) ``Map`` preserves insertion order verbatim,
+ * whereas plain objects re-order numeric-looking keys (e.g.
+ * a host literally named ``"42"`` would float ahead of the
+ * alphabetic neighbours during enumeration), which would
+ * surface as inconsistent UI ordering between snapshot and
+ * post-event renders.
  */
 export const buildOffloadDiscoveredHostsContext = createContext<
-  Record<string, RemoteBuildPeer> | null
+  Map<string, RemoteBuildPeer> | null
 >(Symbol("esphome-build-offload-discovered-hosts"));

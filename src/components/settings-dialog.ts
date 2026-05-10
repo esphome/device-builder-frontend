@@ -167,7 +167,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   // controller" from "loaded with zero rows".
   @consume({ context: buildOffloadDiscoveredHostsContext, subscribe: true })
   @state()
-  private _buildOffloadDiscoveredHosts: Record<string, RemoteBuildPeer> | null =
+  private _buildOffloadDiscoveredHosts: Map<string, RemoteBuildPeer> | null =
     null;
 
   // Phase 3c2b: receiver identity (cert pin + listener-bound + versions).
@@ -1622,7 +1622,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         </div>
       `;
     }
-    const peers = Object.values(this._buildOffloadDiscoveredHosts);
+    const peers = Array.from(this._buildOffloadDiscoveredHosts.values());
     if (peers.length === 0) {
       return html`
         <div class="row" role="status">
