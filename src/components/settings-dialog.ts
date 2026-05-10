@@ -1787,10 +1787,13 @@ export class ESPHomeSettingsDialog extends LitElement {
    * Alerts only clear via re-pair (the pair wizard auto-
    * resolves on success) or unpair (existing flow); there is
    * no Dismiss button. Re-pair opens the same wizard the
-   * pair-with-a-new-receiver flow uses, pre-filled with the
-   * row's hostname (port stays at the wizard's 6055 default
-   * since the row's port already came from the user's prior
-   * pair attempt).
+   * pair-with-a-new-receiver flow uses, pre-filled with both
+   * the row's hostname AND port from the snapshot (the alert
+   * carries the receiver coordinates the user originally
+   * paired against, so we know the right peer-link port —
+   * this is unlike the discovered-host Pair button which
+   * has only the SRV port and falls back to the wizard's
+   * 6055 default).
    *
    * Returns ``nothing`` when the alerts map is null (no
    * controller / still loading) or empty (no alerts), so the
@@ -1831,6 +1834,10 @@ export class ESPHomeSettingsDialog extends LitElement {
             <button
               type="button"
               class="btn-pair-build-server"
+              aria-label=${this._localize(
+                "settings.offloader_alert_repair_aria",
+                { label: alert.receiver_label },
+              )}
               @click=${() => this._onAlertRepair(alert)}
             >
               ${this._localize("settings.offloader_alert_repair_action")}
@@ -1838,6 +1845,10 @@ export class ESPHomeSettingsDialog extends LitElement {
             <button
               type="button"
               class="btn-unpair"
+              aria-label=${this._localize(
+                "settings.offloader_alert_unpair_aria",
+                { label: alert.receiver_label },
+              )}
               @click=${() => this._onAlertUnpair(alert)}
             >
               ${this._localize("settings.unpair_action")}
@@ -1865,6 +1876,10 @@ export class ESPHomeSettingsDialog extends LitElement {
           <button
             type="button"
             class="btn-unpair"
+            aria-label=${this._localize(
+              "settings.offloader_alert_unpair_aria",
+              { label: alert.receiver_label },
+            )}
             @click=${() => this._onAlertUnpair(alert)}
           >
             ${this._localize("settings.unpair_action")}
@@ -1877,13 +1892,16 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _onAlertRepair = (
     alert: OffloaderAlertSnapshotEntry,
   ): void => {
-    // Open the pair wizard with the alert's hostname pre-
-    // filled. A successful ``request_pair`` for the same
-    // ``(host, port)`` auto-resolves the alert backend-side
-    // (fires ``OFFLOADER_PAIR_ALERT_DISMISSED``); app-shell
-    // catches that event and drops the row from the alerts
-    // map, so the alert disappears without any extra work
-    // here.
+    // Open the pair wizard pre-filled with the alert's
+    // hostname AND port — the alert carries the exact
+    // coordinates the user originally paired against, so the
+    // peer-link port is known here (unlike the discovered-
+    // host Pair flow which only has the SRV port). A
+    // successful ``request_pair`` for the same coordinates
+    // auto-resolves the alert backend-side (fires
+    // ``OFFLOADER_PAIR_ALERT_DISMISSED``); app-shell catches
+    // that event and drops the row from the alerts map, so
+    // the alert disappears without any extra work here.
     this._pairBuildServerDialog?.open({
       hostname: alert.receiver_hostname,
       port: alert.receiver_port,
