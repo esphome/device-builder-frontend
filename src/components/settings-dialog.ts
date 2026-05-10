@@ -1536,6 +1536,9 @@ export class ESPHomeSettingsDialog extends LitElement {
         ></button>
       </div>
 
+      ${this._renderApprovedPeers()}
+      ${this._renderPeerRemoveConfirmDialog()}
+
       <div class="section-heading">
         ${this._localize("settings.build_server_card_heading")}
       </div>
@@ -1544,8 +1547,6 @@ export class ESPHomeSettingsDialog extends LitElement {
       </div>
       ${this._renderBuildServerCard()}
       ${this._renderPairingRequests()}
-      ${this._renderApprovedPeers()}
-      ${this._renderPeerRemoveConfirmDialog()}
       <esphome-accept-peer-dialog
         @confirm=${this._onAcceptPeerConfirm}
         @reject=${this._onRejectPeerFromDialog}
