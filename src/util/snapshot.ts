@@ -17,7 +17,7 @@
 
 /**
  * Build a Map<K, T> from *rows* keyed by *keyFn*, or return
- * ``null`` when *rows* is :external:`undefined`.
+ * ``null`` when *rows* is ``undefined``.
  *
  * Mirrors the absent-vs-empty-list semantics the
  * ``initial_state`` snapshot uses across its optional
