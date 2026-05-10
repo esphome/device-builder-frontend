@@ -1,8 +1,6 @@
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
-
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -23,6 +21,7 @@ import {
   parsePortInput,
   trimTrailingDot,
 } from "../util/hostname.js";
+import "./base-dialog.js";
 import "./pin-emoji-grid.js";
 
 /**
@@ -139,8 +138,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   @state()
   private _error: string | null = null;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   static styles = [
     espHomeStyles,
@@ -148,31 +147,25 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     pinHexStyles,
     dialogActionButtonStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 500px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -321,12 +314,19 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     // again on a successful ``request_pair`` once we know the
     // exact ``${hostname}:${port}`` the row landed under.
     this._sentKey = null;
-    this._dialog.open = true;
+    this._open = true;
   }
 
   close(): void {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  private _onAfterHide = (): void => {
+    // wa-dialog finished its hide sequence (after Esc /
+    // outside-click / X). Flip our local open flag so the
+    // next render's ``?open`` binding matches.
+    this._open = false;
+  };
 
   /** Key the dialog watches for an auto-close approval after
    *  ``request_pair`` lands. Set to
@@ -409,33 +409,25 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   }
 
   protected render() {
-    // Gate ``light-dismiss`` while a ``preview_pair`` /
-    // ``request_pair`` round-trip is in flight: outside-click /
-    // Esc / close-button can't hide an error that's about to
-    // surface, and (more importantly) can't dismiss the dialog
-    // between submitting and the request completing — that race
-    // would let a successful ``request_pair`` fire its
-    // ``pair-request-sent`` event + success toast against an
-    // already-closed dialog. ``@wa-request-close`` catches Esc /
-    // close-button while ``light-dismiss`` only blocks
-    // outside-click, so both gates are present (same shape as
-    // ``adopt-dialog``).
+    // ``?busy`` gates outside-click + Esc + close-button
+    // while a ``preview_pair`` / ``request_pair`` round-trip
+    // is in flight. Base-dialog flips light-dismiss off and
+    // vetoes ``wa-request-close`` when busy, so the dialog
+    // can't dismiss between submitting and the request
+    // completing — that race would let a successful
+    // ``request_pair`` fire its ``pair-request-sent`` event
+    // + success toast against an already-closed dialog.
     return html`
-      <wa-dialog
-        label=${this._dialogTitle()}
-        ?light-dismiss=${!this._busy}
-        @wa-request-close=${this._onRequestClose}
+      <esphome-base-dialog
+        ?open=${this._open}
+        ?busy=${this._busy}
+        .label=${this._dialogTitle()}
+        @after-hide=${this._onAfterHide}
       >
         ${this._renderStep()}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
-
-  private _onRequestClose = (e: Event): void => {
-    if (this._busy) {
-      e.preventDefault();
-    }
-  };
 
   private _dialogTitle(): string {
     if (this._step === "sent") {
