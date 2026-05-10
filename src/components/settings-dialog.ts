@@ -39,6 +39,7 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { warningBannerStyles } from "../styles/banners.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
@@ -666,6 +667,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   static styles = [
     espHomeStyles,
     warningBannerStyles,
+    dialogCloseButtonStyles,
     css`
       wa-dialog {
         --width: min(800px, 95vw);
@@ -673,7 +675,10 @@ export class ESPHomeSettingsDialog extends LitElement {
 
       wa-dialog::part(header) {
         background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
+        /* Right padding is 0 so the 40x40 close button (sized via
+           dialogCloseButtonStyles) sits flush with the dialog's
+           corner. */
+        padding: 0 0 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
@@ -682,17 +687,6 @@ export class ESPHomeSettingsDialog extends LitElement {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
-      }
-
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
       }
 
       wa-dialog::part(footer) {
