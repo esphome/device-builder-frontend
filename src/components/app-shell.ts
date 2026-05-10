@@ -98,6 +98,7 @@ import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { BASE_PATH, withBase } from "../util/base-path.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
+import { seededMap } from "../util/snapshot.js";
 
 // Mirrors the backend's `_PRIMARY_JOB_TYPES` retention pool — these
 // are the job types deduplicated to one terminal entry per device.
@@ -992,24 +993,22 @@ export class ESPHomeApp extends LitElement {
         this._devices = devices;
         this._importableDevices = importable;
         this._devicesLoaded = true;
-        // ``peers`` / ``hosts`` / ``pairings`` are optional —
-        // backend omits the fields when no remote-build
-        // controller is wired up. ``[]`` would imply "controller
-        // present, no rows" which is a distinct state. Default
-        // to ``null`` (still / not loading) when absent.
+        // ``peers`` / ``hosts`` / ``pairings`` /
+        // ``offloader_alerts`` are optional — backend omits the
+        // fields when no remote-build controller is wired up.
+        // ``[]`` would imply "controller present, no rows" which
+        // is a distinct state, so we default to ``null`` (still /
+        // not loading) when absent. ``peers`` is the one
+        // remote-build snapshot field that's stored as a list
+        // rather than a Map (its consumer iterates) so it skips
+        // the ``seededMap`` helper.
         this._buildServerPeers = peers ?? null;
-        this._buildOffloadDiscoveredHosts =
-          hosts === undefined
-            ? null
-            : new Map(hosts.map((h) => [h.name, h]));
-        this._buildOffloadPairings =
-          pairings === undefined
-            ? null
-            : new Map(pairings.map((p) => [p.pin_sha256, p]));
-        this._buildOffloadAlerts =
-          offloader_alerts === undefined
-            ? null
-            : new Map(offloader_alerts.map((a) => [a.pin_sha256, a]));
+        this._buildOffloadDiscoveredHosts = seededMap(hosts, (h) => h.name);
+        this._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
+        this._buildOffloadAlerts = seededMap(
+          offloader_alerts,
+          (a) => a.pin_sha256,
+        );
         // ``remote_jobs`` is the offloader-side in-flight
         // remote-build snapshot. The backend's view is
         // authoritative for which jobs exist (terminal entries
