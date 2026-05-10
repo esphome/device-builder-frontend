@@ -43,7 +43,6 @@ import {
 } from "../context/index.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import { warningBannerStyles } from "../styles/banners.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
@@ -68,10 +67,10 @@ import type { ESPHomePairBuildServerDialog } from "./pair-build-server-dialog.js
 import type { ESPHomeReauthWizardDialog } from "./reauth-wizard-dialog.js";
 import type { ESPHomeRemoteBuildJobDialog } from "./remote-build-job-dialog.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   close: mdiClose,
@@ -380,8 +379,8 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _language: LanguageChoice = readStoredLocale() ?? "system";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   open() {
     this._theme = localStorage.getItem("esphome-theme") ?? "system";
@@ -408,7 +407,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     // does need clearing — a stale value would mis-target the
     // confirm dialog on the next visit.
     this._pendingPeerRemove = null;
-    this._dialog.open = true;
+    this._open = true;
   }
 
   close() {
@@ -417,7 +416,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     // the cleanup lives in ``_onDialogAfterHide`` to make sure
     // it runs regardless of how the dialog closed. Programmatic
     // close still flows through here.
-    this._dialog.open = false;
+    this._open = false;
   }
 
   disconnectedCallback() {
@@ -440,6 +439,10 @@ export class ESPHomeSettingsDialog extends LitElement {
    * receiver's idle timer is the safety net.
    */
   private _onDialogAfterHide = () => {
+    // wa-dialog finished its hide sequence (after Esc /
+    // outside-click / X). Flip our local open flag so the
+    // next render's ``?open`` binding matches.
+    this._open = false;
     this._stopPairingTick();
     if (this._section === "pairing_requests" && this._api !== undefined) {
       void this._api
@@ -507,7 +510,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         state?.open &&
         state.expires_in_seconds !== null &&
         this._section === "pairing_requests" &&
-        this._dialog?.open
+        this._open
       ) {
         this._pairingBaselineSeconds = state.expires_in_seconds;
         this._pairingAnchorMs = Date.now();
@@ -953,14 +956,13 @@ export class ESPHomeSettingsDialog extends LitElement {
   static styles = [
     espHomeStyles,
     warningBannerStyles,
-    dialogCloseButtonStyles,
     pinHexStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: min(800px, 95vw);
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         background: var(--esphome-primary);
         /* Right padding is 0 so the 40x40 close button (sized via
            dialogCloseButtonStyles) sits flush with the dialog's
@@ -970,17 +972,17 @@ export class ESPHomeSettingsDialog extends LitElement {
         box-sizing: border-box;
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0;
       }
 
@@ -1750,10 +1752,10 @@ export class ESPHomeSettingsDialog extends LitElement {
     const current = SECTIONS.find((s) => s.id === this._section) ?? SECTIONS[0];
 
     return html`
-      <wa-dialog
-        light-dismiss
-        label="${this._localize("settings.title")} - ${this._localize(current.labelKey)}"
-        @wa-after-hide=${this._onDialogAfterHide}
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label="${this._localize("settings.title")} - ${this._localize(current.labelKey)}"
+        @after-hide=${this._onDialogAfterHide}
       >
         <div class="layout">
           <aside class="sidebar">
@@ -1775,7 +1777,7 @@ export class ESPHomeSettingsDialog extends LitElement {
             <div class="content-body">${this._renderSection()}</div>
           </main>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
