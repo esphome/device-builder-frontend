@@ -11,6 +11,7 @@ import type {
   ConfiguredDevice,
   FirmwareJob,
   Label,
+  OffloaderAlertSnapshotEntry,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
@@ -254,3 +255,35 @@ export const buildOffloadDiscoveredHostsContext = createContext<
 export const buildOffloadPairingsContext = createContext<
   Map<string, PairingSummary> | null
 >(Symbol("esphome-build-offload-pairings"));
+
+/**
+ * Offloader-side pair alerts (pin_mismatch / peer_revoked).
+ * Keyed on ``${hostname}:${port}`` to match the backend's
+ * ``_offloader_alerts`` dict. Seeded from
+ * ``subscribe_events.initial_state.offloader_alerts`` and
+ * mutated locally on the three live events:
+ * ``OFFLOADER_PAIR_PIN_MISMATCH`` (upsert with kind=
+ * pin_mismatch), ``OFFLOADER_PAIR_PEER_REVOKED`` (upsert
+ * with kind=peer_revoked), ``OFFLOADER_PAIR_ALERT_DISMISSED``
+ * (drop by key).
+ *
+ * The alert describes a broken pairing; only the two
+ * resolution paths clear it (re-pair fixes the underlying
+ * state via ``request_pair``; unpair removes the row). No
+ * operator-driven dismiss surface — clicking "OK got it"
+ * without acting would just hide the broken state, which
+ * the next peer-link session would surface again anyway.
+ *
+ * ``Map`` (not plain object) for the same reasons
+ * ``buildOffloadDiscoveredHostsContext`` and
+ * ``buildOffloadPairingsContext`` are: keys are user /
+ * network-supplied strings, insertion order needs to be
+ * stable, and ``Map`` avoids the prototype-key collisions a
+ * plain object would have on those keys. ``null`` until the
+ * snapshot lands so consumers can distinguish "no
+ * controller / still loading" from "loaded with zero
+ * alerts".
+ */
+export const buildOffloadAlertsContext = createContext<
+  Map<string, OffloaderAlertSnapshotEntry> | null
+>(Symbol("esphome-build-offload-alerts"));

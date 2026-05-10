@@ -15,6 +15,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
   ErrorCode,
   type IdentityView,
+  type OffloaderAlertSnapshotEntry,
   type PairingSummary,
   type PairingWindowState,
   type PeerSummary,
@@ -28,6 +29,7 @@ type LanguageChoice = SupportedLocale | "system";
 import {
   apiContext,
   buildOffloadDiscoveredHostsContext,
+  buildOffloadAlertsContext,
   buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
@@ -186,6 +188,21 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
   @state()
   private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
+
+  // Offloader-side pair alerts (pin_mismatch / peer_revoked).
+  // App-shell maintains the canonical map (seeded from
+  // ``initial_state.offloader_alerts`` + mutated on the three
+  // alert events); the Send-builds section renders one alert
+  // banner per entry above the paired-build-servers list.
+  // Keyed on ``${hostname}:${port}`` like the pairings map.
+  // Alerts only clear via re-pair or unpair; no operator
+  // dismiss CTA — clicking "OK got it" without acting would
+  // hide a broken pairing the next peer-link session would
+  // still fail against.
+  @consume({ context: buildOffloadAlertsContext, subscribe: true })
+  @state()
+  private _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null =
+    null;
 
   // Pending Unpair confirmation: receiver coordinates of the
   // row whose Unpair button was clicked. Captured here so the
@@ -993,6 +1010,55 @@ export class ESPHomeSettingsDialog extends LitElement {
         gap: var(--wa-space-s);
       }
 
+      .offloader-alert {
+        display: flex;
+        align-items: flex-start;
+        gap: var(--wa-space-m);
+        padding: var(--wa-space-m);
+        margin: var(--wa-space-s) var(--wa-space-m);
+        border-radius: var(--wa-border-radius-m);
+        border-left: 4px solid var(--esphome-warning, #f59e0b);
+        background: color-mix(
+          in srgb,
+          var(--esphome-warning, #f59e0b),
+          transparent 92%
+        );
+      }
+
+      .offloader-alert-peer-revoked {
+        border-left-color: var(--esphome-error, #dc2626);
+        background: color-mix(
+          in srgb,
+          var(--esphome-error, #dc2626),
+          transparent 92%
+        );
+      }
+
+      .offloader-alert-body {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-2xs);
+      }
+
+      .offloader-alert-title {
+        font-weight: var(--wa-font-weight-semibold);
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text);
+      }
+
+      .offloader-alert-desc {
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-quiet);
+      }
+
+      .offloader-alert-actions {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-xs);
+        flex-shrink: 0;
+      }
+
       .pairing-status-pill {
         display: inline-block;
         padding: 1px 6px;
@@ -1650,6 +1716,8 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.build_offload_unimplemented_banner")}
       </div>
 
+      ${this._renderOffloaderAlerts()}
+
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
       </div>
@@ -1709,6 +1777,133 @@ export class ESPHomeSettingsDialog extends LitElement {
       port: String(this._pendingUnpair.port),
     });
   }
+
+  /**
+   * Pin-mismatch / peer-revoked alert banners above the
+   * paired-build-servers list.
+   *
+   * One row per entry in the offloader-alerts map — each
+   * describes a broken pairing the operator needs to act on.
+   * Alerts only clear via re-pair (the pair wizard auto-
+   * resolves on success) or unpair (existing flow); there is
+   * no Dismiss button. Re-pair opens the same wizard the
+   * pair-with-a-new-receiver flow uses, pre-filled with the
+   * row's hostname (port stays at the wizard's 6055 default
+   * since the row's port already came from the user's prior
+   * pair attempt).
+   *
+   * Returns ``nothing`` when the alerts map is null (no
+   * controller / still loading) or empty (no alerts), so the
+   * Send-builds section's banner area collapses cleanly when
+   * there's nothing broken.
+   */
+  private _renderOffloaderAlerts() {
+    if (
+      this._buildOffloadAlerts === null ||
+      this._buildOffloadAlerts.size === 0
+    ) {
+      return nothing;
+    }
+    return Array.from(this._buildOffloadAlerts.values()).map((alert) =>
+      this._renderOffloaderAlert(alert),
+    );
+  }
+
+  private _renderOffloaderAlert(alert: OffloaderAlertSnapshotEntry) {
+    const target = `${alert.receiver_hostname}:${alert.receiver_port}`;
+    if (alert.kind === "pin_mismatch") {
+      return html`
+        <div class="offloader-alert offloader-alert-pin-mismatch" role="alert">
+          <div class="offloader-alert-body">
+            <div class="offloader-alert-title">
+              ${this._localize("settings.offloader_alert_pin_mismatch_title", {
+                label: alert.receiver_label,
+              })}
+            </div>
+            <div class="offloader-alert-desc">
+              ${this._localize("settings.offloader_alert_pin_mismatch_desc", {
+                label: alert.receiver_label,
+                target,
+              })}
+            </div>
+          </div>
+          <div class="offloader-alert-actions">
+            <button
+              type="button"
+              class="btn-pair-build-server"
+              @click=${() => this._onAlertRepair(alert)}
+            >
+              ${this._localize("settings.offloader_alert_repair_action")}
+            </button>
+            <button
+              type="button"
+              class="btn-unpair"
+              @click=${() => this._onAlertUnpair(alert)}
+            >
+              ${this._localize("settings.unpair_action")}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+    return html`
+      <div class="offloader-alert offloader-alert-peer-revoked" role="alert">
+        <div class="offloader-alert-body">
+          <div class="offloader-alert-title">
+            ${this._localize("settings.offloader_alert_peer_revoked_title", {
+              label: alert.receiver_label,
+            })}
+          </div>
+          <div class="offloader-alert-desc">
+            ${this._localize("settings.offloader_alert_peer_revoked_desc", {
+              label: alert.receiver_label,
+              target,
+            })}
+          </div>
+        </div>
+        <div class="offloader-alert-actions">
+          <button
+            type="button"
+            class="btn-unpair"
+            @click=${() => this._onAlertUnpair(alert)}
+          >
+            ${this._localize("settings.unpair_action")}
+          </button>
+        </div>
+      </div>
+    `;
+  }
+
+  private _onAlertRepair = (
+    alert: OffloaderAlertSnapshotEntry,
+  ): void => {
+    // Open the pair wizard with the alert's hostname pre-
+    // filled. A successful ``request_pair`` for the same
+    // ``(host, port)`` auto-resolves the alert backend-side
+    // (fires ``OFFLOADER_PAIR_ALERT_DISMISSED``); app-shell
+    // catches that event and drops the row from the alerts
+    // map, so the alert disappears without any extra work
+    // here.
+    this._pairBuildServerDialog?.open({
+      hostname: alert.receiver_hostname,
+      port: alert.receiver_port,
+    });
+  };
+
+  private _onAlertUnpair = (
+    alert: OffloaderAlertSnapshotEntry,
+  ): void => {
+    // Route through the same destructive-confirm dialog the
+    // paired-row Unpair button uses. ``unpair`` succeeding
+    // backend-side auto-clears the alert (same
+    // ``OFFLOADER_PAIR_ALERT_DISMISSED`` event path).
+    this._pendingUnpair = {
+      hostname: alert.receiver_hostname,
+      port: alert.receiver_port,
+      label: alert.receiver_label,
+    };
+    this._unpairConfirmDialog?.open();
+  };
 
   private _renderOffloaderPairings() {
     if (this._buildOffloadPairings === null) {

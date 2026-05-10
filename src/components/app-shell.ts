@@ -37,6 +37,10 @@ import type {
   Label,
   LabelDeletedEventData,
   LabelEventData,
+  OffloaderAlertSnapshotEntry,
+  OffloaderPairAlertDismissedEventData,
+  OffloaderPairPeerRevokedEventData,
+  OffloaderPairPinMismatchEventData,
   OffloaderPairStatusChangedEventData,
   PairingSummary,
   PairingWindowState,
@@ -63,6 +67,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   activeJobsContext,
+  buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
   buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
@@ -329,6 +334,20 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: buildOffloadPairingsContext })
   @state()
   private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
+
+  /** Offloader-side pair alerts keyed on ``${hostname}:${port}``.
+   *  Populated by ``OFFLOADER_PAIR_PIN_MISMATCH`` /
+   *  ``OFFLOADER_PAIR_PEER_REVOKED`` (upsert by key) and
+   *  cleared by ``OFFLOADER_PAIR_ALERT_DISMISSED`` (drop by
+   *  key); seeded from ``initial_state.offloader_alerts``
+   *  on subscribe. RAM-only on the backend, RAM-only here.
+   *  ``null`` until the snapshot lands so consumers can
+   *  distinguish "no controller / still loading" from
+   *  "loaded with zero alerts". */
+  @provide({ context: buildOffloadAlertsContext })
+  @state()
+  private _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null =
+    null;
 
   /** True when the onboarding wizard should be shown. Computed
    *  from ``completed_version < current_version`` AND not
@@ -908,8 +927,14 @@ export class ESPHomeApp extends LitElement {
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
-        const { devices, importable, peers, hosts, pairings } =
-          data as InitialStateEventData;
+        const {
+          devices,
+          importable,
+          peers,
+          hosts,
+          pairings,
+          offloader_alerts,
+        } = data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
         this._devicesLoaded = true;
@@ -930,6 +955,15 @@ export class ESPHomeApp extends LitElement {
                 pairings.map((p) => [
                   this._pairingKey(p.receiver_hostname, p.receiver_port),
                   p,
+                ]),
+              );
+        this._buildOffloadAlerts =
+          offloader_alerts === undefined
+            ? null
+            : new Map(
+                offloader_alerts.map((a) => [
+                  this._pairingKey(a.receiver_hostname, a.receiver_port),
+                  a,
                 ]),
               );
         break;
@@ -1152,6 +1186,71 @@ export class ESPHomeApp extends LitElement {
           next.set(key, { ...existing, status: "approved" });
         }
         this._buildOffloadPairings = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_PIN_MISMATCH: {
+        // Backend's pair-status listener detected the receiver's
+        // static X25519 pubkey hash drifted from what the
+        // offloader had on disk. Upsert the alert keyed on
+        // ``${hostname}:${port}`` (overwrites any prior alert
+        // for the same row — only one alert per receiver, the
+        // most recent detection wins). Same key shape as the
+        // backend's ``_offloader_alerts`` dict so the snapshot
+        // and the live event both target the same map slot.
+        const evt = data as OffloaderPairPinMismatchEventData;
+        const key = this._pairingKey(
+          evt.receiver_hostname,
+          evt.receiver_port,
+        );
+        const next = new Map(this._buildOffloadAlerts ?? []);
+        next.set(key, {
+          kind: "pin_mismatch",
+          receiver_hostname: evt.receiver_hostname,
+          receiver_port: evt.receiver_port,
+          receiver_label: evt.receiver_label,
+          expected_pin: evt.expected_pin,
+          observed_pin: evt.observed_pin,
+          fired_at: Date.now() / 1000,
+        });
+        this._buildOffloadAlerts = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_PEER_REVOKED: {
+        // Receiver returned ``rejected`` on the pair-status
+        // long-poll. Same upsert pattern as pin_mismatch, just
+        // a different ``kind`` discriminator.
+        const evt = data as OffloaderPairPeerRevokedEventData;
+        const key = this._pairingKey(
+          evt.receiver_hostname,
+          evt.receiver_port,
+        );
+        const next = new Map(this._buildOffloadAlerts ?? []);
+        next.set(key, {
+          kind: "peer_revoked",
+          receiver_hostname: evt.receiver_hostname,
+          receiver_port: evt.receiver_port,
+          receiver_label: evt.receiver_label,
+          fired_at: Date.now() / 1000,
+        });
+        this._buildOffloadAlerts = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_ALERT_DISMISSED: {
+        // Backend dropped the alert via one of the resolution
+        // paths (``request_pair`` succeeded for matching
+        // ``(host, port)``, or ``unpair`` removed the row).
+        // Drop the local row to match.
+        const evt = data as OffloaderPairAlertDismissedEventData;
+        if (this._buildOffloadAlerts === null) {
+          break;
+        }
+        const key = this._pairingKey(
+          evt.receiver_hostname,
+          evt.receiver_port,
+        );
+        const next = new Map(this._buildOffloadAlerts);
+        next.delete(key);
+        this._buildOffloadAlerts = next;
         break;
       }
     }

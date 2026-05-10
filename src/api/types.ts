@@ -1000,6 +1000,22 @@ export enum DeviceEventType {
   // paints without a round-trip.
   REMOTE_BUILD_HOST_ADDED = "remote_build_host_added",
   REMOTE_BUILD_HOST_REMOVED = "remote_build_host_removed",
+  // Offloader-side pair alerts. Backend's pair-status listener
+  // fires PIN_MISMATCH (the receiver's static X25519 pubkey
+  // hash drifted from the stored ``StoredPairing.pin_sha256``)
+  // or PEER_REVOKED (the receiver returned ``rejected``) when
+  // a pair-status round-trip resolves a broken pairing. ALERT
+  // _DISMISSED fires when the alert clears via re-pair (auto-
+  // resolved by ``request_pair`` succeeding for the same
+  // ``${hostname}:${port}``) or ``unpair``. There is no
+  // operator-driven dismiss — clicking "OK got it" without
+  // acting would just hide a broken pairing the next peer-
+  // link session would still fail against. Late-subscribers
+  // pick up missed alerts via
+  // ``subscribe_events.initial_state.offloader_alerts``.
+  OFFLOADER_PAIR_PIN_MISMATCH = "offloader_pair_pin_mismatch",
+  OFFLOADER_PAIR_PEER_REVOKED = "offloader_pair_peer_revoked",
+  OFFLOADER_PAIR_ALERT_DISMISSED = "offloader_pair_alert_dismissed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -1049,6 +1065,17 @@ export interface InitialStateEventData {
    *  ``name``). Optional for the same reason as ``pairings`` /
    *  ``peers`` — absent controller, omitted field. */
   hosts?: RemoteBuildPeer[];
+  /** Offloader-side pair alerts snapshot. RAM-only on the
+   *  backend; populated when ``OFFLOADER_PAIR_PIN_MISMATCH`` /
+   *  ``OFFLOADER_PAIR_PEER_REVOKED`` fires and cleared when
+   *  ``OFFLOADER_PAIR_ALERT_DISMISSED`` fires. The two
+   *  resolution paths (re-pair / unpair) auto-fire the
+   *  dismissed event; there is no operator-driven dismiss
+   *  surface. Late-subscribing clients pick up alerts that
+   *  fired before they connected via this snapshot. Optional
+   *  for the same reason as ``pairings`` / ``peers`` —
+   *  absent controller, omitted field. */
+  offloader_alerts?: OffloaderAlertSnapshotEntry[];
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
@@ -1405,6 +1432,120 @@ export interface OffloaderPairStatusChangedEventData {
   receiver_port: number;
   status: "approved" | "removed";
 }
+
+/**
+ * Data payload for the ``offloader_pair_pin_mismatch`` event.
+ *
+ * Fires alongside ``offloader_pair_status_changed
+ * status="removed"`` when the offloader's pair-status
+ * listener observes APPROVED + drifted pin (the receiver's
+ * static X25519 pubkey hash differs from
+ * ``StoredPairing.pin_sha256`` recorded at pair time). The
+ * receiver's identity rotated under us. Carries the
+ * diagnostic detail (``expected_pin`` / ``observed_pin``)
+ * the status-changed event doesn't, plus the offloader-side
+ * ``receiver_label`` so the alert can name the row even
+ * after the pairings list has dropped it.
+ *
+ * No receiver-side counterpart event; the receiver never
+ * sees its own pin drift, and the symmetric "offloader
+ * rotated" case lands as a fresh PENDING row on the
+ * receiver's inbox via
+ * ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED``.
+ */
+export interface OffloaderPairPinMismatchEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  receiver_label: string;
+  expected_pin: string;
+  observed_pin: string;
+}
+
+/**
+ * Data payload for the ``offloader_pair_peer_revoked`` event.
+ *
+ * Fires alongside ``offloader_pair_status_changed
+ * status="removed"`` when the offloader's pair-status
+ * listener gets ``IntentResponse.REJECTED`` for a row the
+ * offloader had as PENDING / APPROVED. From the offloader's
+ * POV all four causes (admin Reject, window close, identity
+ * rotation, row never existed) collapse to "the receiver
+ * isn't going to talk to us"; the alert copy stays generic
+ * ("the receiver removed us; reach out to that admin if it
+ * was a mistake").
+ *
+ * The ``receiver_label`` is carried so the alert can name
+ * the row even after the pairings list has dropped it.
+ */
+export interface OffloaderPairPeerRevokedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  receiver_label: string;
+}
+
+/**
+ * Data payload for the ``offloader_pair_alert_dismissed``
+ * event.
+ *
+ * Fires when an entry leaves the controller's RAM-only
+ * offloader-alerts dict via one of the two resolution paths:
+ * a successful ``request_pair`` against the same
+ * ``${hostname}:${port}`` (re-pair auto-resolved the alert),
+ * or ``unpair`` removed the row outright. There is no
+ * operator-driven dismiss — clicking "OK got it" without
+ * acting would just hide a broken pairing the next peer-
+ * link session would still fail against. Lets other tabs /
+ * clients on the global ``subscribe_events`` stream sync
+ * their local alerts list without re-fetching the snapshot.
+ */
+export interface OffloaderPairAlertDismissedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+}
+
+/**
+ * Snapshot row in the offloader-side alerts list (``pin_mismatch`` kind).
+ *
+ * Mirror of ``OffloaderPairPinMismatchEventData`` (the live
+ * event) plus a ``kind`` discriminator so a single alerts
+ * list can carry both pin-mismatch and peer-revoked entries
+ * on the wire. Frontend subscribers branch on ``kind`` to
+ * pick the alert copy + CTA.
+ *
+ * ``fired_at`` is the wall-clock unix timestamp the alert
+ * was added to the dict. Snapshot order is dict insertion
+ * order; frontends that want "newest first" sort on
+ * ``fired_at`` themselves.
+ */
+export interface OffloaderPinMismatchAlert {
+  kind: "pin_mismatch";
+  receiver_hostname: string;
+  receiver_port: number;
+  receiver_label: string;
+  expected_pin: string;
+  observed_pin: string;
+  fired_at: number;
+}
+
+/**
+ * Snapshot row in the offloader-side alerts list (``peer_revoked`` kind).
+ */
+export interface OffloaderPeerRevokedAlert {
+  kind: "peer_revoked";
+  receiver_hostname: string;
+  receiver_port: number;
+  receiver_label: string;
+  fired_at: number;
+}
+
+/**
+ * Sum type the snapshot list carries. Each entry is one of
+ * the two alert kinds above; the ``kind`` discriminator
+ * narrows field access at the consumer.
+ */
+export type OffloaderAlertSnapshotEntry =
+  | OffloaderPinMismatchAlert
+  | OffloaderPeerRevokedAlert;
 
 /**
  * Data payload for the ``remote_build_identity_rotated`` event.
