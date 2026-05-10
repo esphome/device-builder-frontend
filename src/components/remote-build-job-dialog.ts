@@ -106,6 +106,35 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     this._open = true;
   }
 
+  /** Open the dialog re-attached to an existing remote-build
+   *  job, skipping the input form and landing directly on the
+   *  running view. Used by settings-dialog's per-row "View
+   *  build" affordance to let the user check on a running
+   *  build (or last result) after closing the dialog without
+   *  losing access to the live output buffer.
+   *
+   *  Display fields (configuration / target / receiver_label)
+   *  come from the job entry itself; the entry was stamped
+   *  on the original submit's success bubble through
+   *  registerRemoteBuildJob, so a job that originated in this
+   *  tab carries full display fields. A job whose state was
+   *  observed only via wire events (events arrived before the
+   *  ack landed, or a different tab dispatched it) carries
+   *  empty display strings — the running view tolerates them
+   *  and shows the live status / output regardless. */
+  openForJob(job_id: string): void {
+    const job = this._jobs?.get(job_id);
+    if (!job) return;
+    this._jobId = job_id;
+    this._pinSha256 = job.pin_sha256;
+    this._receiverLabel = job.receiver_label;
+    this._configuration = job.configuration;
+    this._target = job.target;
+    this._errorMessage = "";
+    this._step = "running";
+    this._open = true;
+  }
+
   private _close = () => {
     this._open = false;
     this._errorMessage = "";

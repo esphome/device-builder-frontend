@@ -741,6 +741,8 @@
     "build_offload_pairing_disconnected": "Déconnecté",
     "remote_build_submit_action": "Compiler à distance",
     "remote_build_submit_aria": "Compiler à distance sur {label}",
+    "remote_build_view_action": "Voir la compilation",
+    "remote_build_view_aria": "Voir la compilation distante sur {label}",
     "remote_build_submit_title": "Compiler à distance sur {label}",
     "remote_build_running_title": "Compilation distante sur {label}",
     "remote_build_submit_configuration_label": "Configuration",

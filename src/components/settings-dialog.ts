@@ -31,6 +31,7 @@ import {
   apiContext,
   buildOffloadDiscoveredHostsContext,
   buildOffloadAlertsContext,
+  buildOffloadJobsContext,
   buildOffloadPairingsContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
@@ -39,6 +40,7 @@ import {
   remoteBuildEnabledContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import { warningBannerStyles } from "../styles/banners.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
@@ -233,6 +235,19 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null =
     null;
+
+  // In-flight + recently-terminal remote-build jobs the user
+  // dispatched, keyed on job_id. Used by the per-pairing-row
+  // "View build" affordance to re-open the dispatch dialog
+  // on a previously-submitted job's progress view (the row
+  // surfaces the most-recent entry for its pin). Driven by
+  // OFFLOADER_JOB_STATE_CHANGED / OFFLOADER_JOB_OUTPUT events
+  // through app-shell. null until app-shell mounts (always
+  // immediate today; the null-vs-empty distinction follows
+  // the same shape sibling contexts use).
+  @consume({ context: buildOffloadJobsContext, subscribe: true })
+  @state()
+  private _buildOffloadJobs: Map<string, RemoteBuildJobState> | null = null;
 
   // Pending Unpair confirmation. Identified by ``pin_sha256``
   // (the wire-canonical row id sent to ``unpairRemoteBuild``);
@@ -2413,6 +2428,7 @@ export class ESPHomeSettingsDialog extends LitElement {
               </button>
             `
           : nothing}
+        ${this._renderViewRemoteBuildButton(pairing)}
         <button
           type="button"
           class="peer-remove btn-unpair"
@@ -2426,6 +2442,60 @@ export class ESPHomeSettingsDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Render the "View build" affordance for a pairing row when
+   *  the in-flight remote-build jobs map carries an entry for
+   *  the row's pin. The dispatch dialog's openForJob() lands
+   *  directly on the running view so the user can re-attach
+   *  to a build they previously closed the dialog on (or see
+   *  the last terminal result before the user dismisses it).
+   *
+   *  Pairing-disconnected rows still get this button: the
+   *  job state lives client-side regardless of whether the
+   *  peer-link is currently up; surfacing the last output of
+   *  a build that finished before disconnect is the whole
+   *  point of the deferred-dismiss behaviour. */
+  private _renderViewRemoteBuildButton(pairing: PairingSummary) {
+    const job = this._latestRemoteBuildJobForPin(pairing.pin_sha256);
+    if (job === undefined) return nothing;
+    return html`
+      <button
+        type="button"
+        class="btn-view-remote-build"
+        aria-label=${this._localize("settings.remote_build_view_aria", {
+          label: pairing.label,
+        })}
+        @click=${() => this._onViewRemoteBuildClick(job.job_id)}
+      >
+        ${this._localize("settings.remote_build_view_action")}
+      </button>
+    `;
+  }
+
+  /** Pick the most-recently-started remote-build job for *pin*
+   *  out of the in-flight jobs map, or undefined if there are
+   *  no entries for the pin. ``started_at`` is stamped by the
+   *  dispatch dialog's success bubble; events-only entries
+   *  (events arrived before the ack landed) carry 0 and sort
+   *  to the bottom — that's fine because they're rare and the
+   *  re-attach path tolerates either ordering. */
+  private _latestRemoteBuildJobForPin(
+    pin_sha256: string,
+  ): RemoteBuildJobState | undefined {
+    if (this._buildOffloadJobs === null) return undefined;
+    let best: RemoteBuildJobState | undefined;
+    for (const job of this._buildOffloadJobs.values()) {
+      if (job.pin_sha256 !== pin_sha256) continue;
+      if (best === undefined || job.started_at > best.started_at) {
+        best = job;
+      }
+    }
+    return best;
+  }
+
+  private _onViewRemoteBuildClick = (job_id: string): void => {
+    this._remoteBuildDialog?.openForJob(job_id);
+  };
 
   private _onBuildRemoteClick = (pairing: PairingSummary): void => {
     this._remoteBuildDialog?.open({

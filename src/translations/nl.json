@@ -741,6 +741,8 @@
     "build_offload_pairing_disconnected": "Niet verbonden",
     "remote_build_submit_action": "Bouw op afstand",
     "remote_build_submit_aria": "Bouw op afstand op {label}",
+    "remote_build_view_action": "Bouw bekijken",
+    "remote_build_view_aria": "Externe bouw op {label} bekijken",
     "remote_build_submit_title": "Bouw op afstand op {label}",
     "remote_build_running_title": "Externe bouw op {label}",
     "remote_build_submit_configuration_label": "Configuratie",

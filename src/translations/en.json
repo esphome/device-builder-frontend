@@ -804,6 +804,8 @@
     "build_offload_pairing_disconnected": "Disconnected",
     "remote_build_submit_action": "Build remotely",
     "remote_build_submit_aria": "Build remotely on {label}",
+    "remote_build_view_action": "View build",
+    "remote_build_view_aria": "View remote build on {label}",
     "remote_build_submit_title": "Build remotely on {label}",
     "remote_build_running_title": "Remote build on {label}",
     "remote_build_submit_configuration_label": "Configuration",
