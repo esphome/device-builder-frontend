@@ -1426,6 +1426,17 @@ export class ESPHomeApp extends LitElement {
     this._remoteBuildSetInFlight = true;
     try {
       await this._api.setRemoteBuildSettings({ enabled });
+      // Toggling ``enabled`` runs ``apply_remote_build_enabled``
+      // on the backend, which tears down or re-binds the peer-
+      // link runner; ``IdentityView.listener_bound`` flips
+      // alongside. The cached identity in settings-dialog goes
+      // stale immediately, so bump the counter to force a
+      // re-fetch and pick up the fresh ``listener_bound`` (plus
+      // any version fields that depend on the bound state).
+      // Without this the "Listener active / down" indicator
+      // would render whatever ``listener_bound`` was at the
+      // last fetch, ignoring the toggle the user just clicked.
+      this._buildServerIdentityRotationCounter += 1;
     } catch {
       this._remoteBuildEnabled = previous;
       toast.error(

@@ -136,17 +136,26 @@ export const onboardingPendingContext = createContext<boolean>(
 );
 
 /**
- * Counter that increments every time the receiver fires a
- * ``remote_build_identity_rotated`` event. Phase 3c2d (#106).
+ * Counter that increments whenever the cached ``IdentityView``
+ * may have gone stale; the Build server settings card watches
+ * the counter and re-fetches identity when it changes. Phase
+ * 3c2d (#106).
  *
- * The Build server settings card consumes this and re-fetches
- * its identity (``getRemoteBuildIdentity``) when the value
- * changes, so a rotation triggered in another tab (or via the
- * server's REST surface, eventually) refreshes the visible cert
- * fingerprint here without a manual reload. A counter rather
- * than the event payload because the IdentityView model carries
- * fields the event payload doesn't (``listener_bound``,
- * versions); a re-fetch is the simplest way to pick those up.
+ * Bump sites:
+ * * ``remote_build_identity_rotated`` event lands a new cert /
+ *   pin fingerprint; another tab triggered a rotation we want
+ *   to mirror.
+ * * The user toggles the "Enable remote build" switch
+ *   (``setRemoteBuildSettings``); ``IdentityView.listener_bound``
+ *   flips alongside the runner teardown / re-bind so the cached
+ *   view goes stale immediately.
+ *
+ * A counter rather than the event payload because the
+ * IdentityView model carries fields the events don't
+ * (``listener_bound``, versions); a re-fetch is the simplest
+ * way to pick those up regardless of which path invalidated
+ * it. Settings dialog reacts to the value going up; the
+ * specific number doesn't matter.
  */
 export const buildServerIdentityRotationCounterContext = createContext<number>(
   Symbol("esphome-build-server-identity-rotation-counter")
