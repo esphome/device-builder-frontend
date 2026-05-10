@@ -1542,6 +1542,50 @@ export class ESPHomeAPI {
   }
 
   /**
+   * Manually rebind a paired receiver onto new (hostname, port) coords (phase 8b).
+   *
+   * Frontend-only fallback for the cases the 4a-o part 7
+   * mDNS auto-rebind can't catch: cross-subnet receivers (no
+   * mDNS path), mDNS disabled on the receiver's host, the
+   * receiver moved to a hostname the offloader's network can
+   * resolve but mDNS doesn't broadcast.
+   *
+   * Backend runs a one-shot ``peer_link_preview_pair`` probe
+   * at the new coords to verify the endpoint is reachable
+   * AND answers with the same pin the row was paired against.
+   * On match: mutates the stored coords in place, cancels the
+   * stale ``PeerLinkClient``, spawns a fresh one against the
+   * new coords, fires ``offloader_pair_endpoint_rebound``,
+   * and returns the updated ``PairingSummary``. On mismatch /
+   * unreachable / race: leaves the stored row untouched and
+   * raises a typed error.
+   *
+   * Errors from the WS layer:
+   * - INVALID_ARGS: pin / hostname / port shape error.
+   * - NOT_FOUND: no pairing for this pin, or the pairing was
+   *   replaced mid-probe by a concurrent unpair / re-pair.
+   * - PRECONDITION_FAILED: pairing isn't APPROVED, the
+   *   offloader-side identity hasn't loaded yet, the new coords
+   *   match the current ones (no-op edit), or the probe
+   *   answered with a different pin (different identity at the
+   *   new endpoint — re-pair through the regular flow if you
+   *   actually want to switch identities).
+   * - UNAVAILABLE: probe transport / handshake failure (new
+   *   endpoint unreachable). Retry once the underlying
+   *   connectivity recovers.
+   */
+  async editRemoteBuildPairingEndpoint(args: {
+    pin_sha256: string;
+    hostname: string;
+    port: number;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>(
+      "remote_build/edit_pairing_endpoint",
+      args,
+    );
+  }
+
+  /**
    * Dispatch a build to a paired receiver behind pin_sha256.
    *
    * Bundles the YAML + every referenced file (includes,

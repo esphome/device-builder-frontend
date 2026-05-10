@@ -760,6 +760,45 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
+  it("editRemoteBuildPairingEndpoint sends remote_build/edit_pairing_endpoint with pin + new coords", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.editRemoteBuildPairingEndpoint({
+      pin_sha256: "a".repeat(64),
+      hostname: "moved.example.com",
+      port: 6058,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/edit_pairing_endpoint");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      hostname: "moved.example.com",
+      port: 6058,
+    });
+    // Backend mutates StoredPairing in place + returns the
+    // updated PairingSummary projection. Frontend uses it
+    // primarily as a "the rebind succeeded" signal — the
+    // pairings-context subscriber on app-shell upserts the
+    // row from the OFFLOADER_PAIR_ENDPOINT_REBOUND event.
+    const result = {
+      receiver_hostname: "moved.example.com",
+      receiver_port: 6058,
+      pin_sha256: "a".repeat(64),
+      label: "desktop",
+      paired_at: 1_700_000_000.0,
+      status: "approved",
+      connected: false,
+      connecting: true,
+      last_connect_error: "",
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   it("submitRemoteBuildJob sends remote_build/submit_job with pin + configuration + target", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);

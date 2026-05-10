@@ -57,6 +57,8 @@ import "./accept-peer-dialog.js";
 import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
 import "./confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import "./edit-pairing-endpoint-dialog.js";
+import type { ESPHomeEditPairingEndpointDialog } from "./edit-pairing-endpoint-dialog.js";
 import "./pair-build-server-dialog.js";
 import "./pin-emoji-grid.js";
 import "./reauth-wizard-dialog.js";
@@ -357,6 +359,9 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   @query("esphome-reauth-wizard-dialog")
   private _reauthWizardDialog!: ESPHomeReauthWizardDialog;
+
+  @query("esphome-edit-pairing-endpoint-dialog")
+  private _editPairingEndpointDialog!: ESPHomeEditPairingEndpointDialog;
 
   @query("esphome-remote-build-job-dialog")
   private _remoteBuildDialog!: ESPHomeRemoteBuildJobDialog;
@@ -1337,6 +1342,38 @@ export class ESPHomeSettingsDialog extends LitElement {
         border-color: var(--esphome-error);
       }
 
+      /* Icon-only edit button on a paired row — opens the
+         hostname / port edit dialog (8b). Sized to match the
+         32px height of the sibling Unpair / View build buttons
+         so the row's vertical rhythm stays consistent. */
+      .btn-edit-endpoint {
+        height: 32px;
+        width: 32px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        flex-shrink: 0;
+      }
+
+      .btn-edit-endpoint:hover {
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          white 90%
+        );
+        color: var(--esphome-primary);
+        border-color: var(--esphome-primary);
+      }
+
+      .btn-edit-endpoint wa-icon {
+        font-size: 16px;
+      }
+
       .pairing-row {
         align-items: center;
         gap: var(--wa-space-s);
@@ -2217,6 +2254,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         @reauth-confirmed=${this._onReauthConfirmed}
       ></esphome-reauth-wizard-dialog>
       <esphome-remote-build-job-dialog></esphome-remote-build-job-dialog>
+      <esphome-edit-pairing-endpoint-dialog></esphome-edit-pairing-endpoint-dialog>
       <esphome-confirm-dialog
         id="unpair-confirm"
         destructive
@@ -2522,6 +2560,25 @@ export class ESPHomeSettingsDialog extends LitElement {
             `
           : nothing}
         ${this._renderViewRemoteBuildButton(pairing)}
+        ${pairing.status === "approved"
+          ? html`
+              <button
+                type="button"
+                class="btn-edit-endpoint"
+                aria-label=${this._localize(
+                  "settings.edit_pairing_endpoint_aria",
+                  { label: pairing.label },
+                )}
+                title=${this._localize(
+                  "settings.edit_pairing_endpoint_aria",
+                  { label: pairing.label },
+                )}
+                @click=${() => this._onEditPairingEndpointClick(pairing)}
+              >
+                <wa-icon library="mdi" name="pencil"></wa-icon>
+              </button>
+            `
+          : nothing}
         <button
           type="button"
           class="peer-remove btn-unpair"
@@ -2595,6 +2652,10 @@ export class ESPHomeSettingsDialog extends LitElement {
       pin_sha256: pairing.pin_sha256,
       receiver_label: pairing.label,
     });
+  };
+
+  private _onEditPairingEndpointClick = (pairing: PairingSummary): void => {
+    this._editPairingEndpointDialog?.open(pairing);
   };
 
   private _onUnpairRequest = (pairing: PairingSummary): void => {
