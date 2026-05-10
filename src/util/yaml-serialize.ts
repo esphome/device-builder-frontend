@@ -13,6 +13,9 @@
  * dependency checks against the user's current configuration.
  */
 
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { isPlainObject } from "./nested-values.js";
+
 /**
  * Opaque wrapper for a section-value block the parser couldn't fully
  * model — block scalars (`lambda: |-`), automation handlers with
@@ -48,6 +51,84 @@ export class YamlRawValue {
     public readonly lines: readonly string[],
     public readonly inlineHeader?: string,
   ) {}
+
+  /**
+   * Common leading-whitespace prefix of every non-blank line, or
+   * empty string when there are no non-blank lines. Used by
+   * ``body`` to dedent the editor view and by edit handlers to
+   * re-indent a user's freshly-typed text on round-trip.
+   */
+  get indent(): string {
+    const nonBlank = this.lines.filter((line) => line.trim() !== "");
+    if (nonBlank.length === 0) return "";
+    let common = nonBlank[0].match(/^\s*/)?.[0] ?? "";
+    for (const line of nonBlank.slice(1)) {
+      const lead = line.match(/^\s*/)?.[0] ?? "";
+      // Walk backwards from the current common prefix shrinking
+      // until both lines agree.
+      while (common && !line.startsWith(common)) {
+        common = common.slice(0, -1);
+      }
+      // Defensive: if the loop above zeroed out, the lines disagree
+      // at column 0 — fall through to the empty string.
+      if (!common) return "";
+      // Cap at the new line's leading whitespace so we don't keep
+      // a longer prefix than this line actually has.
+      if (lead.length < common.length) common = lead;
+    }
+    return common;
+  }
+
+  /**
+   * The block-scalar body as the user typed it semantically,
+   * with the common indent stripped — what a textarea / lambda
+   * editor wants to render. For example a ``YamlRawValue`` whose
+   * ``lines`` is ``["    return foo;", "    return bar;"]``
+   * displays as ``"return foo;\nreturn bar;"``.
+   *
+   * Round-trip pairing: ``YamlRawValue.fromBodyText(body, original)``
+   * goes the other direction, re-applying the common indent so
+   * the resulting lines slot back into the YAML at the original
+   * depth.
+   */
+  get body(): string {
+    const indent = this.indent;
+    return this.lines.map((line) => line.slice(indent.length)).join("\n");
+  }
+
+  /**
+   * Coercion path so ``String(rawValue)`` and ``${rawValue}`` produce
+   * the dedented body instead of the default ``[object Object]`` —
+   * the bug behind issue #428 (the lambda field rendering as
+   * ``[object Object]`` for any block-scalar value the YAML parser
+   * captured into a ``YamlRawValue``).
+   */
+  toString(): string {
+    return this.body;
+  }
+
+  /**
+   * Build a new ``YamlRawValue`` from an editor-friendly body
+   * string, re-applying the original ``YamlRawValue``'s indent and
+   * preserving its inline header. Used when the user edits a
+   * lambda / multi-line block scalar in the form: feed in the
+   * textarea's value, get back a properly-indented round-trippable
+   * ``YamlRawValue`` to write into the form's values dict.
+   *
+   * When *original* has no inline header (list-rooted block) the
+   * caller probably shouldn't be using a textarea at all — that
+   * shape carries its own dash row inside ``lines`` — so this
+   * helper drops it on the floor and treats the value as a fresh
+   * inline-header-less block. Callers that care about the
+   * list-rooted shape should special-case it before calling this.
+   */
+  static fromBodyText(body: string, original: YamlRawValue): YamlRawValue {
+    const indent = original.indent;
+    const lines = body
+      .split("\n")
+      .map((line) => (line === "" ? "" : `${indent}${line}`));
+    return new YamlRawValue(lines, original.inlineHeader);
+  }
 }
 
 /** Options for ``serializeYamlValues``. */
@@ -64,6 +145,74 @@ export interface SerializeYamlOptions {
    * existing empty-string substitution.)
    */
   keepEmptyStrings?: boolean;
+  /**
+   * Indent step for one level deeper. Defaults to
+   * ``ESPHOME_YAML_INDENT`` (two spaces, the canonical emit
+   * format). Pass the user's detected step (e.g. ``"    "`` for
+   * a 4-space file) so saves preserve the surrounding YAML's
+   * indentation instead of splicing canonical 2-space content
+   * into a 4-space file.
+   */
+  indentStep?: string;
+}
+
+/**
+ * Serialize a single list item. Mapping items
+ * (``esphome.devices`` / ``esphome.areas`` shape — the new
+ * ``multi_value=true`` schema entries) emit as
+ * ``${indent}  - first_key: value`` followed by
+ * ``${indent}    other_key: value`` for each remaining field;
+ * scalar items keep the legacy ``${indent}  - value`` shape.
+ *
+ * Per-field skip rules match the top-level serializer
+ * (``undefined`` / ``null`` / empty-string unless
+ * ``keepEmptyStrings``). When all fields are filtered out — or
+ * the item is literally ``{}`` (a freshly-added Add row the user
+ * hasn't filled yet) — emit a bare ``${indent}  -`` placeholder
+ * so the row survives the round-trip. The parser's
+ * ``collectBlockListMappings`` recognises bare dashes and
+ * rebuilds the empty mapping on reload; without the placeholder
+ * the user's in-progress row would silently vanish.
+ *
+ * ``YamlRawValue`` values inside an item are emitted with the
+ * same inline-header / body shape as the top-level branch.
+ */
+function serializeListItem(
+  item: unknown,
+  indent: string,
+  options: SerializeYamlOptions,
+): string[] {
+  const keepEmpty = options.keepEmptyStrings === true;
+  const step = options.indentStep ?? ESPHOME_YAML_INDENT;
+  const dashIndent = `${indent}${step}`;
+  if (isPlainObject(item)) {
+    const entries = Object.entries(item).filter(
+      ([, v]) => v !== undefined && v !== null && (v !== "" || keepEmpty),
+    );
+    if (entries.length === 0) return [`${dashIndent}-`];
+    const lines: string[] = [];
+    // Follow-up sub-keys align with the inline first key (which
+    // sits at ``${dashIndent}- ``, a fixed two-character offset
+    // past the dash) — NOT at ``${dashIndent}${step}``. With a
+    // canonical 2-space step those happen to coincide, but on a
+    // 4-space user file ``${dashIndent}${step}`` lands sub-keys
+    // four columns deeper than the inline key, producing
+    // valid-but-misaligned YAML. ``ESPHOME_YAML_INDENT`` is the
+    // canonical 2-character "- " gap and stays fixed.
+    const childIndent = `${dashIndent}${ESPHOME_YAML_INDENT}`;
+    entries.forEach(([k, v], idx) => {
+      const prefix = idx === 0 ? `${dashIndent}- ` : childIndent;
+      if (v instanceof YamlRawValue) {
+        const header = v.inlineHeader ? ` ${v.inlineHeader}` : "";
+        lines.push(`${prefix}${k}:${header}`);
+        lines.push(...v.lines);
+        return;
+      }
+      lines.push(`${prefix}${k}: ${formatYamlScalar(v)}`);
+    });
+    return lines;
+  }
+  return [`${dashIndent}- ${formatYamlScalar(item)}`];
 }
 
 /**
@@ -78,6 +227,7 @@ export function serializeYamlValues(
 ): string[] {
   const lines: string[] = [];
   const keepEmpty = options.keepEmptyStrings === true;
+  const step = options.indentStep ?? ESPHOME_YAML_INDENT;
   for (const [key, val] of Object.entries(values)) {
     if (val === undefined || val === null) continue;
     if (val === "" && !keepEmpty) continue;
@@ -98,7 +248,8 @@ export function serializeYamlValues(
       if (val.length === 0) continue;
       lines.push(`${indent}${key}:`);
       for (const item of val) {
-        lines.push(`${indent}  - ${formatYamlScalar(item)}`);
+        const itemLines = serializeListItem(item, indent, options);
+        lines.push(...itemLines);
       }
       continue;
     }
@@ -110,7 +261,7 @@ export function serializeYamlValues(
       // is surprising and loses data on round-trip. (Copilot.)
       const sub = serializeYamlValues(
         val as Record<string, unknown>,
-        `${indent}  `,
+        `${indent}${step}`,
         options,
       );
       if (sub.length === 0) continue;

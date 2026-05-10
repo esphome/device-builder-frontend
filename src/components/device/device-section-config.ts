@@ -746,6 +746,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       renderEntries,
       this._values,
       this._presentComponents,
+      this.board?.esphome.platform ?? null,
     );
 
     const fromLine = resolveCurrentFromLine(

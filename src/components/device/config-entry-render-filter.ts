@@ -24,6 +24,12 @@
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import { isEntryVisible } from "../../util/config-validation.js";
+import {
+  asMappingList,
+  asRecord,
+  isPlainObject,
+} from "../../util/nested-values.js";
+import { YamlRawValue } from "../../util/yaml-serialize.js";
 
 /**
  * Entry keys the form keeps visible even when ``requiredOnly`` is
@@ -47,6 +53,21 @@ export interface RenderFilterOptions {
   showAdvanced: boolean;
   /** Pass-through to ``isEntryVisible`` for cross-component checks. */
   presentComponents?: Set<string>;
+  /**
+   * The device's target platform (``esp32`` / ``esp8266`` /
+   * ``rp2040`` / ...). Forwarded to ``isEntryVisible`` which
+   * applies the actual platform gate against
+   * ``ConfigEntry.supported_platforms``. Keeping the predicate
+   * inside ``isEntryVisible`` (rather than re-implementing it
+   * here) means ``validateEntries``, which also calls
+   * ``isEntryVisible``, stays in lockstep with what the form
+   * paints — no flagging required-and-platform-gated fields the
+   * user can't even see.
+   *
+   * ``null`` / ``undefined`` skips the gate — used by the
+   * add-component dialog when no board is selected yet.
+   */
+  targetPlatform?: string | null;
 }
 
 /**
@@ -70,12 +91,22 @@ function hasMaterialValue(
 ): boolean {
   const value = values[entry.key];
   if (entry.type === ConfigEntryType.NESTED) {
-    if (value === null || typeof value !== "object" || Array.isArray(value)) {
-      return false;
+    if (entry.multi_value) {
+      // Repeatable nested mapping (``esphome.devices`` /
+      // ``esphome.areas``): any non-empty array of items counts.
+      // We don't recurse — items are user-added, and a freshly
+      // added empty ``{}`` still represents user intent (the row
+      // exists because they clicked Add). A ``YamlRawValue`` at
+      // this key (the parser preserved the block byte-for-byte
+      // because the items didn't fit the flat-mapping contract)
+      // also counts — the user's YAML must keep showing without
+      // a trip through the Advanced toggle.
+      if (value instanceof YamlRawValue) return true;
+      return Array.isArray(value) && value.length > 0;
     }
-    const childValues = value as Record<string, unknown>;
+    if (!isPlainObject(value)) return false;
     return (entry.config_entries ?? []).some((child) =>
-      hasMaterialValue(child, childValues),
+      hasMaterialValue(child, value),
     );
   }
   return value !== undefined;
@@ -88,7 +119,16 @@ export function filterRenderable(
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   for (const entry of entries) {
-    if (!isEntryVisible(entry, values, opts.presentComponents)) continue;
+    if (
+      !isEntryVisible(
+        entry,
+        values,
+        opts.presentComponents,
+        opts.targetPlatform,
+      )
+    ) {
+      continue;
+    }
     if (
       entry.advanced &&
       !opts.showAdvanced &&
@@ -97,17 +137,19 @@ export function filterRenderable(
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {
-      const child = values[entry.key];
-      const childValues =
-        child !== null && typeof child === "object" && !Array.isArray(child)
-          ? (child as Record<string, unknown>)
-          : {};
-      const renderableChildren = filterRenderable(
-        entry.config_entries ?? [],
-        childValues,
-        opts,
-      );
-      if (renderableChildren.length === 0) continue;
+      // List-form NESTED always renders — the renderer paints the
+      // Add button even with zero items, and ``filterRenderable``
+      // is called per-item at render time with the item's own
+      // scope. Skipping based on the parent ``values`` shape would
+      // hide the field exactly when the user needs it.
+      if (!entry.multi_value) {
+        const renderableChildren = filterRenderable(
+          entry.config_entries ?? [],
+          asRecord(values[entry.key]),
+          opts,
+        );
+        if (renderableChildren.length === 0) continue;
+      }
     } else if (
       opts.requiredOnly &&
       !entry.required &&
@@ -149,18 +191,30 @@ export function collectRenderablePaths(
 ): Set<string> {
   for (const entry of filterRenderable(entries, values, opts)) {
     if (entry.type === ConfigEntryType.NESTED) {
-      const child = values[entry.key];
-      const childValues =
-        child !== null && typeof child === "object" && !Array.isArray(child)
-          ? (child as Record<string, unknown>)
-          : {};
-      collectRenderablePaths(
-        entry.config_entries ?? [],
-        childValues,
-        opts,
-        [...pathPrefix, entry.key],
-        out,
-      );
+      const childSchema = entry.config_entries ?? [];
+      if (entry.multi_value) {
+        // List-form NESTED: emit one path tree per item with the
+        // index segment (``devices.0.id``) so
+        // ``_anyErrorIsVisible`` can reconcile validation errors
+        // keyed on per-item leaves.
+        asMappingList(values[entry.key]).forEach((itemValues, idx) => {
+          collectRenderablePaths(
+            childSchema,
+            itemValues,
+            opts,
+            [...pathPrefix, entry.key, String(idx)],
+            out,
+          );
+        });
+      } else {
+        collectRenderablePaths(
+          childSchema,
+          asRecord(values[entry.key]),
+          opts,
+          [...pathPrefix, entry.key],
+          out,
+        );
+      }
       out.add([...pathPrefix, entry.key].join("."));
       continue;
     }

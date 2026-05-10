@@ -29,8 +29,30 @@ export class ESPHomeConfirmDialog extends LitElement {
   @property({ attribute: "confirm-label" })
   confirmLabel = "";
 
+  /**
+   * Optional secondary-action button label. When non-empty a
+   * third button renders between Cancel and Confirm; clicking it
+   * fires a "secondary" event (same bubbling shape as the
+   * "confirm" event) and counts as a decision so the
+   * cancel-on-dismiss path doesn't fire. Use it for two-outcome
+   * decisions that aren't quite confirm-or-cancel, e.g. Accept
+   * versus Reject on a pairing request.
+   */
+  @property({ attribute: "secondary-label" })
+  secondaryLabel = "";
+
   @property({ type: Boolean })
   destructive = false;
+
+  /**
+   * Optional override for the icon rendered in the destructive
+   * icon-wrap. Defaults to "alert-outline" (registered locally).
+   * If a caller passes a different name they're responsible for
+   * having registered it via registerMdiIcons in their own
+   * module so wa-icon can resolve the path.
+   */
+  @property()
+  icon = "alert-outline";
 
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
@@ -70,13 +92,27 @@ export class ESPHomeConfirmDialog extends LitElement {
       .btn--confirm.destructive:hover {
         background: color-mix(in srgb, var(--esphome-error), black 10%);
       }
+
+      /* Secondary sits between Cancel and Confirm when the caller
+         passes a secondary-label. Visually neutral; the caller
+         picks whether the destructive intent lives on the
+         primary (Confirm) or the secondary slot via wording. */
+      .btn--secondary {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-normal);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      }
+
+      .btn--secondary:hover {
+        background: var(--wa-color-surface-border);
+      }
     `,
   ];
 
-  private _confirmed = false;
+  private _decided = false;
 
   open() {
-    this._confirmed = false;
+    this._decided = false;
     this._dialog.open = true;
   }
 
@@ -94,15 +130,24 @@ export class ESPHomeConfirmDialog extends LitElement {
         <div class="body">
           ${this.destructive
             ? html`<div class="icon-wrap destructive">
-                <wa-icon library="mdi" name="alert-outline"></wa-icon>
+                <wa-icon library="mdi" name=${this.icon}></wa-icon>
               </div>`
             : nothing}
-          <div class="text">${this.message}</div>
+          <div class="text">
+            <slot name="body">${this.message}</slot>
+          </div>
         </div>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
+          ${this.secondaryLabel
+            ? html`
+                <button class="btn btn--secondary" @click=${this._secondary}>
+                  ${this.secondaryLabel}
+                </button>
+              `
+            : nothing}
           <button
             class="btn btn--confirm ${this.destructive ? "destructive" : ""}"
             @click=${this._confirm}
@@ -115,15 +160,23 @@ export class ESPHomeConfirmDialog extends LitElement {
   }
 
   private _confirm() {
-    this._confirmed = true;
+    this._decided = true;
     this.close();
     this.dispatchEvent(
       new CustomEvent("confirm", { bubbles: true, composed: true }),
     );
   }
 
+  private _secondary() {
+    this._decided = true;
+    this.close();
+    this.dispatchEvent(
+      new CustomEvent("secondary", { bubbles: true, composed: true }),
+    );
+  }
+
   private _onAfterHide() {
-    if (!this._confirmed) {
+    if (!this._decided) {
       this.dispatchEvent(
         new CustomEvent("cancel", { bubbles: true, composed: true }),
       );

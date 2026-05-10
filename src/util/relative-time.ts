@@ -91,6 +91,44 @@ export function ageOf(
 }
 
 /**
+ * Subtract the elapsed wall-clock since *anchor* (in ms) from a
+ * backend-supplied ``expires_in_seconds`` baseline.
+ *
+ * Mirror of :func:`ageOf` for forward-looking countdowns: where
+ * ``ageOf`` advances a "seconds ago" baseline, ``remainingOf``
+ * winds a "seconds left" baseline down. The pairing-window
+ * countdown in Settings → Pairing requests uses this so the
+ * displayed M:SS reads fresh between
+ * ``remote_build_pairing_window_changed`` events without
+ * trusting frontend / backend clocks to be in sync.
+ *
+ * Clamps at zero rather than going negative; a UI counting
+ * down to a deadline doesn't have a meaningful negative reading
+ * and the next server event re-seeds the baseline anyway. The
+ * return value is fractional seconds (no rounding); callers
+ * that want whole-second display ticks (the M:SS chip in
+ * Settings → Pairing requests, for example) ``Math.floor`` at
+ * the format step.
+ *
+ * ``null`` baseline propagates as ``null`` so the row can be
+ * hidden.
+ */
+export function remainingOf(
+  baselineRemainingSeconds: number | null | undefined,
+  anchorMs: number,
+  nowMs: number,
+): number | null {
+  if (
+    baselineRemainingSeconds === null ||
+    baselineRemainingSeconds === undefined
+  ) {
+    return null;
+  }
+  const elapsedSeconds = Math.max(0, (nowMs - anchorMs) / 1000);
+  return Math.max(0, baselineRemainingSeconds - elapsedSeconds);
+}
+
+/**
  * Memoized ``Intl.NumberFormat`` per (locale, fraction-digits) key.
  *
  * Both the drawer's RTT row ("4.2 ms", 1 fraction digit) and TTL

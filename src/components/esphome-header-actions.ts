@@ -9,13 +9,18 @@ import {
   mdiEyeOutline,
   mdiKeyVariant,
   mdiPlaylistCheck,
+  mdiWifiCog,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { JobStatus } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { firmwareJobsContext, localizeContext } from "../context/index.js";
+import {
+  firmwareJobsContext,
+  localizeContext,
+  onboardingPendingContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EscapeController } from "../util/escape-controller.js";
 import { navigate } from "../util/navigation.js";
@@ -33,6 +38,7 @@ registerMdiIcons({
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
   "playlist-check": mdiPlaylistCheck,
+  "wifi-cog": mdiWifiCog,
 });
 
 @customElement("esphome-header-actions")
@@ -54,6 +60,20 @@ export class ESPHomeHeaderActions extends LitElement {
    *  level settings. */
   @state()
   private _showIgnored = false;
+
+  /** True when onboarding still has work to do (currently:
+   *  Wi-Fi step pending — data-derived from ``secrets.yaml``).
+   *  Gates a dedicated ``Set up Wi-Fi…`` kebab entry so a user
+   *  who declined the wizard with "I don't use Wi-Fi" — or who
+   *  cleared the credentials by hand from the Secrets editor —
+   *  still has a one-click re-entry into the wizard. The entry
+   *  appears / disappears in real time as ``secrets.yaml``
+   *  changes (the app-shell re-fetches the snapshot on every
+   *  ``secrets-saved`` event). Owned by the app shell, threaded
+   *  via context. */
+  @consume({ context: onboardingPendingContext, subscribe: true })
+  @state()
+  private _onboardingPending = false;
 
   static styles = [
     espHomeStyles,
@@ -330,8 +350,22 @@ export class ESPHomeHeaderActions extends LitElement {
                 @keydown=${this._onMenuItemKeydown}
               >
                 <wa-icon library="mdi" name="key-variant"></wa-icon>
-                ${this._localize("layout.secrets")}
+                <span class="menu-item-label">${this._localize("layout.secrets")}</span>
               </div>
+              ${this._onboardingPending
+                ? html`<div
+                    class="menu-item"
+                    role="menuitem"
+                    tabindex="0"
+                    @click=${this._openOnboarding}
+                    @keydown=${this._onMenuItemKeydown}
+                  >
+                    <wa-icon library="mdi" name="wifi-cog"></wa-icon>
+                    <span class="menu-item-label"
+                      >${this._localize("onboarding.menu_item_setup_wifi")}</span
+                    >
+                  </div>`
+                : nothing}
               <div
                 class="menu-item ${this._showIgnored ? "menu-item--active" : ""}"
                 role="menuitemcheckbox"
@@ -474,6 +508,21 @@ export class ESPHomeHeaderActions extends LitElement {
   private _openSecrets() {
     this._close();
     navigate("/secrets");
+  }
+
+  /** Re-launches the onboarding wizard on demand. The kebab item
+   *  is gated on ``_onboardingPending`` (data-derived from
+   *  ``secrets.yaml``), so it appears only when there's actually
+   *  something to onboard — a user who declined "I don't use Wi-Fi"
+   *  earlier sees the entry and can change their mind. */
+  private _openOnboarding() {
+    this._close();
+    this.dispatchEvent(
+      new CustomEvent("open-onboarding-wifi", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
   }
 
   private _openFirmwareJobs() {

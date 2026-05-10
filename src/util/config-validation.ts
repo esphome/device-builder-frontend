@@ -1,30 +1,53 @@
 import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
+import { asMappingList, asRecord } from "./nested-values.js";
+import { YamlRawValue } from "./yaml-serialize.js";
 
 /**
  * Determine if a config entry is currently visible.
  *
- * Visibility is the AND of three checks:
+ * Visibility is the AND of four checks:
  *  1. `hidden === false`
  *  2. The `depends_on` predicate against the current form values
  *  3. `depends_on_component` is present in `presentComponents` (when given)
+ *  4. The device's target platform is in ``supported_platforms``
+ *     when the entry is platform-gated (when ``targetPlatform`` given)
  *
- * Pass `presentComponents` to honor the third check; when omitted the
- * cross-component dependency is treated as satisfied (callers without
- * device-wide context — e.g. add-component before insertion — should
- * leave it undefined).
+ * Pass `presentComponents` / `targetPlatform` to honor checks #3 / #4;
+ * when omitted those dependencies are treated as satisfied (callers
+ * without device-wide context — e.g. add-component before insertion
+ * with no board picked — should leave them undefined).
+ *
+ * Used by both ``filterRenderable`` (deciding what to paint) and
+ * ``validateEntries`` (deciding what to validate). Keeping the
+ * predicate in one place means a hidden-by-platform field can't be
+ * paint-skipped but still validated as required — the failure mode
+ * Copilot flagged on PR #226.
  */
 export function isEntryVisible(
   entry: ConfigEntry,
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
+  targetPlatform?: string | null,
 ): boolean {
   if (entry.hidden) return false;
 
   // Cross-component dependency: only check when caller provided context.
   if (entry.depends_on_component && presentComponents) {
     if (!presentComponents.has(entry.depends_on_component)) return false;
+  }
+
+  // Platform gate: only check when caller provided the target platform.
+  // Empty / missing ``supported_platforms`` is "no constraint" (the
+  // common case) and the field stays visible.
+  if (
+    targetPlatform &&
+    entry.supported_platforms &&
+    entry.supported_platforms.length > 0 &&
+    !entry.supported_platforms.includes(targetPlatform)
+  ) {
+    return false;
   }
 
   if (!entry.depends_on) return true;
@@ -167,9 +190,17 @@ export function validateEntries(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
+  targetPlatform?: string | null,
 ): Map<string, ValidationError> {
   const errors = new Map<string, ValidationError>();
-  _validateEntriesRecursive(entries, values, presentComponents, [], errors);
+  _validateEntriesRecursive(
+    entries,
+    values,
+    presentComponents,
+    targetPlatform,
+    [],
+    errors,
+  );
   return errors;
 }
 
@@ -183,20 +214,57 @@ function _validateEntriesRecursive(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   presentComponents: Set<string> | undefined,
+  targetPlatform: string | null | undefined,
   pathPrefix: string[],
   errors: Map<string, ValidationError>,
 ): void {
   for (const entry of entries) {
     // Skip hidden entries and those whose visibility predicates fail —
     // we don't want to require fields the user can't even see.
-    if (!isEntryVisible(entry, values, presentComponents)) continue;
+    if (!isEntryVisible(entry, values, presentComponents, targetPlatform)) continue;
 
     if (entry.type === ConfigEntryType.NESTED) {
-      const child = values[entry.key];
-      const childValues =
-        child !== null && typeof child === "object" && !Array.isArray(child)
-          ? (child as Record<string, unknown>)
-          : {};
+      const childSchema = entry.config_entries ?? [];
+      if (entry.multi_value) {
+        // List-form NESTED (``esphome.devices`` / ``esphome.areas``):
+        // validate each item independently with an array-index path
+        // segment so errors land at ``devices.0.id`` etc. — matching
+        // how the form looks errors up via ``path.join(".")``. An
+        // empty list on an optional field is fine (the user opted
+        // out by adding nothing); a required list with zero items
+        // surfaces a single error on the field itself.
+        //
+        // ``YamlRawValue`` short-circuits — the parser preserved
+        // the block byte-for-byte because items don't fit the
+        // flat-mapping contract, so we can't introspect them. The
+        // user's YAML is present (treats a required field as
+        // satisfied) but unreachable for per-item validation.
+        const raw = values[entry.key];
+        if (raw instanceof YamlRawValue) continue;
+        const items = asMappingList(raw);
+        if (items.length === 0) {
+          if (entry.required) {
+            const fullPath = [...pathPrefix, entry.key].join(".");
+            errors.set(fullPath, {
+              key: fullPath,
+              code: "validation.required",
+            });
+          }
+          continue;
+        }
+        items.forEach((itemValues, idx) => {
+          _validateEntriesRecursive(
+            childSchema,
+            itemValues,
+            presentComponents,
+            targetPlatform,
+            [...pathPrefix, entry.key, String(idx)],
+            errors,
+          );
+        });
+        continue;
+      }
+      const childValues = asRecord(values[entry.key]);
       // Optional nested groups (e.g. `web_server.auth`) often have
       // required CHILDREN (`auth.username`, `auth.password`). Don't
       // flag those as missing when the user hasn't populated the
@@ -209,9 +277,10 @@ function _validateEntriesRecursive(
         continue;
       }
       _validateEntriesRecursive(
-        entry.config_entries ?? [],
+        childSchema,
         childValues,
         presentComponents,
+        targetPlatform,
         [...pathPrefix, entry.key],
         errors,
       );
@@ -229,12 +298,8 @@ function _validateEntriesRecursive(
     // regex here would silently drift on any upstream change).
     if (entry.type === ConfigEntryType.MAP) {
       if (entry.required) {
-        const raw = values[entry.key];
-        const map =
-          raw !== null && typeof raw === "object" && !Array.isArray(raw)
-            ? (raw as Record<string, unknown>)
-            : null;
-        if (!map || Object.keys(map).length === 0) {
+        const map = asRecord(values[entry.key]);
+        if (Object.keys(map).length === 0) {
           const fullPath = [...pathPrefix, entry.key].join(".");
           errors.set(fullPath, {
             key: fullPath,

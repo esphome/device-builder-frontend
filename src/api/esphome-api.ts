@@ -28,11 +28,19 @@ import type {
   ReachabilitySubscription,
   FirmwareDownload,
   FirmwareJob,
+  IdentityView,
   PagedBoardsResponse,
   PagedComponentsResponse,
+  PairingSummary,
+  PairingWindowState,
+  PeerSummary,
+  RemoteBuildPeer,
+  RemoteBuildSettings,
+  RemoteBuildSubmitTarget,
   ResultMessage,
   SerialPort,
   ServerInfoMessage,
+  OnboardingState,
   StreamCallbacks,
   UpdateDeviceResponse,
   UserPreferences,
@@ -1282,6 +1290,341 @@ export class ESPHomeAPI {
   /** Get secret key names. */
   async getSecretKeys(): Promise<string[]> {
     return this.sendCommand<string[]>("config/get_secrets");
+  }
+
+  /**
+   * Onboarding state — current version, what the user has
+   * acknowledged, and per-step ``pending`` / ``done`` status. The
+   * dashboard hits this on app load to decide whether to surface
+   * the setup wizard and whether to show the secrets-menu badge.
+   */
+  async getOnboardingState(): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/get_state");
+  }
+
+  /**
+   * Save Wi-Fi credentials into the user's ``secrets.yaml``. The
+   * backend validates against ESPHome's own length limits
+   * (32 char SSID, 64 char password) and surfaces violations as
+   * ``CommandError(INVALID_ARGS)`` for the UI to render.
+   */
+  async setOnboardingWifi(
+    ssid: string,
+    password: string,
+  ): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>(
+      "onboarding/set_wifi_credentials",
+      { ssid, password },
+    );
+  }
+
+  /**
+   * Mark the current onboarding flow as acknowledged. Called when
+   * the user explicitly closes the wizard (either after saving
+   * credentials or after declining — e.g. an Ethernet-only user
+   * who'll never set Wi-Fi). The badge in the secrets menu stays
+   * if the underlying data is still un-configured; this only
+   * stops the wizard dialog from re-popping until a future
+   * onboarding-version bump.
+   */
+  async markOnboardingAcknowledged(): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/mark_acknowledged");
+  }
+
+  /**
+   * Get the receiver-side remote-build settings.
+   *
+   * Phase 2 of issue #106 — only ``enabled`` is exposed; phase 3+
+   * adds artifact-retention TTL, the cert fingerprint, the token
+   * list, and the rest of the "Remote builder" Settings section.
+   */
+  async getRemoteBuildSettings(): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>("remote_build/get_settings");
+  }
+
+  /** Persist the receiver-side remote-build settings. */
+  async setRemoteBuildSettings(args: {
+    enabled: boolean;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/set_settings",
+      args
+    );
+  }
+
+  /**
+  // Note: there's no ``listRemoteBuildHosts`` /
+  // ``addRemoteBuildManualHost`` / ``removeRemoteBuildManualHost``
+  // wrapper. mDNS-discovered hosts ship through
+  // ``subscribe_events``'s ``initial_state.hosts`` field at
+  // subscribe time + the two live events
+  // (``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``)
+  // drive every mutation. Manual-host entries were dropped
+  // entirely in lockstep with the backend rip-out — the
+  // offloader-side pair flow accepts a typed hostname / port
+  // directly via ``request_pair`` without an intermediate
+  // "save manual host" step.
+
+  // ─── Remote build: receiver-side pairing inbox (phase 4a-r1) ──
+
+  // Note: there's no ``listRemoteBuildPeers`` wrapper. The
+  // receiver-side peer list (PENDING + APPROVED) ships through
+  // ``subscribe_events``'s ``initial_state.peers`` field at
+  // subscribe time + the three live events
+  // (``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` /
+  // ``REMOTE_BUILD_PAIR_STATUS_CHANGED``) drive every mutation.
+  // A separate ``list_peers`` snapshot read would be a redundant
+  // round-trip on the WS the frontend already has open.
+
+  /**
+   * Promote a PENDING peer to APPROVED.
+   *
+   * The receiver-side admin clicks Accept on a row in the
+   * Pairing requests inbox; the call promotes the in-memory
+   * row to a persisted ``StoredPeer``, fires
+   * ``remote_build_pair_status_changed`` with
+   * ``status="approved"``, and wakes any offloader currently
+   * long-polling ``intent="pair_status"`` against this
+   * ``dashboard_id``. Unknown ``dashboard_id`` rejects with
+   * ``ErrorCode.NOT_FOUND``.
+   */
+  async approveRemoteBuildPeer(args: {
+    dashboard_id: string;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/approve_peer",
+      args
+    );
+  }
+
+  /**
+   * Drop a peer row by ``dashboard_id``.
+   *
+   * Works for both PENDING (in-memory) and APPROVED (persisted)
+   * rows. Fires ``remote_build_pair_status_changed`` with
+   * ``status="removed"`` for either case so any offloader
+   * long-polling pair_status sees the cancellation. Unknown
+   * ``dashboard_id`` rejects with ``ErrorCode.NOT_FOUND``.
+   */
+  async removeRemoteBuildPeer(args: {
+    dashboard_id: string;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/remove_peer",
+      args
+    );
+  }
+
+  /**
+   * Open or close the pairing window for the calling WS client.
+   *
+   * The pairing window narrows when ``intent="pair_request"``
+   * Noise frames are accepted: only while at least one client
+   * has called this with ``open: true`` and is keeping the
+   * extend timestamp fresh. Refcounted across clients with a
+   * 5-minute idle timeout; a graceful ``open: false`` removes
+   * just the calling client (other tabs / users still keep the
+   * window open if any of them is extending). Fires
+   * ``remote_build_pairing_window_changed`` on transitions and
+   * on every successful ``open: true`` extend.
+   *
+   * The frontend's Pairing requests screen calls ``open: true``
+   * on mount + on each user-activity tick (debounced to once
+   * per 30s on the wire), and ``open: false`` on unmount.
+   */
+  async setRemoteBuildPairingWindow(args: {
+    open: boolean;
+  }): Promise<PairingWindowState> {
+    return this.sendCommand<PairingWindowState>(
+      "remote_build/set_pairing_window",
+      args
+    );
+  }
+
+  // ─── Remote build: offloader-side pair flow (phase 4a-o) ──
+
+  /**
+   * Open a brief Noise XX WS to the receiver and capture its
+   * pin for OOB-display.
+   *
+   * The offloader runs ``intent="preview"`` to capture the
+   * receiver's static X25519 pubkey from the Noise handshake
+   * transcript before committing to pair. The frontend renders
+   * the returned ``pin_sha256`` for the user to OOB-verify
+   * against the receiver's "Build server" Settings card; only
+   * after that confirmation does the offloader call
+   * {@link requestRemoteBuildPair}. Read-only on the receiver
+   * (no state mutated). Transport / handshake / decode failures
+   * surface as ``ErrorCode.UNAVAILABLE``.
+   */
+  async previewRemoteBuildPair(args: {
+    hostname: string;
+    port: number;
+  }): Promise<{ pin_sha256: string }> {
+    return this.sendCommand<{ pin_sha256: string }>(
+      "remote_build/preview_pair",
+      args
+    );
+  }
+
+  /**
+   * Send ``intent="pair_request"`` and persist a local
+   * ``StoredPairing`` row.
+   *
+   * Re-handshakes the receiver (defends against TOCTOU between
+   * preview and confirm) and sends ``{label: offloader_label,
+   * dashboard_id}`` in the encrypted msg3 payload. The
+   * receiver's response decides what state the local row lands
+   * in: PENDING (typical first pair, awaiting admin Accept) or
+   * APPROVED (re-pair against existing trust the receiver still
+   * remembers).
+   *
+   * Two distinct labels because the offloader-side and
+   * receiver-side rows mean different things:
+   * ``receiver_label`` is the offloader's local name for the
+   * receiver (lands on the offloader's ``StoredPairing.label``);
+   * ``offloader_label`` is the offloader's self-identification
+   * sent to the receiver in msg3 for *their* pairing-requests
+   * inbox.
+   *
+   * Errors:
+   * - ``ErrorCode.PRECONDITION_FAILED`` — pin mismatch (TOCTOU
+   *   between preview and confirm) or receiver-side REJECTED.
+   * - ``ErrorCode.NO_PAIRING_WINDOW`` — receiver's pairing
+   *   window is closed; UI should prompt the user to ask the
+   *   receiving dashboard's admin to open the Pairing requests
+   *   screen.
+   * - ``ErrorCode.UNAVAILABLE`` — transport / handshake / decode
+   *   failure.
+   * - ``ErrorCode.INVALID_ARGS`` — host / port / pin / label
+   *   shape rejection.
+   */
+  async requestRemoteBuildPair(args: {
+    hostname: string;
+    port: number;
+    pin_sha256: string;
+    receiver_label: string;
+    offloader_label: string;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
+  }
+
+  /**
+   * Drop the local pairing row identified by *pin_sha256*.
+   *
+   * Idempotent — returns ``{removed: false}`` when no row
+   * matches. Cancels the row's pair-status listener task if
+   * any (the open Noise WS to the receiver closes promptly
+   * without waiting on disk I/O). Fires
+   * ``offloader_pair_status_changed`` with ``status="removed"``
+   * so other tabs / clients on the global ``subscribe_events``
+   * stream see the removal.
+   *
+   * 4a-o part 6 changed the WS arg from ``hostname / port`` to
+   * ``pin_sha256``: the offloader's controller now keys
+   * pairings on the receiver's stable cryptographic identity,
+   * so the lookup arg follows. Every ``PairingSummary`` row the
+   * frontend renders carries ``pin_sha256``, so the UI
+   * passes that value directly without needing a host/port
+   * round-trip.
+   *
+   * Receiver-side state is NOT notified — the receiver's
+   * ``StoredPeer`` row stays until the receiver admin clicks
+   * Remove on their own inbox; that's the receiver's ownership
+   * concern. Phase 8's re-auth wizard surfaces the
+   * "stale on receiver, removed locally" case as a UI
+   * affordance for the receiver-side admin.
+   */
+  async unpairRemoteBuild(args: {
+    pin_sha256: string;
+  }): Promise<{ removed: boolean }> {
+    return this.sendCommand<{ removed: boolean }>("remote_build/unpair", args);
+  }
+
+  /**
+   * Dispatch a build to a paired receiver behind pin_sha256.
+   *
+   * Bundles the YAML + every referenced file (includes,
+   * secrets, fonts, images) on the offloader, streams the
+   * tarball over the live peer-link Noise session, and
+   * returns the receiver's submit_job_ack. Live job
+   * lifecycle + per-line stdout / stderr arrive
+   * asynchronously through OFFLOADER_JOB_STATE_CHANGED /
+   * OFFLOADER_JOB_OUTPUT events on the subscribe_events
+   * stream tagged with the same job_id this returns.
+   *
+   * target is one of "compile" (build firmware artefacts on
+   * the receiver, no flash) or "upload" (build then OTA-
+   * upload to the device, like the local Install action).
+   *
+   * Errors from the WS layer:
+   * - INVALID_ARGS: pin / target / configuration shape
+   *   error, or bundle build failed (the receiver's
+   *   validator diagnostic is in the message verbatim).
+   * - NOT_FOUND: no pairing for this pin, or the YAML is
+   *   missing from config_dir.
+   * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
+   *   peer-link session isn't currently live (orphaned,
+   *   unreachable, mid-reconnect).
+   * - UNAVAILABLE: ack timeout, or the session died
+   *   mid-flow.
+   *
+   * On accepted: false the receiver actively rejected the
+   * job (queue full, manifest unsupported, hash mismatch);
+   * reason carries the structured rejection code.
+   *
+   * Phase 5c-3 backend, 5c-4 frontend.
+   */
+  async submitRemoteBuildJob(args: {
+    pin_sha256: string;
+    configuration: string;
+    target: RemoteBuildSubmitTarget;
+  }): Promise<{ job_id: string; accepted: boolean; reason?: string }> {
+    return this.sendCommand<{
+      job_id: string;
+      accepted: boolean;
+      reason?: string;
+    }>("remote_build/submit_job", args);
+  }
+
+  // ─── Remote build: receiver identity (phase 3c1) ──────────
+
+  /**
+   * Read this dashboard's stable identity for the Settings card.
+   *
+   * Returns ``{dashboard_id, pin_sha256, server_version,
+   * esphome_version, listener_bound}``. The cert + key PEMs are
+   * intentionally NOT included; only the SPKI fingerprint
+   * (``pin_sha256``, lowercase hex) is safe to ship to a
+   * frontend, and the fingerprint is what a sender pins
+   * against anyway. Idempotent (no rotation triggered by reads).
+   * Lazy-creates the cert + key on first call if missing.
+   */
+  async getRemoteBuildIdentity(): Promise<IdentityView> {
+    return this.sendCommand<IdentityView>("remote_build/get_identity");
+  }
+
+  /**
+   * Mint a fresh cert + keypair, replacing whatever's on disk.
+   *
+   * Forces every paired sender to re-pair (the new SPKI
+   * produces a new ``pin_sha256``); ``dashboard_id`` is
+   * preserved across rotations. If the receiver listener is
+   * currently bound, it gets torn down and rebuilt against the
+   * new cert; the returned ``IdentityView.listener_bound``
+   * reflects the rebuild outcome (``false`` means the rebuild
+   * fail-softed; the operator should check the dashboard logs
+   * before assuming the rotation took effect end-to-end).
+   *
+   * Concurrent calls are rejected with
+   * ``ErrorCode.ALREADY_EXISTS``; the caller is expected to
+   * confirm before each click. Fires a
+   * ``remote_build_identity_rotated`` event on the bus carrying
+   * ``{dashboard_id, pin_sha256}`` so other tabs / subscribers
+   * refresh without polling.
+   */
+  async rotateRemoteBuildIdentity(): Promise<IdentityView> {
+    return this.sendCommand<IdentityView>("remote_build/rotate_identity");
   }
 
   /** Get compiled device metadata. */
