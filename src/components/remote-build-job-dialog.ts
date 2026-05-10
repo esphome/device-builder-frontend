@@ -183,7 +183,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           return this._localize("settings.remote_build_submit_not_found");
         case ErrorCode.INVALID_ARGS:
           return this._localize("settings.remote_build_submit_invalid_args", {
-            details: err.message,
+            details: err.details,
           });
         default:
           return this._localize("settings.remote_build_submit_generic_error");
