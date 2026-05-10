@@ -1,6 +1,7 @@
 import { consume } from "@lit/context";
 import {
   mdiClose,
+  mdiHandshakeOutline,
   mdiPaletteOutline,
   mdiSendOutline,
   mdiServerNetwork,
@@ -45,6 +46,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { remainingOf } from "../util/relative-time.js";
 import "./accept-peer-dialog.js";
 import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
 import "./confirm-dialog.js";
@@ -60,6 +62,7 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
   close: mdiClose,
+  "handshake-outline": mdiHandshakeOutline,
   "palette-outline": mdiPaletteOutline,
   "send-outline": mdiSendOutline,
   "server-network": mdiServerNetwork,
@@ -103,6 +106,7 @@ type Section =
   | "language"
   | "editor"
   | "build_server"
+  | "pairing_requests"
   | "build_offload";
 
 interface SectionDef {
@@ -124,6 +128,21 @@ const SECTIONS: SectionDef[] = [
     id: "build_server",
     icon: "server-network",
     labelKey: "settings.build_server",
+  },
+  {
+    // "Pairing requests" is its own sidebar entry rather than a
+    // subsection inside Build server because the pairing
+    // window's open/closed state is bound to the operator
+    // viewing this specific screen. Folding it under Build
+    // server made the door silently open whenever an admin
+    // poked around the cert pin or tokens list, which was the
+    // wrong default for a security-sensitive accept gate.
+    // Senders' "ask the receiver to open Settings → Pairing
+    // requests" copy is now an accurate navigation prompt
+    // because the path it names exists as a discrete screen.
+    id: "pairing_requests",
+    icon: "handshake-outline",
+    labelKey: "settings.pairing_requests",
   },
   {
     // "Send builds" = Offload role: this dashboard
@@ -271,6 +290,36 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _buildServerPairingWindowState: PairingWindowState | null = null;
 
+  /**
+   * Pairing-window countdown bookkeeping, mirroring the
+   * "anchor + baseline + tick" shape that
+   * ``firmware-jobs-dialog`` and the device drawer's
+   * Reachability section already use for live relative-time
+   * displays.
+   *
+   * - ``_pairingBaselineSeconds`` is the most-recent
+   *   ``expires_in_seconds`` from the
+   *   ``remote_build_pairing_window_changed`` event (or ``null``
+   *   when the window is closed / hasn't been opened yet).
+   * - ``_pairingAnchorMs`` is the wall-clock at which we
+   *   captured that baseline; the live countdown is derived as
+   *   ``remainingOf(baseline, anchor, Date.now())`` at render
+   *   time so we don't trust frontend / backend clocks to be in
+   *   sync.
+   * - ``_pairingTick`` is bumped 1Hz by ``_pairingTickHandle``
+   *   purely to nudge Lit into a re-render; the value itself is
+   *   unused. Same idiom as ``device-drawer-content._tick``.
+   */
+  @state()
+  private _pairingBaselineSeconds: number | null = null;
+
+  private _pairingAnchorMs = 0;
+
+  @state()
+  private _pairingTick = 0;
+
+  private _pairingTickHandle: ReturnType<typeof setInterval> | null = null;
+
   @query("#rotate-confirm")
   private _rotateConfirmDialog!: ESPHomeConfirmDialog;
 
@@ -327,14 +376,36 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   close() {
-    // If the user closed the dialog while the Build server
-    // section was open, the pairing window is still open
-    // server-side. Send the close-our-client tick so the
-    // window's refcount drops; the receiver will auto-close
-    // after the idle timeout regardless, but a prompt close is
-    // less surprising. Fire-and-forget — the WS may already be
-    // tearing down on the dashboard's own logout / navigation.
-    if (this._section === "build_server" && this._api !== undefined) {
+    // ``wa-dialog`` fires ``wa-after-hide`` for every dismissal
+    // path (close button, Esc, light-dismiss outside-click), so
+    // the cleanup lives in ``_onDialogAfterHide`` to make sure
+    // it runs regardless of how the dialog closed. Programmatic
+    // close still flows through here.
+    this._dialog.open = false;
+  }
+
+  disconnectedCallback() {
+    // Drop any in-flight tick interval so a remove-from-DOM (HMR,
+    // navigation away from the dashboard) doesn't leak it. The
+    // server-side pairing window is left to its idle timer; this
+    // path doesn't have a place to await the close call.
+    this._stopPairingTick();
+    super.disconnectedCallback();
+  }
+
+  /**
+   * Always-runs cleanup for any dismissal path (close button,
+   * Esc, outside-click).
+   *
+   * Two side effects: stop the local countdown ticker, and tell
+   * the server the operator has left the screen so the
+   * receiver-side pairing window can drop our client from its
+   * refcount immediately. Fire-and-forget on the WS call; the
+   * receiver's idle timer is the safety net.
+   */
+  private _onDialogAfterHide = () => {
+    this._stopPairingTick();
+    if (this._section === "pairing_requests" && this._api !== undefined) {
       void this._api
         .setRemoteBuildPairingWindow({ open: false })
         .catch(() => {
@@ -342,8 +413,7 @@ export class ESPHomeSettingsDialog extends LitElement {
           // receiver's idle timer cleans up.
         });
     }
-    this._dialog.open = false;
-  }
+  };
 
   /**
    * Cross-tab refresh hook for the receiver identity.
@@ -380,27 +450,69 @@ export class ESPHomeSettingsDialog extends LitElement {
     }
     // Receiver-side peer list flows in via app-shell's context
     // directly; no refetch hook needed here.
+    if (changed.has("_buildServerPairingWindowState")) {
+      // Re-seed the local countdown anchor from the
+      // freshly-pushed window state. ``expires_in_seconds`` is
+      // null when the window is closed (or hasn't been opened
+      // yet); in that case the baseline clears and the local
+      // ticker stops.
+      //
+      // Guard the start branch on "the operator is actually
+      // viewing the Pairing requests screen right now" so a
+      // cross-tab event flowing in while Settings is closed (or
+      // showing a different section) doesn't leak a 1Hz
+      // ``setInterval`` against a countdown nobody can see.
+      // ``_selectSection`` re-runs this check on entry by
+      // re-issuing ``setRemoteBuildPairingWindow({open: true})``,
+      // which fires a fresh event and lands us back here with
+      // the gates satisfied.
+      const state = this._buildServerPairingWindowState;
+      if (
+        state?.open &&
+        state.expires_in_seconds !== null &&
+        this._section === "pairing_requests" &&
+        this._dialog?.open
+      ) {
+        this._pairingBaselineSeconds = state.expires_in_seconds;
+        this._pairingAnchorMs = Date.now();
+        this._startPairingTick();
+      } else {
+        this._pairingBaselineSeconds = null;
+        this._stopPairingTick();
+      }
+    }
   }
 
   private _selectSection(section: Section) {
     const previousSection = this._section;
     this._section = section;
-    // Leaving Build server: close the pairing window we opened
-    // on entry (refcounted server-side; a graceful close drops
-    // our client immediately rather than waiting on the 5min
-    // idle timer). Fire-and-forget — the receiver's idle
-    // cleanup is the safety net.
+    // Leaving Pairing requests: close the pairing window we
+    // opened on entry (refcounted server-side; a graceful close
+    // drops our client immediately rather than waiting on the
+    // 5min idle timer). The window's open/closed state is bound
+    // to the operator viewing this specific screen so the door
+    // tracks the operator's attention rather than silently
+    // staying open while they wander other Settings sections.
+    // Fire-and-forget; the receiver's idle cleanup is the
+    // safety net.
     if (
-      previousSection === "build_server" &&
-      section !== "build_server" &&
-      this._api !== undefined
+      previousSection === "pairing_requests" &&
+      section !== "pairing_requests"
     ) {
-      void this._api
-        .setRemoteBuildPairingWindow({ open: false })
-        .catch(() => {
-          // Ignore: section change shouldn't block on a window
-          // close failure; idle timer cleans up.
-        });
+      // Stop the local countdown immediately on section change;
+      // the close event from the backend will follow shortly,
+      // but we don't want to keep ticking against a window the
+      // operator has already navigated away from.
+      this._stopPairingTick();
+      this._pairingBaselineSeconds = null;
+      if (this._api !== undefined) {
+        void this._api
+          .setRemoteBuildPairingWindow({ open: false })
+          .catch(() => {
+            // Ignore: section change shouldn't block on a window
+            // close failure; idle timer cleans up.
+          });
+      }
     }
     // Each role lazy-loads only the receiver-identity card on
     // section enter; discovered hosts and receiver-side peers
@@ -413,6 +525,8 @@ export class ESPHomeSettingsDialog extends LitElement {
       if (this._buildServerIdentity === null && !this._buildServerIdentityLoadFailed) {
         void this._loadBuildServerIdentity();
       }
+    }
+    if (section === "pairing_requests" && this._api !== undefined) {
       // Open the pairing window so ``intent="pair_request"``
       // Noise frames are accepted while the admin is on this
       // screen. Refcounted server-side; the receiver auto-closes
@@ -421,21 +535,19 @@ export class ESPHomeSettingsDialog extends LitElement {
       // PR — typical accept/reject sessions are well under 5min;
       // a follow-up can add activity-driven extends if user
       // workflows need longer.
-      if (this._api !== undefined) {
-        void this._api
-          .setRemoteBuildPairingWindow({ open: true })
-          .catch(() => {
-            // Soft-toast on failure rather than crashing the
-            // section render — admin can re-enter the section to
-            // retry, or the receiver-side state becomes visible
-            // via the ``_buildServerPairingWindowState`` context
-            // either way.
-            this._toast(
-              "warning",
-              "settings.build_server_pairing_window_open_failed"
-            );
-          });
-      }
+      void this._api
+        .setRemoteBuildPairingWindow({ open: true })
+        .catch(() => {
+          // Soft-toast on failure rather than crashing the
+          // section render — admin can re-enter the section to
+          // retry, or the receiver-side state becomes visible
+          // via the ``_buildServerPairingWindowState`` context
+          // either way.
+          this._toast(
+            "warning",
+            "settings.build_server_pairing_window_open_failed"
+          );
+        });
     }
     // Send-builds section consumes ``_buildOffloadDiscoveredHosts``
     // directly via context — app-shell seeded it from
@@ -635,6 +747,95 @@ export class ESPHomeSettingsDialog extends LitElement {
   ) {
     toast[level](this._localize(key, values), { richColors: true });
   }
+
+  /**
+   * Start the 1Hz tick if it isn't already running.
+   *
+   * Bumps ``_pairingTick`` purely to nudge Lit into re-rendering;
+   * the displayed remaining-seconds value is computed from the
+   * anchor + baseline at render time via :func:`remainingOf`.
+   * Same idiom as ``firmware-jobs-dialog._startTicker`` and
+   * ``device-drawer-content._tickInterval`` so a future shared
+   * tick controller can pick up all three in one go.
+   *
+   * Idempotent; repeated calls (e.g. successive
+   * ``remote_build_pairing_window_changed`` events that re-seed
+   * the anchor) leave the existing handle alone.
+   */
+  private _startPairingTick() {
+    if (this._pairingTickHandle !== null) return;
+    this._pairingTickHandle = setInterval(() => {
+      this._pairingTick = (this._pairingTick + 1) % 1000;
+    }, 1000);
+  }
+
+  private _stopPairingTick() {
+    if (this._pairingTickHandle !== null) {
+      clearInterval(this._pairingTickHandle);
+      this._pairingTickHandle = null;
+    }
+  }
+
+  /**
+   * Derive the live remaining seconds from the anchor + baseline
+   * captured on the most recent
+   * ``remote_build_pairing_window_changed`` event. Returns
+   * ``null`` when the window is closed.
+   */
+  private _pairingRemainingSeconds(): number | null {
+    return remainingOf(
+      this._pairingBaselineSeconds,
+      this._pairingAnchorMs,
+      Date.now(),
+    );
+  }
+
+  /**
+   * Format a remaining-seconds count as ``M:SS``.
+   *
+   * Returns an empty string for ``null`` so the caller can drop
+   * the countdown chip when the window has closed without
+   * branching at the call site.
+   */
+  private _formatPairingDuration(seconds: number | null): string {
+    if (seconds === null) return "";
+    const whole = Math.floor(seconds);
+    const m = Math.floor(whole / 60);
+    const s = whole % 60;
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
+
+  /**
+   * Refresh the pairing window's idle deadline.
+   *
+   * The receiver-side window auto-closes 5min after the most
+   * recent open / extend tick from any client. The Extend button
+   * in the Pairing requests header re-issues ``open: true`` so
+   * the operator can keep the door open through a longer
+   * verification conversation without the screen silently
+   * timing out mid-call.
+   *
+   * The 5-minute duration is hardcoded server-side; the
+   * ``set_pairing_window`` WS arg shape only carries
+   * ``{ open: boolean }`` and there's no per-call duration knob.
+   * That's a YAGNI knob right now — every flow we have today
+   * fits comfortably under 5 minutes and the Extend button
+   * covers the long-tail "operator is on a phone call with the
+   * other side" case. If a future flow needs a longer or
+   * configurable window the right shape is a backend-side
+   * ``duration_seconds`` arg, not a frontend-only override.
+   */
+  private _onExtendPairingWindow = () => {
+    if (this._api === undefined) return;
+    void this._api
+      .setRemoteBuildPairingWindow({ open: true })
+      .catch(() => {
+        this._toast(
+          "warning",
+          "settings.build_server_pairing_window_extend_failed"
+        );
+      });
+  };
 
   private async _onRotateConfirm() {
     if (this._api === undefined || this._buildServerRotateInFlight) {
@@ -989,6 +1190,64 @@ export class ESPHomeSettingsDialog extends LitElement {
         text-transform: uppercase;
         letter-spacing: 0.04em;
         margin: var(--wa-space-l) 0 var(--wa-space-xs);
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: var(--wa-space-xs);
+      }
+
+      /* Pairing-window status display (pill + countdown +
+         Extend button) lives inline with the section heading.
+         Children reset text-transform so they aren't uppercased
+         by the heading; the heading's uppercase only applies
+         to the section title text itself. */
+      .pairing-window-pill,
+      .pairing-window-countdown,
+      .pairing-window-extend {
+        text-transform: none;
+        letter-spacing: normal;
+        font-weight: var(--wa-font-weight-semibold);
+      }
+
+      .pairing-window-pill {
+        font-size: var(--wa-font-size-xs);
+        padding: 1px 8px;
+        border-radius: var(--wa-border-radius-pill, 999px);
+      }
+
+      .pairing-window-open {
+        background: color-mix(in srgb, var(--esphome-success, #16a34a), transparent 80%);
+        color: var(--esphome-success, #16a34a);
+      }
+
+      .pairing-window-closed {
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-quiet);
+      }
+
+      .pairing-window-countdown {
+        font-family: var(--wa-font-family-mono, monospace);
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-normal);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .pairing-window-extend {
+        margin-inline-start: auto;
+        padding: 2px 10px;
+        border-radius: var(--wa-border-radius-s);
+        background: var(--wa-color-surface-raised);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        color: var(--wa-color-text-normal);
+        font: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-semibold);
+        cursor: pointer;
+      }
+
+      .pairing-window-extend:hover,
+      .pairing-window-extend:focus-visible {
+        background: var(--wa-color-surface-border);
       }
 
       .peer-row .row-title {
@@ -1399,6 +1658,7 @@ export class ESPHomeSettingsDialog extends LitElement {
       <wa-dialog
         light-dismiss
         label="${this._localize("settings.title")} - ${this._localize(current.labelKey)}"
+        @wa-after-hide=${this._onDialogAfterHide}
       >
         <div class="layout">
           <aside class="sidebar">
@@ -1434,6 +1694,8 @@ export class ESPHomeSettingsDialog extends LitElement {
         return this._renderEditor();
       case "build_server":
         return this._renderBuildServer();
+      case "pairing_requests":
+        return this._renderPairingRequestsSection();
       case "build_offload":
         return this._renderBuildOffload();
     }
@@ -1546,6 +1808,24 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.build_server_card_desc")}
       </div>
       ${this._renderBuildServerCard()}
+    `;
+  }
+
+  /**
+   * Pairing requests section.
+   *
+   * Lives as its own top-level Settings entry so the pairing
+   * window's open/closed state is bound to the operator
+   * actively viewing this screen. ``_selectSection`` opens the
+   * window on enter and closes it on exit; the dialog's
+   * ``@wa-after-hide`` handler closes the window if the
+   * operator dismisses Settings while this section is active.
+   * The status pill + countdown + Extend button next to the
+   * heading communicate the open/closed state and remaining
+   * lifetime more directly than prose, so no banner here.
+   */
+  private _renderPairingRequestsSection() {
+    return html`
       ${this._renderPairingRequests()}
       <esphome-accept-peer-dialog
         @confirm=${this._onAcceptPeerConfirm}
@@ -1635,15 +1915,23 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   /**
-   * Status pill next to the Pairing requests heading.
+   * Status pill + countdown + Extend button next to the Pairing
+   * requests heading.
    *
    * Mirrors what the backend's
    * ``remote_build_pairing_window_changed`` event reported. The
    * pill is rendered as a sibling to the heading text so the
-   * user sees "Pairing requests · Open · 4:32 left" at a
-   * glance. Hidden when state is null (settings dialog hasn't
-   * opened the section yet, or the section has just been
-   * entered and the first event hasn't landed).
+   * operator sees "Pairing requests · Open · 4:32 · Extend" at
+   * a glance. The countdown is derived from the anchor +
+   * baseline captured on the most recent
+   * ``remote_build_pairing_window_changed`` event and updates at
+   * 1Hz between server events via the local
+   * ``_pairingTick`` re-render nudge; the Extend button re-issues
+   * ``setRemoteBuildPairingWindow({open: true})`` to bump the
+   * idle deadline so a longer verification conversation doesn't
+   * silently time out. Hidden when state is null (settings
+   * dialog hasn't opened the section yet, or the section has
+   * just been entered and the first event hasn't landed).
    */
   private _renderPairingWindowStatus() {
     const state = this._buildServerPairingWindowState;
@@ -1655,10 +1943,31 @@ export class ESPHomeSettingsDialog extends LitElement {
         </span>
       `;
     }
+    const remaining = this._pairingRemainingSeconds();
     return html`
       <span class="pairing-window-pill pairing-window-open">
         ${this._localize("settings.build_server_pairing_window_open")}
       </span>
+      ${remaining !== null
+        ? html`
+            <span
+              class="pairing-window-countdown"
+              aria-label=${this._localize(
+                "settings.build_server_pairing_window_remaining_aria",
+                { duration: this._formatPairingDuration(remaining) },
+              )}
+            >
+              ${this._formatPairingDuration(remaining)}
+            </span>
+          `
+        : nothing}
+      <button
+        type="button"
+        class="pairing-window-extend"
+        @click=${this._onExtendPairingWindow}
+      >
+        ${this._localize("settings.build_server_pairing_window_extend")}
+      </button>
     `;
   }
 
