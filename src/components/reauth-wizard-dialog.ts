@@ -7,6 +7,7 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import type { OffloaderPinMismatchAlert } from "../api/types.js";
+import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -300,6 +301,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     espHomeStyles,
     dialogCloseButtonStyles,
     pinHexStyles,
+    dialogActionButtonStyles,
     css`
       wa-dialog {
         --width: 560px;
@@ -435,41 +437,19 @@ export class ESPHomeReauthWizardDialog extends LitElement {
         margin-top: var(--wa-space-m);
       }
 
-      .btn {
-        padding: 8px 18px;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition: background 0.12s;
-      }
-
-      .btn--cancel,
+      /* Back is .btn--cancel's neutral chrome with a distinct
+         class name so the markup self-documents which row slot
+         the button is. dialogActionButtonStyles paints
+         .btn--cancel; this rule extends the same chrome to
+         .btn--back without re-declaring it. */
       .btn--back {
         background: var(--wa-color-surface-lowered);
         color: var(--wa-color-text-normal);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
 
-      .btn--cancel:hover,
-      .btn--back:hover {
+      .btn--back:hover:not(:disabled) {
         background: var(--wa-color-surface-border);
-      }
-
-      .btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .btn--primary:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-      }
-
-      .btn--primary:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
       }
     `,
   ];

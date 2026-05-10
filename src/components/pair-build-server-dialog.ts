@@ -13,6 +13,7 @@ import {
   buildOffloadPairingsContext,
   localizeContext,
 } from "../context/index.js";
+import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -141,6 +142,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     pinHexStyles,
+    dialogActionButtonStyles,
     css`
       wa-dialog {
         --width: 500px;
@@ -247,41 +249,6 @@ export class ESPHomePairBuildServerDialog extends LitElement {
         justify-content: flex-end;
         gap: var(--wa-space-s);
         padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
-      }
-
-      .btn {
-        padding: 8px 18px;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition: background 0.12s;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover:not(:disabled) {
-        background: var(--wa-color-surface-border);
-      }
-
-      .btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .btn--primary:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-      }
-
-      .btn--primary:disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
       }
 
       .field-error {
