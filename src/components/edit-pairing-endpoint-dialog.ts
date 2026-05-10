@@ -128,12 +128,13 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     if (this._submitting) return;
     const port = parsePortInput(this._port);
     if (port === null) return;
+    const hostname = this._hostname.trim();
     this._errorMessage = "";
     this._submitting = true;
     try {
       await this._api.editRemoteBuildPairingEndpoint({
         pin_sha256: this._pinSha256,
-        hostname: this._hostname.trim(),
+        hostname,
         port,
       });
       // Backend mutates StoredPairing in place + fires
@@ -148,26 +149,31 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
           composed: true,
           detail: {
             pin_sha256: this._pinSha256,
-            hostname: this._hostname.trim(),
+            hostname,
             port,
           },
         }),
       );
       this._open = false;
     } catch (err) {
-      this._errorMessage = this._formatError(err);
+      // Pass the values that actually went on the wire (trimmed
+      // hostname + parsed port) into the formatter so the
+      // UNAVAILABLE message shows the user the same coords the
+      // request attempted, not whatever raw state happens to
+      // be in the input fields right now.
+      this._errorMessage = this._formatError(err, hostname, port);
     } finally {
       this._submitting = false;
     }
   };
 
-  private _formatError(err: unknown): string {
+  private _formatError(err: unknown, host: string, port: number): string {
     if (err instanceof APIError) {
       switch (err.errorCode) {
         case ErrorCode.UNAVAILABLE:
           return this._localize(
             "settings.edit_pairing_endpoint_unavailable",
-            { host: this._hostname, port: this._port },
+            { host, port: String(port) },
           );
         case ErrorCode.PRECONDITION_FAILED:
           // Backend folds four distinct preconditions onto this
