@@ -107,8 +107,19 @@ export class ESPHomeBaseDialog extends LitElement {
 
   /** When ``true``: light-dismiss is disabled and the
    *  close-button is greyed out. Use for "WS round-trip in
-   *  flight; don't let the user orphan it". */
-  @property({ type: Boolean }) busy = false;
+   *  flight; don't let the user orphan it".
+   *
+   *  Reflected to the ``busy`` attribute so the
+   *  ``:host([busy])`` CSS selector matches regardless of
+   *  whether the host binds via boolean-attribute syntax
+   *  (``?busy=${...}``), property syntax (``.busy=${...}``),
+   *  or imperative assignment (``dialog.busy = true``).
+   *  Without ``reflect: true``, only the boolean-attribute
+   *  form would update the attribute, so property /
+   *  imperative writers would get the functional gate
+   *  (wa-request-close veto) but not the visual dim on the
+   *  close button. */
+  @property({ type: Boolean, reflect: true }) busy = false;
 
   private _onWaRequestClose = (e: Event): void => {
     // Busy gate first: refuse close regardless of source
