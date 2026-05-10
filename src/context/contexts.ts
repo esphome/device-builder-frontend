@@ -178,8 +178,10 @@ export const buildServerPeersContext = createContext<PeerSummary[] | null>(
  * receiver's view: ``open: true`` while at least one client is
  * extending, ``open: false`` once everyone backs off and the
  * idle timer expires. Settings UI renders an "open / closed"
- * pill plus the remaining lifetime when open. The frontend
- * uses this for read-only display; mutations (open / close /
+ * pill from this; the payload also carries
+ * ``expires_in_seconds``, but the UI doesn't yet surface a
+ * countdown — that's a follow-up. The frontend uses this
+ * context for read-only display; mutations (open / close /
  * extend) go through the WS command directly so the wire
  * acknowledgement is round-tripped before the local state
  * updates.

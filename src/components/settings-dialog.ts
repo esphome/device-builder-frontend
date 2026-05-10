@@ -203,14 +203,20 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _buildServerPeers: PeerSummary[] | null = null;
 
   /**
-   * dashboard_id of the row whose Reject / Remove button was
-   * just clicked. Captured here so the shared
-   * ``<esphome-confirm-dialog>``'s ``@confirm`` handler knows
-   * which row to drop. ``null`` when no destructive action is
-   * pending.
+   * Pending destructive peer action — captured when the user
+   * clicks Reject (PENDING peer) or Remove (APPROVED peer). The
+   * shared ``<esphome-confirm-dialog>``'s heading / body /
+   * confirm-label and the post-confirm toast keys both branch
+   * on ``kind`` so the user sees Reject-specific copy on the
+   * Reject path and Remove-specific copy on the Remove path
+   * (the underlying WS call is the same in both cases).
+   * ``null`` when no destructive action is pending.
    */
   @state()
-  private _pendingPeerActionDashboardId: string | null = null;
+  private _pendingPeerAction: {
+    kind: "reject" | "remove";
+    dashboardId: string;
+  } | null = null;
 
   // Latest pairing-window state (open / closed / remaining
   // lifetime). ``null`` until the first event lands or the
@@ -261,7 +267,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     // context; nothing to reset here. The pending-action key
     // does need clearing — a stale value would mis-target the
     // confirm dialog on the next visit.
-    this._pendingPeerActionDashboardId = null;
+    this._pendingPeerAction = null;
     this._dialog.open = true;
   }
 
@@ -487,41 +493,52 @@ export class ESPHomeSettingsDialog extends LitElement {
   /**
    * Open the shared confirm-dialog for a destructive peer action.
    *
-   * Same dialog handles Reject (PENDING peer) and Remove
-   * (APPROVED peer) — both end in a ``removePeer`` call. The
-   * dialog wording is parameterised by the peer's status; the
-   * confirmed action lives in :meth:`_onPeerActionConfirm`,
-   * which pulls ``_pendingPeerActionDashboardId`` to know which
-   * row to drop.
+   * Same dialog instance is used for Reject (PENDING peer) and
+   * Remove (APPROVED peer) — both end in a ``removePeer`` call —
+   * but the heading / body / confirm-label and the post-confirm
+   * toast keys are bound to ``kind`` so the user sees the right
+   * copy on each path. The confirmed action lives in
+   * :meth:`_onPeerActionConfirm`, which pulls
+   * ``_pendingPeerAction`` for both the row id and the kind.
    */
-  private _onPeerActionRequest(dashboardId: string) {
-    this._pendingPeerActionDashboardId = dashboardId;
+  private _onPeerActionRequest(
+    dashboardId: string,
+    kind: "reject" | "remove"
+  ) {
+    this._pendingPeerAction = { kind, dashboardId };
     this._peerActionConfirmDialog?.open();
   }
 
   private async _onPeerActionConfirm() {
-    const dashboardId = this._pendingPeerActionDashboardId;
-    this._pendingPeerActionDashboardId = null;
-    if (this._api === undefined || dashboardId === null) {
+    const action = this._pendingPeerAction;
+    this._pendingPeerAction = null;
+    if (this._api === undefined || action === null) {
       return;
     }
+    const toastPrefix =
+      action.kind === "reject"
+        ? "settings.build_server_peer_reject"
+        : "settings.build_server_peer_remove";
     try {
-      await this._api.removeRemoteBuildPeer({ dashboard_id: dashboardId });
+      await this._api.removeRemoteBuildPeer({
+        dashboard_id: action.dashboardId,
+      });
     } catch (err) {
       if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
         // Row already gone (concurrent action in another tab).
         // Soft-toast; the visible-state-after is the same as a
-        // successful remove, so the user doesn't need to retry.
-        this._toast("warning", "settings.build_server_peer_remove_already_gone");
+        // successful reject / remove, so the user doesn't need
+        // to retry.
+        this._toast("warning", `${toastPrefix}_already_gone`);
       } else {
-        this._toast("error", "settings.build_server_peer_remove_failed");
+        this._toast("error", `${toastPrefix}_failed`);
       }
       return;
     }
     // ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` with
     // ``status="removed"`` from the backend will drop the row
     // from the context-provided list automatically.
-    this._toast("success", "settings.build_server_peer_remove_success");
+    this._toast("success", `${toastPrefix}_success`);
   }
 
   private _onRotateRequest() {
@@ -1350,18 +1367,34 @@ export class ESPHomeSettingsDialog extends LitElement {
       ${this._renderBuildServerCard()}
       ${this._renderPairingRequests()}
       ${this._renderApprovedPeers()}
+      ${this._renderPeerActionConfirmDialog()}
+    `;
+  }
+
+  /**
+   * Shared destructive-confirm dialog for Reject + Remove.
+   *
+   * Heading / body / confirm-label are derived from
+   * ``_pendingPeerAction.kind`` so the user sees Reject-specific
+   * copy on the Reject path and Remove-specific copy on the
+   * Remove path. Defaults to the Remove copy when no action is
+   * pending — the dialog is hidden in that state, so the
+   * fallback is never visible; it just keeps the attribute
+   * bindings non-empty between actions.
+   */
+  private _renderPeerActionConfirmDialog() {
+    const kind = this._pendingPeerAction?.kind ?? "remove";
+    const prefix =
+      kind === "reject"
+        ? "settings.build_server_peer_reject_confirm"
+        : "settings.build_server_peer_remove_confirm";
+    return html`
       <esphome-confirm-dialog
         id="peer-action-confirm"
         destructive
-        heading=${this._localize(
-          "settings.build_server_peer_remove_confirm_title"
-        )}
-        message=${this._localize(
-          "settings.build_server_peer_remove_confirm_body"
-        )}
-        confirm-label=${this._localize(
-          "settings.build_server_peer_remove_confirm_confirm"
-        )}
+        heading=${this._localize(`${prefix}_title`)}
+        message=${this._localize(`${prefix}_body`)}
+        confirm-label=${this._localize(`${prefix}_confirm`)}
         @confirm=${this._onPeerActionConfirm}
       ></esphome-confirm-dialog>
     `;
@@ -1372,7 +1405,7 @@ export class ESPHomeSettingsDialog extends LitElement {
    *
    * Renders one row per PENDING ``StoredPeer`` the receiver
    * holds in its in-memory dict, plus a header carrying the
-   * pairing-window status pill (open / closed / countdown).
+   * pairing-window status pill (open / closed).
    * Each row shows label + offloader's pin + peer-IP for sanity-
    * check, with ``[Accept] [Reject]`` buttons. Reject routes
    * through the shared confirm-dialog (destructive).
@@ -1385,8 +1418,8 @@ export class ESPHomeSettingsDialog extends LitElement {
    * enter).
    */
   private _renderPairingRequests() {
-    const peers = this._buildServerPeers ?? [];
-    const pending = peers.filter((p) => p.status === "pending");
+    const peers = this._buildServerPeers;
+    const pending = peers?.filter((p) => p.status === "pending") ?? [];
     return html`
       <div class="section-heading">
         ${this._localize("settings.build_server_pairing_requests_heading")}
@@ -1395,19 +1428,31 @@ export class ESPHomeSettingsDialog extends LitElement {
       <div class="section-intro">
         ${this._localize("settings.build_server_pairing_requests_desc")}
       </div>
-      ${pending.length === 0
+      ${peers === null
         ? html`
             <div class="row" role="status">
               <div class="row-label">
                 <span class="row-desc">
                   ${this._localize(
-                    "settings.build_server_pairing_requests_empty"
+                    "settings.build_server_pairing_requests_loading"
                   )}
                 </span>
               </div>
             </div>
           `
-        : pending.map((p) => this._renderPendingPeerRow(p))}
+        : pending.length === 0
+          ? html`
+              <div class="row" role="status">
+                <div class="row-label">
+                  <span class="row-desc">
+                    ${this._localize(
+                      "settings.build_server_pairing_requests_empty"
+                    )}
+                  </span>
+                </div>
+              </div>
+            `
+          : pending.map((p) => this._renderPendingPeerRow(p))}
     `;
   }
 
@@ -1516,7 +1561,8 @@ export class ESPHomeSettingsDialog extends LitElement {
               "settings.build_server_peer_reject_aria",
               { label: peer.label }
             )}
-            @click=${() => this._onPeerActionRequest(peer.dashboard_id)}
+            @click=${() =>
+              this._onPeerActionRequest(peer.dashboard_id, "reject")}
           >
             ${this._localize("settings.build_server_peer_reject")}
           </button>
@@ -1541,7 +1587,8 @@ export class ESPHomeSettingsDialog extends LitElement {
             "settings.build_server_peer_remove_aria",
             { label: peer.label }
           )}
-          @click=${() => this._onPeerActionRequest(peer.dashboard_id)}
+          @click=${() =>
+            this._onPeerActionRequest(peer.dashboard_id, "remove")}
         >
           ${this._localize("settings.build_server_peer_remove")}
         </button>
