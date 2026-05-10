@@ -952,21 +952,11 @@ export class ESPHomeApp extends LitElement {
         this._buildOffloadPairings =
           pairings === undefined
             ? null
-            : new Map(
-                pairings.map((p) => [
-                  this._pairingKey(p.receiver_hostname, p.receiver_port),
-                  p,
-                ]),
-              );
+            : new Map(pairings.map((p) => [p.pin_sha256, p]));
         this._buildOffloadAlerts =
           offloader_alerts === undefined
             ? null
-            : new Map(
-                offloader_alerts.map((a) => [
-                  this._pairingKey(a.receiver_hostname, a.receiver_port),
-                  a,
-                ]),
-              );
+            : new Map(offloader_alerts.map((a) => [a.pin_sha256, a]));
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {
@@ -1199,19 +1189,15 @@ export class ESPHomeApp extends LitElement {
         if (this._buildOffloadPairings === null) {
           break;
         }
-        const key = this._pairingKey(
-          evt.receiver_hostname,
-          evt.receiver_port,
-        );
         const next = new Map(this._buildOffloadPairings);
         if (evt.status === "removed") {
-          next.delete(key);
+          next.delete(evt.pin_sha256);
         } else {
-          const existing = next.get(key);
+          const existing = next.get(evt.pin_sha256);
           if (existing === undefined) {
             break;
           }
-          next.set(key, { ...existing, status: "approved" });
+          next.set(evt.pin_sha256, { ...existing, status: "approved" });
         }
         this._buildOffloadPairings = next;
         break;
@@ -1220,21 +1206,16 @@ export class ESPHomeApp extends LitElement {
         // Backend's pair-status listener detected the receiver's
         // static X25519 pubkey hash drifted from what the
         // offloader had on disk. Upsert the alert keyed on
-        // ``${hostname}:${port}`` (overwrites any prior alert
-        // for the same row — only one alert per receiver, the
-        // most recent detection wins). Same key shape as the
-        // backend's ``_offloader_alerts`` dict so the snapshot
-        // and the live event both target the same map slot.
+        // ``pin_sha256`` (4a-o part 6 — the alerts dict is
+        // pin-keyed; same key shape as the snapshot's
+        // ``initial_state.offloader_alerts`` push).
         const evt = data as OffloaderPairPinMismatchEventData;
-        const key = this._pairingKey(
-          evt.receiver_hostname,
-          evt.receiver_port,
-        );
         const next = new Map(this._buildOffloadAlerts ?? []);
-        next.set(key, {
+        next.set(evt.pin_sha256, {
           kind: "pin_mismatch",
           receiver_hostname: evt.receiver_hostname,
           receiver_port: evt.receiver_port,
+          pin_sha256: evt.pin_sha256,
           receiver_label: evt.receiver_label,
           expected_pin: evt.expected_pin,
           observed_pin: evt.observed_pin,
@@ -1248,15 +1229,12 @@ export class ESPHomeApp extends LitElement {
         // long-poll. Same upsert pattern as pin_mismatch, just
         // a different ``kind`` discriminator.
         const evt = data as OffloaderPairPeerRevokedEventData;
-        const key = this._pairingKey(
-          evt.receiver_hostname,
-          evt.receiver_port,
-        );
         const next = new Map(this._buildOffloadAlerts ?? []);
-        next.set(key, {
+        next.set(evt.pin_sha256, {
           kind: "peer_revoked",
           receiver_hostname: evt.receiver_hostname,
           receiver_port: evt.receiver_port,
+          pin_sha256: evt.pin_sha256,
           receiver_label: evt.receiver_label,
           fired_at: Date.now() / 1000,
         });
@@ -1265,34 +1243,21 @@ export class ESPHomeApp extends LitElement {
       }
       case DeviceEventType.OFFLOADER_PAIR_ALERT_DISMISSED: {
         // Backend dropped the alert via one of the resolution
-        // paths (``request_pair`` succeeded for matching
-        // ``(host, port)``, or ``unpair`` removed the row).
-        // Drop the local row to match.
+        // paths (``request_pair`` succeeded for matching pin,
+        // or ``unpair`` removed the row). Drop the local row
+        // to match. Pin-keyed since 4a-o part 6.
         const evt = data as OffloaderPairAlertDismissedEventData;
         if (this._buildOffloadAlerts === null) {
           break;
         }
-        const key = this._pairingKey(
-          evt.receiver_hostname,
-          evt.receiver_port,
-        );
         const next = new Map(this._buildOffloadAlerts);
-        next.delete(key);
+        next.delete(evt.pin_sha256);
         this._buildOffloadAlerts = next;
         break;
       }
     }
   }
 
-  /** Compose the pairings-map key from receiver coordinates.
-   *
-   *  ``${hostname}:${port}`` matches the backend's
-   *  ``StoredPairing`` key shape. Hostname is lowercase already
-   *  (backend normalises to RFC 1035 §2.3.3 on persist), so a
-   *  case-flip on either side wouldn't desync the lookup. */
-  private _pairingKey(hostname: string, port: number): string {
-    return `${hostname}:${port}`;
-  }
 
   // ─── Render ──────────────────────────────────────────────
 
@@ -1493,12 +1458,8 @@ export class ESPHomeApp extends LitElement {
     e: CustomEvent<{ summary: PairingSummary }>,
   ): void {
     const summary = e.detail.summary;
-    const key = this._pairingKey(
-      summary.receiver_hostname,
-      summary.receiver_port,
-    );
     const next = new Map(this._buildOffloadPairings ?? []);
-    next.set(key, summary);
+    next.set(summary.pin_sha256, summary);
     this._buildOffloadPairings = next;
   }
 

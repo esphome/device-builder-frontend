@@ -1462,6 +1462,15 @@ export type RemoteBuildPairingWindowChangedEventData = PairingWindowState;
 export interface OffloaderPairStatusChangedEventData {
   receiver_hostname: string;
   receiver_port: number;
+  /**
+   * Stable cryptographic identifier the offloader-side
+   * controller keys ``_pairings`` on (4a-o part 6 — re-keyed
+   * offloader state from ``(host, port)`` to ``pin_sha256``);
+   * frontend handlers should look up the matching
+   * ``PairingSummary`` row by pin rather than by host/port to
+   * stay correct across receiver hostname changes.
+   */
+  pin_sha256: string;
   status: "approved" | "removed";
 }
 
@@ -1505,6 +1514,13 @@ export interface OffloaderPairPinMismatchEventData {
   receiver_hostname: string;
   receiver_port: number;
   receiver_label: string;
+  /**
+   * The **stored** pin the row was keyed on (same value as
+   * ``expected_pin``); duplicated as a separate field so a
+   * pin-keyed lookup doesn't have to parse ``expected_pin``.
+   * 4a-o part 6.
+   */
+  pin_sha256: string;
   expected_pin: string;
   observed_pin: string;
 }
@@ -1529,6 +1545,11 @@ export interface OffloaderPairPeerRevokedEventData {
   receiver_hostname: string;
   receiver_port: number;
   receiver_label: string;
+  /**
+   * Stable cryptographic identifier the alert row keys on
+   * (4a-o part 6).
+   */
+  pin_sha256: string;
 }
 
 /**
@@ -1549,6 +1570,11 @@ export interface OffloaderPairPeerRevokedEventData {
 export interface OffloaderPairAlertDismissedEventData {
   receiver_hostname: string;
   receiver_port: number;
+  /**
+   * Stable cryptographic identifier the dismissed alert row
+   * keyed on (4a-o part 6 — alerts dict re-keyed on pin).
+   */
+  pin_sha256: string;
 }
 
 /**
@@ -1569,6 +1595,8 @@ export interface OffloaderPinMismatchAlert {
   kind: "pin_mismatch";
   receiver_hostname: string;
   receiver_port: number;
+  /** Stable cryptographic identifier (4a-o part 6). */
+  pin_sha256: string;
   receiver_label: string;
   expected_pin: string;
   observed_pin: string;
@@ -1582,6 +1610,8 @@ export interface OffloaderPeerRevokedAlert {
   kind: "peer_revoked";
   receiver_hostname: string;
   receiver_port: number;
+  /** Stable cryptographic identifier (4a-o part 6). */
+  pin_sha256: string;
   receiver_label: string;
   fired_at: number;
 }

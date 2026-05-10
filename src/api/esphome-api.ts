@@ -1509,7 +1509,7 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Drop the local pairing row for ``(hostname, port)``.
+   * Drop the local pairing row identified by *pin_sha256*.
    *
    * Idempotent — returns ``{removed: false}`` when no row
    * matches. Cancels the row's pair-status listener task if
@@ -1519,6 +1519,14 @@ export class ESPHomeAPI {
    * so other tabs / clients on the global ``subscribe_events``
    * stream see the removal.
    *
+   * 4a-o part 6 changed the WS arg from ``hostname / port`` to
+   * ``pin_sha256``: the offloader's controller now keys
+   * pairings on the receiver's stable cryptographic identity,
+   * so the lookup arg follows. Every ``PairingSummary`` row the
+   * frontend renders carries ``pin_sha256``, so the UI
+   * passes that value directly without needing a host/port
+   * round-trip.
+   *
    * Receiver-side state is NOT notified — the receiver's
    * ``StoredPeer`` row stays until the receiver admin clicks
    * Remove on their own inbox; that's the receiver's ownership
@@ -1527,8 +1535,7 @@ export class ESPHomeAPI {
    * affordance for the receiver-side admin.
    */
   async unpairRemoteBuild(args: {
-    hostname: string;
-    port: number;
+    pin_sha256: string;
   }): Promise<{ removed: boolean }> {
     return this.sendCommand<{ removed: boolean }>("remote_build/unpair", args);
   }

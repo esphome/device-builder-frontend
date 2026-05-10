@@ -741,12 +741,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
-  it("unpairRemoteBuild sends remote_build/unpair with hostname + port", async () => {
+  it("unpairRemoteBuild sends remote_build/unpair with pin_sha256", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const pending = api.unpairRemoteBuild({
-      hostname: "build.local",
-      port: 6055,
+      pin_sha256: "a".repeat(64),
     });
     const sent = ws.sentAs<{
       command: string;
@@ -754,7 +753,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       args: Record<string, unknown>;
     }>(0);
     expect(sent.command).toBe("remote_build/unpair");
-    expect(sent.args).toEqual({ hostname: "build.local", port: 6055 });
+    expect(sent.args).toEqual({ pin_sha256: "a".repeat(64) });
     const result = { removed: true };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);

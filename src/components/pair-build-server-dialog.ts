@@ -391,11 +391,19 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     }
     const row = this._buildOffloadPairings?.get(this._sentKey);
     if (row !== undefined && row.status === "approved") {
+      // Read display fields off the row (still present in the
+      // map at this point — the ``approved`` flip is a value
+      // mutation, not a pop). Avoids hard-coding the
+      // ``${hostname}:${port}`` parse pattern that worked when
+      // the map was hostname-keyed pre-4a-o-part-6.
       this.dispatchEvent(
         new CustomEvent<{ hostname: string; port: number }>(
           "pair-approved",
           {
-            detail: this._parseSentKey(this._sentKey),
+            detail: {
+              hostname: row.receiver_hostname,
+              port: row.receiver_port,
+            },
             bubbles: true,
             composed: true,
           },
@@ -413,12 +421,18 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       // ``removed`` event. The dialog can't tell which, but
       // the user-visible outcome is the same ("the request
       // didn't land"); fire a generic ``pair-rejected``
-      // event for the parent toast.
+      // event for the parent toast. Source hostname/port from
+      // the dialog's own form state — the row is gone, and
+      // the form fields are still what the user typed when
+      // they submitted.
       this.dispatchEvent(
         new CustomEvent<{ hostname: string; port: number }>(
           "pair-rejected",
           {
-            detail: this._parseSentKey(this._sentKey),
+            detail: {
+              hostname: this._hostname.trim(),
+              port: Number.parseInt(this._port, 10),
+            },
             bubbles: true,
             composed: true,
           },
@@ -427,14 +441,6 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       this._sentKey = null;
       this.close();
     }
-  }
-
-  private _parseSentKey(key: string): { hostname: string; port: number } {
-    const idx = key.lastIndexOf(":");
-    return {
-      hostname: key.slice(0, idx),
-      port: Number.parseInt(key.slice(idx + 1), 10),
-    };
   }
 
   protected render() {
@@ -737,19 +743,17 @@ export class ESPHomePairBuildServerDialog extends LitElement {
       });
       this._step = "sent";
       // Pin the key the auto-close watcher in ``willUpdate``
-      // checks against the offloader pairings map. Built from
-      // the response, NOT the form fields, because the backend
-      // normalises hostname (lowercase via
-      // ``_validate_hostname``) and that's the form
-      // ``summary.receiver_hostname`` carries — which is what
-      // app-shell's ``_onPairRequestSent`` keys the map on. A
-      // user who types ``MacBook-Pro.local.`` would otherwise
-      // build ``_sentKey`` mixed-case while the map landed
-      // lowercase, the watcher's ``map.get(_sentKey)`` would
-      // return undefined, and the dialog would mistake "row
-      // arrived under the canonical key" for "row never landed
-      // → rejected".
-      this._sentKey = `${summary.receiver_hostname}:${summary.receiver_port}`;
+      // checks against the offloader pairings map. The key is
+      // ``summary.pin_sha256`` — the stable cryptographic
+      // identity of the receiver, which the backend's
+      // ``_pairings`` dict and app-shell's
+      // ``_buildOffloadPairings`` map both key on (4a-o part
+      // 6 — pin-keyed offloader state). Mirrors what
+      // app-shell's ``_onPairRequestSent`` upserts; the
+      // watcher's ``map.get(_sentKey)`` resolves to the same
+      // row regardless of receiver hostname case or
+      // subsequent rename.
+      this._sentKey = summary.pin_sha256;
       // Backend persists the new ``StoredPairing`` row but
       // doesn't fire ``OFFLOADER_PAIR_STATUS_CHANGED`` for the
       // create — only on subsequent status flips. Seed the row

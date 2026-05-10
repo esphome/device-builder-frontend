@@ -210,6 +210,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   // which row to drop. ``null`` when no Unpair is pending.
   @state()
   private _pendingUnpair: {
+    pin_sha256: string;
     hostname: string;
     port: number;
     label: string;
@@ -1967,6 +1968,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     // backend-side auto-clears the alert (same
     // ``OFFLOADER_PAIR_ALERT_DISMISSED`` event path).
     this._pendingUnpair = {
+      pin_sha256: alert.pin_sha256,
       hostname: alert.receiver_hostname,
       port: alert.receiver_port,
       label: alert.receiver_label,
@@ -2040,6 +2042,7 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   private _onUnpairRequest = (pairing: PairingSummary): void => {
     this._pendingUnpair = {
+      pin_sha256: pairing.pin_sha256,
       hostname: pairing.receiver_hostname,
       port: pairing.receiver_port,
       label: pairing.label,
@@ -2054,9 +2057,11 @@ export class ESPHomeSettingsDialog extends LitElement {
       return;
     }
     try {
+      // 4a-o part 6 changed the WS arg from ``hostname / port``
+      // to ``pin_sha256``; offloader-side state is keyed on the
+      // receiver's stable cryptographic identity now.
       await this._api.unpairRemoteBuild({
-        hostname: pending.hostname,
-        port: pending.port,
+        pin_sha256: pending.pin_sha256,
       });
     } catch (err) {
       // Log to the dashboard console for diagnostics; the
