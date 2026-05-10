@@ -799,6 +799,8 @@
     "paired_build_servers_empty": "No build servers paired yet.",
     "pairing_status_pending": "Pending",
     "pairing_status_approved": "Approved",
+    "build_offload_pairing_connected": "Connected",
+    "build_offload_pairing_disconnected": "Disconnected",
     "unpair_action": "Unpair",
     "unpair_aria": "Unpair {label}",
     "unpair_confirm_title": "Unpair this build server?",

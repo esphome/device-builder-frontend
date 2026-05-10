@@ -2008,6 +2008,23 @@ export class ESPHomeSettingsDialog extends LitElement {
       pairing.status === "approved"
         ? "pairing-status-approved"
         : "pairing-status-pending";
+    // Connection-state pill renders next to the status pill on
+    // APPROVED rows so the operator sees at a glance whether the
+    // offloader's long-lived PeerLinkClient currently has an
+    // open Noise WS to the receiver. Fed by
+    // OFFLOADER_PEER_LINK_OPENED / _CLOSED events on app-shell,
+    // with the snapshot (initial_state.pairings) seeding the
+    // initial paint. PENDING rows hide the pill: the offloader
+    // doesn't spawn a peer-link client until the receiver flips
+    // APPROVED, so a "Disconnected" pill on PENDING would just
+    // be noise next to "Pending".
+    const showConnection = pairing.status === "approved";
+    const connectedClass = pairing.connected
+      ? "peer-connection-connected"
+      : "peer-connection-disconnected";
+    const connectedLabel = pairing.connected
+      ? this._localize("settings.build_offload_pairing_connected")
+      : this._localize("settings.build_offload_pairing_disconnected");
     return html`
       <div class="row peer-row pairing-row">
         <div class="row-label">
@@ -2016,6 +2033,13 @@ export class ESPHomeSettingsDialog extends LitElement {
             <span class=${`pairing-status-pill ${statusClass}`}>
               ${this._localize(statusKey)}
             </span>
+            ${showConnection
+              ? html`
+                  <span class=${`peer-connection-pill ${connectedClass}`}>
+                    ${connectedLabel}
+                  </span>
+                `
+              : null}
           </span>
           <span class="row-desc">
             ${pairing.receiver_hostname}:${pairing.receiver_port}

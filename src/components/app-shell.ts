@@ -42,6 +42,7 @@ import type {
   OffloaderPairPeerRevokedEventData,
   OffloaderPairPinMismatchEventData,
   OffloaderPairStatusChangedEventData,
+  OffloaderPeerLinkSessionEventData,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
@@ -1202,6 +1203,32 @@ export class ESPHomeApp extends LitElement {
           }
           next.set(evt.pin_sha256, { ...existing, status: "approved" });
         }
+        this._buildOffloadPairings = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PEER_LINK_OPENED:
+      case DeviceEventType.OFFLOADER_PEER_LINK_CLOSED: {
+        // Flip 'connected' on the matching APPROVED row. Keyed
+        // on pin_sha256 (the same wire-canonical identity
+        // OFFLOADER_PAIR_STATUS_CHANGED uses). Both events share
+        // the same payload shape; the discriminator is the event
+        // type itself. _buildOffloadPairings may be null
+        // (snapshot not yet seeded) or missing the row (event
+        // raced ahead of the snapshot, or fired against a
+        // pairing the backend just dropped). In both cases the
+        // next initial_state reseed carries the right state, so
+        // skip rather than synthesise a partial row.
+        if (this._buildOffloadPairings === null) {
+          break;
+        }
+        const evt = data as OffloaderPeerLinkSessionEventData;
+        const existing = this._buildOffloadPairings.get(evt.pin_sha256);
+        if (existing === undefined) {
+          break;
+        }
+        const connected = event === DeviceEventType.OFFLOADER_PEER_LINK_OPENED;
+        const next = new Map(this._buildOffloadPairings);
+        next.set(evt.pin_sha256, { ...existing, connected });
         this._buildOffloadPairings = next;
         break;
       }

@@ -1002,6 +1002,15 @@ export enum DeviceEventType {
   // ``_buildServerPeers``.
   RECEIVER_PEER_LINK_SESSION_OPENED = "receiver_peer_link_session_opened",
   RECEIVER_PEER_LINK_SESSION_CLOSED = "receiver_peer_link_session_closed",
+  // Offloader-side peer-link session lifecycle. Fired by the
+  // offloader's long-lived PeerLinkClient when its Noise WS
+  // to the receiver enters / leaves the post-handshake parked
+  // state. Drives the PairingSummary.connected indicator on
+  // the offloader-side Paired-build-servers list. Both events
+  // share the same OffloaderPeerLinkSessionEventData shape;
+  // the discriminator is the event type itself.
+  OFFLOADER_PEER_LINK_OPENED = "offloader_peer_link_opened",
+  OFFLOADER_PEER_LINK_CLOSED = "offloader_peer_link_closed",
   // mDNS-discovered peer dashboards. Replaces the deleted
   // ``remote_build/list_hosts`` WS command — the controller fires
   // these events as its mDNS browser callback resolves /
@@ -1333,6 +1342,22 @@ export interface PairingSummary {
   label: string;
   paired_at: number;
   status: PeerStatus;
+  /**
+   * Whether the offloader currently has an open 5a-2 peer-link
+   * session to the receiver (pin_sha256 membership in the
+   * controller's _open_peer_links set). Live updates flow
+   * through OFFLOADER_PEER_LINK_OPENED /
+   * OFFLOADER_PEER_LINK_CLOSED bus events on the
+   * subscribe_events stream; the snapshot
+   * (initial_state.pairings) carries the current value at
+   * subscribe time so a reconnecting tab paints the right state
+   * without waiting for the next event.
+   *
+   * Always false for PENDING rows: the offloader doesn't spawn
+   * a peer-link client until the receiver flips the row to
+   * APPROVED.
+   */
+  connected: boolean;
 }
 
 /**
@@ -1488,6 +1513,27 @@ export interface OffloaderPairStatusChangedEventData {
  */
 export interface ReceiverPeerLinkSessionEventData {
   dashboard_id: string;
+}
+
+/**
+ * Data payload for offloader_peer_link_opened and
+ * offloader_peer_link_closed.
+ *
+ * Fires on the offloader-side bus whenever the long-lived
+ * PeerLinkClient enters / leaves its post-handshake parked
+ * state. Drives the PairingSummary.connected indicator:
+ * app-shell flips the matching row's connected flag in the
+ * local _buildOffloadPairings map keyed by pin_sha256. Both
+ * events share the same shape; the discriminator is the event
+ * type itself. Receiver coords are carried as display fields
+ * the renderer can use without a follow-up lookup, but they're
+ * ignored when keying the map (4a-o part 6; pin_sha256 is the
+ * canonical row identity).
+ */
+export interface OffloaderPeerLinkSessionEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
 }
 
 /**

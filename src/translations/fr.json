@@ -736,6 +736,8 @@
     "paired_build_servers_empty": "Aucun serveur de compilation appairé pour le moment.",
     "pairing_status_pending": "En attente",
     "pairing_status_approved": "Approuvé",
+    "build_offload_pairing_connected": "Connecté",
+    "build_offload_pairing_disconnected": "Déconnecté",
     "unpair_action": "Désappairer",
     "unpair_aria": "Désappairer {label}",
     "unpair_confirm_title": "Désappairer ce serveur de compilation ?",

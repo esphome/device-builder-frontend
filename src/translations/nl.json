@@ -736,6 +736,8 @@
     "paired_build_servers_empty": "Nog geen build-servers gekoppeld.",
     "pairing_status_pending": "In afwachting",
     "pairing_status_approved": "Goedgekeurd",
+    "build_offload_pairing_connected": "Verbonden",
+    "build_offload_pairing_disconnected": "Niet verbonden",
     "unpair_action": "Ontkoppelen",
     "unpair_aria": "{label} ontkoppelen",
     "unpair_confirm_title": "Deze build-server ontkoppelen?",
