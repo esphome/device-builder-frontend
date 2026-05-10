@@ -1630,7 +1630,12 @@ export class ESPHomeSettingsDialog extends LitElement {
    *    pill, with an Unpair button per row.
    * 2. Known dashboards — mDNS-discovered build servers on the
    *    LAN. Each row gets a Pair button that opens the wizard
-   *    pre-filled with the row's hostname / peer-link port.
+   *    pre-filled with the row's hostname only; the port stays
+   *    at the wizard's 6055 default because the row's
+   *    ``peer.port`` is the SRV-advertised dashboard HTTP port
+   *    (6052), not the peer-link Noise WS port. Surfacing the
+   *    receiver's actual peer-link port from the TXT
+   *    ``remote_build_port`` key is a backend follow-up.
    * 3. Pair-by-hostname — the typed-hostname fallback for
    *    cross-subnet / non-mDNS receivers.
    *

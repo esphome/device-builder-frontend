@@ -794,7 +794,7 @@
     "pair_build_server_row_already_paired": "Paired",
     "pair_build_server_row_aria": "Pair with {name}",
     "paired_build_servers_heading": "Paired build servers",
-    "paired_build_servers_desc": "Build servers this dashboard has authorised compile jobs to. Pending rows are waiting for the receiver's admin to accept.",
+    "paired_build_servers_desc": "Build servers this dashboard has paired with for compile jobs. Pending rows are waiting for the receiver's admin to accept.",
     "paired_build_servers_loading": "Loading pairings…",
     "paired_build_servers_empty": "No build servers paired yet.",
     "pairing_status_pending": "Pending",

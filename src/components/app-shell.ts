@@ -320,10 +320,12 @@ export class ESPHomeApp extends LitElement {
    *  paired-receivers list, and the pair dialog reads it to
    *  auto-close on a matching event after a sent
    *  ``request_pair``. ``Map`` for the same reasons
-   *  ``_buildOffloadDiscoveredHosts`` is — these are
-   *  user/network-supplied strings; insertion-order matters;
-   *  prototype-key collisions on a plain object don't. ``null``
-   *  until the snapshot lands. */
+   *  ``_buildOffloadDiscoveredHosts`` is: keys are
+   *  user/network-supplied strings, insertion order needs to
+   *  be stable, and ``Map`` avoids the
+   *  ``__proto__``/``constructor`` key collisions a plain
+   *  object would have on those keys. ``null`` until the
+   *  snapshot lands. */
   @provide({ context: buildOffloadPairingsContext })
   @state()
   private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
