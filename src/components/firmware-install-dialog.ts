@@ -10,13 +10,12 @@ import {
   mdiConsole,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { JobStatus } from "../api/types.js";
 import type { ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { chipNameToVariant } from "../util/chip-variant.js";
 import { downloadBase64Binary } from "../util/download-text.js";
@@ -31,10 +30,10 @@ import {
   type DetectedChip,
 } from "../util/web-serial.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./ansi-log.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "alert-circle": mdiAlertCircle,
@@ -123,9 +122,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   private _compileReject: ((err: Error) => void) | null = null;
   private _detected: DetectedChip | null = null;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
-
   // ─── Public API ────────────────────────────────────────
 
   /**
@@ -139,7 +135,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = "web-serial";
     this._step = "connecting";
     this._statusMessage = this._localize("firmware.status_connecting");
-    this._dialog.open = true;
     this._startWebSerialInstall();
   }
 
@@ -155,7 +150,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = "web-download";
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
-    this._dialog.open = true;
     this._startDownload();
   }
 
@@ -170,7 +164,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = "binary-download";
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
-    this._dialog.open = true;
     this._startDownload();
   }
 
@@ -182,7 +175,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    * preserved across the flip.
    */
   public reopen() {
-    this._dialog.open = true;
+    this._open = true;
   }
 
   private _init(device: ConfiguredDevice) {
@@ -244,7 +237,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
-    dialogCloseButtonStyles,
     css`
       :host {
         --term-bg: #1e1e1e;
@@ -261,33 +253,34 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         --term-error: #c72e2e;
       }
 
-      wa-dialog {
+      esphome-base-dialog {
         --width: 520px;
         transition: width 0.2s;
       }
-      :host([expanded]) wa-dialog {
+      :host([expanded]) esphome-base-dialog {
         --width: min(900px, 90vw);
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         background: var(--esphome-primary);
         padding: 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
       }
       /* Close-button styling lives in
-         src/styles/dialog-close-button.ts — see the
-         dialogCloseButtonStyles import below. */
+         src/styles/dialog-close-button.ts — base-dialog bundles
+         dialogCloseButtonStyles so the X-button sizing /
+         positioning is consistent across migrated dialogs. */
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: var(--wa-space-l) var(--wa-space-xl);
       }
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -500,10 +493,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog label=${this._title} ?open=${this._open} @wa-after-hide=${this._onClose}>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._title}
+        @after-hide=${this._onClose}
+      >
         ${this._renderStatus()} ${this._renderProgress()} ${this._renderLogs()}
         ${this._renderFooter()}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -942,7 +939,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       webSerialPort,
       reopenInstall: () => this.reopen(),
     });
-    if (handled) this._dialog.open = false;
+    if (handled) this._open = false;
   }
 
   // ─── Download flows (compile + save binary) ────────────────────
