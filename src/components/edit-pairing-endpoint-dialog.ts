@@ -1,5 +1,3 @@
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
-
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
@@ -9,7 +7,6 @@ import { APIError } from "../api/api-error.js";
 import { ErrorCode, type PairingSummary } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import {
@@ -18,6 +15,8 @@ import {
   trimTrailingDot,
 } from "../util/hostname.js";
 import { renderErrorBanner } from "../util/render-error.js";
+
+import "./base-dialog.js";
 
 /**
  * Edit a paired build server's hostname / port without re-pairing.
@@ -248,26 +247,15 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
   protected render() {
     if (!this._open) return nothing;
     return html`
-      <wa-dialog
+      <esphome-base-dialog
         ?open=${this._open}
-        ?light-dismiss=${!this._submitting}
-        @wa-request-close=${this._onRequestClose}
-        @wa-after-hide=${this._close}
+        ?busy=${this._submitting}
+        .label=${this._localize("settings.edit_pairing_endpoint_title", {
+          label: this._label,
+        })}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._close}
       >
-        <header slot="label">
-          ${this._localize("settings.edit_pairing_endpoint_title", {
-            label: this._label,
-          })}
-        </header>
-        <button
-          class="dialog-close"
-          slot="header-actions"
-          aria-label=${this._localize("layout.close")}
-          ?disabled=${this._submitting}
-          @click=${this._close}
-        >
-          ✕
-        </button>
         <p class="desc">
           ${this._localize("settings.edit_pairing_endpoint_desc")}
         </p>
@@ -324,14 +312,13 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
             )}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
   static styles = [
     espHomeStyles,
     inputStyles,
-    dialogCloseButtonStyles,
     css`
       .desc {
         margin: 0 0 var(--wa-space-m);
