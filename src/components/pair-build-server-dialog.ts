@@ -18,7 +18,11 @@ import { inputStyles } from "../styles/inputs.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
-import { friendlyHostname, trimTrailingDot } from "../util/hostname.js";
+import {
+  friendlyHostname,
+  parsePortInput,
+  trimTrailingDot,
+} from "../util/hostname.js";
 import "./pin-emoji-grid.js";
 
 /**
@@ -450,9 +454,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   }
 
   private _renderInputStep() {
-    const portNum = Number.parseInt(this._port, 10);
-    const portValid =
-      Number.isFinite(portNum) && portNum >= 1 && portNum <= 65535;
+    const portValid = parsePortInput(this._port) !== null;
     const canSubmit =
       !this._busy && this._hostname.trim().length > 0 && portValid;
     return html`
@@ -655,8 +657,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   private _onPreviewSubmit = async (): Promise<void> => {
     if (this._api === undefined || this._busy) return;
     const hostname = this._hostname.trim();
-    const port = Number.parseInt(this._port, 10);
-    if (!hostname || !Number.isFinite(port) || port < 1 || port > 65535) {
+    const port = parsePortInput(this._port);
+    if (!hostname || port === null) {
       this._error = this._localize(
         "settings.pair_build_server_input_invalid",
       );
@@ -691,7 +693,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   private _onConfirmSubmit = async (): Promise<void> => {
     if (this._api === undefined || this._busy) return;
     const hostname = this._hostname.trim();
-    const port = Number.parseInt(this._port, 10);
+    const port = parsePortInput(this._port);
+    if (port === null) return;
     const receiverLabel = this._receiverLabel.trim();
     const offloaderLabel = this._offloaderLabel.trim();
     if (!receiverLabel || !offloaderLabel) {

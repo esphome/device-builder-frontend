@@ -76,3 +76,32 @@ export function friendlyHostname(host: string): string {
 export function normalizeHostnameForCompare(host: string): string {
   return trimTrailingDot(host.trim()).toLowerCase();
 }
+
+/**
+ * Parse a user-typed port string into a valid 1-65535 integer.
+ *
+ * Returns ``null`` for any non-decimal content (whitespace
+ * inside, trailing garbage, leading sign), zero, or
+ * out-of-range values. ``Number.parseInt`` alone is
+ * permissive — it stops at the first non-digit and accepts
+ * leading whitespace + trailing garbage (``"6055abc"`` parses
+ * to ``6055``); the regex pins the input shape before
+ * parsing.
+ *
+ * Used by the pair-build-server wizard's input step and the
+ * edit-pairing-endpoint dialog's Save gate; both want the
+ * same "did the user type a valid port?" semantics keyed on
+ * the same constraints. ``null`` semantics are invariant
+ * across both: caller treats it as "Save disabled" /
+ * "validation failed", non-null as "use this int as the wire
+ * value." Mirrors the receiver-side ``_validate_port``'s
+ * accepted range so a value that passes here is guaranteed
+ * to round-trip through the WS validator without raising.
+ */
+export function parsePortInput(input: string): number | null {
+  const trimmed = input.trim();
+  if (!/^\d+$/.test(trimmed)) return null;
+  const n = Number.parseInt(trimmed, 10);
+  if (!Number.isInteger(n) || n < 1 || n > 65535) return null;
+  return n;
+}

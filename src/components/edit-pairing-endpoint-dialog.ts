@@ -12,7 +12,11 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { trimTrailingDot } from "../util/hostname.js";
+import {
+  normalizeHostnameForCompare,
+  parsePortInput,
+  trimTrailingDot,
+} from "../util/hostname.js";
 
 /**
  * Edit a paired build server's hostname / port without re-pairing.
@@ -53,9 +57,14 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
   @state() private _pinSha256 = "";
   @state() private _label = "";
   @state() private _hostname = "";
-  @state() private _port = 0;
+  /** Port held as a string so an empty input stays empty
+   *  while the user is mid-edit; parsed to a number only at
+   *  validate / Save time. Mirrors ``pair-build-server-dialog``'s
+   *  shape — coercing ``""`` back to ``0`` on every input event
+   *  re-renders the field while the user is still typing. */
+  @state() private _port = "";
   @state() private _initialHostname = "";
-  @state() private _initialPort = 0;
+  @state() private _initialPort = "";
   @state() private _submitting = false;
   @state() private _errorMessage = "";
 
@@ -75,16 +84,25 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     // FQDN-form like ``desktop.local.`` reads as
     // ``desktop.local`` in the dashboard's host-display
     // convention. Backend's ``_validate_hostname`` accepts
-    // both forms, so the user can edit either way and the
-    // ``_endpoints_equal`` no-op check folds the trailing
-    // dot at compare time.
+    // both forms, so the user can edit either way; the
+    // ``_isUnchanged`` no-op check normalises both sides
+    // through ``normalizeHostnameForCompare`` so re-typing
+    // the same coords with a trailing dot or different case
+    // is correctly recognised as unchanged.
     this._hostname = trimTrailingDot(pairing.receiver_hostname);
-    this._port = pairing.receiver_port;
+    this._port = String(pairing.receiver_port);
     this._initialHostname = this._hostname;
     this._initialPort = this._port;
     this._submitting = false;
     this._errorMessage = "";
     this._open = true;
+    // Autofocus the hostname field on next paint. ``_open``
+    // gates the whole render tree, so the input doesn't
+    // exist until ``updateComplete`` fires.
+    void this.updateComplete.then(() => {
+      this._hostInput?.focus();
+      this._hostInput?.select();
+    });
   }
 
   private _close = () => {
@@ -98,22 +116,25 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
   };
 
   private _onPortInput = (e: Event) => {
-    const raw = (e.target as HTMLInputElement).value;
-    // Empty input parks at 0 so the disabled check fires;
-    // backend's port validator rejects 0 as out-of-range.
-    this._port = raw === "" ? 0 : Number.parseInt(raw, 10);
+    // Stored as a string so an empty / partial edit
+    // (clearing the field, or typing one digit at a time)
+    // doesn't snap to ``0`` mid-edit. Validator parses on
+    // the way out via ``_portValid`` / ``_onSave``.
+    this._port = (e.target as HTMLInputElement).value;
   };
 
   private _onSave = async () => {
     if (this._api === undefined) return;
     if (this._submitting) return;
+    const port = parsePortInput(this._port);
+    if (port === null) return;
     this._errorMessage = "";
     this._submitting = true;
     try {
       await this._api.editRemoteBuildPairingEndpoint({
         pin_sha256: this._pinSha256,
         hostname: this._hostname.trim(),
-        port: this._port,
+        port,
       });
       // Backend mutates StoredPairing in place + fires
       // OFFLOADER_PAIR_ENDPOINT_REBOUND; the pairings-context
@@ -128,7 +149,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
           detail: {
             pin_sha256: this._pinSha256,
             hostname: this._hostname.trim(),
-            port: this._port,
+            port,
           },
         }),
       );
@@ -146,7 +167,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
         case ErrorCode.UNAVAILABLE:
           return this._localize(
             "settings.edit_pairing_endpoint_unavailable",
-            { host: this._hostname, port: String(this._port) },
+            { host: this._hostname, port: this._port },
           );
         case ErrorCode.PRECONDITION_FAILED:
           // Backend folds four distinct preconditions onto this
@@ -189,16 +210,22 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     return this._hostname.trim().length > 0;
   }
 
-  private _portValid(): boolean {
-    return (
-      Number.isInteger(this._port) && this._port > 0 && this._port < 65536
-    );
-  }
-
   private _isUnchanged(): boolean {
+    // Normalise both sides through the codebase's
+    // case- + trailing-dot-insensitive folder so re-typing
+    // ``Desktop.local.`` against a stored ``desktop.local``
+    // is correctly recognised as unchanged. Backend's
+    // ``_endpoints_equal`` does the same fold at compare
+    // time, so a Save that slipped past this gate would
+    // bounce off ``PRECONDITION_FAILED`` anyway — catching
+    // it here keeps the round-trip out of the loop.
+    const port = parsePortInput(this._port);
+    if (port === null) return false;
+    const initialPort = parsePortInput(this._initialPort);
     return (
-      this._hostname.trim() === this._initialHostname &&
-      this._port === this._initialPort
+      normalizeHostnameForCompare(this._hostname) ===
+        normalizeHostnameForCompare(this._initialHostname) &&
+      port === initialPort
     );
   }
 
@@ -206,7 +233,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     return (
       this._submitting ||
       !this._hostnameValid() ||
-      !this._portValid() ||
+      parsePortInput(this._port) === null ||
       this._isUnchanged()
     );
   }

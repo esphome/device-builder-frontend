@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   friendlyHostname,
   normalizeHostnameForCompare,
+  parsePortInput,
   trimTrailingDot,
 } from "../../src/util/hostname.js";
 
@@ -98,5 +99,40 @@ describe("friendlyHostname", () => {
 
   it("trims surrounding whitespace", () => {
     expect(friendlyHostname("  MyDashboard.local.  ")).toBe("MyDashboard");
+  });
+});
+
+describe("parsePortInput", () => {
+  it("returns the integer for a valid in-range port", () => {
+    expect(parsePortInput("6055")).toBe(6055);
+    expect(parsePortInput("1")).toBe(1);
+    expect(parsePortInput("65535")).toBe(65535);
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(parsePortInput("  6055  ")).toBe(6055);
+  });
+
+  it("rejects empty / whitespace-only", () => {
+    expect(parsePortInput("")).toBeNull();
+    expect(parsePortInput("   ")).toBeNull();
+  });
+
+  it("rejects out-of-range values", () => {
+    expect(parsePortInput("0")).toBeNull();
+    expect(parsePortInput("65536")).toBeNull();
+    expect(parsePortInput("99999999")).toBeNull();
+  });
+
+  it("rejects non-decimal content", () => {
+    // ``Number.parseInt`` would accept these and return a
+    // value; the regex pre-check rejects them so partial
+    // edits / accidental garbage don't slip through.
+    expect(parsePortInput("6055abc")).toBeNull();
+    expect(parsePortInput("abc6055")).toBeNull();
+    expect(parsePortInput("60.55")).toBeNull();
+    expect(parsePortInput("0x6055")).toBeNull();
+    expect(parsePortInput("-6055")).toBeNull();
+    expect(parsePortInput("+6055")).toBeNull();
   });
 });
