@@ -690,7 +690,7 @@
     "build_offload": "Envoyer les compilations",
     "build_offload_unimplemented_banner": "L'envoi de compilations à un autre tableau de bord n'est pas encore implémenté. Les noms d'hôte ajoutés ici sont mémorisés, mais aucune tâche de compilation n'est dispatchée tant que l'appairage n'est pas livré dans une version ultérieure.",
     "remote_build_enable": "Activer la compilation à distance",
-    "remote_build_enable_desc": "Permettre à d'autres tableaux de bord de votre réseau d'envoyer des tâches de compilation de firmware à ce tableau de bord. L'appairage avec un pair lui donne la possibilité d'exécuter du code sur cet hôte ; n'activez que pour les tableaux de bord auxquels vous faites déjà confiance au niveau shell.",
+    "remote_build_enable_desc": "Permet à d'autres tableaux de bord de votre réseau de compiler leur YAML ici. Un pair appairé peut exécuter n'importe quel code sur cette machine ; n'appairez qu'avec des tableaux de bord à qui vous donneriez un accès ssh.",
     "remote_build_known_dashboards": "Tableaux de bord connus",
     "remote_build_peers_loading": "Chargement…",
     "remote_build_peers_empty": "Aucun tableau de bord découvert pour le moment.",
