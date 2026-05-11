@@ -172,8 +172,10 @@ export class ESPHomeCommandDialog extends LitElement {
    *  ``job_queued`` / ``job_updated`` event, so without
    *  this fallback a REMOTE-routed install dialog renders
    *  blank chrome for the ~roundtrip-time before the
-   *  sub-line appears. Cleared on close + when the
-   *  followed job lands in the context. */
+   *  sub-line appears. Reset to ``null`` on ``open()`` so
+   *  the next dialog session starts clean; the renderer
+   *  prefers the live context entry when present, so a
+   *  stale prime is benign once ``_jobs`` catches up. */
   private _primedSource: { source: JobSource; source_label: string } | null = null;
   /** Stream message ID (for both validate streaming and follow_job streaming). */
   private _streamId = "";
@@ -707,10 +709,14 @@ export class ESPHomeCommandDialog extends LitElement {
     if (!this._jobId) return nothing;
     const liveJob = this._jobs.get(this._jobId);
     if (liveJob && isTerminalJobStatus(liveJob.status)) return nothing;
-    // Live entry wins when present (latest source_label after a
-    // rename / re-pair on the receiver side); the primed
-    // snapshot only fills the gap before the first context
-    // update lands.
+    // Live entry wins when present — it's the canonical
+    // source the rest of the dialog reads from, so we
+    // prefer it over the locally-primed snapshot. The
+    // ``source_label`` field is a snapshot at job-creation
+    // time per the backend's wire contract (see
+    // ``FirmwareJob.source_label`` in ``api/types.ts``), so
+    // the two values agree once ``_jobs`` catches up; the
+    // prime only fills the paint-gap before that.
     const source = liveJob?.source ?? this._primedSource?.source;
     const label = liveJob?.source_label ?? this._primedSource?.source_label;
     if (source !== JobSource.REMOTE || !label) return nothing;
