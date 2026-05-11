@@ -24,8 +24,8 @@ type Step = 1 | 2 | 3;
  * (hostname, port) responded with a different cryptographic
  * identity than the one OOB-verified at pair time. That has
  * two completely different real-world causes: the receiver
- * admin rotated the identity legitimately (cert rotation, OS
- * reinstall, server rebuild), or something is impersonating
+ * admin rotated the identity legitimately (identity rotation,
+ * OS reinstall, server rebuild), or something is impersonating
  * the receiver. The operator faces a real decision that the
  * existing alert banner's one-line "Re-pair" CTA doesn't
  * walk them through.

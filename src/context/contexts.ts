@@ -96,7 +96,7 @@ export const yamlDiffButtonContext = createContext<boolean>(
  * default; the value comes from the backend on startup via
  * ``remote_build/get_settings`` and is updated when the user
  * flips the toggle in Settings → Remote builder. Phase 3+ adds
- * the rest of the receiver-side knobs (cert fingerprint, tokens,
+ * the rest of the receiver-side knobs (identity fingerprint,
  * artifact-retention TTL, etc.) — this single boolean is the
  * scaffolding the Settings UI plugs the rest into.
  */
@@ -161,9 +161,9 @@ export const onboardingPendingContext = createContext<boolean>(
  * 3c2d (#106).
  *
  * Bump sites:
- * * ``remote_build_identity_rotated`` event lands a new cert /
- *   pin fingerprint; another tab triggered a rotation we want
- *   to mirror.
+ * * 'remote_build_identity_rotated' event lands a new X25519
+ *   public-key fingerprint; another tab triggered a rotation
+ *   we want to mirror.
  * * The user toggles the "Enable remote build" switch
  *   (``setRemoteBuildSettings``); ``IdentityView.listener_bound``
  *   flips alongside the runner teardown / re-bind so the cached

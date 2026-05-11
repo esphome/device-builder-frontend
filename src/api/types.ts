@@ -1391,7 +1391,7 @@ export interface EditorValidateResponse {
 
 // Remote-build feature (issue #106).
 // Phase 2: peer dashboard discovery + receiver-side master switch.
-// Phase 3c1: receiver dashboard identity + cert rotation.
+// Phase 3c1: receiver dashboard identity + X25519 keypair rotation.
 // Phase 4a: Noise XX peer-link replaces the bearer-token surface;
 //           offloader-side pair flow + receiver-side pairing inbox.
 

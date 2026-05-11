@@ -1178,7 +1178,7 @@ export class ESPHomeApp extends LitElement {
         // Bump the counter. Settings dialog watches the matching
         // context and re-fetches identity when the value changes,
         // so a rotation triggered in another tab refreshes the
-        // visible cert fingerprint here.
+        // visible identity fingerprint here.
         this._buildServerIdentityRotationCounter += 1;
         break;
       }

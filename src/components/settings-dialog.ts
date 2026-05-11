@@ -167,7 +167,7 @@ const SECTIONS: SectionDef[] = [
     // window's open/closed state is bound to the operator
     // viewing this specific screen. Folding it under Build
     // server made the door silently open whenever an admin
-    // poked around the cert pin or tokens list, which was the
+    // poked around the identity fingerprint, which was the
     // wrong default for a security-sensitive accept gate.
     // Senders' "ask the receiver to open Settings → Pairing
     // requests" copy is now an accurate navigation prompt
@@ -333,7 +333,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     label: string;
   } | null = null;
 
-  // Phase 3c2b: receiver identity (cert pin + listener-bound + versions).
+  // Receiver identity (identity fingerprint + listener-bound + versions).
   // Lazy-loaded the first time the user opens the section,
   // refreshed after a successful rotate. ``null`` means
   // "not yet loaded"; an explicit error state is tracked
@@ -681,12 +681,12 @@ export class ESPHomeSettingsDialog extends LitElement {
   /**
    * Fetch the receiver identity for the Build server card.
    *
-   * Idempotent on the backend (``get_identity`` lazy-creates the
-   * cert + key on first call but never rotates), so re-firing on
-   * dialog re-open or after a rotate just refreshes the local
-   * state. Tracks failure separately from the null-while-loading
-   * state so the UI can render an explicit error message rather
-   * than spinning forever.
+   * Idempotent on the backend ('get_identity' lazy-creates the
+   * X25519 peer-link keypair on first call but never rotates),
+   * so re-firing on dialog re-open or after a rotate just
+   * refreshes the local state. Tracks failure separately from
+   * the null-while-loading state so the UI can render an
+   * explicit error message rather than spinning forever.
    *
    * Cross-tab refresh on a rotation from another tab is handled
    * by ``updated()`` watching the
@@ -2050,7 +2050,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   /**
    * Receive role: this dashboard letting other dashboards use
    * it to compile firmware. Master enable toggle + the
-   * build-server identity card (cert fingerprint +
+   * build-server identity card (identity fingerprint +
    * listener-bound + rotate). The pairing-requests inbox UI
    * and approved-peers list land in phase 4b-2; the
    * pin-mismatch / peer-revoked alert reshape lands in 4b-4.

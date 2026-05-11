@@ -1349,9 +1349,9 @@ export class ESPHomeAPI {
   /**
    * Get the receiver-side remote-build settings.
    *
-   * Phase 2 of issue #106 — only ``enabled`` is exposed; phase 3+
-   * adds artifact-retention TTL, the cert fingerprint, the token
-   * list, and the rest of the "Remote builder" Settings section.
+   * Phase 2 of issue #106 — only 'enabled' is exposed; phase 3+
+   * adds artifact-retention TTL, the identity fingerprint, and
+   * the rest of the "Remote builder" Settings section.
    */
   async getRemoteBuildSettings(): Promise<RemoteBuildSettings> {
     return this.sendCommand<RemoteBuildSettings>("remote_build/get_settings");
