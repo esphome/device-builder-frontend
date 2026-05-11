@@ -79,12 +79,12 @@ python3 -m build --wheel
 
 ### Other scripts
 
-| Script           | Description                                |
-| ---------------- | ------------------------------------------ |
-| `npm run lint`   | TypeScript type-check (`tsc --noEmit`)     |
-| `npm test`       | Run the Vitest suite once                  |
+| Script               | Description                            |
+| -------------------- | -------------------------------------- |
+| `npm run lint`       | TypeScript type-check (`tsc --noEmit`) |
+| `npm test`           | Run the Vitest suite once              |
 | `npm run test:watch` | Run tests in watch mode                |
-| `npm run format` | Format `src/` with Prettier                |
+| `npm run format`     | Format `src/` with Prettier            |
 
 ## Project structure
 
@@ -111,6 +111,48 @@ public/
 
 esphome_device_builder_frontend/   # Build output (gitignored)
 ```
+
+## Code structure policies
+
+These rules apply to all new code in `src/`. Existing files that pre-date them are grandfathered, but please don't make them worse.
+
+### File size
+
+- **Hard limit: 500–600 lines per file.** Split before a file grows past this.
+- No exceptions for "it's just one big component". Break it up.
+
+### Component decomposition
+
+- Prefer many small, focused components over one large one.
+- If a `render()` method exceeds ~100 lines, that's a signal to extract a sub-component.
+- Extract repeated template patterns into their own components immediately — don't wait for the third copy.
+
+### Folder structure
+
+- One `@customElement` per `.ts` file. File name matches element name: `esphome-foo-bar.ts` → `<esphome-foo-bar>`.
+- If a feature grows beyond 2–3 files, give it its own subfolder (see `src/components/settings-dialog/` for the pattern).
+- Create folders proactively when grouping related files makes sense — don't pile everything flat.
+
+### TypeScript
+
+- `strict: true` everywhere. No implicit `any`, no non-null assertions without a clear reason.
+- New code uses `unknown` and narrows; avoid `any`.
+
+### What to avoid
+
+- No `document.querySelector` — go through shadow DOM.
+- No direct DOM mutation — use reactive properties and re-render.
+- No business logic in `render()` — extract to private methods or computed properties.
+- No new global singletons for state two components need — use Lit context.
+
+### Localization
+
+- All user-facing strings go through `_localize(key)` from `src/common/localize.ts`.
+- New keys added to `en.json` must land in `fr.json` and `nl.json` in the same PR — the i18n machinery falls back to English silently, which mixes languages in non-English UIs.
+
+### Comments
+
+- Default comments. Add one only when the _why_ is non-obvious (a constraint, an invariant, a workaround). Don't restate what the code does.
 
 ## Releases
 

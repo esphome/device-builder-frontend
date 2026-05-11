@@ -110,16 +110,8 @@ describe("device-section-config wiring", () => {
   // prop directly to the catalog source — leaving the
   // substitutions section silently empty in the UI.
   it("forwards renderEntries / resolveSectionEntries to the form's .entries prop", async () => {
-    // ``tsconfig.json`` restricts ``types`` to ``@types/w3c-web-serial``
-    // for the production build, so ``@types/node`` isn't visible to
-    // ``tsc`` even though it's installed for runtime use. Skip the
-    // type check for these node-only imports — the test runs in
-    // vitest's node environment where they resolve fine.
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const fs = await import("node:fs");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const path = await import("node:path");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const url = await import("node:url");
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
@@ -165,11 +157,8 @@ describe("device-section-config wiring", () => {
     // continuously, and the explicit Validate button runs the
     // full ESPHome compile against the saved file. The "x y is
     // invalid" feedback now flows through those two surfaces.
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const fs = await import("node:fs");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const path = await import("node:path");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const url = await import("node:url");
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(

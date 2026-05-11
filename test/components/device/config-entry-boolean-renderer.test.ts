@@ -13,11 +13,8 @@ import { describe, expect, it } from "vitest";
 
 describe("renderBooleanField default-value fallback", () => {
   it("treats undefined / null raw as ``entry.default_value`` when computing checked state", async () => {
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const fs = await import("node:fs");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const path = await import("node:path");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
     const url = await import("node:url");
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
