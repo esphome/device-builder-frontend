@@ -292,7 +292,10 @@
     "queued_title": "En file d'attente",
     "queued_message": "Une autre tâche firmware est en cours. Celle-ci démarrera à la fin.",
     "queued_waiting_for": "En attente de {name}.",
-    "queued_view_all": "Voir les tâches firmware"
+    "queued_view_all": "Voir les tâches firmware",
+    "force_local_action": "Compiler localement à la place",
+    "force_local_switching": "Bascule en cours…",
+    "force_local_failed": "Impossible de basculer vers une compilation locale"
   },
   "serial": {
     "title": "Appareil USB",
