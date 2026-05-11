@@ -634,6 +634,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    *  * **YAML validation** (the output stream included ESPHome's
    *    validation-failure marker) — neither clean nor reset can
    *    help; offer the editor instead.
+   *  * **Receiver session lost** (REMOTE compile that dropped
+   *    mid-build because the build server restarted / dropped
+   *    network) — neither clean nor reset helps; the build
+   *    environment was fine, the connection wasn't. Skip the
+   *    hint entirely so the operator just sees the specific
+   *    error text and the Retry button.
    *  * **C++ build / compile** failure — keep the clean → reset
    *    staircase (clean is surgical / fast; reset is the heavier
    *    toolchain-wide wipe).
@@ -646,7 +652,25 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (this._failedDuringValidate) {
       return this._renderValidationFailureSuggestion();
     }
+    if (this._isPeerLinkSessionLostError(this._errorMessage)) {
+      return nothing;
+    }
     return this._renderBuildFailureSuggestion();
+  }
+
+  /** Returns ``true`` when the failure text matches the
+   *  receiver-side ``_fail_locally`` "peer-link session lost"
+   *  shape from the backend's ``remote_runner``. Used to skip
+   *  the misleading clean / reset hint for failures that
+   *  weren't actually about the build environment.
+   *
+   *  Match by substring rather than a regex / structured error
+   *  code because the wire shape today is a free-form string
+   *  (``FirmwareJob.error``). If a future backend lands a
+   *  typed error code that carries the same signal, this is
+   *  the call site to switch over to. */
+  private _isPeerLinkSessionLostError(message: string): boolean {
+    return message.includes("peer-link session lost");
   }
 
   /** YAML validation failure → "open in editor" hint. */
@@ -950,9 +974,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_queued");
     try {
       await this._compileAndWait(device.configuration);
-    } catch {
+    } catch (err) {
       this._failedDuringCompile = true;
-      this._fail(this._localize("firmware.compile_failed"));
+      this._fail(this._compileFailureMessage(err));
       return;
     }
 
@@ -1073,9 +1097,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
     try {
       await this._compileAndWait(device.configuration);
-    } catch {
+    } catch (err) {
       this._failedDuringCompile = true;
-      this._fail(this._localize("firmware.compile_failed"));
+      this._fail(this._compileFailureMessage(err));
       return;
     }
 
@@ -1147,10 +1171,24 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
             this._streamId = "";
             this._jobId = "";
             this._compileReject = null;
-            const result = data as unknown as { status: string };
-            result.status === JobStatus.COMPLETED
-              ? resolve()
-              : reject(new Error("Compilation failed"));
+            const result = data as unknown as {
+              status: string;
+              error?: string | null;
+            };
+            if (result.status === JobStatus.COMPLETED) {
+              resolve();
+              return;
+            }
+            /* Prefer the backend's specific failure text so the
+             * red error banner names the actual cause (e.g.
+             * "remote build: peer-link session lost (transport_error: …)")
+             * instead of a generic "Install failed.". Older
+             * backends that don't set ``error`` on the wire
+             * still produce the generic message because the
+             * catch in ``_startInstall`` falls back to
+             * ``firmware.compile_failed`` when the rejection's
+             * message is empty. */
+            reject(new Error(result.error || ""));
           },
           onError: (error) => {
             this._streamId = "";
@@ -1177,6 +1215,28 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = message;
     this._errorMessage = message;
     this._logsExpanded = true;
+  }
+
+  /** Pick the most informative copy for a compile-step failure.
+   *
+   *  ``_compileAndWait`` rejects with an ``Error`` whose
+   *  ``message`` is the backend's ``FirmwareJob.error`` text
+   *  (when ``firmware/follow_job``'s RESULT carried one — newer
+   *  backend, see esphome/device-builder#597) or an empty
+   *  string (older backend that didn't put ``error`` on the
+   *  wire). Prefer the specific backend text so the red banner
+   *  names the actual cause; fall back to the generic localised
+   *  "Install failed." copy when nothing useful came back.
+   *
+   *  The session-lost case is the user-visible motivator:
+   *  ``remote build: peer-link session lost (transport_error: …)``
+   *  is a much better operator signal than a generic failure
+   *  string followed by a "try cleaning the build files" hint
+   *  that doesn't help when the receiver just restarted.
+   */
+  private _compileFailureMessage(err: unknown): string {
+    const text = err instanceof Error ? err.message.trim() : String(err ?? "").trim();
+    return text || this._localize("firmware.compile_failed");
   }
 
   private async _cancel() {
