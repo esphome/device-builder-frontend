@@ -13,8 +13,13 @@ import { describe, expect, it } from "vitest";
 
 describe("renderBooleanField default-value fallback", () => {
   it("treats undefined / null raw as ``entry.default_value`` when computing checked state", async () => {
+    // tsconfig restricts `types` to @types/w3c-web-serial, so node
+    // module specifiers don't type-check; vitest resolves them fine.
+    // @ts-ignore — node-only module
     const fs = await import("node:fs");
+    // @ts-ignore — node-only module
     const path = await import("node:path");
+    // @ts-ignore — node-only module
     const url = await import("node:url");
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
