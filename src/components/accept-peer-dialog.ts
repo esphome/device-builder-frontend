@@ -37,9 +37,11 @@ registerMdiIcons({ "shield-alert-outline": mdiShieldAlertOutline });
  * Composes the shared ``<esphome-confirm-dialog>``: rich body via
  * the ``body`` slot, primary destructive Accept via ``confirm``,
  * neutral Reject via the secondary action. Re-emits the inner
- * dialog's events as ``confirm`` and ``reject`` carrying the peer's
+ * dialog's events as ``accept`` and ``reject`` carrying the peer's
  * ``dashboard_id`` so the parent doesn't need to track which row
- * the dialog was opened with.
+ * the dialog was opened with. The outgoing names are domain-specific
+ * on purpose — reusing the inner generic ``confirm`` would collide
+ * with the parent's listener and fire it twice per click.
  */
 @customElement("esphome-accept-peer-dialog")
 export class ESPHomeAcceptPeerDialog extends LitElement {
