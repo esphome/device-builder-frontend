@@ -982,6 +982,35 @@ export interface FirmwareJob {
    *  track later renames (the install dialog should show what the
    *  user saw when they clicked Install). */
   source_label: string;
+  /** Offloader's ``dashboard_id`` when this job came in via the
+   *  peer-link ``submit_job`` flow. Empty for locally-submitted
+   *  jobs. Receiver-side rendering surfaces this as a "from
+   *  <peer>" sub-line on the firmware-tasks dialog so a
+   *  build-server admin can distinguish their own work from
+   *  delegated builds. */
+  remote_peer: string;
+  /** Display label for the offloader, snapshotted from the
+   *  receiver's ``_approved_peers[dashboard_id].label`` at submit
+   *  time. Empty for locally-submitted jobs and for jobs from
+   *  before this field landed; the receiver-side renderer falls
+   *  back to the raw ``remote_peer`` dashboard_id when empty.
+   *  Symmetric to ``source_label`` on the offloader side. */
+  remote_peer_label: string;
+  /** The submitting device's ``esphome.name`` (machine handle),
+   *  sent by the offloader on the ``submit_job`` header. Empty
+   *  for locally-submitted jobs and for jobs whose offloader
+   *  didn't set the NotRequired wire field. The receiver-side
+   *  title surface uses this when ``remote_peer !== ""`` since
+   *  the receiver has no Device list of its own to look the
+   *  friendly name up against. */
+  device_name: string;
+  /** The submitting device's ``esphome.friendly_name`` (display
+   *  string), sent by the offloader on the ``submit_job`` header.
+   *  Empty for locally-submitted jobs, for jobs whose offloader
+   *  didn't set the NotRequired wire field, or for YAMLs that
+   *  don't define ``esphome.friendly_name``. The receiver-side
+   *  title surface prefers this over ``device_name`` when set. */
+  device_friendly_name: string;
 }
 
 export interface FirmwareBinary {

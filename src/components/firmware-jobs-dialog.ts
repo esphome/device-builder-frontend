@@ -614,14 +614,33 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
    *  row text doesn't churn if the pairing is later renamed.
    *  LOCAL jobs (and anything from before 7a-2a's source field
    *  landed) carry an empty source_label, so this row is
-   *  effectively a no-op for them. */
+   *  effectively a no-op for them.
+   *
+   *  Symmetric receiver-side rendering: when ``remote_peer`` is
+   *  set, the job was submitted to this dashboard by another
+   *  dashboard's offloader. Render "from {peer}" with the
+   *  peer's snapshotted label (or the raw dashboard_id as a
+   *  fallback when an older offloader's submit didn't carry
+   *  ``remote_peer_label``). The same .job-source style runs
+   *  for both directions so the visual treatment matches.
+   */
   private _renderSourceLine(job: FirmwareJob) {
-    if (job.source !== JobSource.REMOTE || !job.source_label) return nothing;
-    return html`
-      <div class="job-source">
-        ${this._localize("firmware_jobs.building_on", { label: job.source_label })}
-      </div>
-    `;
+    if (job.source === JobSource.REMOTE && job.source_label) {
+      return html`
+        <div class="job-source">
+          ${this._localize("firmware_jobs.building_on", { label: job.source_label })}
+        </div>
+      `;
+    }
+    if (job.remote_peer) {
+      const peer = job.remote_peer_label || job.remote_peer;
+      return html`
+        <div class="job-source">
+          ${this._localize("firmware_jobs.submitted_by", { label: peer })}
+        </div>
+      `;
+    }
+    return nothing;
   }
 
   private _renderStatus(job: FirmwareJob) {

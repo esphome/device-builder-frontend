@@ -31,6 +31,10 @@ function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
     source: JobSource.LOCAL,
     source_pin_sha256: "",
     source_label: "",
+    remote_peer: "",
+    remote_peer_label: "",
+    device_name: "",
+    device_friendly_name: "",
     ...overrides,
   };
 }
