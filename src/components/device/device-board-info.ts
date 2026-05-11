@@ -21,6 +21,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 // Automation add-flow is gated on a backend that doesn't yet exist;
 // the navigator still shows the section but disables its action
 // button. See `feature-flags.ts` and the README "Status" section.
+import { withBase } from "../../util/base-path.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
@@ -543,12 +544,12 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
 
   private _boardImageUrl(board: BoardCatalogEntry): string {
     if (board.images.length > 0) return board.images[0];
-    return "/assets/board/default.svg";
+    return withBase("/assets/board/default.svg");
   }
 
   private _onImageError(e: Event) {
     const img = e.target as HTMLImageElement;
-    const fallback = "/assets/board/default.svg";
+    const fallback = withBase("/assets/board/default.svg");
     if (img.src !== window.location.origin + fallback && !img.src.endsWith(fallback)) {
       img.src = fallback;
     }

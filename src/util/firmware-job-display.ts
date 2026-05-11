@@ -16,6 +16,16 @@ import type { LocalizeFunc } from "../common/localize.js";
  *   so reopening one from the firmware-tasks list still says *which*
  *   rename this stream belongs to. Friendly name is prepended in
  *   parentheses when it differs from the raw hostname.
+ * - **Receiver-side remote-build jobs** (``remote_peer !== ""``) —
+ *   the receiver has no Device list to look the friendly name up
+ *   against (the YAML lives at
+ *   ``.esphome/.remote_builds/<id>/<device>/<device>.yaml``, useless
+ *   as a title), so prefer the offloader-sent
+ *   ``device_friendly_name`` → fall back to ``device_name`` → fall
+ *   back to the configuration path's device segment. The
+ *   ``from {peer}`` attribution lives in a separate sub-line
+ *   (rendered alongside the meta row, not folded into the title)
+ *   so the title stays consistent with offloader-side rendering.
  * - Otherwise prefer the configured device's friendly name → fall
  *   back to ``name`` → fall back to the raw configuration filename.
  */
@@ -26,6 +36,25 @@ export function firmwareJobDisplayName(
 ): string {
   if (job.job_type === JobType.RESET_BUILD_ENV || !job.configuration) {
     return localize("firmware_jobs.build_env_label");
+  }
+  if (job.remote_peer) {
+    if (job.device_friendly_name) {
+      return job.device_friendly_name;
+    }
+    if (job.device_name) {
+      return job.device_name;
+    }
+    /* Configuration is ``.esphome/.remote_builds/<id>/<device>/<device>.yaml``.
+       The second-to-last segment is the device folder name — the
+       cleanest fallback when both display fields are empty (older
+       offloader didn't set the NotRequired wire fields). Strip
+       the YAML extension off the last segment if the path has
+       only the filename (defensive). */
+    const segments = job.configuration.split("/");
+    if (segments.length >= 2) {
+      return segments[segments.length - 2];
+    }
+    return job.configuration.replace(/\.ya?ml$/, "") || job.configuration;
   }
   if (job.job_type === JobType.RENAME && job.new_name) {
     /* job.configuration is the *old* YAML filename (``foo.yaml`` or

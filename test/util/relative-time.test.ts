@@ -17,6 +17,7 @@ import {
   ageOf,
   formatSecondsAgo,
   getNumberFormatter,
+  remainingOf,
 } from "../../src/util/relative-time.js";
 
 describe("formatSecondsAgo", () => {
@@ -127,5 +128,33 @@ describe("getNumberFormatter", () => {
 
   it("does not crash without a language argument", () => {
     expect(() => getNumberFormatter(undefined, 0)).not.toThrow();
+  });
+});
+
+describe("remainingOf", () => {
+  it("returns null for null / undefined baseline", () => {
+    expect(remainingOf(null, 0, 1000)).toBeNull();
+    expect(remainingOf(undefined, 0, 1000)).toBeNull();
+  });
+
+  it("returns the unmodified baseline when anchor equals now", () => {
+    expect(remainingOf(120, 1000, 1000)).toBe(120);
+  });
+
+  it("subtracts elapsed wall-clock seconds from the baseline", () => {
+    // 30 seconds elapsed since the anchor, baseline 120 → 90
+    expect(remainingOf(120, 1000, 31000)).toBe(90);
+  });
+
+  it("floors at zero rather than going negative", () => {
+    // baseline 10s, but 60s elapsed since anchor
+    expect(remainingOf(10, 0, 60_000)).toBe(0);
+  });
+
+  it("clamps a backwards clock skew at the baseline", () => {
+    // anchor in the future would otherwise yield a value larger
+    // than the baseline; the clamp at 0 elapsed keeps the
+    // displayed countdown bounded above by what the server said.
+    expect(remainingOf(120, 5000, 1000)).toBe(120);
   });
 });

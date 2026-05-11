@@ -21,9 +21,17 @@ import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 
 describe("MAP_SECTIONS", () => {
-  it("contains 'substitutions' and 'packages'", () => {
+  it("contains 'substitutions'", () => {
     expect(MAP_SECTIONS.has("substitutions")).toBe(true);
-    expect(MAP_SECTIONS.has("packages")).toBe(true);
+  });
+
+  it("does NOT contain 'packages' (#361 — list shape would corrupt)", () => {
+    // ``packages`` accepts both ``{name: pkg}`` and ``[pkg, pkg]``
+    // upstream. The dict-only ``renderMapField`` silently
+    // overwrote a list-shaped YAML with ``{}`` on save (#361).
+    // Routed through ``YAML_ONLY_SECTIONS`` instead so both
+    // shapes round-trip cleanly via the YAML pane.
+    expect(MAP_SECTIONS.has("packages")).toBe(false);
   });
 });
 
@@ -35,19 +43,16 @@ describe("resolveSectionEntries — MAP section shape", () => {
   // ``ctx.getAt`` / ``ctx.emitChange``. The value template must be
   // a string-shaped entry so primitive values (the common case)
   // get a text input.
-  it.each(["substitutions", "packages"])(
-    "%s resolves to a single empty-keyed MAP with a required string value template",
-    (sectionKey) => {
-      const entries = resolveSectionEntries(sectionKey, []);
-      expect(entries).toHaveLength(1);
-      expect(entries[0].key).toBe("");
-      expect(entries[0].type).toBe(ConfigEntryType.MAP);
-      const valueTemplate = entries[0].config_entries?.[0];
-      expect(valueTemplate).toBeDefined();
-      expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
-      expect(valueTemplate!.required).toBe(true);
-    },
-  );
+  it("substitutions resolves to a single empty-keyed MAP with a required string value template", () => {
+    const entries = resolveSectionEntries("substitutions", []);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].key).toBe("");
+    expect(entries[0].type).toBe(ConfigEntryType.MAP);
+    const valueTemplate = entries[0].config_entries?.[0];
+    expect(valueTemplate).toBeDefined();
+    expect(valueTemplate!.type).toBe(ConfigEntryType.STRING);
+    expect(valueTemplate!.required).toBe(true);
+  });
 });
 
 describe("resolveSectionEntries", () => {
@@ -81,18 +86,15 @@ describe("resolveSectionEntries", () => {
     expect(resolveSectionEntries("custom_unknown", [])).toEqual([]);
   });
 
-  it.each(["substitutions", "packages"])(
-    "is referentially stable for %s (same reference across calls)",
-    (sectionKey) => {
-      // The form re-renders on every state change; if the resolver
-      // built a new array each time, the form's ``.entries`` prop
-      // would change reference and Lit would re-mount the rows.
-      // Same reference → no churn.
-      const a = resolveSectionEntries(sectionKey, []);
-      const b = resolveSectionEntries(sectionKey, []);
-      expect(a).toBe(b);
-    },
-  );
+  it("is referentially stable for substitutions (same reference across calls)", () => {
+    // The form re-renders on every state change; if the resolver
+    // built a new array each time, the form's ``.entries`` prop
+    // would change reference and Lit would re-mount the rows.
+    // Same reference → no churn.
+    const a = resolveSectionEntries("substitutions", []);
+    const b = resolveSectionEntries("substitutions", []);
+    expect(a).toBe(b);
+  });
 });
 
 describe("device-section-config wiring", () => {
@@ -146,86 +148,23 @@ describe("device-section-config wiring", () => {
     ).toBe(false);
   });
 
-  it("routes _onSave through validateYaml to refuse saves ESPHome would reject", async () => {
-    // Regression pin for the "x y is invalid but the form lets it
-    // through" complaint on ``packages:``. We deliberately don't
-    // duplicate ESPHome's source-shorthand validator on the
-    // frontend (drift risk on every upstream change to accepted
-    // domains / chars). Instead, ``_onSave`` runs the candidate
-    // YAML through ``editor/validate_yaml`` — the same backend
-    // lint that drives the editor's red squiggles
-    // (``yaml-lint-backend.ts``) — and bails with the upstream
-    // error message when ESPHome reports a problem. This test
-    // pins the *wiring* (a ``_lintFailureMessage`` helper exists
-    // and ``_onSave`` consults it before ``updateConfig``); the
-    // backend's actual rejection logic is upstream's concern.
-    // @ts-expect-error — node-only module, types excluded from tsconfig
-    const fs = await import("node:fs");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
-    const path = await import("node:path");
-    // @ts-expect-error — node-only module, types excluded from tsconfig
-    const url = await import("node:url");
-    const here = path.dirname(url.fileURLToPath(import.meta.url));
-    const sourcePath = path.resolve(
-      here,
-      "../../src/components/device/device-section-config.ts",
-    );
-    const src = fs.readFileSync(sourcePath, "utf-8");
-
-    expect(
-      /private async _lintFailureMessage\s*\(/.test(src),
-      "_lintFailureMessage helper missing",
-    ).toBe(true);
-    expect(
-      /this\._api\.validateYaml\s*\(\s*this\.configuration\s*,\s*candidateYaml\s*\)/.test(
-        src,
-      ),
-      "_lintFailureMessage doesn't call validateYaml with the candidate YAML",
-    ).toBe(true);
-    // ``_onSave`` must consult the lint between building newYaml
-    // and calling updateConfig. Pin both the order (lint after
-    // updateSectionInYaml, before updateConfig) and the bail
-    // (assigning ``this._error`` and returning before the
-    // ``updateConfig`` call) so a future refactor that reads
-    // the lint message but forgets to bail can't ship.
-    const onSave = src.slice(src.indexOf("private async _onSave"));
-    const lintCallIdx = onSave.indexOf("_lintFailureMessage");
-    const updateConfigIdx = onSave.indexOf("updateConfig");
-    const updateSectionIdx = onSave.indexOf("updateSectionInYaml");
-    expect(
-      updateSectionIdx > 0 && lintCallIdx > updateSectionIdx,
-      "_lintFailureMessage must run after updateSectionInYaml",
-    ).toBe(true);
-    expect(
-      lintCallIdx > 0 && updateConfigIdx > lintCallIdx,
-      "_lintFailureMessage must run before updateConfig",
-    ).toBe(true);
-    // Between the lint call and the ``updateConfig`` call, the
-    // bail must assign the message to ``this._error`` AND
-    // ``return`` early — otherwise the lint message gets
-    // surfaced but the save proceeds anyway, which is the exact
-    // shape the comment above warned about.
-    const bailRegion = onSave.slice(lintCallIdx, updateConfigIdx);
-    expect(
-      /this\._error\s*=/.test(bailRegion),
-      "lint failure must assign this._error before updateConfig",
-    ).toBe(true);
-    expect(
-      /\breturn\b/.test(bailRegion),
-      "lint failure must return before reaching updateConfig",
-    ).toBe(true);
-  });
-
-  it("routes _onSave's validateEntries through the resolver, not the catalog", async () => {
+  it("routes form-driven validation through the resolver, not the catalog", async () => {
     // Regression pin for the "Save click does nothing" bug on
     // ``packages:`` (and the latent equivalent on
     // ``substitutions:``). The form rendered the resolver's
-    // user-keyed MAP shape, but ``_onSave`` validated against the
-    // catalog's flat schema — whose required fields (``url`` etc.
-    // for packages) were absent from the user-named rows, so
+    // user-keyed MAP shape, but the form's validation ran against
+    // the catalog's flat schema — whose required fields (``url``
+    // etc. for packages) were absent from the user-named rows, so
     // ``_fieldErrors`` filled up and the save bailed silently.
     // ``validateEntries`` must see the same entries the form
     // rendered.
+    //
+    // Architecture note: pre-save backend lint (``validateYaml``)
+    // is no longer wired into the form. The YAML pane's red
+    // squiggles (``yaml-lint-backend.ts``) provide the same lint
+    // continuously, and the explicit Validate button runs the
+    // full ESPHome compile against the saved file. The "x y is
+    // invalid" feedback now flows through those two surfaces.
     // @ts-expect-error — node-only module, types excluded from tsconfig
     const fs = await import("node:fs");
     // @ts-expect-error — node-only module, types excluded from tsconfig

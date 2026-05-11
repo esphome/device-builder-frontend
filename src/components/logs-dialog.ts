@@ -20,9 +20,9 @@ import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./ansi-log.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "arrow-collapse": mdiArrowCollapse,
@@ -88,6 +88,9 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   _lines: string[] = [];
 
+  @state()
+  private _open = false;
+
   private _streamId = "";
 
   /**
@@ -98,9 +101,6 @@ export class ESPHomeLogsDialog extends LitElement {
    * the next session.
    */
   private _serialCancel: (() => void) | null = null;
-
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
 
   @query("esphome-ansi-log")
   private _ansiLog?: ESPHomeAnsiLog;
@@ -130,7 +130,7 @@ export class ESPHomeLogsDialog extends LitElement {
         --term-error: #c02020;
       }
 
-      wa-dialog {
+      esphome-base-dialog {
         /* Width history: 900 wrapped, 1100 still ~100px short, 1200
            still wrapped on retina / HiDPI screens where ESPHome's
            ANSI-coloured output reads at a slightly larger glyph and
@@ -163,7 +163,7 @@ export class ESPHomeLogsDialog extends LitElement {
          terminal-themed — header colour was the only thing that
          looked unintentional against the dashboard's blue header
          bar. */
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         background: var(--esphome-primary);
         /* Right padding is 0 so the close button sits flush with the
            dialog's corner — the button is explicitly sized to a 40x40
@@ -174,45 +174,25 @@ export class ESPHomeLogsDialog extends LitElement {
         box-sizing: border-box;
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        /* Square 40x40 button matching the header height so the X has a
-           comfortable click/tap target instead of just the icon's
-           ~14px footprint. */
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
+      /* Close-button styling is bundled by
+         <esphome-base-dialog>; the shared
+         dialogCloseButtonStyles sheet lives in
+         src/styles/dialog-close-button.ts. */
 
-      /* Same affordance for keyboard users tabbing to the close
-         button — without a focus-visible style they'd land on an
-         identical-looking control with no visual cue. */
-      wa-dialog::part(close-button__base):hover,
-      wa-dialog::part(close-button__base):focus-visible {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        outline: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0;
         background: var(--term-bg);
         overflow: hidden;
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -333,11 +313,11 @@ export class ESPHomeLogsDialog extends LitElement {
       /* Full-viewport rules — the same shape applies when the user
          hits expand on desktop AND on any mobile width. Placed last
          so same-specificity rules in this file win source-order
-         against the desktop defaults. The :host wa-dialog::part(dialog)
+         against the desktop defaults. The :host esphome-base-dialog::part(dialog)
          selector lands at (0,1,2), beating both wa-dialog's internal
          .dialog (0,1,0) and the user-agent's dialog:modal (0,1,1)
          without needing !important. */
-      :host([expanded]) wa-dialog::part(dialog) {
+      :host([expanded]) esphome-base-dialog::part(dialog) {
         position: fixed;
         inset: 0;
         width: 100vw;
@@ -350,7 +330,7 @@ export class ESPHomeLogsDialog extends LitElement {
       }
 
       @media (max-width: 700px) {
-        :host wa-dialog::part(dialog) {
+        :host esphome-base-dialog::part(dialog) {
           position: fixed;
           inset: 0;
           /* width/height are explicit because wa-dialog's
@@ -407,7 +387,7 @@ export class ESPHomeLogsDialog extends LitElement {
     this._backToInstallHandler = options.onBackToInstall ?? null;
     this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
-    this._dialog.open = true;
+    this._open = true;
     this._resetAnsiLogScroll();
     this._startStreaming();
   }
@@ -464,13 +444,13 @@ export class ESPHomeLogsDialog extends LitElement {
     this._backToInstallHandler = options.onBackToInstall ?? null;
     this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
-    this._dialog.open = true;
+    this._open = true;
     this._resetAnsiLogScroll();
   }
 
   public close() {
     this._stopStreaming();
-    this._dialog.open = false;
+    this._open = false;
   }
 
   protected render() {
@@ -480,7 +460,12 @@ export class ESPHomeLogsDialog extends LitElement {
     );
 
     return html`
-      <wa-dialog label=${title} light-dismiss @wa-after-hide=${this._onDialogHide}>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${title}
+        @request-close=${this._onDialogRequestClose}
+        @after-hide=${this._onDialogHide}
+      >
         <div class="logs-content">
           <esphome-ansi-log
             .lines=${this._lines}
@@ -552,7 +537,7 @@ export class ESPHomeLogsDialog extends LitElement {
                 `}
           </div>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -630,7 +615,26 @@ export class ESPHomeLogsDialog extends LitElement {
     this._lines = [];
   }
 
+  /**
+   * Flip our local ``_open`` flag the moment the user
+   * initiates a close (X / Esc / outside-click), before
+   * wa-dialog finishes its hide animation. Log streaming
+   * pushes new lines into ``_lines`` on a continuous WS
+   * subscription, and each push triggers a re-render with
+   * ``?open=${this._open}`` — if ``_open`` were still
+   * ``true`` during the hide animation, the re-asserted
+   * ``open=true`` could cancel wa-dialog's in-progress
+   * hide. Doesn't ``preventDefault`` — no host-side veto
+   * reason — so the close still proceeds and the
+   * ``after-hide`` handler tears down the stream as
+   * before.
+   */
+  private _onDialogRequestClose = (): void => {
+    this._open = false;
+  };
+
   private _onDialogHide() {
+    this._open = false;
     this._stopStreaming();
   }
 
@@ -651,7 +655,7 @@ export class ESPHomeLogsDialog extends LitElement {
     const handler = this._backToInstallHandler;
     this._backToInstall = false;
     this._backToInstallHandler = null;
-    this._dialog.open = false;
+    this._open = false;
     handler?.();
   };
 }

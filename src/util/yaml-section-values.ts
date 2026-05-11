@@ -7,6 +7,7 @@
  * read and write — not as a general YAML parser.
  */
 
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   YamlRawValue,
   formatYamlScalar,
@@ -33,6 +34,17 @@ import {
  * strategy; see issue tracker for upstream support if needed.
  */
 const KEY_PATTERN = "[a-zA-Z_][^\\s:#]*";
+
+/**
+ * Matches a line that begins a top-level YAML section (column-0
+ * identifier). Mirrors ``KEY_PATTERN``'s leading-character set —
+ * accepts ``_internal:`` and similar underscore-leading keys, not
+ * just ASCII letters. Used by every "stop at the next sibling
+ * section" terminator in this module so the predicate stays
+ * consistent — drift between sites would let one walk past a
+ * section header another walk treats as a hard stop.
+ */
+const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
 
 /**
  * Match the inline-key form on a YAML list-item line
@@ -87,6 +99,20 @@ const BLOCK_SCALAR_RE = /^[^"']*:\s*[|>][-+]?\s*(?:#.*)?$/;
 const BLOCK_SCALAR_INLINE_RE = /^[|>][-+]?$/;
 
 /**
+ * Match a bare-dash list item (``    -`` followed by EOL or only
+ * whitespace). The serializer emits this shape as a placeholder
+ * for an empty mapping item — a freshly-added Add row the user
+ * saved before filling fields. Without flagging it as a
+ * complexity signal the scalar-list branch in ``parseListBlock``
+ * runs (``- `` regex misses the bare dash, items=0), the key is
+ * dropped from the values dict, and the user's empty row vanishes
+ * on save. Marking it complex routes the block through
+ * ``collectBlockListMappings`` which already treats bare dashes
+ * as ``{}`` placeholders.
+ */
+const LIST_ITEM_BARE_DASH_RE = /^\s+-\s*$/;
+
+/**
  * Match a list item whose value is a key-style sub-dict header
  * (`- then:`, `- lambda:`, `- logger.log: pressed`,
  * `- switch.turn_on: relay`). The dash + key + colon shape is the
@@ -114,9 +140,159 @@ const childRegexFor = (indent: string) =>
 // scalar (string with spaces, number, !secret reference) and we
 // just round-trip it. Validating the leading-token shape here
 // would over-match `KEY_PATTERN`'s purpose; that constraint
-// applies only to dict keys.
-const listItemRegexFor = (indent: string) =>
-  new RegExp(`^${indent}  -\\s+(.*)$`);
+// applies only to dict keys. The argument is the indent BEFORE
+// the dash (detected from the actual list content by the caller),
+// not the parent key's indent — a 4-space user file puts the
+// dash at ``parent + 4``, not the canonical ``parent + 2``.
+const listItemRegexFor = (dashIndent: string) =>
+  new RegExp(`^${dashIndent}-\\s+(.*)$`);
+
+/**
+ * True when *line* is structurally invisible to the key/value
+ * parser — blank, or a comment-only line whose first non-whitespace
+ * character is ``#``. Centralised so every "skip blank line"
+ * loop in this module also skips comments; otherwise a comment
+ * between ``key:`` and a child list/mapping (or interleaved with
+ * list items) makes the parser bail or terminate early, dropping
+ * the field from values and deleting it on the next save.
+ *
+ * This minimal parser doesn't preserve comments on round-trip
+ * either way — they're already silently dropped by the
+ * line-by-line serializer. Skipping them here just keeps comments
+ * from corrupting the structural read.
+ */
+const isBlankOrCommentLine = (line: string): boolean => {
+  const trimmed = line.trim();
+  return trimmed === "" || trimmed.startsWith("#");
+};
+
+/**
+ * Walk forward from *startIdx* skipping blank and comment-only
+ * lines. Returns the first index that holds real content, or
+ * ``lines.length`` if none.
+ */
+const _skipBlankAndCommentLines = (
+  lines: string[],
+  startIdx: number,
+): number => {
+  let j = startIdx;
+  while (j < lines.length && isBlankOrCommentLine(lines[j])) j++;
+  return j;
+};
+
+/**
+ * Measure the leading whitespace on *line* — used to detect the
+ * actual indent the user's YAML uses for the first child of a
+ * section. The parser is tied to ESPHome's emit format (2 spaces
+ * per level) at write time, but reads must accept any consistent
+ * indent: a user-typed 4-space file is just as valid as the
+ * 2-space canonical form, and pasting one into the editor
+ * shouldn't silently come back empty.
+ */
+const _leadingIndent = (line: string): string =>
+  line.match(/^ */)![0];
+
+/**
+ * Walk forward from *startIdx* and return the indent of the first
+ * line that's a child of the section that starts at *startIdx*.
+ * "Child" means deeper-indented than the section's leading
+ * whitespace and not a sibling section header (a column-0
+ * identifier line). Returns the canonical 2-space indent when
+ * the section has no readable children — the empty case where
+ * the parser has nothing to learn from.
+ */
+const _detectSectionChildIndent = (
+  lines: string[],
+  startIdx: number,
+  isListItem: boolean,
+): string => {
+  // The "floor" is the column a child line must strictly beat. For
+  // map sections that's the section header's leading whitespace;
+  // for list-item sections it's one column past the dash, so a
+  // child key (at ``dash + 2``) clears it while a sibling dash
+  // (same column as ours) doesn't.
+  const headLine = lines[startIdx];
+  const floor = isListItem
+    ? headLine.indexOf("-") + 1
+    : _leadingIndent(headLine).length;
+  const fallback = isListItem
+    ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
+    : ESPHOME_YAML_INDENT;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (isBlankOrCommentLine(line)) continue;
+    // Column-0 identifier ⇒ sibling section, this section has no
+    // children of its own.
+    if (TOP_LEVEL_KEY_START_RE.test(line)) return fallback;
+    const lead = _leadingIndent(line);
+    if (lead.length > floor) return lead;
+    // Sibling dash (list-item) or back-out (map) — done scanning.
+    return fallback;
+  }
+  return fallback;
+};
+
+/**
+ * Find the indent of the first sub-key inside a list item — the
+ * line just under ``${dashIndent}- key: …`` that starts at a
+ * deeper column. Returns ``null`` when the item has no
+ * follow-up sub-keys before the next sibling dash (a single-key
+ * item or a freshly-added bare-dash placeholder); the caller
+ * falls back to a canonical 2-space step in that case.
+ */
+const _detectListItemChildIndent = (
+  lines: string[],
+  startIdx: number,
+  dashIndent: string,
+): string | null => {
+  for (let i = startIdx; i < lines.length; i++) {
+    const line = lines[i];
+    if (isBlankOrCommentLine(line)) continue;
+    const lead = _leadingIndent(line);
+    // A sibling dash (or shallower) terminates this item.
+    if (lead.length <= dashIndent.length) return null;
+    // Skip nested list items (``      - ``) under this item —
+    // those are not the item's own child keys.
+    if (line[lead.length] === "-") continue;
+    return lead;
+  }
+  return null;
+};
+
+/**
+ * True when *line* is a list-item dash at *dashIndent*. Accepts
+ * both ``${dashIndent}- ``  (item with content) and the bare
+ * ``${dashIndent}-`` followed by EOL (the placeholder shape the
+ * serializer emits for an empty mapping item — a freshly-added
+ * Add-button row the user hasn't filled in yet). Without the
+ * bare-dash branch the parser would skip the empty row on
+ * reload and the user's freshly-added item would silently
+ * vanish.
+ */
+const isListItemLine = (line: string, dashIndent: string): boolean => {
+  const prefix = `${dashIndent}-`;
+  if (!line.startsWith(prefix)) return false;
+  const trailing = line.slice(prefix.length);
+  return trailing === "" || trailing.startsWith(" ");
+};
+
+/**
+ * True when *line* is a list-item dash deeper than *parentIndent*.
+ * The exact dash column doesn't matter at peek time — that's
+ * detected later by ``parseListBlock`` from the actual line —
+ * so the peek check only needs to confirm "this is a child
+ * list of the current key, regardless of which indent step the
+ * user picked". 4-space YAML pastes work as a result.
+ */
+const isDeeperListItemLine = (
+  line: string,
+  parentIndent: string,
+): boolean => {
+  const lead = _leadingIndent(line);
+  if (lead.length <= parentIndent.length) return false;
+  const tail = line.slice(lead.length);
+  return tail === "-" || tail.startsWith("- ");
+};
 
 const stripQuotes = (s: string): string => {
   if (
@@ -150,11 +326,270 @@ const collectBlockListItems = (
   const items: string[] = [];
   let j = startIdx;
   for (; j < lines.length; j++) {
-    if (lines[j].trim() === "") continue;
+    if (isBlankOrCommentLine(lines[j])) continue;
     if (!lines[j].startsWith(prefix)) break;
     const m = lines[j].match(itemRegex);
     if (!m) break;
     items.push(stripQuotes(m[1].trim()));
+  }
+  return { items, endIdx: j };
+};
+
+/**
+ * Find the leading whitespace of the first list-item dash at or
+ * after *startIdx*. Returns *fallback* when no dash is reachable
+ * (the block is blank or terminates before any item) and the
+ * 0-indexed line of the first dash so the caller can hand it to
+ * :func:`_detectListItemChildIndent`.
+ */
+const _detectFirstDashIndent = (
+  lines: string[],
+  startIdx: number,
+  fallback: string,
+): { dashIndent: string; firstDashIdx: number } => {
+  let firstDashIdx = startIdx;
+  while (
+    firstDashIdx < lines.length &&
+    isBlankOrCommentLine(lines[firstDashIdx])
+  ) {
+    firstDashIdx++;
+  }
+  if (firstDashIdx >= lines.length) {
+    return { dashIndent: fallback, firstDashIdx };
+  }
+  const dashIndent =
+    lines[firstDashIdx].match(/^( *)-/)?.[1] ?? fallback;
+  return { dashIndent, firstDashIdx };
+};
+
+/**
+ * Dispatch a YAML list block (``key:\n  - …``) into the right
+ * value shape: structured array of mappings for editor-friendly
+ * lists (``esphome.devices`` / ``esphome.areas``), ``YamlRawValue``
+ * for complex automation triggers, or ``string[]`` for scalar
+ * lists. Shared between the top-level and nested-block parsers
+ * so both surfaces agree on the dispatch.
+ *
+ * ``parentIndent`` is the indent of the parent KEY (the one whose
+ * value is the list). The dash and child indents are detected
+ * from the first list-item line so 4-space (or other consistent)
+ * user YAML round-trips correctly — the editor's canonical
+ * 2-space emit applies on save, but reads accept any indent the
+ * user chose.
+ *
+ * Returns ``endIdx`` — the line after the block ends — so callers
+ * can fast-forward their loop index. ``isEmptyScalarList`` lets
+ * the top-level caller preserve its existing "skip the assignment
+ * for an empty scalar list" semantic.
+ */
+const parseListBlock = (
+  lines: string[],
+  startIdx: number,
+  parentIndent: string,
+): {
+  value: YamlRawValue | Record<string, unknown>[] | string[];
+  endIdx: number;
+  isEmptyScalarList: boolean;
+} => {
+  const canonicalDashIndent = `${parentIndent}${ESPHOME_YAML_INDENT}`;
+  const { dashIndent, firstDashIdx } = _detectFirstDashIndent(
+    lines,
+    startIdx,
+    canonicalDashIndent,
+  );
+  const childIndent =
+    _detectListItemChildIndent(lines, firstDashIdx + 1, dashIndent) ??
+    `${dashIndent}${ESPHOME_YAML_INDENT}`;
+  const { endIdx, isComplex } = _scanValueBlock(lines, startIdx, parentIndent);
+
+  // Complex blocks are anything beyond a flat scalar list (block
+  // scalars, automation triggers, mapping items). Try the
+  // structured-mapping parse first (``esphome.devices`` /
+  // ``esphome.areas``); fall through to ``YamlRawValue`` for
+  // shapes the editor can't round-trip.
+  if (isComplex) {
+    const mapping = collectBlockListMappings(
+      lines,
+      startIdx,
+      dashIndent,
+      childIndent,
+    );
+    if (mapping) {
+      return {
+        value: mapping.items,
+        endIdx: mapping.endIdx,
+        isEmptyScalarList: false,
+      };
+    }
+    return {
+      value: new YamlRawValue(lines.slice(startIdx, endIdx)),
+      endIdx,
+      isEmptyScalarList: false,
+    };
+  }
+
+  // Flat scalar list (``packages: [- a, - b]``). Both the
+  // startsWith prefix and the line regex use the detected
+  // ``dashIndent`` so 4-space user YAMLs round-trip — the older
+  // ``listItemRegexFor(parentIndent)`` hardcoded the canonical
+  // 2-space step and silently dropped scalar lists otherwise.
+  const { items, endIdx: scalarEndIdx } = collectBlockListItems(
+    lines,
+    startIdx,
+    `${dashIndent}- `,
+    listItemRegexFor(dashIndent),
+  );
+  return {
+    value: items,
+    endIdx: scalarEndIdx,
+    isEmptyScalarList: items.length === 0,
+  };
+};
+
+/**
+ * Parse a single ``key: value`` field of a flat-mapping list item
+ * — used by ``collectBlockListMappings`` for both the inline header
+ * (``- key: value``) and the follow-up child lines. Returns
+ * ``null`` whenever the field carries anything outside the
+ * mapping-list contract (dotted automation-trigger keys, empty
+ * raw values that would open a nested mapping/list, block-scalar
+ * headers). Callers translate ``null`` into "bail out, fall back
+ * to YamlRawValue".
+ */
+const parseFlatMappingField = (
+  key: string,
+  raw: string,
+): { key: string; value: unknown } | null => {
+  // Dotted keys (``logger.log:``, ``switch.turn_on:``) are
+  // automation-action shorthand — not flat-mapping fields. Bail
+  // so the surrounding parser keeps the block as YamlRawValue
+  // and the serializer doesn't quote the dotted key on save.
+  if (key.includes(".")) return null;
+  if (raw === "" || BLOCK_SCALAR_INLINE_RE.test(raw)) return null;
+  return { key, value: parseScalar(raw) };
+};
+
+/**
+ * Match *line* against *re* (one of the two ``key: value`` regexes
+ * built by :func:`collectBlockListMappings`) and run the captured
+ * key + raw value through :func:`parseFlatMappingField`. Returns
+ * ``null`` for any failure — regex miss, dotted key, block scalar,
+ * empty raw — which all share the same "bail out, fall back to
+ * YamlRawValue" semantic at the caller. Centralised so the inline
+ * header (``- key: value``) and child-line (``  key: value``)
+ * paths share one match-and-validate step.
+ */
+const _matchFlatMappingField = (
+  line: string,
+  re: RegExp,
+): { key: string; value: unknown } | null => {
+  const m = line.match(re);
+  return m ? parseFlatMappingField(m[1], m[2].trim()) : null;
+};
+
+/**
+ * Walk follow-up sub-key lines under a list-item dash and merge
+ * them into *item*. Stops at the next sibling dash, blank-then-EOF,
+ * or a back-out. Returns the line index after the last sub-key,
+ * or ``null`` if anything outside the flat-mapping contract turned
+ * up (line strictly deeper than ``childIndent`` ⇒ nested mapping;
+ * unmatched key shape; dotted key; block scalar; empty raw).
+ * Mutates *item* in place — keeps the caller's outer loop from
+ * having to thread two return values.
+ */
+const _parseItemSubKeys = (
+  lines: string[],
+  startIdx: number,
+  childIndent: string,
+  childRe: RegExp,
+  item: Record<string, unknown>,
+): number | null => {
+  let j = startIdx;
+  while (j < lines.length) {
+    const sub = lines[j];
+    if (isBlankOrCommentLine(sub)) {
+      j++;
+      continue;
+    }
+    if (!sub.startsWith(childIndent)) break;
+    // Strictly deeper than ``childIndent`` ⇒ nested mapping/list
+    // under a sub-key — bail.
+    if (sub.startsWith(`${childIndent} `)) return null;
+    const field = _matchFlatMappingField(sub, childRe);
+    if (!field) return null;
+    item[field.key] = field.value;
+    j++;
+  }
+  return j;
+};
+
+/**
+ * Collect a YAML list whose items are flat key:value mappings —
+ * ``esphome.devices`` / ``esphome.areas`` and similar
+ * ``multi_value=true`` schema entries — as ``Record<string, unknown>[]``.
+ * Each item starts with ``<dashIndent>-`` and continues at
+ * ``<childIndent>`` (one level deeper than the dash). Returns
+ * ``null`` when the block can't be parsed cleanly into a structured
+ * array — caller should fall back to ``YamlRawValue`` so complex
+ * shapes (block scalars, automation triggers, nested mappings)
+ * still round-trip.
+ *
+ * The helper is deliberately conservative: false negatives drop
+ * back to the existing raw path (no behaviour change), false
+ * positives would silently lose user content on save.
+ */
+const collectBlockListMappings = (
+  lines: string[],
+  startIdx: number,
+  dashIndent: string,
+  childIndent: string,
+): { items: Record<string, unknown>[]; endIdx: number } | null => {
+  const headerRe = new RegExp(
+    `^${dashIndent}-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
+  );
+  const childRe = new RegExp(`^${childIndent}(${KEY_PATTERN}):\\s*(.*)$`);
+
+  /**
+   * Parse one list item starting at *at* (the dash line). Returns
+   * the new line index on success, ``null`` to bail. Bare-dash
+   * items (``${dashIndent}-`` followed by EOL or only whitespace)
+   * are the serializer's placeholder for a freshly-added Add row
+   * the user saved before filling fields — we skip the header
+   * parse and let the sub-key walk find zero follow-ups, so the
+   * item stays ``{}`` and the row survives the round-trip. The
+   * trailing-whitespace shape (``    -  ``) is what some editors
+   * emit when the user's cursor lands on a fresh dash line, and
+   * also what ``LIST_ITEM_BARE_DASH_RE`` already accepts as a
+   * complexity signal — using the same regex here keeps the two
+   * predicates in lockstep.
+   */
+  const parseItem = (
+    at: number,
+  ): { item: Record<string, unknown>; endIdx: number } | null => {
+    // Same null-prototype defence as the surrounding parser — see
+    // the comment in ``parseYamlSectionValues``.
+    const item: Record<string, unknown> = Object.create(null);
+    if (!LIST_ITEM_BARE_DASH_RE.test(lines[at])) {
+      const header = _matchFlatMappingField(lines[at], headerRe);
+      if (!header) return null;
+      item[header.key] = header.value;
+    }
+    const after = _parseItemSubKeys(lines, at + 1, childIndent, childRe, item);
+    return after === null ? null : { item, endIdx: after };
+  };
+
+  const items: Record<string, unknown>[] = [];
+  let j = startIdx;
+  while (j < lines.length) {
+    if (isBlankOrCommentLine(lines[j])) {
+      j++;
+      continue;
+    }
+    if (!isListItemLine(lines[j], dashIndent)) break;
+    const parsed = parseItem(j);
+    if (!parsed) return null;
+    items.push(parsed.item);
+    j = parsed.endIdx;
   }
   return { items, endIdx: j };
 };
@@ -200,11 +635,15 @@ const _scanValueBlock = (
   let isComplex = false;
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     const lead = line.match(/^ */)![0];
     if (lead.length <= keyIndent.length) return { endIdx: i, isComplex };
     if (!isComplex) {
-      if (BLOCK_SCALAR_RE.test(line) || LIST_ITEM_DICT_KEY_RE.test(line)) {
+      if (
+        BLOCK_SCALAR_RE.test(line) ||
+        LIST_ITEM_DICT_KEY_RE.test(line) ||
+        LIST_ITEM_BARE_DASH_RE.test(line)
+      ) {
         isComplex = true;
       }
     }
@@ -264,7 +703,12 @@ export function parseYamlSectionValues(
   if (startIdx < 0) return values;
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
-  const childIndent = isListItem ? "    " : "  ";
+  // Detect the indent the user actually picked for this
+  // section's children so 4-space (or other consistent) YAMLs
+  // round-trip through the editor without coming back empty.
+  // Falls back to ESPHome's canonical 2-space step on empty
+  // sections.
+  const childIndent = _detectSectionChildIndent(lines, startIdx, isListItem);
   const childRegex = childRegexFor(childIndent);
 
   // List-item form: the first child key may sit on the same line as
@@ -277,8 +721,6 @@ export function parseYamlSectionValues(
     }
   }
 
-  const listItemPrefix = `${childIndent}  - `;
-  const listItemRegex = listItemRegexFor(childIndent);
   // For list-item-rooted sections: only sibling dashes at the
   // SAME indentation as the leading dash terminate the section.
   // A nested list inside a value (`on_press:` → `      - lambda:`)
@@ -292,12 +734,12 @@ export function parseYamlSectionValues(
 
   for (let i = startIdx + 1; i < lines.length; i++) {
     const line = lines[i];
-    if (line.trim() === "") continue;
+    if (isBlankOrCommentLine(line)) continue;
     if (isListItem) {
       const dashMatch = line.match(/^(\s*)-(\s|$)/);
       if (dashMatch && dashMatch[1].length === siblingDashIndent) break;
-      if (/^[a-zA-Z]/.test(line)) break;
-    } else if (/^[a-zA-Z]/.test(line)) {
+      if (TOP_LEVEL_KEY_START_RE.test(line)) break;
+    } else if (TOP_LEVEL_KEY_START_RE.test(line)) {
       break;
     }
 
@@ -322,47 +764,28 @@ export function parseYamlSectionValues(
     }
 
     if (raw === "") {
-      let peek = i + 1;
-      while (peek < lines.length && lines[peek].trim() === "") peek++;
+      const peek = _skipBlankAndCommentLines(lines, i + 1);
       if (peek >= lines.length) continue;
       const peekLine = lines[peek];
 
-      if (peekLine.startsWith(listItemPrefix)) {
-        // Find the full extent of this key's value-block AND its
-        // complexity in a single forward scan. Complexity can
-        // hide on a follow-up body line — `      - lambda: |-`
-        // looks parseable on its own; the next-line
-        // `          some_code();` body is what triggers raw-mode.
-        const { endIdx, isComplex } = _scanValueBlock(
+      if (isDeeperListItemLine(peekLine, childIndent)) {
+        const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,
           childIndent,
         );
-        if (isComplex) {
-          // Slice with `lines.slice(i + 1, endIdx)` to capture
-          // the lines verbatim (with trailing blank lines
-          // trimmed by `_scanValueBlock`'s "next non-blank line
-          // at keyIndent or shallower" terminator).
-          values[key] = new YamlRawValue(lines.slice(i + 1, endIdx));
+        if (!isEmptyScalarList) {
+          values[key] = value;
           i = endIdx - 1;
-          continue;
-        }
-        const { items, endIdx: listEndIdx } = collectBlockListItems(
-          lines,
-          i + 1,
-          listItemPrefix,
-          listItemRegex,
-        );
-        if (items.length > 0) {
-          values[key] = items;
-          i = listEndIdx - 1;
         }
         continue;
       }
 
-      const nestedIndent = `${childIndent}  `;
-      if (peekLine.startsWith(nestedIndent)) {
-        const result = parseNestedBlock(lines, i + 1, nestedIndent);
+      // Read the deeper indent from the peek line itself so a
+      // user-typed 4-space file recurses correctly.
+      const peekLead = _leadingIndent(peekLine);
+      if (peekLead.length > childIndent.length) {
+        const result = parseNestedBlock(lines, i + 1, peekLead);
         if (Object.keys(result.values).length > 0) {
           values[key] = result.values;
         }
@@ -388,8 +811,6 @@ function parseNestedBlock(
   indent: string,
 ): { values: Record<string, unknown>; endIdx: number } {
   const childRegex = childRegexFor(indent);
-  const listItemPrefix = `${indent}  - `;
-  const listItemRegex = listItemRegexFor(indent);
   // Null-prototype — same prototype-pollution defense as the
   // top-level `parseYamlSectionValues` map; nested blocks recurse
   // into here so they need the same safety.
@@ -397,7 +818,7 @@ function parseNestedBlock(
   let i = startIdx;
   while (i < lines.length) {
     const line = lines[i];
-    if (line.trim() === "") {
+    if (isBlankOrCommentLine(line)) {
       i++;
       continue;
     }
@@ -423,34 +844,24 @@ function parseNestedBlock(
     }
 
     if (raw === "") {
-      let peek = i + 1;
-      while (peek < lines.length && lines[peek].trim() === "") peek++;
-      if (peek < lines.length && lines[peek].startsWith(listItemPrefix)) {
-        // Same complex-block detection as the top-level parser:
-        // block scalars or sub-dict list items under a key get
-        // captured raw rather than mangled into `string[]`.
-        const { endIdx, isComplex } = _scanValueBlock(lines, i + 1, indent);
-        if (isComplex) {
-          values[key] = new YamlRawValue(lines.slice(i + 1, endIdx));
-          i = endIdx;
-          continue;
-        }
-        const { items, endIdx: listEndIdx } = collectBlockListItems(
-          lines,
-          i + 1,
-          listItemPrefix,
-          listItemRegex,
-        );
-        values[key] = items;
-        i = listEndIdx;
+      const peek = _skipBlankAndCommentLines(lines, i + 1);
+      if (
+        peek < lines.length &&
+        isDeeperListItemLine(lines[peek], indent)
+      ) {
+        const { value, endIdx } = parseListBlock(lines, i + 1, indent);
+        values[key] = value;
+        i = endIdx;
         continue;
       }
-      const deeper = `${indent}  `;
-      if (peek < lines.length && lines[peek].startsWith(deeper)) {
-        const sub = parseNestedBlock(lines, i + 1, deeper);
-        if (Object.keys(sub.values).length > 0) values[key] = sub.values;
-        i = sub.endIdx;
-        continue;
+      if (peek < lines.length) {
+        const peekLead = _leadingIndent(lines[peek]);
+        if (peekLead.length > indent.length) {
+          const sub = parseNestedBlock(lines, i + 1, peekLead);
+          if (Object.keys(sub.values).length > 0) values[key] = sub.values;
+          i = sub.endIdx;
+          continue;
+        }
       }
       i++;
       continue;
@@ -501,11 +912,11 @@ export function findSectionRange(
         end = i;
         break;
       }
-      if (/^[a-zA-Z]/.test(lines[i])) {
+      if (TOP_LEVEL_KEY_START_RE.test(lines[i])) {
         end = i;
         break;
       }
-    } else if (/^[a-zA-Z]/.test(lines[i])) {
+    } else if (TOP_LEVEL_KEY_START_RE.test(lines[i])) {
       end = i;
       break;
     }
@@ -535,7 +946,11 @@ export function updateSectionInYaml(
   if (start < 0) return yaml;
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
-  const childIndent = isListItem ? "    " : "  ";
+  // Match the user's existing indent step on save so 4-space (or
+  // other consistent) YAML doesn't get re-emitted with a mixed
+  // 2-space slice. Falls back to the canonical 2-space step when
+  // the section is otherwise empty.
+  const childIndent = _detectSectionChildIndent(lines, start, isListItem);
   let toSerialize = values;
   let dashLine = lines[start];
   if (isListItem) {
@@ -614,9 +1029,25 @@ export function updateSectionInYaml(
       }
     }
   }
+  // For non-list-item sections the user's indent step IS the
+  // section's child indent (top-level keys at column 0, children
+  // at one step deeper). Pass that through so nested-mapping
+  // recursion preserves the user's chosen step end-to-end.
+  //
+  // For list-item sections the picture is messier — child keys
+  // align with the inline first key after the dash, not at a
+  // step-multiple — and there's no clean "user step" to read off.
+  // Default to canonical 2-space; the round-trip stays
+  // valid-and-readable even when the surrounding file uses a
+  // different step elsewhere.
+  const detectedStep =
+    !isListItem && childIndent ? childIndent : ESPHOME_YAML_INDENT;
   const newLines = [
     dashLine,
-    ...serializeYamlValues(toSerialize, childIndent, options),
+    ...serializeYamlValues(toSerialize, childIndent, {
+      ...options,
+      indentStep: options.indentStep ?? detectedStep,
+    }),
   ];
   lines.splice(start, end - start, ...newLines);
   return lines.join("\n");
@@ -656,14 +1087,14 @@ export function removeSectionFromYaml(
     // Walk backwards to the parent top-level key; if nothing but
     // blanks remain between it and the next sibling, drop it too.
     let parentIdx = start - 1;
-    while (parentIdx >= 0 && !/^[a-zA-Z]/.test(lines[parentIdx])) {
+    while (parentIdx >= 0 && !TOP_LEVEL_KEY_START_RE.test(lines[parentIdx])) {
       parentIdx--;
     }
     if (parentIdx >= 0) {
       let hasContent = false;
       let parentEnd = lines.length;
       for (let i = parentIdx + 1; i < lines.length; i++) {
-        if (/^[a-zA-Z]/.test(lines[i])) {
+        if (TOP_LEVEL_KEY_START_RE.test(lines[i])) {
           parentEnd = i;
           break;
         }

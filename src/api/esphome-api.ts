@@ -7,6 +7,7 @@
  * EventMessages with "output" and "result" events.
  */
 import { APIError } from "./api-error.js";
+import { BASE_PATH } from "../util/base-path.js";
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
 import type {
   AddComponentResponse,
@@ -15,21 +16,32 @@ import type {
   BulkActionResult,
   CommandMessage,
   ComponentCatalogEntry,
+  ConfiguredDevice,
   DevicesResponse,
   EditorValidateResponse,
   ErrorMessage,
   EventMessage,
   EventSubscriptionCallback,
   FirmwareBinary,
+  Label,
   ReachabilityStateEvent,
   ReachabilitySubscription,
   FirmwareDownload,
   FirmwareJob,
+  IdentityView,
   PagedBoardsResponse,
   PagedComponentsResponse,
+  OffloaderRemoteBuildSettings,
+  PairingSummary,
+  PairingWindowState,
+  PeerSummary,
+  RemoteBuildPeer,
+  RemoteBuildSettings,
+  RemoteBuildSubmitTarget,
   ResultMessage,
   SerialPort,
   ServerInfoMessage,
+  OnboardingState,
   StreamCallbacks,
   UpdateDeviceResponse,
   UserPreferences,
@@ -190,7 +202,7 @@ export class ESPHomeAPI {
       this._intentionalDisconnect = false;
 
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}${BASE_PATH}ws`;
 
       this._ws = new WebSocket(wsUrl);
 
@@ -744,6 +756,69 @@ export class ESPHomeAPI {
     );
   }
 
+  /** Clone a device — copy the source YAML under a fresh hostname.
+   *
+   *  The clone gets:
+   *  - a fresh ``esphome.name`` (mDNS hostname / API endpoint),
+   *  - a fresh ``friendly_name`` (defaults to the slug-derived form
+   *    of *newName*; pass ``newFriendlyName`` to override),
+   *  - a freshly-generated ``api.encryption.key`` (fleet members
+   *    don't share encryption material).
+   *
+   *  Indirections (``!secret api_key`` / ``${api_key}``) are
+   *  preserved as-is — they point at content the clone shares with
+   *  the source on disk, and rewriting them would silently desync.
+   *
+   *  Returns the new configuration filename. ``CommandError(INVALID_ARGS)``
+   *  surfaces user-correctable failures (collision, empty / equal
+   *  name, missing source) so the dialog can show a specific
+   *  message.
+   */
+  async cloneDevice(
+    configuration: string,
+    newName: string,
+    newFriendlyName?: string
+  ): Promise<{ configuration: string }> {
+    return this.sendCommand<{ configuration: string }>("devices/clone", {
+      configuration,
+      new_name: newName,
+      ...(newFriendlyName !== undefined
+        ? { new_friendly_name: newFriendlyName }
+        : {}),
+    });
+  }
+
+  /** Rewrite ``esphome.friendly_name`` in the device YAML in place.
+   *
+   *  The dashboard's friendly name and the running device's mDNS
+   *  broadcast both come from this YAML field, so an edit has to
+   *  land in the YAML (not just a sidecar) for the dashboard label
+   *  and the device's announced name to stay in sync. Backend
+   *  reuses the same YAML rewriter the clone path is built on:
+   *  substitution-aware (``${friendly_name}`` redirects through
+   *  the substitutions block) and safe on YAML-special characters
+   *  (``Bedroom #2`` round-trips correctly).
+   *
+   *  Returns ``{configuration, rewritten}``. ``rewritten=false``
+   *  signals an idempotent no-op (user submitted the same value
+   *  the leaf already had); the caller should skip a follow-up
+   *  install in that case.
+   *
+   *  ``CommandError(INVALID_ARGS)`` surfaces user-correctable
+   *  failures (blank name, missing device, package-driven
+   *  friendly_name with no inline leaf) so the dialog can show a
+   *  specific message.
+   */
+  async editFriendlyName(
+    configuration: string,
+    newFriendlyName: string
+  ): Promise<{ configuration: string; rewritten: boolean }> {
+    return this.sendCommand<{ configuration: string; rewritten: boolean }>(
+      "devices/edit_friendly_name",
+      { configuration, new_friendly_name: newFriendlyName }
+    );
+  }
+
   /** Delete a device and all associated files. */
   async deleteDevice(configuration: string): Promise<void> {
     await this.sendCommand("devices/delete", { configuration });
@@ -867,6 +942,62 @@ export class ESPHomeAPI {
     await this.sendCommand("devices/ignore", { name, ignore });
   }
 
+  /** Replace this device's label assignments wholesale.
+   *
+   *  ``labelIds`` is the new full list — pass ``[]`` to clear every
+   *  assignment. Unknown ids are rejected as ``invalid_args``; the
+   *  catalog check runs inside the same metadata transaction as the
+   *  write so a concurrent ``labels/delete`` cascade can't leave a
+   *  dangling reference. The returned ``ConfiguredDevice`` already
+   *  reflects the freshly-loaded labels, so callers can update local
+   *  state without waiting for the ``device_updated`` event. */
+  async setDeviceLabels(
+    configuration: string,
+    labelIds: string[],
+  ): Promise<ConfiguredDevice> {
+    return this.sendCommand<ConfiguredDevice>("devices/set_labels", {
+      configuration,
+      label_ids: labelIds,
+    });
+  }
+
+  // ─── Labels Commands ──────────────────────────────────────
+
+  /** Return every label in the global catalog. */
+  async listLabels(): Promise<Label[]> {
+    return this.sendCommand<Label[]>("labels/list");
+  }
+
+  /** Create a new label. ``name`` 1-50 chars, unique
+   *  case-insensitively. ``color`` is ``#rrggbb`` (lowercased on
+   *  save) or ``null`` / omitted for "no explicit color". */
+  async createLabel(args: {
+    name: string;
+    color?: string | null;
+  }): Promise<Label> {
+    return this.sendCommand<Label>("labels/create", args);
+  }
+
+  /** Rename and / or recolor a label. Pass ``color: null`` to clear
+   *  the color; omit ``color`` from the request to leave it
+   *  unchanged. At least one of ``name`` / ``color`` is required. */
+  async updateLabel(args: {
+    label_id: string;
+    name?: string;
+    color?: string | null;
+  }): Promise<Label> {
+    return this.sendCommand<Label>("labels/update", args);
+  }
+
+  /** Delete a label. The backend cascades through every device
+   *  assignment in a single metadata transaction; affected devices
+   *  fire their own ``device_updated`` events as the live
+   *  ``Device`` objects reload, and a ``label_deleted`` event lands
+   *  last so consumers can drop the catalog entry. */
+  async deleteLabel(labelId: string): Promise<void> {
+    await this.sendCommand("labels/delete", { label_id: labelId });
+  }
+
   // ─── Streaming Commands (per-connection) ───────────────────
 
   /**
@@ -968,9 +1099,23 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareJob>("firmware/upload", { configuration, port });
   }
 
-  /** Queue a compile+upload job (defaults to OTA). */
-  async firmwareInstall(configuration: string, port = "OTA"): Promise<FirmwareJob> {
-    return this.sendCommand<FirmwareJob>("firmware/install", { configuration, port });
+  /** Queue a compile+upload job (defaults to OTA).
+   *
+   *  ``forceLocal=true`` bypasses the offloader-side scheduler
+   *  decision and runs the install on the local CPU regardless of
+   *  paired build servers — used by the install dialog's "Build
+   *  locally instead" override link when the operator wants to
+   *  opt out of the transparent REMOTE routing for one install. */
+  async firmwareInstall(
+    configuration: string,
+    port = "OTA",
+    forceLocal = false,
+  ): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/install", {
+      configuration,
+      port,
+      force_local: forceLocal,
+    });
   }
 
   /** Queue a clean job. */
@@ -1160,6 +1305,497 @@ export class ESPHomeAPI {
   /** Get secret key names. */
   async getSecretKeys(): Promise<string[]> {
     return this.sendCommand<string[]>("config/get_secrets");
+  }
+
+  /**
+   * Onboarding state — current version, what the user has
+   * acknowledged, and per-step ``pending`` / ``done`` status. The
+   * dashboard hits this on app load to decide whether to surface
+   * the setup wizard and whether to show the secrets-menu badge.
+   */
+  async getOnboardingState(): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/get_state");
+  }
+
+  /**
+   * Save Wi-Fi credentials into the user's ``secrets.yaml``. The
+   * backend validates against ESPHome's own length limits
+   * (32 char SSID, 64 char password) and surfaces violations as
+   * ``CommandError(INVALID_ARGS)`` for the UI to render.
+   */
+  async setOnboardingWifi(
+    ssid: string,
+    password: string,
+  ): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>(
+      "onboarding/set_wifi_credentials",
+      { ssid, password },
+    );
+  }
+
+  /**
+   * Mark the current onboarding flow as acknowledged. Called when
+   * the user explicitly closes the wizard (either after saving
+   * credentials or after declining — e.g. an Ethernet-only user
+   * who'll never set Wi-Fi). The badge in the secrets menu stays
+   * if the underlying data is still un-configured; this only
+   * stops the wizard dialog from re-popping until a future
+   * onboarding-version bump.
+   */
+  async markOnboardingAcknowledged(): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/mark_acknowledged");
+  }
+
+  /**
+   * Get the receiver-side remote-build settings.
+   *
+   * Phase 2 of issue #106 — only ``enabled`` is exposed; phase 3+
+   * adds artifact-retention TTL, the cert fingerprint, the token
+   * list, and the rest of the "Remote builder" Settings section.
+   */
+  async getRemoteBuildSettings(): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>("remote_build/get_settings");
+  }
+
+  /**
+   * Persist the receiver-side remote-build settings.
+   *
+   * `cleanup_ttl_seconds` is optional; omit (or pass `undefined`)
+   * to preserve the existing value. The backend's
+   * `remote_build/set_settings` handler validates it in
+   * [`CLEANUP_TTL_MIN_SECONDS`, `CLEANUP_TTL_MAX_SECONDS`] and
+   * rejects with `INVALID_ARGS` outside that range; the
+   * settings dialog clamps client-side before the call, but
+   * the validator is the load-bearing gate.
+   */
+  async setRemoteBuildSettings(args: {
+    enabled: boolean;
+    cleanup_ttl_seconds?: number;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/set_settings",
+      args
+    );
+  }
+
+  /**
+   * Get the offloader-side remote-build settings (7b).
+   *
+   * Bundles the master ``remote_builds_enabled`` toggle with
+   * the pairings list so the Settings UI's first paint reads
+   * everything it needs from one round-trip. Live updates
+   * still ride on ``subscribe_events`` —
+   * ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` /
+   * ``OFFLOADER_PAIRING_ENABLED_CHANGED`` events fire after
+   * the matching setter mutates state, so the UI doesn't have
+   * to re-fetch.
+   */
+  async getOffloaderRemoteBuildSettings(): Promise<OffloaderRemoteBuildSettings> {
+    return this.sendCommand<OffloaderRemoteBuildSettings>(
+      "remote_build/get_offloader_settings"
+    );
+  }
+
+  /**
+   * Flip the offloader-side master "Remote builds enabled"
+   * toggle (7b).
+   *
+   * When set to `false`, the backend's ``pick_build_path``
+   * short-circuits every install to LOCAL; paired peer-link
+   * sessions stay open and the Send-builds power-user dialog
+   * still works — only the implicit auto-route is gated.
+   * Strict boolean validation on the backend rejects truthy
+   * non-booleans (the string ``"false"`` would otherwise
+   * coerce to `true` and persist the opposite of operator
+   * intent on a security-relevant switch).
+   */
+  async setOffloaderRemoteBuildSettings(args: {
+    remote_builds_enabled: boolean;
+  }): Promise<OffloaderRemoteBuildSettings> {
+    return this.sendCommand<OffloaderRemoteBuildSettings>(
+      "remote_build/set_offloader_settings",
+      args
+    );
+  }
+
+  /**
+   * Flip one pairing's per-row enable switch (7b).
+   *
+   * When ``enabled=false``, the backend's ``pick_build_path``
+   * walks past this row and looks for the next eligible
+   * APPROVED + connected + idle pairing. The peer-link session
+   * stays open and the Send-builds manual-dispatch path
+   * against this row still works. Unknown ``pin_sha256``
+   * rejects with ``ErrorCode.NOT_FOUND`` — a stale UI flipping
+   * a switch for a pairing the operator just unpaired on
+   * another tab gets a clean error, not a switch state that
+   * doesn't match anything.
+   */
+  async setOffloaderPairingEnabled(args: {
+    pin_sha256: string;
+    enabled: boolean;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>(
+      "remote_build/set_pairing_enabled",
+      args
+    );
+  }
+
+  /**
+  // Note: there's no ``listRemoteBuildHosts`` /
+  // ``addRemoteBuildManualHost`` / ``removeRemoteBuildManualHost``
+  // wrapper. mDNS-discovered hosts ship through
+  // ``subscribe_events``'s ``initial_state.hosts`` field at
+  // subscribe time + the two live events
+  // (``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``)
+  // drive every mutation. Manual-host entries were dropped
+  // entirely in lockstep with the backend rip-out — the
+  // offloader-side pair flow accepts a typed hostname / port
+  // directly via ``request_pair`` without an intermediate
+  // "save manual host" step.
+
+  // ─── Remote build: receiver-side pairing inbox (phase 4a-r1) ──
+
+  // Note: there's no ``listRemoteBuildPeers`` wrapper. The
+  // receiver-side peer list (PENDING + APPROVED) ships through
+  // ``subscribe_events``'s ``initial_state.peers`` field at
+  // subscribe time + the three live events
+  // (``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` /
+  // ``REMOTE_BUILD_PAIR_STATUS_CHANGED``) drive every mutation.
+  // A separate ``list_peers`` snapshot read would be a redundant
+  // round-trip on the WS the frontend already has open.
+
+  /**
+   * Promote a PENDING peer to APPROVED.
+   *
+   * The receiver-side admin clicks Accept on a row in the
+   * Pairing requests inbox; the call promotes the in-memory
+   * row to a persisted ``StoredPeer``, fires
+   * ``remote_build_pair_status_changed`` with
+   * ``status="approved"``, and wakes any offloader currently
+   * long-polling ``intent="pair_status"`` against this
+   * ``dashboard_id``. Unknown ``dashboard_id`` rejects with
+   * ``ErrorCode.NOT_FOUND``.
+   */
+  async approveRemoteBuildPeer(args: {
+    dashboard_id: string;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/approve_peer",
+      args
+    );
+  }
+
+  /**
+   * Drop a peer row by ``dashboard_id``.
+   *
+   * Works for both PENDING (in-memory) and APPROVED (persisted)
+   * rows. Fires ``remote_build_pair_status_changed`` with
+   * ``status="removed"`` for either case so any offloader
+   * long-polling pair_status sees the cancellation. Unknown
+   * ``dashboard_id`` rejects with ``ErrorCode.NOT_FOUND``.
+   */
+  async removeRemoteBuildPeer(args: {
+    dashboard_id: string;
+  }): Promise<RemoteBuildSettings> {
+    return this.sendCommand<RemoteBuildSettings>(
+      "remote_build/remove_peer",
+      args
+    );
+  }
+
+  /**
+   * Open or close the pairing window for the calling WS client.
+   *
+   * The pairing window narrows when ``intent="pair_request"``
+   * Noise frames are accepted: only while at least one client
+   * has called this with ``open: true`` and is keeping the
+   * extend timestamp fresh. Refcounted across clients with a
+   * 5-minute idle timeout; a graceful ``open: false`` removes
+   * just the calling client (other tabs / users still keep the
+   * window open if any of them is extending). Fires
+   * ``remote_build_pairing_window_changed`` on transitions and
+   * on every successful ``open: true`` extend.
+   *
+   * The frontend's Pairing requests screen calls ``open: true``
+   * on mount + on each user-activity tick (debounced to once
+   * per 30s on the wire), and ``open: false`` on unmount.
+   */
+  async setRemoteBuildPairingWindow(args: {
+    open: boolean;
+  }): Promise<PairingWindowState> {
+    return this.sendCommand<PairingWindowState>(
+      "remote_build/set_pairing_window",
+      args
+    );
+  }
+
+  // ─── Remote build: offloader-side pair flow (phase 4a-o) ──
+
+  /**
+   * Open a brief Noise XX WS to the receiver and capture its
+   * pin for OOB-display.
+   *
+   * The offloader runs ``intent="preview"`` to capture the
+   * receiver's static X25519 pubkey from the Noise handshake
+   * transcript before committing to pair. The frontend renders
+   * the returned ``pin_sha256`` for the user to OOB-verify
+   * against the receiver's "Build server" Settings card; only
+   * after that confirmation does the offloader call
+   * {@link requestRemoteBuildPair}. Read-only on the receiver
+   * (no state mutated). Transport / handshake / decode failures
+   * surface as ``ErrorCode.UNAVAILABLE``.
+   */
+  async previewRemoteBuildPair(args: {
+    hostname: string;
+    port: number;
+  }): Promise<{ pin_sha256: string }> {
+    return this.sendCommand<{ pin_sha256: string }>(
+      "remote_build/preview_pair",
+      args
+    );
+  }
+
+  /**
+   * Send ``intent="pair_request"`` and persist a local
+   * ``StoredPairing`` row.
+   *
+   * Re-handshakes the receiver (defends against TOCTOU between
+   * preview and confirm) and sends ``{label: offloader_label,
+   * dashboard_id}`` in the encrypted msg3 payload. The
+   * receiver's response decides what state the local row lands
+   * in: PENDING (typical first pair, awaiting admin Accept) or
+   * APPROVED (re-pair against existing trust the receiver still
+   * remembers).
+   *
+   * Two distinct labels because the offloader-side and
+   * receiver-side rows mean different things:
+   * ``receiver_label`` is the offloader's local name for the
+   * receiver (lands on the offloader's ``StoredPairing.label``);
+   * ``offloader_label`` is the offloader's self-identification
+   * sent to the receiver in msg3 for *their* pairing-requests
+   * inbox.
+   *
+   * Errors:
+   * - ``ErrorCode.PRECONDITION_FAILED`` — pin mismatch (TOCTOU
+   *   between preview and confirm) or receiver-side REJECTED.
+   * - ``ErrorCode.NO_PAIRING_WINDOW`` — receiver's pairing
+   *   window is closed; UI should prompt the user to ask the
+   *   receiving dashboard's admin to open the Pairing requests
+   *   screen.
+   * - ``ErrorCode.UNAVAILABLE`` — transport / handshake / decode
+   *   failure.
+   * - ``ErrorCode.INVALID_ARGS`` — host / port / pin / label
+   *   shape rejection.
+   */
+  async requestRemoteBuildPair(args: {
+    hostname: string;
+    port: number;
+    pin_sha256: string;
+    receiver_label: string;
+    offloader_label: string;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>("remote_build/request_pair", args);
+  }
+
+  /**
+   * Drop the local pairing row identified by *pin_sha256*.
+   *
+   * Idempotent — returns ``{removed: false}`` when no row
+   * matches. Cancels the row's pair-status listener task if
+   * any (the open Noise WS to the receiver closes promptly
+   * without waiting on disk I/O). Fires
+   * ``offloader_pair_status_changed`` with ``status="removed"``
+   * so other tabs / clients on the global ``subscribe_events``
+   * stream see the removal.
+   *
+   * 4a-o part 6 changed the WS arg from ``hostname / port`` to
+   * ``pin_sha256``: the offloader's controller now keys
+   * pairings on the receiver's stable cryptographic identity,
+   * so the lookup arg follows. Every ``PairingSummary`` row the
+   * frontend renders carries ``pin_sha256``, so the UI
+   * passes that value directly without needing a host/port
+   * round-trip.
+   *
+   * Receiver-side state is NOT notified — the receiver's
+   * ``StoredPeer`` row stays until the receiver admin clicks
+   * Remove on their own inbox; that's the receiver's ownership
+   * concern. Phase 8's re-auth wizard surfaces the
+   * "stale on receiver, removed locally" case as a UI
+   * affordance for the receiver-side admin.
+   */
+  async unpairRemoteBuild(args: {
+    pin_sha256: string;
+  }): Promise<{ removed: boolean }> {
+    return this.sendCommand<{ removed: boolean }>("remote_build/unpair", args);
+  }
+
+  /**
+   * Manually rebind a paired receiver onto new (hostname, port) coords (phase 8b).
+   *
+   * Frontend-only fallback for the cases the 4a-o part 7
+   * mDNS auto-rebind can't catch: cross-subnet receivers (no
+   * mDNS path), mDNS disabled on the receiver's host, the
+   * receiver moved to a hostname the offloader's network can
+   * resolve but mDNS doesn't broadcast.
+   *
+   * Backend runs a one-shot ``peer_link_preview_pair`` probe
+   * at the new coords to verify the endpoint is reachable
+   * AND answers with the same pin the row was paired against.
+   * On match: mutates the stored coords in place, cancels the
+   * stale ``PeerLinkClient``, spawns a fresh one against the
+   * new coords, fires ``offloader_pair_endpoint_rebound``,
+   * and returns the updated ``PairingSummary``. On mismatch /
+   * unreachable / race: leaves the stored row untouched and
+   * raises a typed error.
+   *
+   * Errors from the WS layer:
+   * - INVALID_ARGS: pin / hostname / port shape error.
+   * - NOT_FOUND: no pairing for this pin, or the pairing was
+   *   replaced mid-probe by a concurrent unpair / re-pair.
+   * - PRECONDITION_FAILED: pairing isn't APPROVED, the
+   *   offloader-side identity hasn't loaded yet, the new coords
+   *   match the current ones (no-op edit), or the probe
+   *   answered with a different pin (different identity at the
+   *   new endpoint — re-pair through the regular flow if you
+   *   actually want to switch identities).
+   * - UNAVAILABLE: probe transport / handshake failure (new
+   *   endpoint unreachable). Retry once the underlying
+   *   connectivity recovers.
+   */
+  async editRemoteBuildPairingEndpoint(args: {
+    pin_sha256: string;
+    hostname: string;
+    port: number;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>(
+      "remote_build/edit_pairing_endpoint",
+      args,
+    );
+  }
+
+  /**
+   * Dispatch a build to a paired receiver behind pin_sha256.
+   *
+   * Bundles the YAML + every referenced file (includes,
+   * secrets, fonts, images) on the offloader, streams the
+   * tarball over the live peer-link Noise session, and
+   * returns the receiver's submit_job_ack. Live job
+   * lifecycle + per-line stdout / stderr arrive
+   * asynchronously through OFFLOADER_JOB_STATE_CHANGED /
+   * OFFLOADER_JOB_OUTPUT events on the subscribe_events
+   * stream tagged with the same job_id this returns.
+   *
+   * target is one of "compile" (build firmware artefacts on
+   * the receiver, no flash) or "upload" (build then OTA-
+   * upload to the device, like the local Install action).
+   *
+   * Errors from the WS layer:
+   * - INVALID_ARGS: pin / target / configuration shape
+   *   error, or bundle build failed (the receiver's
+   *   validator diagnostic is in the message verbatim).
+   * - NOT_FOUND: no pairing for this pin, or the YAML is
+   *   missing from config_dir.
+   * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
+   *   peer-link session isn't currently live (orphaned,
+   *   unreachable, mid-reconnect).
+   * - UNAVAILABLE: ack timeout, or the session died
+   *   mid-flow.
+   *
+   * On accepted: false the receiver actively rejected the
+   * job (queue full, manifest unsupported, hash mismatch);
+   * reason carries the structured rejection code.
+   *
+   * Phase 5c-3 backend, 5c-4 frontend.
+   */
+  async submitRemoteBuildJob(args: {
+    pin_sha256: string;
+    configuration: string;
+    target: RemoteBuildSubmitTarget;
+  }): Promise<{ job_id: string; accepted: boolean; reason?: string }> {
+    return this.sendCommand<{
+      job_id: string;
+      accepted: boolean;
+      reason?: string;
+    }>("remote_build/submit_job", args);
+  }
+
+  /**
+   * Send a cooperative cancel for a remote build job (phase 5d).
+   *
+   * Routes through ``remote_build/cancel_job`` to the paired
+   * receiver behind *pin_sha256*; the receiver maps *job_id*
+   * (the offloader-local id ``submitRemoteBuildJob`` returned)
+   * back to its local ``FirmwareJob`` and dispatches the same
+   * cancel primitive an operator-driven cancel uses.
+   *
+   * Fire-and-forget on the wire — the resolved payload's
+   * ``sent`` flag reflects whether the cancel frame made it
+   * onto the peer-link wire (Noise encrypt + WS send
+   * succeeded), not whether the receiver acted on it. A
+   * ``sent: false`` resolve means a same-tick channel failure
+   * on the offloader side; the cancel never reached the
+   * receiver and the caller should treat it as an error.
+   * The actual cancel confirmation rides the existing
+   * ``OFFLOADER_JOB_STATE_CHANGED`` event stream as a
+   * ``status: "cancelled"`` transition, so callers should
+   * watch ``buildOffloadJobsContext`` for the terminal flip
+   * rather than treating ``sent: true`` as completion.
+   *
+   * Errors:
+   * - INVALID_ARGS: bad pin or empty job_id.
+   * - NOT_FOUND: no pairing for the given pin.
+   * - PRECONDITION_FAILED: pairing isn't APPROVED, or the
+   *   peer-link session isn't currently live.
+   */
+  async cancelRemoteBuildJob(args: {
+    pin_sha256: string;
+    job_id: string;
+  }): Promise<{ sent: boolean }> {
+    return this.sendCommand<{ sent: boolean }>(
+      "remote_build/cancel_job",
+      args,
+    );
+  }
+
+  // ─── Remote build: receiver identity (phase 3c1) ──────────
+
+  /**
+   * Read this dashboard's stable identity for the Settings card.
+   *
+   * Returns ``{dashboard_id, pin_sha256, server_version,
+   * esphome_version, listener_bound}``. The cert + key PEMs are
+   * intentionally NOT included; only the SPKI fingerprint
+   * (``pin_sha256``, lowercase hex) is safe to ship to a
+   * frontend, and the fingerprint is what a sender pins
+   * against anyway. Idempotent (no rotation triggered by reads).
+   * Lazy-creates the cert + key on first call if missing.
+   */
+  async getRemoteBuildIdentity(): Promise<IdentityView> {
+    return this.sendCommand<IdentityView>("remote_build/get_identity");
+  }
+
+  /**
+   * Mint a fresh cert + keypair, replacing whatever's on disk.
+   *
+   * Forces every paired sender to re-pair (the new SPKI
+   * produces a new ``pin_sha256``); ``dashboard_id`` is
+   * preserved across rotations. If the receiver listener is
+   * currently bound, it gets torn down and rebuilt against the
+   * new cert; the returned ``IdentityView.listener_bound``
+   * reflects the rebuild outcome (``false`` means the rebuild
+   * fail-softed; the operator should check the dashboard logs
+   * before assuming the rotation took effect end-to-end).
+   *
+   * Concurrent calls are rejected with
+   * ``ErrorCode.ALREADY_EXISTS``; the caller is expected to
+   * confirm before each click. Fires a
+   * ``remote_build_identity_rotated`` event on the bus carrying
+   * ``{dashboard_id, pin_sha256}`` so other tabs / subscribers
+   * refresh without polling.
+   */
+  async rotateRemoteBuildIdentity(): Promise<IdentityView> {
+    return this.sendCommand<IdentityView>("remote_build/rotate_identity");
   }
 
   /** Get compiled device metadata. */

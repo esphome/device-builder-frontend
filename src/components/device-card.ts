@@ -21,11 +21,16 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { DeviceState, JobStatus, JobType } from "../api/types.js";
-import type { FirmwareJob } from "../api/types.js";
+import type { FirmwareJob, Label } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { localizeContext } from "../context/index.js";
+import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getCompactEncryptionVisual } from "../util/encryption-state.js";
+import {
+  labelChipStyles,
+  renderLabelChips,
+  resolveLabelIds,
+} from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -80,6 +85,16 @@ export class ESPHomeDeviceCard extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: labelsContext, subscribe: true })
+  @state()
+  private _labelCatalog: Label[] = [];
+
+  /** Label ids assigned to this device. Resolved against the
+   *  catalog at render time so a recolor / rename in another
+   *  client repaints every card without per-card state. */
+  @property({ attribute: false })
+  labelIds: string[] = [];
 
   @property({ attribute: false })
   name = "";
@@ -142,6 +157,22 @@ export class ESPHomeDeviceCard extends LitElement {
 
   static styles = [
     espHomeStyles,
+    labelChipStyles,
+    css`
+      /* Only rendered when the device carries labels; an untagged
+         device gets no chip row and the card collapses naturally.
+         Padding leans top-heavy (8px top vs 4px bottom) because the
+         actions row that follows already carries its own
+         var(--wa-space-s) of top padding, so a symmetric padding
+         here reads as more space below the chips than above. */
+      .device-card-labels {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px;
+        padding: 8px var(--wa-space-m) 4px;
+      }
+    `,
     css`
       :host {
         display: block;
@@ -471,8 +502,9 @@ export class ESPHomeDeviceCard extends LitElement {
       /* Compact icon-only button that sits inline with the labelled
          buttons — same visual size as the kebab but without the auto
          left-margin that pushes the kebab to the right edge. Used by
-         the Visit Web UI control (icon-only since the open-in-new
-         icon is self-explanatory). */
+         the Update / Install accent action, Logs, and the Visit Web
+         UI link — Edit is the only labelled action so the row still
+         fits in long-language locales (French / Dutch). */
       .action-btn--tile {
         padding: 5px;
         flex-shrink: 0;
@@ -555,6 +587,7 @@ export class ESPHomeDeviceCard extends LitElement {
           </div>
           ${this._renderStatusBadge()}
         </div>
+        ${this._renderLabels()}
         ${!this.selectMode
           ? html`
               <div class="device-actions" @click=${(e: Event) => e.stopPropagation()}>
@@ -566,53 +599,45 @@ export class ESPHomeDeviceCard extends LitElement {
                   <wa-icon library="mdi" name="pencil"></wa-icon>
                   ${this._localize("dashboard.edit")}
                 </button>
-                ${this.hasUpdateAvailable
-                  ? html`
-                      <button
-                        class="action-btn action-btn--accent"
+                ${
+                  // Collapse the accent action (Update / Install) and
+                  // Logs to icon-only so only Edit keeps a label. In
+                  // long-language locales (French "Mettre à jour",
+                  // Dutch "Bijwerken"/"Bewerken") full-text Edit +
+                  // accent + Logs overflows the 300px-min card.
+                  // Edit stays labelled because it's the primary
+                  // action and the pencil alone is ambiguous; the
+                  // upload and console icons read clearly without one.
+                  this.hasUpdateAvailable
+                    ? html`<button
+                        class="action-btn action-btn--accent action-btn--tile"
                         ?disabled=${this.busy}
                         @click=${() => this._emit("update-device")}
+                        aria-label=${this._localize("dashboard.update")}
+                        title=${this._localize("dashboard.update")}
                       >
                         <wa-icon library="mdi" name="upload"></wa-icon>
-                        ${this._localize("dashboard.update")}
-                      </button>
-                    `
-                  : this.hasPendingChanges
-                    ? html`
-                        <button
-                          class="action-btn action-btn--accent"
+                      </button>`
+                    : this.hasPendingChanges
+                      ? html`<button
+                          class="action-btn action-btn--accent action-btn--tile"
                           ?disabled=${this.busy}
                           @click=${() => this._emit("install-device")}
+                          aria-label=${this._localize("dashboard.install")}
+                          title=${this._localize("dashboard.install")}
                         >
                           <wa-icon library="mdi" name="upload"></wa-icon>
-                          ${this._localize("dashboard.install")}
-                        </button>
-                      `
-                    : nothing}
-                ${
-                  // Collapse Logs to icon-only when an accent action
-                  // (Install/Update) is present — Edit + accent + Logs
-                  // + kebab overflows the 300px-min card in long-language
-                  // locales like Dutch ("Bewerken"/"Installeren"/"Logboek").
-                  // Logs collapses first since the console icon reads
-                  // clearly without a label.
-                  this.hasPendingChanges || this.hasUpdateAvailable
-                    ? html`<button
-                        class="action-btn action-btn--ghost action-btn--tile"
-                        @click=${() => this._emit("open-logs")}
-                        aria-label=${this._localize("dashboard.drawer_logs")}
-                        title=${this._localize("dashboard.drawer_logs")}
-                      >
-                        <wa-icon library="mdi" name="console"></wa-icon>
-                      </button>`
-                    : html`<button
-                        class="action-btn action-btn--ghost"
-                        @click=${() => this._emit("open-logs")}
-                      >
-                        <wa-icon library="mdi" name="console"></wa-icon>
-                        ${this._localize("dashboard.drawer_logs")}
-                      </button>`
+                        </button>`
+                      : nothing
                 }
+                <button
+                  class="action-btn action-btn--ghost action-btn--tile"
+                  @click=${() => this._emit("open-logs")}
+                  aria-label=${this._localize("dashboard.drawer_logs")}
+                  title=${this._localize("dashboard.drawer_logs")}
+                >
+                  <wa-icon library="mdi" name="console"></wa-icon>
+                </button>
                 ${this.webUrl
                   ? html`<a
                       class="action-btn action-btn--ghost action-btn--tile"
@@ -638,6 +663,20 @@ export class ESPHomeDeviceCard extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /** Render the device's label chips just below the name / status
+   *  header. Caps at 4 visible chips with a "+N" overflow chip so a
+   *  heavily-tagged device doesn't blow out the card height; the
+   *  full set is reachable from the drawer. ``nothing`` when the
+   *  device carries no labels — the card collapses naturally so
+   *  untagged cards don't show an empty band. */
+  private _renderLabels() {
+    const labels = resolveLabelIds(this.labelIds, this._labelCatalog);
+    if (labels.length === 0) return nothing;
+    return html`<div class="device-card-labels">
+      ${renderLabelChips(labels, { max: 4 })}
+    </div>`;
   }
 
   private _renderEncryptionIcon() {

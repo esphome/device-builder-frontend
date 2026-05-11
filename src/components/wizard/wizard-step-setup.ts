@@ -7,6 +7,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { withBase } from "../../util/base-path.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -234,7 +235,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
               class="board-image"
               src=${board.images.length > 0
                 ? board.images[0]
-                : "/assets/board/default.svg"}
+                : withBase("/assets/board/default.svg")}
               alt=${board.name}
             />`
           : null}

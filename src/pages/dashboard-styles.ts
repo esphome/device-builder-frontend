@@ -4,7 +4,7 @@ export const dashboardStyles = css`
   :host {
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--esphome-header-height));
+    height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
        footprint. --fab-bottom is the gap between the FAB and the
@@ -13,15 +13,27 @@ export const dashboardStyles = css`
        text). The card grid pads its bottom by their sum so the
        trailing card's action row never sits under the FAB. Defining
        these once stops the grid clearance and the FAB position from
-       drifting if either gets tweaked later. */
-    --fab-bottom: var(--wa-space-l);
+       drifting if either gets tweaked later. The fab-bottom also
+       includes the footer height so the FAB clears the version line. */
+    --fab-bottom: calc(var(--wa-space-l) + var(--esphome-footer-height));
     --fab-height: 48px;
     --fab-clearance: calc(var(--fab-bottom) + var(--fab-height) + var(--wa-space-xs));
+    /* Height of the floating multi-select action bar (rendered by
+       esphome-select-bar at position:fixed; bottom:0). Used both to
+       enforce the bar's own height and to reserve clearance inside
+       the device table so its pagination row doesn't sit beneath it. */
+    --select-bar-height: 64px;
   }
 
   :host([view="cards"]) {
     height: auto;
     overflow: visible;
+    /* Body scrolls in cards view (incl. YAML mode), and the layout
+       footer is fixed and opaque — without this padding the trailing
+       row of yaml-hits / banner content can sit behind the version
+       line. The configured device grid has its own --fab-clearance,
+       so this only matters for the YAML / discovered content paths. */
+    padding-bottom: var(--esphome-footer-height);
   }
 
   /* ─── Discovered Banner ─── */
@@ -135,6 +147,23 @@ export const dashboardStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
+  }
+
+  /* Pushes the filter group to the right edge of the toolbar so
+     view-toggles (left of the spacer) and filter affordances
+     (right of the spacer) read as separate clusters. Collapses to
+     zero on viewports too narrow to afford it — the row wraps via
+     'flex-wrap' higher up if individual buttons overflow. */
+  .toolbar-spacer {
+    flex: 1 1 auto;
+    min-width: var(--wa-space-s);
+  }
+
+  .filter-group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-xs);
+    flex-shrink: 0;
   }
 
   .search-wrap {
@@ -259,32 +288,87 @@ export const dashboardStyles = css`
     display: flex;
     flex-direction: column;
     padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
-    gap: 2px;
+    gap: var(--wa-space-l);
   }
-  .yaml-hit {
+  .yaml-hit-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-xs);
+  }
+  .yaml-hit-group-header {
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-xs) var(--wa-space-s);
+    padding-bottom: var(--wa-space-xs);
+    border-bottom: 1px solid var(--wa-color-surface-border);
+  }
+  .yaml-hit-group-name {
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+  .yaml-hit-group-count {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+    margin-left: auto;
+  }
+  /* The legacy .yaml-hit / .yaml-hit-label rows (palette-style
+     flat per-match listing) are gone from the dashboard; the
+     snippet-block styles below replace them with a grouped
+     code-search shape. */
+  .yaml-snippet {
+    display: block;
+    background: var(--wa-color-surface-lowered);
+    border: 1px solid var(--wa-color-surface-border);
     border-radius: 6px;
     color: var(--wa-color-text-normal);
     text-decoration: none;
+    font-family: var(--wa-font-family-code, ui-monospace, monospace);
     font-size: var(--wa-font-size-s);
-    transition: background-color 0.1s ease;
+    overflow: hidden;
+    transition: border-color 0.1s ease, background-color 0.1s ease;
   }
-  .yaml-hit:hover,
-  .yaml-hit:focus-visible {
-    background: var(--wa-color-surface-raised);
+  .yaml-snippet:hover,
+  .yaml-snippet:focus-visible {
+    border-color: var(--esphome-primary);
     outline: none;
   }
-  .yaml-hit-label {
-    /* Single line, ellipsis on overflow — long YAML lines
-       (lambdas, comments) can run wide. */
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .yaml-snippet-line {
+    display: flex;
+    align-items: baseline;
+    padding: 1px 0;
+  }
+  .yaml-snippet-line--match {
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 92%
+    );
+  }
+  .yaml-snippet-gutter {
+    flex: 0 0 auto;
+    width: 3em;
+    padding: 0 var(--wa-space-s);
+    text-align: right;
+    color: var(--wa-color-text-quiet);
+    user-select: none;
+  }
+  .yaml-snippet-text {
     flex: 1;
-    font-family: var(--wa-font-family-code, ui-monospace, monospace);
+    /* Preserve YAML indentation but wrap long lines (lambdas /
+       deeply-nested config) instead of horizontally scrolling. */
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding-right: var(--wa-space-s);
+  }
+  .yaml-snippet-text mark {
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 70%
+    );
+    color: inherit;
+    padding: 0 1px;
+    border-radius: 2px;
   }
   .device-count {
     font-size: var(--wa-font-size-xs);

@@ -20,9 +20,9 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
@@ -115,39 +115,32 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 460px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         background: var(--esphome-primary);
         padding: 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
+      /* Close-button styling is bundled in
+         <esphome-base-dialog> via dialogCloseButtonStyles,
+         no per-dialog override needed. */
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: var(--wa-space-l);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -403,14 +396,13 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         : this._localize("dashboard.install_method_select_port");
 
     return html`
-      <wa-dialog
-        label=${label}
+      <esphome-base-dialog
+        .label=${label}
         ?open=${this.open}
-        @wa-after-hide=${this._onClose}
-        light-dismiss
+        @after-hide=${this._onClose}
       >
         ${this._view === "method" ? this._renderMethodList() : this._renderPortList()}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 

@@ -6,6 +6,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
+import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 /** 1-indexed line of the *n*th (1-based) list-item dash following
  *  `parent:` in `yaml`. Section-editor callers pass that line as
@@ -722,6 +723,91 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     // Sanity: only Button B got the icon (siblings stayed clean)
     expect(after.match(/icon:/g)).toHaveLength(1);
   });
+
+  it("preserves a lambda block scalar verbatim when the user re-saves without editing", () => {
+    // Issue #428 — opening the form for a binary_sensor with a
+    // ``lambda: |-`` previously rendered ``[object Object]`` and
+    // a save round-trip would have dropped the body entirely. Now
+    // ``YamlRawValue.toString`` surfaces the dedented body for
+    // display; the parser keeps the wrapper intact so the
+    // serializer can paste the lines back unchanged.
+    //
+    // Byte-equality assertion (rather than substring presence) so
+    // a future drift — extra whitespace, indent change, missing
+    // ``|-`` marker — fails the test. The contract for "no edit"
+    // on the lambda is "no diff," so we slice the exact lambda
+    // block out of both the input and the output and compare them
+    // line-for-line. (The test fixture's ``name: "..."`` quoting
+    // gets stripped by the unrelated scalar serializer, so we
+    // can't byte-compare the WHOLE document — that's a separate
+    // pre-existing concern.)
+    const lambdaBlock = `    lambda: |-
+      return id(moving) && id(opening) && !id(opened).state ? true : false;`;
+    const yaml = `binary_sensor:
+  - platform: template
+    name: Driveway Opening
+    id: opening_sensor
+${lambdaBlock}
+`;
+    const values = parseYamlSectionValues(
+      yaml,
+      "binary_sensor.template",
+      2,
+    );
+    // Parser wraps the block scalar so the on-disk style round-trips.
+    expect(values.lambda).toBeInstanceOf(YamlRawValue);
+    // Re-save without editing → byte-identical YAML.
+    const after = updateSectionInYaml(
+      yaml,
+      "binary_sensor.template",
+      values,
+      2,
+    );
+    expect(after).toBe(yaml);
+    // Belt + suspenders: even if a future serializer change
+    // reformats some surrounding key, the lambda block itself
+    // must survive byte-identical.
+    expect(after).toContain(lambdaBlock);
+  });
+
+  it("re-wraps an edited lambda body as a YamlRawValue with the same indent", () => {
+    // Issue #428 — when the user edits a lambda body, the renderer
+    // calls ``YamlRawValue.fromBodyText`` to wrap the textarea
+    // content as a fresh ``YamlRawValue`` with the original indent
+    // and ``|-`` header preserved. The serializer must paste it back
+    // in the same shape so the YAML doesn't drift to inline-quoted
+    // form on save.
+    const yaml = `binary_sensor:
+  - platform: template
+    name: "Driveway Opening"
+    lambda: |-
+      return original_body;
+`;
+    const values = parseYamlSectionValues(
+      yaml,
+      "binary_sensor.template",
+      2,
+    );
+    const original = values.lambda;
+    expect(original).toBeInstanceOf(YamlRawValue);
+    // Simulate the form editing the body:
+    values.lambda = YamlRawValue.fromBodyText(
+      "return id(moving) && id(opening);",
+      original as YamlRawValue,
+    );
+    const after = updateSectionInYaml(
+      yaml,
+      "binary_sensor.template",
+      values,
+      2,
+    );
+    // Block-scalar form is preserved.
+    expect(after).toContain("lambda: |-");
+    // Body has the new content at the original indent.
+    expect(after).toContain("      return id(moving) && id(opening);");
+    // Old body is gone.
+    expect(after).not.toContain("return original_body");
+  });
 });
 
 describe("updateSectionInYaml — keepEmptyStrings option", () => {
@@ -785,5 +871,477 @@ describe("updateSectionInYaml — keepEmptyStrings option", () => {
       keepEmptyStrings: true,
     });
     expect(after).toMatch(/inner_empty:\s*""/);
+  });
+});
+
+describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () => {
+  // Regression pin for issue #434: catalog entries marked
+  // ``type=nested, multi_value=true`` (``esphome.devices`` /
+  // ``esphome.areas``) must reach the renderer as structured
+  // arrays of objects, not as ``YamlRawValue``. The parser used to
+  // capture the whole block raw (because ``LIST_ITEM_DICT_KEY_RE``
+  // flagged any ``- key:`` line as "complex"), and the editor's
+  // nested-list renderer would then show "No items yet" even when
+  // the YAML had items.
+
+  it("parses esphome.devices into an array of plain objects", () => {
+    const yaml = `esphome:
+  name: test
+  devices:
+    - id: front_door_device
+      name: "Front Door Sensor"
+      area_id: entrance_area
+    - id: kitchen_motion_device
+      name: "Kitchen Motion"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.name).toBe("test");
+    expect(values.devices).toEqual([
+      {
+        id: "front_door_device",
+        name: "Front Door Sensor",
+        area_id: "entrance_area",
+      },
+      { id: "kitchen_motion_device", name: "Kitchen Motion" },
+    ]);
+    // Not a YamlRawValue — the editor must be able to recurse
+    // into per-item children, which it can't with raw text.
+    expect(values.devices).not.toBeInstanceOf(YamlRawValue);
+  });
+
+  it("parses esphome.areas alongside esphome.devices in the same section", () => {
+    const yaml = `esphome:
+  devices:
+    - id: front_door
+      name: "Front Door"
+  areas:
+    - id: entrance
+      name: "Entrance"
+    - id: kitchen
+      name: "Kitchen"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      { id: "front_door", name: "Front Door" },
+    ]);
+    expect(values.areas).toEqual([
+      { id: "entrance", name: "Entrance" },
+      { id: "kitchen", name: "Kitchen" },
+    ]);
+  });
+
+  it("falls back to YamlRawValue when items contain dotted-key automation actions", () => {
+    // ``- logger.log: pressed`` is automation-action shorthand,
+    // not a flat-mapping field. Capturing it as a structured
+    // ``{ "logger.log": "pressed" }`` would round-trip on save as
+    // ``- "logger.log": pressed``, corrupting the trigger.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - logger.log: pressed
+      - switch.turn_on: relay_id
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    expect(values.on_press).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("falls back to YamlRawValue when items contain block scalars", () => {
+    const yaml = `script:
+  - id: my_script
+    actions:
+      - lambda: |-
+          some_function();
+          another_line;
+`;
+    const values = parseYamlSectionValues(yaml, "script", 2);
+    expect(values.actions).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("falls back to YamlRawValue when items have nested mappings under a sub-key", () => {
+    // ``- key:\n      sub_key:`` (sub_key with empty raw, opening
+    // a deeper mapping) carries shape the flat-mapping helper
+    // can't model. The conservative bail-out keeps the block raw
+    // so the deeper content survives a round-trip.
+    const yaml = `sensor:
+  - platform: template
+    name: outside_temp
+    triggers:
+      - id: my_trigger
+        filters:
+          delta: 0.5
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.triggers).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("round-trips esphome.devices through update with edits to one item", () => {
+    const yaml = `esphome:
+  devices:
+    - id: front_door
+      name: "Front Door"
+    - id: kitchen
+      name: "Kitchen"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    const devices = values.devices as Record<string, unknown>[];
+    devices[0].name = "Front Entry";
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    // Both items survive; only the first item's name changed.
+    expect(after).toContain("- id: front_door");
+    expect(after).toContain("name: Front Entry");
+    expect(after).toContain("- id: kitchen");
+    expect(after).toContain("name: Kitchen");
+    // No double-quoted dotted-key corruption.
+    expect(after).not.toMatch(/"id":/);
+  });
+
+  it("round-trips a freshly-added empty item via the renderer's Add button", () => {
+    // ``renderNestedListField`` emits ``[..., {}]`` when the user
+    // clicks Add. The serializer should emit a bare dash
+    // placeholder so the YAML stays valid even before the user
+    // fills in a key.
+    const yaml = `esphome:
+  devices:
+    - id: existing
+      name: Existing
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    const devices = values.devices as Record<string, unknown>[];
+    devices.push({});
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    // The existing item still emits with its keys.
+    expect(after).toContain("- id: existing");
+    // The new empty item emits as a bare dash; the next compile
+    // will surface a real schema error if any required field is
+    // missing.
+    const lines = after.split("\n");
+    const dashLines = lines.filter((l) => /^\s+-/.test(l));
+    expect(dashLines).toHaveLength(2);
+    expect(dashLines[1].trim()).toBe("-");
+  });
+
+  it("emits new mapping items with the dash on the first key only", () => {
+    // The serializer's contract for list-of-mappings: the dash
+    // sits on the first sub-key's line; remaining keys live one
+    // indent step deeper, no leading dash. Matches what
+    // ``parseYamlSectionValues`` reads back so the round-trip is
+    // stable.
+    const yaml = `esphome:
+  name: test
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values as Record<string, unknown>).devices = [
+      { id: "front", name: "Front Door", area_id: "entrance" },
+    ];
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    expect(after).toContain("    - id: front");
+    expect(after).toContain("      name: Front Door");
+    expect(after).toContain("      area_id: entrance");
+    // The dash must NOT appear on the second / third sub-key's
+    // line — the parser would re-read those as new list items.
+    expect(after).not.toContain("    - name:");
+    expect(after).not.toContain("    - area_id:");
+  });
+
+  it("treats a bare dash with trailing whitespace as an empty placeholder", () => {
+    // Some editors emit ``    -  `` (dash + trailing spaces)
+    // when the user lands on a fresh dash line and pauses. The
+    // exact-match check (``lines[at] === bareDash``) used to
+    // miss this and bail to YamlRawValue, breaking the visual
+    // editor. ``LIST_ITEM_BARE_DASH_RE`` already accepts any
+    // trailing whitespace as a complexity signal — the parser
+    // now uses the same predicate inside ``parseItem`` so the
+    // two stay in lockstep.
+    const yaml = `esphome:
+  devices:
+    -
+    - id: kitchen
+      name: Kitchen
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      {},
+      { id: "kitchen", name: "Kitchen" },
+    ]);
+  });
+
+  it("parses a list-of-mappings with a comment line between key and items", () => {
+    // Regression for Copilot's catch: a comment between
+    // ``devices:`` and the first ``- id:`` line used to make
+    // ``peekLine`` land on the comment, fail
+    // ``isDeeperListItemLine``, and route through
+    // ``parseNestedBlock`` — which then skipped the list items
+    // entirely, returning an empty mapping. The field got
+    // dropped from values and deleted on save.
+    const yaml = `esphome:
+  devices:
+    # the kitchen sensor and the front door
+    - id: kitchen
+      name: Kitchen
+    - id: front_door
+      name: "Front Door"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      { id: "kitchen", name: "Kitchen" },
+      { id: "front_door", name: "Front Door" },
+    ]);
+  });
+
+  it("parses a nested mapping with a comment line between key and content", () => {
+    // Same comment-skip semantic in ``parseNestedBlock`` — the
+    // recursion path that handles deeper map blocks. A comment
+    // between ``manual_ip:`` and ``static_ip:`` would silently
+    // drop the manual_ip field from values.
+    const yaml = `wifi:
+  manual_ip:
+    # static IP for the office sensor
+    static_ip: 10.0.0.5
+    gateway: 10.0.0.1
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.manual_ip).toEqual({
+      static_ip: "10.0.0.5",
+      gateway: "10.0.0.1",
+    });
+  });
+
+  it("preserves a list of only bare-dash placeholder items", () => {
+    // Regression for the bug Copilot caught: a list whose only
+    // items are bare-dash placeholders (the user clicked Add but
+    // hadn't filled any fields yet, then saved) used to drop the
+    // whole field. ``_scanValueBlock`` saw no ``- key:`` lines and
+    // returned ``isComplex=false``, so the scalar-list branch
+    // ran, the ``- `` regex missed the bare dash, items=0, and
+    // the key got omitted from the values dict — which then
+    // *deleted* the user's in-progress rows on the next save.
+    // The bare-dash regex is now part of the complexity signal,
+    // so the block routes through ``collectBlockListMappings``
+    // and rebuilds each placeholder as ``{}``.
+    const yaml = `esphome:
+  devices:
+    -
+    -
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([{}, {}]);
+  });
+
+  it("re-parses a bare-dash list item as an empty mapping (round-trip stable)", () => {
+    // The serializer emits ``    -`` (no trailing key) for an
+    // empty mapping item — the placeholder shape for a
+    // freshly-added Add row the user saved before filling in any
+    // fields. The parser must accept the bare dash and rebuild
+    // ``{}`` so the row survives the round-trip; otherwise the
+    // user's in-progress item vanishes on reload.
+    const yaml = `esphome:
+  devices:
+    - id: kitchen
+      name: Kitchen
+    -
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.devices).toEqual([
+      { id: "kitchen", name: "Kitchen" },
+      {},
+    ]);
+  });
+
+  it("re-parses a bare-dash item inside a parseNestedBlock recursion", () => {
+    // Same bare-dash handling at deeper indents — exercises the
+    // ``parseNestedBlock`` branch that ``parseYamlSectionValues``
+    // delegates to for nested mappings.
+    const yaml = `outer:
+  meta:
+    rows:
+      - id: first
+      -
+`;
+    const values = parseYamlSectionValues(yaml, "outer");
+    expect(values.meta).toEqual({ rows: [{ id: "first" }, {}] });
+  });
+
+  it("survives a full Add → save → reload cycle", () => {
+    // Drives the exact flow the user hits in the visual editor:
+    // start with one item, click Add, save (serializer emits
+    // bare dash for the new empty row), reload (parser rebuilds
+    // the array). Without the round-trip fix the second item
+    // disappears on reload.
+    const yaml = `esphome:
+  devices:
+    - id: kitchen
+      name: Kitchen
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values.devices as Record<string, unknown>[]).push({});
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    const reloaded = parseYamlSectionValues(after, "esphome");
+    expect(reloaded.devices).toEqual([{ id: "kitchen", name: "Kitchen" }, {}]);
+  });
+
+  it("reads a flat section with 4-space user indent", () => {
+    // The non-list path through ``parseYamlSectionValues`` —
+    // every leaf is a bare ``key: value`` and the section has
+    // no list-of-mappings child — must also detect indent.
+    const yaml = `wifi:
+    ssid: home
+    password: secret
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.ssid).toBe("home");
+    expect(values.password).toBe("secret");
+  });
+
+  it("reads nested mappings with 4-space user indent", () => {
+    // ``parseNestedBlock`` recursion must propagate the
+    // detected indent so a ``manual_ip:`` block with
+    // ``static_ip:`` underneath comes back as a structured
+    // sub-object, not undefined.
+    const yaml = `wifi:
+    ssid: home
+    manual_ip:
+        static_ip: 10.0.0.5
+        gateway: 10.0.0.1
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.manual_ip).toEqual({
+      static_ip: "10.0.0.5",
+      gateway: "10.0.0.1",
+    });
+  });
+
+  it("round-trips 4-space user YAML through update without mixing indents", () => {
+    // The save path detects the user's indent step and threads it
+    // through the serializer so the rewritten section keeps the
+    // user's 4-space style instead of splicing canonical 2-space
+    // content into a 4-space file (mixed indent inside one
+    // mapping is valid YAML but visually inconsistent).
+    const yaml = `esphome:
+    name: test
+    devices:
+        - id: kitchen
+          name: Kitchen
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values.devices as Record<string, unknown>[])[0].name = "Renamed";
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    // Top-level fields stay at 4-space — column 4, exactly.
+    expect(after).toMatch(/^ {4}name: test/m);
+    // Devices list keeps its 8-space dash indent (4 + 4 step) and
+    // sub-keys align with the inline first key — column 10
+    // (= dash col 8 + the literal 2-char ``- `` gap), NOT
+    // dash + step (which would be 12 on a 4-space file). Pin the
+    // exact column so a regression to ``${dashIndent}${step}``
+    // surfaces in CI instead of hiding behind a substring match.
+    expect(after).toMatch(/^ {8}- id: kitchen/m);
+    expect(after).toMatch(/^ {10}name: Renamed/m);
+    // No 2-space children sneaking in mid-section.
+    expect(after).not.toMatch(/^ {2}[a-zA-Z]/m);
+  });
+
+  it("reads a flat scalar list with 4-space user indent", () => {
+    // Regression pin for the bug Copilot caught:
+    // ``listItemRegexFor`` was building its regex from
+    // ``parentIndent + ESPHOME_YAML_INDENT``, hardcoding the dash
+    // at ``parent + 2`` even when the actual dash sat at
+    // ``parent + 4`` for a 4-space user file. The startsWith
+    // prefix check passed (it was already detected from the
+    // content) but the regex match failed, so
+    // ``collectBlockListItems`` returned ``[]`` and the list was
+    // silently dropped — and would have been deleted on save.
+    const yaml = `wifi:
+    networks:
+        - one
+        - two
+        - three
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    expect(values.networks).toEqual(["one", "two", "three"]);
+  });
+
+  it("round-trips a 4-space scalar list through update without dropping items", () => {
+    // The save path would have spliced the empty parsed list back
+    // into the YAML, deleting the user's networks. Pin both the
+    // parse and the round-trip so a regression is caught at CI.
+    const yaml = `wifi:
+    networks:
+        - one
+        - two
+`;
+    const values = parseYamlSectionValues(yaml, "wifi");
+    (values.networks as string[]).push("three");
+    const after = updateSectionInYaml(yaml, "wifi", values);
+    expect(after).toContain("- one");
+    expect(after).toContain("- two");
+    expect(after).toContain("- three");
+  });
+
+  it("treats an underscore-leading sibling section as a section terminator", () => {
+    // The terminator predicate has to mirror ``KEY_PATTERN``'s
+    // leading-character set (``[a-zA-Z_]``). A section header
+    // like ``_internal:`` wasn't matched by the older
+    // ``/^[a-zA-Z]/`` shape and could leak into the parent
+    // section's child walk, picking up its keys as siblings of
+    // the parent.
+    const yaml = `esphome:
+  name: test
+_internal:
+  hidden: true
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.name).toBe("test");
+    // The ``_internal`` section's children must not bleed into
+    // ``esphome``'s.
+    expect(values.hidden).toBeUndefined();
+  });
+
+  it("reads list-of-mappings with non-default user indent (4-space YAML)", () => {
+    // YAML allows any consistent indent step — a user-typed
+    // 4-space file is just as valid as ESPHome's canonical
+    // 2-space emit. The parser detects the actual indent from
+    // the first child line and propagates it down so the same
+    // ``esphome.devices`` list works regardless of the step
+    // the user chose.
+    const yaml = `esphome:
+    name: test
+    devices:
+        - id: kitchen
+          name: Kitchen
+        - id: front_door
+          name: "Front Door"
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    expect(values.name).toBe("test");
+    expect(values.devices).toEqual([
+      { id: "kitchen", name: "Kitchen" },
+      { id: "front_door", name: "Front Door" },
+    ]);
+  });
+
+  it("skips null / undefined / empty-string fields inside a mapping item — round-trip", () => {
+    // Same skip semantics the top-level serializer applies, so a
+    // partially-filled item written by ``renderNestedListField``
+    // doesn't emit half-blank rows that re-parse as different
+    // values on the next round-trip.
+    const yaml = `esphome:
+  name: test
+`;
+    const values = parseYamlSectionValues(yaml, "esphome");
+    (values as Record<string, unknown>).devices = [
+      {
+        id: "front",
+        name: "Front Door",
+        area_id: null,
+        comment: undefined,
+        empty_field: "",
+      },
+    ];
+    const after = updateSectionInYaml(yaml, "esphome", values);
+    expect(after).toContain("- id: front");
+    expect(after).toContain("name: Front Door");
+    expect(after).not.toContain("area_id:");
+    expect(after).not.toContain("comment:");
+    expect(after).not.toContain("empty_field:");
   });
 });

@@ -33,7 +33,7 @@ const HIT: YamlSearchHit = {
   configuration: "kitchen.yaml",
   device_name: "kitchen",
   friendly_name: "Kitchen",
-  matches: [{ line_number: 1, line_text: "wifi:" }],
+  matches: [{ line_number: 1, line_text: "wifi:", before: [], after: [] }],
 };
 
 describe("YamlSearchController", () => {

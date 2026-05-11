@@ -54,6 +54,7 @@ import {
   renderMapField,
   renderMultiValueField,
   renderNestedField,
+  renderNestedListField,
   renderNumberField,
   renderPinField,
   renderSelectField,
@@ -178,6 +179,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       requiredOnly: this.requiredOnly,
       showAdvanced: this.showAdvanced,
       presentComponents: this.presentComponents,
+      targetPlatform: this.board?.esphome.platform ?? null,
     });
 
   protected render() {
@@ -269,6 +271,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // primitive value" for null-prototype objects. Clear any
       // stale selection rather than leaving the previous primitive
       // displayed against a now-non-primitive YAML state.
+      // Renderers whose value can legitimately be a non-primitive
+      // (PIN's long-form block, FLOAT_WITH_UNIT's unit picker)
+      // opt out of this generic sync via ``data-no-value-sync``
+      // — handled above — and own their selection through
+      // ``_syncSelectedAttr`` against the ``?selected`` Lit
+      // binding instead.
       if (!isPrimitiveOrNullish(value)) {
         const current = Array.isArray(select.value)
           ? select.value[0] ?? ""
@@ -392,6 +400,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
       return html`<div class="alert-entry">${labelFor(entry, ctx)}</div>`;
     }
     if (entry.type === ConfigEntryType.NESTED) {
+      // Repeatable nested mapping (``esphome.devices``,
+      // ``esphome.areas``, …). The single-group renderer can't
+      // express the list shape, so route to the list renderer first.
+      if (entry.multi_value) {
+        return renderNestedListField(entry, path, ctx);
+      }
       return renderNestedField(entry, path, ctx);
     }
     if (entry.type === ConfigEntryType.MAP) {

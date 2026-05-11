@@ -28,8 +28,19 @@ export interface FloatWithUnit {
  * is the canonical unit and is used as the default when the input has
  * no unit suffix. When `unitOptions` is empty we fall back to `""`.
  *
- * The unit match prefers the longest matching option so `"mHz"` doesn't
- * lose its `m` prefix to a shorter `"Hz"` option earlier in the list.
+ * Matching mirrors ESPHome's ``cv.float_with_unit`` regex
+ * (``config_validation.py``): the base unit is matched
+ * case-insensitively (``cv.frequency`` accepts ``Hz|HZ|hz``) but the
+ * SI prefix is significant (``m`` = milli, ``M`` = mega — different
+ * entries in ``METRIC_SUFFIXES``). For an ambiguous case-insensitive
+ * match — e.g. ``"433.92Mhz"`` against options ``mHz`` and ``MHz`` —
+ * each option is scored by the longest leading run of characters
+ * whose case matches the input verbatim, and the highest-scoring
+ * option wins. So ``"Mhz"`` → ``MHz`` (M matches → score 1 beats
+ * ``mHz``'s 0) and ``"mhz"`` → ``mHz`` (m matches → score 1 beats
+ * ``MHz``'s 0). The returned ``unit`` is always the canonical-cased
+ * option from ``unitOptions``, so a save round-trip normalises the
+ * user's casing to the ESPHome-canonical form. Issue #213.
  */
 export function parseFloatWithUnit(
   raw: unknown,
@@ -43,14 +54,39 @@ export function parseFloatWithUnit(
   const text =
     raw === null || raw === undefined ? "" : String(raw).trim();
   if (text === "") return { value: null, unit: fallbackUnit };
-  // Try the longest option first so `"50mHz"` matches `"mHz"` rather
-  // than the shorter `"Hz"` option earlier in the canonical-prefix
-  // list. `endsWith` is case-sensitive — esphome catalog units are
-  // canonical-cased.
-  const sortedOptions = [...unitOptions].sort((a, b) => b.length - a.length);
-  const match = sortedOptions.find(
-    (option) => option !== "" && text.endsWith(option),
-  );
+
+  const lowerText = text.toLowerCase();
+  let match: string | undefined;
+  let bestScore = -1;
+  let bestLength = -1;
+  for (const option of unitOptions) {
+    if (option === "") continue;
+    if (!lowerText.endsWith(option.toLowerCase())) continue;
+    // Score: count of leading characters whose case matches the
+    // input's corresponding suffix character. Higher score → the
+    // option's prefix-case lines up with what the user typed, which
+    // is the disambiguator for ``mHz`` (milli) vs ``MHz`` (mega)
+    // when the user's input is case-folded (``Mhz`` / ``mhz``).
+    const suffix = text.slice(-option.length);
+    let score = 0;
+    for (let i = 0; i < option.length; i++) {
+      if (suffix[i] !== option[i]) break;
+      score++;
+    }
+    // Prefer higher score; tie-break on length (longer match
+    // captures more of the user's input — ``"50mHz"`` should match
+    // ``mHz`` over ``Hz`` so the ``m`` prefix isn't stranded as
+    // part of the numeric portion).
+    if (
+      score > bestScore ||
+      (score === bestScore && option.length > bestLength)
+    ) {
+      match = option;
+      bestScore = score;
+      bestLength = option.length;
+    }
+  }
+
   const [numericText, unit] = match
     ? [text.slice(0, -match.length).trim(), match]
     : [text, fallbackUnit];

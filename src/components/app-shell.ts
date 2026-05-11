@@ -14,6 +14,9 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { APIError, ESPHomeAPI } from "../api/index.js";
 import {
+  CLEANUP_TTL_DEFAULT_SECONDS,
+  CLEANUP_TTL_MAX_SECONDS,
+  CLEANUP_TTL_MIN_SECONDS,
   DeviceEventType,
   DeviceState,
   ErrorCode,
@@ -21,6 +24,10 @@ import {
   JobType,
   Theme,
 } from "../api/types.js";
+import {
+  isOnboardingPending,
+  shouldAutoShowOnboarding,
+} from "../util/onboarding-gate.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -30,6 +37,31 @@ import type {
   ImportableDeviceAddedEventData,
   ImportableDeviceRemovedEventData,
   InitialStateEventData,
+  Label,
+  LabelDeletedEventData,
+  LabelEventData,
+  OffloaderAlertSnapshotEntry,
+  OffloaderJobOutputEventData,
+  OffloaderJobStateChangedEventData,
+  OffloaderPairAlertDismissedEventData,
+  OffloaderPairingEnabledChangedEventData,
+  OffloaderPairPeerRevokedEventData,
+  OffloaderPairPinMismatchEventData,
+  OffloaderPairStatusChangedEventData,
+  OffloaderPeerLinkClosedEventData,
+  OffloaderPeerLinkSessionEventData,
+  OffloaderRemoteBuildsToggledEventData,
+  PairingSummary,
+  PairingWindowState,
+  PeerSummary,
+  ReceiverPeerLinkSessionEventData,
+  RemoteBuildHostAddedEventData,
+  RemoteBuildHostRemovedEventData,
+  RemoteBuildPairingWindowChangedEventData,
+  RemoteBuildPairRequestReceivedEventData,
+  RemoteBuildPairStatusChangedEventData,
+  RemoteBuildPeer,
+  RemoteBuildSubmitTarget,
   ServerInfoMessage,
 } from "../api/types.js";
 import {
@@ -46,17 +78,34 @@ import {
   devicesContext,
   devicesLoadedContext,
   activeJobsContext,
+  buildOffloadAlertsContext,
+  buildOffloadDiscoveredHostsContext,
+  buildOffloadJobsContext,
+  buildOffloadPairingsContext,
+  offloaderRemoteBuildsEnabledContext,
+  buildServerIdentityRotationCounterContext,
+  buildServerPairingWindowStateContext,
+  buildServerPeersContext,
   recentJobsContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
   isHaIngressContext,
+  labelsContext,
   localizeContext,
+  onboardingPendingContext,
+  remoteBuildCleanupTtlContext,
+  remoteBuildEnabledContext,
+  serverVersionContext,
+  stubRemoteBuildJobState,
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { BASE_PATH, withBase } from "../util/base-path.js";
 import { isTerminalJobStatus } from "../util/firmware-job-status.js";
+import { seededMap } from "../util/snapshot.js";
 
 // Mirrors the backend's `_PRIMARY_JOB_TYPES` retention pool — these
 // are the job types deduplicated to one terminal entry per device.
@@ -101,6 +150,7 @@ import "./feedback-dialog.js";
 import type { ESPHomeFeedbackDialog } from "./feedback-dialog.js";
 import "./firmware-jobs-dialog.js";
 import type { ESPHomeFirmwareJobsDialog } from "./firmware-jobs-dialog.js";
+import "./onboarding-wifi-dialog.js";
 import "./settings-dialog.js";
 import type { ESPHomeSettingsDialog } from "./settings-dialog.js";
 
@@ -157,6 +207,10 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _version = "";
 
+  @provide({ context: serverVersionContext })
+  @state()
+  private _serverVersion = "";
+
   @provide({ context: darkModeContext })
   @state()
   private _darkMode = false;
@@ -188,12 +242,177 @@ export class ESPHomeApp extends LitElement {
   @state()
   private _yamlDiffButton = false;
 
+  // Receiver-side master switch for the remote-build feature
+  // (issue #106 phase 2). Loaded from the backend on (re)connect;
+  // updated when the user toggles ``Settings → Remote builder``.
+  // Phase 2 only persists the flag — phase 3 wires the
+  // ``/remote-build/v1/*`` route registration to it.
+  @provide({ context: remoteBuildEnabledContext })
+  @state()
+  private _remoteBuildEnabled = false;
+
+  // 6c cleanup-sweep TTL (seconds). Loaded alongside the
+  // master enable toggle; updated when the operator commits
+  // the input in Settings → Build server. Default mirrors the
+  // backend default so a never-loaded state still renders
+  // sensibly in the UI.
+  @provide({ context: remoteBuildCleanupTtlContext })
+  @state()
+  private _remoteBuildCleanupTtl = CLEANUP_TTL_DEFAULT_SECONDS;
+
   // Frozen catalog-derived map; refreshed only with a backend release.
   // Cheap to leave at {} until the fetch lands — the device drawer
   // falls back to plain-text tags whenever a name isn't in the map.
   @provide({ context: integrationDocsContext })
   @state()
   private _integrationDocs: Record<string, string> = {};
+
+  /** Global label catalog. Fetched once on (re)connect via
+   *  ``labels/list`` and kept in sync by ``label_*`` events
+   *  delivered through ``subscribe_events``. Empty until the
+   *  fetch lands; consumers tolerate that — chip renderers
+   *  silently drop unknown ids (``resolveLabelIds``) and the
+   *  toolbar filter hides itself entirely on an empty catalog,
+   *  so missing entries simply produce no visible UI. */
+  @provide({ context: labelsContext })
+  @state()
+  private _labels: Label[] = [];
+
+  /** True when onboarding has any data-derived ``pending`` step.
+   *  Derived in ``_loadOnboardingState`` from
+   *  ``onboarding/get_state``. Surfaced to header-actions to gate
+   *  the conditional ``Set up Wi-Fi…`` kebab entry. Dialog
+   *  visibility uses a separate signal (acknowledged-version +
+   *  session-dismissal) — this context is the always-on data
+   *  signal that should outlive any dismissal. */
+  @provide({ context: onboardingPendingContext })
+  @state()
+  private _onboardingPending = false;
+
+  /** Counter incremented on every ``remote_build_identity_rotated``
+   *  event. The Build server Settings card watches this through
+   *  the matching context and re-fetches its identity when the
+   *  value changes, so a rotation triggered in another tab
+   *  refreshes here without a manual reload. */
+  @provide({ context: buildServerIdentityRotationCounterContext })
+  @state()
+  private _buildServerIdentityRotationCounter = 0;
+
+  /** Receiver-side peer list (PENDING + APPROVED). Seeded from
+   *  the ``initial_state.peers`` snapshot the backend pushes
+   *  once at subscribe time; mutated locally as
+   *  ``remote_build_pair_request_received`` (upsert) and
+   *  ``remote_build_pair_status_changed`` (status flip / row
+   *  drop) events arrive. ``null`` until the snapshot lands so
+   *  consumers can distinguish "no controller / still loading"
+   *  from "loaded with zero rows". Phase 4b-2 (#106). */
+  @provide({ context: buildServerPeersContext })
+  @state()
+  private _buildServerPeers: PeerSummary[] | null = null;
+
+  /** Latest receiver-side pairing-window state. ``null`` until
+   *  the first ``remote_build_pairing_window_changed`` event lands
+   *  (or until the Settings dialog's Build server section runs
+   *  its initial ``setRemoteBuildPairingWindow`` call). The
+   *  Settings UI renders an open/closed status pill plus the
+   *  remaining lifetime when open. Phase 4b-2 (#106). */
+  @provide({ context: buildServerPairingWindowStateContext })
+  @state()
+  private _buildServerPairingWindowState: PairingWindowState | null = null;
+
+  /** mDNS-discovered offload-target dashboards, keyed on the
+   *  service-instance ``name`` for fast upsert / delete and
+   *  insertion-ordered iteration. Seeded from
+   *  ``initial_state.hosts`` on subscribe; live updates flow
+   *  through ``REMOTE_BUILD_HOST_ADDED`` (upsert) /
+   *  ``REMOTE_BUILD_HOST_REMOVED`` (drop). Replaces the deleted
+   *  ``listRemoteBuildHosts`` pull surface. ``null`` until the
+   *  initial-state snapshot lands so consumers can distinguish
+   *  "no controller / still loading" from "loaded with zero
+   *  rows". A :class:`Map` (not a plain object) avoids the
+   *  ``__proto__``/``constructor`` key collision a malicious
+   *  mDNS responder could trigger and the
+   *  numeric-key reordering plain objects do during
+   *  enumeration. */
+  @provide({ context: buildOffloadDiscoveredHostsContext })
+  @state()
+  private _buildOffloadDiscoveredHosts: Map<string, RemoteBuildPeer> | null =
+    null;
+
+  /** Offloader-side pairings (PENDING + APPROVED), keyed on
+   *  ``${hostname}:${port}`` (matches the backend's
+   *  ``StoredPairing`` key — receiver `dashboard_id` isn't
+   *  visible offloader-side, so the receiver coordinates the
+   *  user typed are the stable id). Seeded from
+   *  ``initial_state.pairings``; mutated locally on
+   *  ``OFFLOADER_PAIR_STATUS_CHANGED`` (status flip on
+   *  ``"approved"``, drop on ``"removed"``). The Send-builds
+   *  Settings subsection reads this directly to render the
+   *  paired-receivers list, and the pair dialog reads it to
+   *  auto-close on a matching event after a sent
+   *  ``request_pair``. ``Map`` for the same reasons
+   *  ``_buildOffloadDiscoveredHosts`` is: keys are
+   *  user/network-supplied strings, insertion order needs to
+   *  be stable, and ``Map`` avoids the
+   *  ``__proto__``/``constructor`` key collisions a plain
+   *  object would have on those keys. ``null`` until the
+   *  snapshot lands. */
+  @provide({ context: buildOffloadPairingsContext })
+  @state()
+  private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
+
+  /** Offloader-side master "Remote builds enabled" toggle (7b).
+   *  Seeded from ``initial_state.remote_builds_enabled``;
+   *  mutated locally on ``OFFLOADER_REMOTE_BUILDS_TOGGLED``
+   *  events. ``null`` until the snapshot lands so consumers
+   *  can distinguish "no controller / still loading" from
+   *  "loaded but disabled". */
+  @provide({ context: offloaderRemoteBuildsEnabledContext })
+  @state()
+  private _offloaderRemoteBuildsEnabled: boolean | null = null;
+
+  /** Offloader-side pair alerts keyed on ``${hostname}:${port}``.
+   *  Populated by ``OFFLOADER_PAIR_PIN_MISMATCH`` /
+   *  ``OFFLOADER_PAIR_PEER_REVOKED`` (upsert by key) and
+   *  cleared by ``OFFLOADER_PAIR_ALERT_DISMISSED`` (drop by
+   *  key); seeded from ``initial_state.offloader_alerts``
+   *  on subscribe. RAM-only on the backend, RAM-only here.
+   *  ``null`` until the snapshot lands so consumers can
+   *  distinguish "no controller / still loading" from
+   *  "loaded with zero alerts". */
+  @provide({ context: buildOffloadAlertsContext })
+  @state()
+  private _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null =
+    null;
+
+  /** Active + recently-terminal remote-build jobs the offloader's
+   *  user dispatched via remote_build/submit_job, keyed on
+   *  job_id. Seeded as an empty Map on app boot (no backend
+   *  snapshot today; tabs that subscribe mid-build pick up
+   *  state on the next event). Mutated by
+   *  OFFLOADER_JOB_STATE_CHANGED / OFFLOADER_JOB_OUTPUT events
+   *  on the global subscribe_events stream, plus a fresh
+   *  submit_job returning ack on the offloader UI's click
+   *  path (the dispatch helper seeds the entry's display
+   *  fields the wire frames don't carry). */
+  @provide({ context: buildOffloadJobsContext })
+  @state()
+  private _buildOffloadJobs: Map<string, RemoteBuildJobState> = new Map();
+
+  /** True when the onboarding wizard should be shown. Computed
+   *  from ``completed_version < current_version`` AND not
+   *  session-dismissed. Session-only ``"maybe later"`` flips
+   *  ``_onboardingSessionDismissed`` so the dialog stays closed
+   *  until the next dashboard load; explicit decline / save call
+   *  ``mark_acknowledged`` on the backend so the dialog stops
+   *  re-popping until a future onboarding-version bump. */
+  @state()
+  private _onboardingShouldShow = false;
+
+  /** Frontend-only "maybe later" — closes the dialog without
+   *  POSTing acknowledgement. Reset on next page load. */
+  @state()
+  private _onboardingSessionDismissed = false;
 
   // ─── Auth gate ───────────────────────────────────────────
   // Drives whether we render the connecting spinner, the login form,
@@ -223,11 +442,11 @@ export class ESPHomeApp extends LitElement {
 
   private _router = new Router(this, [
     {
-      path: "/",
+      path: withBase("/"),
       render: () => html`<esphome-page-dashboard></esphome-page-dashboard>`,
     },
     {
-      path: "/secrets",
+      path: withBase("/secrets"),
       enter: async () => {
         await import("../pages/secrets.js");
         return true;
@@ -235,7 +454,7 @@ export class ESPHomeApp extends LitElement {
       render: () => html`<esphome-page-secrets></esphome-page-secrets>`,
     },
     {
-      path: "/device/:id",
+      path: withBase("/device/:id"),
       enter: async () => {
         await import("../pages/device.js");
         return true;
@@ -322,6 +541,12 @@ export class ESPHomeApp extends LitElement {
     if ("serial" in navigator) {
       navigator.serial.addEventListener("connect", this._onSerialConnect);
     }
+    // ``secrets-saved`` is dispatched on ``window`` by every code
+    // path that writes ``secrets.yaml`` (the secrets editor, the
+    // onboarding wizard). Refresh the onboarding snapshot so the
+    // kebab "Set up Wi-Fi" entry tracks the on-disk state in real
+    // time regardless of which surface initiated the write.
+    window.addEventListener("secrets-saved", this._onSecretsSaved);
   }
 
   disconnectedCallback() {
@@ -331,6 +556,7 @@ export class ESPHomeApp extends LitElement {
     if ("serial" in navigator) {
       navigator.serial.removeEventListener("connect", this._onSerialConnect);
     }
+    window.removeEventListener("secrets-saved", this._onSecretsSaved);
   }
 
   private _initDarkMode() {
@@ -391,7 +617,8 @@ export class ESPHomeApp extends LitElement {
     // sends backend commands has to wait for ``api.ready``.
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
-      this._isHaIngress = info.ha_addon && window.location.pathname.includes("/ingress");
+      this._serverVersion = info.server_version;
+      this._isHaIngress = info.ha_addon && BASE_PATH.includes("/ingress");
       this._apiConnected = true;
       // ``api.ready`` resolves when the connection is usable — either
       // ``requires_auth: false``, or a stored token replay succeeds.
@@ -433,7 +660,123 @@ export class ESPHomeApp extends LitElement {
     this._subscribeToEvents();
     this._subscribeToFollowJobs();
     this._loadIntegrationDocs();
+    this._loadLabels();
     this._loadThemePreference();
+    this._loadRemoteBuildSettings();
+    this._loadOnboardingState();
+  }
+
+  /** Load the onboarding snapshot and update both the
+   *  always-on data signal (``_onboardingPending`` — gates the
+   *  ``Set up Wi-Fi…`` kebab entry in header-actions) and the
+   *  dialog-show signal (``_onboardingShouldShow`` — auto-pop
+   *  requires acknowledged-version-behind AND a pending step
+   *  AND no session-dismissal; see ``shouldAutoShowOnboarding``
+   *  for the full predicate). Re-runs on reconnect and after
+   *  every secrets save; the dialog doesn't re-open mid-session
+   *  because ``_onboardingSessionDismissed`` survives the
+   *  refresh. The kebab entry is the manual override for users
+   *  who want the wizard outside of the auto-pop conditions. */
+  private async _loadOnboardingState() {
+    try {
+      const state = await this._api.getOnboardingState();
+      this._onboardingPending = isOnboardingPending(state);
+      this._onboardingShouldShow = shouldAutoShowOnboarding(
+        state,
+        this._onboardingSessionDismissed,
+      );
+    } catch (err) {
+      // Onboarding is non-critical — a transient WS failure here
+      // shouldn't block the rest of the dashboard. Clear the
+      // badge (the latest data is unknown, so reading as "no
+      // nudge" is safer than a stale red dot) but leave the
+      // dialog-show signal alone: a transient reload on a
+      // session-dismissed state must not cause a false→true
+      // transition that re-opens the wizard the user just
+      // closed. ``_onboardingSessionDismissed`` already prevents
+      // the *next* successful load from re-opening, but only if
+      // we don't toggle the show signal in between.
+      console.warn("Failed to load onboarding state:", err);
+      this._onboardingPending = false;
+    }
+  }
+
+  private _onOnboardingAcknowledged = () => {
+    // Triggered by the dialog after a successful save or explicit
+    // decline — both of which call ``mark_acknowledged`` on the
+    // backend. Refresh the state so the badge reflects the new
+    // data (cleared after a save) and so the dialog signal stays
+    // accurate without another full round-trip on the user's
+    // next page load.
+    this._onboardingShouldShow = false;
+    this._loadOnboardingState();
+  };
+
+  private _onOnboardingDismissedSession = () => {
+    this._onboardingSessionDismissed = true;
+    this._onboardingShouldShow = false;
+  };
+
+  /** User picked the "Set up Wi-Fi" kebab item. Re-launches the
+   *  wizard regardless of acknowledged-version / session-dismiss
+   *  — the kebab entry is the explicit "I want to do this now"
+   *  signal, so we override both gates. */
+  private _onOpenOnboarding = () => {
+    this._onboardingSessionDismissed = false;
+    this._onboardingDialog?.open();
+  };
+
+  /** Secrets editor finished a save. Refresh the onboarding
+   *  snapshot so the kebab entry appears / disappears in real
+   *  time when the user clears or fills in Wi-Fi credentials by
+   *  hand instead of going through the wizard. */
+  private _onSecretsSaved = () => {
+    this._loadOnboardingState();
+  };
+
+  // True while a ``setRemoteBuildSettings`` write is in flight. The
+  // reload path on (re)connect skips when this is set so a write
+  // racing with an auto-reconnect can't get clobbered by the
+  // server-side pre-toggle value.
+  private _remoteBuildSetInFlight = false;
+
+  private async _loadRemoteBuildSettings() {
+    // Receiver-side remote-build settings (issue #106 phase 2).
+    // The frontend is shipped bundled with the backend wheel, so
+    // every backend on the wire already knows these commands —
+    // no older-version path. A real failure here is a transient
+    // (broken WS, server bug), logged so it isn't silently
+    // masking ``false`` when the actual state is ``true``.
+    if (this._remoteBuildSetInFlight) {
+      // A user-initiated write is racing with this reload. Skip —
+      // the optimistic value is the source of truth until the
+      // write completes; the post-write state is what should
+      // persist, not the pre-write server snapshot.
+      return;
+    }
+    try {
+      const settings = await this._api.getRemoteBuildSettings();
+      this._remoteBuildEnabled = settings.enabled;
+      this._remoteBuildCleanupTtl = settings.cleanup_ttl_seconds;
+    } catch (err) {
+      console.warn("Could not load remote-build settings:", err);
+    }
+  }
+
+  /** Fetch the global label catalog. Called on every (re)connect so
+   *  a session that reconnects after a backend label change picks up
+   *  the latest state — push events drive it day-to-day, but a
+   *  reconnect crosses a window where events were dropped. A failure
+   *  here is non-fatal: ``_labels`` stays at its previous value (or
+   *  empty on first load); chip renderers silently drop unknown ids
+   *  and the toolbar filter hides itself on an empty catalog, so the
+   *  missing data simply produces no visible UI. */
+  private async _loadLabels() {
+    try {
+      this._labels = await this._api.listLabels();
+    } catch (err) {
+      console.warn("Failed to load labels catalog:", err);
+    }
   }
 
   /**
@@ -632,13 +975,117 @@ export class ESPHomeApp extends LitElement {
     this._recentJobTimers.set(job.configuration, timer);
   }
 
+  /**
+   * Merge a partial diff into the matching offloader pairing
+   * row keyed by `pin`.
+   *
+   * Centralises the null-check + missing-row guard + Map clone
+   * pattern that every connection-state transition shares
+   * (PAIR_STATUS_CHANGED, PEER_LINK_OPENED, PEER_LINK_CLOSED).
+   * `_buildOffloadPairings === null` means the
+   * `subscribe_events` snapshot hasn't seeded yet; a missing
+   * row means the event raced ahead of the snapshot or fired
+   * against a pairing the backend just dropped. Both no-op
+   * because the next initial_state reseed carries the right
+   * state and we'd rather skip than synthesise a partial row.
+   */
+  private _patchOffloadPairing(
+    pin: string,
+    diff: Partial<PairingSummary>,
+  ): void {
+    if (this._buildOffloadPairings === null) {
+      return;
+    }
+    const existing = this._buildOffloadPairings.get(pin);
+    if (existing === undefined) {
+      return;
+    }
+    const next = new Map(this._buildOffloadPairings);
+    next.set(pin, { ...existing, ...diff });
+    this._buildOffloadPairings = next;
+  }
+
   private _handleEvent(event: string, data: unknown): void {
     switch (event) {
       case DeviceEventType.INITIAL_STATE: {
-        const { devices, importable } = data as InitialStateEventData;
+        const {
+          devices,
+          importable,
+          peers,
+          hosts,
+          pairings,
+          offloader_alerts,
+          remote_jobs,
+          remote_builds_enabled,
+        } = data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
         this._devicesLoaded = true;
+        // ``peers`` / ``hosts`` / ``pairings`` /
+        // ``offloader_alerts`` are optional — backend omits the
+        // fields when no remote-build controller is wired up.
+        // ``[]`` would imply "controller present, no rows" which
+        // is a distinct state, so we default to ``null`` (still /
+        // not loading) when absent. ``peers`` is the one
+        // remote-build snapshot field that's stored as a list
+        // rather than a Map (its consumer iterates) so it skips
+        // the ``seededMap`` helper.
+        this._buildServerPeers = peers ?? null;
+        this._buildOffloadDiscoveredHosts = seededMap(hosts, (h) => h.name);
+        this._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
+        this._buildOffloadAlerts = seededMap(
+          offloader_alerts,
+          (a) => a.pin_sha256,
+        );
+        // ``remote_jobs`` is the offloader-side in-flight
+        // remote-build snapshot. The backend's view is
+        // authoritative for which jobs exist (terminal entries
+        // are already dropped on the receiver) and for the
+        // status / error_message fields the wire carries; for
+        // each snapshot entry we MERGE onto whatever the local
+        // map had so a WS reconnect doesn't wipe the
+        // dispatch-side display fields (configuration / target /
+        // receiver_label) the submit dialog stamped, the
+        // accumulated output buffer, or the started_at the
+        // dispatch helper recorded. Local entries the backend
+        // doesn't include in the snapshot get dropped — they're
+        // either terminal-and-cleaned-up (correct: receiver no
+        // longer has them) or never existed on the receiver
+        // (correct: they shouldn't survive a reconnect into
+        // the new connection's reality). Display fields stay
+        // empty on a fresh page load mid-build (no prior
+        // dispatch in this session); the re-attach view
+        // tolerates the empty defaults and the next
+        // OFFLOADER_JOB_OUTPUT line repopulates the buffer
+        // from the subscribe point forward. Skips the rebuild
+        // when the field is absent (controller not wired up)
+        // so a previously-seeded map isn't lost on a reconnect
+        // against a backend that dropped the controller.
+        if (remote_jobs !== undefined) {
+          const seeded = new Map<string, RemoteBuildJobState>();
+          for (const entry of remote_jobs) {
+            const existing = this._buildOffloadJobs.get(entry.job_id);
+            const base =
+              existing ??
+              stubRemoteBuildJobState(entry.job_id, entry.pin_sha256);
+            seeded.set(entry.job_id, {
+              ...base,
+              pin_sha256: entry.pin_sha256,
+              status: entry.status,
+              error_message: entry.error_message,
+            });
+          }
+          this._buildOffloadJobs = seeded;
+        }
+        // 7b — master "Remote builds enabled" toggle. Default
+        // `null` when absent (controller not wired up) so
+        // consumers can distinguish "still loading" from a
+        // landed-but-disabled state; the OffloaderRemoteBuilds
+        // toggle event handler below upserts the same field
+        // when the master switch flips through any tab.
+        if (remote_builds_enabled !== undefined) {
+          this._offloaderRemoteBuildsEnabled = remote_builds_enabled;
+        }
         break;
       }
       case DeviceEventType.DEVICE_ADDED: {
@@ -701,8 +1148,416 @@ export class ESPHomeApp extends LitElement {
         );
         break;
       }
+      case DeviceEventType.LABEL_CREATED: {
+        const { label } = data as LabelEventData;
+        if (!this._labels.some((l) => l.id === label.id)) {
+          this._labels = [...this._labels, label];
+        }
+        break;
+      }
+      case DeviceEventType.LABEL_UPDATED: {
+        // Upsert, not just replace — if the initial ``labels/list``
+        // failed (or this client missed the matching ``LABEL_CREATED``
+        // for any reason) the catalog can be missing this entry, and
+        // a plain ``map`` would silently drop the update and leave the
+        // catalog permanently incomplete until the next reconnect.
+        const { label } = data as LabelEventData;
+        const idx = this._labels.findIndex((l) => l.id === label.id);
+        this._labels =
+          idx === -1
+            ? [...this._labels, label]
+            : this._labels.map((l) => (l.id === label.id ? label : l));
+        break;
+      }
+      case DeviceEventType.LABEL_DELETED: {
+        const { label_id } = data as LabelDeletedEventData;
+        this._labels = this._labels.filter((l) => l.id !== label_id);
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_IDENTITY_ROTATED: {
+        // Bump the counter. Settings dialog watches the matching
+        // context and re-fetches identity when the value changes,
+        // so a rotation triggered in another tab refreshes the
+        // visible cert fingerprint here.
+        this._buildServerIdentityRotationCounter += 1;
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_PAIR_REQUEST_RECEIVED: {
+        // Upsert a PENDING row keyed on ``dashboard_id``. Carries
+        // every field needed for a complete ``PeerSummary``-shape
+        // (the receiver fires this event with ``paired_at`` and
+        // ``peer_ip`` so the frontend doesn't need a follow-up
+        // read). A re-pair by the same offloader before admin
+        // clicked Accept lands a fresh event with the new pin /
+        // pubkey / paired_at / peer_ip; upsert overwrites in
+        // place. ``peer_ip`` is display-only — the inbox renders
+        // it as a clone-risk sanity-check, no decision logic
+        // keys on it.
+        const evt = data as RemoteBuildPairRequestReceivedEventData;
+        const incoming: PeerSummary = {
+          dashboard_id: evt.dashboard_id,
+          pin_sha256: evt.pin_sha256,
+          label: evt.label,
+          paired_at: evt.paired_at,
+          status: "pending",
+          peer_ip: evt.peer_ip,
+          // PENDING peers are always offline; peer-link is gated
+          // on APPROVED status server-side via
+          // ``lookup_peer_for_session``, so the receiver won't
+          // register a session for this row until admin accepts.
+          connected: false,
+        };
+        const current = this._buildServerPeers ?? [];
+        const idx = current.findIndex(
+          (p) => p.dashboard_id === incoming.dashboard_id
+        );
+        this._buildServerPeers =
+          idx === -1
+            ? [...current, incoming]
+            : [...current.slice(0, idx), incoming, ...current.slice(idx + 1)];
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_PAIR_STATUS_CHANGED: {
+        // Two cases keyed on ``status``:
+        // - ``approved``: flip the matching row's ``status`` from
+        //   pending to approved. The other fields stay valid (no
+        //   command mutates an APPROVED row in production today;
+        //   the receiver event carries only dashboard_id +
+        //   status by design).
+        // - ``removed``: drop the row. Reaches the frontend when
+        //   admin clicked Remove or when the pairing-window
+        //   auto-close cleared a stale PENDING entry.
+        const evt = data as RemoteBuildPairStatusChangedEventData;
+        const current = this._buildServerPeers ?? [];
+        if (evt.status === "removed") {
+          this._buildServerPeers = current.filter(
+            (p) => p.dashboard_id !== evt.dashboard_id
+          );
+        } else {
+          this._buildServerPeers = current.map((p) =>
+            p.dashboard_id === evt.dashboard_id
+              ? { ...p, status: "approved" as const }
+              : p
+          );
+        }
+        break;
+      }
+      case DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED:
+      case DeviceEventType.RECEIVER_PEER_LINK_SESSION_CLOSED: {
+        // Flip ``connected`` on the matching APPROVED row.
+        // Both events share the same payload shape; the
+        // discriminator is the event type itself.
+        // ``_buildServerPeers`` may be ``null`` (snapshot not
+        // yet seeded) or missing the row entirely (event raced
+        // ahead of the snapshot, or fired against a peer the
+        // backend just dropped). In both cases the next
+        // ``initial_state`` reseed carries the right state, so
+        // skip rather than synthesise a partial row.
+        if (this._buildServerPeers === null) {
+          break;
+        }
+        const evt = data as ReceiverPeerLinkSessionEventData;
+        const connected =
+          event === DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED;
+        this._buildServerPeers = this._buildServerPeers.map((p) =>
+          p.dashboard_id === evt.dashboard_id ? { ...p, connected } : p
+        );
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_PAIRING_WINDOW_CHANGED: {
+        // Mirror the receiver's pairing-window state directly.
+        // The event payload IS the state shape, so the assignment
+        // is a passthrough.
+        this._buildServerPairingWindowState =
+          data as RemoteBuildPairingWindowChangedEventData;
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_HOST_ADDED: {
+        // Upsert a discovered-host row keyed on ``name`` (the
+        // mDNS service-instance label). The same event fires for
+        // both the cache-hit branch and the async resolve-success
+        // branch on the backend, plus on TXT refreshes mid-
+        // session, so overwrite-by-name handles all three paths.
+        // ``Map.set`` preserves the existing insertion position
+        // for an already-present key, so a TXT refresh on an
+        // existing host doesn't shuffle the rendered order.
+        const evt = data as RemoteBuildHostAddedEventData;
+        const next = new Map(this._buildOffloadDiscoveredHosts ?? []);
+        next.set(evt.name, evt);
+        this._buildOffloadDiscoveredHosts = next;
+        break;
+      }
+      case DeviceEventType.REMOTE_BUILD_HOST_REMOVED: {
+        // Drop the row keyed on ``name``. Backend only fires this
+        // when ``self._peers.pop`` actually returned a row, so
+        // unknown-name events would already be filtered server-
+        // side; the ``delete`` here is the immutable mutation
+        // (clone, then drop) Lit needs to re-render.
+        const evt = data as RemoteBuildHostRemovedEventData;
+        if (this._buildOffloadDiscoveredHosts === null) {
+          break;
+        }
+        const next = new Map(this._buildOffloadDiscoveredHosts);
+        next.delete(evt.name);
+        this._buildOffloadDiscoveredHosts = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_STATUS_CHANGED: {
+        // Two cases keyed on ``status``. The map (and event) is
+        // keyed by ``pin_sha256`` (the receiver's static
+        // X25519 pubkey hash), the wire-canonical stable row
+        // identity — receiver hostname/port are display-only
+        // and can change without remapping (4a-o part 6).
+        // - ``approved``: flip the matching pairing row's status
+        //   to "approved". Other fields stay valid (the receiver-
+        //   side approval doesn't mutate label / pin / paired_at).
+        //   If the row isn't in the map yet (event raced ahead
+        //   of the snapshot), skip the flip — the next
+        //   initial-state push reseeds.
+        // - ``removed``: drop the row by key. ``unpair`` /
+        //   receiver-side reject / receiver-rotated-out-from-
+        //   under-us all funnel through this event.
+        const evt = data as OffloaderPairStatusChangedEventData;
+        if (evt.status === "removed") {
+          // ``removed`` is a row-drop, not a row-patch, so the
+          // shared ``_patchOffloadPairing`` doesn't apply.
+          if (this._buildOffloadPairings === null) {
+            break;
+          }
+          const next = new Map(this._buildOffloadPairings);
+          next.delete(evt.pin_sha256);
+          this._buildOffloadPairings = next;
+          break;
+        }
+        // PENDING→APPROVED flips ``connecting`` to true: the
+        // backend spawns the long-lived peer-link client at
+        // the same moment, so the next thing the operator sees
+        // should be a "Connecting…" pill on the row until the
+        // first OFFLOADER_PEER_LINK_OPENED lands.
+        // ``last_connect_error`` resets to empty for the same
+        // reason — the previous-pairing's error history is
+        // unrelated to the freshly-approved row.
+        this._patchOffloadPairing(evt.pin_sha256, {
+          status: "approved",
+          connecting: true,
+          connected: false,
+          last_connect_error: "",
+        });
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PEER_LINK_OPENED: {
+        // OPENED clears the failure record: a successful
+        // session-open invalidates whatever caused the previous
+        // close. Mirrors the backend's
+        // ``PeerLinkClient._last_connect_error`` clear at the
+        // same moment.
+        const evt = data as OffloaderPeerLinkSessionEventData;
+        this._patchOffloadPairing(evt.pin_sha256, {
+          connected: true,
+          connecting: false,
+          last_connect_error: "",
+        });
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PEER_LINK_CLOSED: {
+        // CLOSED has the same identity fields as OPENED plus
+        // the close classification: ``reason`` is the category,
+        // ``error_detail`` is the human-readable specific.
+        // Orphan reasons (``superseded`` / ``pin_mismatch``) are
+        // the run loop's terminal stops: the offloader's
+        // PeerLinkClient won't reconnect, so the row should NOT
+        // show "Connecting…" in the UI — it should show the
+        // last error and wait for the operator to re-pair or
+        // unpair. Every other reason is a transient close where
+        // the run loop is about to back off and try again, so
+        // ``connecting`` flips back to true.
+        const evt = data as OffloaderPeerLinkClosedEventData;
+        const orphaned =
+          evt.reason === "superseded" || evt.reason === "pin_mismatch";
+        this._patchOffloadPairing(evt.pin_sha256, {
+          connected: false,
+          connecting: !orphaned,
+          last_connect_error: evt.error_detail,
+        });
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_PIN_MISMATCH: {
+        // Backend's pair-status listener detected the receiver's
+        // static X25519 pubkey hash drifted from what the
+        // offloader had on disk. Upsert the alert keyed on
+        // ``pin_sha256`` (4a-o part 6 — the alerts dict is
+        // pin-keyed; same key shape as the snapshot's
+        // ``initial_state.offloader_alerts`` push).
+        const evt = data as OffloaderPairPinMismatchEventData;
+        const next = new Map(this._buildOffloadAlerts ?? []);
+        next.set(evt.pin_sha256, {
+          kind: "pin_mismatch",
+          receiver_hostname: evt.receiver_hostname,
+          receiver_port: evt.receiver_port,
+          pin_sha256: evt.pin_sha256,
+          receiver_label: evt.receiver_label,
+          expected_pin: evt.expected_pin,
+          observed_pin: evt.observed_pin,
+          fired_at: Date.now() / 1000,
+        });
+        this._buildOffloadAlerts = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_PEER_REVOKED: {
+        // Receiver returned ``rejected`` on the pair-status
+        // long-poll. Same upsert pattern as pin_mismatch, just
+        // a different ``kind`` discriminator.
+        const evt = data as OffloaderPairPeerRevokedEventData;
+        const next = new Map(this._buildOffloadAlerts ?? []);
+        next.set(evt.pin_sha256, {
+          kind: "peer_revoked",
+          receiver_hostname: evt.receiver_hostname,
+          receiver_port: evt.receiver_port,
+          pin_sha256: evt.pin_sha256,
+          receiver_label: evt.receiver_label,
+          fired_at: Date.now() / 1000,
+        });
+        this._buildOffloadAlerts = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIR_ALERT_DISMISSED: {
+        // Backend dropped the alert via one of the resolution
+        // paths (``request_pair`` succeeded for matching pin,
+        // or ``unpair`` removed the row). Drop the local row
+        // to match. Pin-keyed since 4a-o part 6.
+        const evt = data as OffloaderPairAlertDismissedEventData;
+        if (this._buildOffloadAlerts === null) {
+          break;
+        }
+        const next = new Map(this._buildOffloadAlerts);
+        next.delete(evt.pin_sha256);
+        this._buildOffloadAlerts = next;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_REMOTE_BUILDS_TOGGLED: {
+        // 7b — master "Remote builds enabled" switch flipped via
+        // another tab (or this tab's optimistic write coming
+        // back through the bus). Plain assign; the field is a
+        // primitive boolean, no Map/array immutability dance.
+        const evt = data as OffloaderRemoteBuildsToggledEventData;
+        this._offloaderRemoteBuildsEnabled = evt.remote_builds_enabled;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIRING_ENABLED_CHANGED: {
+        // 7b — per-pairing enable switch flipped. Patch the row
+        // through the shared helper so the consumer sees the
+        // immutable Map mutation. If the row isn't in the map
+        // yet (event raced ahead of the snapshot, or the row
+        // was just unpaired on another tab), skip — the next
+        // initial-state reseed will resync.
+        const evt = data as OffloaderPairingEnabledChangedEventData;
+        this._patchOffloadPairing(evt.pin_sha256, { enabled: evt.enabled });
+        break;
+      }
+      case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
+        // Lifecycle transition for a remote-build job we
+        // submitted: queued / running / completed / failed /
+        // cancelled. Either upsert an existing entry (the
+        // dispatch helper already seeded display fields), or
+        // start one with empty display fields (event raced
+        // ahead of submit_job's return, or a late-subscribing
+        // tab joined mid-build). The dialog tolerates empty
+        // display fields and the dispatch helper backfills
+        // them on its success bubble.
+        const evt = data as OffloaderJobStateChangedEventData;
+        const base = this._buildOffloadJobs.get(evt.job_id) ??
+          stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
+        this._buildOffloadJobs = new Map(this._buildOffloadJobs).set(evt.job_id, {
+          ...base,
+          status: evt.status,
+          error_message: evt.error_message,
+        });
+        break;
+      }
+      case DeviceEventType.OFFLOADER_JOB_OUTPUT: {
+        // Per-line stdout / stderr from the receiver's running
+        // build. High-rate path during an active compile; the
+        // existing ansi-log component re-renders on its own
+        // throttle. Same brand-new-entry tolerance as
+        // STATE_CHANGED above (event-before-ack race).
+        const evt = data as OffloaderJobOutputEventData;
+        const base = this._buildOffloadJobs.get(evt.job_id) ??
+          stubRemoteBuildJobState(evt.job_id, evt.pin_sha256);
+        this._buildOffloadJobs = new Map(this._buildOffloadJobs).set(evt.job_id, {
+          ...base,
+          output: [...base.output, evt.line],
+        });
+        break;
+      }
     }
   }
+
+  /**
+   * Stamp / refresh the in-flight remote-build job map with
+   * the display fields the wire events don't carry.
+   *
+   * Called by the submit-job dialog right after the WS ack
+   * returns: backend's response gives us the canonical
+   * job_id; the dialog already has the configuration /
+   * target / receiver_label the user picked. Merging both
+   * here lets the renderer show "kitchen.yaml on desktop"
+   * instead of falling back to the empty defaults the
+   * event-only path stamps.
+   *
+   * If a state-changed or output event already raced ahead
+   * (and stamped an entry with empty display fields), we
+   * preserve its accumulated state and only fill in the
+   * missing display fields.
+   */
+  registerRemoteBuildJob(seed: {
+    job_id: string;
+    pin_sha256: string;
+    receiver_label: string;
+    configuration: string;
+    target: RemoteBuildSubmitTarget;
+  }): void {
+    const next = new Map(this._buildOffloadJobs);
+    const existing = next.get(seed.job_id);
+    next.set(seed.job_id, {
+      job_id: seed.job_id,
+      pin_sha256: seed.pin_sha256,
+      receiver_label: seed.receiver_label,
+      configuration: seed.configuration,
+      target: seed.target,
+      status: existing?.status ?? JobStatus.QUEUED,
+      error_message: existing?.error_message ?? "",
+      output: existing?.output ?? [],
+      // ``||`` not ``??``: stubRemoteBuildJobState seeds 0 as
+      // the "unset" sentinel, and ``??`` would preserve it
+      // here (?? only falls through on null / undefined). Any
+      // existing>0 wins (the entry was stamped on a previous
+      // submit's bubble); a 0 from an events-only stub gets
+      // replaced with the current dispatch time so consumers
+      // sorting by started_at (settings-dialog's
+      // _latestRemoteBuildJobForPin) reliably pick the newest.
+      started_at: existing?.started_at || Date.now(),
+    });
+    this._buildOffloadJobs = next;
+  }
+
+  /**
+   * Drop a finished remote-build job from the in-flight map.
+   *
+   * Called by the progress dialog's Close button on a
+   * terminal job (completed / failed / cancelled). The
+   * receiver doesn't echo a "row removed" event the way
+   * pair-status does, so the offloader-side cleanup is
+   * client-driven.
+   */
+  dismissRemoteBuildJob(job_id: string): void {
+    if (!this._buildOffloadJobs.has(job_id)) {
+      return;
+    }
+    const next = new Map(this._buildOffloadJobs);
+    next.delete(job_id);
+    this._buildOffloadJobs = next;
+  }
+
 
   // ─── Render ──────────────────────────────────────────────
 
@@ -746,6 +1601,7 @@ export class ESPHomeApp extends LitElement {
         @open-firmware-jobs=${this._onOpenFirmwareJobs}
         @open-reset-build-env=${this._onOpenResetBuildEnv}
         @open-feedback=${this._onOpenFeedback}
+        @open-onboarding-wifi=${this._onOpenOnboarding}
       >
         ${this._router.outlet()}
       </esphome-layout>
@@ -757,14 +1613,38 @@ export class ESPHomeApp extends LitElement {
       <esphome-settings-dialog
         @set-theme=${this._onSetTheme}
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
+        @set-remote-build-enabled=${this._onSetRemoteBuildEnabled}
+        @set-remote-build-cleanup-ttl=${this._onSetRemoteBuildCleanupTtl}
+        @set-offloader-remote-builds-enabled=${this._onSetOffloaderRemoteBuildsEnabled}
+        @set-offloader-pairing-enabled=${this._onSetOffloaderPairingEnabled}
         @set-language=${this._onSetLanguage}
+        @pair-request-sent=${this._onPairRequestSent}
+        @remote-build-job-submitted=${this._onRemoteBuildJobSubmitted}
+        @remote-build-job-dismissed=${this._onRemoteBuildJobDismissed}
       ></esphome-settings-dialog>
       <esphome-firmware-jobs-dialog
         @firmware-history-cleared=${this._onFirmwareHistoryCleared}
       ></esphome-firmware-jobs-dialog>
       <esphome-feedback-dialog></esphome-feedback-dialog>
+      <esphome-onboarding-wifi-dialog
+        @onboarding-acknowledged=${this._onOnboardingAcknowledged}
+        @onboarding-dismissed-session=${this._onOnboardingDismissedSession}
+      ></esphome-onboarding-wifi-dialog>
     `;
   }
+
+  /** When ``_onboardingShouldShow`` flips true, programmatically
+   *  open the dialog. The dialog itself is mounted unconditionally
+   *  (so the ``@`` event listeners are wired) but starts closed. */
+  protected updated(changed: Map<string | number | symbol, unknown>) {
+    super.updated?.(changed);
+    if (changed.has("_onboardingShouldShow") && this._onboardingShouldShow) {
+      this._onboardingDialog?.open();
+    }
+  }
+
+  @query("esphome-onboarding-wifi-dialog")
+  private _onboardingDialog?: HTMLElement & { open(): void };
 
   private async _onLoginSubmit(
     e: CustomEvent<{ username: string; password: string }>,
@@ -825,6 +1705,198 @@ export class ESPHomeApp extends LitElement {
     const enabled = e.detail;
     this._yamlDiffButton = enabled;
     this._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
+  }
+
+  private async _onSetRemoteBuildEnabled(e: CustomEvent<boolean>) {
+    // Optimistic flip — keeps the toggle's visual state in sync
+    // with the click. The backend round-trip happens after; if it
+    // fails we revert the optimistic value and surface a toast so
+    // the user sees their security-sensitive toggle didn't take
+    // effect (silent UI / disk divergence on a "trust this peer"
+    // toggle is a real bug, not a polish item).
+    //
+    // ``_remoteBuildSetInFlight`` gates ``_loadRemoteBuildSettings``
+    // so a reconnect that lands mid-write can't clobber the
+    // optimistic value with the pre-toggle server snapshot.
+    const enabled = e.detail;
+    const previous = this._remoteBuildEnabled;
+    this._remoteBuildEnabled = enabled;
+    this._remoteBuildSetInFlight = true;
+    try {
+      // Omit ``cleanup_ttl_seconds`` so the toggle path doesn't
+      // clobber a TTL another tab / direct sidecar edit may
+      // have set; the backend leaves the existing value in
+      // place when the field is absent.
+      await this._api.setRemoteBuildSettings({ enabled });
+      // Toggling ``enabled`` runs ``apply_remote_build_enabled``
+      // on the backend, which tears down or re-binds the peer-
+      // link runner; ``IdentityView.listener_bound`` flips
+      // alongside. The cached identity in settings-dialog goes
+      // stale immediately, so bump the counter to force a
+      // re-fetch and pick up the fresh ``listener_bound`` (plus
+      // any version fields that depend on the bound state).
+      // Without this the "Listener active / down" indicator
+      // would render whatever ``listener_bound`` was at the
+      // last fetch, ignoring the toggle the user just clicked.
+      this._buildServerIdentityRotationCounter += 1;
+    } catch {
+      this._remoteBuildEnabled = previous;
+      toast.error(
+        this._localize("settings.remote_build_save_failed"),
+        { richColors: true }
+      );
+    } finally {
+      this._remoteBuildSetInFlight = false;
+    }
+  }
+
+  private async _onSetRemoteBuildCleanupTtl(e: CustomEvent<number>) {
+    // Same optimistic-with-revert shape as the toggle path —
+    // commit the user's value to the UI immediately, write to
+    // the backend, revert + toast on failure. Client-side
+    // clamps to [MIN, MAX] before sending; the backend
+    // validator is the load-bearing gate (rejects outside that
+    // range with INVALID_ARGS).
+    const requested = e.detail;
+    if (
+      !Number.isFinite(requested) ||
+      requested < CLEANUP_TTL_MIN_SECONDS ||
+      requested > CLEANUP_TTL_MAX_SECONDS
+    ) {
+      // Settings dialog already clamps; this is defense-in-depth
+      // for a future caller bypassing the clamp.
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
+      return;
+    }
+    const previous = this._remoteBuildCleanupTtl;
+    if (previous === requested) return;
+    this._remoteBuildCleanupTtl = requested;
+    this._remoteBuildSetInFlight = true;
+    try {
+      await this._api.setRemoteBuildSettings({
+        enabled: this._remoteBuildEnabled,
+        cleanup_ttl_seconds: requested,
+      });
+    } catch {
+      this._remoteBuildCleanupTtl = previous;
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
+    } finally {
+      this._remoteBuildSetInFlight = false;
+    }
+  }
+
+  /**
+   * 7b — master "Remote builds enabled" toggle write path.
+   *
+   * Optimistic flip + rollback on failure, mirrors the
+   * receiver-side ``_onSetRemoteBuildEnabled`` shape. The
+   * ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` event the setter
+   * fires on the backend bus comes back through the WS and
+   * upserts the same field — that's a no-op on the optimistic
+   * tab and the cross-tab sync mechanism for any other tab
+   * looking at the same Settings page.
+   */
+  private async _onSetOffloaderRemoteBuildsEnabled(
+    e: CustomEvent<boolean>,
+  ): Promise<void> {
+    const enabled = e.detail;
+    const previous = this._offloaderRemoteBuildsEnabled;
+    this._offloaderRemoteBuildsEnabled = enabled;
+    try {
+      await this._api.setOffloaderRemoteBuildSettings({
+        remote_builds_enabled: enabled,
+      });
+    } catch {
+      this._offloaderRemoteBuildsEnabled = previous;
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
+    }
+  }
+
+  /**
+   * 7b — per-pairing enable toggle write path.
+   *
+   * Same optimistic-with-revert shape as the master toggle:
+   * patch the in-memory row, fire the WS write, roll back +
+   * toast on failure. The matching
+   * ``OFFLOADER_PAIRING_ENABLED_CHANGED`` event the backend
+   * fires lands as a no-op patch on this tab and as the
+   * canonical sync hook for any other tab open against the
+   * same dashboard.
+   */
+  private async _onSetOffloaderPairingEnabled(
+    e: CustomEvent<{ pin_sha256: string; enabled: boolean }>,
+  ): Promise<void> {
+    const { pin_sha256, enabled } = e.detail;
+    const previous = this._buildOffloadPairings?.get(pin_sha256)?.enabled;
+    this._patchOffloadPairing(pin_sha256, { enabled });
+    try {
+      await this._api.setOffloaderPairingEnabled({ pin_sha256, enabled });
+    } catch {
+      if (previous !== undefined) {
+        this._patchOffloadPairing(pin_sha256, { enabled: previous });
+      }
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
+    }
+  }
+
+  /** Upsert a freshly-created pairing into the offloader
+   *  pairings map.
+   *
+   *  Fired by the pair-build-server dialog after a successful
+   *  ``request_pair``. The backend persists the row but doesn't
+   *  fire ``OFFLOADER_PAIR_STATUS_CHANGED`` for the create
+   *  (events only mark status flips), so the dialog's
+   *  auto-close watcher needs the row in the map locally as a
+   *  baseline for the next event. The ``PairingSummary``
+   *  shape here is identical to what
+   *  ``initial_state.pairings`` carries, so re-using the same
+   *  ``${hostname}:${port}`` key keeps snapshot and live-event
+   *  paths aligned. */
+  private _onPairRequestSent(
+    e: CustomEvent<{ summary: PairingSummary }>,
+  ): void {
+    const summary = e.detail.summary;
+    const next = new Map(this._buildOffloadPairings ?? []);
+    next.set(summary.pin_sha256, summary);
+    this._buildOffloadPairings = next;
+  }
+
+  /** Stamp the in-flight remote-jobs map's display fields when
+   *  the submit dialog completes its WS round-trip. The wire
+   *  events don't echo configuration / target / receiver_label
+   *  back; without this seed the progress view would render
+   *  empty placeholders until the user dismisses. */
+  private _onRemoteBuildJobSubmitted(
+    e: CustomEvent<{
+      job_id: string;
+      pin_sha256: string;
+      receiver_label: string;
+      configuration: string;
+      target: RemoteBuildSubmitTarget;
+    }>,
+  ): void {
+    this.registerRemoteBuildJob(e.detail);
+  }
+
+  /** Drop a terminal remote-build job from the in-flight map
+   *  when the user closes its progress dialog. The dialog
+   *  only fires this for terminal status (completed / failed
+   *  / cancelled); non-terminal closes are "minimise" and
+   *  leave the entry in place. Without this, terminal jobs
+   *  would accumulate in buildOffloadJobsContext across
+   *  every submit cycle. */
+  private _onRemoteBuildJobDismissed(
+    e: CustomEvent<{ job_id: string }>,
+  ): void {
+    this.dismissRemoteBuildJob(e.detail.job_id);
   }
 
   private async _onSetLanguage(

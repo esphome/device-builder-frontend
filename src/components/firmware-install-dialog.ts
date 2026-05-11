@@ -10,7 +10,7 @@ import {
   mdiConsole,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { JobStatus } from "../api/types.js";
 import type { ConfiguredDevice } from "../api/types.js";
@@ -18,6 +18,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { chipNameToVariant } from "../util/chip-variant.js";
+import { downloadBase64Binary } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -29,10 +30,10 @@ import {
   type DetectedChip,
 } from "../util/web-serial.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./ansi-log.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "alert-circle": mdiAlertCircle,
@@ -79,9 +80,17 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    *  in front of users on chip-mismatch / Web Serial connection
    *  errors where it can't help. */
   @state() private _failedDuringCompile = false;
+  /** Flips true when the compile-step output stream contains an
+   *  ESPHome validation-failure marker (``Failed config`` or an
+   *  anchored ``ERROR Error while reading config:`` logger line —
+   *  see ``_isValidationFailureLine`` for the exact match rules).
+   *  Drives the failure hint to switch from clean / reset (which
+   *  only help C++ build failures) to "open this device in the
+   *  editor" — the right action when the YAML itself is broken.
+   *  Reset alongside the other per-attempt state. */
+  @state() private _failedDuringValidate = false;
   @state() private _logLines: string[] = [];
   @state() private _logsExpanded = false;
-  @state() private _logsFullHeight = false;
   @state() private _flashPercent = 0;
   @state() private _downloadedFilename = "";
   /** Auto-flip to the logs dialog after a successful Web Serial
@@ -110,6 +119,33 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   private _jobId = "";
   private _streamId = "";
 
+  /** Match a dashboard-escaped or raw ANSI SGR sequence — backend
+   *  pins ``--dashboard`` so the four-character escaped form is
+   *  the live case; the raw branch is defensive. */
+  private static readonly _ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
+
+  /** Match an ESPHome logger line whose level is ``ERROR`` and
+   *  whose message starts with the canonical YAML-load-failure
+   *  prefix. Anchored at start-of-line so a non-validation line
+   *  that happens to quote the phrase mid-message can't match. */
+  private static readonly _LOADER_ERROR =
+    /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
+
+  /** Detect ESPHome's validation-failure markers in a streamed
+   *  output line. ``Failed config`` is the standalone bold-red
+   *  banner from ``esphome/config.py`` (matched after ANSI strip
+   *  by strict equality — the line *is* the marker).
+   *  ``ERROR Error while reading config:`` is the earlier YAML-
+   *  load-stage error. Both indicate the build never reached the
+   *  C++ compile step, so clean / reset can't help. */
+  private static _isValidationFailureLine(line: string): boolean {
+    const stripped = line
+      .replace(ESPHomeFirmwareInstallDialog._ANSI_SGR, "")
+      .trim();
+    if (stripped === "Failed config") return true;
+    return ESPHomeFirmwareInstallDialog._LOADER_ERROR.test(stripped);
+  }
+
   /**
    * Reject hook for the in-flight ``_compileAndWait`` promise.
    * ``_compileAndWait`` only settles from the firmwareFollowJob
@@ -121,9 +157,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    */
   private _compileReject: ((err: Error) => void) | null = null;
   private _detected: DetectedChip | null = null;
-
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
 
   // ─── Public API ────────────────────────────────────────
 
@@ -138,7 +171,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = "web-serial";
     this._step = "connecting";
     this._statusMessage = this._localize("firmware.status_connecting");
-    this._dialog.open = true;
     this._startWebSerialInstall();
   }
 
@@ -154,7 +186,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = "web-download";
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
-    this._dialog.open = true;
     this._startDownload();
   }
 
@@ -169,7 +200,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = "binary-download";
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
-    this._dialog.open = true;
     this._startDownload();
   }
 
@@ -181,7 +211,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    * preserved across the flip.
    */
   public reopen() {
-    this._dialog.open = true;
+    this._open = true;
   }
 
   private _init(device: ConfiguredDevice) {
@@ -203,12 +233,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._errorMessage = "";
     this._logLines = [];
     this._logsExpanded = false;
-    this._logsFullHeight = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failedDuringCompile = false;
+    this._failedDuringValidate = false;
     // ``_jobId`` is already cleared by ``_detachStream`` above; same
     // for ``_streamId`` and ``_compileReject``.
     this._detected = null;
@@ -260,39 +290,41 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         --term-error: #c72e2e;
       }
 
-      wa-dialog {
+      esphome-base-dialog {
         --width: 520px;
-        transition: width 0.2s;
       }
-      :host([expanded]) wa-dialog {
+      :host([expanded]) esphome-base-dialog {
         --width: min(900px, 90vw);
       }
 
-      wa-dialog::part(header) {
+      /* Animate the dialog's width when the user toggles the
+         expand button. Lives on ::part(dialog) (the inner
+         wa-dialog box) because esphome-base-dialog itself is
+         display: contents and has no layout box to transition. */
+      esphome-base-dialog::part(dialog) {
+        transition: width 0.2s;
+      }
+
+      esphome-base-dialog::part(header) {
         background: var(--esphome-primary);
         padding: 0 var(--wa-space-m);
         height: 40px;
         box-sizing: border-box;
       }
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
       }
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-      wa-dialog::part(body) {
+      /* Close-button styling lives in
+         src/styles/dialog-close-button.ts — base-dialog bundles
+         dialogCloseButtonStyles so the X-button sizing /
+         positioning is consistent across migrated dialogs. */
+
+      esphome-base-dialog::part(body) {
         padding: var(--wa-space-l) var(--wa-space-xl);
       }
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -378,6 +410,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       .instructions li + li {
         margin-top: var(--wa-space-2xs);
       }
+      .instructions-note {
+        margin: var(--wa-space-s) 0 0;
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+        line-height: 1.5;
+      }
 
       a.btn {
         text-decoration: none;
@@ -425,20 +463,6 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         justify-content: space-between;
       }
 
-      .expand-btn {
-        display: inline-flex;
-        align-items: center;
-        padding: 0;
-        background: none;
-        border: none;
-        font-size: 16px;
-        color: var(--wa-color-text-quiet);
-        cursor: pointer;
-      }
-      .expand-btn:hover {
-        color: var(--wa-color-text-normal);
-      }
-
       .logs-container {
         margin-top: var(--wa-space-s);
         border: 1px solid var(--term-border);
@@ -447,12 +471,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       }
 
       esphome-ansi-log {
-        --log-height: 200px;
-      }
-
-      .logs-container--full esphome-ansi-log {
         --log-height: 50vh;
       }
+
       esphome-ansi-log::part(container) {
         border-radius: 0;
       }
@@ -507,8 +528,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     if (changedProperties.has("_darkMode")) {
       this.toggleAttribute("light", !this._darkMode);
     }
-    if (changedProperties.has("_logsFullHeight")) {
-      this.toggleAttribute("expanded", this._logsFullHeight);
+    if (changedProperties.has("_logsExpanded")) {
+      this.toggleAttribute("expanded", this._logsExpanded);
     }
   }
 
@@ -516,10 +537,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog label=${this._title} ?open=${this._open} @wa-after-hide=${this._onClose}>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._title}
+        @after-hide=${this._onClose}
+      >
         ${this._renderStatus()} ${this._renderProgress()} ${this._renderLogs()}
         ${this._renderFooter()}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -576,6 +601,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           <li>${this._localize("firmware.web_download_step_connect")}</li>
           <li>${this._localize("firmware.web_download_step_install", { filename })}</li>
         </ol>
+        <p class="instructions-note">
+          ${this._localize("dashboard.install_method_web_download_desc")}
+        </p>
       `;
     }
     if (this._step === "error") {
@@ -587,7 +615,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
             name="alert-circle"
           ></wa-icon>
           <span class="status-text">${this._statusMessage}</span>
-          <span class="status-detail">${this._errorMessage}</span>
+          ${this._errorMessage
+            ? html`<span class="status-detail">${this._errorMessage}</span>`
+            : nothing}
         </div>
         ${this._renderResetSuggestion()}
       `;
@@ -600,23 +630,80 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     `;
   }
 
-  /** Hint shown after a compile-step failure pointing the user at
-   *  "Reset Build Environment". Only surfaced for failures during
-   *  the server-side compile (see ``_failedDuringCompile``) — chip
-   *  mismatch / Web Serial connection / flash errors don't benefit
-   *  from clearing the toolchain cache.
+  /** Hint shown after a compile-step failure. Branches on what
+   *  actually failed:
    *
-   *  Inline-link rendering: the action is a clickable link inside
-   *  the sentence so the CTA reads as part of the hint. The
-   *  translation puts the link text behind a ``{action}`` marker so
-   *  other locales can place it wherever reads naturally. */
+   *  * **YAML validation** (the output stream included ESPHome's
+   *    validation-failure marker) — neither clean nor reset can
+   *    help; offer the editor instead.
+   *  * **Receiver session lost** (REMOTE compile that dropped
+   *    mid-build because the build server restarted / dropped
+   *    network) — neither clean nor reset helps; the build
+   *    environment was fine, the connection wasn't. Skip the
+   *    hint entirely so the operator just sees the specific
+   *    error text and the Retry button.
+   *  * **C++ build / compile** failure — keep the clean → reset
+   *    staircase (clean is surgical / fast; reset is the heavier
+   *    toolchain-wide wipe).
+   *
+   *  Only surfaced for failures during the server-side compile
+   *  (see ``_failedDuringCompile``) — chip mismatch / Web Serial
+   *  connection / flash errors don't benefit from any of these. */
   private _renderResetSuggestion() {
     if (!this._failedDuringCompile) return nothing;
-    const text = this._localize("command.try_reset_suggestion");
-    const [before, after = ""] = text.split("{action}");
+    if (this._failedDuringValidate) {
+      return this._renderValidationFailureSuggestion();
+    }
+    if (this._isPeerLinkSessionLostError(this._errorMessage)) {
+      return nothing;
+    }
+    return this._renderBuildFailureSuggestion();
+  }
+
+  /** Returns ``true`` when the failure text matches the
+   *  receiver-side ``_fail_locally`` "peer-link session lost"
+   *  shape from the backend's ``remote_runner``. Used to skip
+   *  the misleading clean / reset hint for failures that
+   *  weren't actually about the build environment.
+   *
+   *  Match by substring rather than a regex / structured error
+   *  code because the wire shape today is a free-form string
+   *  (``FirmwareJob.error``). If a future backend lands a
+   *  typed error code that carries the same signal, this is
+   *  the call site to switch over to. */
+  private _isPeerLinkSessionLostError(message: string): boolean {
+    return message.includes("peer-link session lost");
+  }
+
+  /** YAML validation failure → "open in editor" hint. */
+  private _renderValidationFailureSuggestion() {
+    const text = this._localize("command.validation_failed_suggestion");
+    const [before, after = ""] = text.split("{editor_action}");
     return html`
       <div class="reset-suggestion" role="status">
         ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryOpenInEditor}
+        >
+          ${this._localize("command.try_open_editor_button")}</button>${after}
+      </div>
+    `;
+  }
+
+  /** C++ build failure → clean (surgical) → reset (nuclear)
+   *  staircase. Both actions are inline links inside the sentence
+   *  so the CTAs read as part of the hint. */
+  private _renderBuildFailureSuggestion() {
+    const text = this._localize("command.try_reset_suggestion");
+    const [before, rest = ""] = text.split("{clean_action}");
+    const [middle, after = ""] = rest.split("{reset_action}");
+    return html`
+      <div class="reset-suggestion" role="status">
+        ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryCleanBuild}
+        >
+          ${this._localize("command.try_clean_button")}</button>${middle}<button
           class="reset-suggestion-link"
           @click=${this._tryResetBuildEnv}
         >
@@ -624,6 +711,42 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Close the dialog and ask the host page to take the user to
+   *  the device-page editor for the failing device. Mirrors the
+   *  clean / reset event-bubble pattern; minimal ``{configuration}``
+   *  payload so the host's handler is the same shape as the one
+   *  on ``command-dialog``. */
+  private _tryOpenInEditor = () => {
+    const device = this._device;
+    this._close();
+    if (!device) return;
+    this.dispatchEvent(
+      new CustomEvent("request-open-editor", {
+        detail: { configuration: device.configuration },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  /** Per-device clean: closes the install dialog and asks the page
+   *  to open the command-dialog in clean mode for ``_device``.
+   *  Clean wipes just this device's ``.esphome/build/<name>/``
+   *  artifacts; the user re-attempts the install from the device
+   *  row once it finishes. */
+  private _tryCleanBuild = () => {
+    const device = this._device;
+    this._close();
+    if (!device) return;
+    this.dispatchEvent(
+      new CustomEvent("clean-build", {
+        detail: device,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   /** Hand off to the firmware-jobs-dialog's reset flow. Closes the
    *  current install dialog first so the confirm prompt isn't
@@ -665,24 +788,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
             ? this._localize("firmware.hide_details")
             : this._localize("firmware.show_details")}
         </button>
-        ${this._logsExpanded
-          ? html`<button
-              class="expand-btn"
-              @click=${() => {
-                this._logsFullHeight = !this._logsFullHeight;
-              }}
-            >
-              <wa-icon
-                library="mdi"
-                name=${this._logsFullHeight ? "arrow-collapse" : "arrow-expand"}
-              ></wa-icon>
-            </button>`
-          : nothing}
       </div>
       ${this._logsExpanded
-        ? html`<div
-            class="logs-container ${this._logsFullHeight ? "logs-container--full" : ""}"
-          >
+        ? html`<div class="logs-container">
             <esphome-ansi-log
               .lines=${this._logLines}
               ?light=${!this._darkMode}
@@ -868,9 +976,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._statusMessage = this._localize("firmware.status_queued");
     try {
       await this._compileAndWait(device.configuration);
-    } catch {
+    } catch (err) {
       this._failedDuringCompile = true;
-      this._fail(this._localize("firmware.compile_failed"));
+      this._fail(
+        this._localize("firmware.compile_failed"),
+        this._compileFailureDetail(err)
+      );
       return;
     }
 
@@ -970,7 +1081,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       webSerialPort,
       reopenInstall: () => this.reopen(),
     });
-    if (handled) this._dialog.open = false;
+    if (handled) this._open = false;
   }
 
   // ─── Download flows (compile + save binary) ────────────────────
@@ -991,9 +1102,12 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
     try {
       await this._compileAndWait(device.configuration);
-    } catch {
+    } catch (err) {
       this._failedDuringCompile = true;
-      this._fail(this._localize("firmware.compile_failed"));
+      this._fail(
+        this._localize("firmware.compile_failed"),
+        this._compileFailureDetail(err)
+      );
       return;
     }
 
@@ -1028,14 +1142,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         device.configuration,
         flashable.file
       );
-      const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-      const blob = new Blob([bytes], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = result.filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBase64Binary(result.data, result.filename);
       this._downloadedFilename = result.filename;
     } catch {
       this._fail(this._localize("firmware.download_failed"));
@@ -1064,15 +1171,32 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
               this._statusMessage = this._localize("firmware.status_compiling");
             }
             this._logLines = [...this._logLines, line];
+            if (ESPHomeFirmwareInstallDialog._isValidationFailureLine(line)) {
+              this._failedDuringValidate = true;
+            }
           },
           onResult: (data) => {
             this._streamId = "";
             this._jobId = "";
             this._compileReject = null;
-            const result = data as unknown as { status: string };
-            result.status === JobStatus.COMPLETED
-              ? resolve()
-              : reject(new Error("Compilation failed"));
+            const result = data as unknown as {
+              status: string;
+              error?: string | null;
+            };
+            if (result.status === JobStatus.COMPLETED) {
+              resolve();
+              return;
+            }
+            /* Prefer the backend's specific failure text so the
+             * red error banner names the actual cause (e.g.
+             * "remote build: peer-link session lost (transport_error: …)")
+             * instead of a generic "Install failed.". Older
+             * backends that don't set ``error`` on the wire
+             * still produce the generic message because the
+             * catch in ``_startInstall`` falls back to
+             * ``firmware.compile_failed`` when the rejection's
+             * message is empty. */
+            reject(new Error(result.error || ""));
           },
           onError: (error) => {
             this._streamId = "";
@@ -1094,11 +1218,41 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;
   };
 
-  private _fail(message: string) {
+  /** Drop the dialog into the red error state.
+   *
+   *  ``title`` is the bold heading (shown next to the alert
+   *  icon). ``detail`` is the optional smaller caption beneath
+   *  it. Pass ``detail`` only when it adds information the
+   *  heading doesn't already carry; the render skips the
+   *  caption span entirely when ``detail`` is empty, so a
+   *  single-string call doesn't paint the same text twice. */
+  private _fail(title: string, detail = "") {
     this._step = "error";
-    this._statusMessage = message;
-    this._errorMessage = message;
+    this._statusMessage = title;
+    this._errorMessage = detail;
     this._logsExpanded = true;
+  }
+
+  /** Specific cause text for a compile-step failure, used as
+   *  the caption beneath the generic "Install failed." heading.
+   *
+   *  ``_compileAndWait`` rejects with an ``Error`` whose
+   *  ``message`` is the backend's ``FirmwareJob.error`` text
+   *  (when ``firmware/follow_job``'s RESULT carried one; newer
+   *  backend, see esphome/device-builder#597) or an empty
+   *  string (older backend that didn't put ``error`` on the
+   *  wire). Return that text so the red banner names the
+   *  actual cause; return an empty string when nothing useful
+   *  came back so ``_fail`` shows the generic heading alone
+   *  instead of repeating it.
+   *
+   *  The session-lost case is the user-visible motivator:
+   *  ``remote build: peer-link session lost (transport_error: …)``
+   *  is a much better operator signal than a generic failure
+   *  string followed by a "try cleaning the build files" hint
+   *  that doesn't help when the receiver just restarted. */
+  private _compileFailureDetail(err: unknown): string {
+    return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
   }
 
   private async _cancel() {

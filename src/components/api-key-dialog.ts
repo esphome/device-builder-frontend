@@ -1,15 +1,16 @@
 import { consume } from "@lit/context";
 import { mdiContentCopy, mdiEye, mdiEyeOff } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { LitElement, css, html } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "content-copy": mdiContentCopy,
@@ -29,37 +30,31 @@ export class ESPHomeApiKeyDialog extends LitElement {
   @state()
   private _visible = false;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   static styles = [
     espHomeStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 480px;
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -122,20 +117,32 @@ export class ESPHomeApiKeyDialog extends LitElement {
   open(key: string) {
     this.apiKey = key;
     this._visible = false;
-    this._dialog.open = true;
+    this._open = true;
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  private _onAfterHide = (): void => {
+    // <esphome-base-dialog> re-emits after-hide for every
+    // dismissal path (Esc / outside-click / X / reactive
+    // ?open flip). Flip our local open flag so the next
+    // render's ?open binding matches.
+    this._open = false;
+  };
 
   protected render() {
     return html`
-      <wa-dialog label=${this._localize("dashboard.action_api_key_title")} light-dismiss>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("dashboard.action_api_key_title")}
+        @after-hide=${this._onAfterHide}
+      >
         <div class="content">
           ${this.apiKey ? this._renderKey() : this._renderNoKey()}
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -172,12 +179,20 @@ export class ESPHomeApiKeyDialog extends LitElement {
   }
 
   private async _copy() {
-    try {
-      await navigator.clipboard.writeText(this.apiKey);
-      toast.success(this._localize("dashboard.action_api_key_copied"), { richColors: true });
-    } catch {
-      // Clipboard API not available
+    // Goes through ``copyToClipboard`` so the button works on
+    // plain-HTTP origins where ``navigator.clipboard.writeText``
+    // throws (HA-addon direct port, container-on-LAN deploys
+    // reaching the dashboard via ``http://192.168.x.x:6052``).
+    if (await copyToClipboard(this.apiKey)) {
+      toast.success(this._localize("dashboard.action_api_key_copied"), {
+        richColors: true,
+      });
     }
+    // No failure toast here — the api-key dialog already
+    // displays the key in plain text inside the dialog body,
+    // so the user can select-and-copy manually if the button
+    // failed. Keeping the silent-on-failure contract that
+    // existed before the helper switch.
   }
 }
 

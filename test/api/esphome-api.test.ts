@@ -8,6 +8,7 @@ import {
 } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import { JobType } from "../../src/api/types.js";
 import {
   MockWebSocket,
   installMockWebSocket,
@@ -220,6 +221,132 @@ describe("ESPHomeAPI — sendCommand", () => {
   });
 });
 
+describe("ESPHomeAPI — cloneDevice", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/clone`` with snake_case args and returns the new configuration", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.cloneDevice(
+      "kitchen.yaml",
+      "bedroom-bulb",
+      "Bedroom Reading Lamp",
+    );
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/clone");
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "bedroom-bulb",
+      new_friendly_name: "Bedroom Reading Lamp",
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "bedroom-bulb.yaml" },
+    });
+    await expect(pending).resolves.toEqual({ configuration: "bedroom-bulb.yaml" });
+  });
+
+  it("omits ``new_friendly_name`` when the caller doesn't pass one", async () => {
+    // The backend defaults to ``friendly_name_slugify(new_name)``
+    // when the field is missing — sending an empty string instead
+    // would tell the backend to leave the source's
+    // ``friendly_name:`` line untouched, producing two list
+    // entries with the same label. Pin that the helper omits the
+    // key entirely on ``undefined`` so the default kicks in.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.cloneDevice("kitchen.yaml", "bedroom-bulb");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "bedroom-bulb",
+    });
+    expect("new_friendly_name" in sent.args).toBe(false);
+  });
+
+  it("forwards an explicit empty friendly name so the source's label is preserved", async () => {
+    // Edge case: a caller that *wants* the clone to share the
+    // source's ``friendly_name:`` line (rare but supported)
+    // passes ``""`` explicitly. Pin that the helper sends
+    // ``new_friendly_name: ""`` on the wire so the backend's
+    // ``if new_friendly_name:`` short-circuit fires and the
+    // rewrite is skipped.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.cloneDevice("kitchen.yaml", "bedroom-bulb", "");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_name: "bedroom-bulb",
+      new_friendly_name: "",
+    });
+  });
+});
+
+describe("ESPHomeAPI — editFriendlyName", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/edit_friendly_name`` with snake_case args", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.editFriendlyName("kitchen.yaml", "Reading Lamp");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/edit_friendly_name");
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      new_friendly_name: "Reading Lamp",
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "kitchen.yaml", rewritten: true },
+    });
+    await expect(pending).resolves.toEqual({
+      configuration: "kitchen.yaml",
+      rewritten: true,
+    });
+  });
+
+  it("propagates the rewritten=false signal for an idempotent edit", async () => {
+    // The command is idempotent on the backend — submitting the
+    // same value the leaf already has skips the write and returns
+    // ``rewritten: false`` so the caller knows to skip the
+    // follow-up install. Pin that the helper passes the flag
+    // through unchanged so the dashboard handler can branch on it.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.editFriendlyName("kitchen.yaml", "Kitchen");
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { configuration: "kitchen.yaml", rewritten: false },
+    });
+    await expect(pending).resolves.toEqual({
+      configuration: "kitchen.yaml",
+      rewritten: false,
+    });
+  });
+});
+
 describe("ESPHomeAPI — streaming commands", () => {
   beforeEach(() => {
     installMockWebSocket();
@@ -424,12 +551,28 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await pending;
   });
 
-  it("firmwareInstall defaults port to OTA", async () => {
+  it("firmwareInstall defaults port to OTA and force_local to false", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     api.firmwareInstall("foo.yaml");
     const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
-    expect(sent.args).toEqual({ configuration: "foo.yaml", port: "OTA" });
+    expect(sent.args).toEqual({
+      configuration: "foo.yaml",
+      port: "OTA",
+      force_local: false,
+    });
+  });
+
+  it("firmwareInstall threads force_local through to the backend", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    api.firmwareInstall("foo.yaml", "OTA", true);
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({
+      configuration: "foo.yaml",
+      port: "OTA",
+      force_local: true,
+    });
   });
 
   it("validate sends devices/validate through the stream API", async () => {
@@ -479,6 +622,395 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
     expect(sent.command).toBe("config/set_preferences");
     expect(sent.args).toEqual({ theme: "dark" });
+  });
+
+  it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = { enabled: true, peers: [] };
+    const pending = api.getRemoteBuildSettings();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_settings");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("setRemoteBuildSettings sends remote_build/set_settings with the args and returns the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setRemoteBuildSettings({ enabled: true });
+    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    expect(sent.command).toBe("remote_build/set_settings");
+    expect(sent.args).toEqual({ enabled: true });
+    const result = { enabled: true, peers: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("getOffloaderRemoteBuildSettings sends remote_build/get_offloader_settings without args", async () => {
+    // 7b — the bundle entry-point for the offloader Settings UI.
+    // First paint reads the master ``remote_builds_enabled``
+    // flag and the pairings list off the same round-trip; live
+    // updates flow through the OFFLOADER_REMOTE_BUILDS_TOGGLED
+    // / OFFLOADER_PAIRING_ENABLED_CHANGED events on subscribe.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.getOffloaderRemoteBuildSettings();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_offloader_settings");
+    expect(sent.args).toBeUndefined();
+    const result = { remote_builds_enabled: true, pairings: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setOffloaderRemoteBuildSettings sends remote_build/set_offloader_settings with the master toggle", async () => {
+    // The master kill-switch flip path: app-shell calls this
+    // when the user clicks the "Auto-route installs to remote
+    // build" switch. The backend round-trip carries strict
+    // boolean validation (rejects truthy non-booleans); the
+    // API helper passes the value through unchanged.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderRemoteBuildSettings({
+      remote_builds_enabled: false,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_offloader_settings");
+    expect(sent.args).toEqual({ remote_builds_enabled: false });
+    const result = { remote_builds_enabled: false, pairings: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setOffloaderPairingEnabled sends remote_build/set_pairing_enabled keyed on pin_sha256", async () => {
+    // The per-row enable flip path. Wire-canonical row id is
+    // ``pin_sha256`` (4a-o part 6 re-keyed offloader state
+    // from ``(host, port)`` to pin so receiver hostname
+    // changes don't break the row identity); the API helper
+    // matches.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderPairingEnabled({
+      pin_sha256: "a".repeat(64),
+      enabled: false,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_pairing_enabled");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      enabled: false,
+    });
+    // Backend returns the patched ``PairingSummary``; the
+    // helper passes it through unchanged so app-shell's
+    // ``_patchOffloadPairing`` flow has the canonical row.
+    const result = {
+      receiver_hostname: "build.local",
+      receiver_port: 6055,
+      pin_sha256: "a".repeat(64),
+      label: "desktop",
+      paired_at: 1.0,
+      status: "approved",
+      connected: true,
+      connecting: false,
+      last_connect_error: "",
+      esphome_version: "2026.5.0",
+      enabled: false,
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  // No ``listRemoteBuildHosts`` / ``addRemoteBuildManualHost`` /
+  // ``removeRemoteBuildManualHost`` tests — the wrappers were
+  // deleted in lockstep with the backend rip-out. Discovered
+  // hosts ship via ``subscribe_events`` initial-state +
+  // ``REMOTE_BUILD_HOST_ADDED`` / ``REMOTE_BUILD_HOST_REMOVED``;
+  // manual hosts went away as a UI surface (the pair dialog
+  // accepts a typed hostname / port directly). Same shape as
+  // the ``listRemoteBuildPeers`` deletion in #248.
+
+  it("approveRemoteBuildPeer sends remote_build/approve_peer with dashboard_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.approveRemoteBuildPeer({ dashboard_id: "green" });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/approve_peer");
+    expect(sent.args).toEqual({ dashboard_id: "green" });
+    const result = { enabled: true, peers: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("removeRemoteBuildPeer sends remote_build/remove_peer with dashboard_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.removeRemoteBuildPeer({ dashboard_id: "green" });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/remove_peer");
+    expect(sent.args).toEqual({ dashboard_id: "green" });
+    const result = { enabled: true, peers: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setRemoteBuildPairingWindow sends remote_build/set_pairing_window with open flag", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setRemoteBuildPairingWindow({ open: true });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_pairing_window");
+    expect(sent.args).toEqual({ open: true });
+    const result = { open: true, expires_in_seconds: 300 };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("previewRemoteBuildPair sends remote_build/preview_pair and unwraps the pin", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.previewRemoteBuildPair({
+      hostname: "build.local",
+      port: 6055,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/preview_pair");
+    expect(sent.args).toEqual({ hostname: "build.local", port: 6055 });
+    const result = { pin_sha256: "a".repeat(64) };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("requestRemoteBuildPair sends host + pin + both labels (TOCTOU + dual label)", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const args = {
+      hostname: "build.local",
+      port: 6055,
+      pin_sha256: "a".repeat(64),
+      receiver_label: "build server",
+      offloader_label: "green",
+    };
+    const pending = api.requestRemoteBuildPair(args);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/request_pair");
+    // Pin the wire shape: both labels go through; the receiver
+    // sees ``offloader_label`` and the local ``StoredPairing``
+    // gets ``receiver_label``. Conflating them would let a
+    // receiver-side rename retro-rewrite the offloader's row.
+    expect(sent.args).toEqual(args);
+    const result = {
+      receiver_hostname: "build.local",
+      receiver_port: 6055,
+      pin_sha256: args.pin_sha256,
+      label: "build server",
+      paired_at: 1715212800,
+      status: "pending",
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("unpairRemoteBuild sends remote_build/unpair with pin_sha256", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.unpairRemoteBuild({
+      pin_sha256: "a".repeat(64),
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/unpair");
+    expect(sent.args).toEqual({ pin_sha256: "a".repeat(64) });
+    const result = { removed: true };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("editRemoteBuildPairingEndpoint sends remote_build/edit_pairing_endpoint with pin + new coords", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.editRemoteBuildPairingEndpoint({
+      pin_sha256: "a".repeat(64),
+      hostname: "moved.example.com",
+      port: 6058,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/edit_pairing_endpoint");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      hostname: "moved.example.com",
+      port: 6058,
+    });
+    // Backend mutates StoredPairing in place + returns the
+    // updated PairingSummary projection. Frontend uses it
+    // primarily as a "the rebind succeeded" signal — the
+    // pairings-context subscriber on app-shell upserts the
+    // row from the OFFLOADER_PAIR_ENDPOINT_REBOUND event.
+    const result = {
+      receiver_hostname: "moved.example.com",
+      receiver_port: 6058,
+      pin_sha256: "a".repeat(64),
+      label: "desktop",
+      paired_at: 1_700_000_000.0,
+      status: "approved",
+      connected: false,
+      connecting: true,
+      last_connect_error: "",
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("submitRemoteBuildJob sends remote_build/submit_job with pin + configuration + target", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.submitRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      configuration: "kitchen.yaml",
+      target: JobType.COMPILE,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/submit_job");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      configuration: "kitchen.yaml",
+      target: JobType.COMPILE,
+    });
+    const result = { job_id: "abc123", accepted: true };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("submitRemoteBuildJob surfaces a rejection with reason", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.submitRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      configuration: "kitchen.yaml",
+      target: JobType.UPLOAD,
+    });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    const result = { job_id: "abc123", accepted: false, reason: "queue_full" };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("cancelRemoteBuildJob sends remote_build/cancel_job with pin + job_id", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.cancelRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      job_id: "abc123",
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/cancel_job");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      job_id: "abc123",
+    });
+    const result = { sent: true };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("cancelRemoteBuildJob surfaces sent=false on a same-tick wire failure", async () => {
+    // ``sent: false`` is the documented signal for a Noise-encrypt
+    // / WS-send failure on the offloader side — the cancel never
+    // reached the wire. The frontend treats it the same as a
+    // typed error toast (the receiver's JOB_CANCELLED-driven
+    // status flip won't fire), but the API client wrapper
+    // itself just returns the literal payload; mapping happens
+    // in the dialog.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.cancelRemoteBuildJob({
+      pin_sha256: "a".repeat(64),
+      job_id: "abc123",
+    });
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    const result = { sent: false };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("getRemoteBuildIdentity sends remote_build/get_identity and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      dashboard_id: "abc123",
+      pin_sha256: "a".repeat(64),
+      server_version: "1.2.3",
+      esphome_version: "2026.5.0",
+      listener_bound: true,
+    };
+    const pending = api.getRemoteBuildIdentity();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_identity");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("rotateRemoteBuildIdentity sends remote_build/rotate_identity and unwraps the result", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      dashboard_id: "abc123",
+      pin_sha256: "b".repeat(64),
+      server_version: "1.2.3",
+      esphome_version: "2026.5.0",
+      listener_bound: true,
+    };
+    const pending = api.rotateRemoteBuildIdentity();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/rotate_identity");
+    expect(sent.args).toBeUndefined();
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
   });
 });
 

@@ -3,7 +3,6 @@ import { mdiArrowLeft, mdiClose, mdiPackageVariantClosed } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import {
-  CORE_CATEGORIES,
   type BoardCatalogEntry,
   type ComponentCatalogEntry,
   type FeaturedBundle,
@@ -14,6 +13,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -357,7 +357,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
           .board=${this.board}
           .yaml=${this.yaml}
           .lockedCategories=${this.lockedCategories}
-          .excludeCategories=${isCore ? [] : CORE_CATEGORIES}
+          .excludeCategories=${chooseExcludeCategories({
+            isCoreLocked: isCore,
+            isInDepDetour: this._returnTo !== null,
+          })}
         ></esphome-component-catalog>
         ${isForm
           ? html`<esphome-add-component-form

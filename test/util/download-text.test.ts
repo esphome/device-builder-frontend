@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { downloadAnsiText } from "../../src/util/download-text.js";
+import {
+  downloadAnsiText,
+  downloadBase64Binary,
+} from "../../src/util/download-text.js";
 
 /* The runtime test environment is Node, so we stub the bits of the
    browser API the helper touches. The download mechanics (anchor +
@@ -111,5 +114,61 @@ describe("downloadAnsiText", () => {
     const blob = FakeBlob.instances[0];
     expect(blob.options?.type).toBe("text/plain");
     expect(blob.parts).toEqual(["hello\nworld"]);
+  });
+});
+
+describe("downloadBase64Binary", () => {
+  it("decodes the base64 payload and saves as application/octet-stream", () => {
+    /* ``AAECAw==`` decodes to the four-byte sequence 0x00 0x01 0x02 0x03. */
+    const { anchor } = withBrowserStubs(() =>
+      downloadBase64Binary("AAECAw==", "firmware.bin"),
+    );
+    expect(anchor.download).toBe("firmware.bin");
+    expect(anchor.click).toHaveBeenCalledTimes(1);
+    expect(FakeBlob.instances).toHaveLength(1);
+    const blob = FakeBlob.instances[0];
+    expect(blob.options?.type).toBe("application/octet-stream");
+    expect(blob.parts).toHaveLength(1);
+    const part = blob.parts[0];
+    expect(part).toBeInstanceOf(Uint8Array);
+    expect(Array.from(part as Uint8Array)).toEqual([0x00, 0x01, 0x02, 0x03]);
+  });
+
+  it("creates and revokes an object URL for the Blob", () => {
+    const createSpy = vi.fn(() => "blob:fake");
+    const revokeSpy = vi.fn();
+    const stubs = {
+      Blob: FakeBlob,
+      URL: { createObjectURL: createSpy, revokeObjectURL: revokeSpy },
+      document: { createElement: vi.fn(() => new FakeAnchor()) },
+    };
+    const g = globalThis as Record<string, unknown>;
+    const prev: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(stubs)) {
+      prev[key] = g[key];
+      g[key] = value;
+    }
+    try {
+      downloadBase64Binary("aGVsbG8=", "hello.bin");
+    } finally {
+      for (const [key, value] of Object.entries(prev)) g[key] = value;
+    }
+    expect(createSpy).toHaveBeenCalledTimes(1);
+    expect(revokeSpy).toHaveBeenCalledTimes(1);
+    expect(revokeSpy).toHaveBeenCalledWith("blob:fake");
+  });
+
+  it("accepts an empty payload (zero-byte download)", () => {
+    /* An empty base64 string decodes to zero bytes. Helpful for
+       defensive call sites that pass through whatever the backend
+       returned without their own length gate. */
+    const { anchor } = withBrowserStubs(() =>
+      downloadBase64Binary("", "empty.bin"),
+    );
+    expect(anchor.download).toBe("empty.bin");
+    const blob = FakeBlob.instances[0];
+    const part = blob.parts[0];
+    expect(part).toBeInstanceOf(Uint8Array);
+    expect((part as Uint8Array).length).toBe(0);
   });
 });

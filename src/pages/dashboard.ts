@@ -20,6 +20,8 @@ import type {
   ArchivedDevice,
   ConfiguredDevice,
   FirmwareJob,
+  Label,
+  YamlSearchHit,
 } from "../api/types.js";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -35,11 +37,14 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import { downloadBase64Binary } from "../util/download-text.js";
+import { computeLabelUsage, deleteConfirmKey } from "../util/label-usage.js";
 import {
-  forEachYamlMatch,
+  buildYamlSnippetBlocks,
   yamlEmptyMessageKey,
-  yamlHitHref,
-  yamlHitLabel,
+  yamlHitDeviceLabel,
+  yamlSnippetBlockHref,
+  type YamlSnippetBlock,
 } from "../util/yaml-search-helpers.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { navigate } from "../util/navigation.js";
@@ -76,11 +81,16 @@ import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
+import "../components/labels/labels-filter.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/install-method-dialog.js";
+import "../components/clone-device-dialog.js";
+import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
+import "../components/friendly-name-dialog.js";
+import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
 import "../components/discovered-device-card.js";
@@ -136,6 +146,13 @@ export class ESPHomePageDashboard extends LitElement {
 
   @state() private _showDiscovered = false;
   @state() private _search = "";
+
+  /** Label-id filter: a device is shown only when its
+   *  ``device.labels`` list contains *every* selected id. Logical
+   *  AND on purpose — a user adding chips to the filter expects each
+   *  one to narrow the result, not widen it. Empty set disables the
+   *  filter entirely. */
+  @state() private _selectedLabels: string[] = [];
 
   /**
    * When true, the search input drives a fleet-wide YAML-content
@@ -205,6 +222,7 @@ export class ESPHomePageDashboard extends LitElement {
     | { kind: "delete-bulk" }
     | { kind: "archive-single"; device: ConfiguredDevice }
     | { kind: "archive-bulk" }
+    | { kind: "delete-label"; label: Label }
     | null = null;
   /** Configuration filename of the most recently adopted device.
    *  Drives a short-lived ``highlight`` attribute on the matching
@@ -230,6 +248,18 @@ export class ESPHomePageDashboard extends LitElement {
   private _sortedDevicesCache: {
     source: ConfiguredDevice[];
     sorted: ConfiguredDevice[];
+  } | null = null;
+  /** Cache for the per-label usage count map (mirrors
+   *  ``_sortedDevicesCache``'s reference-keyed shape). The map
+   *  rebuilds only when ``_devices`` is replaced — every WS event
+   *  that mutates the list does a full reassign — so the
+   *  delete-label confirm dialog's "removes from N devices" copy,
+   *  which calls ``_computeLabelUsage()`` on every render of
+   *  ``_confirmDialogCopy``, doesn't pay the count walk while the
+   *  dialog sits open over an unchanged device list. */
+  private _labelUsageCache: {
+    source: ConfiguredDevice[];
+    map: Record<string, number>;
   } | null = null;
   /** When false (default), discovered devices the user previously
    *  marked as Ignored are hidden from the banner and grid; the
@@ -258,6 +288,27 @@ export class ESPHomePageDashboard extends LitElement {
     // Load preferences once WS is connected (devices loaded means events are flowing)
     if (changed.has("_devicesLoaded") && this._devicesLoaded) {
       this._loadPreferences();
+    }
+    /* Re-bind the drawer's device reference when ``_devices``
+       updates. ``_toggleDrawerForDevice`` snapshots the device
+       object at click time, but the WS reducer in app-shell
+       replaces entries in ``_devices`` on every ``DEVICE_UPDATED``
+       push — without the re-bind, the drawer keeps showing the
+       fields it had at open time (stale ``friendly_name`` after
+       a rename, stale ``state`` after a flap, stale ``ip`` after
+       a DHCP renew). Lookup is by ``configuration`` since that's
+       the stable identity the WS reducer keys on too. */
+    if (changed.has("_devices") && this._drawerDevice) {
+      const live = this._devices.find(
+        (d) => d.configuration === this._drawerDevice!.configuration,
+      );
+      if (live && live !== this._drawerDevice) {
+        this._drawerDevice = live;
+      } else if (!live) {
+        // Device removed (delete / archive) — close the drawer.
+        this._drawerDevice = null;
+        this._drawerOpen = false;
+      }
     }
   }
 
@@ -363,6 +414,10 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog")
   private _createDialog!: ESPHomeCreateConfigDialog;
+  @query("esphome-clone-device-dialog")
+  private _cloneDialog!: ESPHomeCloneDeviceDialog;
+  @query("esphome-friendly-name-dialog")
+  private _friendlyNameDialog!: ESPHomeFriendlyNameDialog;
   @query("esphome-rename-device-dialog")
   private _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") private _adoptDialog!: ESPHomeAdoptDialog;
@@ -409,9 +464,10 @@ export class ESPHomePageDashboard extends LitElement {
 
     const q = this._search.trim().toLowerCase();
     const sorted = this._sortedDevices;
+    const labelFiltered = this._applyLabelFilter(sorted);
     const filtered = q
-      ? sorted.filter((d) => matchesDeviceName(d, q))
-      : sorted;
+      ? labelFiltered.filter((d) => matchesDeviceName(d, q))
+      : labelFiltered;
 
     return html`
       ${this._renderBanner()} ${this._renderDiscoveredGrid()}
@@ -449,6 +505,8 @@ export class ESPHomePageDashboard extends LitElement {
       <div class="toolbar">
         <div class="toolbar-row">
           ${this._renderSearchInput()} ${this._renderViewToggle()}
+          <span class="toolbar-spacer"></span>
+          ${this._renderFilterGroup()}
         </div>
         ${this._renderDiscoveryHint()}
         ${matchCount !== null
@@ -461,10 +519,20 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   /**
-   * YAML-mode body — empty-state copy or a list of hit rows. Each
-   * row links to ``/device/<config>?line=<n>`` so click /
-   * cmd-click / middle-click all do the right thing without
-   * hand-rolling a click handler.
+   * YAML-mode body — empty-state copy or grouped device sections.
+   *
+   * Per device: a header (icon + friendly name + match count)
+   * followed by one or more code-snippet blocks. Each snippet
+   * block bundles a match together with its ±N context lines
+   * (from the backend's ``before`` / ``after`` fields), with the
+   * matched line(s) highlighted. Adjacent matches whose context
+   * windows overlap collapse into a single block — the visual
+   * shape GitHub code search and VS Code search both use.
+   *
+   * Each snippet block is its own clickable link to the editor
+   * pinned at the block's first match line, so click / cmd-click
+   * / middle-click all do the right thing without a custom
+   * click handler beyond the SPA-navigate guard.
    */
   private _renderYamlMode() {
     const hits = this._yamlSearch.hits;
@@ -483,31 +551,104 @@ export class ESPHomePageDashboard extends LitElement {
       // ``yaml_search.no_matches`` (fetched, no hits).
       return this._renderYamlEmptyState(emptyKey);
     }
-    // hits is non-empty here — render the rows.
+    // hits is non-empty here — render the device sections.
     return html`
       <div class="yaml-hits">
-        ${forEachYamlMatch(
-          hits,
-          (hit, match) => html`
-            <a
-              class="yaml-hit"
-              href=${yamlHitHref(hit, match)}
-              @click=${(e: MouseEvent) => {
-                // Plain left-click → SPA navigate; let middle /
-                // cmd / shift-click fall through to the browser
-                // for new-tab / new-window behaviour.
-                if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
-                e.preventDefault();
-                navigate(yamlHitHref(hit, match));
-              }}
-            >
-              <wa-icon library="mdi" name="code-braces"></wa-icon>
-              <span class="yaml-hit-label">${yamlHitLabel(hit, match)}</span>
-            </a>
-          `
-        )}
+        ${(hits ?? []).map((hit) => {
+          const blocks = buildYamlSnippetBlocks(hit.matches);
+          const matchCount = hit.matches.length;
+          const countUnit =
+            matchCount === 1
+              ? this._localize("yaml_search.match_count_singular")
+              : this._localize("yaml_search.match_count_plural");
+          return html`
+            <section class="yaml-hit-group">
+              <header class="yaml-hit-group-header">
+                <wa-icon library="mdi" name="code-braces"></wa-icon>
+                <span class="yaml-hit-group-name"
+                  >${yamlHitDeviceLabel(hit)}</span
+                >
+                <span class="yaml-hit-group-count"
+                  >${matchCount} ${countUnit}</span
+                >
+              </header>
+              ${blocks.map((block) =>
+                this._renderYamlSnippetBlock(hit, block, query)
+              )}
+            </section>
+          `;
+        })}
       </div>
     `;
+  }
+
+  /** Render a single ``YamlSnippetBlock`` as a clickable code panel.
+   *
+   *  Lines render in monospace with a small line-number gutter.
+   *  Match lines get a class hook (``yaml-snippet-line--match``)
+   *  so styling can highlight the row; the matched substring
+   *  itself is wrapped in ``<mark>`` for inline highlighting.
+   */
+  private _renderYamlSnippetBlock(
+    hit: YamlSearchHit,
+    block: YamlSnippetBlock,
+    query: string,
+  ) {
+    const href = yamlSnippetBlockHref(hit, block);
+    return html`
+      <a
+        class="yaml-snippet"
+        href=${href}
+        @click=${(e: MouseEvent) => {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+          e.preventDefault();
+          navigate(href);
+        }}
+      >
+        ${block.lines.map((text, i) => {
+          const lineNumber = block.startLine + i;
+          const isMatch = block.matchedLines.has(lineNumber);
+          return html`
+            <div
+              class="yaml-snippet-line ${isMatch
+                ? "yaml-snippet-line--match"
+                : ""}"
+            >
+              <span class="yaml-snippet-gutter">${lineNumber}</span>
+              <span class="yaml-snippet-text"
+                >${isMatch ? this._highlightMatch(text, query) : text}</span
+              >
+            </div>
+          `;
+        })}
+      </a>
+    `;
+  }
+
+  /** Wrap every case-insensitive occurrence of *needle* in *text*
+   *  with a ``<mark>`` element so the matched substring stands
+   *  out inside the snippet line. *needle* may be empty (the
+   *  caller already gates on ``query`` being non-empty before
+   *  calling, but defensively returns the unmodified text in
+   *  that case).
+   */
+  private _highlightMatch(text: string, needle: string) {
+    if (!needle) return text;
+    const lower = text.toLowerCase();
+    const lowerNeedle = needle.toLowerCase();
+    const out: Array<unknown> = [];
+    let i = 0;
+    while (i < text.length) {
+      const idx = lower.indexOf(lowerNeedle, i);
+      if (idx === -1) {
+        out.push(text.slice(i));
+        break;
+      }
+      if (idx > i) out.push(text.slice(i, idx));
+      out.push(html`<mark>${text.slice(idx, idx + needle.length)}</mark>`);
+      i = idx + needle.length;
+    }
+    return out;
   }
 
   private _renderYamlEmptyState(messageKey: string) {
@@ -517,6 +658,25 @@ export class ESPHomePageDashboard extends LitElement {
         <p class="empty-search-desc">${this._localize(messageKey)}</p>
       </div>
     `;
+  }
+
+  /** Apply the active label filter (logical AND across selections)
+   *  to the input device list. Empty selection short-circuits to
+   *  the input unchanged. Stale ids — labels that were deleted
+   *  while their filter chip stayed in our selection — silently
+   *  match no devices, surfacing the empty state and prompting the
+   *  user to clear; the alternative (silently dropping the stale
+   *  id) would change the result set without any visible
+   *  explanation. */
+  private _applyLabelFilter(devices: ConfiguredDevice[]): ConfiguredDevice[] {
+    if (this._selectedLabels.length === 0) return devices;
+    const required = this._selectedLabels;
+    return devices.filter((d) => {
+      const ids = d.labels;
+      if (!ids || ids.length === 0) return false;
+      const set = new Set(ids);
+      return required.every((id) => set.has(id));
+    });
   }
 
   /** Cached, sorted view of ``_devices``. Cache key is the array
@@ -543,7 +703,7 @@ export class ESPHomePageDashboard extends LitElement {
    *  user can actually see. */
   private _currentlyVisibleConfigurations(): string[] {
     const q = this._search.trim().toLowerCase();
-    const sorted = this._sortedDevices;
+    const sorted = this._applyLabelFilter(this._sortedDevices);
     if (!q) return sorted.map((d) => d.configuration);
     const isTable = this._view === DashboardView.TABLE;
     return sorted
@@ -640,9 +800,12 @@ export class ESPHomePageDashboard extends LitElement {
           <div style="justify-content: center; display: flex; align-items: center">
             <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
             <span
-              >${this._localize("dashboard.discovered_count", {
-                count: visible.length,
-              })}</span
+              >${this._localize(
+                visible.length === 1
+                  ? "dashboard.discovered_count_singular"
+                  : "dashboard.discovered_count_plural",
+                { count: visible.length },
+              )}</span
             >
           </div>
           <button
@@ -666,13 +829,11 @@ export class ESPHomePageDashboard extends LitElement {
     const yaml = this._yamlMode;
     const cardsLabel = this._localize("dashboard.view_cards");
     const tableLabel = this._localize("dashboard.view_table");
-    const yamlLabel = this._localize("yaml_search.switch_to_yaml");
-    // Three-way segmented control: device-list view (cards or
-    // table) plus a YAML-content-search mode. Only one button
-    // shows ``active`` at a time. Clicking cards / table while
-    // in YAML mode flips out of YAML and sets the chosen view;
-    // clicking ``{}`` flips into YAML mode and the underlying
-    // ``_view`` is preserved for when the user returns.
+    // Two-way segmented control for the device-list view. The YAML
+    // mode used to live here as a third segment but reads better
+    // grouped with the labels filter — it's a "narrow what's
+    // showing" affordance, not a "how is it laid out" choice. See
+    // ``_renderFilterGroup`` for the YAML-mode button.
     return html`
       <div
         class="view-toggle"
@@ -699,13 +860,30 @@ export class ESPHomePageDashboard extends LitElement {
         >
           <wa-icon library="mdi" name="table"></wa-icon>
         </button>
+      </div>
+    `;
+  }
+
+  /** Group the filtering affordances — labels filter + YAML-content
+   *  toggle — into one cluster sitting at the right of the toolbar.
+   *  Both narrow what the device list shows; pairing them visually
+   *  keeps the "how do I find a thing" tools together and away from
+   *  the view-mode toggle, which controls layout, not filtering. */
+  private _renderFilterGroup() {
+    const yaml = this._yamlMode;
+    const yamlLabel = this._localize(
+      yaml ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml",
+    );
+    return html`
+      <div class="filter-group">
+        ${this._renderLabelsFilter()}
         <button
-          class="view-toggle-btn ${yaml ? "active" : ""}"
+          class="select-toggle-btn ${yaml ? "active" : ""}"
           type="button"
           title=${yamlLabel}
           aria-label=${yamlLabel}
           aria-pressed=${yaml ? "true" : "false"}
-          @click=${() => this._setSearchMode(true)}
+          @click=${this._toggleSearchMode}
         >
           <wa-icon library="mdi" name="code-braces"></wa-icon>
         </button>
@@ -947,11 +1125,42 @@ export class ESPHomePageDashboard extends LitElement {
         <div class="toolbar-row">
           ${this._renderSearchInput()} ${this._renderSelectToggle()}
           ${this._renderViewToggle()}
+          <span class="toolbar-spacer"></span>
+          ${this._renderFilterGroup()}
         </div>
         ${this._renderDiscoveryHint()}
         <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
       </div>
     `;
+  }
+
+  /** Per-label-id usage count across the current device list.
+   *  Read by ``_confirmDialogCopy`` when rendering the
+   *  delete-label confirm dialog so the prompt reads "this will
+   *  remove the label from N devices" before the cascade fires.
+   *  Reference-keyed cache off ``_devices`` so the dialog doesn't
+   *  pay the count walk twice if it re-renders while the list is
+   *  unchanged (which is most of the dialog's lifetime). */
+  private _computeLabelUsage(): Record<string, number> {
+    const source = this._devices;
+    if (this._labelUsageCache?.source === source) {
+      return this._labelUsageCache.map;
+    }
+    const map = computeLabelUsage(source);
+    this._labelUsageCache = { source, map };
+    return map;
+  }
+
+  private _renderLabelsFilter() {
+    return html`<esphome-labels-filter
+      .selected=${this._selectedLabels}
+      @labels-filter-change=${(e: CustomEvent<string[]>) => {
+        this._selectedLabels = e.detail;
+      }}
+      @request-delete-label=${(e: CustomEvent<Label>) => {
+        this._openConfirm({ kind: "delete-label", label: e.detail });
+      }}
+    ></esphome-labels-filter>`;
   }
 
   private _renderEmptySearch() {
@@ -1036,6 +1245,7 @@ export class ESPHomePageDashboard extends LitElement {
               .name=${device.friendly_name || device.name}
               .configuration=${device.configuration}
               .state=${device.state}
+              .labelIds=${device.labels ?? []}
               ?has-pending-changes=${device.has_pending_changes === true}
               ?has-update-available=${device.update_available}
               ?api-enabled=${device.api_enabled === true}
@@ -1068,9 +1278,15 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   private _renderTable() {
+    // Pre-filter on labels at the dashboard level so the table only
+    // sees the post-filter set; the table's own global search then
+    // narrows further across name / address / IP / MAC. Using
+    // ``_devices`` directly (instead of ``_sortedDevices``) keeps
+    // the table's own column-level sort authoritative.
+    const filteredDevices = this._applyLabelFilter(this._devices);
     return html`
       <esphome-device-table
-        .devices=${this._devices}
+        .devices=${filteredDevices}
         .search=${this._search}
         .activeJobs=${this._activeJobs}
         .recentJobs=${this._recentJobs}
@@ -1104,6 +1320,9 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
+        @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openFriendlyName(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1119,6 +1338,8 @@ export class ESPHomePageDashboard extends LitElement {
           <div class="toolbar-row">
             ${this._renderSearchInput()} ${this._renderSelectToggle()}
             ${this._renderViewToggle()}
+            <span class="toolbar-spacer"></span>
+            ${this._renderFilterGroup()}
           </div>
           ${this._renderDiscoveryHint()}
         </div>
@@ -1197,6 +1418,9 @@ export class ESPHomePageDashboard extends LitElement {
         @download-yaml=${(e: CustomEvent<ConfiguredDevice>) =>
           downloadYaml(e.detail, this._api, this._localize)}
         @rename-device=${(e: CustomEvent<ConfiguredDevice>) => this._openRename(e.detail)}
+        @clone-device=${(e: CustomEvent<ConfiguredDevice>) => this._openClone(e.detail)}
+        @edit-friendly-name=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openFriendlyName(e.detail)}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
         @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -1319,6 +1543,18 @@ export class ESPHomePageDashboard extends LitElement {
           destructive: false,
         };
       }
+      case "delete-label": {
+        const usage = this._computeLabelUsage()[p.label.id] ?? 0;
+        return {
+          heading: t("dashboard.labels_delete_title"),
+          message: t(deleteConfirmKey(usage), {
+            name: p.label.name,
+            count: usage,
+          }),
+          confirm: t("dashboard.labels_delete_submit"),
+          destructive: true,
+        };
+      }
     }
   }
 
@@ -1342,6 +1578,12 @@ export class ESPHomePageDashboard extends LitElement {
         @confirm=${this._executeConfirm}
         @cancel=${() => (this._pendingConfirm = null)}
       ></esphome-confirm-dialog>
+      <esphome-clone-device-dialog
+        @clone-confirm=${this._executeClone}
+      ></esphome-clone-device-dialog>
+      <esphome-friendly-name-dialog
+        @friendly-name-confirm=${this._executeFriendlyName}
+      ></esphome-friendly-name-dialog>
       <esphome-rename-device-dialog
         @rename-confirm=${this._executeRename}
       ></esphome-rename-device-dialog>
@@ -1350,9 +1592,13 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-command-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-command-dialog>
       <esphome-firmware-install-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "clean")}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
@@ -1644,6 +1890,116 @@ export class ESPHomePageDashboard extends LitElement {
     this._renameDialog.open(device.name);
   }
 
+  private _openClone(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._cloneDialog.open(device.name);
+  }
+
+  private _openFriendlyName(device: ConfiguredDevice) {
+    this._actionDevice = device;
+    this._friendlyNameDialog.open(
+      device.name,
+      device.friendly_name || device.name,
+    );
+  }
+
+  private async _executeFriendlyName(
+    e: CustomEvent<{ newFriendlyName: string; install: boolean }>,
+  ) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const { newFriendlyName, install } = e.detail;
+    let result: Awaited<ReturnType<ESPHomeAPI["editFriendlyName"]>>;
+    try {
+      result = await this._api.editFriendlyName(
+        device.configuration,
+        newFriendlyName,
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      toast.error(
+        this._localize("dashboard.action_friendly_name_failed", {
+          name: device.name,
+          reason,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    /* ``rewritten=false`` means the YAML already had this value —
+       skip the install (no firmware-level change) and just close
+       the toast with a quiet success message. */
+    if (!result.rewritten) {
+      toast.success(
+        this._localize("dashboard.action_friendly_name_unchanged"),
+        { richColors: true },
+      );
+      return;
+    }
+    if (!install) {
+      /* Edit-only path: the YAML now reflects the new label, the
+         next compile will pick it up. The "Install" pending-changes
+         badge will surface in the row's update column via
+         ``compute_has_pending_changes`` since the YAML's mtime
+         moved. */
+      toast.success(
+        this._localize("dashboard.action_friendly_name_success", {
+          name: newFriendlyName,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    /* Toast first so the user sees the rewrite landed, then route
+       through the install-method picker. The picker handles every
+       install path the dashboard already knows about — OTA when
+       the device is online, web-serial / USB-via-server when it's
+       not, web-download / binary-download for "I want to flash
+       from another machine." It's also the only place that knows
+       to disable the OTA row for a device with no ``ota:`` block
+       (offline / no-OTA state). Reusing it avoids a parallel
+       install path that would have to learn the same edge cases. */
+    toast.success(
+      this._localize("dashboard.action_friendly_name_success", {
+        name: newFriendlyName,
+      }),
+      { richColors: true },
+    );
+    this._openInstallMethod(device);
+  }
+
+  private async _executeClone(
+    e: CustomEvent<{ newName: string; newFriendlyName: string }>,
+  ) {
+    const device = this._actionDevice;
+    if (!device) return;
+    const { newName, newFriendlyName } = e.detail;
+    try {
+      // Empty friendlyName → forward as ``undefined`` so the
+      // backend defaults to ``friendly_name_slugify(new_name)``.
+      // Sending ``""`` would tell the backend to leave the
+      // source's friendly_name untouched, which produces two list
+      // entries with the same label — confusing for the common
+      // "clone and tweak" workflow.
+      const friendly = newFriendlyName.length > 0 ? newFriendlyName : undefined;
+      await this._api.cloneDevice(device.configuration, newName, friendly);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      toast.error(
+        this._localize("dashboard.action_clone_failed", {
+          name: device.name,
+          reason,
+        }),
+        { richColors: true },
+      );
+      return;
+    }
+    toast.success(
+      this._localize("dashboard.action_clone_success", { name: newName }),
+      { richColors: true },
+    );
+  }
+
   private async _executeRename(e: CustomEvent<string>) {
     const device = this._actionDevice;
     if (!device) return;
@@ -1705,14 +2061,7 @@ export class ESPHomePageDashboard extends LitElement {
       }
       const binary = binaries[0];
       const result = await this._api.firmwareDownload(device.configuration, binary.file);
-      const bytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
-      const blob = new Blob([bytes], { type: "application/octet-stream" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = result.filename;
-      a.click();
-      URL.revokeObjectURL(url);
+      downloadBase64Binary(result.data, result.filename);
     } catch {
       toast.error(this._localize("dashboard.download_firmware_failed", { name }), {
         richColors: true,
@@ -1758,6 +2107,17 @@ export class ESPHomePageDashboard extends LitElement {
     this._commandDialog.name = device.friendly_name || device.name;
     this._commandDialog.open(type, port ? { port } : undefined);
   }
+
+  /** Catch the post-validation-failure "open in editor" hint from
+   *  the inner command / install dialogs and SPA-navigate to the
+   *  device page. The detail carries the configuration filename
+   *  (extension included, e.g. ``foo.yaml``); the device route is
+   *  ``/device/<configuration>``. */
+  private _onRequestOpenEditor = (
+    e: CustomEvent<{ configuration: string }>
+  ) => {
+    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+  };
 
   private _showJobProgress(device: ConfiguredDevice) {
     const job = this._activeJobs.get(device.configuration);
@@ -1963,12 +2323,39 @@ export class ESPHomePageDashboard extends LitElement {
       case "archive-single":
         this._archiveDevice(p.device);
         return;
+      case "delete-label":
+        void this._deleteLabel(p.label);
+        return;
     }
   }
 
   private async _deleteArchivedDevice(device: ArchivedDevice) {
     if (await deleteArchivedDevice(device, this._api, this._localize)) {
       await this._archivedDialog?.refresh();
+    }
+  }
+
+  /** Round-trip ``labels/delete`` and surface a toast on failure.
+   *  The ``LABEL_DELETED`` push from the backend refreshes the
+   *  catalog through ``labelsContext`` — nothing to do locally on
+   *  success. The active filter selection is dropped synchronously
+   *  so a stale chip can't outlive the catalog entry; the alternative
+   *  (silently keeping the id) leaves the filter matching nothing
+   *  with no visible explanation. */
+  private async _deleteLabel(label: Label) {
+    if (!this._api) return;
+    try {
+      await this._api.deleteLabel(label.id);
+      if (this._selectedLabels.includes(label.id)) {
+        this._selectedLabels = this._selectedLabels.filter(
+          (id) => id !== label.id,
+        );
+      }
+    } catch (err) {
+      console.warn("label delete failed", err);
+      toast.error(this._localize("dashboard.labels_delete_failed"), {
+        richColors: true,
+      });
     }
   }
 }

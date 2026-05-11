@@ -16,7 +16,7 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobStatus, JobType } from "../api/types.js";
+import { JobSource, JobStatus, JobType } from "../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
 import { activeLocale } from "../common/localize.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -349,6 +349,18 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
         gap: var(--wa-space-xs);
       }
 
+      /* "Building on <receiver-label>" sub-line under the meta
+         row. Only renders when the job carries a REMOTE source
+         (see _renderSourceLine). Matches the meta line's quiet
+         palette but lives on its own line so a long receiver
+         label doesn't push the status / timestamp off-screen
+         on narrow viewports. */
+      .job-source {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+        margin-top: 2px;
+      }
+
       .job-status {
         display: inline-flex;
         align-items: center;
@@ -548,6 +560,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
             ${this._renderStatus(job)}
             ${this._renderTimestamp(job)}
           </div>
+          ${this._renderSourceLine(job)}
           ${showProgress
             ? html`
                 <div class="progress">
@@ -593,6 +606,41 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
         <wa-icon library="mdi" name="close"></wa-icon>
       </button>
     `;
+  }
+
+  /** Sub-line under the meta row naming the paired receiver a
+   *  REMOTE-routed install is building on. Picked up from
+   *  job.source_label, snapshotted at job-creation time so the
+   *  row text doesn't churn if the pairing is later renamed.
+   *  LOCAL jobs (and anything from before 7a-2a's source field
+   *  landed) carry an empty source_label, so this row is
+   *  effectively a no-op for them.
+   *
+   *  Symmetric receiver-side rendering: when ``remote_peer`` is
+   *  set, the job was submitted to this dashboard by another
+   *  dashboard's offloader. Render "from {peer}" with the
+   *  peer's snapshotted label (or the raw dashboard_id as a
+   *  fallback when an older offloader's submit didn't carry
+   *  ``remote_peer_label``). The same .job-source style runs
+   *  for both directions so the visual treatment matches.
+   */
+  private _renderSourceLine(job: FirmwareJob) {
+    if (job.source === JobSource.REMOTE && job.source_label) {
+      return html`
+        <div class="job-source">
+          ${this._localize("firmware_jobs.building_on", { label: job.source_label })}
+        </div>
+      `;
+    }
+    if (job.remote_peer) {
+      const peer = job.remote_peer_label || job.remote_peer;
+      return html`
+        <div class="job-source">
+          ${this._localize("firmware_jobs.submitted_by", { label: peer })}
+        </div>
+      `;
+    }
+    return nothing;
   }
 
   private _renderStatus(job: FirmwareJob) {

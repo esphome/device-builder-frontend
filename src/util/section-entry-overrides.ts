@@ -25,53 +25,49 @@ import { makeConfigEntry } from "./config-entry-defaults.js";
  *  primitives via the value template and falls back to a per-row
  *  "edit in YAML" placeholder for non-primitives (verified by
  *  ``test/components/device/render-map-field.test.ts``), so the YAML
- *  still round-trips losslessly. ``packages:`` rides this same path
- *  so the user can at least add / rename / delete package keys from
- *  the form even though each value's structured body falls through
- *  to the per-row YAML placeholder. */
+ *  still round-trips losslessly.
+ *
+ *  ``packages:`` was previously routed through here so the user
+ *  could add / rename / delete package keys from the form, but
+ *  upstream also accepts the list shape ``packages: [pkg, pkg]``
+ *  (the form the bare-single-package deprecation steers users to,
+ *  per ``esphome/components/packages/__init__.py:137``). The
+ *  dict-only ``renderMapField`` silently overwrote a list-shaped
+ *  YAML with ``{}`` on save (#361), so packages now goes through
+ *  ``YAML_ONLY_SECTIONS`` instead — both shapes round-trip via
+ *  the YAML pane. */
 export const MAP_SECTIONS: ReadonlySet<string> = new Set([
   "substitutions",
-  "packages",
 ]);
 
 /** Sections that must persist explicit ``""`` values in YAML — i.e.
  *  the user typed a key + cleared the value, treat that as
  *  intentional data instead of "user cleared the field, drop it".
- *  Distinct from :data:`MAP_SECTIONS` because the empty-string
- *  invariant is a substitutions-specific contract: substitutions
- *  values are user-supplied strings (a cleared value means "this
- *  substitution is intentionally empty"), whereas ``packages``
- *  values are nested package mappings — a top-level empty-string
- *  there is just a placeholder from ``renderMapField`` that the
- *  user hasn't filled in yet. ``packages: { new_1: "" }`` is
- *  syntactically valid YAML but ESPHome's ``packages:`` schema
- *  rejects an empty-string package definition, so persisting it
- *  produces a config that fails validation. */
+ *  ``substitutions`` is currently the only one: its values are
+ *  user-supplied strings, and a cleared value means "this
+ *  substitution is intentionally empty". */
 export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set([
   "substitutions",
 ]);
 
 /** Synthesised entries shared by every section in :data:`MAP_SECTIONS`
  *  — a single MAP whose value template is a string. The user names
- *  each row's key themselves (the substitution name, the package
- *  name, etc.). The string template is the primitive-value case;
- *  non-primitive values (lists / dicts, e.g. nested package
- *  definitions) get a per-row "edit in YAML" placeholder via
+ *  each row's key themselves (the substitution name). The string
+ *  template is the primitive-value case; non-primitive values
+ *  (lists / dicts) get a per-row "edit in YAML" placeholder via
  *  ``renderMapField`` rather than being forced through the string
  *  template (which would stringify them to ``[object Object]`` and
  *  lose data on save).
  *
- *  Per-row format validation (e.g. ``packages:`` only accepts the
- *  ``github://`` / ``gitlab://`` shorthand) is intentionally NOT
- *  done here — the YAML editor's ``yaml-lint-backend.ts`` already
- *  pipes the document through ``editor/validate_yaml``
+ *  Per-row format validation is intentionally NOT done here — the
+ *  YAML editor's ``yaml-lint-backend.ts`` already pipes the
+ *  document through ``editor/validate_yaml``
  *  (``esphome vscode --ace``) and surfaces ESPHome's actual error
  *  as a red squiggle, so the form's save path delegates to that
  *  same backend lint. Duplicating ESPHome's validators in the
  *  frontend would silently drift the moment upstream's accepted
- *  shorthand changes (new domain, new alias, char class loosened).
- *  The save path's roundtrip lives in ``device-section-config``'s
- *  ``_onSave``. */
+ *  shape changes. The save path's roundtrip lives in
+ *  ``device-section-config``'s ``_onSave``. */
 const MAP_SECTION_ENTRIES: ConfigEntry[] = [
   makeConfigEntry({
     type: ConfigEntryType.MAP,

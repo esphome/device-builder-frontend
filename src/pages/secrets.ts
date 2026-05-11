@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiContentSave } from "@mdi/js";
+import { mdiArrowLeft, mdiContentSave, mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -18,6 +18,8 @@ import "../components/yaml-editor.js";
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
   "content-save": mdiContentSave,
+  eye: mdiEye,
+  "eye-off": mdiEyeOff,
 });
 
 const SECRETS_FILE = "secrets.yaml";
@@ -43,8 +45,33 @@ export class ESPHomePageSecrets extends LitElement {
   @state()
   private _loaded = false;
 
+  // Mirrors the device editor's per-field reveal toggle. Default
+  // hidden so values render as bullets the moment the page paints —
+  // anyone glancing at the screen sees masks, not the raw secrets.
+  @state()
+  private _revealSensitive = false;
+
   async connectedCallback() {
     super.connectedCallback();
+    window.addEventListener(
+      "secrets-saved",
+      this._onExternalSecretsSaved as EventListener,
+    );
+    await this._loadFromServer();
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener(
+      "secrets-saved",
+      this._onExternalSecretsSaved as EventListener,
+    );
+    super.disconnectedCallback();
+  }
+
+  /** Pull `secrets.yaml` from the server and reset both buffers.
+   *  On read error (file missing) seeds the editor with the
+   *  localized header so the user has a starting point. */
+  private async _loadFromServer() {
     try {
       const yaml = await this._api.getConfig(SECRETS_FILE);
       this._yaml = yaml;
@@ -57,13 +84,26 @@ export class ESPHomePageSecrets extends LitElement {
     this._loaded = true;
   }
 
+  /** Another component (typically the onboarding wizard) just
+   *  wrote `secrets.yaml`. Reload from the server so the editor
+   *  doesn't show stale content. Skip when this page initiated
+   *  the save (no work to do — buffers already reflect the new
+   *  content) and when the user has unsaved edits in the editor
+   *  (silently overwriting their typing would lose work; they'll
+   *  see the disk's view next time they reload the page or save). */
+  private _onExternalSecretsSaved = (e: CustomEvent<{ source: EventTarget }>) => {
+    if (e.detail?.source === this) return;
+    if (this._yaml !== this._savedYaml) return;
+    void this._loadFromServer();
+  };
+
   static styles = [
     espHomeStyles,
     css`
       :host {
         display: flex;
         flex-direction: column;
-        height: calc(100vh - var(--esphome-header-height));
+        height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
         box-sizing: border-box;
       }
 
@@ -161,10 +201,46 @@ export class ESPHomePageSecrets extends LitElement {
         font-size: var(--wa-font-size-l);
         color: var(--esphome-primary);
       }
+
+      .reveal-toggle {
+        border: none;
+        background: transparent;
+        color: var(--esphome-primary);
+        padding: 6px 8px;
+        border-radius: var(--wa-border-radius-m);
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+      }
+
+      .reveal-toggle:hover {
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 90%
+        );
+      }
+
+      .reveal-toggle[aria-pressed="true"] {
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 85%
+        );
+      }
+
+      .reveal-toggle wa-icon {
+        font-size: var(--wa-font-size-l);
+      }
     `,
   ];
 
   protected render() {
+    const revealLabel = this._localize(
+      this._revealSensitive ? "secrets.hide_values" : "secrets.reveal_values",
+    );
     return html`
       <div class="page">
         <div class="page-header">
@@ -175,6 +251,19 @@ export class ESPHomePageSecrets extends LitElement {
             <h1>${this._localize("secrets.title")}</h1>
             <p>${this._localize("secrets.desc")}</p>
           </div>
+          <button
+            type="button"
+            class="reveal-toggle"
+            aria-pressed=${this._revealSensitive}
+            aria-label=${revealLabel}
+            title=${revealLabel}
+            @click=${this._toggleRevealSensitive}
+          >
+            <wa-icon
+              library="mdi"
+              name=${this._revealSensitive ? "eye-off" : "eye"}
+            ></wa-icon>
+          </button>
         </div>
         <wa-divider></wa-divider>
         <div class="editor-card">
@@ -191,6 +280,8 @@ export class ESPHomePageSecrets extends LitElement {
           </button>
           <esphome-yaml-editor
             .value=${this._yaml}
+            .maskAllValues=${true}
+            .revealSensitive=${this._revealSensitive}
             @yaml-change=${(e: CustomEvent) => {
               this._yaml = e.detail.value;
             }}
@@ -200,19 +291,48 @@ export class ESPHomePageSecrets extends LitElement {
     `;
   }
 
+  private _toggleRevealSensitive() {
+    this._revealSensitive = !this._revealSensitive;
+  }
+
   private _goBack() {
     window.history.back();
   }
 
   private _save() {
+    // Optimistic update: dirty-state UI flips back to "saved"
+    // immediately so the Save button disables. Snapshot the
+    // previous saved buffer first so a real (non-timeout)
+    // failure can revert and let the user retry.
+    const previousSaved = this._savedYaml;
     this._savedYaml = this._yaml;
     toast.success(this._localize("secrets.saved"), { richColors: true });
-    this._api.updateConfig(SECRETS_FILE, this._yaml).catch((e) => {
-      const msg = e instanceof Error ? e.message : "";
-      if (!msg.includes("timed out")) {
-        toast.error(this._localize("secrets.save_error"), { richColors: true });
-      }
-    });
+    this._api
+      .updateConfig(SECRETS_FILE, this._yaml)
+      .then(() => {
+        // Window-level so other mounted components (app-shell's
+        // onboarding-state refresh, peer secrets-page instances)
+        // can react regardless of where they live in the tree.
+        // ``detail.source`` lets self-listeners short-circuit.
+        window.dispatchEvent(
+          new CustomEvent("secrets-saved", { detail: { source: this } }),
+        );
+      })
+      .catch((e) => {
+        const msg = e instanceof Error ? e.message : "";
+        // WS commands may time out client-side while the server
+        // still completes the write — keep the optimistic buffer
+        // so the user isn't told their save failed when it
+        // probably succeeded. Any other error is a real failure:
+        // restore the previous saved buffer so the dirty state
+        // returns and the user can retry.
+        if (!msg.includes("timed out")) {
+          this._savedYaml = previousSaved;
+          toast.error(this._localize("secrets.save_error"), {
+            richColors: true,
+          });
+        }
+      });
   }
 }
 

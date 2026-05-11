@@ -9,13 +9,15 @@ import {
   mdiKeyOutline,
   mdiPlaylistCheck,
   mdiRefresh,
+  mdiServerNetwork,
   mdiStop,
   mdiTimerSand,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobStatus, JobType } from "../api/types.js";
+import { ErrorCode, JobSource, JobStatus, JobType } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeAnsiLog } from "./ansi-log.js";
@@ -27,6 +29,7 @@ import {
   firmwareJobsContext,
   localizeContext,
 } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
@@ -49,6 +52,7 @@ registerMdiIcons({
   "check-circle": mdiCheckCircle,
   "alert-circle": mdiAlertCircle,
   "playlist-check": mdiPlaylistCheck,
+  "server-network": mdiServerNetwork,
   "timer-sand": mdiTimerSand,
 });
 
@@ -127,6 +131,18 @@ export class ESPHomeCommandDialog extends LitElement {
    *  install finishes. Reset to default per ``open()`` so an opt-out
    *  on one run doesn't silently persist into unrelated future runs. */
   @state() private _showLogsAfterInstall = true;
+  /** Flips true when the output stream contains an ESPHome
+   *  validation-failure marker (``Failed config`` from the schema
+   *  validator, or an anchored ``ERROR Error while reading
+   *  config:`` logger line from the earlier YAML load step — see
+   *  ``_isValidationFailureLine`` for the exact match rules).
+   *  Lets the failure hint switch from "clean the build files /
+   *  reset the build environment" — which only help for C++
+   *  compile failures — to "open this device in the editor",
+   *  which is the right action when the YAML itself is broken.
+   *  Reset per ``open()``. */
+  @state() private _failedDuringValidate = false;
+
   /** Guard against re-entrancy on the show-secrets toggle.
    *  ``_detachStream`` clears ``_streamId`` synchronously and only
    *  awaits the backend stop afterwards; without this flag a fast
@@ -148,6 +164,27 @@ export class ESPHomeCommandDialog extends LitElement {
    *  ``_isQueued`` below. */
   @state()
   private _jobStatus: JobStatus | null = null;
+  /** Locally-primed snapshot of the followed job's
+   *  ``{source, source_label}`` so the "Building on
+   *  <receiver>" sub-line can paint on the very first
+   *  frame — same priming pattern ``_jobStatus`` uses for
+   *  the queued overlay. The ``firmwareJobsContext`` only
+   *  delivers ``_jobs.get(id)`` after the next
+   *  ``job_queued`` / ``job_updated`` event, so without
+   *  this fallback a REMOTE-routed install dialog renders
+   *  blank chrome for the ~roundtrip-time before the
+   *  sub-line appears. Reset to ``null`` on ``open()`` so
+   *  the next dialog session starts clean; the renderer
+   *  prefers the live context entry when present, so a
+   *  stale prime is benign once ``_jobs`` catches up. */
+  private _primedSource: { source: JobSource; source_label: string } | null = null;
+  /** True while the "Build locally instead" override is mid-flight
+   *  (cancel + resubmit pair). Disables the link so a fast double-
+   *  click can't queue two resubmits, and lets the renderer flip
+   *  the label to "Switching…" so the user sees something is
+   *  happening across the small ``firmware/cancel`` → ``firmware/install``
+   *  round-trip. */
+  @state() private _switchingToLocal = false;
   /** Stream message ID (for both validate streaming and follow_job streaming). */
   private _streamId = "";
   /** Install target port — "OTA" for network, an actual port for server-serial. */
@@ -161,6 +198,7 @@ export class ESPHomeCommandDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dialogCloseButtonStyles,
     css`
       :host {
         --term-bg: #1e1e1e;
@@ -218,29 +256,9 @@ export class ESPHomeCommandDialog extends LitElement {
         font-weight: var(--wa-font-weight-bold);
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       }
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        /* Square 40x40 button matching the header height so the X has a
-           comfortable click/tap target instead of just the icon's
-           ~14px footprint. */
-        padding: 0;
-        width: 40px;
-        height: 40px;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-      /* Same affordance for hover and keyboard focus so the close
-         button is discoverable either way on the new lighter
-         background. */
-      wa-dialog::part(close-button__base):hover,
-      wa-dialog::part(close-button__base):focus-visible {
-        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-        outline: none;
-      }
+      /* Close-button styling lives in
+         src/styles/dialog-close-button.ts — see the
+         dialogCloseButtonStyles import below. */
       wa-dialog::part(body) {
         padding: 0;
         background: var(--term-bg);
@@ -348,6 +366,60 @@ export class ESPHomeCommandDialog extends LitElement {
       .status-banner--error {
         background: color-mix(in srgb, var(--term-error), transparent 85%);
         color: var(--term-error);
+      }
+
+      /* "Building on <receiver_label>" sub-line, visible while a
+         REMOTE-source job is in flight (queued / compiling /
+         installing). Surfaced above the log area so the user can
+         see at a glance which paired build server is doing the
+         work — transparent install routes the compile silently,
+         but the operator still wants to know where the bytes
+         are coming from. */
+      .remote-builder-sub-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 20px;
+        border-bottom: 1px solid var(--term-border);
+        font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+        font-size: 12px;
+        color: var(--wa-color-text-quiet, #888);
+      }
+      .remote-builder-sub-line wa-icon {
+        font-size: 16px;
+        flex-shrink: 0;
+      }
+      .remote-builder-sub-line .spacer {
+        flex: 1;
+      }
+
+      /* "Build locally instead" override link. Sits at the
+         right edge of the remote-builder sub-line and fires
+         the cancel-and-resubmit-locally flow when clicked.
+         Styled as an inline text link rather than a button —
+         the row is informational chrome, not a primary action
+         surface, so a full-fledged button would over-promise.
+         Disabled while a switch is mid-flight so a fast
+         double-click can't queue two resubmits. */
+      .force-local-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        color: var(--esphome-primary, #1e88e5);
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .force-local-link:hover:not(:disabled),
+      .force-local-link:focus-visible {
+        text-decoration-thickness: 2px;
+        outline: none;
+      }
+      .force-local-link:disabled {
+        color: var(--wa-color-text-quiet, #888);
+        cursor: not-allowed;
+        text-decoration: none;
       }
 
       /* Reset-build-env suggestion — surfaced only on install/compile
@@ -498,6 +570,8 @@ export class ESPHomeCommandDialog extends LitElement {
     this._statusMessage = "";
     this._jobId = "";
     this._jobStatus = null;
+    this._primedSource = null;
+    this._failedDuringValidate = false;
     /* Always start with secrets redacted on a fresh open — the
        toggle is opt-in per session so a screen-share / pair-coding
        moment can't accidentally inherit a previous "show secrets"
@@ -546,8 +620,15 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = job.job_id;
     /* Prime from the job we were handed so the queued overlay can
        render on the very first paint instead of after the next
-       context update. */
+       context update. ``_primedSource`` does the same job for the
+       "Building on <receiver>" sub-line — without it, a REMOTE-
+       routed install dialog renders blank chrome for the
+       ~roundtrip-time before the next context update lands. */
     this._jobStatus = job.status;
+    this._primedSource = {
+      source: job.source,
+      source_label: job.source_label,
+    };
     // Cancel any prior follow before starting a new one. Without
     // this, every reopen of the dialog (clicking the busy spinner
     // again while a job is still running) layered on a fresh
@@ -636,6 +717,7 @@ export class ESPHomeCommandDialog extends LitElement {
     return html`
       <wa-dialog label=${this._title} light-dismiss @wa-after-hide=${this._onDialogHide}>
         <div class="content">
+          ${this._renderRemoteBuilderSubLine()}
           <div class="log-area">
             <esphome-ansi-log
               .lines=${this._lines}
@@ -648,6 +730,167 @@ export class ESPHomeCommandDialog extends LitElement {
         </div>
       </wa-dialog>
     `;
+  }
+
+  /** "Building on <receiver_label>" sub-line for in-flight REMOTE jobs.
+   *
+   *  Reads ``FirmwareJob.source`` + ``source_label`` from the
+   *  jobs context (7a-2a / 7a-3). Visible while the job is non-
+   *  terminal so the operator can see at a glance which paired
+   *  build server the compile was routed to; the transparent
+   *  install flow dispatches silently otherwise. Falls back to
+   *  the locally-primed ``_primedSource`` snapshot for the gap
+   *  between ``followJob`` and the first context update —
+   *  without it, a REMOTE-routed install dialog renders blank
+   *  chrome for the ~roundtrip-time before the live entry
+   *  lands. Returns ``nothing`` for LOCAL jobs or when neither
+   *  source is available. */
+  private _renderRemoteBuilderSubLine() {
+    if (!this._jobId) return nothing;
+    const liveJob = this._jobs.get(this._jobId);
+    if (liveJob && isTerminalJobStatus(liveJob.status)) return nothing;
+    // Live entry wins when present — it's the canonical
+    // source the rest of the dialog reads from, so we
+    // prefer it over the locally-primed snapshot. The
+    // ``source_label`` field is a snapshot at job-creation
+    // time per the backend's wire contract (see
+    // ``FirmwareJob.source_label`` in ``api/types.ts``), so
+    // the two values agree once ``_jobs`` catches up; the
+    // prime only fills the paint-gap before that.
+    const source = liveJob?.source ?? this._primedSource?.source;
+    const label = liveJob?.source_label ?? this._primedSource?.source_label;
+    if (source !== JobSource.REMOTE || !label) return nothing;
+    // Only allow the override while the install is mid-flight
+    // and only for the install command type — switching mid-
+    // upload doesn't make sense, and switching a compile job
+    // mid-flight is a power-user shape we don't have a UI for
+    // yet. For terminal jobs ``_renderRemoteBuilderSubLine``
+    // already returns ``nothing`` above; this guard is the
+    // remaining gate for "compile-only" and "command-dialog
+    // opened from non-Install entry points".
+    const canOverride = this._commandType === "install";
+    return html`
+      <div class="remote-builder-sub-line" role="status">
+        <wa-icon library="mdi" name="server-network"></wa-icon>
+        <span
+          >${this._localize("command.remote_builder_sub_line", {
+            receiver: label,
+          })}</span
+        >
+        ${canOverride
+          ? html`
+              <span class="spacer"></span>
+              <button
+                class="force-local-link"
+                ?disabled=${this._switchingToLocal}
+                @click=${this._onForceLocalClick}
+              >
+                ${this._switchingToLocal
+                  ? this._localize("command.force_local_switching")
+                  : this._localize("command.force_local_action")}
+              </button>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
+  /** Cancel the in-flight REMOTE install and resubmit as LOCAL.
+   *
+   *  The dialog stays attached: after the cancel lands the
+   *  fresh ``firmwareInstall`` returns the new ``FirmwareJob``,
+   *  we re-prime ``_primedSource`` (so the sub-line disappears
+   *  on the very first paint), and call ``_followJob`` to
+   *  follow the new ``job_id``. The visible end-result for the
+   *  operator: "Building on X" sub-line replaced by the local
+   *  compile output stream, no dialog flicker.
+   *
+   *  Edge cases:
+   *  - Cancel-already-terminal race: if the in-flight job
+   *    flipped to a terminal state in the same tick, the
+   *    backend rejects with ``NOT_FOUND`` (already cleared) or
+   *    ``INVALID_ARGS`` (terminal). The override path swallows
+   *    those specifically and proceeds to the resubmit — the
+   *    operator's intent is "I want LOCAL now," which is still
+   *    achievable.
+   *  - Transport / unexpected cancel failure: surface the
+   *    error and abort the override so we don't queue a second
+   *    install while the original REMOTE keeps running.
+   *  - Resubmit failure: the dialog flips to the error banner
+   *    with a localized status message; ``APIError.details``
+   *    rides through as the secondary line via ``_lines`` so
+   *    the operator sees both the friendly copy and the wire
+   *    detail. Plain ``Error`` instances pass through their
+   *    ``.message`` verbatim.
+   *  - Double-click: ``_switchingToLocal`` gates the button
+   *    visually + functionally so the second click is a no-op. */
+  private _onForceLocalClick = async (): Promise<void> => {
+    if (this._switchingToLocal) return;
+    this._switchingToLocal = true;
+    const configuration = this.configuration;
+    const port = this._port;
+    const cancelJobId = this._jobId;
+    try {
+      if (cancelJobId) {
+        try {
+          await this._api.firmwareCancel(cancelJobId);
+        } catch (cancelErr) {
+          // Only swallow the cancel-already-terminal race —
+          // any other failure (transport, server bug, …)
+          // aborts the override so we don't queue a second
+          // install while the original REMOTE keeps running.
+          if (!this._isCancelAlreadyTerminal(cancelErr)) throw cancelErr;
+        }
+      }
+      const job = await this._api.firmwareInstall(configuration, port, true);
+      // Re-attach the dialog to the new job. ``followJob``
+      // resets the line buffer + primes ``_jobStatus`` /
+      // ``_primedSource`` so the "Building on" sub-line
+      // disappears on the next render without waiting for the
+      // jobs-context update.
+      this.followJob(job, this.name);
+    } catch (err) {
+      // Surface the failure on the existing error banner. The
+      // primary status message is the localized "couldn't
+      // switch" copy (so the operator sees user-facing language,
+      // not a wire error code); the secondary detail rides into
+      // ``_lines`` as a single line so the existing log surface
+      // carries the actionable detail. APIError.details is the
+      // server-provided actionable text; plain Error instances
+      // fall back to ``.message``.
+      this._state = "error";
+      this._statusMessage = this._localize("command.force_local_failed");
+      const detail = this._formatForceLocalError(err);
+      if (detail) this._lines = [...this._lines, detail];
+    } finally {
+      this._switchingToLocal = false;
+    }
+  };
+
+  /** Recognise the cancel-already-terminal race so the override
+   *  swallows only that specific failure path. ``NOT_FOUND`` =
+   *  the job already left ``_jobs``; ``INVALID_ARGS`` = the
+   *  backend's "Cannot cancel a {status} job" reject for a job
+   *  that already flipped to a terminal status in the same
+   *  tick. Anything else — transport error, server bug — gets
+   *  re-raised. */
+  private _isCancelAlreadyTerminal(err: unknown): boolean {
+    if (!(err instanceof APIError)) return false;
+    return (
+      err.errorCode === ErrorCode.NOT_FOUND ||
+      err.errorCode === ErrorCode.INVALID_ARGS
+    );
+  }
+
+  /** Format an override-flow error for the secondary detail
+   *  line. ``APIError.details`` is the server-provided
+   *  user-facing text (e.g. the configuration validator's line
+   *  number); plain ``Error`` instances fall back to
+   *  ``.message``. */
+  private _formatForceLocalError(err: unknown): string {
+    if (err instanceof APIError) return err.details || err.errorCode;
+    if (err instanceof Error) return err.message;
+    return String(err);
   }
 
   /** True when this dialog is following a job that's still in the
@@ -726,33 +969,68 @@ export class ESPHomeCommandDialog extends LitElement {
     `;
   }
 
-  /** Hint shown after a failed install / compile pointing the user
-   *  at "Reset Build Environment". Build-env corruption is a common
-   *  cause of compile failures (stale toolchain, half-installed
-   *  platform/library); the legacy dashboard surfaced a Clean All
-   *  button at the top level for this reason. We keep the entry-
-   *  point in the kebab and contextually offer it here so users
-   *  don't have to dig for it after a failure. Limited to install /
-   *  compile because the other command types don't have a build
-   *  step that the reset would help with.
+  /** Failure hint dispatcher. Picks between two messages based on
+   *  what failed:
    *
-   *  Rendered as an inline link inside the sentence rather than a
-   *  separate button so the call-to-action reads as part of the
-   *  hint ("try reset build environment") instead of a standalone
-   *  next-step. The translation puts the link text behind a
-   *  ``{action}`` marker so other locales can place it wherever
-   *  reads naturally. */
+   *  * **YAML validation** (the ``validate`` command, or an
+   *    ``install`` / ``compile`` whose output stream included
+   *    ESPHome's validation-failure marker) — neither clean nor
+   *    reset will help a broken YAML; offer the editor instead.
+   *  * **Build / compile failure** (install / compile that got
+   *    past validation) — keep the clean → reset staircase.
+   *
+   *  Other command types (clean, reset, rename) don't get a hint;
+   *  their failure mode is its own thing. The ``_userStopped`` gate
+   *  is shared — a user-cancel isn't a build problem either way. */
   private _renderResetSuggestion() {
     if (this._state !== "error") return nothing;
     if (this._userStopped) return nothing;
+    if (this._commandType === "validate" || this._failedDuringValidate) {
+      return this._renderValidationFailureSuggestion();
+    }
     if (this._commandType !== "install" && this._commandType !== "compile") {
       return nothing;
     }
-    const text = this._localize("command.try_reset_suggestion");
-    const [before, after = ""] = text.split("{action}");
+    return this._renderBuildFailureSuggestion();
+  }
+
+  /** YAML validation failure → "open in editor" hint. The
+   *  translation puts the link text behind a ``{editor_action}``
+   *  marker. */
+  private _renderValidationFailureSuggestion() {
+    const text = this._localize("command.validation_failed_suggestion");
+    const [before, after = ""] = text.split("{editor_action}");
     return html`
       <div class="reset-suggestion" role="status">
         ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryOpenInEditor}
+        >
+          ${this._localize("command.try_open_editor_button")}</button>${after}
+      </div>
+    `;
+  }
+
+  /** Build-step failure → clean (surgical, per-device) → reset
+   *  (nuclear, wipes every toolchain and cache) staircase.
+   *  Stale per-device build artifacts cause the bulk of compile
+   *  failures; the toolchain wipe is the heavier hammer reserved
+   *  for cases where clean doesn't help. Both actions are inline
+   *  links inside the sentence so the CTAs read as part of the
+   *  hint. The translation puts each link text behind a
+   *  ``{clean_action}`` / ``{reset_action}`` marker so other
+   *  locales can place them wherever reads naturally. */
+  private _renderBuildFailureSuggestion() {
+    const text = this._localize("command.try_reset_suggestion");
+    const [before, rest = ""] = text.split("{clean_action}");
+    const [middle, after = ""] = rest.split("{reset_action}");
+    return html`
+      <div class="reset-suggestion" role="status">
+        ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryCleanBuild}
+        >
+          ${this._localize("command.try_clean_button")}</button>${middle}<button
           class="reset-suggestion-link"
           @click=${this._tryResetBuildEnv}
         >
@@ -760,6 +1038,35 @@ export class ESPHomeCommandDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Close the dialog and ask the host page to take the user to
+   *  the device-page editor for this configuration. Dashboard
+   *  handles this by navigating to ``/device/<config>``; the
+   *  device page just closes the dialog (the user is already on
+   *  the editor). */
+  private _tryOpenInEditor = () => {
+    const configuration = this.configuration;
+    this.close();
+    if (!configuration) return;
+    this.dispatchEvent(
+      new CustomEvent("request-open-editor", {
+        detail: { configuration },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  /** Per-device clean: re-uses this same dialog instance — the
+   *  ``configuration`` property is already set to the failing
+   *  config, so calling ``open("clean")`` tears down the current
+   *  command and starts a fresh clean job on the same device. No
+   *  bubble-up needed; clean is non-destructive (just wipes one
+   *  device's ``.esphome/build/<name>/``) and doesn't need the
+   *  confirm step that gates the toolchain-wide reset. */
+  private _tryCleanBuild = () => {
+    this.open("clean");
+  };
 
   /** Hand off to the firmware-jobs-dialog's reset flow. We close the
    *  current command dialog first so the user can see the confirm
@@ -975,12 +1282,49 @@ export class ESPHomeCommandDialog extends LitElement {
     this._lines = [];
     this._statusMessage = "";
     this._userStopped = false;
+    this._failedDuringValidate = false;
 
     if (this._commandType === "validate") {
       this._startValidateStream();
       return;
     }
     await this._startFirmwareJob();
+  }
+
+  /** Match a dashboard-escaped or raw ANSI SGR sequence (``\033[…m``
+   *  in dashboard mode, ``\x1b[…m`` in raw mode). The backend pins
+   *  ``--dashboard``, so we always see the four-character escaped
+   *  form; the raw branch is defensive in case that ever changes. */
+  private static readonly _ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
+
+  /** Match an ESPHome logger line whose level is ``ERROR`` and
+   *  whose message starts with the canonical YAML-load-failure
+   *  prefix. The log format is ``"<asctime>? <LEVEL> <message>"``
+   *  (esphome/log.py), so an optional timestamp may precede
+   *  ``ERROR``. Anchored at start-of-line so a debug / info line
+   *  that happens to quote the phrase mid-message can't match. */
+  private static readonly _LOADER_ERROR =
+    /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
+
+  /** Detect ESPHome's validation-failure markers in a streamed
+   *  output line. Two distinct sources:
+   *
+   *  * ``Failed config`` — printed via ``safe_print`` as a
+   *    standalone bold-red banner from ``esphome/config.py`` when
+   *    the schema validator rejects a successfully-loaded YAML.
+   *    Strict equality after ANSI strip: the line *is* the marker.
+   *  * ``ERROR Error while reading config: …`` — earlier
+   *    ``_LOGGER.error`` from the YAML-load step (parse failure /
+   *    missing include / etc.). Anchored ERROR-prefix match so a
+   *    stack trace or doc string that happens to contain the
+   *    phrase mid-text can't match.
+   *
+   *  Both indicate the build never reached the C++ compile step;
+   *  clean / reset can't help. */
+  private static _isValidationFailureLine(line: string): boolean {
+    const stripped = line.replace(ESPHomeCommandDialog._ANSI_SGR, "").trim();
+    if (stripped === "Failed config") return true;
+    return ESPHomeCommandDialog._LOADER_ERROR.test(stripped);
   }
 
   /** Validate uses the per-connection streaming command (not a queued job). */
@@ -990,6 +1334,9 @@ export class ESPHomeCommandDialog extends LitElement {
       {
         onOutput: (line) => {
           this._lines = [...this._lines, line];
+          if (ESPHomeCommandDialog._isValidationFailureLine(line)) {
+            this._failedDuringValidate = true;
+          }
         },
         onResult: (data) => {
           this._streamId = "";
@@ -1078,8 +1425,14 @@ export class ESPHomeCommandDialog extends LitElement {
     /* Prime status from the API response so the queued overlay shows
        up immediately. The matching ``job_queued`` event will lands in
        ``firmwareJobsContext`` shortly after and the getter will
-       prefer that live value going forward. */
+       prefer that live value going forward. Same priming pattern
+       carries ``{source, source_label}`` for the "Building on
+       <receiver>" sub-line. */
     this._jobStatus = job.status;
+    this._primedSource = {
+      source: job.source,
+      source_label: job.source_label,
+    };
     this._followJob(job.job_id);
   }
 
@@ -1097,6 +1450,9 @@ export class ESPHomeCommandDialog extends LitElement {
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];
+        if (ESPHomeCommandDialog._isValidationFailureLine(line)) {
+          this._failedDuringValidate = true;
+        }
       },
       onResult: (data) => {
         this._streamId = "";

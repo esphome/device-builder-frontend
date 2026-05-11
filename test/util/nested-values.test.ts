@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getIn,
+  isPlainObject,
   isPrimitiveOrNullish,
   setIn,
 } from "../../src/util/nested-values.js";
@@ -43,6 +44,48 @@ describe("setIn", () => {
     expect(setIn({ a: 1 }, [], "wat")).toEqual({});
     expect(setIn({ a: 1 }, [], [1, 2])).toEqual({});
   });
+
+  it("descends into arrays via numeric path segments", () => {
+    // Editing ``esphome.devices[0].name`` from the nested-list
+    // renderer; the array slot must survive the write.
+    const before = { devices: [{ name: "old" }, { name: "kitchen" }] };
+    const after = setIn(before, ["devices", "0", "name"], "front");
+    expect(after).toEqual({
+      devices: [{ name: "front" }, { name: "kitchen" }],
+    });
+    // Untouched siblings keep identity (structural sharing).
+    expect((after.devices as unknown[])[1]).toBe(before.devices[1]);
+  });
+
+  it("creates intermediate objects inside an array slot", () => {
+    expect(setIn({ devices: [{}] }, ["devices", "0", "id", "x"], 1)).toEqual({
+      devices: [{ id: { x: 1 } }],
+    });
+  });
+
+  it("grows the array when writing past the end", () => {
+    // Newly-added nested-list items can write to their own slot
+    // before the placeholder object is materialised in form state.
+    const after = setIn({ devices: [] }, ["devices", "0", "name"], "front");
+    expect(after).toEqual({ devices: [{ name: "front" }] });
+  });
+
+  it("preserves array shape when replacing a slot", () => {
+    expect(
+      setIn({ devices: [{ name: "old" }] }, ["devices", "0"], { name: "new" }),
+    ).toEqual({ devices: [{ name: "new" }] });
+  });
+
+  it("ignores invalid array-index segments instead of writing string keys", () => {
+    // ``arr["name"] = ...`` would silently set a string property on
+    // the array object, leaving ``.length`` stale — every consumer
+    // downstream sees the array as untouched but ``Object.keys``
+    // surfaces the rogue key. The helper drops the write instead.
+    const before = { devices: [{ id: "kitchen" }] };
+    expect(setIn(before, ["devices", "name", "x"], 1)).toEqual(before);
+    expect(setIn(before, ["devices", "-1", "x"], 1)).toEqual(before);
+    expect(setIn(before, ["devices", "1.5", "x"], 1)).toEqual(before);
+  });
 });
 
 describe("getIn", () => {
@@ -57,7 +100,21 @@ describe("getIn", () => {
 
   it("returns undefined when the path crosses a non-object", () => {
     expect(getIn({ a: "hello" }, ["a", "b"])).toBeUndefined();
-    expect(getIn({ a: [1, 2] }, ["a", "0"])).toBeUndefined();
+    expect(getIn({ a: 5 }, ["a", "b"])).toBeUndefined();
+  });
+
+  it("descends into arrays via numeric path segments", () => {
+    // Arrays are valid containers — the nested-list renderer needs
+    // to read child fields out of items at ``devices[0]``.
+    expect(getIn({ devices: [{ name: "front" }] }, ["devices", "0", "name"]))
+      .toBe("front");
+    expect(getIn({ a: [1, 2, 3] }, ["a", "2"])).toBe(3);
+  });
+
+  it("returns undefined for out-of-range / non-numeric array paths", () => {
+    expect(getIn({ a: [1, 2] }, ["a", "5"])).toBeUndefined();
+    expect(getIn({ a: [1, 2] }, ["a", "-1"])).toBeUndefined();
+    expect(getIn({ a: [1, 2] }, ["a", "name"])).toBeUndefined();
   });
 });
 
@@ -103,6 +160,47 @@ describe("isPrimitiveOrNullish", () => {
       // — TypeScript accepts ``String(value)`` without a cast.
       const s: string = String(value ?? "");
       expect(s).toBe("hello");
+    }
+  });
+});
+
+describe("isPlainObject", () => {
+  it("accepts plain objects (the deep-merge target shape)", () => {
+    expect(isPlainObject({})).toBe(true);
+    expect(isPlainObject({ a: 1 })).toBe(true);
+    expect(isPlainObject(Object.create(null))).toBe(true);
+  });
+
+  it("rejects null and undefined", () => {
+    // ``setIn`` and the pin renderer both treat null/undefined as
+    // "no existing object — start fresh". The check has to be
+    // explicit because ``typeof null === 'object'``.
+    expect(isPlainObject(null)).toBe(false);
+    expect(isPlainObject(undefined)).toBe(false);
+  });
+
+  it("rejects primitives", () => {
+    expect(isPlainObject("hello")).toBe(false);
+    expect(isPlainObject("")).toBe(false);
+    expect(isPlainObject(0)).toBe(false);
+    expect(isPlainObject(true)).toBe(false);
+  });
+
+  it("rejects arrays", () => {
+    // The pin renderer's long-form detection has to exclude arrays
+    // — ``pin: [GPIO5]`` is invalid YAML for an ESPHome pin field
+    // (and ``setIn`` treats arrays as "non-object child, replace
+    // with {}"), so descending into one would be wrong either way.
+    expect(isPlainObject([])).toBe(false);
+    expect(isPlainObject([1, 2, 3])).toBe(false);
+  });
+
+  it("narrows the type for the caller", () => {
+    const value: unknown = { a: 1 };
+    if (isPlainObject(value)) {
+      // ``value`` is now ``Record<string, unknown>`` — TypeScript
+      // accepts ``value.a`` without a cast.
+      expect(value.a).toBe(1);
     }
   });
 });

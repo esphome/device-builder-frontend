@@ -7,6 +7,7 @@ import {
   validateEntry,
 } from "../../src/util/config-validation.js";
 import { makeConfigEntry as makeEntry } from "./_make-config-entry.js";
+import { YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 describe("validateDeviceName", () => {
   it("accepts valid slug", () => {
@@ -194,6 +195,114 @@ describe("validateEntries", () => {
     expect(errors.size).toBe(0);
   });
 
+  it("validates each item of a multi_value NESTED entry with index path segments", () => {
+    // ``esphome.devices`` / ``esphome.areas`` shape: the catalog
+    // marks the field optional but each item's ``id`` is required.
+    // Validation must visit every item and key errors at
+    // ``devices.<idx>.<child>`` so the form can look them up via
+    // ``path.join(".")`` against the renderer's per-item paths.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        required: false,
+        config_entries: [
+          makeEntry({ key: "id", required: true }),
+          makeEntry({ key: "name" }),
+        ],
+      }),
+    ];
+    const errors = validateEntries(entries, {
+      devices: [
+        { id: "front" },
+        {}, // missing required id
+        { id: "kitchen", name: "Kitchen" },
+      ],
+    });
+    expect(errors.get("devices.1.id")?.code).toBe("validation.required");
+    // Other items should be clean.
+    expect(errors.has("devices.0.id")).toBe(false);
+    expect(errors.has("devices.2.id")).toBe(false);
+  });
+
+  it("treats a YamlRawValue at a multi_value NESTED key as satisfied", () => {
+    // The parser preserves un-modellable list shapes as
+    // ``YamlRawValue`` (dotted keys, block scalars, etc.). The
+    // validator can't introspect items, so:
+    //   1. A required field whose value is a YamlRawValue is
+    //      satisfied by the YAML's existence — no
+    //      ``validation.required`` on the bare field.
+    //   2. Per-item rules can't run, so we skip recursion.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        required: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, {
+      devices: new YamlRawValue(["    - logger.log: hello"]),
+    });
+    expect(errors.size).toBe(0);
+  });
+
+  it("does not validate inside an empty optional multi_value NESTED entry", () => {
+    // Adding zero devices is fine for an optional field — forcing
+    // an item just to opt out would mirror the bug
+    // ``does not require nested children of an untouched optional
+    // group`` already pins for single-nested.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    expect(validateEntries(entries, {}).size).toBe(0);
+    expect(validateEntries(entries, { devices: [] }).size).toBe(0);
+  });
+
+  it("flags an empty required multi_value NESTED entry on the field itself", () => {
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        required: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, { devices: [] });
+    expect(errors.get("devices")?.code).toBe("validation.required");
+    // Items aren't there to validate, so no per-item errors.
+    expect(errors.size).toBe(1);
+  });
+
+  it("coerces non-object items to {} so each item is still validated cleanly", () => {
+    // js-yaml round-trips can briefly emit ``null`` items mid-edit
+    // (a stray ``-`` line). Validation should treat those as empty
+    // mappings — the recursion shouldn't blow up on
+    // ``Object.keys(null)``-style descents.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const errors = validateEntries(entries, {
+      devices: [null, "weird", { id: "real" }],
+    });
+    expect(errors.get("devices.0.id")?.code).toBe("validation.required");
+    expect(errors.get("devices.1.id")?.code).toBe("validation.required");
+    expect(errors.has("devices.2.id")).toBe(false);
+  });
+
   it("does not require nested children of an untouched optional group", () => {
     // web_server.auth in real life: the auth block is optional but
     // its username/password children are required. The user must be
@@ -312,5 +421,85 @@ describe("validateEntries", () => {
     // for non-required entries and auto-generates the id.
     const values = { id: "i2c_1" };
     expect(validateEntries(i2cEntries, values).size).toBe(0);
+  });
+
+  // ---------------------------------------------------------------------
+  // supported_platforms gate (mirrors the filterRenderable gate so a
+  // hidden-by-platform required field doesn't get flagged as missing —
+  // the bug Copilot caught on PR #226 before this lockstep was added).
+
+  it("does not require a platform-gated entry on an incompatible board", () => {
+    // ``sensor.debug.psram`` is required-only-on-esp32 in upstream's
+    // schema — when the user picks the debug component on an
+    // esp8266 board the form hides the field, so we must NOT
+    // surface a "required" error for it (the user can't see the
+    // input to fill it in).
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+    ];
+    expect(
+      validateEntries(entries, {}, undefined, "esp8266").size,
+    ).toBe(0);
+    // On the matching platform the gate is a no-op and the missing
+    // required field is still flagged.
+    expect(
+      validateEntries(entries, {}, undefined, "esp32").get("psram")?.code,
+    ).toBe("validation.required");
+  });
+
+  it("treats a null/undefined targetPlatform as 'no gate'", () => {
+    // The add-component dialog opens before a board is locked in;
+    // we don't have a target platform yet, so platform-gated fields
+    // stay visible *and* validatable. Once the user picks a board
+    // the validation re-runs with targetPlatform set and gated
+    // fields drop out of the required set.
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+    ];
+    expect(
+      validateEntries(entries, {}).get("psram")?.code,
+    ).toBe("validation.required");
+    expect(
+      validateEntries(entries, {}, undefined, null).get("psram")?.code,
+    ).toBe("validation.required");
+  });
+
+  it("recurses through NESTED groups with the platform gate", () => {
+    // Pin that the gate flows down — a required leaf inside a
+    // nested group, gated to esp32, should not be flagged on
+    // esp8266 even though the parent NESTED is unconstrained.
+    const entries = [
+      makeEntry({
+        key: "diagnostics",
+        type: ConfigEntryType.NESTED,
+        config_entries: [
+          makeEntry({
+            key: "psram",
+            required: true,
+            supported_platforms: ["esp32"],
+          }),
+        ],
+      }),
+    ];
+    // Provide a non-empty diagnostics dict so the "untouched optional
+    // group" short-circuit doesn't skip validation — we want to
+    // exercise the platform gate on the leaf.
+    const values = { diagnostics: { psram: undefined } };
+    expect(
+      validateEntries(entries, values, undefined, "esp8266").size,
+    ).toBe(0);
+    expect(
+      validateEntries(entries, values, undefined, "esp32").get(
+        "diagnostics.psram",
+      )?.code,
+    ).toBe("validation.required");
   });
 });

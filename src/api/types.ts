@@ -51,9 +51,26 @@ export enum ErrorCode {
   UNKNOWN_COMMAND = "unknown_command",
   INVALID_ARGS = "invalid_args",
   NOT_FOUND = "not_found",
+  ALREADY_EXISTS = "already_exists",
   INTERNAL_ERROR = "internal_error",
   NOT_AUTHENTICATED = "not_authenticated",
   RATE_LIMITED = "rate_limited",
+  /** Receiver reachable, but the operation can't proceed in the
+   *  current state — pin mismatch on ``request_pair`` (TOCTOU
+   *  between preview and confirm), receiver-side ``REJECTED``,
+   *  etc. Distinct from ``UNAVAILABLE`` (transport failure). */
+  PRECONDITION_FAILED = "precondition_failed",
+  /** Transport / handshake / decode failure on a peer-link
+   *  round-trip. The receiver was unreachable or the Noise
+   *  handshake didn't complete cleanly — distinct from
+   *  ``PRECONDITION_FAILED`` where the receiver explicitly
+   *  rejected the operation. */
+  UNAVAILABLE = "unavailable",
+  /** Receiver-side pairing window is closed.
+   *  ``request_pair`` raises this when the receiver admin
+   *  hasn't opened the Pairing requests screen — UI should
+   *  prompt the user to coordinate with the receiver admin. */
+  NO_PAIRING_WINDOW = "no_pairing_window",
 }
 
 // ─── Paged Responses ─────────────────────────────────────────
@@ -78,6 +95,12 @@ export interface ConfiguredDevice {
   friendly_name: string;
   configuration: string;
   comment: string | null;
+  /** Optional ``esphome.area`` from the YAML — a free-form
+   *  room / location label (the same key Home Assistant uses as
+   *  a device-area hint). Empty string when the YAML doesn't
+   *  declare one. Surfaced in the drawer and as an opt-in table
+   *  column. */
+  area: string;
   board_id: string;
   target_platform: string;
   /** mDNS hostname from StorageJSON (e.g. "my_device.local"). */
@@ -94,6 +117,25 @@ export interface ConfiguredDevice {
   current_version: string;
   deployed_version: string;
   loaded_integrations: string[];
+  /**
+   * Subset of ``loaded_integrations`` the user directly wrote in
+   * YAML — top-level keys (``api:``, ``wifi:``, ``sensor:``) plus
+   * the platform stems from ``- platform: <name>`` references
+   * (``gpio`` under ``binary_sensor``, ``homeassistant`` /
+   * ``sntp`` under ``time``, ``esphome`` under ``ota``). The
+   * complement against ``loaded_integrations`` is the auto-loaded
+   * dependency chain (``md5`` from WPA2 password hashing,
+   * ``mdns`` from ``api``, ``web_server_base`` from ``web_server``,
+   * ``voltage_sampler`` from ADC sensors).
+   *
+   * Optional on the wire: older backends (pre-#425) don't emit
+   * the field at all, and a backend whose resolved-YAML parse
+   * failed mid-edit emits an empty array. Both are the
+   * graceful-degrade signal — the drawer falls back to rendering
+   * ``loaded_integrations`` as a flat list. ``splitIntegrations``
+   * accepts ``null`` / ``undefined`` / ``[]`` interchangeably.
+   */
+  directly_referenced_integrations?: string[];
   state: DeviceState;
   /**
    * 8-char hex hash of the YAML as last successfully compiled,
@@ -184,6 +226,30 @@ export interface ConfiguredDevice {
    *  is heavy I/O — backend caches the value keyed off the build
    *  directory's mtime, so a steady-state poll never re-walks. */
   build_size_bytes: number;
+  /** Opaque label IDs assigned to this device (uuid hex strings
+   *  from the global catalog at ``.device-builder.json``'s
+   *  ``_labels`` key). Resolved against ``labels/list`` to render
+   *  colored chips; the catalog entry is the source of truth for
+   *  name + color, so a rename / recolor doesn't require a
+   *  per-device write. */
+  labels: string[];
+}
+
+// ─── Labels ──────────────────────────────────────────────────
+
+/** A user-defined label that can be assigned to devices. The
+ *  catalog is global; ``ConfiguredDevice.labels`` carries an opaque
+ *  list of ids referencing entries here. */
+export interface Label {
+  /** Server-generated ``uuid.uuid4().hex``. Stable across name /
+   *  color edits — devices reference labels by id. */
+  id: string;
+  /** Display name. Trimmed before save; uniqueness is enforced
+   *  case-insensitively on the backend. 1-50 chars. */
+  name: string;
+  /** ``#rrggbb`` (lowercase). ``null`` means "no explicit color"
+   *  — frontend falls back to a neutral chip palette. */
+  color: string | null;
 }
 
 /** An adoptable/importable ESPHome device. */
@@ -207,10 +273,24 @@ export interface DevicesResponse {
   importable: AdoptableDevice[];
 }
 
-/** A single matching line within a YAML file. */
+/** A single matching line within a YAML file.
+ *
+ *  ``before`` / ``after`` carry up to ``MAX_CONTEXT_LINES`` (10)
+ *  lines on each side of the matched line, sliced from the same
+ *  capped scan window the backend walks. The frontend renders a
+ *  code-snippet block that surfaces the surrounding key
+ *  (``device:`` / ``platform:`` / list-anchor lines) so a hit
+ *  deep inside a nested block reads as anchored config rather
+ *  than a free-floating value. Both default to ``[]`` for
+ *  matches at file edges.
+ */
 export interface YamlSearchMatch {
   line_number: number;
   line_text: string;
+  /** Up to ``context_lines`` lines preceding the match (file order). */
+  before: string[];
+  /** Up to ``context_lines`` lines following the match (file order). */
+  after: string[];
 }
 
 /**
@@ -529,6 +609,18 @@ export interface ConfigEntry {
   /** Min/max bounds for INTEGER / FLOAT entries. */
   range: [number, number] | null;
   /**
+   * Display-formatting hint for INTEGER entries.
+   *
+   * Currently only `"hex"` is defined. The backend sets it for
+   * fields whose upstream validator is one of the `cv.hex_uint*_t`
+   * family (`i2c_address` is the canonical case). Frontend renders
+   * `<input type="text">` with a hex-aware parser/formatter so
+   * users can type either `0x76` or `118` and the value
+   * round-trips as `0x76`. `null` (the default for plain
+   * `cv.int_range` integers) → decimal display.
+   */
+  display_format: "hex" | null;
+  /**
    * Unit choices for `FLOAT_WITH_UNIT` entries. The frontend renders
    * a unit picker populated from this list; each option's string is
    * what the YAML serialization appends after the numeric value
@@ -580,6 +672,20 @@ export interface ConfigEntry {
    * "uart" buses. null = free-form ID input.
    */
   references_component: string | null;
+  /**
+   * Target chips this field is valid on. Empty list (or omitted) =
+   * no restriction (the common case); non-empty = the field is
+   * restricted to the listed chips. Same wire shape as
+   * `ComponentCatalogEntry.supported_platforms`, but at the
+   * single-field grain — a component may run on every platform
+   * while one of its fields (`sensor.debug.psram` is the canonical
+   * case, ESP32-only) does not. Form renderer hides the entry when
+   * the device's target platform isn't in this list.
+   *
+   * Recovered by the backend's sync script from upstream's
+   * declarative `cv.only_on` validators.
+   */
+  supported_platforms?: string[];
 
   // === pin selection (only meaningful when type == PIN) ===
   /** Pin capabilities required for this field. */
@@ -729,6 +835,69 @@ export interface UserPreferences {
   table_column_visibility: Record<string, boolean>;
   table_sort_column: string | null;
   table_sort_direction: SortDirection | null;
+  /** Highest onboarding-flow version the user has acknowledged.
+   *  ``0`` ⇒ never gone through onboarding. The dashboard surfaces
+   *  the wizard whenever this is below the server's
+   *  ``OnboardingState.current_version``. */
+  onboarding_completed_version: number;
+}
+
+/**
+ * Stable identifiers for onboarding steps. Keep in lockstep with
+ * the backend's ``OnboardingStepId`` enum — these strings flow
+ * through the wire as-is.
+ */
+export enum OnboardingStepId {
+  WIFI_CREDENTIALS = "wifi_credentials",
+}
+
+export enum OnboardingStepStatus {
+  PENDING = "pending",
+  DONE = "done",
+}
+
+export interface OnboardingStep {
+  id: OnboardingStepId;
+  status: OnboardingStepStatus;
+}
+
+/**
+ * Snapshot of the dashboard onboarding flow.
+ *
+ * ``current_version`` is the version of onboarding the server
+ * knows about; ``completed_version`` is what the user last
+ * acknowledged. The wizard auto-pops when ALL of the following
+ * are true: ``completed_version < current_version`` (user is
+ * behind a newer onboarding version), at least one
+ * ``steps[].status`` is ``pending`` (there's actually
+ * something to do), and the user hasn't frontend-side
+ * session-dismissed it. A version bump alone isn't enough —
+ * pre-wizard installs all started at ``completed_version = 0``
+ * and asking a user with already-configured secrets to re-enter
+ * them is friction with no payoff. The exact gate lives in
+ * ``src/util/onboarding-gate.ts`` (``shouldAutoShowOnboarding``)
+ * with unit-test coverage of every branch.
+ *
+ * Manual entry via the ``Set up Wi-Fi…`` kebab item bypasses
+ * both the version-bump gate and the session-dismiss flag —
+ * the click IS the explicit "I want to do this now" signal —
+ * but is itself only visible when ``isOnboardingPending`` is
+ * true (so the user never sees the entry when there's nothing
+ * to do).
+ *
+ * Step status also drives the kebab entry's visibility
+ * directly. It's computed from live on-disk state on every
+ * server-side ``get_state`` call — never persisted — and the
+ * dashboard re-fetches on (re)connect AND on every
+ * ``secrets-saved`` event, so an in-app save (wizard or
+ * Secrets editor) updates the entry in real time and an
+ * out-of-band ``secrets.yaml`` edit clears it no later than
+ * the next WS reconnect.
+ */
+export interface OnboardingState {
+  current_version: number;
+  completed_version: number;
+  steps: OnboardingStep[];
 }
 
 /**
@@ -777,6 +946,28 @@ export enum JobType {
   RENAME = "rename",
 }
 
+/** Output stream discriminator on a single line of build output. */
+export enum JobStream {
+  STDOUT = "stdout",
+  STDERR = "stderr",
+}
+
+/** Subset of {@link JobType} the remote-build submit_job WS arg accepts. */
+export type RemoteBuildSubmitTarget = JobType.COMPILE | JobType.UPLOAD;
+
+/** Where the bytes for a firmware build come from.
+ *
+ *  Mirrors the backend's ``JobSource`` StrEnum (7a-2a). ``LOCAL`` is
+ *  a build this dashboard's CPU ran; ``REMOTE`` is a build a paired
+ *  receiver ran and the offloader fetched the artifacts from. The
+ *  install dialog reads ``FirmwareJob.source_label`` to render a
+ *  "Building on {receiver_label}" sub-line when ``source ===
+ *  REMOTE``. */
+export enum JobSource {
+  LOCAL = "local",
+  REMOTE = "remote",
+}
+
 export interface FirmwareJob {
   job_id: string;
   configuration: string;
@@ -797,6 +988,52 @@ export interface FirmwareJob {
    *  `null` until the underlying tooling (PlatformIO/esptool) emits a
    *  percentage we can latch onto. */
   progress: number | null;
+  /** Where the build's bytes come from (7a-2a). Defaults to LOCAL
+   *  for jobs from before this field landed; jobs the install
+   *  handler routed to a paired receiver via ``pick_build_path``
+   *  (7a-3) carry ``REMOTE``. */
+  source: JobSource;
+  /** Machine-readable handle on the receiver that compiled the job
+   *  when ``source === REMOTE`` — matches the StoredPairing's
+   *  ``pin_sha256``. Empty string for LOCAL jobs. The runner uses
+   *  this to route ``cancel_job`` / ``download_artifacts`` against
+   *  the right peer-link client. */
+  source_pin_sha256: string;
+  /** Display label for the paired receiver that compiled the job,
+   *  when ``source === REMOTE``. Empty string for LOCAL jobs.
+   *  Snapshot of the pairing's label at job-creation time — doesn't
+   *  track later renames (the install dialog should show what the
+   *  user saw when they clicked Install). */
+  source_label: string;
+  /** Offloader's ``dashboard_id`` when this job came in via the
+   *  peer-link ``submit_job`` flow. Empty for locally-submitted
+   *  jobs. Receiver-side rendering surfaces this as a "from
+   *  <peer>" sub-line on the firmware-tasks dialog so a
+   *  build-server admin can distinguish their own work from
+   *  delegated builds. */
+  remote_peer: string;
+  /** Display label for the offloader, snapshotted from the
+   *  receiver's ``_approved_peers[dashboard_id].label`` at submit
+   *  time. Empty for locally-submitted jobs and for jobs from
+   *  before this field landed; the receiver-side renderer falls
+   *  back to the raw ``remote_peer`` dashboard_id when empty.
+   *  Symmetric to ``source_label`` on the offloader side. */
+  remote_peer_label: string;
+  /** The submitting device's ``esphome.name`` (machine handle),
+   *  sent by the offloader on the ``submit_job`` header. Empty
+   *  for locally-submitted jobs and for jobs whose offloader
+   *  didn't set the NotRequired wire field. The receiver-side
+   *  title surface uses this when ``remote_peer !== ""`` since
+   *  the receiver has no Device list of its own to look the
+   *  friendly name up against. */
+  device_name: string;
+  /** The submitting device's ``esphome.friendly_name`` (display
+   *  string), sent by the offloader on the ``submit_job`` header.
+   *  Empty for locally-submitted jobs, for jobs whose offloader
+   *  didn't set the NotRequired wire field, or for YAMLs that
+   *  don't define ``esphome.friendly_name``. The receiver-side
+   *  title surface prefers this over ``device_name`` when set. */
+  device_friendly_name: string;
 }
 
 export interface FirmwareBinary {
@@ -827,11 +1064,93 @@ export enum DeviceEventType {
   DEVICE_STATE_CHANGED = "device_state_changed",
   IMPORTABLE_DEVICE_ADDED = "importable_device_added",
   IMPORTABLE_DEVICE_REMOVED = "importable_device_removed",
+  // Label catalog mutations. Per-device label assignment changes
+  // ride the existing ``DEVICE_UPDATED`` event.
+  LABEL_CREATED = "label_created",
+  LABEL_UPDATED = "label_updated",
+  LABEL_DELETED = "label_deleted",
   JOB_QUEUED = "job_queued",
   JOB_STARTED = "job_started",
   JOB_OUTPUT = "job_output",
   JOB_COMPLETED = "job_completed",
   JOB_FAILED = "job_failed",
+  // Remote-build events.
+  REMOTE_BUILD_IDENTITY_ROTATED = "remote_build_identity_rotated",
+  REMOTE_BUILD_PAIR_REQUEST_RECEIVED = "remote_build_pair_request_received",
+  REMOTE_BUILD_PAIR_STATUS_CHANGED = "remote_build_pair_status_changed",
+  REMOTE_BUILD_PAIRING_WINDOW_CHANGED = "remote_build_pairing_window_changed",
+  // Offloader-side counterpart to ``REMOTE_BUILD_PAIR_STATUS_CHANGED``;
+  // fires from the offloader's pair-status listener task and from
+  // ``remote_build/unpair``.
+  OFFLOADER_PAIR_STATUS_CHANGED = "offloader_pair_status_changed",
+  // Receiver-side peer-link session lifecycle. Fired by the
+  // receiver's ``register_peer_link_session`` /
+  // ``unregister_peer_link_session`` hooks when a 5a-2 offloader
+  // client connects / disconnects. Drives the
+  // ``PeerSummary.connected`` indicator on the receiver-side
+  // Paired senders list. Payload is just the ``dashboard_id``;
+  // the matching row is found by lookup against
+  // ``_buildServerPeers``.
+  RECEIVER_PEER_LINK_SESSION_OPENED = "receiver_peer_link_session_opened",
+  RECEIVER_PEER_LINK_SESSION_CLOSED = "receiver_peer_link_session_closed",
+  // Offloader-side peer-link session lifecycle. Fired by the
+  // offloader's long-lived PeerLinkClient when its Noise WS
+  // to the receiver enters / leaves the post-handshake parked
+  // state. Drives the PairingSummary.connected indicator on
+  // the offloader-side Paired-build-servers list. Both events
+  // share the same OffloaderPeerLinkSessionEventData shape;
+  // the discriminator is the event type itself.
+  OFFLOADER_PEER_LINK_OPENED = "offloader_peer_link_opened",
+  OFFLOADER_PEER_LINK_CLOSED = "offloader_peer_link_closed",
+  // Offloader-side remote-build job lifecycle. Fired by the
+  // offloader's PeerLinkClient receive loop when an inbound
+  // job_state_changed / job_output frame lands from the
+  // paired receiver this dashboard submitted the job to. The
+  // offloader doesn't own a FirmwareJob row for these (the
+  // receiver runs the build); it just fans the wire frames
+  // onto its local bus so subscribe_events re-broadcasts to
+  // frontend tabs. Settings dialog's Send-builds section
+  // consumes both to render the live progress drawer per
+  // in-flight remote job: STATE_CHANGED drives the lifecycle
+  // pill (queued / running / completed / failed / cancelled),
+  // OUTPUT appends each per-line stdout / stderr chunk to the
+  // ansi-log buffer. Phase 5c-3 wired the backend.
+  OFFLOADER_JOB_STATE_CHANGED = "offloader_job_state_changed",
+  OFFLOADER_JOB_OUTPUT = "offloader_job_output",
+  // mDNS-discovered peer dashboards. Replaces the deleted
+  // ``remote_build/list_hosts`` WS command — the controller fires
+  // these events as its mDNS browser callback resolves /
+  // forgets entries, and the ``subscribe_events`` initial-state
+  // push carries the current set under ``hosts`` so a fresh tab
+  // paints without a round-trip.
+  REMOTE_BUILD_HOST_ADDED = "remote_build_host_added",
+  REMOTE_BUILD_HOST_REMOVED = "remote_build_host_removed",
+  // Offloader-side pair alerts. Backend's pair-status listener
+  // fires PIN_MISMATCH (the receiver's static X25519 pubkey
+  // hash drifted from the stored ``StoredPairing.pin_sha256``)
+  // or PEER_REVOKED (the receiver returned ``rejected``) when
+  // a pair-status round-trip resolves a broken pairing. ALERT
+  // _DISMISSED fires when the alert clears via re-pair (auto-
+  // resolved by ``request_pair`` succeeding for the same
+  // ``${hostname}:${port}``) or ``unpair``. There is no
+  // operator-driven dismiss — clicking "OK got it" without
+  // acting would just hide a broken pairing the next peer-
+  // link session would still fail against. Late-subscribers
+  // pick up missed alerts via
+  // ``subscribe_events.initial_state.offloader_alerts``.
+  OFFLOADER_PAIR_PIN_MISMATCH = "offloader_pair_pin_mismatch",
+  OFFLOADER_PAIR_PEER_REVOKED = "offloader_pair_peer_revoked",
+  OFFLOADER_PAIR_ALERT_DISMISSED = "offloader_pair_alert_dismissed",
+  // 7b — offloader Settings UI toggles for the transparent
+  // install flow. ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` fires when
+  // the dashboard-wide "Remote builds enabled" master switch
+  // flips; ``OFFLOADER_PAIRING_ENABLED_CHANGED`` fires when one
+  // pairing's per-row enable switch flips. Both are emitted by
+  // the matching WS setters (``remote_build/set_offloader_settings``
+  // and ``remote_build/set_pairing_enabled``) so other open tabs
+  // sync their switch state without polling.
+  OFFLOADER_REMOTE_BUILDS_TOGGLED = "offloader_remote_builds_toggled",
+  OFFLOADER_PAIRING_ENABLED_CHANGED = "offloader_pairing_enabled_changed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -853,6 +1172,95 @@ export interface InitialStateEventData {
    *  ``IMPORTABLE_DEVICE_ADDED`` / ``_REMOVED`` events for changes
    *  after subscription. */
   importable: AdoptableDevice[];
+  /** Offloader-side pairings snapshot the backend pushes once at
+   *  subscribe time so the Send-builds initial paint matches what
+   *  ``OFFLOADER_PAIR_STATUS_CHANGED`` events will subsequently
+   *  mutate against. Carries both PENDING and APPROVED rows from
+   *  the controller's in-RAM ``_pairings`` dict (sync read; no
+   *  wire calls, no disk I/O). Optional because not every
+   *  dashboard has a remote-build controller wired up — when
+   *  the controller is absent the field is omitted entirely
+   *  rather than sent as an empty list. */
+  pairings?: PairingSummary[];
+  /** Receiver-side peers snapshot. Carries both PENDING (in the
+   *  receiver's in-memory ``_pending_peers`` dict, awaiting
+   *  Accept / Reject) and APPROVED (persisted) rows. Live updates
+   *  flow through the same ``subscribe_events`` stream as
+   *  ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED`` (upsert),
+   *  ``REMOTE_BUILD_PAIR_STATUS_CHANGED`` (status flip / row
+   *  drop) events. Optional for the same reason as
+   *  ``pairings`` — absent controller, omitted field. */
+  peers?: PeerSummary[];
+  /** Receiver-side mDNS-discovered hosts snapshot. RAM-only on
+   *  the backend; a sibling-of-RAM map populated by the
+   *  ``_esphomebuilder._tcp.local.`` browser callback. Replaces
+   *  the deleted ``remote_build/list_hosts`` command. Live
+   *  updates flow through ``REMOTE_BUILD_HOST_ADDED`` (upsert
+   *  by ``name``) and ``REMOTE_BUILD_HOST_REMOVED`` (drop by
+   *  ``name``). Optional for the same reason as ``pairings`` /
+   *  ``peers`` — absent controller, omitted field. */
+  hosts?: RemoteBuildPeer[];
+  /** Offloader-side pair alerts snapshot. RAM-only on the
+   *  backend; populated when ``OFFLOADER_PAIR_PIN_MISMATCH`` /
+   *  ``OFFLOADER_PAIR_PEER_REVOKED`` fires and cleared when
+   *  ``OFFLOADER_PAIR_ALERT_DISMISSED`` fires. The two
+   *  resolution paths (re-pair / unpair) auto-fire the
+   *  dismissed event; there is no operator-driven dismiss
+   *  surface. Late-subscribing clients pick up alerts that
+   *  fired before they connected via this snapshot. Optional
+   *  for the same reason as ``pairings`` / ``peers`` —
+   *  absent controller, omitted field. */
+  offloader_alerts?: OffloaderAlertSnapshotEntry[];
+  /** Offloader-side in-flight remote-build jobs snapshot.
+   *  RAM-only on the backend; populated as
+   *  ``OFFLOADER_JOB_STATE_CHANGED`` events upsert rows by
+   *  ``job_id`` and dropped when a terminal event (completed /
+   *  failed / cancelled) fires. Lets a tab subscribing AFTER
+   *  a ``running`` transition (page reload mid-build, second
+   *  tab opened after dispatch) repaint the live build
+   *  without waiting for the next event. Output buffer isn't
+   *  in the snapshot — the receiver doesn't replay; the next
+   *  ``OFFLOADER_JOB_OUTPUT`` line repopulates from the
+   *  point-of-subscribe forward. Display fields
+   *  (configuration / target / receiver_label) aren't carried
+   *  either — the receiver doesn't echo them, so reload-time
+   *  rows show empty strings until terminal (the dialog's
+   *  re-attach view tolerates them). Optional for the same
+   *  reason as ``pairings`` / ``peers`` — absent controller,
+   *  omitted field. */
+  remote_jobs?: OffloaderRemoteJobSnapshotEntry[];
+  /** Offloader-side master "Remote builds enabled" toggle (7b).
+   *  When `false`, the backend's ``pick_build_path`` short-
+   *  circuits every install to LOCAL; paired peer-link
+   *  sessions stay open and the Send-builds power-user dialog
+   *  still works — only the implicit auto-route is gated.
+   *  Live updates flow through
+   *  ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` events. Optional for
+   *  the same reason as ``pairings`` / ``peers`` — absent
+   *  controller, omitted field. Defaults to `true` on a fresh
+   *  install (matches the pre-7b semantic where any APPROVED
+   *  + connected + idle pairing was eligible). */
+  remote_builds_enabled?: boolean;
+}
+
+/**
+ * Snapshot row in the offloader-side in-flight remote-build
+ * jobs cache. Mirror of the backend's
+ * :class:`OffloaderRemoteJobSnapshotEntry` TypedDict (see
+ * ``models/remote_build.py``). Carries enough to render the
+ * lifecycle pill on a late-subscribing tab; display fields
+ * (configuration / target / receiver_label) and the output
+ * buffer are deliberately absent — the receiver doesn't echo
+ * the display fields back through the wire, and the output
+ * buffer would balloon the snapshot for any in-flight build.
+ */
+export interface OffloaderRemoteJobSnapshotEntry {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  job_id: string;
+  status: JobStatus;
+  error_message: string;
 }
 
 /** Data payload for device_added / device_updated / device_removed events. */
@@ -879,6 +1287,18 @@ export interface ImportableDeviceAddedEventData {
  *  beyond the name to evict its own copy. */
 export interface ImportableDeviceRemovedEventData {
   name: string;
+}
+
+/** Data payload for label_created / label_updated events. */
+export interface LabelEventData {
+  label: Label;
+}
+
+/** Data payload for label_deleted events. The catalog entry is
+ *  already gone by the time this fires; per-device assignments
+ *  cascade through the existing ``device_updated`` events. */
+export interface LabelDeletedEventData {
+  label_id: string;
 }
 
 /** Callback for event subscription push events. */
@@ -923,6 +1343,23 @@ export interface ReachabilityStateEvent {
    *  several windows already". ``null`` when ``mdns_last_seen``
    *  is null. */
   mdns_ttl_remaining_seconds: number | null;
+  /** Decoded TXT key/value pairs from the device's
+   *  ``_esphomelib._tcp.local.`` TXT record — same payload the
+   *  dashboard already mines for ``version`` / ``config_hash`` /
+   *  ``mac`` / ``api_encryption``. The drawer renders these
+   *  inside a chevron-collapsible under the mDNS row so users
+   *  can debug "is the device actually broadcasting what I
+   *  expect?" without dropping to ``avahi-browse`` /
+   *  ``dns-sd``. ``null`` when no TXT record is cached (drawer
+   *  hides the section entirely); empty mapping is normalised
+   *  to ``null`` upstream. Empty-string values are meaningful —
+   *  zeroconf collapses bare keys and ``key=`` empty-value
+   *  entries to the same shape, so the backend surfaces both as
+   *  ``""`` (the ``api_encryption=`` "device confirmed
+   *  plaintext" tri-state signal lives here). Optional because
+   *  older backend builds don't emit the field — the drawer
+   *  treats undefined the same as ``null``. */
+  mdns_txt_records?: Record<string, string> | null;
   ping_last_seen_seconds_ago: number | null;
   mqtt_last_seen_seconds_ago: number | null;
   ping_rtt_ms: number | null;
@@ -973,4 +1410,717 @@ export interface EditorValidationError {
 export interface EditorValidateResponse {
   yaml_errors: EditorYamlError[];
   validation_errors: EditorValidationError[];
+}
+
+// Remote-build feature (issue #106).
+// Phase 2: peer dashboard discovery + receiver-side master switch.
+// Phase 3c1: receiver dashboard identity + cert rotation.
+// Phase 4a: Noise XX peer-link replaces the bearer-token surface;
+//           offloader-side pair flow + receiver-side pairing inbox.
+
+/**
+ * Origin of a discovered :class:`RemoteBuildPeer`. Collapsed to a
+ * single ``"mdns"`` value after the manual-hosts surface was
+ * deleted (the offloader-side pair flow accepts a typed hostname
+ * + port directly without an intermediate "save" step). The
+ * single-value union is kept rather than removed because the
+ * backend's ``RemoteBuildPeer.source`` field still discriminates
+ * for forward-compat (e.g. a future "configured" / "static"
+ * source).
+ */
+export type RemoteBuildPeerSource = "mdns";
+
+/**
+ * Lifecycle position of a paired (or pending) peer / pairing.
+ *
+ * Mirrors the backend's ``PeerStatus`` StrEnum. ``pending`` rows
+ * land via the pair_request flow and live in-memory only on the
+ * receiver (admin hasn't accepted yet); ``approved`` rows are
+ * persisted and grant full peer-link access. There is no
+ * explicit ``rejected`` terminal state — Reject deletes the row.
+ */
+export type PeerStatus = "pending" | "approved";
+
+/**
+ * Receiver-side wire view of a paired offloader (``StoredPeer``).
+ *
+ * Drops the raw 32-byte X25519 pubkey; ``pin_sha256`` is the
+ * wire-friendly form (lowercase-hex SHA-256 of the pubkey)
+ * that UIs render for OOB-verification. ``status`` is supplied
+ * by the controller because the receiver-side ``StoredPeer``
+ * itself doesn't carry one (PENDING peers live in the
+ * controller's in-memory dict; persisted peers are implicitly
+ * APPROVED). ``peer_ip`` is the source IP observed at
+ * pair_request time and persisted on ``StoredPeer``; the
+ * receiver Settings inbox renders it next to the pin so the
+ * operator can clone-risk-sanity-check the source against
+ * expectations. Empty string for legacy on-disk rows from
+ * receivers that pre-date the persisted ``peer_ip`` field —
+ * the renderer hides the row line in that case.
+ */
+export interface PeerSummary {
+  dashboard_id: string;
+  pin_sha256: string;
+  label: string;
+  paired_at: number;
+  status: PeerStatus;
+  peer_ip: string;
+  /**
+   * Whether the receiver currently has an active 5a-2 peer-link
+   * session for this peer (``dashboard_id`` membership in the
+   * receiver's ``_peer_link_sessions`` registry). Legacy
+   * backends that pre-date the field may omit it; in that case,
+   * the renderer treats the missing value as falsy and shows
+   * "Disconnected" rather than crashing.
+   *
+   * Live updates flow through
+   * ``RECEIVER_PEER_LINK_SESSION_OPENED`` /
+   * ``RECEIVER_PEER_LINK_SESSION_CLOSED`` bus events on the
+   * ``subscribe_events`` stream; the snapshot
+   * (``initial_state.peers``) carries the current value at
+   * subscribe time so a reconnecting tab paints the right
+   * state without waiting for the next event.
+   *
+   * Always ``false`` for PENDING rows: peer-link is gated on
+   * APPROVED status server-side via ``lookup_peer_for_session``,
+   * so a PENDING peer can never legitimately have a registered
+   * session.
+   */
+  connected: boolean;
+}
+
+/**
+ * Offloader-side wire view of a pinned receiver
+ * (``StoredPairing``).
+ *
+ * Mirror of ``PeerSummary`` for the offloader side: drops the
+ * raw X25519 pubkey, keys on the receiver coordinates the user
+ * entered (rather than the receiver's ``dashboard_id``, which
+ * the offloader doesn't track). ``status`` reflects the
+ * row's lifecycle in the unified ``_pairings`` dict on the
+ * controller; the disk filter strips PENDING rows at serialise
+ * time so APPROVED is the on-disk shape.
+ */
+export interface PairingSummary {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  label: string;
+  paired_at: number;
+  status: PeerStatus;
+  /**
+   * Whether the offloader currently has an open 5a-2 peer-link
+   * session to the receiver (pin_sha256 membership in the
+   * controller's _open_peer_links set). Live updates flow
+   * through OFFLOADER_PEER_LINK_OPENED /
+   * OFFLOADER_PEER_LINK_CLOSED bus events on the
+   * subscribe_events stream; the snapshot
+   * (initial_state.pairings) carries the current value at
+   * subscribe time so a reconnecting tab paints the right state
+   * without waiting for the next event.
+   *
+   * Always false for PENDING rows: the offloader doesn't spawn
+   * a peer-link client until the receiver flips the row to
+   * APPROVED.
+   */
+  connected: boolean;
+  /**
+   * Whether the offloader's per-pairing peer-link client task
+   * is alive but has no open session right now. Covers the
+   * very first connect attempt and every subsequent reconnect
+   * cycle inside the run loop's backoff window. Goes false on
+   * `connected` (post-handshake open) and on the orphan paths
+   * (pin mismatch / superseded) where the run loop won't retry
+   * — operator's recovery there is re-pair / unpair, not
+   * "wait for reconnect," so both `connected` and `connecting`
+   * report false on those states.
+   *
+   * UI uses the tri-state to render Connected / Connecting… /
+   * Disconnected; pair an empty `last_connect_error` with
+   * `connecting=true` and the row is the steady-state
+   * reconnect cycle, while a non-empty error there + both
+   * flags false is the orphaned terminal case.
+   */
+  connecting: boolean;
+  /**
+   * One-line description of the most recent connection failure
+   * (`"<ExceptionType>: <message>"` for transport / Noise
+   * errors, `"auth rejected"`, `"pin mismatch"`). Cleared when
+   * a session reaches the post-handshake open state so a
+   * stale message can't outlive a successful reconnect.
+   *
+   * Live updates ride on `OFFLOADER_PEER_LINK_CLOSED.error_detail`;
+   * the snapshot here is the post-load value for tabs that
+   * subscribe after an in-flight failure.
+   */
+  last_connect_error: string;
+  /**
+   * Receiver-advertised `esphome.const.__version__` captured
+   * at handshake time and refreshed on every peer-link
+   * session-open. Empty string before the first successful
+   * handshake (PENDING row, or APPROVED row that has never
+   * connected). Used by Settings → Build server → paired
+   * build servers to surface a per-row version-mismatch
+   * sub-line ahead of the scheduler's
+   * allow-major-version-mismatch toggle landing in 7a-3 +
+   * 7b. Both sides are wire-typed `string`; comparison is
+   * structural (year+month vs patch) per
+   * `util/version-mismatch.ts`.
+   */
+  esphome_version: string;
+  /**
+   * Whether this pairing is eligible for the transparent
+   * install flow's auto-route to remote build (7b). When
+   * `false`, the backend's `pick_build_path` walks past
+   * this row and looks for the next eligible APPROVED +
+   * connected + idle pairing; if none exist the install
+   * falls back to LOCAL. The peer-link session stays open
+   * regardless and the Send-builds power-user dialog still
+   * works against this receiver — only the implicit
+   * auto-route is gated. Live updates flow through
+   * `OFFLOADER_PAIRING_ENABLED_CHANGED` events.
+   *
+   * Defaults to `true` for back-compat with pre-7b
+   * sidecars (any APPROVED + connected + idle pairing was
+   * eligible).
+   */
+  enabled: boolean;
+}
+
+/**
+ * Receiver-side pairing-window state.
+ *
+ * Returned from ``remote_build/set_pairing_window`` and
+ * delivered as the ``remote_build_pairing_window_changed``
+ * event payload. The window narrows when ``intent="pair_request"``
+ * Noise frames are accepted: only while the receiver's Pairing
+ * requests screen is mounted. ``expires_in_seconds`` is
+ * ``null`` when ``open`` is ``false``; otherwise it's the
+ * remaining lifetime against the latest activity-driven extend
+ * (frontend renders the live countdown from this value and ticks
+ * locally between events).
+ */
+export interface PairingWindowState {
+  open: boolean;
+  expires_in_seconds: number | null;
+}
+
+/**
+ * Wire view returned from ``remote_build/get_offloader_settings``
+ * and ``remote_build/set_offloader_settings`` (7b).
+ *
+ * Bundles the master ``remote_builds_enabled`` toggle with the
+ * pairings list so the offloader Settings UI's first paint
+ * reads everything it needs from one round-trip. Subsequent
+ * live updates flow through ``OFFLOADER_REMOTE_BUILDS_TOGGLED``
+ * / ``OFFLOADER_PAIRING_ENABLED_CHANGED`` /
+ * ``OFFLOADER_PAIR_STATUS_CHANGED`` events on the global
+ * ``subscribe_events`` stream.
+ */
+export interface OffloaderRemoteBuildSettings {
+  remote_builds_enabled: boolean;
+  pairings: PairingSummary[];
+}
+
+export interface RemoteBuildSettings {
+  enabled: boolean;
+  /**
+   * 6c cleanup-sweep cold-subtree threshold (seconds). Backend
+   * defaults to 24h and clamps writes to [1h, 30d] via the
+   * `remote_build/set_settings` validator. The UI renders this
+   * as hours; the conversion lives at the input boundary so
+   * the wire shape stays a single primitive.
+   */
+  cleanup_ttl_seconds: number;
+  /** Receiver-side pinned offloaders. Includes both PENDING (in
+   *  the receiver's ``_pending_peers`` dict) and APPROVED
+   *  (persisted) rows, projected through ``PeerSummary``. */
+  peers: PeerSummary[];
+}
+
+/**
+ * Bounds for {@link RemoteBuildSettings.cleanup_ttl_seconds}.
+ * Mirror the backend's `MIN_CLEANUP_TTL_SECONDS` /
+ * `MAX_CLEANUP_TTL_SECONDS` constants so the UI input clamps to
+ * the same range and the operator gets a client-side validation
+ * hint before the WS round-trip.
+ */
+export const CLEANUP_TTL_MIN_SECONDS = 60 * 60;
+export const CLEANUP_TTL_MAX_SECONDS = 30 * 24 * 60 * 60;
+export const CLEANUP_TTL_DEFAULT_SECONDS = 24 * 60 * 60;
+
+export interface RemoteBuildPeer {
+  name: string;
+  hostname: string;
+  port: number;
+  source: RemoteBuildPeerSource;
+  addresses: string[];
+  server_version: string;
+  esphome_version: string;
+  /**
+   * SHA-256 of the receiver's static X25519 peer-link pubkey,
+   * lowercase hex, parsed off the mDNS TXT record. Empty string
+   * for receivers that haven't bound the peer-link listener at
+   * announce time (default-off mode). The offloader's mDNS
+   * auto-rebind path matches this against persisted pairings;
+   * the discovered-row Pair button doesn't read it (the wizard
+   * runs `preview_pair` against the chosen endpoint and OOBs
+   * the live fingerprint).
+   */
+  pin_sha256: string;
+  /**
+   * Receiver's peer-link Noise WS port from the TXT
+   * `remote_build_port` key, NOT the SRV-advertised dashboard
+   * HTTP port (`port` above). The discovered-row Pair button
+   * pre-fills this into the wizard so operators on a non-default
+   * `--remote-build-port` don't have to retype it on every pair.
+   * `0` for receivers that haven't bound the peer-link listener
+   * yet; the wizard falls back to its 6055 default in that case.
+   */
+  remote_build_port: number;
+}
+
+/**
+ * Receiver's stable identity, returned from
+ * ``remote_build/get_identity`` and ``remote_build/rotate_identity``.
+ *
+ * The cert + key PEMs are intentionally NOT included — only the
+ * SPKI fingerprint (``pin_sha256``, lowercase hex SHA-256 of the
+ * SubjectPublicKeyInfo) is safe to ship, and it's what a peer
+ * pins against anyway. ``listener_bound`` reports whether the
+ * peer-link Noise WS is currently serving traffic; lets the
+ * Settings UI distinguish "rotation succeeded AND the listener
+ * is back up" from "rotation succeeded but the rebuild
+ * fail-softed; check logs".
+ */
+export interface IdentityView {
+  dashboard_id: string;
+  pin_sha256: string;
+  server_version: string;
+  esphome_version: string;
+  listener_bound: boolean;
+}
+
+/**
+ * Data payload for the ``remote_build_pair_request_received`` event.
+ *
+ * Fires on the receiver-side bus when a fresh
+ * ``intent="pair_request"`` Noise frame lands inside an open
+ * pairing window. The Settings UI surfaces the row in the
+ * Pairing requests inbox; ``peer_ip`` lets the operator
+ * sanity-check the source against expectations before
+ * OOB-confirming the pin.
+ *
+ * ``paired_at`` carries the receiver-clock timestamp the row
+ * was created at — same value the receiver writes to
+ * ``StoredPeer.paired_at``. Sent on the event so the frontend
+ * can construct a complete ``PeerSummary``-equivalent row from
+ * the event alone (no follow-up read).
+ */
+export interface RemoteBuildPairRequestReceivedEventData {
+  dashboard_id: string;
+  pin_sha256: string;
+  label: string;
+  peer_ip: string;
+  paired_at: number;
+}
+
+/**
+ * Data payload for the ``remote_build_pair_status_changed`` event.
+ *
+ * Receiver-side. Fires from three paths: ``approve_peer``
+ * promoting a PENDING dict entry to APPROVED
+ * (``status="approved"``); ``remove_peer`` dropping either a
+ * PENDING dict entry or an APPROVED list row
+ * (``status="removed"``); pairing-window-close clearing the
+ * in-memory PENDING dict (``status="removed"`` per cleared
+ * entry). The ``status="removed"`` event is what wakes any
+ * in-flight ``intent="pair_status"`` long-poll on a paired
+ * offloader so its listener task drops the offloader's local
+ * state.
+ */
+export interface RemoteBuildPairStatusChangedEventData {
+  dashboard_id: string;
+  status: "approved" | "removed";
+}
+
+/**
+ * Data payload for the ``remote_build_pairing_window_changed``
+ * event.
+ *
+ * Receiver-side. Fires whenever the in-process pairing window
+ * opens, extends, or closes. Same shape as
+ * ``PairingWindowState``; the Settings UI re-syncs its local
+ * countdown against ``expires_in_seconds`` on every event tick.
+ */
+export type RemoteBuildPairingWindowChangedEventData = PairingWindowState;
+
+/**
+ * Data payload for the ``offloader_pair_status_changed`` event.
+ *
+ * Offloader-side counterpart to
+ * ``RemoteBuildPairStatusChangedEventData``. Fired by the
+ * offloader's per-row pair-status listener task
+ * (``_apply_pair_status_result`` → ``_fire_offloader_pair_status_changed``)
+ * and by ``remote_build/unpair`` when the user removes a row.
+ * Keys on the receiver coordinates (``hostname`` /
+ * ``port``) the user dialled because the offloader's
+ * ``StoredPairing`` doesn't store the receiver's
+ * ``dashboard_id``.
+ */
+export interface OffloaderPairStatusChangedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  /**
+   * Stable cryptographic identifier the offloader-side
+   * controller keys ``_pairings`` on (4a-o part 6 — re-keyed
+   * offloader state from ``(host, port)`` to ``pin_sha256``);
+   * frontend handlers should look up the matching
+   * ``PairingSummary`` row by pin rather than by host/port to
+   * stay correct across receiver hostname changes.
+   */
+  pin_sha256: string;
+  status: "approved" | "removed";
+}
+
+/**
+ * Data payload for the ``offloader_remote_builds_toggled`` event
+ * (7b).
+ *
+ * Fires when the offloader's master "Remote builds enabled"
+ * switch flips through ``remote_build/set_offloader_settings``.
+ * Carries the new value so subscribing tabs can update their
+ * switch render without re-fetching settings.
+ */
+export interface OffloaderRemoteBuildsToggledEventData {
+  remote_builds_enabled: boolean;
+}
+
+/**
+ * Data payload for the ``offloader_pairing_enabled_changed``
+ * event (7b).
+ *
+ * Fires when one pairing's per-row enable switch flips
+ * through ``remote_build/set_pairing_enabled``. App-shell
+ * looks up the matching ``PairingSummary`` row in
+ * ``_buildOffloadPairings`` keyed on ``pin_sha256`` and flips
+ * ``enabled`` so other open tabs render the new switch state.
+ */
+export interface OffloaderPairingEnabledChangedEventData {
+  pin_sha256: string;
+  enabled: boolean;
+}
+
+/**
+ * Data payload for ``receiver_peer_link_session_opened`` and
+ * ``receiver_peer_link_session_closed``.
+ *
+ * Fires on the receiver-side bus whenever an APPROVED peer's
+ * 5a-2 ``PeerLinkClient`` connects or disconnects. Drives the
+ * ``PeerSummary.connected`` indicator: app-shell flips the
+ * matching row's ``connected`` flag in the local
+ * ``_buildServerPeers`` list. Both events share the same shape
+ * (just the ``dashboard_id``); the discriminator is the event
+ * type itself.
+ */
+export interface ReceiverPeerLinkSessionEventData {
+  dashboard_id: string;
+}
+
+/**
+ * Data payload for offloader_peer_link_opened.
+ *
+ * Fires on the offloader-side bus when the long-lived
+ * PeerLinkClient enters its post-handshake parked state.
+ * Drives the PairingSummary.connected indicator: app-shell
+ * flips the matching row's connected flag in the local
+ * _buildOffloadPairings map keyed by pin_sha256. Receiver
+ * coords are carried as display fields the renderer can use
+ * without a follow-up lookup, but they're ignored when keying
+ * the map (4a-o part 6; pin_sha256 is the canonical row
+ * identity).
+ */
+export interface OffloaderPeerLinkSessionEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+}
+
+/**
+ * Close-reason category for `OFFLOADER_PEER_LINK_CLOSED`.
+ *
+ * Mirrors the backend's union of receiver-driven
+ * `TerminateReason` enum values (`superseded` /
+ * `server_shutting_down` / `heartbeat_timeout` /
+ * `malformed_frame` — the wire form of a structured `terminate`
+ * frame) and the offloader-side reasons (`transport_error` /
+ * `client_stopped` / `peer_hung_up` / `auth_rejected` /
+ * `pin_mismatch` — what `PeerLinkClient` infers when our side
+ * detects the close before the wire does). Two reasons in this
+ * union are *orphan* close reasons where the run loop won't
+ * reconnect: `superseded` and `pin_mismatch`. App-shell branches
+ * on the literal — keeping it as a union (rather than `string`)
+ * lets TypeScript catch typos before they land as silently-broken
+ * UI state.
+ */
+export type PeerLinkCloseReason =
+  | "superseded"
+  | "server_shutting_down"
+  | "heartbeat_timeout"
+  | "malformed_frame"
+  | "transport_error"
+  | "client_stopped"
+  | "peer_hung_up"
+  | "auth_rejected"
+  | "pin_mismatch";
+
+/**
+ * Data payload for offloader_peer_link_closed.
+ *
+ * Same identity fields as OffloaderPeerLinkSessionEventData
+ * (the OPENED counterpart) plus the close-classification:
+ *
+ * - `reason`: category code, see `PeerLinkCloseReason`.
+ * - `error_detail`: one-line human-readable description for
+ *   the categories that have one (transport / Noise exception
+ *   text, `"auth rejected"`, `"pin mismatch"`). Empty for
+ *   clean closes where the category itself is the explanation
+ *   (`client_stopped`, `superseded`, receiver-driven
+ *   `terminate`).
+ *
+ * App-shell uses both fields to update the matching row's
+ * `last_connect_error` (set to `error_detail`) and `connecting`
+ * (true on non-orphan reasons; false on `pin_mismatch` /
+ * `superseded` where the run loop won't retry).
+ */
+export interface OffloaderPeerLinkClosedEventData
+  extends OffloaderPeerLinkSessionEventData {
+  reason: PeerLinkCloseReason;
+  error_detail: string;
+}
+
+/**
+ * Data payload for offloader_job_state_changed.
+ *
+ * Fired on the offloader's bus per inbound job_state_changed
+ * frame from the paired receiver this dashboard submitted
+ * job_id to. status mirrors the wire literal exactly
+ * (queued / running / completed / failed / cancelled);
+ * error_message is empty on non-terminal states and on
+ * completed, populated on failed / cancelled.
+ *
+ * Receiver coords + pin_sha256 are carried so subscribers
+ * routing across multiple paired receivers can disambiguate;
+ * the in-flight jobs map keys on job_id (which is unique per
+ * peer-link session, so collisions across receivers don't
+ * happen in practice).
+ */
+export interface OffloaderJobStateChangedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  job_id: string;
+  status: JobStatus;
+  error_message: string;
+}
+
+/**
+ * Data payload for offloader_job_output.
+ *
+ * Fired per inbound job_output frame. line preserves its
+ * trailing terminator (\n / \r / \r\n) so the existing
+ * ansi-log renderer's carriage-return-overwrite contract
+ * works byte-identical to local JOB_OUTPUT events.
+ *
+ * High-rate path during an active build (one frame per line
+ * of compiler / linker output). Subscribers should batch
+ * downstream rendering rather than re-render per event.
+ */
+export interface OffloaderJobOutputEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  pin_sha256: string;
+  job_id: string;
+  stream: JobStream;
+  line: string;
+}
+
+/**
+ * Data payload for the ``offloader_pair_pin_mismatch`` event.
+ *
+ * Fires alongside ``offloader_pair_status_changed
+ * status="removed"`` when the offloader's pair-status
+ * listener observes APPROVED + drifted pin (the receiver's
+ * static X25519 pubkey hash differs from
+ * ``StoredPairing.pin_sha256`` recorded at pair time). The
+ * receiver's identity rotated under us. Carries the
+ * diagnostic detail (``expected_pin`` / ``observed_pin``)
+ * the status-changed event doesn't, plus the offloader-side
+ * ``receiver_label`` so the alert can name the row even
+ * after the pairings list has dropped it.
+ *
+ * No receiver-side counterpart event; the receiver never
+ * sees its own pin drift, and the symmetric "offloader
+ * rotated" case lands as a fresh PENDING row on the
+ * receiver's inbox via
+ * ``REMOTE_BUILD_PAIR_REQUEST_RECEIVED``.
+ */
+export interface OffloaderPairPinMismatchEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  receiver_label: string;
+  /**
+   * The **stored** pin the row was keyed on (same value as
+   * ``expected_pin``); duplicated as a separate field so a
+   * pin-keyed lookup doesn't have to parse ``expected_pin``.
+   * 4a-o part 6.
+   */
+  pin_sha256: string;
+  expected_pin: string;
+  observed_pin: string;
+}
+
+/**
+ * Data payload for the ``offloader_pair_peer_revoked`` event.
+ *
+ * Fires alongside ``offloader_pair_status_changed
+ * status="removed"`` when the offloader's pair-status
+ * listener gets ``IntentResponse.REJECTED`` for a row the
+ * offloader had as PENDING / APPROVED. From the offloader's
+ * POV all four causes (admin Reject, window close, identity
+ * rotation, row never existed) collapse to "the receiver
+ * isn't going to talk to us"; the alert copy stays generic
+ * ("the receiver removed us; reach out to that admin if it
+ * was a mistake").
+ *
+ * The ``receiver_label`` is carried so the alert can name
+ * the row even after the pairings list has dropped it.
+ */
+export interface OffloaderPairPeerRevokedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  receiver_label: string;
+  /**
+   * Stable cryptographic identifier the alert row keys on
+   * (4a-o part 6).
+   */
+  pin_sha256: string;
+}
+
+/**
+ * Data payload for the ``offloader_pair_alert_dismissed``
+ * event.
+ *
+ * Fires when an entry leaves the controller's RAM-only
+ * offloader-alerts dict via one of the two resolution paths:
+ * a successful ``request_pair`` against the same
+ * ``${hostname}:${port}`` (re-pair auto-resolved the alert),
+ * or ``unpair`` removed the row outright. There is no
+ * operator-driven dismiss — clicking "OK got it" without
+ * acting would just hide a broken pairing the next peer-
+ * link session would still fail against. Lets other tabs /
+ * clients on the global ``subscribe_events`` stream sync
+ * their local alerts list without re-fetching the snapshot.
+ */
+export interface OffloaderPairAlertDismissedEventData {
+  receiver_hostname: string;
+  receiver_port: number;
+  /**
+   * Stable cryptographic identifier the dismissed alert row
+   * keyed on (4a-o part 6 — alerts dict re-keyed on pin).
+   */
+  pin_sha256: string;
+}
+
+/**
+ * Snapshot row in the offloader-side alerts list (``pin_mismatch`` kind).
+ *
+ * Mirror of ``OffloaderPairPinMismatchEventData`` (the live
+ * event) plus a ``kind`` discriminator so a single alerts
+ * list can carry both pin-mismatch and peer-revoked entries
+ * on the wire. Frontend subscribers branch on ``kind`` to
+ * pick the alert copy + CTA.
+ *
+ * ``fired_at`` is the wall-clock unix timestamp the alert
+ * was added to the dict. Snapshot order is dict insertion
+ * order; frontends that want "newest first" sort on
+ * ``fired_at`` themselves.
+ */
+export interface OffloaderPinMismatchAlert {
+  kind: "pin_mismatch";
+  receiver_hostname: string;
+  receiver_port: number;
+  /** Stable cryptographic identifier (4a-o part 6). */
+  pin_sha256: string;
+  receiver_label: string;
+  expected_pin: string;
+  observed_pin: string;
+  fired_at: number;
+}
+
+/**
+ * Snapshot row in the offloader-side alerts list (``peer_revoked`` kind).
+ */
+export interface OffloaderPeerRevokedAlert {
+  kind: "peer_revoked";
+  receiver_hostname: string;
+  receiver_port: number;
+  /** Stable cryptographic identifier (4a-o part 6). */
+  pin_sha256: string;
+  receiver_label: string;
+  fired_at: number;
+}
+
+/**
+ * Sum type the snapshot list carries. Each entry is one of
+ * the two alert kinds above; the ``kind`` discriminator
+ * narrows field access at the consumer.
+ */
+export type OffloaderAlertSnapshotEntry =
+  | OffloaderPinMismatchAlert
+  | OffloaderPeerRevokedAlert;
+
+/**
+ * Data payload for the ``remote_build_identity_rotated`` event.
+ *
+ * Fires when the operator triggers ``rotate_identity``. Lets the
+ * Settings UI refresh its cached pin without polling
+ * ``get_identity`` (the dashboard might've been rotated from
+ * another tab, or via the WS API directly). Only the rotated
+ * fields are carried; ``server_version`` and
+ * ``esphome_version`` don't change on rotation, and the
+ * ``listener_bound`` state is best read via a fresh
+ * ``get_identity`` call on the receiving tab.
+ */
+export interface RemoteBuildIdentityRotatedEventData {
+  dashboard_id: string;
+  pin_sha256: string;
+}
+
+/**
+ * Data payload for ``REMOTE_BUILD_HOST_ADDED`` event.
+ *
+ * Aliases :type:`RemoteBuildPeer` directly (the backend fires
+ * ``peer.to_dict()`` from ``_upsert_host``, identical to what
+ * ``hosts_snapshot`` projects into
+ * ``subscribe_events.initial_state.hosts``). Aliasing rather
+ * than duplicating the field list keeps the event payload from
+ * drifting out of shape when ``RemoteBuildPeer`` gains a field.
+ * Fires from the controller's mDNS browse-callback cache-hit
+ * branch and from the async resolve-success path. Upsert
+ * semantics: subscribers key on ``name`` and replace an
+ * existing row with the same key.
+ */
+export type RemoteBuildHostAddedEventData = RemoteBuildPeer;
+
+/**
+ * Data payload for ``REMOTE_BUILD_HOST_REMOVED`` event.
+ *
+ * Fires when zeroconf delivers a ``Removed`` callback (TTL
+ * expiry without renewal, or an explicit goodbye). ``name``
+ * matches the corresponding ``REMOTE_BUILD_HOST_ADDED`` event's
+ * ``name`` field.
+ */
+export interface RemoteBuildHostRemovedEventData {
+  name: string;
 }

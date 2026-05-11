@@ -6,6 +6,7 @@ import {
   filterRenderable,
 } from "../../../src/components/device/config-entry-render-filter.js";
 import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
+import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 
 describe("ALWAYS_SHOWN_KEYS", () => {
   it("contains 'name' (the friendly-name leaf)", () => {
@@ -204,6 +205,91 @@ describe("filterRenderable", () => {
     expect(out.map((e) => e.key)).toEqual(["auth"]);
   });
 
+  it("keeps multi_value NESTED entries with zero items (Add button is the UI)", () => {
+    // Single-nested groups are dropped when no child would render,
+    // because the body would be empty. List-form is different:
+    // ``renderNestedListField`` paints an Add button so the user
+    // can declare the first device — dropping the field would
+    // make ``esphome.devices: []`` un-fillable from the editor.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [
+          // Required, but no items yet — the single-nested branch
+          // would drop the group. The list branch must NOT.
+          makeEntry({ key: "id", required: true }),
+        ],
+      }),
+    ];
+    const empty = filterRenderable(
+      entries,
+      {},
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(empty.map((e) => e.key)).toEqual(["devices"]);
+    const populated = filterRenderable(
+      entries,
+      { devices: [{ id: "front" }] },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(populated.map((e) => e.key)).toEqual(["devices"]);
+  });
+
+  it("treats a YamlRawValue at a multi_value NESTED key as material", () => {
+    // The parser falls back to ``YamlRawValue`` when the items
+    // can't fit the flat-mapping contract (dotted keys, block
+    // scalars, nested mappings). The user clearly has YAML
+    // there, so an advanced multi_value field with raw content
+    // must stay visible without a trip through the Advanced
+    // toggle — otherwise the visual editor would silently hide
+    // the user's data.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        advanced: true,
+        config_entries: [makeEntry({ key: "id" })],
+      }),
+    ];
+    const out = filterRenderable(
+      entries,
+      { devices: new YamlRawValue(["    - id: kitchen", "      filters:", "        delta: 0.5"]) },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(out.map((e) => e.key)).toEqual(["devices"]);
+  });
+
+  it("keeps an advanced multi_value NESTED entry with items, even when showAdvanced is off", () => {
+    // ``hasMaterialValue`` for list-form should treat any non-empty
+    // array as material so an advanced device list set in YAML
+    // stays visible without the user toggling the advanced switch.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        advanced: true,
+        config_entries: [makeEntry({ key: "id" })],
+      }),
+    ];
+    const filled = filterRenderable(
+      entries,
+      { devices: [{ id: "front" }] },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect(filled.map((e) => e.key)).toEqual(["devices"]);
+    const empty = filterRenderable(
+      entries,
+      { devices: [] },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    // Empty array → not material → advanced gate hides it.
+    expect(empty.map((e) => e.key)).toEqual([]);
+  });
+
   it("respects depends_on visibility", () => {
     const entries = [
       makeEntry({ key: "mode", required: true }),
@@ -253,6 +339,140 @@ describe("filterRenderable", () => {
         presentComponents: new Set(["esphome", "mqtt"]),
       }).map((e) => e.key),
     ).toEqual(["mqtt_topic", "name"]);
+  });
+
+  // ────────── supported_platforms gate ──────────────────────
+
+  it("hides a platform-gated entry when targetPlatform isn't in the allowlist", () => {
+    // Mirrors ``sensor.debug.psram`` upstream — wrapped in
+    // ``cv.only_on_esp32``, so the backend stamps
+    // ``supported_platforms = ["esp32"]`` and we hide it on
+    // every other board.
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+      makeEntry({ key: "free", required: true }),
+    ];
+    const onEsp8266 = filterRenderable(entries, {}, {
+      requiredOnly: true,
+      showAdvanced: false,
+      targetPlatform: "esp8266",
+    });
+    expect(onEsp8266.map((e) => e.key)).toEqual(["free"]);
+    const onEsp32 = filterRenderable(entries, {}, {
+      requiredOnly: true,
+      showAdvanced: false,
+      targetPlatform: "esp32",
+    });
+    expect(onEsp32.map((e) => e.key)).toEqual(["psram", "free"]);
+  });
+
+  it("respects multi-platform allowlists (union from cv.Any)", () => {
+    // Mirrors ``sensor.debug.fragmentation`` upstream —
+    // ``cv.Any(cv.only_on_esp8266, cv.only_on_esp32)`` collapses
+    // to ``["esp32", "esp8266"]``. The entry shows on either chip,
+    // hides on others (e.g. rp2040).
+    const entries = [
+      makeEntry({
+        key: "fragmentation",
+        required: true,
+        supported_platforms: ["esp32", "esp8266"],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp32",
+      }).map((e) => e.key),
+    ).toEqual(["fragmentation"]);
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }).map((e) => e.key),
+    ).toEqual(["fragmentation"]);
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "rp2040",
+      }).map((e) => e.key),
+    ).toEqual([]);
+  });
+
+  it("does not gate when supported_platforms is empty (the common case)", () => {
+    // Empty list = no constraint — most fields don't carry a
+    // platform restriction so the gate must be a no-op for them.
+    const entries = [
+      makeEntry({ key: "loop_time", required: true, supported_platforms: [] }),
+      makeEntry({ key: "free", required: true }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }).map((e) => e.key),
+    ).toEqual(["loop_time", "free"]);
+  });
+
+  it("does not gate when targetPlatform is null/undefined", () => {
+    // Add-component dialog opens before a board is locked in;
+    // we don't have a target platform yet so we shouldn't pre-
+    // emptively hide gated fields. Empty-allowlist semantics
+    // stay (which means "every field is visible until a board
+    // is picked").
+    const entries = [
+      makeEntry({
+        key: "psram",
+        required: true,
+        supported_platforms: ["esp32"],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: null,
+      }).map((e) => e.key),
+    ).toEqual(["psram"]);
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+      }).map((e) => e.key),
+    ).toEqual(["psram"]);
+  });
+
+  it("hides a NESTED group when its only child is platform-gated away", () => {
+    // The "skip empty groups" rule still applies — a NESTED
+    // whose only renderable child got platform-gated should also
+    // disappear, otherwise the form shows an empty header.
+    const entries = [
+      makeEntry({
+        key: "diagnostics",
+        type: ConfigEntryType.NESTED,
+        config_entries: [
+          makeEntry({
+            key: "psram",
+            required: true,
+            supported_platforms: ["esp32"],
+          }),
+        ],
+      }),
+    ];
+    expect(
+      filterRenderable(entries, {}, {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }).map((e) => e.key),
+    ).toEqual([]);
   });
 });
 
@@ -321,5 +541,52 @@ describe("collectRenderablePaths", () => {
       showAdvanced: false,
     });
     expect([...paths]).toEqual(["vis"]);
+  });
+
+  it("emits per-item indexed paths for multi_value NESTED entries", () => {
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [
+          makeEntry({ key: "id", required: true }),
+          makeEntry({ key: "name" }),
+        ],
+      }),
+    ];
+    const paths = collectRenderablePaths(
+      entries,
+      { devices: [{ id: "front" }, { id: "kitchen", name: "Kitchen" }] },
+      { requiredOnly: false, showAdvanced: false },
+    );
+    expect([...paths].sort()).toEqual(
+      [
+        "devices",
+        "devices.0.id",
+        "devices.0.name",
+        "devices.1.id",
+        "devices.1.name",
+      ].sort(),
+    );
+  });
+
+  it("emits the bare field path for an empty multi_value NESTED entry", () => {
+    // No items → no per-item paths, but the field itself is still
+    // onscreen (Add button), so its path should land in the set so
+    // an error keyed on the bare field surfaces as visible.
+    const entries = [
+      makeEntry({
+        key: "devices",
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        config_entries: [makeEntry({ key: "id", required: true })],
+      }),
+    ];
+    const paths = collectRenderablePaths(entries, {}, {
+      requiredOnly: false,
+      showAdvanced: false,
+    });
+    expect([...paths]).toEqual(["devices"]);
   });
 });

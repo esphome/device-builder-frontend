@@ -18,9 +18,11 @@ import {
   mdiLockAlert,
   mdiLockClock,
   mdiLockOpenVariant,
+  mdiMapMarkerOutline,
   mdiMemory,
   mdiMessage,
   mdiNetworkOutline,
+  mdiOpenInNew,
   mdiSync,
   mdiTagMultiple,
   mdiTextShort,
@@ -45,7 +47,13 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
+import { splitIntegrations } from "../../util/integration-split.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { buildWebUiUrl } from "../../util/web-ui-url.js";
+import {
+  renderIpValue,
+  renderMdnsTxtRecords,
+} from "./device-drawer-render.js";
 import {
   ageOf,
   formatSecondsAgo,
@@ -53,6 +61,7 @@ import {
 } from "../../util/relative-time.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../labels/device-labels-editor.js";
 
 registerMdiIcons({
   "access-point-network": mdiAccessPointNetwork,
@@ -73,9 +82,11 @@ registerMdiIcons({
   "lock-alert": mdiLockAlert,
   "lock-clock": mdiLockClock,
   "lock-open-variant": mdiLockOpenVariant,
+  "map-marker-outline": mdiMapMarkerOutline,
   memory: mdiMemory,
   message: mdiMessage,
   "network-outline": mdiNetworkOutline,
+  "open-in-new": mdiOpenInNew,
   sync: mdiSync,
   "tag-multiple": mdiTagMultiple,
   "text-short": mdiTextShort,
@@ -112,6 +123,14 @@ interface ReachabilityRowSpec {
   labelKey: string;
   age: number | null;
   rttMs?: number | null;
+  /** Decoded TXT record key/value pairs from the device's
+   *  ``_esphomelib._tcp.local.`` announce, only set on the mDNS
+   *  row. The renderer drops a chevron-collapsible underneath
+   *  the row when this is present so users can debug what the
+   *  device is broadcasting (version mismatch, lost
+   *  ``api_encryption`` advertisement, stale ``mac``). ``null``
+   *  / omitted hides the section. */
+  txtRecords?: Record<string, string> | null;
 }
 
 @customElement("esphome-device-drawer-content")
@@ -137,6 +156,16 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
    *  render the content directly without the parent drawer. */
   @property({ type: Boolean, attribute: "drawer-open" })
   drawerOpen = true;
+
+  /** True while a firmware job is in flight for this device.
+   *  Gates the destructive in-content actions (the Build Size
+   *  row's broom button) so the user can't supersede a running
+   *  build by accident — the backend rejects ``firmware/clean``
+   *  in that state too, but disabling the affordance up front
+   *  avoids the round-trip and the resulting toast. Forwarded
+   *  from the parent ``<esphome-device-drawer>``. */
+  @property({ type: Boolean, reflect: true })
+  busy = false;
 
   /** Latest reachability snapshot pushed by the backend over the
    *  per-device WS subscription. ``null`` until the initial event
@@ -314,6 +343,57 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         font-size: 14px;
       }
 
+      .ip-value {
+        display: inline-flex;
+        align-items: center;
+        gap: var(--wa-space-xs);
+        /* Cap to the row's text column so a long IPv6 literal wraps
+           in-place instead of pushing the visit-link icon out of the
+           drawer. The flex children below carry the actual wrapping
+           (min-width: 0) and shrink-protection (flex-shrink: 0). */
+        max-width: 100%;
+      }
+      /* Flex items default to min-width: auto, which prevents the IP
+         text from shrinking below its intrinsic width — long IPv6
+         literals would then overflow. Force min-width: 0 and let
+         overflow-wrap break inside the address. */
+      .ip-value-text {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+      /* Match the table's .cell-action-btn icon-only target geometry
+         so the drawer link is reachable by keyboard and touch —
+         square hit area, :focus-visible ring, and the same hover
+         affordance the table-cell visit-web button uses.
+         flex-shrink: 0 keeps the icon a stable 24x24 even when the
+         IPv6 text is wrapping next to it. */
+      .ip-visit-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        width: 24px;
+        height: 24px;
+        border-radius: var(--wa-border-radius-m);
+        color: var(--wa-color-text-quiet);
+        text-decoration: none;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
+      .ip-visit-link:hover {
+        background: var(--wa-color-surface-lowered);
+        color: var(--esphome-primary);
+      }
+      .ip-visit-link:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 2px;
+        color: var(--esphome-primary);
+      }
+      .ip-visit-link wa-icon {
+        font-size: 14px;
+      }
+
       .build-size-value {
         display: inline-flex;
         align-items: center;
@@ -340,6 +420,19 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           var(--esphome-primary),
           transparent 88%
         );
+      }
+      /* Disabled state uses aria-disabled rather than the native
+         disabled attribute so the button stays focusable and the
+         title tooltip remains discoverable on hover — disabled
+         native buttons hide both, which would silently drop the
+         "wait for the current build…" explanation. The click
+         handler is gated separately on the busy property. */
+      .build-size-clean--disabled,
+      .build-size-clean--disabled:hover {
+        color: var(--wa-color-text-quiet);
+        background: none;
+        cursor: not-allowed;
+        opacity: 0.5;
       }
       .build-size-clean wa-icon {
         font-size: 14px;
@@ -389,6 +482,74 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       .tag--link:focus-visible {
         outline: 2px solid var(--esphome-primary);
         outline-offset: 2px;
+      }
+
+      /* Shared muted-disclosure treatment: a closed-by-default
+         <details> whose <summary> reads as secondary metadata
+         (small, quiet text colour) rather than as another data
+         row. Used by the auto-loaded integrations collapsible
+         below the primary chip row, and by the mDNS TXT-records
+         collapsible under the reachability row. The two have
+         different margin-top spacing because they sit beside
+         content of different vertical density — the integrations
+         row needs a clear gap, the reachability row only needs
+         a tight 2xs nudge. */
+      .auto-loaded-details > summary,
+      .mdns-txt-details > summary {
+        cursor: pointer;
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+        padding: 2px 0;
+        user-select: none;
+      }
+
+      .auto-loaded-details > summary:hover,
+      .mdns-txt-details > summary:hover {
+        color: var(--wa-color-text-normal);
+      }
+
+      .auto-loaded-details {
+        margin-top: var(--wa-space-s);
+      }
+
+      .mdns-txt-details {
+        margin-top: var(--wa-space-2xs);
+      }
+
+      .tags-wrap--auto-loaded {
+        margin-top: var(--wa-space-2xs);
+      }
+
+      /* TXT keys are device-controlled — a malicious or
+         misbehaving firmware can broadcast an absurdly long key
+         that would otherwise expand the dt column under a plain
+         max-content sizing and squeeze the value column to
+         nothing (or push the drawer's horizontal scrollbar).
+         The minmax(0, max-content) lets the dt column shrink
+         below its natural size when the row would overflow, and
+         overflow-wrap: anywhere lets long keys break mid-string
+         so they actually wrap inside the shrunken column rather
+         than overflowing it. Same defensive shape on dd for
+         symmetry — TXT values are equally device-controlled. */
+      .mdns-txt-list {
+        display: grid;
+        grid-template-columns: minmax(0, max-content) 1fr;
+        column-gap: var(--wa-space-s);
+        row-gap: 2px;
+        margin: var(--wa-space-2xs) 0 0 0;
+        font-size: var(--wa-font-size-2xs);
+      }
+
+      .mdns-txt-list > dt {
+        color: var(--wa-color-text-quiet);
+        font-family: var(--wa-font-family-code, monospace);
+        overflow-wrap: anywhere;
+      }
+
+      .mdns-txt-list > dd {
+        margin: 0;
+        font-family: var(--wa-font-family-code, monospace);
+        overflow-wrap: anywhere;
       }
 
       .status-badges {
@@ -544,7 +705,10 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         ${this._renderBluetoothMacRow(d)}
         ${this._row("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
         ${this._renderBuildSizeRow(d)}
+        ${d.area ? this._row("map-marker-outline", this._localize("dashboard.drawer_area"), d.area) : nothing}
       </div>
+
+      ${this._renderLabelsSection(d)}
 
       ${this._renderReachabilitySection()}
 
@@ -558,27 +722,98 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
       ${this._renderConfigHashSection(d)}
 
-      ${d.loaded_integrations && d.loaded_integrations.length > 0
-        ? html`
-            <div class="section">
-              <h4 class="section-title">${this._localize("dashboard.drawer_loaded_integrations")}</h4>
-              <div class="tags-wrap">
-                ${d.loaded_integrations.map((i) => {
-                  const url = this._integrationDocs[i];
-                  return url && _isSafeDocsUrl(url)
-                    ? html`<a
-                        class="tag tag--link"
-                        href=${url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        >${i}</a
-                      >`
-                    : html`<span class="tag">${i}</span>`;
-                })}
-              </div>
-            </div>
-          `
-        : nothing}
+      ${this._renderLoadedIntegrationsSection(d)}
+    `;
+  }
+
+  /**
+   * Render the "Loaded Integrations" section with a direct /
+   * auto-loaded split.
+   *
+   * `loaded_integrations` from the backend lumps every integration
+   * upstream ESPHome resolved at compile time — the user's
+   * top-level blocks, their `- platform: ...` references, AND the
+   * AUTO_LOAD chain those things drag in (`md5` from WPA2 password
+   * hashing, `mdns` from `api`, `web_server_base` from
+   * `web_server`, `voltage_sampler` from ADC sensors). For
+   * non-trivial configs the auto-loaded chain dominates, burying
+   * the user-meaningful entries.
+   *
+   * Backend's `directly_referenced_integrations` is the subset
+   * the user actually wrote (issue #422 fix); the complement is
+   * the auto-loaded chain. We render direct chips inline, and
+   * tuck auto-loaded ones inside a `<details>` collapsible the
+   * user can expand on demand.
+   *
+   * Falls back to rendering the flat `loaded_integrations` list
+   * when the backend couldn't compute the split — empty
+   * `directly_referenced_integrations` is the graceful-degrade
+   * signal (resolved-config parse failed mid-edit).
+   */
+  private _renderLoadedIntegrationsSection(d: ConfiguredDevice) {
+    if (!d.loaded_integrations || d.loaded_integrations.length === 0) {
+      return nothing;
+    }
+    const { direct, indirect } = splitIntegrations(
+      d.loaded_integrations,
+      d.directly_referenced_integrations,
+    );
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_loaded_integrations")}
+        </h4>
+        <div class="tags-wrap">${direct.map((i) => this._renderIntegrationTag(i))}</div>
+        ${indirect.length > 0
+          ? html`
+              <details class="auto-loaded-details">
+                <summary>
+                  ${this._localize("dashboard.drawer_auto_loaded_integrations", {
+                    count: String(indirect.length),
+                  })}
+                </summary>
+                <div class="tags-wrap tags-wrap--auto-loaded">
+                  ${indirect.map((i) => this._renderIntegrationTag(i))}
+                </div>
+              </details>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
+  private _renderIntegrationTag(name: string) {
+    const url = this._integrationDocs[name];
+    return url && _isSafeDocsUrl(url)
+      ? html`<a
+          class="tag tag--link"
+          href=${url}
+          target="_blank"
+          rel="noopener noreferrer"
+          >${name}</a
+        >`
+      : html`<span class="tag">${name}</span>`;
+  }
+
+  /**
+   * Render the user-defined labels section with inline editor.
+   *
+   * The editor consumes ``apiContext`` and ``labelsContext`` itself
+   * — the drawer just hands it the device. Persists assignments
+   * via ``devices/set_labels``; the resulting ``DEVICE_UPDATED``
+   * push refreshes the ``device.labels`` array, which Lit reactivity
+   * threads back into the editor's chip row.
+   */
+  private _renderLabelsSection(d: ConfiguredDevice) {
+    return html`
+      <div class="section">
+        <h4 class="section-title">
+          ${this._localize("dashboard.drawer_labels")}
+        </h4>
+        <esphome-device-labels-editor
+          .device=${d}
+        ></esphome-device-labels-editor>
+      </div>
     `;
   }
 
@@ -775,8 +1010,31 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
   private _renderIpAddressRow(d: ConfiguredDevice) {
     const list = d.ip_addresses;
     const label = this._localize("dashboard.drawer_ip_address");
+    // Resolve once per render — ``buildWebUiUrl`` parses a URL and
+    // both the empty-IP guard and ``_renderIpValue`` need the same
+    // answer.
+    const webUrl = buildWebUiUrl(d);
     if (list.length === 0) {
-      return this._row("ip-network-outline", label, "", true);
+      // ``device.address`` (the YAML-declared mDNS hostname) plus a
+      // configured ``web_port`` is enough to build a usable visit-web
+      // URL even before the first resolved A/AAAA record arrives, so
+      // route through ``_renderIpValue`` to surface the link in that
+      // window. Falls back to ``_row``'s muted em-dash when neither
+      // is available.
+      if (!webUrl) {
+        return this._row("ip-network-outline", label, "", true);
+      }
+      return html`
+        <div class="row">
+          <div class="icon">
+            <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
+          </div>
+          <div class="content">
+            <div class="label">${label}</div>
+            ${this._renderIpValue("", webUrl)}
+          </div>
+        </div>
+      `;
     }
     if (list.length === 1) {
       return html`
@@ -786,7 +1044,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           </div>
           <div class="content">
             <div class="label">${label}</div>
-            <div class="value mono">${list[0]}</div>
+            ${this._renderIpValue(list[0], webUrl)}
           </div>
         </div>
       `;
@@ -800,7 +1058,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
         <div class="content">
           <div class="label">${label}</div>
-          <div class="value mono">${list[0]}</div>
+          ${this._renderIpValue(list[0], webUrl)}
           ${expanded
             ? list
                 .slice(1)
@@ -825,6 +1083,10 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  private _renderIpValue(ip: string, url: string) {
+    return renderIpValue(ip, url, this._localize);
   }
 
   /**
@@ -917,11 +1179,18 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
           <div class="value build-size-value">
             <span>${formatFileSize(d.build_size_bytes)}</span>
             <button
-              class="build-size-clean"
+              class="build-size-clean ${this.busy
+                ? "build-size-clean--disabled"
+                : ""}"
               type="button"
-              title=${this._localize("dashboard.action_clean_build")}
-              aria-label=${this._localize("dashboard.action_clean_build")}
-              @click=${() => this._emitCleanBuild(d)}
+              aria-disabled=${this.busy ? "true" : "false"}
+              title=${this.busy
+                ? this._localize("dashboard.action_clean_build_busy")
+                : this._localize("dashboard.action_clean_build")}
+              aria-label=${this.busy
+                ? this._localize("dashboard.action_clean_build_busy")
+                : this._localize("dashboard.action_clean_build")}
+              @click=${() => (this.busy ? null : this._emitCleanBuild(d))}
             >
               <wa-icon library="mdi" name="broom"></wa-icon>
             </button>
@@ -993,6 +1262,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         icon: "access-point-network",
         labelKey: "dashboard.drawer_source_mdns",
         age: ageOf(r.mdns_last_seen_seconds_ago, anchor, now),
+        txtRecords: r.mdns_txt_records ?? null,
       },
       {
         source: "ping",
@@ -1069,6 +1339,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
               ? html` &middot; <span class="reachability-rtt">${rttText}</span>`
               : nothing}
           </div>
+          ${renderMdnsTxtRecords(row.txtRecords, this._localize)}
         </div>
       </div>
     `;
@@ -1078,7 +1349,22 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
 
   protected updated(changed: Map<string, unknown>) {
     super.updated?.(changed);
-    if (changed.has("device")) {
+    /* The dashboard re-binds ``device`` to a fresh object on every
+       ``DEVICE_UPDATED`` push (state flap, IP change, version
+       change) so the drawer reflects the latest data without the
+       user closing and reopening it. We only want the per-device
+       resets / subscription churn when the drawer is actually
+       being reused for a *different* device — a new
+       configuration filename, or a transition from null to a
+       device. Compare ``configuration`` rather than identity so
+       same-device WS pushes don't reset ``_ipExpanded`` or rotate
+       the reachability subscription. */
+    const previousDevice = changed.get("device") as ConfiguredDevice | null | undefined;
+    const deviceTargetMoved =
+      changed.has("device") &&
+      (previousDevice?.configuration ?? null) !==
+        (this.device?.configuration ?? null);
+    if (deviceTargetMoved) {
       // Per-device UI state must reset when the drawer is reused
       // for a new device — without this a user who expanded the
       // multi-IP row on device A would see device B's drawer open
@@ -1086,7 +1372,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
       // contract.
       this._ipExpanded = false;
     }
-    if (changed.has("device") || changed.has("drawerOpen") || changed.has("_api")) {
+    if (deviceTargetMoved || changed.has("drawerOpen") || changed.has("_api")) {
       this._reconcileReachabilitySubscription();
       // Run the tick whenever there's a *target* (drawer open +
       // device + api), independent of whether the subscribe

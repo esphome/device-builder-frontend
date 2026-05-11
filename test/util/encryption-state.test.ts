@@ -92,6 +92,56 @@ describe("getEncryptionState", () => {
       ),
     ).toBe("mismatch");
   });
+
+  it("returns 'active' when mDNS confirms encryption even if YAML detection missed it", () => {
+    /* Dashboard issue #437: a config that wires encryption via
+       ESPHome's Jinja-templated packages (``api: |\n  # set ns =
+       ...  ${ns.cfg}``) lands at the dashboard's
+       ``yaml_util.load_yaml`` as ``api`` = literal string, the
+       package merge clobbers it with the dict-shaped ``api:
+       actions:`` from another package, and the YAML signal
+       comes back ``api_encrypted: false``. The device's mDNS
+       broadcast still carries the live cipher string because
+       the firmware really IS running encryption — ESPHome's
+       compile path renders the Jinja that the dashboard
+       doesn't.
+
+       Honour the wire: a truthy ``api_encryption_active``
+       (``"Noise_..."``) means encryption is live regardless of
+       whether the YAML pass found the encryption block. The
+       previous behaviour returned "plaintext" here and showed
+       an open-lock indicator on a fully-encrypted device.
+
+       Same fix covers the symmetric case the previous logic
+       also missed: a device flashed elsewhere whose YAML doesn't
+       reflect the encryption that's already running on the
+       hardware (e.g. firmware sourced from a backup, a config
+       restore that lost the secret). The wire signal is the
+       authoritative one; surfacing "plaintext" there misled
+       operators into reflashing devices that didn't need it. */
+    expect(
+      getEncryptionState(
+        inputs({
+          api_encrypted: false,
+          api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256",
+        }),
+      ),
+    ).toBe("active");
+  });
+
+  it("stays 'plaintext' when YAML disables encryption AND mDNS confirms plaintext", () => {
+    /* The mDNS empty-string is "TXT seen, key absent → device
+       confirmed plaintext"; combined with YAML saying plaintext
+       this is unambiguously a non-encrypted device. The truth-on-
+       the-wire short-circuit must NOT promote this to "active"
+       just because ``api_encryption_active`` is non-null —
+       only truthy strings (the live cipher) flip the state. */
+    expect(
+      getEncryptionState(
+        inputs({ api_encrypted: false, api_encryption_active: "" }),
+      ),
+    ).toBe("plaintext");
+  });
 });
 
 describe("getEncryptionVisual", () => {

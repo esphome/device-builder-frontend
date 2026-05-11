@@ -12,6 +12,7 @@ import {
   findUsedPins,
   sectionEndLine,
 } from "../../util/config-entry-yaml-scan.js";
+import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
   renderFieldError,
@@ -111,8 +112,19 @@ export function renderPinField(
   // before comparing or the disabled select renders blank.
   const rawValue = ctx.getAt(path);
   const valueGpio = parsePinGpio(rawValue);
+  // Fallback to ``String(rawValue)`` only when the value is a
+  // primitive — js-yaml emits null-prototype maps for partial /
+  // mid-edit pin blocks, and ``String(Object.create(null))`` throws
+  // "Cannot convert object to primitive value", crashing the form
+  // for a pin renderer that's already in a recoverable state. Treat
+  // unparseable objects as "no selection" so no option matches and
+  // the dropdown stays empty rather than blowing up.
   const value =
-    valueGpio !== null ? `GPIO${valueGpio}` : String(rawValue ?? "");
+    valueGpio !== null
+      ? `GPIO${valueGpio}`
+      : isPrimitiveOrNullish(rawValue)
+        ? String(rawValue ?? "")
+        : "";
   const invalid = ctx.errorAt(path) !== null;
   const required = entry.pin_features ?? [];
   const matchesFeatures = (pin: BoardPin) =>
@@ -161,15 +173,32 @@ export function renderPinField(
     sectionEndLine(ctx.yaml, ctx.fromLine),
   );
   const fieldDisabled = effectiveDisabled(entry, ctx);
+  const isLongForm = isPlainObject(rawValue);
+
+  // Pin-select onChange routes to ``path.number`` when the field is
+  // already in long form (the user expanded Advanced and set a flag,
+  // promoting ``pin: GPIO5`` to ``pin: { number: GPIO5, mode: ... }``)
+  // and to bare ``path`` otherwise. Without this branch, picking a
+  // different GPIO on a long-form pin would overwrite the whole
+  // mapping (mode flags + inverted) with the GPIO string — silently
+  // discarding every Advanced setting the user just configured.
+  const onPinChange = (e: Event) => {
+    const newGpio = (e.target as HTMLSelectElement).value;
+    if (isLongForm) {
+      ctx.emitChange([...path, "number"], newGpio);
+    } else {
+      ctx.emitChange(path, newGpio);
+    }
+  };
 
   return html`
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
       <wa-select
+        data-no-value-sync
         class=${invalid ? "invalid" : ""}
         ?disabled=${fieldDisabled}
-        @change=${(e: Event) =>
-          ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
+        @change=${onPinChange}
       >
         ${visible.map((pin) => {
           const v = buildPinOption(pin, entry, usedPins, ctx);
@@ -200,6 +229,107 @@ export function renderPinField(
         })}
       </wa-select>
       ${renderFieldError(path, ctx)}
+      ${renderPinAdvanced(entry, path, ctx, rawValue, isLongForm, fieldDisabled)}
+    </div>
+  `;
+}
+
+/**
+ * Render the "Advanced" disclosure carrying the long-form pin
+ * fields (``mode`` flag group + ``inverted``) attached by
+ * ``script/sync_components.py``'s ``_pin_long_form_extras``
+ * (esphome/device-builder#430). ESPHome accepts both forms:
+ *
+ *     pin: GPIO5          # short form — what the picker writes
+ *     pin:                # long form — what flipping any flag promotes to
+ *       number: GPIO5
+ *       mode:
+ *         pullup: true
+ *       inverted: false
+ *
+ * Without this disclosure the visual editor only ever writes the
+ * short form, and configurations that need a pull-up (issue #420)
+ * have no path through the editor.
+ *
+ * Returns ``nothing`` when the entry has no nested config_entries —
+ * pre-#430 catalogs (or future entries that opt out by clearing
+ * ``config_entries``) keep the simple short-form picker.
+ */
+function renderPinAdvanced(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  rawValue: unknown,
+  isLongForm: boolean,
+  fieldDisabled: boolean,
+): TemplateResult | typeof nothing {
+  // Apply the same visibility filter every other nested renderer
+  // uses so requiredOnly / showAdvanced / platform-gating rules
+  // hide long-form sub-fields the user shouldn't see (e.g. an
+  // analog-mode flag on a platform that lacks it). Skipping
+  // ``filterRenderable`` would let the long-form disclosure leak
+  // sub-fields the rest of the form has hidden.
+  const longFormFields = ctx.filterRenderable(
+    entry.config_entries ?? [],
+    ctx.scopeValues(path),
+  );
+  if (longFormFields.length === 0) return nothing;
+
+  const advancedKey = `${path.join(".")}:pin-advanced`;
+  // Reuse the form's ``nestedOpenSections`` machinery so the
+  // open/closed state survives a re-render and follows the same
+  // semantics as a regular ``nested`` group's expand toggle.
+  // Default closed — the long-form fields are an opt-in
+  // disclosure, never on the main form.
+  const isOpen = ctx.nestedOpenSections.has(advancedKey);
+
+  const onAdvancedToggle = () => {
+    // Locked / disabled fields (board-preset pins, parent-disabled
+    // groups) must not mutate via Advanced — without this guard,
+    // opening the disclosure on a short-form locked pin would fire
+    // the promotion ``emitChange`` and rewrite the locked value to
+    // the long form. The toggle is also rendered ``disabled`` below,
+    // but defending in both places means a synthetic click event
+    // (test code, accessibility tooling) can't bypass the guard.
+    if (fieldDisabled) return;
+    ctx.toggleNested(advancedKey);
+    // When opening for the first time on a short-form pin value,
+    // promote ``pin: GPIO5`` → ``pin: { number: GPIO5 }`` so a
+    // subsequent flag flip can write to ``pin.mode.pullup``
+    // without ``setIn`` clobbering the GPIO. The form's
+    // value-change handler picks this up before the children
+    // render, so the nested fields read off the freshly-promoted
+    // mapping. Skip when already long-form (preserves the
+    // user's existing flags) or when the pin has no value yet
+    // (no GPIO to preserve; the picker will write to bare path
+    // on first selection).
+    if (!isOpen && !isLongForm && rawValue != null && rawValue !== "") {
+      ctx.emitChange(path, { number: rawValue });
+    }
+  };
+
+  return html`
+    <div class="pin-advanced" data-field-key="${advancedKey}">
+      <button
+        type="button"
+        class="pin-advanced-toggle"
+        aria-expanded=${isOpen}
+        ?disabled=${fieldDisabled}
+        @click=${onAdvancedToggle}
+      >
+        <wa-icon
+          library="mdi"
+          name=${isOpen ? "chevron-up" : "chevron-down"}
+        ></wa-icon>
+        <span>${ctx.localize("device.pin_advanced")}</span>
+      </button>
+      ${isOpen
+        ? html`<div class="pin-advanced-fields">
+            ${longFormFields.map((child) =>
+              ctx.renderEntry(child, [...path, child.key]),
+            )}
+          </div>`
+        : nothing}
     </div>
   `;
 }

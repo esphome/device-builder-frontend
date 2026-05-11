@@ -351,6 +351,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.component.config_entries,
       this._values,
       presentComponents,
+      this.board?.esphome.platform ?? null,
     );
     const isComplete = !this._hasRequiredErrors(validation);
 
@@ -525,6 +526,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         requiredOnly: true,
         showAdvanced: false,
         presentComponents,
+        targetPlatform: this.board?.esphome.platform ?? null,
       },
     );
     for (const key of errors.keys()) {
@@ -593,6 +595,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.component.config_entries,
       this._values,
       presentComponents,
+      this.board?.esphome.platform ?? null,
     );
     if (errors.size > 0) {
       this._errors = errors;
