@@ -1595,6 +1595,8 @@ export class ESPHomePageDashboard extends LitElement {
       ></esphome-command-dialog>
       <esphome-firmware-install-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
+          this._openCommand(e.detail, "clean")}
       ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog

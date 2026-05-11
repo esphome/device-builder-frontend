@@ -592,22 +592,30 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   }
 
   /** Hint shown after a compile-step failure pointing the user at
-   *  "Reset Build Environment". Only surfaced for failures during
-   *  the server-side compile (see ``_failedDuringCompile``) — chip
-   *  mismatch / Web Serial connection / flash errors don't benefit
-   *  from clearing the toolchain cache.
+   *  the recovery staircase: clean this device's build files
+   *  first (surgical, fast), then fall back to reset build
+   *  environment if that doesn't help. Only surfaced for failures
+   *  during the server-side compile (see ``_failedDuringCompile``)
+   *  — chip mismatch / Web Serial connection / flash errors don't
+   *  benefit from clearing the build cache.
    *
-   *  Inline-link rendering: the action is a clickable link inside
-   *  the sentence so the CTA reads as part of the hint. The
-   *  translation puts the link text behind a ``{action}`` marker so
-   *  other locales can place it wherever reads naturally. */
+   *  Inline-link rendering: both actions are clickable links inside
+   *  the sentence so the CTAs read as part of the hint. The
+   *  translation puts each link text behind a ``{clean_action}`` /
+   *  ``{reset_action}`` marker so other locales can place them
+   *  wherever reads naturally. */
   private _renderResetSuggestion() {
     if (!this._failedDuringCompile) return nothing;
     const text = this._localize("command.try_reset_suggestion");
-    const [before, after = ""] = text.split("{action}");
+    const [before, rest = ""] = text.split("{clean_action}");
+    const [middle, after = ""] = rest.split("{reset_action}");
     return html`
       <div class="reset-suggestion" role="status">
         ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryCleanBuild}
+        >
+          ${this._localize("command.try_clean_button")}</button>${middle}<button
           class="reset-suggestion-link"
           @click=${this._tryResetBuildEnv}
         >
@@ -615,6 +623,24 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Per-device clean: closes the install dialog and asks the page
+   *  to open the command-dialog in clean mode for ``_device``.
+   *  Clean wipes just this device's ``.esphome/build/<name>/``
+   *  artifacts; the user re-attempts the install from the device
+   *  row once it finishes. */
+  private _tryCleanBuild = () => {
+    const device = this._device;
+    this._close();
+    if (!device) return;
+    this.dispatchEvent(
+      new CustomEvent("clean-build", {
+        detail: device,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   /** Hand off to the firmware-jobs-dialog's reset flow. Closes the
    *  current install dialog first so the confirm prompt isn't

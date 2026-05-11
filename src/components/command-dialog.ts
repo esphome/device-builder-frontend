@@ -709,21 +709,20 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   /** Hint shown after a failed install / compile pointing the user
-   *  at "Reset Build Environment". Build-env corruption is a common
-   *  cause of compile failures (stale toolchain, half-installed
-   *  platform/library); the legacy dashboard surfaced a Clean All
-   *  button at the top level for this reason. We keep the entry-
-   *  point in the kebab and contextually offer it here so users
-   *  don't have to dig for it after a failure. Limited to install /
-   *  compile because the other command types don't have a build
-   *  step that the reset would help with.
+   *  at the recovery staircase: clean this device's build files
+   *  first (surgical, fast), then fall back to reset build
+   *  environment (nuclear, wipes every toolchain + cache, slow
+   *  recovery). Stale per-device build artifacts cause the bulk
+   *  of compile failures; the toolchain wipe is the heavier
+   *  hammer reserved for cases where clean doesn't help.
+   *  Limited to install / compile because the other command
+   *  types don't have a build step the recovery would help with.
    *
-   *  Rendered as an inline link inside the sentence rather than a
-   *  separate button so the call-to-action reads as part of the
-   *  hint ("try reset build environment") instead of a standalone
-   *  next-step. The translation puts the link text behind a
-   *  ``{action}`` marker so other locales can place it wherever
-   *  reads naturally. */
+   *  Rendered as two inline links inside the sentence rather than
+   *  separate buttons so the calls-to-action read as part of the
+   *  hint. The translation puts each link text behind a
+   *  ``{clean_action}`` / ``{reset_action}`` marker so other
+   *  locales can place them wherever reads naturally. */
   private _renderResetSuggestion() {
     if (this._state !== "error") return nothing;
     if (this._userStopped) return nothing;
@@ -731,10 +730,15 @@ export class ESPHomeCommandDialog extends LitElement {
       return nothing;
     }
     const text = this._localize("command.try_reset_suggestion");
-    const [before, after = ""] = text.split("{action}");
+    const [before, rest = ""] = text.split("{clean_action}");
+    const [middle, after = ""] = rest.split("{reset_action}");
     return html`
       <div class="reset-suggestion" role="status">
         ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryCleanBuild}
+        >
+          ${this._localize("command.try_clean_button")}</button>${middle}<button
           class="reset-suggestion-link"
           @click=${this._tryResetBuildEnv}
         >
@@ -742,6 +746,17 @@ export class ESPHomeCommandDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Per-device clean: re-uses this same dialog instance — the
+   *  ``configuration`` property is already set to the failing
+   *  config, so calling ``open("clean")`` tears down the current
+   *  command and starts a fresh clean job on the same device. No
+   *  bubble-up needed; clean is non-destructive (just wipes one
+   *  device's ``.esphome/build/<name>/``) and doesn't need the
+   *  confirm step that gates the toolchain-wide reset. */
+  private _tryCleanBuild = () => {
+    this.open("clean");
+  };
 
   /** Hand off to the firmware-jobs-dialog's reset flow. We close the
    *  current command dialog first so the user can see the confirm
