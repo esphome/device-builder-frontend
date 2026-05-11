@@ -255,10 +255,17 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
 
       esphome-base-dialog {
         --width: 520px;
-        transition: width 0.2s;
       }
       :host([expanded]) esphome-base-dialog {
         --width: min(900px, 90vw);
+      }
+
+      /* Animate the dialog's width when the user toggles the
+         expand button. Lives on ::part(dialog) (the inner
+         wa-dialog box) because esphome-base-dialog itself is
+         display: contents and has no layout box to transition. */
+      esphome-base-dialog::part(dialog) {
+        transition: width 0.2s;
       }
 
       esphome-base-dialog::part(header) {
