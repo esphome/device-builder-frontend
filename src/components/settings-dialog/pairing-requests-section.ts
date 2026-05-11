@@ -240,23 +240,6 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     this._toast("success", `${prefix}_success`);
   }
 
-  /**
-   * Toast a WS-command failure with the backend's structured reason.
-   *
-   * ``NOT_FOUND`` is the gentle "the row went away under us" path —
-   * the pairing inbox refreshes through ``pair_status_changed`` events
-   * so the user's view is already correct; surfacing a generic
-   * "couldn't X" error on top of that would be noise. Other
-   * ``APIError`` codes (``INVALID_ARGS`` on a duplicate-Accept race,
-   * ``UNAVAILABLE`` on transport drop, ``INTERNAL_ERROR`` on receiver
-   * crash) each carry a backend-supplied ``details`` string that says
-   * what actually failed — fold that into the toast so the operator
-   * can tell "I clicked twice and the second one lost the race" apart
-   * from "the dashboard is unreachable" without opening devtools.
-   * Non-``APIError`` throws (e.g. a TypeError from a malformed event
-   * payload) have no useful reason to surface and fall back to the
-   * generic message.
-   */
   private _toastApiFailure(prefix: string, err: unknown) {
     if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
       this._toast("warning", `${prefix}_already_gone`);
