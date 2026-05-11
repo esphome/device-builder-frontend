@@ -830,6 +830,8 @@
     "reauth_wizard_back": "Retour",
     "reauth_wizard_continue": "Continuer",
     "reauth_wizard_repair_action": "Réappairer ce récepteur",
+    "reauth_wizard_repair_in_progress": "Réappairage…",
+    "reauth_wizard_repair_retry": "Réessayer",
     "reauth_repair_success": "Réappairage avec {label} réussi.",
     "reauth_repair_pin_changed": "L'identité de {label} a encore changé entre l'assistant et la tentative de réappairage — le récepteur a répondu avec une empreinte différente de celle que vous venez de vérifier. Rouvrez l'alerte et vérifiez la nouvelle empreinte avant de réessayer.",
     "reauth_repair_unreachable": "Impossible d'atteindre {label} pour terminer le réappairage. Vérifiez que l'hôte est en ligne et réessayez depuis l'alerte.",

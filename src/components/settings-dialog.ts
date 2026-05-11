@@ -11,8 +11,12 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
+import type { OffloaderAlertSnapshotEntry } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { localizeContext } from "../context/index.js";
+import {
+  buildOffloadAlertsContext,
+  localizeContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -45,6 +49,16 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** Offloader-side alerts (pin_mismatch / peer_revoked).
+   *  Drives the notification dot on the 'Send builds' nav item
+   *  so the operator sees there's an alert to act on without
+   *  having to click into the section first. ``null`` until
+   *  subscribe_events snapshot lands. The header-actions
+   *  component owns the matching dot on the settings gear. */
+  @consume({ context: buildOffloadAlertsContext, subscribe: true })
+  @state()
+  private _offloaderAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
 
   @state()
   private _section: Section = "appearance";
@@ -89,6 +103,24 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _renderNav() {
     const flat = SECTIONS.filter((s) => !s.group);
     const experimental = SECTIONS.filter((s) => s.group === "experimental");
+    // Pre-compute whether to render the alert dot on the
+    // 'Send builds' (build_offload) entry. The dot's meaning is
+    // 'something in this section needs your attention' -- driven
+    // by the offloader-side alerts dict (pin_mismatch /
+    // peer_revoked). Other sections don't have alert surfaces
+    // today; the alertedSection switch lets future sections
+    // (e.g. pairing_requests with PENDING rows) attach the same
+    // dot without rewriting the render loop.
+    const offloadAlerted =
+      this._offloaderAlerts !== null && this._offloaderAlerts.size > 0;
+    const sectionAlerted = (id: Section): boolean => {
+      switch (id) {
+        case "build_offload":
+          return offloadAlerted;
+        default:
+          return false;
+      }
+    };
     const renderItem = (s: SectionDef) => html`
       <button
         class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
@@ -96,6 +128,9 @@ export class ESPHomeSettingsDialog extends LitElement {
       >
         <wa-icon library="mdi" name=${s.icon}></wa-icon>
         <span>${this._localize(s.labelKey)}</span>
+        ${sectionAlerted(s.id)
+          ? html`<span class="nav-item-dot" aria-hidden="true"></span>`
+          : nothing}
       </button>
     `;
     return html`

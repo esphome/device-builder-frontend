@@ -88,6 +88,22 @@ export const settingsSharedStyles = css`
     transition: color 0.12s;
   }
 
+  /* Notification dot on a nav item. Pushed to the right by the
+     flex layout (margin-left: auto) so the icon + label stay
+     left-anchored. Sized to match the existing menu-btn-badge
+     on the header gear so the two notification surfaces use
+     the same visual language. Currently rendered when the
+     'Send builds' section has offloader-side alerts to act on
+     (pin_mismatch / peer_revoked). */
+  .nav-item-dot {
+    margin-left: auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--wa-color-danger-fill-loud);
+    flex-shrink: 0;
+  }
+
   .nav-group-header {
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);

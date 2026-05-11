@@ -4,13 +4,11 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
-import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
-import {
-  ErrorCode,
-  type OffloaderAlertSnapshotEntry,
-  type PairingSummary,
-  type RemoteBuildPeer,
+import type {
+  OffloaderAlertSnapshotEntry,
+  PairingSummary,
+  RemoteBuildPeer,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
@@ -26,7 +24,6 @@ import {
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
-  friendlyHostname,
   normalizeHostnameForCompare,
   trimTrailingDot,
 } from "../../util/hostname.js";
@@ -167,7 +164,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         @pair-rejected=${this._onPairRejected}
       ></esphome-pair-build-server-dialog>
       <esphome-reauth-wizard-dialog
-        @reauth-confirmed=${this._onReauthConfirmed}
+        @reauth-result=${this._onReauthResult}
       ></esphome-reauth-wizard-dialog>
       <esphome-remote-build-job-dialog></esphome-remote-build-job-dialog>
       <esphome-edit-pairing-endpoint-dialog></esphome-edit-pairing-endpoint-dialog>
@@ -375,92 +372,40 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     });
   };
 
-  private _onReauthConfirmed = async (
+  private _onReauthResult = (
     e: CustomEvent<{
-      hostname: string;
-      port: number;
-      observed_pin: string;
+      outcome: "success" | "pin_changed";
       receiver_label: string;
     }>,
-  ): Promise<void> => {
-    if (this._api === undefined) return;
-    const { hostname, port, observed_pin, receiver_label } = e.detail;
-    // Thread the wizard's observed_pin (the user just verified
-    // it OOB at step 1 of the wizard) straight into request_pair.
-    // The backend's TOCTOU defense compares this pin to the
-    // pubkey observed on its own live handshake at request_pair
-    // time and rejects with PRECONDITION_FAILED on mismatch.
-    // That binds the user's wizard verification to the eventual
-    // pinned identity: an attacker that took over the hostname
-    // between the wizard and now cannot get its pubkey persisted
-    // because its handshake produces a different pubkey than
-    // observed_pin. Pre-rewrite this handler opened the
-    // fresh-pair dialog, which re-ran preview_pair and pinned
-    // whatever IT observed -- a TOCTOU window that mDNS / DHCP
-    // rebinds during the wizard's open period could exploit.
-    //
-    // offloader_label defaults to the same value the fresh-pair
-    // dialog pre-fills (friendlyHostname of window.location.hostname
-    // -- the dashboard's own hostname). The receiver-side admin's
-    // inbox already shows this peer with the label from the
-    // original pair; the re-pair just refreshes the StoredPeer row
-    // receiver-side, and the existing APPROVED gate returns
-    // APPROVED immediately (offloader pubkey didn't rotate, only
-    // the receiver did), so no second receiver-side approval is
-    // needed.
-    const offloaderLabel = friendlyHostname(window.location.hostname);
-    try {
-      await this._api.requestRemoteBuildPair({
-        hostname,
-        port,
-        pin_sha256: observed_pin,
-        receiver_label,
-        offloader_label: offloaderLabel,
-      });
+  ): void => {
+    // The wizard now owns the request_pair call and the
+    // retry-on-NO_PAIRING_WINDOW / UNAVAILABLE UX (operator's
+    // verification stays bound across retries). Only terminal
+    // outcomes reach this handler: success and pin_changed.
+    // PIN_CHANGED is the load-bearing case -- receiver's pubkey
+    // differs from the one the operator just verified, which
+    // means the verification is stale and the operator needs
+    // to redo the OOB step against a fresh observation. The
+    // wizard closes itself on this branch; the toast tells the
+    // operator to retry from the alert (which re-fires
+    // preview_pair and re-opens the wizard with the new
+    // observed pin).
+    if (e.detail.outcome === "success") {
       toast.success(
         this._localize("settings.reauth_repair_success", {
-          label: receiver_label,
+          label: e.detail.receiver_label,
         }),
         { richColors: true },
       );
-    } catch (err) {
-      // Distinguish PRECONDITION_FAILED (the load-bearing TOCTOU
-      // case) from generic transport errors so the toast copy
-      // prompts the operator to retry from the alert. A failed
-      // pin-binding here means either the receiver rotated AGAIN
-      // between the wizard and now (rare) or the hostname rebound
-      // to a different host (the attack the wizard's verification
-      // step is designed to surface). Either way the right next
-      // step is to re-run the alert -> wizard flow with a fresh
-      // observation.
-      toast.error(this._reauthErrorMessage(err, receiver_label), {
-        richColors: true,
-      });
+      return;
     }
+    toast.error(
+      this._localize("settings.reauth_repair_pin_changed", {
+        label: e.detail.receiver_label,
+      }),
+      { richColors: true },
+    );
   };
-
-  private _reauthErrorMessage(err: unknown, receiverLabel: string): string {
-    if (err instanceof APIError) {
-      if (err.errorCode === ErrorCode.PRECONDITION_FAILED) {
-        return this._localize("settings.reauth_repair_pin_changed", {
-          label: receiverLabel,
-        });
-      }
-      if (err.errorCode === ErrorCode.UNAVAILABLE) {
-        return this._localize("settings.reauth_repair_unreachable", {
-          label: receiverLabel,
-        });
-      }
-      if (err.errorCode === ErrorCode.NO_PAIRING_WINDOW) {
-        return this._localize("settings.reauth_repair_no_window", {
-          label: receiverLabel,
-        });
-      }
-    }
-    return this._localize("settings.reauth_repair_failed", {
-      label: receiverLabel,
-    });
-  }
 
   private _onAlertUnpair = (alert: OffloaderAlertSnapshotEntry): void => {
     this._pendingUnpair = {

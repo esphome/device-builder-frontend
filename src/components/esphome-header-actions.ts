@@ -14,9 +14,10 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { JobStatus } from "../api/types.js";
-import type { FirmwareJob } from "../api/types.js";
+import type { FirmwareJob, OffloaderAlertSnapshotEntry } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
+  buildOffloadAlertsContext,
   firmwareJobsContext,
   localizeContext,
   onboardingPendingContext,
@@ -50,6 +51,15 @@ export class ESPHomeHeaderActions extends LitElement {
   @consume({ context: firmwareJobsContext, subscribe: true })
   @state()
   private _jobs: Map<string, FirmwareJob> = new Map();
+
+  /** Offloader-side alerts (pin_mismatch / peer_revoked).
+   *  Drives a notification dot on the settings gear so the
+   *  operator notices something needs attention without having
+   *  to open Settings → Send builds first. ``null`` until the
+   *  subscribe_events snapshot lands. Empty map = no alerts. */
+  @consume({ context: buildOffloadAlertsContext, subscribe: true })
+  @state()
+  private _offloaderAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
 
   @state()
   private _open = false;
@@ -307,6 +317,9 @@ export class ESPHomeHeaderActions extends LitElement {
           aria-label=${this._localize("layout.settings")}
         >
           <wa-icon library="mdi" name="cog"></wa-icon>
+          ${this._offloaderAlertsCount() > 0
+            ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
+            : nothing}
         </button>
       </div>
       <button
@@ -553,6 +566,15 @@ export class ESPHomeHeaderActions extends LitElement {
         composed: true,
       }),
     );
+  }
+
+  /** Count offloader-side alerts (pin_mismatch / peer_revoked)
+   *  that need operator attention. Drives the settings-gear
+   *  notification dot so the operator notices an alert without
+   *  having to open Settings → Send builds first. Returns 0 when
+   *  the alerts snapshot hasn't arrived yet (null) or is empty. */
+  private _offloaderAlertsCount(): number {
+    return this._offloaderAlerts === null ? 0 : this._offloaderAlerts.size;
   }
 
   private _openFeedback() {

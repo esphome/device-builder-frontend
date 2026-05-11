@@ -830,6 +830,8 @@
     "reauth_wizard_back": "Terug",
     "reauth_wizard_continue": "Doorgaan",
     "reauth_wizard_repair_action": "Deze ontvanger opnieuw koppelen",
+    "reauth_wizard_repair_in_progress": "Opnieuw koppelen…",
+    "reauth_wizard_repair_retry": "Opnieuw proberen",
     "reauth_repair_success": "Opnieuw gekoppeld met {label}.",
     "reauth_repair_pin_changed": "De identiteit van {label} is opnieuw veranderd tussen de wizard en de herkoppelpoging — de ontvanger antwoordde met een andere vingerafdruk dan degene die u zojuist hebt geverifieerd. Open de melding opnieuw en verifieer de nieuwe vingerafdruk voordat u het opnieuw probeert.",
     "reauth_repair_unreachable": "Kon {label} niet bereiken om de herkoppeling te voltooien. Controleer of de host bereikbaar is en probeer het opnieuw vanaf de melding.",
