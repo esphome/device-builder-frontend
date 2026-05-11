@@ -14,23 +14,14 @@ import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { formatPinSha256 } from "../util/pin-format.js";
-import { copyToClipboard } from "../util/copy-to-clipboard.js";
-import {
-  normalizeHostnameForCompare,
-  trimTrailingDot,
-} from "../util/hostname.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import {
-  SECTIONS,
-  type Section,
-  type SectionDef,
-} from "./settings-dialog/types.js";
 import {
   settingsRowStyles,
   settingsSharedStyles,
 } from "./settings-dialog/shared-styles.js";
+import { SECTIONS, type Section, type SectionDef } from "./settings-dialog/types.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./base-dialog.js";
 import "./settings-dialog/appearance-section.js";
 import "./settings-dialog/build-offload-section.js";
@@ -38,7 +29,6 @@ import "./settings-dialog/build-server-section.js";
 import "./settings-dialog/editor-section.js";
 import "./settings-dialog/language-section.js";
 import "./settings-dialog/pairing-requests-section.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   close: mdiClose,
@@ -78,9 +68,7 @@ export class ESPHomeSettingsDialog extends LitElement {
     return html`
       <esphome-base-dialog
         ?open=${this._open}
-        .label="${this._localize("settings.title")} - ${this._localize(
-          current.labelKey,
-        )}"
+        .label="${this._localize("settings.title")} - ${this._localize(current.labelKey)}"
         @request-close=${this._onRequestClose}
         @after-hide=${this._onAfterHide}
       >

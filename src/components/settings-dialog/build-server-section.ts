@@ -25,23 +25,20 @@ import {
 } from "../../context/index.js";
 import { pinHexStyles } from "../../styles/pin-hex.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { formatPinSha256 } from "../../util/cert-pin-format.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
+import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
-import {
-  buildServerCardStyles,
-  cleanupTtlStyles,
-} from "./build-server-styles.js";
+import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
 import {
   peerRowStyles,
   settingsRowStyles,
   settingsSharedStyles,
 } from "./shared-styles.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../confirm-dialog.js";
 import "../pin-emoji-grid.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({ close: mdiClose });
 
@@ -110,7 +107,10 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     super.updated(changed);
     // Cross-tab rotate: another tab fired remote_build_identity_rotated;
     // refresh the local card so it matches what's on disk now.
-    if (changed.has("_rotationCounter") && changed.get("_rotationCounter") !== undefined) {
+    if (
+      changed.has("_rotationCounter") &&
+      changed.get("_rotationCounter") !== undefined
+    ) {
       void this._loadIdentity();
     }
   }
@@ -135,8 +135,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
         ></button>
       </div>
 
-      ${this._renderApprovedPeers()}
-      ${this._renderPeerRemoveConfirmDialog()}
+      ${this._renderApprovedPeers()} ${this._renderPeerRemoveConfirmDialog()}
 
       <div class="section-heading">
         ${this._localize("settings.build_server_card_heading")}
@@ -144,9 +143,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
       <div class="section-intro">
         ${this._localize("settings.build_server_card_desc")}
       </div>
-      ${this._renderCard()}
-
-      ${this._renderCleanupTtlRow()}
+      ${this._renderCard()} ${this._renderCleanupTtlRow()}
     `;
   }
 
@@ -250,9 +247,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
             ${this._localize("settings.remote_build_pin_label")}
           </span>
           <div class="build-server-pin-display">
-            <esphome-pin-emoji-grid
-              .pin=${identity.pin_sha256}
-            ></esphome-pin-emoji-grid>
+            <esphome-pin-emoji-grid .pin=${identity.pin_sha256}></esphome-pin-emoji-grid>
             <details class="pin-hex">
               <summary>
                 ${this._localize("settings.remote_build_pin_hex_summary")}
@@ -310,9 +305,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
         destructive
         heading=${this._localize("settings.remote_build_rotate_confirm_title")}
         message=${this._localize("settings.remote_build_rotate_confirm_body")}
-        confirm-label=${this._localize(
-          "settings.remote_build_rotate_confirm_confirm",
-        )}
+        confirm-label=${this._localize("settings.remote_build_rotate_confirm_confirm")}
         @confirm=${this._onRotateConfirm}
       ></esphome-confirm-dialog>
     `;
@@ -366,7 +359,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
   private _toast(
     level: "success" | "warning" | "error",
     key: string,
-    values?: Record<string, string | number>,
+    values?: Record<string, string | number>
   ) {
     toast[level](this._localize(key, values), { richColors: true });
   }
@@ -377,7 +370,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
         detail: !this._remoteBuildEnabled,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     return nothing;
   }
@@ -468,7 +461,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
         detail: seconds,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 }
