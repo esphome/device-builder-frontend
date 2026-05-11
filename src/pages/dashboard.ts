@@ -1592,11 +1592,13 @@ export class ESPHomePageDashboard extends LitElement {
       <esphome-create-config-dialog></esphome-create-config-dialog>
       <esphome-command-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-command-dialog>
       <esphome-firmware-install-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
         @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
           this._openCommand(e.detail, "clean")}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
@@ -2105,6 +2107,16 @@ export class ESPHomePageDashboard extends LitElement {
     this._commandDialog.name = device.friendly_name || device.name;
     this._commandDialog.open(type, port ? { port } : undefined);
   }
+
+  /** Catch the post-validation-failure "open in editor" hint from
+   *  the inner command / install dialogs and SPA-navigate to the
+   *  device page. The detail carries the YAML filename stem; the
+   *  device route is ``/device/<configuration>``. */
+  private _onRequestOpenEditor = (
+    e: CustomEvent<{ configuration: string }>
+  ) => {
+    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+  };
 
   private _showJobProgress(device: ConfiguredDevice) {
     const job = this._activeJobs.get(device.configuration);

@@ -706,6 +706,21 @@ export class ESPHomePageDevice extends LitElement {
     this._commandDialog.open("clean");
   };
 
+  /** Catch ``request-open-editor`` from the post-validation-failure
+   *  hint. We're already on the device editor for this device, so
+   *  the dialog closing itself is the whole UX — no navigation
+   *  needed when the requested configuration matches the page's
+   *  current device. Cross-device requests shouldn't reach this
+   *  handler (the dialogs only ever surface for the current
+   *  device), but guard with an explicit equality check so a
+   *  future regression can't silently send the user to a wrong
+   *  route. */
+  private _onRequestOpenEditor = (
+    e: CustomEvent<{ configuration: string }>
+  ) => {
+    if (e.detail.configuration === this._device?.configuration) return;
+  };
+
   static styles = [espHomeStyles, devicePageStyles];
 
   protected render() {
@@ -785,10 +800,12 @@ export class ESPHomePageDevice extends LitElement {
       ></esphome-unsaved-changes-dialog>
       <esphome-command-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-command-dialog>
       <esphome-firmware-install-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
         @clean-build=${this._onCleanBuild}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog

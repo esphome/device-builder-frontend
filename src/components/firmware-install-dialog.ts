@@ -80,6 +80,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    *  in front of users on chip-mismatch / Web Serial connection
    *  errors where it can't help. */
   @state() private _failedDuringCompile = false;
+  /** Flips true when the compile-step output stream contains an
+   *  ESPHome validation-failure marker (``Failed config`` /
+   *  ``Error while reading config:``). Drives the failure hint to
+   *  switch from clean / reset (which only help C++ build
+   *  failures) to "open this device in the editor" — the right
+   *  action when the YAML itself is broken. Reset alongside the
+   *  other per-attempt state. */
+  @state() private _failedDuringValidate = false;
   @state() private _logLines: string[] = [];
   @state() private _logsExpanded = false;
   @state() private _flashPercent = 0;
@@ -109,6 +117,33 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   private _device: ConfiguredDevice | null = null;
   private _jobId = "";
   private _streamId = "";
+
+  /** Match a dashboard-escaped or raw ANSI SGR sequence — backend
+   *  pins ``--dashboard`` so the four-character escaped form is
+   *  the live case; the raw branch is defensive. */
+  private static readonly _ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
+
+  /** Match an ESPHome logger line whose level is ``ERROR`` and
+   *  whose message starts with the canonical YAML-load-failure
+   *  prefix. Anchored at start-of-line so a non-validation line
+   *  that happens to quote the phrase mid-message can't match. */
+  private static readonly _LOADER_ERROR =
+    /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
+
+  /** Detect ESPHome's validation-failure markers in a streamed
+   *  output line. ``Failed config`` is the standalone bold-red
+   *  banner from ``esphome/config.py`` (matched after ANSI strip
+   *  by strict equality — the line *is* the marker).
+   *  ``ERROR Error while reading config:`` is the earlier YAML-
+   *  load-stage error. Both indicate the build never reached the
+   *  C++ compile step, so clean / reset can't help. */
+  private static _isValidationFailureLine(line: string): boolean {
+    const stripped = line
+      .replace(ESPHomeFirmwareInstallDialog._ANSI_SGR, "")
+      .trim();
+    if (stripped === "Failed config") return true;
+    return ESPHomeFirmwareInstallDialog._LOADER_ERROR.test(stripped);
+  }
 
   /**
    * Reject hook for the in-flight ``_compileAndWait`` promise.
@@ -202,6 +237,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failedDuringCompile = false;
+    this._failedDuringValidate = false;
     // ``_jobId`` is already cleared by ``_detachStream`` above; same
     // for ``_streamId`` and ``_compileReject``.
     this._detected = null;
@@ -591,21 +627,46 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     `;
   }
 
-  /** Hint shown after a compile-step failure pointing the user at
-   *  the recovery staircase: clean this device's build files
-   *  first (surgical, fast), then fall back to reset build
-   *  environment if that doesn't help. Only surfaced for failures
-   *  during the server-side compile (see ``_failedDuringCompile``)
-   *  — chip mismatch / Web Serial connection / flash errors don't
-   *  benefit from clearing the build cache.
+  /** Hint shown after a compile-step failure. Branches on what
+   *  actually failed:
    *
-   *  Inline-link rendering: both actions are clickable links inside
-   *  the sentence so the CTAs read as part of the hint. The
-   *  translation puts each link text behind a ``{clean_action}`` /
-   *  ``{reset_action}`` marker so other locales can place them
-   *  wherever reads naturally. */
+   *  * **YAML validation** (the output stream included ESPHome's
+   *    validation-failure marker) — neither clean nor reset can
+   *    help; offer the editor instead.
+   *  * **C++ build / compile** failure — keep the clean → reset
+   *    staircase (clean is surgical / fast; reset is the heavier
+   *    toolchain-wide wipe).
+   *
+   *  Only surfaced for failures during the server-side compile
+   *  (see ``_failedDuringCompile``) — chip mismatch / Web Serial
+   *  connection / flash errors don't benefit from any of these. */
   private _renderResetSuggestion() {
     if (!this._failedDuringCompile) return nothing;
+    if (this._failedDuringValidate) {
+      return this._renderValidationFailureSuggestion();
+    }
+    return this._renderBuildFailureSuggestion();
+  }
+
+  /** YAML validation failure → "open in editor" hint. */
+  private _renderValidationFailureSuggestion() {
+    const text = this._localize("command.validation_failed_suggestion");
+    const [before, after = ""] = text.split("{editor_action}");
+    return html`
+      <div class="reset-suggestion" role="status">
+        ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryOpenInEditor}
+        >
+          ${this._localize("command.try_open_editor_button")}</button>${after}
+      </div>
+    `;
+  }
+
+  /** C++ build failure → clean (surgical) → reset (nuclear)
+   *  staircase. Both actions are inline links inside the sentence
+   *  so the CTAs read as part of the hint. */
+  private _renderBuildFailureSuggestion() {
     const text = this._localize("command.try_reset_suggestion");
     const [before, rest = ""] = text.split("{clean_action}");
     const [middle, after = ""] = rest.split("{reset_action}");
@@ -623,6 +684,24 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Close the dialog and ask the host page to take the user to
+   *  the device-page editor for the failing device. Mirrors the
+   *  clean / reset event-bubble pattern; minimal ``{configuration}``
+   *  payload so the host's handler is the same shape as the one
+   *  on ``command-dialog``. */
+  private _tryOpenInEditor = () => {
+    const device = this._device;
+    this._close();
+    if (!device) return;
+    this.dispatchEvent(
+      new CustomEvent("request-open-editor", {
+        detail: { configuration: device.configuration },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   /** Per-device clean: closes the install dialog and asks the page
    *  to open the command-dialog in clean mode for ``_device``.
@@ -1059,6 +1138,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
               this._statusMessage = this._localize("firmware.status_compiling");
             }
             this._logLines = [...this._logLines, line];
+            if (ESPHomeFirmwareInstallDialog._isValidationFailureLine(line)) {
+              this._failedDuringValidate = true;
+            }
           },
           onResult: (data) => {
             this._streamId = "";

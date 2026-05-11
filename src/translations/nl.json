@@ -278,6 +278,8 @@
     "try_reset_suggestion": "Het lijkt erop dat je een probleem hebt met de compilatie. Probeer eerst {clean_action}; als dat niet helpt, probeer dan {reset_action}.",
     "try_clean_button": "de bouwbestanden voor dit apparaat op te schonen",
     "try_reset_button": "de bouw-omgeving te resetten",
+    "validation_failed_suggestion": "Dit lijkt op een configuratiefout. Probeer {editor_action} om de YAML te repareren.",
+    "try_open_editor_button": "dit apparaat in de editor te openen",
     "validate_success": "Configuratie is geldig!",
     "validate_failed": "Validatie mislukt.",
     "clean_success": "Bouwbestanden opgeschoond.",
