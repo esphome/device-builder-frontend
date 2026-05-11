@@ -694,6 +694,18 @@ export class ESPHomePageDevice extends LitElement {
     this._commandDialog.open("validate");
   };
 
+  /** Catch ``clean-build`` from the install dialog's post-failure
+   *  hint and route it through this page's command-dialog —
+   *  mirrors dashboard's page-level handler so the "clean the
+   *  build files for this device" link works the same way on
+   *  the device page. */
+  private _onCleanBuild = (e: CustomEvent<ConfiguredDevice>) => {
+    const device = e.detail;
+    this._commandDialog.configuration = device.configuration;
+    this._commandDialog.name = device.friendly_name || device.name;
+    this._commandDialog.open("clean");
+  };
+
   static styles = [espHomeStyles, devicePageStyles];
 
   protected render() {
@@ -776,6 +788,7 @@ export class ESPHomePageDevice extends LitElement {
       ></esphome-command-dialog>
       <esphome-firmware-install-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @clean-build=${this._onCleanBuild}
       ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
