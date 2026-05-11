@@ -28,6 +28,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { copyToClipboard } from "../../util/copy-to-clipboard.js";
 import { formatPinSha256 } from "../../util/pin-format.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { formatSecondsAgo } from "../../util/relative-time.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import { buildServerCardStyles, cleanupTtlStyles } from "./build-server-styles.js";
 import {
@@ -182,6 +183,16 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     const connectedLabel = peer.connected
       ? this._localize("settings.build_server_peer_connected")
       : this._localize("settings.build_server_peer_disconnected");
+    // ``paired_at`` is a Unix-seconds timestamp from the
+    // receiver's clock at the time the pairing was approved.
+    // We render it as a relative "paired N days ago" via the
+    // shared :func:`formatSecondsAgo` so the wording localises
+    // through ``Intl.RelativeTimeFormat`` (matching the device
+    // drawer's reachability strings). A row with ``paired_at``
+    // of 0 (legacy / corrupt) hides the line rather than
+    // showing a misleading "55 years ago".
+    const pairedAgoSeconds =
+      peer.paired_at > 0 ? Math.max(0, Date.now() / 1000 - peer.paired_at) : null;
     return html`
       <div class="row peer-row peer-row-approved">
         <div class="row-label">
@@ -191,9 +202,55 @@ export class ESPHomeSettingsBuildServer extends LitElement {
               ${connectedLabel}
             </span>
           </span>
-          <span class="row-desc">
-            <code class="peer-dashboard-id">${peer.dashboard_id}</code>
-          </span>
+          <!--
+            "Show details" disclosure. Matches the
+            details.pin-hex pattern used elsewhere in this
+            section so the visual behaviour is consistent.
+            The opaque dashboard_id used to render directly
+            under the label; users have no use for it
+            day-to-day (the label + emoji fingerprint cover
+            identification + verification) so it's now tucked
+            here alongside the more useful paired-N-ago and
+            peer_ip fields.
+          -->
+          <details class="peer-details">
+            <summary>
+              ${this._localize("settings.build_server_peer_details_summary")}
+            </summary>
+            <dl class="peer-details-list">
+              ${pairedAgoSeconds !== null
+                ? html`
+                    <dt>
+                      ${this._localize(
+                        "settings.build_server_peer_paired_at_label",
+                      )}
+                    </dt>
+                    <dd>${formatSecondsAgo(pairedAgoSeconds)}</dd>
+                  `
+                : nothing}
+              ${peer.peer_ip
+                ? html`
+                    <dt>
+                      ${this._localize("settings.build_server_peer_ip_label")}
+                    </dt>
+                    <dd><code>${peer.peer_ip}</code></dd>
+                  `
+                : nothing}
+              <dt>
+                ${this._localize(
+                  "settings.build_server_peer_dashboard_id_label",
+                )}
+              </dt>
+              <dd>
+                <code class="peer-dashboard-id">${peer.dashboard_id}</code>
+                <span class="peer-details-desc">
+                  ${this._localize(
+                    "settings.build_server_peer_dashboard_id_desc",
+                  )}
+                </span>
+              </dd>
+            </dl>
+          </details>
         </div>
         <button
           type="button"

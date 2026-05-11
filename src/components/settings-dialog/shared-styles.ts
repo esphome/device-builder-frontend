@@ -285,4 +285,51 @@ export const peerRowStyles = css`
     );
     color: var(--esphome-warning, #f59e0b);
   }
+
+  /*
+   * "Show details" disclosure under an approved peer row. Mirrors
+   * the .pin-hex styling shape (small / quiet / pointer cursor on
+   * the summary) so the two disclosures feel like the same widget
+   * across the section. The body is a two-column dl so field
+   * labels align in their own gutter.
+   */
+  .peer-details {
+    margin-top: var(--wa-space-2xs);
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+  }
+
+  .peer-details summary {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .peer-details-list {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 2px var(--wa-space-s);
+    margin: 4px 0 0 0;
+    padding: 0;
+  }
+
+  .peer-details-list dt {
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-normal);
+  }
+
+  .peer-details-list dd {
+    margin: 0;
+    color: var(--wa-color-text-normal);
+  }
+
+  .peer-details-list code {
+    font-family: var(--wa-font-family-code);
+    word-break: break-all;
+  }
+
+  .peer-details-desc {
+    display: block;
+    margin-top: 2px;
+    color: var(--wa-color-text-quiet);
+  }
 `;
