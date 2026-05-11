@@ -149,9 +149,17 @@ const SECTIONS: SectionDef[] = [
     // "build server" rather than "build host" because the
     // CI/CD term is broadly recognised; "build host" reads
     // as jargon for users who haven't seen it before.
+    // Grouped under the EXPERIMENTAL nav header alongside its
+    // sibling Pairing requests + Send builds entries: the
+    // remote-build flow as a whole is still in development
+    // (the receiver site binds and accepts pair requests, but
+    // the operator-facing UX, pair-approval modal, scheduler,
+    // and the offloader's submit_job pipeline are landing
+    // across multiple phases).
     id: "build_server",
     icon: "server-network",
     labelKey: "settings.build_server",
+    group: "experimental",
   },
   {
     // "Pairing requests" is its own sidebar entry rather than a
@@ -164,18 +172,21 @@ const SECTIONS: SectionDef[] = [
     // Senders' "ask the receiver to open Settings → Pairing
     // requests" copy is now an accurate navigation prompt
     // because the path it names exists as a discrete screen.
+    // Marked experimental alongside Build server / Send builds
+    // because the pair-approval surface is still maturing.
     id: "pairing_requests",
     icon: "handshake-outline",
     labelKey: "settings.pairing_requests",
+    group: "experimental",
   },
   {
     // "Send builds" = Offload role: this dashboard
-    // dispatching its compiles to another dashboard. Grouped
-    // under the EXPERIMENTAL nav header because the compile-
-    // dispatch flow is still in development -- the typed
-    // hostnames + paired-build-server rows on this screen are
-    // remembered, but no compile job is actually dispatched
-    // until the offloader's submit_job pipeline lands.
+    // dispatching its compiles to another dashboard. The
+    // offload direction is the least-finished of the three
+    // remote-build screens: the typed hostnames +
+    // paired-build-server rows here are remembered, but no
+    // compile job is actually dispatched until the
+    // offloader's submit_job pipeline lands.
     id: "build_offload",
     icon: "send-outline",
     labelKey: "settings.build_offload",
@@ -1249,9 +1260,10 @@ export class ESPHomeSettingsDialog extends LitElement {
          container. */
 
       /* Nav-sidebar group header. Renders above grouped
-         sections in the left rail (currently just the
-         EXPERIMENTAL group containing 'Send builds'). Same
-         visual treatment as the in-content '.section-heading'
+         sections in the left rail (currently the EXPERIMENTAL
+         group containing Build server, Pairing requests, and
+         Send builds). Same visual treatment as the in-content
+         '.section-heading'
          small-caps subtitles -- uppercase, tracked, quiet
          colour, hairline divider above -- so the eye reads the
          group as "sectioning" rather than "another nav item".
@@ -1921,10 +1933,12 @@ export class ESPHomeSettingsDialog extends LitElement {
    * list. Grouped sections render after, each group preceded
    * by a small uppercase header (currently only the
    * 'experimental' group is used, surfaced as 'EXPERIMENTAL'
-   * above 'Send builds'). The grouped pattern replaces the
-   * previous inline-banner approach -- "this feature is still
-   * in development" lives in the nav structure rather than as
-   * a paragraph at the top of the section content.
+   * above the three remote-build screens: Build server,
+   * Pairing requests, and Send builds). The grouped pattern
+   * replaces the previous inline-banner approach -- "this
+   * feature is still in development" lives in the nav
+   * structure rather than as a paragraph at the top of the
+   * section content.
    */
   private _renderNav() {
     const flat = SECTIONS.filter((s) => !s.group);
