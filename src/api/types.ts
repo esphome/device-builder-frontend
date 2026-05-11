@@ -1089,6 +1089,16 @@ export enum DeviceEventType {
   OFFLOADER_PAIR_PIN_MISMATCH = "offloader_pair_pin_mismatch",
   OFFLOADER_PAIR_PEER_REVOKED = "offloader_pair_peer_revoked",
   OFFLOADER_PAIR_ALERT_DISMISSED = "offloader_pair_alert_dismissed",
+  // 7b — offloader Settings UI toggles for the transparent
+  // install flow. ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` fires when
+  // the dashboard-wide "Remote builds enabled" master switch
+  // flips; ``OFFLOADER_PAIRING_ENABLED_CHANGED`` fires when one
+  // pairing's per-row enable switch flips. Both are emitted by
+  // the matching WS setters (``remote_build/set_offloader_settings``
+  // and ``remote_build/set_pairing_enabled``) so other open tabs
+  // sync their switch state without polling.
+  OFFLOADER_REMOTE_BUILDS_TOGGLED = "offloader_remote_builds_toggled",
+  OFFLOADER_PAIRING_ENABLED_CHANGED = "offloader_pairing_enabled_changed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -1167,6 +1177,18 @@ export interface InitialStateEventData {
    *  reason as ``pairings`` / ``peers`` — absent controller,
    *  omitted field. */
   remote_jobs?: OffloaderRemoteJobSnapshotEntry[];
+  /** Offloader-side master "Remote builds enabled" toggle (7b).
+   *  When `false`, the backend's ``pick_build_path`` short-
+   *  circuits every install to LOCAL; paired peer-link
+   *  sessions stay open and the Send-builds power-user dialog
+   *  still works — only the implicit auto-route is gated.
+   *  Live updates flow through
+   *  ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` events. Optional for
+   *  the same reason as ``pairings`` / ``peers`` — absent
+   *  controller, omitted field. Defaults to `true` on a fresh
+   *  install (matches the pre-7b semantic where any APPROVED
+   *  + connected + idle pairing was eligible). */
+  remote_builds_enabled?: boolean;
 }
 
 /**
@@ -1494,6 +1516,23 @@ export interface PairingSummary {
    * `util/version-mismatch.ts`.
    */
   esphome_version: string;
+  /**
+   * Whether this pairing is eligible for the transparent
+   * install flow's auto-route to remote build (7b). When
+   * `false`, the backend's `pick_build_path` walks past
+   * this row and looks for the next eligible APPROVED +
+   * connected + idle pairing; if none exist the install
+   * falls back to LOCAL. The peer-link session stays open
+   * regardless and the Send-builds power-user dialog still
+   * works against this receiver — only the implicit
+   * auto-route is gated. Live updates flow through
+   * `OFFLOADER_PAIRING_ENABLED_CHANGED` events.
+   *
+   * Defaults to `true` for back-compat with pre-7b
+   * sidecars (any APPROVED + connected + idle pairing was
+   * eligible).
+   */
+  enabled: boolean;
 }
 
 /**
@@ -1512,6 +1551,23 @@ export interface PairingSummary {
 export interface PairingWindowState {
   open: boolean;
   expires_in_seconds: number | null;
+}
+
+/**
+ * Wire view returned from ``remote_build/get_offloader_settings``
+ * and ``remote_build/set_offloader_settings`` (7b).
+ *
+ * Bundles the master ``remote_builds_enabled`` toggle with the
+ * pairings list so the offloader Settings UI's first paint
+ * reads everything it needs from one round-trip. Subsequent
+ * live updates flow through ``OFFLOADER_REMOTE_BUILDS_TOGGLED``
+ * / ``OFFLOADER_PAIRING_ENABLED_CHANGED`` /
+ * ``OFFLOADER_PAIR_STATUS_CHANGED`` events on the global
+ * ``subscribe_events`` stream.
+ */
+export interface OffloaderRemoteBuildSettings {
+  remote_builds_enabled: boolean;
+  pairings: PairingSummary[];
 }
 
 export interface RemoteBuildSettings {
@@ -1673,6 +1729,34 @@ export interface OffloaderPairStatusChangedEventData {
    */
   pin_sha256: string;
   status: "approved" | "removed";
+}
+
+/**
+ * Data payload for the ``offloader_remote_builds_toggled`` event
+ * (7b).
+ *
+ * Fires when the offloader's master "Remote builds enabled"
+ * switch flips through ``remote_build/set_offloader_settings``.
+ * Carries the new value so subscribing tabs can update their
+ * switch render without re-fetching settings.
+ */
+export interface OffloaderRemoteBuildsToggledEventData {
+  remote_builds_enabled: boolean;
+}
+
+/**
+ * Data payload for the ``offloader_pairing_enabled_changed``
+ * event (7b).
+ *
+ * Fires when one pairing's per-row enable switch flips
+ * through ``remote_build/set_pairing_enabled``. App-shell
+ * looks up the matching ``PairingSummary`` row in
+ * ``_buildOffloadPairings`` keyed on ``pin_sha256`` and flips
+ * ``enabled`` so other open tabs render the new switch state.
+ */
+export interface OffloaderPairingEnabledChangedEventData {
+  pin_sha256: string;
+  enabled: boolean;
 }
 
 /**

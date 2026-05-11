@@ -31,6 +31,7 @@ import type {
   IdentityView,
   PagedBoardsResponse,
   PagedComponentsResponse,
+  OffloaderRemoteBuildSettings,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
@@ -1359,6 +1360,69 @@ export class ESPHomeAPI {
   }): Promise<RemoteBuildSettings> {
     return this.sendCommand<RemoteBuildSettings>(
       "remote_build/set_settings",
+      args
+    );
+  }
+
+  /**
+   * Get the offloader-side remote-build settings (7b).
+   *
+   * Bundles the master ``remote_builds_enabled`` toggle with
+   * the pairings list so the Settings UI's first paint reads
+   * everything it needs from one round-trip. Live updates
+   * still ride on ``subscribe_events`` —
+   * ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` /
+   * ``OFFLOADER_PAIRING_ENABLED_CHANGED`` events fire after
+   * the matching setter mutates state, so the UI doesn't have
+   * to re-fetch.
+   */
+  async getOffloaderRemoteBuildSettings(): Promise<OffloaderRemoteBuildSettings> {
+    return this.sendCommand<OffloaderRemoteBuildSettings>(
+      "remote_build/get_offloader_settings"
+    );
+  }
+
+  /**
+   * Flip the offloader-side master "Remote builds enabled"
+   * toggle (7b).
+   *
+   * When set to `false`, the backend's ``pick_build_path``
+   * short-circuits every install to LOCAL; paired peer-link
+   * sessions stay open and the Send-builds power-user dialog
+   * still works — only the implicit auto-route is gated.
+   * Strict boolean validation on the backend rejects truthy
+   * non-booleans (the string ``"false"`` would otherwise
+   * coerce to `true` and persist the opposite of operator
+   * intent on a security-relevant switch).
+   */
+  async setOffloaderRemoteBuildSettings(args: {
+    remote_builds_enabled: boolean;
+  }): Promise<OffloaderRemoteBuildSettings> {
+    return this.sendCommand<OffloaderRemoteBuildSettings>(
+      "remote_build/set_offloader_settings",
+      args
+    );
+  }
+
+  /**
+   * Flip one pairing's per-row enable switch (7b).
+   *
+   * When ``enabled=false``, the backend's ``pick_build_path``
+   * walks past this row and looks for the next eligible
+   * APPROVED + connected + idle pairing. The peer-link session
+   * stays open and the Send-builds manual-dispatch path
+   * against this row still works. Unknown ``pin_sha256``
+   * rejects with ``ErrorCode.NOT_FOUND`` — a stale UI flipping
+   * a switch for a pairing the operator just unpaired on
+   * another tab gets a clean error, not a switch state that
+   * doesn't match anything.
+   */
+  async setOffloaderPairingEnabled(args: {
+    pin_sha256: string;
+    enabled: boolean;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>(
+      "remote_build/set_pairing_enabled",
       args
     );
   }

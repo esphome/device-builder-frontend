@@ -44,11 +44,13 @@ import type {
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
+  OffloaderPairingEnabledChangedEventData,
   OffloaderPairPeerRevokedEventData,
   OffloaderPairPinMismatchEventData,
   OffloaderPairStatusChangedEventData,
   OffloaderPeerLinkClosedEventData,
   OffloaderPeerLinkSessionEventData,
+  OffloaderRemoteBuildsToggledEventData,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
@@ -80,6 +82,7 @@ import {
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
+  offloaderRemoteBuildsEnabledContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
@@ -357,6 +360,16 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: buildOffloadPairingsContext })
   @state()
   private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
+
+  /** Offloader-side master "Remote builds enabled" toggle (7b).
+   *  Seeded from ``initial_state.remote_builds_enabled``;
+   *  mutated locally on ``OFFLOADER_REMOTE_BUILDS_TOGGLED``
+   *  events. ``null`` until the snapshot lands so consumers
+   *  can distinguish "no controller / still loading" from
+   *  "loaded but disabled". */
+  @provide({ context: offloaderRemoteBuildsEnabledContext })
+  @state()
+  private _offloaderRemoteBuildsEnabled: boolean | null = null;
 
   /** Offloader-side pair alerts keyed on ``${hostname}:${port}``.
    *  Populated by ``OFFLOADER_PAIR_PIN_MISMATCH`` /
@@ -1003,6 +1016,7 @@ export class ESPHomeApp extends LitElement {
           pairings,
           offloader_alerts,
           remote_jobs,
+          remote_builds_enabled,
         } = data as InitialStateEventData;
         this._devices = devices;
         this._importableDevices = importable;
@@ -1062,6 +1076,15 @@ export class ESPHomeApp extends LitElement {
             });
           }
           this._buildOffloadJobs = seeded;
+        }
+        // 7b — master "Remote builds enabled" toggle. Default
+        // `null` when absent (controller not wired up) so
+        // consumers can distinguish "still loading" from a
+        // landed-but-disabled state; the OffloaderRemoteBuilds
+        // toggle event handler below upserts the same field
+        // when the master switch flips through any tab.
+        if (remote_builds_enabled !== undefined) {
+          this._offloaderRemoteBuildsEnabled = remote_builds_enabled;
         }
         break;
       }
@@ -1411,6 +1434,26 @@ export class ESPHomeApp extends LitElement {
         this._buildOffloadAlerts = next;
         break;
       }
+      case DeviceEventType.OFFLOADER_REMOTE_BUILDS_TOGGLED: {
+        // 7b — master "Remote builds enabled" switch flipped via
+        // another tab (or this tab's optimistic write coming
+        // back through the bus). Plain assign; the field is a
+        // primitive boolean, no Map/array immutability dance.
+        const evt = data as OffloaderRemoteBuildsToggledEventData;
+        this._offloaderRemoteBuildsEnabled = evt.remote_builds_enabled;
+        break;
+      }
+      case DeviceEventType.OFFLOADER_PAIRING_ENABLED_CHANGED: {
+        // 7b — per-pairing enable switch flipped. Patch the row
+        // through the shared helper so the consumer sees the
+        // immutable Map mutation. If the row isn't in the map
+        // yet (event raced ahead of the snapshot, or the row
+        // was just unpaired on another tab), skip — the next
+        // initial-state reseed will resync.
+        const evt = data as OffloaderPairingEnabledChangedEventData;
+        this._patchOffloadPairing(evt.pin_sha256, { enabled: evt.enabled });
+        break;
+      }
       case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {
         // Lifecycle transition for a remote-build job we
         // submitted: queued / running / completed / failed /
@@ -1572,6 +1615,8 @@ export class ESPHomeApp extends LitElement {
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
         @set-remote-build-enabled=${this._onSetRemoteBuildEnabled}
         @set-remote-build-cleanup-ttl=${this._onSetRemoteBuildCleanupTtl}
+        @set-offloader-remote-builds-enabled=${this._onSetOffloaderRemoteBuildsEnabled}
+        @set-offloader-pairing-enabled=${this._onSetOffloaderPairingEnabled}
         @set-language=${this._onSetLanguage}
         @pair-request-sent=${this._onPairRequestSent}
         @remote-build-job-submitted=${this._onRemoteBuildJobSubmitted}
@@ -1741,6 +1786,64 @@ export class ESPHomeApp extends LitElement {
       });
     } finally {
       this._remoteBuildSetInFlight = false;
+    }
+  }
+
+  /**
+   * 7b — master "Remote builds enabled" toggle write path.
+   *
+   * Optimistic flip + rollback on failure, mirrors the
+   * receiver-side ``_onSetRemoteBuildEnabled`` shape. The
+   * ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` event the setter
+   * fires on the backend bus comes back through the WS and
+   * upserts the same field — that's a no-op on the optimistic
+   * tab and the cross-tab sync mechanism for any other tab
+   * looking at the same Settings page.
+   */
+  private async _onSetOffloaderRemoteBuildsEnabled(
+    e: CustomEvent<boolean>,
+  ): Promise<void> {
+    const enabled = e.detail;
+    const previous = this._offloaderRemoteBuildsEnabled;
+    this._offloaderRemoteBuildsEnabled = enabled;
+    try {
+      await this._api.setOffloaderRemoteBuildSettings({
+        remote_builds_enabled: enabled,
+      });
+    } catch {
+      this._offloaderRemoteBuildsEnabled = previous;
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
+    }
+  }
+
+  /**
+   * 7b — per-pairing enable toggle write path.
+   *
+   * Same optimistic-with-revert shape as the master toggle:
+   * patch the in-memory row, fire the WS write, roll back +
+   * toast on failure. The matching
+   * ``OFFLOADER_PAIRING_ENABLED_CHANGED`` event the backend
+   * fires lands as a no-op patch on this tab and as the
+   * canonical sync hook for any other tab open against the
+   * same dashboard.
+   */
+  private async _onSetOffloaderPairingEnabled(
+    e: CustomEvent<{ pin_sha256: string; enabled: boolean }>,
+  ): Promise<void> {
+    const { pin_sha256, enabled } = e.detail;
+    const previous = this._buildOffloadPairings?.get(pin_sha256)?.enabled;
+    this._patchOffloadPairing(pin_sha256, { enabled });
+    try {
+      await this._api.setOffloaderPairingEnabled({ pin_sha256, enabled });
+    } catch {
+      if (previous !== undefined) {
+        this._patchOffloadPairing(pin_sha256, { enabled: previous });
+      }
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
     }
   }
 

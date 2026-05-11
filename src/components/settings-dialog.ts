@@ -37,6 +37,7 @@ import {
   buildOffloadAlertsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
+  offloaderRemoteBuildsEnabledContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
@@ -255,6 +256,20 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: buildOffloadPairingsContext, subscribe: true })
   @state()
   private _buildOffloadPairings: Map<string, PairingSummary> | null = null;
+
+  // 7b — offloader-side master "Remote builds enabled" toggle.
+  // App-shell seeds this from
+  // ``initial_state.remote_builds_enabled`` and updates on
+  // ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` events; the Send-builds
+  // section renders a toggle row at the top wired through
+  // ``set-offloader-remote-builds-enabled`` to app-shell's
+  // ``setOffloaderRemoteBuildSettings`` write. ``null`` until
+  // the snapshot lands so the switch row can render disabled
+  // (avoids paint-time flips between default-true and the
+  // landed value).
+  @consume({ context: offloaderRemoteBuildsEnabledContext, subscribe: true })
+  @state()
+  private _offloaderRemoteBuildsEnabled: boolean | null = null;
 
   // Offloader-side pair alerts (pin_mismatch / peer_revoked).
   // App-shell maintains the canonical map (seeded from
@@ -2319,6 +2334,7 @@ export class ESPHomeSettingsDialog extends LitElement {
       </div>
 
       ${this._renderOffloaderAlerts()}
+      ${this._renderOffloaderRemoteBuildsToggle()}
 
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
@@ -2555,6 +2571,52 @@ export class ESPHomeSettingsDialog extends LitElement {
     this._unpairConfirmDialog?.open();
   };
 
+  /**
+   * 7b — master "Remote builds enabled" switch.
+   *
+   * The dashboard-wide kill-switch for transparent install
+   * auto-routing. Default `true` matches the pre-7b semantic
+   * (any APPROVED + connected + idle pairing was eligible);
+   * flipping to `false` short-circuits ``pick_build_path`` to
+   * LOCAL for every install while leaving the peer-link
+   * sessions open and the Send-builds power-user dialog
+   * working — operator says "keep the pairings, just stop
+   * auto-routing for now."
+   *
+   * Renders disabled (``aria-disabled``) until the snapshot
+   * lands so the operator can't fire a write against a stale
+   * default — the next ``initial_state`` push would race the
+   * write back to whatever the backend has.
+   */
+  private _renderOffloaderRemoteBuildsToggle() {
+    const loaded = this._offloaderRemoteBuildsEnabled !== null;
+    const checked = this._offloaderRemoteBuildsEnabled ?? true;
+    return html`
+      <div class="row">
+        <div class="row-label">
+          <span
+            id="offloader-remote-builds-enabled-title"
+            class="row-title"
+          >
+            ${this._localize("settings.offloader_remote_builds_enabled")}
+          </span>
+          <span class="row-desc">
+            ${this._localize("settings.offloader_remote_builds_enabled_desc")}
+          </span>
+        </div>
+        <button
+          class="toggle"
+          role="switch"
+          aria-labelledby="offloader-remote-builds-enabled-title"
+          aria-checked=${checked}
+          aria-disabled=${!loaded}
+          ?disabled=${!loaded}
+          @click=${this._onToggleOffloaderRemoteBuilds}
+        ></button>
+      </div>
+    `;
+  }
+
   private _renderOffloaderPairings() {
     if (this._buildOffloadPairings === null) {
       return html`
@@ -2653,6 +2715,23 @@ export class ESPHomeSettingsDialog extends LitElement {
             : nothing}
           ${this._renderPairingVersionMismatch(pairing)}
         </div>
+        ${pairing.status === "approved"
+          ? html`
+              <button
+                class="toggle"
+                role="switch"
+                aria-label=${this._localize(
+                  "settings.build_offload_pairing_enabled_aria",
+                  { label: pairing.label },
+                )}
+                aria-checked=${pairing.enabled}
+                title=${this._localize(
+                  "settings.build_offload_pairing_enabled_title",
+                )}
+                @click=${() => this._onTogglePairingEnabled(pairing)}
+              ></button>
+            `
+          : nothing}
         ${pairing.status === "approved" && pairing.connected
           ? html`
               <button
@@ -3139,6 +3218,51 @@ export class ESPHomeSettingsDialog extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-remote-build-enabled", {
         detail: !this._remoteBuildEnabled,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /**
+   * 7b — master "Remote builds enabled" switch click handler.
+   *
+   * Dispatches a custom event up to app-shell, which routes
+   * the WS write through ``setOffloaderRemoteBuildSettings``
+   * and rolls back the local state on failure (same shape as
+   * ``set-remote-build-enabled``). The click is ignored when
+   * the snapshot hasn't landed yet — the switch renders
+   * disabled in that state to make the intent obvious.
+   */
+  private _onToggleOffloaderRemoteBuilds() {
+    if (this._offloaderRemoteBuildsEnabled === null) {
+      return;
+    }
+    this.dispatchEvent(
+      new CustomEvent("set-offloader-remote-builds-enabled", {
+        detail: !this._offloaderRemoteBuildsEnabled,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  /**
+   * 7b — per-row enable switch click handler.
+   *
+   * Identifies the row by ``pin_sha256`` (the wire-canonical
+   * key the backend's ``_pairings`` dict is keyed on; receiver
+   * hostname/port are display-only and can change without
+   * remapping). App-shell routes the WS write through
+   * ``setOffloaderPairingEnabled`` and rolls back on failure.
+   */
+  private _onTogglePairingEnabled(pairing: PairingSummary) {
+    this.dispatchEvent(
+      new CustomEvent("set-offloader-pairing-enabled", {
+        detail: {
+          pin_sha256: pairing.pin_sha256,
+          enabled: !pairing.enabled,
+        },
         bubbles: true,
         composed: true,
       })

@@ -632,6 +632,88 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
+  it("getOffloaderRemoteBuildSettings sends remote_build/get_offloader_settings without args", async () => {
+    // 7b — the bundle entry-point for the offloader Settings UI.
+    // First paint reads the master ``remote_builds_enabled``
+    // flag and the pairings list off the same round-trip; live
+    // updates flow through the OFFLOADER_REMOTE_BUILDS_TOGGLED
+    // / OFFLOADER_PAIRING_ENABLED_CHANGED events on subscribe.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.getOffloaderRemoteBuildSettings();
+    const sent = ws.sentAs<{ command: string; message_id: string; args?: unknown }>(0);
+    expect(sent.command).toBe("remote_build/get_offloader_settings");
+    expect(sent.args).toBeUndefined();
+    const result = { remote_builds_enabled: true, pairings: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setOffloaderRemoteBuildSettings sends remote_build/set_offloader_settings with the master toggle", async () => {
+    // The master kill-switch flip path: app-shell calls this
+    // when the user clicks the "Auto-route installs to remote
+    // build" switch. The backend round-trip carries strict
+    // boolean validation (rejects truthy non-booleans); the
+    // API helper passes the value through unchanged.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderRemoteBuildSettings({
+      remote_builds_enabled: false,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_offloader_settings");
+    expect(sent.args).toEqual({ remote_builds_enabled: false });
+    const result = { remote_builds_enabled: false, pairings: [] };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setOffloaderPairingEnabled sends remote_build/set_pairing_enabled keyed on pin_sha256", async () => {
+    // The per-row enable flip path. Wire-canonical row id is
+    // ``pin_sha256`` (4a-o part 6 re-keyed offloader state
+    // from ``(host, port)`` to pin so receiver hostname
+    // changes don't break the row identity); the API helper
+    // matches.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderPairingEnabled({
+      pin_sha256: "a".repeat(64),
+      enabled: false,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_pairing_enabled");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      enabled: false,
+    });
+    // Backend returns the patched ``PairingSummary``; the
+    // helper passes it through unchanged so app-shell's
+    // ``_patchOffloadPairing`` flow has the canonical row.
+    const result = {
+      receiver_hostname: "build.local",
+      receiver_port: 6055,
+      pin_sha256: "a".repeat(64),
+      label: "desktop",
+      paired_at: 1.0,
+      status: "approved",
+      connected: true,
+      connecting: false,
+      last_connect_error: "",
+      esphome_version: "2026.5.0",
+      enabled: false,
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   // No ``listRemoteBuildHosts`` / ``addRemoteBuildManualHost`` /
   // ``removeRemoteBuildManualHost`` tests — the wrappers were
   // deleted in lockstep with the backend rip-out. Discovered

@@ -285,6 +285,28 @@ export const buildOffloadPairingsContext = createContext<
 >(Symbol("esphome-build-offload-pairings"));
 
 /**
+ * Offloader-side master "Remote builds enabled" toggle (7b).
+ *
+ * When `false`, the backend's ``pick_build_path`` short-
+ * circuits every install to LOCAL — paired peer-link sessions
+ * stay open and the Send-builds power-user dialog still works,
+ * only the implicit auto-route is gated. Seeded from
+ * ``subscribe_events.initial_state.remote_builds_enabled`` and
+ * mutated locally on ``OFFLOADER_REMOTE_BUILDS_TOGGLED`` events
+ * fired by any tab's ``set_offloader_settings`` write.
+ *
+ * ``null`` until the snapshot lands (controller may not be
+ * wired up, or the WS is still connecting) so the Settings UI
+ * can distinguish "still loading" from a deliberate `false`
+ * state. Defaults to `true` on a fresh dashboard (matches the
+ * pre-7b semantic where any APPROVED + connected + idle
+ * pairing was eligible).
+ */
+export const offloaderRemoteBuildsEnabledContext = createContext<
+  boolean | null
+>(Symbol("esphome-offloader-remote-builds-enabled"));
+
+/**
  * Offloader-side pair alerts (pin_mismatch / peer_revoked).
  * Keyed on ``${hostname}:${port}`` to match the backend's
  * ``_offloader_alerts`` dict. Seeded from

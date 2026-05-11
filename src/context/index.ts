@@ -22,6 +22,7 @@ export {
   buildServerPeersContext,
   buildOffloadDiscoveredHostsContext,
   buildOffloadPairingsContext,
+  offloaderRemoteBuildsEnabledContext,
   buildOffloadAlertsContext,
   buildOffloadJobsContext,
   stubRemoteBuildJobState,
