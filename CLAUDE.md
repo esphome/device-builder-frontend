@@ -2,8 +2,17 @@
 
 A short orientation file for an LLM working in this repo. Skim
 before making changes; keep edits to existing code consistent
-with what's described here. Read [README.md](README.md) for the
-user-facing intro.
+with what's described here.
+
+**Before writing code, read [README.md → "Code structure
+policies"](README.md#code-structure-policies).** Those rules
+(500-600 line file cap, component decomposition, folder layout,
+TypeScript / DOM / localization / comment policies) are the
+authoritative coding standard for this repo, set and maintained
+by the human maintainers; everything in this CLAUDE.md sits on
+top of them. When a rule in README.md and a rule here disagree,
+README.md wins; flag the conflict in the PR so this file can be
+brought back into line.
 
 ## What this project is
 
@@ -62,6 +71,25 @@ Frontend-backend deployment is lockstep") is the canonical reply.
 
 ## Code style
 
+See [README.md → "Code structure
+policies"](README.md#code-structure-policies) first; the file
+size, component-decomposition, folder layout, and DOM / a11y
+rules there are authoritative. The bullets below are practical
+expansions, not substitutes. The high-leverage ones to keep in
+working memory while editing:
+
+- **File size cap: 500-600 lines.** Split before crossing it; no
+  exemptions for "it's just one big component." If a render
+  block exceeds ~100 lines, that's the signal to extract a
+  sub-component.
+- **One `@customElement` per file.** File name matches element
+  name (`esphome-foo-bar.ts` → `<esphome-foo-bar>`). When a
+  feature grows beyond ~3 files, give it its own subfolder
+  (`src/components/settings-dialog/` is the pattern).
+- **No `document.querySelector`, no direct DOM mutation.** Go
+  through shadow DOM via `@query` / refs, and use reactive
+  properties to re-render. No business logic in `render()`;
+  extract it to private methods or computed values.
 - **TypeScript strict** throughout. No `any` in new code; use
   `unknown` and narrow when truly necessary. Existing `as never`
   casts are legacy and shouldn't be cargoed.
@@ -152,6 +180,14 @@ on failure assign the previous value back and surface a
 
 ## Commit / PR conventions
 
+- **Don't self-merge frontend PRs.** The frontend codebase
+  carries a high volume of AI-assisted contributions and the
+  maintainers (Steven, Marcel) are actively curating quality
+  and consistency. Push PRs, hand them off for human review,
+  and let a maintainer merge; don't `gh pr merge` your own
+  work on this repo even when CI is green and Copilot is
+  satisfied. The CLAUDE-side review pass and the human
+  curation pass catch different things; both are required.
 - **No `Co-Authored-By: Claude` trailer.** Project preference.
 - Imperative-mood subject line ("Add X", not "Added X").
 - Tick exactly one "Types of changes" box in the PR body. CI
