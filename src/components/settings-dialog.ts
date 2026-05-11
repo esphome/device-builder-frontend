@@ -14,6 +14,12 @@ import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { formatPinSha256 } from "../util/pin-format.js";
+import { copyToClipboard } from "../util/copy-to-clipboard.js";
+import {
+  normalizeHostnameForCompare,
+  trimTrailingDot,
+} from "../util/hostname.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
   SECTIONS,
