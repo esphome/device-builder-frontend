@@ -49,15 +49,30 @@ type Step = 1 | 2 | 3;
  *    verification step.
  *
  * Pressing **Re-pair this receiver** on step 3 fires
- * ``reauth-confirmed`` with ``{hostname, port}``. The dialog
- * itself doesn't run ``preview_pair`` / ``request_pair`` — the
- * existing ``<esphome-pair-build-server-dialog>`` already
- * does both, and re-doing them here would mean two
- * preview_pair round-trips back-to-back with a TOCTOU window
- * between. Settings-dialog catches the event and opens the
- * existing pair wizard pre-filled with the alert's hostname
- * + port; that dialog's confirm step is the canonical OOB
- * surface and stays the load-bearing verification gate.
+ * 'reauth-confirmed' carrying the alert's
+ * '{hostname, port, observed_pin, receiver_label}'. The
+ * dialog itself doesn't open another OOB surface -- the
+ * observed_pin the operator just verified at step 1 is the
+ * authoritative gate, and the parent handler threads it
+ * straight into 'request_pair' so the backend's TOCTOU
+ * defense binds the cryptographic identity the user
+ * confirmed in this wizard to the eventual stored pairing.
+ *
+ * Pre-rewrite the wizard opened a separate
+ * '<esphome-pair-build-server-dialog>' that re-ran
+ * preview_pair against {hostname, port} -- producing a
+ * SECOND observation of the receiver's pubkey, with an
+ * unbounded TOCTOU window between the wizard's step-1
+ * display and the pair dialog's confirm step. mDNS / DHCP
+ * lease changes during that window could rebind the
+ * hostname to a different host, and the user would
+ * cryptographically pin whatever the pair dialog observed
+ * (potentially an attacker) while believing they had
+ * verified the legitimate-rotation pin. Carrying observed_pin
+ * through the event and skipping the pair dialog closes
+ * that window: the user's wizard verification IS the
+ * verification, and the backend's existing pin-arg TOCTOU
+ * check at request_pair rejects any subsequent rebind.
  *
  * peer_revoked alerts are deliberately not handled by this
  * wizard — they only have one operator-actionable outcome
@@ -110,6 +125,18 @@ export class ESPHomeReauthWizardDialog extends LitElement {
   private _onConfirm = () => {
     if (!this._verified || this._alert === null) return;
     const alert = this._alert;
+    // Carry the observed_pin and receiver_label the operator
+    // just verified at step 1 through to the parent's
+    // request_pair call. The pin is the load-bearing piece:
+    // the backend's existing TOCTOU defense at request_pair
+    // compares the live handshake pubkey against this value
+    // and rejects on mismatch, so an attacker that took over
+    // the hostname after step 1 (mDNS spoof, DHCP-lease
+    // takeover) cannot get its pubkey pinned. Skipping the
+    // intermediate pair dialog removes a second preview_pair
+    // call that observed a fresh -- and potentially
+    // attacker-supplied -- pin without binding it back to the
+    // wizard's verification.
     this.dispatchEvent(
       new CustomEvent("reauth-confirmed", {
         bubbles: true,
@@ -117,6 +144,8 @@ export class ESPHomeReauthWizardDialog extends LitElement {
         detail: {
           hostname: alert.receiver_hostname,
           port: alert.receiver_port,
+          observed_pin: alert.observed_pin,
+          receiver_label: alert.receiver_label,
         },
       }),
     );
