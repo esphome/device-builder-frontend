@@ -214,19 +214,16 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
 
   private async _onAcceptConfirm(e: CustomEvent<{ dashboardId: string }>) {
     if (this._api === undefined) return;
+    const prefix = "settings.build_server_peer_approve";
     try {
       await this._api.approveRemoteBuildPeer({
         dashboard_id: e.detail.dashboardId,
       });
     } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
-        this._toast("warning", "settings.build_server_peer_approve_already_gone");
-      } else {
-        this._toast("error", "settings.build_server_peer_approve_failed");
-      }
+      this._toastApiFailure(prefix, err);
       return;
     }
-    this._toast("success", "settings.build_server_peer_approve_success");
+    this._toast("success", `${prefix}_success`);
   }
 
   private async _onRejectFromDialog(e: CustomEvent<{ dashboardId: string }>) {
@@ -237,14 +234,39 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
         dashboard_id: e.detail.dashboardId,
       });
     } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
-        this._toast("warning", `${prefix}_already_gone`);
-      } else {
-        this._toast("error", `${prefix}_failed`);
-      }
+      this._toastApiFailure(prefix, err);
       return;
     }
     this._toast("success", `${prefix}_success`);
+  }
+
+  /**
+   * Toast a WS-command failure with the backend's structured reason.
+   *
+   * ``NOT_FOUND`` is the gentle "the row went away under us" path —
+   * the pairing inbox refreshes through ``pair_status_changed`` events
+   * so the user's view is already correct; surfacing a generic
+   * "couldn't X" error on top of that would be noise. Other
+   * ``APIError`` codes (``INVALID_ARGS`` on a duplicate-Accept race,
+   * ``UNAVAILABLE`` on transport drop, ``INTERNAL_ERROR`` on receiver
+   * crash) each carry a backend-supplied ``details`` string that says
+   * what actually failed — fold that into the toast so the operator
+   * can tell "I clicked twice and the second one lost the race" apart
+   * from "the dashboard is unreachable" without opening devtools.
+   * Non-``APIError`` throws (e.g. a TypeError from a malformed event
+   * payload) have no useful reason to surface and fall back to the
+   * generic message.
+   */
+  private _toastApiFailure(prefix: string, err: unknown) {
+    if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
+      this._toast("warning", `${prefix}_already_gone`);
+      return;
+    }
+    if (err instanceof APIError && err.details) {
+      this._toast("error", `${prefix}_failed_detail`, { reason: err.details });
+      return;
+    }
+    this._toast("error", `${prefix}_failed`);
   }
 
   private _onExtend = () => {

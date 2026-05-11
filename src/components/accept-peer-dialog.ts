@@ -238,8 +238,21 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
     `;
   }
 
-  private _onAccept() {
+  private _onAccept(e: Event) {
     if (this.peer === null) return;
+    // The inner ``esphome-confirm-dialog`` dispatches its own
+    // ``confirm`` event with ``bubbles + composed``, and we
+    // re-dispatch under the same name from this host below.
+    // Without ``stopPropagation`` the *original* event keeps
+    // bubbling past us and the parent section's ``@confirm``
+    // listener fires a second time with the inner event's empty
+    // ``detail``. That second call either nulls out
+    // ``dashboard_id`` and throws inside the parent's try / catch,
+    // or wins the race and hits the backend's ``INVALID_ARGS``
+    // "already approved" branch — either way it stacks a red
+    // "Couldn't approve" toast on top of the green success
+    // even though the pairing actually went through.
+    e.stopPropagation();
     this.dispatchEvent(
       new CustomEvent("confirm", {
         detail: { dashboardId: this.peer.dashboard_id },
