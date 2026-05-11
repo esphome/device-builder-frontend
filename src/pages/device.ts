@@ -28,7 +28,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { setLeaveGuard } from "../util/navigation.js";
+import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -707,18 +707,21 @@ export class ESPHomePageDevice extends LitElement {
   };
 
   /** Catch ``request-open-editor`` from the post-validation-failure
-   *  hint. We're already on the device editor for this device, so
-   *  the dialog closing itself is the whole UX — no navigation
-   *  needed when the requested configuration matches the page's
-   *  current device. Cross-device requests shouldn't reach this
-   *  handler (the dialogs only ever surface for the current
-   *  device), but guard with an explicit equality check so a
-   *  future regression can't silently send the user to a wrong
-   *  route. */
+   *  hint. ``stopPropagation`` to prevent any future higher-level
+   *  listener from also acting on the event. Two cases:
+   *
+   *  * Same device — already on the right editor; the dialog
+   *    closing itself is the whole UX, no navigation needed.
+   *  * Different device — shouldn't happen in practice (the
+   *    dialogs only ever surface for the current page's device),
+   *    but defensively navigate to the requested device so the
+   *    hint can never become a silent no-op. */
   private _onRequestOpenEditor = (
     e: CustomEvent<{ configuration: string }>
   ) => {
+    e.stopPropagation();
     if (e.detail.configuration === this._device?.configuration) return;
+    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };
 
   static styles = [espHomeStyles, devicePageStyles];

@@ -130,12 +130,14 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() private _showLogsAfterInstall = true;
   /** Flips true when the output stream contains an ESPHome
    *  validation-failure marker (``Failed config`` from the schema
-   *  validator, or ``Error while reading config:`` from the earlier
-   *  YAML load step). Lets the failure hint switch from "clean the
-   *  build files / reset the build environment" — which only help
-   *  for C++ compile failures — to "open this device in the
-   *  editor", which is the right action when the YAML itself is
-   *  broken. Reset per ``open()``. */
+   *  validator, or an anchored ``ERROR Error while reading
+   *  config:`` logger line from the earlier YAML load step — see
+   *  ``_isValidationFailureLine`` for the exact match rules).
+   *  Lets the failure hint switch from "clean the build files /
+   *  reset the build environment" — which only help for C++
+   *  compile failures — to "open this device in the editor",
+   *  which is the right action when the YAML itself is broken.
+   *  Reset per ``open()``. */
   @state() private _failedDuringValidate = false;
 
   /** Guard against re-entrancy on the show-secrets toggle.

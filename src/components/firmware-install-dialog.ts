@@ -81,12 +81,13 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
    *  errors where it can't help. */
   @state() private _failedDuringCompile = false;
   /** Flips true when the compile-step output stream contains an
-   *  ESPHome validation-failure marker (``Failed config`` /
-   *  ``Error while reading config:``). Drives the failure hint to
-   *  switch from clean / reset (which only help C++ build
-   *  failures) to "open this device in the editor" — the right
-   *  action when the YAML itself is broken. Reset alongside the
-   *  other per-attempt state. */
+   *  ESPHome validation-failure marker (``Failed config`` or an
+   *  anchored ``ERROR Error while reading config:`` logger line —
+   *  see ``_isValidationFailureLine`` for the exact match rules).
+   *  Drives the failure hint to switch from clean / reset (which
+   *  only help C++ build failures) to "open this device in the
+   *  editor" — the right action when the YAML itself is broken.
+   *  Reset alongside the other per-attempt state. */
   @state() private _failedDuringValidate = false;
   @state() private _logLines: string[] = [];
   @state() private _logsExpanded = false;

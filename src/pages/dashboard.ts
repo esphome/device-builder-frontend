@@ -2110,8 +2110,9 @@ export class ESPHomePageDashboard extends LitElement {
 
   /** Catch the post-validation-failure "open in editor" hint from
    *  the inner command / install dialogs and SPA-navigate to the
-   *  device page. The detail carries the YAML filename stem; the
-   *  device route is ``/device/<configuration>``. */
+   *  device page. The detail carries the configuration filename
+   *  (extension included, e.g. ``foo.yaml``); the device route is
+   *  ``/device/<configuration>``. */
   private _onRequestOpenEditor = (
     e: CustomEvent<{ configuration: string }>
   ) => {
