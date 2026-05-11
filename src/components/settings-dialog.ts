@@ -2652,18 +2652,6 @@ export class ESPHomeSettingsDialog extends LitElement {
     `;
   }
 
-  /** Render the "View build" affordance for a pairing row when
-   *  the in-flight remote-build jobs map carries an entry for
-   *  the row's pin. The dispatch dialog's openForJob() lands
-   *  directly on the running view so the user can re-attach
-   *  to a build they previously closed the dialog on (or see
-   *  the last terminal result before the user dismisses it).
-   *
-   *  Pairing-disconnected rows still get this button: the
-   *  job state lives client-side regardless of whether the
-   *  peer-link is currently up; surfacing the last output of
-   *  a build that finished before disconnect is the whole
-   *  point of the deferred-dismiss behaviour. */
   /** Per-row sub-line surfacing an esphome_version mismatch
    *  between the offloader's bundled version and the
    *  paired receiver's reported version. Helps the operator
@@ -2705,6 +2693,18 @@ export class ESPHomeSettingsDialog extends LitElement {
     `;
   }
 
+  /** Render the "View build" affordance for a pairing row when
+   *  the in-flight remote-build jobs map carries an entry for
+   *  the row's pin. The dispatch dialog's openForJob() lands
+   *  directly on the running view so the user can re-attach
+   *  to a build they previously closed the dialog on (or see
+   *  the last terminal result before the user dismisses it).
+   *
+   *  Pairing-disconnected rows still get this button: the
+   *  job state lives client-side regardless of whether the
+   *  peer-link is currently up; surfacing the last output of
+   *  a build that finished before disconnect is the whole
+   *  point of the deferred-dismiss behaviour. */
   private _renderViewRemoteBuildButton(pairing: PairingSummary) {
     const job = this._latestRemoteBuildJobForPin(pairing.pin_sha256);
     if (job === undefined) return nothing;

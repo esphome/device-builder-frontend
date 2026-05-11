@@ -25,9 +25,11 @@
  *     YAML may reference fields the receiver's schema does
  *     not recognise (or vice versa).
  *
- * Both strings are passed in verbatim so the caller can
- * display them as-is — the comparison is purely structural,
- * not normalising.
+ * The helper returns the classification kind only; it does
+ * not echo back the version strings. The caller already
+ * holds both values and renders them verbatim in the
+ * translated sub-line (see settings-dialog's
+ * ``_renderPairingVersionMismatch``).
  */
 export type VersionMismatchKind = "patch" | "release" | null;
 
@@ -47,10 +49,15 @@ export function classifyVersionMismatch(
   if (local === peer) return null;
 
   // First two dot-separated components are year + month for
-  // ESPHome's CalVer scheme. Trim any pre-release / dev /
-  // build-metadata suffix off the second component before
-  // comparing so ``2026.5.0`` and ``2026.5.0b1`` classify as
-  // patch-level, not release-level.
+  // ESPHome's CalVer scheme. Modern ESPHome puts pre-release
+  // suffixes on the patch component (e.g. 2026.5.0b1 -> the
+  // suffix lives on "0b1") so dropping the third component
+  // is enough to make 2026.5.0 and 2026.5.0b1 classify as
+  // patch-level. Older / hypothetical shapes occasionally
+  // put the suffix on the month component (2026.5b1) — the
+  // stripSuffix() call here is the defence against those:
+  // it trims trailing non-digits off the month component so
+  // 2026.5b1 and 2026.5 still classify as the same release.
   const localParts = local.split(".");
   const peerParts = peer.split(".");
   const localRelease = `${localParts[0] ?? ""}.${stripSuffix(
