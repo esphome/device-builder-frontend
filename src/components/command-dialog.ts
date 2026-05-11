@@ -130,6 +130,18 @@ export class ESPHomeCommandDialog extends LitElement {
    *  install finishes. Reset to default per ``open()`` so an opt-out
    *  on one run doesn't silently persist into unrelated future runs. */
   @state() private _showLogsAfterInstall = true;
+  /** Flips true when the output stream contains an ESPHome
+   *  validation-failure marker (``Failed config`` from the schema
+   *  validator, or an anchored ``ERROR Error while reading
+   *  config:`` logger line from the earlier YAML load step — see
+   *  ``_isValidationFailureLine`` for the exact match rules).
+   *  Lets the failure hint switch from "clean the build files /
+   *  reset the build environment" — which only help for C++
+   *  compile failures — to "open this device in the editor",
+   *  which is the right action when the YAML itself is broken.
+   *  Reset per ``open()``. */
+  @state() private _failedDuringValidate = false;
+
   /** Guard against re-entrancy on the show-secrets toggle.
    *  ``_detachStream`` clears ``_streamId`` synchronously and only
    *  awaits the backend stop afterwards; without this flag a fast
@@ -517,6 +529,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._jobId = "";
     this._jobStatus = null;
     this._primedSource = null;
+    this._failedDuringValidate = false;
     /* Always start with secrets redacted on a fresh open — the
        toggle is opt-in per session so a screen-share / pair-coding
        moment can't accidentally inherit a previous "show secrets"
@@ -789,33 +802,68 @@ export class ESPHomeCommandDialog extends LitElement {
     `;
   }
 
-  /** Hint shown after a failed install / compile pointing the user
-   *  at "Reset Build Environment". Build-env corruption is a common
-   *  cause of compile failures (stale toolchain, half-installed
-   *  platform/library); the legacy dashboard surfaced a Clean All
-   *  button at the top level for this reason. We keep the entry-
-   *  point in the kebab and contextually offer it here so users
-   *  don't have to dig for it after a failure. Limited to install /
-   *  compile because the other command types don't have a build
-   *  step that the reset would help with.
+  /** Failure hint dispatcher. Picks between two messages based on
+   *  what failed:
    *
-   *  Rendered as an inline link inside the sentence rather than a
-   *  separate button so the call-to-action reads as part of the
-   *  hint ("try reset build environment") instead of a standalone
-   *  next-step. The translation puts the link text behind a
-   *  ``{action}`` marker so other locales can place it wherever
-   *  reads naturally. */
+   *  * **YAML validation** (the ``validate`` command, or an
+   *    ``install`` / ``compile`` whose output stream included
+   *    ESPHome's validation-failure marker) — neither clean nor
+   *    reset will help a broken YAML; offer the editor instead.
+   *  * **Build / compile failure** (install / compile that got
+   *    past validation) — keep the clean → reset staircase.
+   *
+   *  Other command types (clean, reset, rename) don't get a hint;
+   *  their failure mode is its own thing. The ``_userStopped`` gate
+   *  is shared — a user-cancel isn't a build problem either way. */
   private _renderResetSuggestion() {
     if (this._state !== "error") return nothing;
     if (this._userStopped) return nothing;
+    if (this._commandType === "validate" || this._failedDuringValidate) {
+      return this._renderValidationFailureSuggestion();
+    }
     if (this._commandType !== "install" && this._commandType !== "compile") {
       return nothing;
     }
-    const text = this._localize("command.try_reset_suggestion");
-    const [before, after = ""] = text.split("{action}");
+    return this._renderBuildFailureSuggestion();
+  }
+
+  /** YAML validation failure → "open in editor" hint. The
+   *  translation puts the link text behind a ``{editor_action}``
+   *  marker. */
+  private _renderValidationFailureSuggestion() {
+    const text = this._localize("command.validation_failed_suggestion");
+    const [before, after = ""] = text.split("{editor_action}");
     return html`
       <div class="reset-suggestion" role="status">
         ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryOpenInEditor}
+        >
+          ${this._localize("command.try_open_editor_button")}</button>${after}
+      </div>
+    `;
+  }
+
+  /** Build-step failure → clean (surgical, per-device) → reset
+   *  (nuclear, wipes every toolchain and cache) staircase.
+   *  Stale per-device build artifacts cause the bulk of compile
+   *  failures; the toolchain wipe is the heavier hammer reserved
+   *  for cases where clean doesn't help. Both actions are inline
+   *  links inside the sentence so the CTAs read as part of the
+   *  hint. The translation puts each link text behind a
+   *  ``{clean_action}`` / ``{reset_action}`` marker so other
+   *  locales can place them wherever reads naturally. */
+  private _renderBuildFailureSuggestion() {
+    const text = this._localize("command.try_reset_suggestion");
+    const [before, rest = ""] = text.split("{clean_action}");
+    const [middle, after = ""] = rest.split("{reset_action}");
+    return html`
+      <div class="reset-suggestion" role="status">
+        ${before}<button
+          class="reset-suggestion-link"
+          @click=${this._tryCleanBuild}
+        >
+          ${this._localize("command.try_clean_button")}</button>${middle}<button
           class="reset-suggestion-link"
           @click=${this._tryResetBuildEnv}
         >
@@ -823,6 +871,35 @@ export class ESPHomeCommandDialog extends LitElement {
       </div>
     `;
   }
+
+  /** Close the dialog and ask the host page to take the user to
+   *  the device-page editor for this configuration. Dashboard
+   *  handles this by navigating to ``/device/<config>``; the
+   *  device page just closes the dialog (the user is already on
+   *  the editor). */
+  private _tryOpenInEditor = () => {
+    const configuration = this.configuration;
+    this.close();
+    if (!configuration) return;
+    this.dispatchEvent(
+      new CustomEvent("request-open-editor", {
+        detail: { configuration },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
+  /** Per-device clean: re-uses this same dialog instance — the
+   *  ``configuration`` property is already set to the failing
+   *  config, so calling ``open("clean")`` tears down the current
+   *  command and starts a fresh clean job on the same device. No
+   *  bubble-up needed; clean is non-destructive (just wipes one
+   *  device's ``.esphome/build/<name>/``) and doesn't need the
+   *  confirm step that gates the toolchain-wide reset. */
+  private _tryCleanBuild = () => {
+    this.open("clean");
+  };
 
   /** Hand off to the firmware-jobs-dialog's reset flow. We close the
    *  current command dialog first so the user can see the confirm
@@ -1038,12 +1115,49 @@ export class ESPHomeCommandDialog extends LitElement {
     this._lines = [];
     this._statusMessage = "";
     this._userStopped = false;
+    this._failedDuringValidate = false;
 
     if (this._commandType === "validate") {
       this._startValidateStream();
       return;
     }
     await this._startFirmwareJob();
+  }
+
+  /** Match a dashboard-escaped or raw ANSI SGR sequence (``\033[…m``
+   *  in dashboard mode, ``\x1b[…m`` in raw mode). The backend pins
+   *  ``--dashboard``, so we always see the four-character escaped
+   *  form; the raw branch is defensive in case that ever changes. */
+  private static readonly _ANSI_SGR = /(?:\\033|\x1b)\[[0-9;]*m/g;
+
+  /** Match an ESPHome logger line whose level is ``ERROR`` and
+   *  whose message starts with the canonical YAML-load-failure
+   *  prefix. The log format is ``"<asctime>? <LEVEL> <message>"``
+   *  (esphome/log.py), so an optional timestamp may precede
+   *  ``ERROR``. Anchored at start-of-line so a debug / info line
+   *  that happens to quote the phrase mid-message can't match. */
+  private static readonly _LOADER_ERROR =
+    /^(?:\d{2}:\d{2}:\d{2}\s+)?ERROR Error while reading config:/;
+
+  /** Detect ESPHome's validation-failure markers in a streamed
+   *  output line. Two distinct sources:
+   *
+   *  * ``Failed config`` — printed via ``safe_print`` as a
+   *    standalone bold-red banner from ``esphome/config.py`` when
+   *    the schema validator rejects a successfully-loaded YAML.
+   *    Strict equality after ANSI strip: the line *is* the marker.
+   *  * ``ERROR Error while reading config: …`` — earlier
+   *    ``_LOGGER.error`` from the YAML-load step (parse failure /
+   *    missing include / etc.). Anchored ERROR-prefix match so a
+   *    stack trace or doc string that happens to contain the
+   *    phrase mid-text can't match.
+   *
+   *  Both indicate the build never reached the C++ compile step;
+   *  clean / reset can't help. */
+  private static _isValidationFailureLine(line: string): boolean {
+    const stripped = line.replace(ESPHomeCommandDialog._ANSI_SGR, "").trim();
+    if (stripped === "Failed config") return true;
+    return ESPHomeCommandDialog._LOADER_ERROR.test(stripped);
   }
 
   /** Validate uses the per-connection streaming command (not a queued job). */
@@ -1053,6 +1167,9 @@ export class ESPHomeCommandDialog extends LitElement {
       {
         onOutput: (line) => {
           this._lines = [...this._lines, line];
+          if (ESPHomeCommandDialog._isValidationFailureLine(line)) {
+            this._failedDuringValidate = true;
+          }
         },
         onResult: (data) => {
           this._streamId = "";
@@ -1166,6 +1283,9 @@ export class ESPHomeCommandDialog extends LitElement {
     this._streamId = this._api.firmwareFollowJob(jobId, {
       onOutput: (line) => {
         this._lines = [...this._lines, line];
+        if (ESPHomeCommandDialog._isValidationFailureLine(line)) {
+          this._failedDuringValidate = true;
+        }
       },
       onResult: (data) => {
         this._streamId = "";

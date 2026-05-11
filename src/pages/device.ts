@@ -28,7 +28,7 @@ import {
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
 import { consumeJustCreated } from "../util/just-created.js";
-import { setLeaveGuard } from "../util/navigation.js";
+import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -694,6 +694,36 @@ export class ESPHomePageDevice extends LitElement {
     this._commandDialog.open("validate");
   };
 
+  /** Catch ``clean-build`` from the install dialog's post-failure
+   *  hint and route it through this page's command-dialog —
+   *  mirrors dashboard's page-level handler so the "clean the
+   *  build files for this device" link works the same way on
+   *  the device page. */
+  private _onCleanBuild = (e: CustomEvent<ConfiguredDevice>) => {
+    const device = e.detail;
+    this._commandDialog.configuration = device.configuration;
+    this._commandDialog.name = device.friendly_name || device.name;
+    this._commandDialog.open("clean");
+  };
+
+  /** Catch ``request-open-editor`` from the post-validation-failure
+   *  hint. ``stopPropagation`` to prevent any future higher-level
+   *  listener from also acting on the event. Two cases:
+   *
+   *  * Same device — already on the right editor; the dialog
+   *    closing itself is the whole UX, no navigation needed.
+   *  * Different device — shouldn't happen in practice (the
+   *    dialogs only ever surface for the current page's device),
+   *    but defensively navigate to the requested device so the
+   *    hint can never become a silent no-op. */
+  private _onRequestOpenEditor = (
+    e: CustomEvent<{ configuration: string }>
+  ) => {
+    e.stopPropagation();
+    if (e.detail.configuration === this._device?.configuration) return;
+    navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
+  };
+
   static styles = [espHomeStyles, devicePageStyles];
 
   protected render() {
@@ -773,9 +803,12 @@ export class ESPHomePageDevice extends LitElement {
       ></esphome-unsaved-changes-dialog>
       <esphome-command-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-command-dialog>
       <esphome-firmware-install-dialog
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
+        @clean-build=${this._onCleanBuild}
+        @request-open-editor=${this._onRequestOpenEditor}
       ></esphome-firmware-install-dialog>
       <esphome-logs-dialog></esphome-logs-dialog>
       <esphome-install-method-dialog
