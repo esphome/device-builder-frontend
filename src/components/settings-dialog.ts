@@ -411,13 +411,30 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   close() {
-    // ``wa-dialog`` fires ``wa-after-hide`` for every dismissal
-    // path (close button, Esc, light-dismiss outside-click), so
-    // the cleanup lives in ``_onDialogAfterHide`` to make sure
-    // it runs regardless of how the dialog closed. Programmatic
-    // close still flows through here.
+    // ``<esphome-base-dialog>`` re-emits ``after-hide`` for
+    // every dismissal path (close button, Esc, light-dismiss
+    // outside-click), so the cleanup lives in
+    // ``_onDialogAfterHide`` to make sure it runs regardless
+    // of how the dialog closed. Programmatic close still
+    // flows through here.
     this._open = false;
   }
+
+  /**
+   * Flip our local ``_open`` flag the moment the user
+   * initiates a close (X / Esc / outside-click), before
+   * wa-dialog finishes its hide animation. Without this,
+   * the 1Hz ``_pairingTick`` interval can fire a re-render
+   * mid-hide while ``_open`` is still ``true``, which
+   * re-asserts ``?open=true`` on the inner wa-dialog and
+   * cancels the in-progress hide. Doesn't ``preventDefault``
+   * — we don't have a host-side veto reason — so the close
+   * still proceeds and ``_onDialogAfterHide`` fires for the
+   * server-side window cleanup.
+   */
+  private _onDialogRequestClose = (): void => {
+    this._open = false;
+  };
 
   disconnectedCallback() {
     // Drop any in-flight tick interval so a remove-from-DOM (HMR,
@@ -1755,6 +1772,7 @@ export class ESPHomeSettingsDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._open}
         .label="${this._localize("settings.title")} - ${this._localize(current.labelKey)}"
+        @request-close=${this._onDialogRequestClose}
         @after-hide=${this._onDialogAfterHide}
       >
         <div class="layout">
