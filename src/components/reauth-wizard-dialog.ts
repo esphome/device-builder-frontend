@@ -399,6 +399,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     return html`
       <esphome-base-dialog
         ?open=${this._open}
+        ?busy=${this._busy}
         .label=${title}
         @after-hide=${this._onClose}
       >
