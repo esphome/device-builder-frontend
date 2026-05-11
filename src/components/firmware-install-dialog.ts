@@ -615,7 +615,9 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
             name="alert-circle"
           ></wa-icon>
           <span class="status-text">${this._statusMessage}</span>
-          <span class="status-detail">${this._errorMessage}</span>
+          ${this._errorMessage
+            ? html`<span class="status-detail">${this._errorMessage}</span>`
+            : nothing}
         </div>
         ${this._renderResetSuggestion()}
       `;
@@ -976,7 +978,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       await this._compileAndWait(device.configuration);
     } catch (err) {
       this._failedDuringCompile = true;
-      this._fail(this._compileFailureMessage(err));
+      this._fail(
+        this._localize("firmware.compile_failed"),
+        this._compileFailureDetail(err)
+      );
       return;
     }
 
@@ -1099,7 +1104,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       await this._compileAndWait(device.configuration);
     } catch (err) {
       this._failedDuringCompile = true;
-      this._fail(this._compileFailureMessage(err));
+      this._fail(
+        this._localize("firmware.compile_failed"),
+        this._compileFailureDetail(err)
+      );
       return;
     }
 
@@ -1210,33 +1218,41 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._showLogsAfterInstall = !this._showLogsAfterInstall;
   };
 
-  private _fail(message: string) {
+  /** Drop the dialog into the red error state.
+   *
+   *  ``title`` is the bold heading (shown next to the alert
+   *  icon). ``detail`` is the optional smaller caption beneath
+   *  it. Pass ``detail`` only when it adds information the
+   *  heading doesn't already carry; the render skips the
+   *  caption span entirely when ``detail`` is empty, so a
+   *  single-string call doesn't paint the same text twice. */
+  private _fail(title: string, detail = "") {
     this._step = "error";
-    this._statusMessage = message;
-    this._errorMessage = message;
+    this._statusMessage = title;
+    this._errorMessage = detail;
     this._logsExpanded = true;
   }
 
-  /** Pick the most informative copy for a compile-step failure.
+  /** Specific cause text for a compile-step failure, used as
+   *  the caption beneath the generic "Install failed." heading.
    *
    *  ``_compileAndWait`` rejects with an ``Error`` whose
    *  ``message`` is the backend's ``FirmwareJob.error`` text
-   *  (when ``firmware/follow_job``'s RESULT carried one — newer
+   *  (when ``firmware/follow_job``'s RESULT carried one; newer
    *  backend, see esphome/device-builder#597) or an empty
    *  string (older backend that didn't put ``error`` on the
-   *  wire). Prefer the specific backend text so the red banner
-   *  names the actual cause; fall back to the generic localised
-   *  "Install failed." copy when nothing useful came back.
+   *  wire). Return that text so the red banner names the
+   *  actual cause; return an empty string when nothing useful
+   *  came back so ``_fail`` shows the generic heading alone
+   *  instead of repeating it.
    *
    *  The session-lost case is the user-visible motivator:
    *  ``remote build: peer-link session lost (transport_error: …)``
    *  is a much better operator signal than a generic failure
    *  string followed by a "try cleaning the build files" hint
-   *  that doesn't help when the receiver just restarted.
-   */
-  private _compileFailureMessage(err: unknown): string {
-    const text = err instanceof Error ? err.message.trim() : String(err ?? "").trim();
-    return text || this._localize("firmware.compile_failed");
+   *  that doesn't help when the receiver just restarted. */
+  private _compileFailureDetail(err: unknown): string {
+    return err instanceof Error ? err.message.trim() : String(err ?? "").trim();
   }
 
   private async _cancel() {
