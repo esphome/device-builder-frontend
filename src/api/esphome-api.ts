@@ -1098,9 +1098,23 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareJob>("firmware/upload", { configuration, port });
   }
 
-  /** Queue a compile+upload job (defaults to OTA). */
-  async firmwareInstall(configuration: string, port = "OTA"): Promise<FirmwareJob> {
-    return this.sendCommand<FirmwareJob>("firmware/install", { configuration, port });
+  /** Queue a compile+upload job (defaults to OTA).
+   *
+   *  ``forceLocal=true`` bypasses the offloader-side scheduler
+   *  decision and runs the install on the local CPU regardless of
+   *  paired build servers — used by the install dialog's "Build
+   *  locally instead" override link when the operator wants to
+   *  opt out of the transparent REMOTE routing for one install. */
+  async firmwareInstall(
+    configuration: string,
+    port = "OTA",
+    forceLocal = false,
+  ): Promise<FirmwareJob> {
+    return this.sendCommand<FirmwareJob>("firmware/install", {
+      configuration,
+      port,
+      force_local: forceLocal,
+    });
   }
 
   /** Queue a clean job. */

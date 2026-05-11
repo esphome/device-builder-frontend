@@ -177,6 +177,13 @@ export class ESPHomeCommandDialog extends LitElement {
    *  prefers the live context entry when present, so a
    *  stale prime is benign once ``_jobs`` catches up. */
   private _primedSource: { source: JobSource; source_label: string } | null = null;
+  /** True while the "Build locally instead" override is mid-flight
+   *  (cancel + resubmit pair). Disables the link so a fast double-
+   *  click can't queue two resubmits, and lets the renderer flip
+   *  the label to "Switching…" so the user sees something is
+   *  happening across the small ``firmware/cancel`` → ``firmware/install``
+   *  round-trip. */
+  @state() private _switchingToLocal = false;
   /** Stream message ID (for both validate streaming and follow_job streaming). */
   private _streamId = "";
   /** Install target port — "OTA" for network, an actual port for server-serial. */
@@ -380,6 +387,38 @@ export class ESPHomeCommandDialog extends LitElement {
       .remote-builder-sub-line wa-icon {
         font-size: 16px;
         flex-shrink: 0;
+      }
+      .remote-builder-sub-line .spacer {
+        flex: 1;
+      }
+
+      /* "Build locally instead" override link. Sits at the
+         right edge of the remote-builder sub-line and fires
+         the cancel-and-resubmit-locally flow when clicked.
+         Styled as an inline text link rather than a button —
+         the row is informational chrome, not a primary action
+         surface, so a full-fledged button would over-promise.
+         Disabled while a switch is mid-flight so a fast
+         double-click can't queue two resubmits. */
+      .force-local-link {
+        background: none;
+        border: none;
+        padding: 0;
+        font: inherit;
+        color: var(--esphome-primary, #1e88e5);
+        cursor: pointer;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+      }
+      .force-local-link:hover:not(:disabled),
+      .force-local-link:focus-visible {
+        text-decoration-thickness: 2px;
+        outline: none;
+      }
+      .force-local-link:disabled {
+        color: var(--wa-color-text-quiet, #888);
+        cursor: not-allowed;
+        text-decoration: none;
       }
 
       /* Reset-build-env suggestion — surfaced only on install/compile
@@ -720,6 +759,15 @@ export class ESPHomeCommandDialog extends LitElement {
     const source = liveJob?.source ?? this._primedSource?.source;
     const label = liveJob?.source_label ?? this._primedSource?.source_label;
     if (source !== JobSource.REMOTE || !label) return nothing;
+    // Only allow the override while the install is mid-flight
+    // and only for the install command type — switching mid-
+    // upload doesn't make sense, and switching a compile job
+    // mid-flight is a power-user shape we don't have a UI for
+    // yet. For terminal jobs ``_renderRemoteBuilderSubLine``
+    // already returns ``nothing`` above; this guard is the
+    // remaining gate for "compile-only" and "command-dialog
+    // opened from non-Install entry points".
+    const canOverride = this._commandType === "install";
     return html`
       <div class="remote-builder-sub-line" role="status">
         <wa-icon library="mdi" name="server-network"></wa-icon>
@@ -728,9 +776,81 @@ export class ESPHomeCommandDialog extends LitElement {
             receiver: label,
           })}</span
         >
+        ${canOverride
+          ? html`
+              <span class="spacer"></span>
+              <button
+                class="force-local-link"
+                ?disabled=${this._switchingToLocal}
+                @click=${this._onForceLocalClick}
+              >
+                ${this._switchingToLocal
+                  ? this._localize("command.force_local_switching")
+                  : this._localize("command.force_local_action")}
+              </button>
+            `
+          : nothing}
       </div>
     `;
   }
+
+  /** Cancel the in-flight REMOTE install and resubmit as LOCAL.
+   *
+   *  The dialog stays attached: after the cancel lands the
+   *  fresh ``firmwareInstall`` returns the new ``FirmwareJob``,
+   *  we re-prime ``_primedSource`` (so the sub-line disappears
+   *  on the very first paint), and call ``_followJob`` to
+   *  follow the new ``job_id``. The visible end-result for the
+   *  operator: "Building on X" sub-line replaced by the local
+   *  compile output stream, no dialog flicker.
+   *
+   *  Edge cases that fall out for free:
+   *  - Cancel race: if the in-flight job hits a terminal state
+   *    before the cancel WS call lands, the backend's
+   *    ``firmware/cancel`` rejects with NOT_FOUND / wrong-state
+   *    — caught here so we still try the resubmit.
+   *  - Resubmit failure: if ``firmware/install`` rejects (port
+   *    invalid, validation failure), the dialog flips to the
+   *    error banner via the normal command flow.
+   *  - Double-click: ``_switchingToLocal`` gates the button
+   *    visually + functionally so the second click is a no-op. */
+  private _onForceLocalClick = async (): Promise<void> => {
+    if (this._switchingToLocal) return;
+    this._switchingToLocal = true;
+    const configuration = this.configuration;
+    const port = this._port;
+    const cancelJobId = this._jobId;
+    try {
+      if (cancelJobId) {
+        // Swallow cancel failures — the most common reason is
+        // a job that flipped to a terminal state in the same
+        // tick, in which case the resubmit below is still the
+        // right move. A genuine WS error here surfaces on the
+        // resubmit too.
+        try {
+          await this._api.firmwareCancel(cancelJobId);
+        } catch {
+          /* see note above — the cancel is best-effort */
+        }
+      }
+      const job = await this._api.firmwareInstall(configuration, port, true);
+      // Re-attach the dialog to the new job. ``followJob``
+      // resets the line buffer + primes ``_jobStatus`` /
+      // ``_primedSource`` so the "Building on" sub-line
+      // disappears on the next render without waiting for the
+      // jobs-context update.
+      this.followJob(job, this.name);
+    } catch (err) {
+      // Surface the failure on the existing error banner shape
+      // so the operator sees what went wrong rather than the
+      // sub-line silently staying put.
+      this._state = "error";
+      this._statusMessage =
+        err instanceof Error ? err.message : this._localize("command.force_local_failed");
+    } finally {
+      this._switchingToLocal = false;
+    }
+  };
 
   /** True when this dialog is following a job that's still in the
    *  queue — backend serialises firmware work, so an Install kicked
