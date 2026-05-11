@@ -965,9 +965,10 @@ export class ESPHomeSettingsDialog extends LitElement {
     }
     // Optimistic-update would be wrong here: a rotate hands
     // back a wholly new pin that the frontend can't predict
-    // (it's the SHA-256 of the freshly-generated SPKI), so
-    // there's nothing we can pre-fill. Just gate the button
-    // on ``_buildServerRotateInFlight`` and toast the result.
+    // (it's the SHA-256 of the freshly-generated X25519 public
+    // key), so there's nothing we can pre-fill. Just gate the
+    // button on '_buildServerRotateInFlight' and toast the
+    // result.
     this._buildServerRotateInFlight = true;
     try {
       this._buildServerIdentity = await this._api.rotateRemoteBuildIdentity();

@@ -1,16 +1,18 @@
 /**
- * Display formatting for the receiver's SPKI fingerprint.
+ * Display formatting for the receiver's identity fingerprint.
  *
- * The wire form of ``pin_sha256`` is a contiguous 64-char
- * lowercase hex string. For OOB verification (the user reads
- * the fingerprint off the receiver's Build host card and
- * compares to what the sender's pair dialog observed on the
- * TLS handshake), space-separated byte pairs are easier to
- * scan visually:
+ * The wire form of 'pin_sha256' is a contiguous 64-char
+ * lowercase hex string carrying the SHA-256 of the
+ * receiver's X25519 peer-link public key (the one paired
+ * offloaders pin against during the Noise XX handshake).
+ * For OOB verification -- the user reads the fingerprint off
+ * the receiver's Build server card and compares to what
+ * the sender's pair dialog observed on the wire --
+ * space-separated byte pairs are easier to scan visually:
  *
- *   "abcdef0123456789..."  →  "ab cd ef 01 23 45 67 89 ..."
+ *   "abcdef0123456789..."  ->  "ab cd ef 01 23 45 67 89 ..."
  *
- * Mirrors the backend's ``DashboardIdentity.pin_sha256_formatted``
+ * Mirrors the backend's 'DashboardIdentity.pin_sha256_formatted'
  * property so the frontend display matches what the receiver-side
  * Settings card shows on the dashboard's HTML rendering of its
  * own identity.
@@ -20,7 +22,7 @@
  * Format a contiguous lowercase-hex SHA-256 fingerprint as
  * space-separated byte pairs.
  *
- * Doesn't validate the input length — a malformed pin (wrong
+ * Doesn't validate the input length -- a malformed pin (wrong
  * length, non-hex chars) renders verbatim with the same
  * pair-splitting applied. The Settings card surfaces invalid
  * pins via a separate "couldn't load identity" error path,

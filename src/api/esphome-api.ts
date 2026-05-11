@@ -1758,40 +1758,42 @@ export class ESPHomeAPI {
     );
   }
 
-  // ─── Remote build: receiver identity (phase 3c1) ──────────
+  // ─── Remote build: receiver identity ──────────
 
   /**
    * Read this dashboard's stable identity for the Settings card.
    *
-   * Returns ``{dashboard_id, pin_sha256, server_version,
-   * esphome_version, listener_bound}``. The cert + key PEMs are
-   * intentionally NOT included; only the SPKI fingerprint
-   * (``pin_sha256``, lowercase hex) is safe to ship to a
-   * frontend, and the fingerprint is what a sender pins
-   * against anyway. Idempotent (no rotation triggered by reads).
-   * Lazy-creates the cert + key on first call if missing.
+   * Returns '{dashboard_id, pin_sha256, server_version,
+   * esphome_version, listener_bound}'. The X25519 private key
+   * is intentionally NOT included; only the public-key
+   * fingerprint ('pin_sha256', lowercase-hex SHA-256 of the
+   * X25519 public key) is safe to ship to a frontend, and the
+   * fingerprint is what a sender pins against during the
+   * Noise XX handshake. Idempotent (no rotation triggered by
+   * reads). Lazy-creates the peer-link keypair on first call
+   * if missing.
    */
   async getRemoteBuildIdentity(): Promise<IdentityView> {
     return this.sendCommand<IdentityView>("remote_build/get_identity");
   }
 
   /**
-   * Mint a fresh cert + keypair, replacing whatever's on disk.
+   * Mint a fresh X25519 peer-link keypair, replacing whatever's on disk.
    *
-   * Forces every paired sender to re-pair (the new SPKI
-   * produces a new ``pin_sha256``); ``dashboard_id`` is
-   * preserved across rotations. If the receiver listener is
-   * currently bound, it gets torn down and rebuilt against the
-   * new cert; the returned ``IdentityView.listener_bound``
-   * reflects the rebuild outcome (``false`` means the rebuild
-   * fail-softed; the operator should check the dashboard logs
-   * before assuming the rotation took effect end-to-end).
+   * Forces every paired sender to re-pair (the new public key
+   * produces a new 'pin_sha256'); 'dashboard_id' is preserved
+   * across rotations. If the receiver listener is currently
+   * bound, it gets torn down and rebuilt against the new key;
+   * the returned 'IdentityView.listener_bound' reflects the
+   * rebuild outcome ('false' means the rebuild fail-softed;
+   * the operator should check the dashboard logs before
+   * assuming the rotation took effect end-to-end).
    *
    * Concurrent calls are rejected with
-   * ``ErrorCode.ALREADY_EXISTS``; the caller is expected to
+   * 'ErrorCode.ALREADY_EXISTS'; the caller is expected to
    * confirm before each click. Fires a
-   * ``remote_build_identity_rotated`` event on the bus carrying
-   * ``{dashboard_id, pin_sha256}`` so other tabs / subscribers
+   * 'remote_build_identity_rotated' event on the bus carrying
+   * '{dashboard_id, pin_sha256}' so other tabs / subscribers
    * refresh without polling.
    */
   async rotateRemoteBuildIdentity(): Promise<IdentityView> {
