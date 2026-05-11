@@ -121,18 +121,33 @@ export class ESPHomeSettingsDialog extends LitElement {
           return false;
       }
     };
-    const renderItem = (s: SectionDef) => html`
-      <button
-        class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
-        @click=${() => this._selectSection(s.id)}
-      >
-        <wa-icon library="mdi" name=${s.icon}></wa-icon>
-        <span>${this._localize(s.labelKey)}</span>
-        ${sectionAlerted(s.id)
-          ? html`<span class="nav-item-dot" aria-hidden="true"></span>`
-          : nothing}
-      </button>
-    `;
+    const renderItem = (s: SectionDef) => {
+      // The .nav-item-dot below is aria-hidden because it
+      // carries no text content (purely visual chrome).
+      // Without a parallel signal in the button's
+      // accessible name, screen-reader users wouldn't be
+      // told that this section needs attention. Inject
+      // 'settings.nav_item_attention_suffix' into the
+      // button's aria-label so the SR announcement reads
+      // e.g. "Send builds, attention needed".
+      const label = this._localize(s.labelKey);
+      const ariaLabel = sectionAlerted(s.id)
+        ? this._localize("settings.nav_item_attention_aria", { label })
+        : label;
+      return html`
+        <button
+          class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
+          @click=${() => this._selectSection(s.id)}
+          aria-label=${ariaLabel}
+        >
+          <wa-icon library="mdi" name=${s.icon}></wa-icon>
+          <span>${label}</span>
+          ${sectionAlerted(s.id)
+            ? html`<span class="nav-item-dot" aria-hidden="true"></span>`
+            : nothing}
+        </button>
+      `;
+    };
     return html`
       ${flat.map(renderItem)}
       ${experimental.length

@@ -313,8 +313,8 @@ export class ESPHomeHeaderActions extends LitElement {
           type="button"
           class="menu-btn"
           @click=${this._openSettings}
-          title=${this._localize("layout.settings")}
-          aria-label=${this._localize("layout.settings")}
+          title=${this._settingsButtonLabel()}
+          aria-label=${this._settingsButtonLabel()}
         >
           <wa-icon library="mdi" name="cog"></wa-icon>
           ${this._offloaderAlertsCount() > 0
@@ -575,6 +575,19 @@ export class ESPHomeHeaderActions extends LitElement {
    *  the alerts snapshot hasn't arrived yet (null) or is empty. */
   private _offloaderAlertsCount(): number {
     return this._offloaderAlerts === null ? 0 : this._offloaderAlerts.size;
+  }
+
+  /** Settings-button accessible name. When offloader alerts are
+   *  pending, the label embeds the count so screen-reader users
+   *  get the same "attention needed" signal sighted users see
+   *  from the visual badge. Mirrors the firmware-jobs button's
+   *  count-in-label pattern. */
+  private _settingsButtonLabel(): string {
+    const count = this._offloaderAlertsCount();
+    if (count > 0) {
+      return this._localize("layout.settings_with_alerts", { count });
+    }
+    return this._localize("layout.settings");
   }
 
   private _openFeedback() {
