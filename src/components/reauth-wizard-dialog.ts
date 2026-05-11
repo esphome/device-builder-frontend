@@ -4,7 +4,11 @@ import { customElement, state } from "lit/decorators.js";
 
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import { ErrorCode, type OffloaderPinMismatchAlert } from "../api/types.js";
+import {
+  ErrorCode,
+  type OffloaderPinMismatchAlert,
+  type PairingSummary,
+} from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
@@ -169,8 +173,9 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     const offloaderLabel = friendlyHostname(window.location.hostname);
     this._busy = true;
     this._errorKey = null;
+    let summary: PairingSummary;
     try {
-      await this._api.requestRemoteBuildPair({
+      summary = await this._api.requestRemoteBuildPair({
         hostname: alert.receiver_hostname,
         port: alert.receiver_port,
         pin_sha256: alert.observed_pin,
@@ -204,6 +209,31 @@ export class ESPHomeReauthWizardDialog extends LitElement {
       return;
     }
     this._busy = false;
+    // Mirror the fresh-pair dialog: dispatch ``pair-request-sent``
+    // with the returned ``PairingSummary`` so app-shell's
+    // ``_onPairRequestSent`` upserts the row into
+    // ``buildOffloadPairings``. The backend persists the
+    // updated ``StoredPairing`` (new ``pin_sha256``,
+    // ``static_x25519_pub``, etc.) but does NOT fire
+    // ``OFFLOADER_PAIR_STATUS_CHANGED`` for a re-pair against
+    // an APPROVED row whose pin rotated under it -- the
+    // status didn't change, only the cryptographic identity
+    // did. Without this dispatch the local pairings map
+    // keeps the stale-pin entry until a full
+    // ``subscribe_events`` re-snapshot, and the background
+    // peer-link client keeps reconnecting against the old
+    // pin -> pin_mismatch alert fires again -> wizard
+    // re-opens in a loop until reload. Mirrors the
+    // bubble+composed dispatch the pair dialog uses so the
+    // same upsert listeners (build-offload-section.ts and
+    // app-shell.ts) catch it.
+    this.dispatchEvent(
+      new CustomEvent<{ summary: PairingSummary }>("pair-request-sent", {
+        detail: { summary },
+        bubbles: true,
+        composed: true,
+      }),
+    );
     this._dispatchResult("success", alert.receiver_label);
     this._open = false;
   };
