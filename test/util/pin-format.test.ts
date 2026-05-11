@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatPinSha256 } from "../../src/util/cert-pin-format.js";
+import { formatPinSha256 } from "../../src/util/pin-format.js";
 
 describe("formatPinSha256", () => {
   it("splits a 64-char hex pin into 32 space-separated byte pairs", () => {

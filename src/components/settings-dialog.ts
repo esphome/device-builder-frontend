@@ -50,7 +50,7 @@ import {
 import type { RemoteBuildJobState } from "../context/index.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { formatPinSha256 } from "../util/cert-pin-format.js";
+import { formatPinSha256 } from "../util/pin-format.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import {
   normalizeHostnameForCompare,
