@@ -1016,6 +1016,7 @@
     "type_rename": "Rename",
     "time_queued": "queued {time}",
     "time_started": "started {time}",
-    "time_finished": "finished {time}"
+    "time_finished": "finished {time}",
+    "building_on": "Building on {label}"
   }
 }
