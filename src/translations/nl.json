@@ -597,7 +597,8 @@
   },
   "firmware_jobs": {
     "menu_item": "Firmwaretaken",
-    "menu_item_with_count": "Firmwaretaken ({count} actief)"
+    "menu_item_with_count": "Firmwaretaken ({count} actief)",
+    "submitted_by": "van {label}"
   },
   "secrets": {
     "title": "Geheimen",

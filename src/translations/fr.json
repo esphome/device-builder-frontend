@@ -597,7 +597,8 @@
   },
   "firmware_jobs": {
     "menu_item": "Tâches firmware",
-    "menu_item_with_count": "Tâches firmware ({count} active(s))"
+    "menu_item_with_count": "Tâches firmware ({count} active(s))",
+    "submitted_by": "de {label}"
   },
   "secrets": {
     "title": "Secrets",
