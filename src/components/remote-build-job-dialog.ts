@@ -1,5 +1,3 @@
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
-
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -22,7 +20,6 @@ import {
   type RemoteBuildJobState,
 } from "../context/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { inputStyles } from "../styles/inputs.js";
 import { jobStatusPillStyles } from "../styles/job-status-pill.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -30,6 +27,7 @@ import { isTerminalJobStatus } from "../util/firmware-job-status.js";
 import { renderErrorBanner } from "../util/render-error.js";
 
 import "./ansi-log.js";
+import "./base-dialog.js";
 
 type Step = "input" | "submitting" | "list";
 
@@ -568,48 +566,33 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         body = this._renderList();
         break;
     }
-    // Gate light-dismiss while the submit_job WS round-trip
-    // is in flight: outside-click / Esc / close-button can't
-    // dismiss between the submit and the ack returning, which
-    // would orphan the response (a successful ack would fire
-    // remote-build-job-submitted against an already-closed
-    // dialog). Mirrors pair-build-server-dialog's gate.
+    // ?busy gates outside-click + Esc + close-button while
+    // the submit_job WS round-trip is in flight: base-dialog
+    // flips light-dismiss off and vetoes wa-request-close
+    // when busy, so the dialog can't dismiss between the
+    // submit and the ack returning. Orphaning that response
+    // would fire remote-build-job-submitted against an
+    // already-closed dialog. Mirrors pair-build-server-dialog's
+    // gate.
     const busy = this._step === "submitting";
     return html`
-      <wa-dialog
+      <esphome-base-dialog
         ?open=${this._open}
-        ?light-dismiss=${!busy}
-        @wa-request-close=${this._onRequestClose}
-        @wa-after-hide=${this._close}
+        ?busy=${busy}
+        .label=${title}
+        @after-hide=${this._close}
       >
-        <header slot="label">${title}</header>
-        <button
-          class="dialog-close"
-          slot="header-actions"
-          aria-label=${this._localize("layout.close")}
-          ?disabled=${busy}
-          @click=${this._close}
-        >
-          ✕
-        </button>
         ${body}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
-
-  private _onRequestClose = (e: Event): void => {
-    if (this._step === "submitting") {
-      e.preventDefault();
-    }
-  };
 
   static styles = [
     espHomeStyles,
     inputStyles,
-    dialogCloseButtonStyles,
     jobStatusPillStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 560px;
       }
 
