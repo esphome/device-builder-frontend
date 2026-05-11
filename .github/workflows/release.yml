@@ -375,6 +375,25 @@ jobs:
             Bumps `${{ env.PACKAGE_NAME }}` to [`${{ inputs.version }}`](https://github.com/${{ github.repository }}/releases/tag/${{ inputs.version }}).
 
             ${{ steps.notes.outputs.body }}
+
+            ## Types of changes
+
+            <!--
+            The backend's ``pr-labels`` workflow parses this checklist
+            to apply the release-notes label. Auto-bump PRs are always
+            a ``dependencies`` bump by definition; the box is ticked
+            here so the check passes without manual editing.
+            -->
+
+            - [ ] Bugfix (non-breaking change which fixes an issue) — `bugfix`
+            - [ ] New feature (non-breaking change which adds functionality) — `new-feature`
+            - [ ] Enhancement to an existing feature — `enhancement`
+            - [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected) — `breaking-change`
+            - [ ] Refactor (no behaviour change) — `refactor`
+            - [ ] Documentation only — `docs`
+            - [ ] Maintenance / chore — `maintenance`
+            - [ ] CI / workflow change — `ci`
+            - [x] Dependencies bump — `dependencies`
           labels: |
             dependencies
             frontend
