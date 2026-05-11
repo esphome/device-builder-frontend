@@ -751,7 +751,7 @@
     "build_server": "Build server",
     "pairing_requests": "Pairing requests",
     "build_offload": "Send builds",
-    "build_offload_unimplemented_banner": "Sending builds to another dashboard isn't implemented yet. Hostnames added here are remembered, but no compile jobs are dispatched until pairing ships in a later release.",
+    "experimental_tag": "Experimental",
     "remote_build_enable": "Enable remote build",
     "remote_build_enable_desc": "Lets other dashboards on your network compile their YAML here. A paired peer can run arbitrary code on this machine; only pair with dashboards you'd give ssh access to.",
     "remote_build_known_dashboards": "Known dashboards",

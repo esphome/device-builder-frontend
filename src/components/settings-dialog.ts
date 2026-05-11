@@ -48,7 +48,6 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import type { RemoteBuildJobState } from "../context/index.js";
-import { warningBannerStyles } from "../styles/banners.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
@@ -1017,7 +1016,6 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
-    warningBannerStyles,
     pinHexStyles,
     css`
       esphome-base-dialog {
@@ -1239,8 +1237,29 @@ export class ESPHomeSettingsDialog extends LitElement {
          via .row: zero horizontal padding, rely on the
          container. */
 
-      /* Per-consumer spacing for warningBannerStyles' .warning-banner. */
-      .warning-banner {
+      /* Inline 'EXPERIMENTAL' tag rendered next to the section
+         heading at the top of an in-development settings pane.
+         Same visual language as esphome-layout's .preview-badge
+         but recoloured for the settings dialog's neutral surface
+         (the header's --esphome-on-primary tones read as
+         low-contrast on this background). Carries the same
+         lightweight "feature is in development, no detailed
+         caveat banner" signal a Preview tag carries for the
+         whole app; replaces the verbose
+         build_offload_unimplemented_banner copy. */
+      .experimental-tag {
+        display: inline-block;
+        font-size: 9px;
+        font-weight: var(--wa-font-weight-bold);
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        padding: 2px 6px;
+        border-radius: var(--wa-border-radius-s);
+        background: color-mix(in srgb, var(--wa-color-warning-fill-loud), transparent 85%);
+        color: var(--wa-color-warning-fill-loud);
+        border: 1px solid color-mix(in srgb, var(--wa-color-warning-fill-loud), transparent 60%);
+        line-height: 1;
+        flex-shrink: 0;
         margin: 0 0 var(--wa-space-m);
       }
 
@@ -2323,15 +2342,16 @@ export class ESPHomeSettingsDialog extends LitElement {
    *    cross-subnet / non-mDNS receivers.
    *
    * Pairing-window + peer-link + scheduler land across phases
-   * 4 / 5 / 7; the in-section banner still says "not
-   * implemented yet" because no compile job is actually
-   * dispatched until phase 5+ wires the build session.
+   * 4 / 5 / 7. The inline EXPERIMENTAL tag at the top of the
+   * pane is the only "feature is in development" signal —
+   * lighter touch than the verbose banner this replaced, same
+   * visual language as the dashboard header's PREVIEW badge.
    */
   private _renderBuildOffload() {
     return html`
-      <div class="warning-banner" role="status">
-        ${this._localize("settings.build_offload_unimplemented_banner")}
-      </div>
+      <span class="experimental-tag" role="status">
+        ${this._localize("settings.experimental_tag")}
+      </span>
 
       ${this._renderOffloaderAlerts()}
       ${this._renderOffloaderRemoteBuildsToggle()}

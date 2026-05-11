@@ -688,7 +688,7 @@
     "build_server": "Serveur de compilation",
     "pairing_requests": "Demandes d'appairage",
     "build_offload": "Envoyer les compilations",
-    "build_offload_unimplemented_banner": "L'envoi de compilations à un autre tableau de bord n'est pas encore implémenté. Les noms d'hôte ajoutés ici sont mémorisés, mais aucune tâche de compilation n'est dispatchée tant que l'appairage n'est pas livré dans une version ultérieure.",
+    "experimental_tag": "Expérimental",
     "remote_build_enable": "Activer la compilation à distance",
     "remote_build_enable_desc": "Permet à d'autres tableaux de bord de votre réseau de compiler leur YAML ici. Un pair appairé peut exécuter n'importe quel code sur cette machine ; n'appairez qu'avec des tableaux de bord à qui vous donneriez un accès ssh.",
     "remote_build_known_dashboards": "Tableaux de bord connus",
