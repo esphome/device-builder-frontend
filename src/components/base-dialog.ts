@@ -169,6 +169,32 @@ export class ESPHomeBaseDialog extends LitElement {
     css`
       :host {
         display: contents;
+
+        /* Alias the consumer-set --width into a wrapper-
+           private name. wa-dialog declares
+           :host { --width: 31rem } in its own shadow
+           root, and a property's :host declaration beats
+           inherited values from outside the shadow tree
+           per the CSS Scoping spec — so a consumer's
+           --width on this wrapper would be silently
+           clobbered by wa-dialog's default and the
+           dialog would always render at 31rem regardless
+           of what the consumer asked for. Forwarding via
+           an internal name + an external selector on the
+           inner wa-dialog (below) is the only CSS-only
+           way to make the consumer's --width win the
+           cascade race. */
+        --base-dialog-width: var(--width, 31rem);
+      }
+
+      /* External author rule from the wrapper's shadow
+         root targeting the inner wa-dialog. External
+         declarations beat the inner shadow root's :host
+         default, so this is where the consumer's
+         --width finally lands as wa-dialog's effective
+         width. */
+      wa-dialog {
+        --width: var(--base-dialog-width);
       }
 
       /* Busy visual on wa-dialog's built-in close. The
