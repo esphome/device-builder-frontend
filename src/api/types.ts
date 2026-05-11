@@ -1489,13 +1489,9 @@ export interface RemoteBuildSettings {
   /**
    * 6c cleanup-sweep cold-subtree threshold (seconds). Backend
    * defaults to 24h and clamps writes to [1h, 30d] via the
-   * `remote_build/set_settings` validator. Empty / missing on
-   * an older receiver predating this field deserialises to
-   * the default — the on-disk decode coerces silently rather
-   * than rejecting, so existing operators don't see a
-   * settings-load failure on upgrade. The UI renders this as
-   * hours; the conversion lives at the input boundary so the
-   * wire shape stays a single primitive.
+   * `remote_build/set_settings` validator. The UI renders this
+   * as hours; the conversion lives at the input boundary so
+   * the wire shape stays a single primitive.
    */
   cleanup_ttl_seconds: number;
   /** Receiver-side pinned offloaders. Includes both PENDING (in

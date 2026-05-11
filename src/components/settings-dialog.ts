@@ -201,7 +201,7 @@ export class ESPHomeSettingsDialog extends LitElement {
   // ``setRemoteBuildSettings``.
   @consume({ context: remoteBuildCleanupTtlContext, subscribe: true })
   @state()
-  private _remoteBuildCleanupTtl = 0;
+  private _remoteBuildCleanupTtl = CLEANUP_TTL_DEFAULT_SECONDS;
 
   // Local dashboard's bundled ESPHome version. Compared
   // against each paired build server's
@@ -3194,19 +3194,17 @@ export class ESPHomeSettingsDialog extends LitElement {
   private _onCommitCleanupTtl = (e: Event): void => {
     // Parse the input as integer hours; reject NaN (the user
     // cleared the field then blurred) by reverting to the
-    // current state's value via a follow-up re-render. Lit
-    // doesn't auto-revert without a state mutation, so explicitly
-    // bump _remoteBuildCleanupTtl with the (unchanged) value to
-    // trigger one.
+    // current state's value. Clamp to [min, max] to mirror the
+    // backend validator. Only dispatch when the resulting
+    // seconds value differs from the current context value —
+    // a blur on the unchanged field shouldn't fire a redundant
+    // WS write.
     const input = e.target as HTMLInputElement;
     const hoursRaw = Number.parseInt(input.value, 10);
     const minHours = CLEANUP_TTL_MIN_SECONDS / 3600;
     const maxHours = CLEANUP_TTL_MAX_SECONDS / 3600;
     let hours: number;
     if (!Number.isFinite(hoursRaw)) {
-      // Empty / invalid input — revert to the current value.
-      // The defaulted starting state is in seconds; render in
-      // hours.
       hours = Math.round(this._remoteBuildCleanupTtl / 3600) || (
         CLEANUP_TTL_DEFAULT_SECONDS / 3600
       );
@@ -3215,6 +3213,9 @@ export class ESPHomeSettingsDialog extends LitElement {
     }
     input.value = String(hours);
     const seconds = hours * 3600;
+    if (seconds === this._remoteBuildCleanupTtl) {
+      return;
+    }
     this.dispatchEvent(
       new CustomEvent<number>("set-remote-build-cleanup-ttl", {
         detail: seconds,
