@@ -181,9 +181,10 @@ export class ESPHomeLogsDialog extends LitElement {
         font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
       }
 
-      /* Close-button styling lives in
-         src/styles/dialog-close-button.ts — see the
-         dialogCloseButtonStyles import below. */
+      /* Close-button styling is bundled by
+         <esphome-base-dialog>; the shared
+         dialogCloseButtonStyles sheet lives in
+         src/styles/dialog-close-button.ts. */
 
       esphome-base-dialog::part(body) {
         padding: 0;
