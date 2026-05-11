@@ -2583,14 +2583,32 @@ export class ESPHomeSettingsDialog extends LitElement {
    * working — operator says "keep the pairings, just stop
    * auto-routing for now."
    *
-   * Renders disabled (``aria-disabled``) until the snapshot
-   * lands so the operator can't fire a write against a stale
-   * default — the next ``initial_state`` push would race the
-   * write back to whatever the backend has.
+   * Renders a loading placeholder while the
+   * ``subscribe_events`` snapshot hasn't seeded the value
+   * yet. We do NOT default-render the switch as
+   * ``aria-checked=true`` during loading: if the backend
+   * value lands as `false` the switch would briefly announce
+   * to screen readers as checked before flipping. Matches
+   * the loading-row pattern already used by
+   * ``_renderOffloaderPairings``.
    */
   private _renderOffloaderRemoteBuildsToggle() {
-    const loaded = this._offloaderRemoteBuildsEnabled !== null;
-    const checked = this._offloaderRemoteBuildsEnabled ?? true;
+    if (this._offloaderRemoteBuildsEnabled === null) {
+      return html`
+        <div class="row" role="status">
+          <div class="row-label">
+            <span class="row-title">
+              ${this._localize("settings.offloader_remote_builds_enabled")}
+            </span>
+            <span class="row-desc">
+              ${this._localize(
+                "settings.offloader_remote_builds_enabled_loading",
+              )}
+            </span>
+          </div>
+        </div>
+      `;
+    }
     return html`
       <div class="row">
         <div class="row-label">
@@ -2608,9 +2626,7 @@ export class ESPHomeSettingsDialog extends LitElement {
           class="toggle"
           role="switch"
           aria-labelledby="offloader-remote-builds-enabled-title"
-          aria-checked=${checked}
-          aria-disabled=${!loaded}
-          ?disabled=${!loaded}
+          aria-checked=${this._offloaderRemoteBuildsEnabled}
           @click=${this._onToggleOffloaderRemoteBuilds}
         ></button>
       </div>

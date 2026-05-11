@@ -809,6 +809,7 @@
     "pairing_status_approved": "Approved",
     "offloader_remote_builds_enabled": "Auto-route installs to remote build",
     "offloader_remote_builds_enabled_desc": "When enabled, the dashboard picks a paired remote build server for each install when one is available; turn off to keep every install local while leaving your pairings in place.",
+    "offloader_remote_builds_enabled_loading": "Loading…",
     "build_offload_pairing_connected": "Connected",
     "build_offload_pairing_connecting": "Connecting…",
     "build_offload_pairing_disconnected": "Disconnected",
