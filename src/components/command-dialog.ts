@@ -9,13 +9,14 @@ import {
   mdiKeyOutline,
   mdiPlaylistCheck,
   mdiRefresh,
+  mdiServerNetwork,
   mdiStop,
   mdiTimerSand,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobStatus, JobType } from "../api/types.js";
+import { JobSource, JobStatus, JobType } from "../api/types.js";
 import type { FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeAnsiLog } from "./ansi-log.js";
@@ -50,6 +51,7 @@ registerMdiIcons({
   "check-circle": mdiCheckCircle,
   "alert-circle": mdiAlertCircle,
   "playlist-check": mdiPlaylistCheck,
+  "server-network": mdiServerNetwork,
   "timer-sand": mdiTimerSand,
 });
 
@@ -330,6 +332,28 @@ export class ESPHomeCommandDialog extends LitElement {
       .status-banner--error {
         background: color-mix(in srgb, var(--term-error), transparent 85%);
         color: var(--term-error);
+      }
+
+      /* "Building on <receiver_label>" sub-line, visible while a
+         REMOTE-source job is in flight (queued / compiling /
+         installing). Surfaced above the log area so the user can
+         see at a glance which paired build server is doing the
+         work — transparent install routes the compile silently,
+         but the operator still wants to know where the bytes
+         are coming from. */
+      .remote-builder-sub-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 20px;
+        border-bottom: 1px solid var(--term-border);
+        font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
+        font-size: 12px;
+        color: var(--wa-color-text-quiet, #888);
+      }
+      .remote-builder-sub-line wa-icon {
+        font-size: 16px;
+        flex-shrink: 0;
       }
 
       /* Reset-build-env suggestion — surfaced only on install/compile
@@ -618,6 +642,7 @@ export class ESPHomeCommandDialog extends LitElement {
     return html`
       <wa-dialog label=${this._title} light-dismiss @wa-after-hide=${this._onDialogHide}>
         <div class="content">
+          ${this._renderRemoteBuilderSubLine()}
           <div class="log-area">
             <esphome-ansi-log
               .lines=${this._lines}
@@ -629,6 +654,32 @@ export class ESPHomeCommandDialog extends LitElement {
           ${this._renderToolbar()}
         </div>
       </wa-dialog>
+    `;
+  }
+
+  /** "Building on <receiver_label>" sub-line for in-flight REMOTE jobs.
+   *
+   *  Reads ``FirmwareJob.source`` + ``source_label`` from the
+   *  jobs context (7a-2a / 7a-3). Visible while the job is non-
+   *  terminal so the operator can see at a glance which paired
+   *  build server the compile was routed to; the transparent
+   *  install flow dispatches silently otherwise. Returns
+   *  ``nothing`` for LOCAL jobs (the default) or when the
+   *  context hasn't seen the job yet. */
+  private _renderRemoteBuilderSubLine() {
+    if (!this._jobId) return nothing;
+    const job = this._jobs.get(this._jobId);
+    if (!job || job.source !== JobSource.REMOTE || !job.source_label) return nothing;
+    if (isTerminalJobStatus(job.status)) return nothing;
+    return html`
+      <div class="remote-builder-sub-line" role="status">
+        <wa-icon library="mdi" name="server-network"></wa-icon>
+        <span
+          >${this._localize("command.remote_builder_sub_line", {
+            receiver: job.source_label,
+          })}</span
+        >
+      </div>
     `;
   }
 

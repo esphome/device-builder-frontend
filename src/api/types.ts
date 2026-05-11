@@ -932,6 +932,19 @@ export enum JobStream {
 /** Subset of {@link JobType} the remote-build submit_job WS arg accepts. */
 export type RemoteBuildSubmitTarget = JobType.COMPILE | JobType.UPLOAD;
 
+/** Where the bytes for a firmware build come from.
+ *
+ *  Mirrors the backend's ``JobSource`` StrEnum (7a-2a). ``LOCAL`` is
+ *  a build this dashboard's CPU ran; ``REMOTE`` is a build a paired
+ *  receiver ran and the offloader fetched the artifacts from. The
+ *  install dialog reads ``FirmwareJob.source_label`` to render a
+ *  "Building on {receiver_label}" sub-line when ``source ===
+ *  REMOTE``. */
+export enum JobSource {
+  LOCAL = "local",
+  REMOTE = "remote",
+}
+
 export interface FirmwareJob {
   job_id: string;
   configuration: string;
@@ -952,6 +965,23 @@ export interface FirmwareJob {
    *  `null` until the underlying tooling (PlatformIO/esptool) emits a
    *  percentage we can latch onto. */
   progress: number | null;
+  /** Where the build's bytes come from (7a-2a). Defaults to LOCAL
+   *  for jobs from before this field landed; jobs the install
+   *  handler routed to a paired receiver via ``pick_build_path``
+   *  (7a-3) carry ``REMOTE``. */
+  source: JobSource;
+  /** Machine-readable handle on the receiver that compiled the job
+   *  when ``source === REMOTE`` — matches the StoredPairing's
+   *  ``pin_sha256``. Empty string for LOCAL jobs. The runner uses
+   *  this to route ``cancel_job`` / ``download_artifacts`` against
+   *  the right peer-link client. */
+  source_pin_sha256: string;
+  /** Display label for the paired receiver that compiled the job,
+   *  when ``source === REMOTE``. Empty string for LOCAL jobs.
+   *  Snapshot of the pairing's label at job-creation time — doesn't
+   *  track later renames (the install dialog should show what the
+   *  user saw when they clicked Install). */
+  source_label: string;
 }
 
 export interface FirmwareBinary {

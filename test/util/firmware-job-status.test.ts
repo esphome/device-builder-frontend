@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { JobStatus, JobType } from "../../src/api/types.js";
+import { JobSource, JobStatus, JobType } from "../../src/api/types.js";
 import type { FirmwareJob } from "../../src/api/types.js";
 import {
   TERMINAL_JOB_STATUSES,
@@ -28,6 +28,9 @@ function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
     port: "",
     new_name: "",
     progress: null,
+    source: JobSource.LOCAL,
+    source_pin_sha256: "",
+    source_label: "",
     ...overrides,
   };
 }
