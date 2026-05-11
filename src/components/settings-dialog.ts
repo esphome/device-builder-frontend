@@ -15,6 +15,9 @@ import toast from "sonner-js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import {
+  CLEANUP_TTL_DEFAULT_SECONDS,
+  CLEANUP_TTL_MAX_SECONDS,
+  CLEANUP_TTL_MIN_SECONDS,
   ErrorCode,
   type IdentityView,
   type OffloaderAlertSnapshotEntry,
@@ -38,6 +41,7 @@ import {
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
   localizeContext,
+  remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
   versionContext,
   yamlDiffButtonContext,
@@ -188,6 +192,16 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: remoteBuildEnabledContext, subscribe: true })
   @state()
   private _remoteBuildEnabled = false;
+
+  // 6c cleanup-sweep TTL in seconds. App-shell loads this off
+  // ``remote_build/get_settings`` and provides it via the
+  // context; the input row below renders it as hours and
+  // fires ``set-remote-build-cleanup-ttl`` (in seconds) on
+  // commit, which app-shell rewrites through
+  // ``setRemoteBuildSettings``.
+  @consume({ context: remoteBuildCleanupTtlContext, subscribe: true })
+  @state()
+  private _remoteBuildCleanupTtl = 0;
 
   // Local dashboard's bundled ESPHome version. Compared
   // against each paired build server's
@@ -1165,6 +1179,40 @@ export class ESPHomeSettingsDialog extends LitElement {
         transform: translateX(18px);
       }
 
+      /* 6c cache-cleanup TTL input. Number + unit label sit on
+         one line at the row's trailing edge, matching the
+         toggle's flex-shrink placement above. */
+      .cleanup-ttl-input {
+        display: inline-flex;
+        align-items: baseline;
+        gap: var(--wa-space-2xs);
+        flex-shrink: 0;
+      }
+
+      .cleanup-ttl-number {
+        width: 5em;
+        text-align: right;
+        padding: var(--wa-space-2xs) var(--wa-space-xs);
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-m);
+        background: var(--wa-color-surface-default);
+        color: var(--wa-color-text-normal);
+        font-family: inherit;
+        font-size: var(--wa-font-size-s);
+      }
+
+      .cleanup-ttl-number:focus {
+        outline: none;
+        border-color: var(--esphome-primary);
+        box-shadow: 0 0 0 2px
+          color-mix(in srgb, var(--esphome-primary), transparent 80%);
+      }
+
+      .cleanup-ttl-unit {
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-quiet);
+      }
+
       /* Remote builder sections (Build server / Send builds).
          No per-element horizontal padding — .content-body
          already pads the section's left/right edges via
@@ -1959,6 +2007,8 @@ export class ESPHomeSettingsDialog extends LitElement {
         ${this._localize("settings.build_server_card_desc")}
       </div>
       ${this._renderBuildServerCard()}
+
+      ${this._renderCleanupTtlRow()}
     `;
   }
 
@@ -3094,6 +3144,85 @@ export class ESPHomeSettingsDialog extends LitElement {
       })
     );
   }
+
+  /**
+   * Cache-cleanup TTL row.
+   *
+   * Renders the 6c knob as an hours input so operators don't
+   * have to think in seconds. The backend stores seconds in
+   * the canonical wire shape (matches the model field and
+   * the WS validator's range); conversion lives at this seam.
+   * Step + min + max constrain the keyboard / spinner; the
+   * commit-on-change handler additionally clamps + only fires
+   * the WS event when the value would actually change, so a
+   * blur on the unchanged field isn't a redundant write.
+   */
+  private _renderCleanupTtlRow() {
+    const hours = Math.round(this._remoteBuildCleanupTtl / 3600);
+    const minHours = CLEANUP_TTL_MIN_SECONDS / 3600;
+    const maxHours = CLEANUP_TTL_MAX_SECONDS / 3600;
+    return html`
+      <div class="row">
+        <div class="row-label">
+          <span id="remote-build-cleanup-ttl-title" class="row-title">
+            ${this._localize("settings.remote_build_cleanup_ttl_title")}
+          </span>
+          <span class="row-desc">
+            ${this._localize("settings.remote_build_cleanup_ttl_desc")}
+          </span>
+        </div>
+        <div class="cleanup-ttl-input">
+          <input
+            id="remote-build-cleanup-ttl"
+            class="cleanup-ttl-number"
+            type="number"
+            min=${minHours}
+            max=${maxHours}
+            step="1"
+            aria-labelledby="remote-build-cleanup-ttl-title"
+            .value=${String(hours)}
+            @change=${this._onCommitCleanupTtl}
+          />
+          <span class="cleanup-ttl-unit">
+            ${this._localize("settings.remote_build_cleanup_ttl_unit")}
+          </span>
+        </div>
+      </div>
+    `;
+  }
+
+  private _onCommitCleanupTtl = (e: Event): void => {
+    // Parse the input as integer hours; reject NaN (the user
+    // cleared the field then blurred) by reverting to the
+    // current state's value via a follow-up re-render. Lit
+    // doesn't auto-revert without a state mutation, so explicitly
+    // bump _remoteBuildCleanupTtl with the (unchanged) value to
+    // trigger one.
+    const input = e.target as HTMLInputElement;
+    const hoursRaw = Number.parseInt(input.value, 10);
+    const minHours = CLEANUP_TTL_MIN_SECONDS / 3600;
+    const maxHours = CLEANUP_TTL_MAX_SECONDS / 3600;
+    let hours: number;
+    if (!Number.isFinite(hoursRaw)) {
+      // Empty / invalid input — revert to the current value.
+      // The defaulted starting state is in seconds; render in
+      // hours.
+      hours = Math.round(this._remoteBuildCleanupTtl / 3600) || (
+        CLEANUP_TTL_DEFAULT_SECONDS / 3600
+      );
+    } else {
+      hours = Math.max(minHours, Math.min(maxHours, hoursRaw));
+    }
+    input.value = String(hours);
+    const seconds = hours * 3600;
+    this.dispatchEvent(
+      new CustomEvent<number>("set-remote-build-cleanup-ttl", {
+        detail: seconds,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
 }
 

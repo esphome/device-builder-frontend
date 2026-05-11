@@ -104,6 +104,22 @@ export const remoteBuildEnabledContext = createContext<boolean>(
   Symbol("esphome-remote-build-enabled")
 );
 
+/**
+ * Receiver-side cleanup-sweep TTL (seconds).
+ *
+ * 6c knob that controls how long a cold remote-build subtree
+ * lingers before the receiver's background sweep reclaims it.
+ * Loaded alongside the master enable toggle from
+ * ``remote_build/get_settings``; updated whenever the operator
+ * commits the input in Settings → Build server. App-shell
+ * provides the value; the settings dialog consumes + renders
+ * an hours input. Default is 24h
+ * (``CLEANUP_TTL_DEFAULT_SECONDS``).
+ */
+export const remoteBuildCleanupTtlContext = createContext<number>(
+  Symbol("esphome-remote-build-cleanup-ttl")
+);
+
 /** Context for the integration → esphome.io docs URL map. Populated
  *  once on app load via ``components/get_integration_docs``; the
  *  drawer's loaded-integration tags consult it to decide whether to

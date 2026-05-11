@@ -1486,11 +1486,34 @@ export interface PairingWindowState {
 
 export interface RemoteBuildSettings {
   enabled: boolean;
+  /**
+   * 6c cleanup-sweep cold-subtree threshold (seconds). Backend
+   * defaults to 24h and clamps writes to [1h, 30d] via the
+   * `remote_build/set_settings` validator. Empty / missing on
+   * an older receiver predating this field deserialises to
+   * the default — the on-disk decode coerces silently rather
+   * than rejecting, so existing operators don't see a
+   * settings-load failure on upgrade. The UI renders this as
+   * hours; the conversion lives at the input boundary so the
+   * wire shape stays a single primitive.
+   */
+  cleanup_ttl_seconds: number;
   /** Receiver-side pinned offloaders. Includes both PENDING (in
    *  the receiver's ``_pending_peers`` dict) and APPROVED
    *  (persisted) rows, projected through ``PeerSummary``. */
   peers: PeerSummary[];
 }
+
+/**
+ * Bounds for {@link RemoteBuildSettings.cleanup_ttl_seconds}.
+ * Mirror the backend's `MIN_CLEANUP_TTL_SECONDS` /
+ * `MAX_CLEANUP_TTL_SECONDS` constants so the UI input clamps to
+ * the same range and the operator gets a client-side validation
+ * hint before the WS round-trip.
+ */
+export const CLEANUP_TTL_MIN_SECONDS = 60 * 60;
+export const CLEANUP_TTL_MAX_SECONDS = 30 * 24 * 60 * 60;
+export const CLEANUP_TTL_DEFAULT_SECONDS = 24 * 60 * 60;
 
 export interface RemoteBuildPeer {
   name: string;

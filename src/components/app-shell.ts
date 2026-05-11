@@ -14,6 +14,9 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { APIError, ESPHomeAPI } from "../api/index.js";
 import {
+  CLEANUP_TTL_DEFAULT_SECONDS,
+  CLEANUP_TTL_MAX_SECONDS,
+  CLEANUP_TTL_MIN_SECONDS,
   DeviceEventType,
   DeviceState,
   ErrorCode,
@@ -88,6 +91,7 @@ import {
   labelsContext,
   localizeContext,
   onboardingPendingContext,
+  remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
   serverVersionContext,
   stubRemoteBuildJobState,
@@ -243,6 +247,15 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: remoteBuildEnabledContext })
   @state()
   private _remoteBuildEnabled = false;
+
+  // 6c cleanup-sweep TTL (seconds). Loaded alongside the
+  // master enable toggle; updated when the operator commits
+  // the input in Settings → Build server. Default mirrors the
+  // backend default so a never-loaded state still renders
+  // sensibly in the UI.
+  @provide({ context: remoteBuildCleanupTtlContext })
+  @state()
+  private _remoteBuildCleanupTtl = CLEANUP_TTL_DEFAULT_SECONDS;
 
   // Frozen catalog-derived map; refreshed only with a backend release.
   // Cheap to leave at {} until the fetch lands — the device drawer
@@ -731,6 +744,7 @@ export class ESPHomeApp extends LitElement {
     try {
       const settings = await this._api.getRemoteBuildSettings();
       this._remoteBuildEnabled = settings.enabled;
+      this._remoteBuildCleanupTtl = settings.cleanup_ttl_seconds;
     } catch (err) {
       console.warn("Could not load remote-build settings:", err);
     }
@@ -1557,6 +1571,7 @@ export class ESPHomeApp extends LitElement {
         @set-theme=${this._onSetTheme}
         @set-yaml-diff-button=${this._onSetYamlDiffButton}
         @set-remote-build-enabled=${this._onSetRemoteBuildEnabled}
+        @set-remote-build-cleanup-ttl=${this._onSetRemoteBuildCleanupTtl}
         @set-language=${this._onSetLanguage}
         @pair-request-sent=${this._onPairRequestSent}
         @remote-build-job-submitted=${this._onRemoteBuildJobSubmitted}
@@ -1663,6 +1678,10 @@ export class ESPHomeApp extends LitElement {
     this._remoteBuildEnabled = enabled;
     this._remoteBuildSetInFlight = true;
     try {
+      // Omit ``cleanup_ttl_seconds`` so the toggle path doesn't
+      // clobber a TTL another tab / direct sidecar edit may
+      // have set; the backend leaves the existing value in
+      // place when the field is absent.
       await this._api.setRemoteBuildSettings({ enabled });
       // Toggling ``enabled`` runs ``apply_remote_build_enabled``
       // on the backend, which tears down or re-binds the peer-
@@ -1681,6 +1700,45 @@ export class ESPHomeApp extends LitElement {
         this._localize("settings.remote_build_save_failed"),
         { richColors: true }
       );
+    } finally {
+      this._remoteBuildSetInFlight = false;
+    }
+  }
+
+  private async _onSetRemoteBuildCleanupTtl(e: CustomEvent<number>) {
+    // Same optimistic-with-revert shape as the toggle path —
+    // commit the user's value to the UI immediately, write to
+    // the backend, revert + toast on failure. Client-side
+    // clamps to [MIN, MAX] before sending; the backend
+    // validator is the load-bearing gate (rejects outside that
+    // range with INVALID_ARGS).
+    const requested = e.detail;
+    if (
+      !Number.isFinite(requested) ||
+      requested < CLEANUP_TTL_MIN_SECONDS ||
+      requested > CLEANUP_TTL_MAX_SECONDS
+    ) {
+      // Settings dialog already clamps; this is defense-in-depth
+      // for a future caller bypassing the clamp.
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
+      return;
+    }
+    const previous = this._remoteBuildCleanupTtl;
+    if (previous === requested) return;
+    this._remoteBuildCleanupTtl = requested;
+    this._remoteBuildSetInFlight = true;
+    try {
+      await this._api.setRemoteBuildSettings({
+        enabled: this._remoteBuildEnabled,
+        cleanup_ttl_seconds: requested,
+      });
+    } catch {
+      this._remoteBuildCleanupTtl = previous;
+      toast.error(this._localize("settings.remote_build_save_failed"), {
+        richColors: true,
+      });
     } finally {
       this._remoteBuildSetInFlight = false;
     }

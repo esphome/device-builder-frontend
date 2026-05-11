@@ -1342,9 +1342,20 @@ export class ESPHomeAPI {
     return this.sendCommand<RemoteBuildSettings>("remote_build/get_settings");
   }
 
-  /** Persist the receiver-side remote-build settings. */
+  /**
+   * Persist the receiver-side remote-build settings.
+   *
+   * `cleanup_ttl_seconds` is optional; omit (or pass `undefined`)
+   * to preserve the existing value. The backend's
+   * `remote_build/set_settings` handler validates it in
+   * [`CLEANUP_TTL_MIN_SECONDS`, `CLEANUP_TTL_MAX_SECONDS`] and
+   * rejects with `INVALID_ARGS` outside that range; the
+   * settings dialog clamps client-side before the call, but
+   * the validator is the load-bearing gate.
+   */
   async setRemoteBuildSettings(args: {
     enabled: boolean;
+    cleanup_ttl_seconds?: number;
   }): Promise<RemoteBuildSettings> {
     return this.sendCommand<RemoteBuildSettings>(
       "remote_build/set_settings",
