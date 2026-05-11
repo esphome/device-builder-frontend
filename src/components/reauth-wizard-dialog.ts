@@ -1,19 +1,17 @@
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
-
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import type { OffloaderPinMismatchAlert } from "../api/types.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { formatPinSha256 } from "../util/cert-pin-format.js";
 import { trimTrailingDot } from "../util/hostname.js";
 
+import "./base-dialog.js";
 import "./pin-emoji-grid.js";
 
 type Step = 1 | 2 | 3;
@@ -81,9 +79,6 @@ export class ESPHomeReauthWizardDialog extends LitElement {
    *  operator can't bypass the "I've checked with the receiver
    *  admin" acknowledgment. Resets on every ``open()``. */
   @state() private _verified = false;
-
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
 
   open(alert: OffloaderPinMismatchAlert): void {
     this._alert = alert;
@@ -241,35 +236,27 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           : this._renderStep3(alert);
     const title = this._localize(`settings.reauth_wizard_step${this._step}_title`);
     return html`
-      <wa-dialog
+      <esphome-base-dialog
         ?open=${this._open}
-        light-dismiss
-        @wa-after-hide=${this._onClose}
+        .label=${title}
+        @after-hide=${this._onClose}
       >
-        <header slot="label">
-          <div class="title">${title}</div>
-          <div class="step-indicator" aria-label=${this._localize(
+        <div
+          class="step-indicator"
+          aria-label=${this._localize(
             "settings.reauth_wizard_step_progress",
             { step: this._step, total: 3 },
-          )}>
-            ${[1, 2, 3].map(
-              (n) => html`
-                <span
-                  class=${`dot ${this._step === n ? "dot-active" : ""}`}
-                  aria-hidden="true"
-                ></span>
-              `,
-            )}
-          </div>
-        </header>
-        <button
-          class="dialog-close"
-          slot="header-actions"
-          aria-label=${this._localize("layout.close")}
-          @click=${this._onClose}
+          )}
         >
-          ✕
-        </button>
+          ${[1, 2, 3].map(
+            (n) => html`
+              <span
+                class=${`dot ${this._step === n ? "dot-active" : ""}`}
+                aria-hidden="true"
+              ></span>
+            `,
+          )}
+        </div>
         <div class="step-body">${stepBody}</div>
         <div class="actions">
           <button class="btn btn--cancel" type="button" @click=${this._onClose}>
@@ -293,35 +280,32 @@ export class ESPHomeReauthWizardDialog extends LitElement {
                 ${this._localize("settings.reauth_wizard_repair_action")}
               </button>`}
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
   static styles = [
     espHomeStyles,
-    dialogCloseButtonStyles,
     pinHexStyles,
     dialogActionButtonStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 560px;
       }
 
-      header[slot="label"] {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-      }
-
-      .title {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
+      /* Step-progress dots sit at the top of the body. The
+         pre-migration shape rendered them inside the
+         slot=label header next to the wizard title;
+         base-dialog's .label property only takes a string,
+         so the indicator moved into the body where it reads
+         as the first row above the step content. Wizard
+         title still renders in the dialog header via the
+         .label property. */
       .step-indicator {
         display: flex;
         gap: 6px;
         align-items: center;
+        padding-bottom: var(--wa-space-s);
       }
 
       .dot {
