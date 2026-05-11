@@ -804,6 +804,8 @@
     "build_offload_pairing_connecting": "Connecting…",
     "build_offload_pairing_disconnected": "Disconnected",
     "build_offload_pairing_last_error": "Last connection error: {detail}",
+    "build_offload_pairing_version_mismatch_patch": "Build server runs ESPHome {peer}; you're on {local}",
+    "build_offload_pairing_version_mismatch_release": "Build server runs ESPHome {peer}; you're on {local}. YAML may not compile across this release gap.",
     "remote_build_submit_action": "Build remotely",
     "remote_build_submit_aria": "Build remotely on {label}",
     "remote_build_view_action": "View build",

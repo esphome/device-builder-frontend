@@ -1450,6 +1450,20 @@ export interface PairingSummary {
    * subscribe after an in-flight failure.
    */
   last_connect_error: string;
+  /**
+   * Receiver-advertised `esphome.const.__version__` captured
+   * at handshake time and refreshed on every peer-link
+   * session-open. Empty string before the first successful
+   * handshake (PENDING row, or APPROVED row that has never
+   * connected). Used by Settings → Build server → paired
+   * build servers to surface a per-row version-mismatch
+   * sub-line ahead of the scheduler's
+   * allow-major-version-mismatch toggle landing in 7a-3 +
+   * 7b. Both sides are wire-typed `string`; comparison is
+   * structural (year+month vs patch) per
+   * `util/version-mismatch.ts`.
+   */
+  esphome_version: string;
 }
 
 /**

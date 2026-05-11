@@ -741,6 +741,8 @@
     "build_offload_pairing_connecting": "Connexion…",
     "build_offload_pairing_disconnected": "Déconnecté",
     "build_offload_pairing_last_error": "Dernière erreur de connexion : {detail}",
+    "build_offload_pairing_version_mismatch_patch": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}",
+    "build_offload_pairing_version_mismatch_release": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}. Le YAML peut ne pas compiler à travers cet écart de version.",
     "remote_build_submit_action": "Compiler à distance",
     "remote_build_submit_aria": "Compiler à distance sur {label}",
     "remote_build_view_action": "Voir la compilation",

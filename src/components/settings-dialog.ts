@@ -39,6 +39,7 @@ import {
   buildServerPeersContext,
   localizeContext,
   remoteBuildEnabledContext,
+  versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
 import type { RemoteBuildJobState } from "../context/index.js";
@@ -53,6 +54,7 @@ import {
 } from "../util/hostname.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { remainingOf } from "../util/relative-time.js";
+import { classifyVersionMismatch } from "../util/version-mismatch.js";
 import "./accept-peer-dialog.js";
 import type { ESPHomeAcceptPeerDialog } from "./accept-peer-dialog.js";
 import "./confirm-dialog.js";
@@ -186,6 +188,20 @@ export class ESPHomeSettingsDialog extends LitElement {
   @consume({ context: remoteBuildEnabledContext, subscribe: true })
   @state()
   private _remoteBuildEnabled = false;
+
+  // Local dashboard's bundled ESPHome version. Compared
+  // against each paired build server's
+  // ``PairingSummary.esphome_version`` to drive the
+  // per-row mismatch sub-line in the paired-build-servers
+  // list. App-shell publishes this via ``versionContext``
+  // once the ServerInfo handshake completes; subscribers
+  // also pick up the value if it changes (rotate / restart
+  // path through the same context). Empty string before
+  // ServerInfo lands — the helper treats empty as "unknown,
+  // don't surface a mismatch."
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  private _appVersion = "";
 
   @consume({
     context: buildServerIdentityRotationCounterContext,
@@ -1521,6 +1537,26 @@ export class ESPHomeSettingsDialog extends LitElement {
         word-break: break-word;
       }
 
+      /* Sub-line under any APPROVED row whose receiver
+         reports a different esphome_version than the
+         offloader's bundled version. Two shades: --patch
+         is informational (same year+month, just a
+         different patch / dev / beta build) and inherits
+         the quiet row-desc colour; --release is
+         cautionary (different year+month; YAMLs may not
+         compile cleanly across the gap) and uses the
+         warning palette to draw the eye. Once 7b's
+         allow-major-version-mismatch toggle and 7a's
+         scheduler land, the --release case becomes the
+         signal the operator has to explicitly accept; the
+         banner here is the visible cue ahead of that. */
+      .pairing-version-mismatch {
+        word-break: break-word;
+      }
+      .pairing-version-mismatch--release {
+        color: var(--esphome-warning, #f59e0b);
+      }
+
       .pairing-status-pending {
         background: color-mix(
           in srgb,
@@ -2565,6 +2601,7 @@ export class ESPHomeSettingsDialog extends LitElement {
                 </span>
               `
             : nothing}
+          ${this._renderPairingVersionMismatch(pairing)}
         </div>
         ${pairing.status === "approved" && pairing.connected
           ? html`
@@ -2627,6 +2664,47 @@ export class ESPHomeSettingsDialog extends LitElement {
    *  peer-link is currently up; surfacing the last output of
    *  a build that finished before disconnect is the whole
    *  point of the deferred-dismiss behaviour. */
+  /** Per-row sub-line surfacing an esphome_version mismatch
+   *  between the offloader's bundled version and the
+   *  paired receiver's reported version. Helps the operator
+   *  spot the case the dispatched compile will run against
+   *  a different schema than the YAML was authored on —
+   *  especially the cross-release (year+month) gap, which
+   *  is what the future scheduler's
+   *  allow-major-version-mismatch toggle will key on (7a-3
+   *  + 7b). PENDING rows skip the line: the handshake-time
+   *  ``esphome_version`` capture only happens once the
+   *  receiver has accepted the pair, so PENDING rows always
+   *  carry an empty value the helper classifies as
+   *  unknown. Connection-state (connected / connecting /
+   *  disconnected) doesn't gate this — a long-disconnected
+   *  pairing still carries the version we captured at the
+   *  last handshake, and that version mismatch is still the
+   *  right thing to surface ahead of the next reconnect. */
+  private _renderPairingVersionMismatch(pairing: PairingSummary) {
+    if (pairing.status !== "approved") return nothing;
+    const kind = classifyVersionMismatch(
+      this._appVersion,
+      pairing.esphome_version,
+    );
+    if (kind === null) return nothing;
+    const key =
+      kind === "release"
+        ? "settings.build_offload_pairing_version_mismatch_release"
+        : "settings.build_offload_pairing_version_mismatch_patch";
+    return html`
+      <span
+        class=${`row-desc pairing-version-mismatch pairing-version-mismatch--${kind}`}
+        role="status"
+      >
+        ${this._localize(key, {
+          peer: pairing.esphome_version,
+          local: this._appVersion,
+        })}
+      </span>
+    `;
+  }
+
   private _renderViewRemoteBuildButton(pairing: PairingSummary) {
     const job = this._latestRemoteBuildJobForPin(pairing.pin_sha256);
     if (job === undefined) return nothing;
