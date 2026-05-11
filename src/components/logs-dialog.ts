@@ -463,6 +463,7 @@ export class ESPHomeLogsDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._open}
         .label=${title}
+        @request-close=${this._onDialogRequestClose}
         @after-hide=${this._onDialogHide}
       >
         <div class="logs-content">
@@ -613,6 +614,24 @@ export class ESPHomeLogsDialog extends LitElement {
   private _clearLogs() {
     this._lines = [];
   }
+
+  /**
+   * Flip our local ``_open`` flag the moment the user
+   * initiates a close (X / Esc / outside-click), before
+   * wa-dialog finishes its hide animation. Log streaming
+   * pushes new lines into ``_lines`` on a continuous WS
+   * subscription, and each push triggers a re-render with
+   * ``?open=${this._open}`` — if ``_open`` were still
+   * ``true`` during the hide animation, the re-asserted
+   * ``open=true`` could cancel wa-dialog's in-progress
+   * hide. Doesn't ``preventDefault`` — no host-side veto
+   * reason — so the close still proceeds and the
+   * ``after-hide`` handler tears down the stream as
+   * before.
+   */
+  private _onDialogRequestClose = (): void => {
+    this._open = false;
+  };
 
   private _onDialogHide() {
     this._open = false;
