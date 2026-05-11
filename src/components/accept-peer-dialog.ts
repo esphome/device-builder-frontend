@@ -238,14 +238,10 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
     `;
   }
 
-  private _onAccept(e: Event) {
+  private _onAccept() {
     if (this.peer === null) return;
-    // Stop the inner ``confirm`` so it doesn't bubble past us
-    // and fire the parent's listener a second time with empty
-    // detail; we re-dispatch under the same name below.
-    e.stopPropagation();
     this.dispatchEvent(
-      new CustomEvent("confirm", {
+      new CustomEvent("accept", {
         detail: { dashboardId: this.peer.dashboard_id },
         bubbles: true,
         composed: true,

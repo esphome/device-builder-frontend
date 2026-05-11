@@ -124,7 +124,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
           ? this._statusRow("settings.build_server_pairing_requests_empty")
           : pending.map((p) => this._renderPendingRow(p))}
       <esphome-accept-peer-dialog
-        @confirm=${this._onAcceptConfirm}
+        @accept=${this._onAcceptConfirm}
         @reject=${this._onRejectFromDialog}
       ></esphome-accept-peer-dialog>
     `;
