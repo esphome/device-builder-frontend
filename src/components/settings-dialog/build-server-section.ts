@@ -14,7 +14,7 @@ import {
   type IdentityView,
   type PeerSummary,
 } from "../../api/types.js";
-import type { LocalizeFunc } from "../../common/localize.js";
+import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
   buildServerIdentityRotationCounterContext,
@@ -225,7 +225,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
                         "settings.build_server_peer_paired_at_label",
                       )}
                     </dt>
-                    <dd>${formatSecondsAgo(pairedAgoSeconds)}</dd>
+                    <dd>${formatSecondsAgo(pairedAgoSeconds, activeLocale())}</dd>
                   `
                 : nothing}
               ${peer.peer_ip
