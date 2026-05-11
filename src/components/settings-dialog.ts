@@ -132,6 +132,11 @@ interface SectionDef {
   id: Section;
   icon: string;
   labelKey: string;
+  // Optional group tag. Sections that share a non-empty group
+  // are rendered together in the nav under a small uppercase
+  // group header (currently used only for 'experimental').
+  // Sections with no group are rendered first as a flat list.
+  group?: "experimental";
 }
 
 const SECTIONS: SectionDef[] = [
@@ -165,10 +170,16 @@ const SECTIONS: SectionDef[] = [
   },
   {
     // "Send builds" = Offload role: this dashboard
-    // dispatching its compiles to another dashboard.
+    // dispatching its compiles to another dashboard. Grouped
+    // under the EXPERIMENTAL nav header because the compile-
+    // dispatch flow is still in development -- the typed
+    // hostnames + paired-build-server rows on this screen are
+    // remembered, but no compile job is actually dispatched
+    // until the offloader's submit_job pipeline lands.
     id: "build_offload",
     icon: "send-outline",
     labelKey: "settings.build_offload",
+    group: "experimental",
   },
 ];
 
@@ -1237,30 +1248,26 @@ export class ESPHomeSettingsDialog extends LitElement {
          via .row: zero horizontal padding, rely on the
          container. */
 
-      /* Inline 'EXPERIMENTAL' tag rendered next to the section
-         heading at the top of an in-development settings pane.
-         Same visual language as esphome-layout's .preview-badge
-         but recoloured for the settings dialog's neutral surface
-         (the header's --esphome-on-primary tones read as
-         low-contrast on this background). Carries the same
-         lightweight "feature is in development, no detailed
-         caveat banner" signal a Preview tag carries for the
-         whole app; replaces the verbose
-         build_offload_unimplemented_banner copy. */
-      .experimental-tag {
-        display: inline-block;
-        font-size: 9px;
+      /* Nav-sidebar group header. Renders above grouped
+         sections in the left rail (currently just the
+         EXPERIMENTAL group containing 'Send builds'). Same
+         visual treatment as the in-content '.section-heading'
+         small-caps subtitles -- uppercase, tracked, quiet
+         colour, hairline divider above -- so the eye reads the
+         group as "sectioning" rather than "another nav item".
+         Lives in the nav layer rather than as an inline content
+         banner: replaces the previous verbose
+         'build_offload_unimplemented_banner' copy with a
+         lightweight structural signal in the navigation. */
+      .nav-group-header {
+        font-size: var(--wa-font-size-2xs);
         font-weight: var(--wa-font-weight-bold);
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
-        padding: 2px 6px;
-        border-radius: var(--wa-border-radius-s);
-        background: color-mix(in srgb, var(--wa-color-warning-fill-loud), transparent 85%);
-        color: var(--wa-color-warning-fill-loud);
-        border: 1px solid color-mix(in srgb, var(--wa-color-warning-fill-loud), transparent 60%);
-        line-height: 1;
-        flex-shrink: 0;
-        margin: 0 0 var(--wa-space-m);
+        color: var(--wa-color-text-quiet);
+        padding: var(--wa-space-s) var(--wa-space-s) var(--wa-space-2xs);
+        margin-top: var(--wa-space-s);
+        border-top: 1px solid var(--wa-color-surface-border);
       }
 
       /* Binding-mismatch alert rows. Same shape as
@@ -1896,17 +1903,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         <div class="layout">
           <aside class="sidebar">
             <nav class="nav">
-              ${SECTIONS.map(
-                (s) => html`
-                  <button
-                    class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
-                    @click=${() => this._selectSection(s.id)}
-                  >
-                    <wa-icon library="mdi" name=${s.icon}></wa-icon>
-                    <span>${this._localize(s.labelKey)}</span>
-                  </button>
-                `
-              )}
+              ${this._renderNav()}
             </nav>
           </aside>
           <main class="content">
@@ -1914,6 +1911,43 @@ export class ESPHomeSettingsDialog extends LitElement {
           </main>
         </div>
       </esphome-base-dialog>
+    `;
+  }
+
+  /**
+   * Render the nav sidebar.
+   *
+   * Flat sections (no 'group') render first as a single
+   * list. Grouped sections render after, each group preceded
+   * by a small uppercase header (currently only the
+   * 'experimental' group is used, surfaced as 'EXPERIMENTAL'
+   * above 'Send builds'). The grouped pattern replaces the
+   * previous inline-banner approach -- "this feature is still
+   * in development" lives in the nav structure rather than as
+   * a paragraph at the top of the section content.
+   */
+  private _renderNav() {
+    const flat = SECTIONS.filter((s) => !s.group);
+    const experimental = SECTIONS.filter((s) => s.group === "experimental");
+    const renderItem = (s: SectionDef) => html`
+      <button
+        class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
+        @click=${() => this._selectSection(s.id)}
+      >
+        <wa-icon library="mdi" name=${s.icon}></wa-icon>
+        <span>${this._localize(s.labelKey)}</span>
+      </button>
+    `;
+    return html`
+      ${flat.map(renderItem)}
+      ${experimental.length
+        ? html`
+            <div class="nav-group-header">
+              ${this._localize("settings.experimental_tag")}
+            </div>
+            ${experimental.map(renderItem)}
+          `
+        : nothing}
     `;
   }
 
@@ -2342,17 +2376,15 @@ export class ESPHomeSettingsDialog extends LitElement {
    *    cross-subnet / non-mDNS receivers.
    *
    * Pairing-window + peer-link + scheduler land across phases
-   * 4 / 5 / 7. The inline EXPERIMENTAL tag at the top of the
-   * pane is the only "feature is in development" signal —
-   * lighter touch than the verbose banner this replaced, same
-   * visual language as the dashboard header's PREVIEW badge.
+   * 4 / 5 / 7. The section's "still in development" signal
+   * lives in the nav sidebar (this section is grouped under
+   * the EXPERIMENTAL header, see SectionDef.group) rather
+   * than as an inline banner at the top of the content pane —
+   * lighter touch, doesn't push the actual settings down the
+   * screen.
    */
   private _renderBuildOffload() {
     return html`
-      <span class="experimental-tag" role="status">
-        ${this._localize("settings.experimental_tag")}
-      </span>
-
       ${this._renderOffloaderAlerts()}
       ${this._renderOffloaderRemoteBuildsToggle()}
 
