@@ -356,6 +356,7 @@
     "queued_title": "Waiting in queue",
     "queued_message": "Another firmware task is running. This task will start when it finishes.",
     "queued_waiting_for": "Waiting for {name} to finish.",
+    "queued_waiting_for_build_server": "Waiting for another job running on the build server.",
     "queued_view_all": "View firmware tasks",
     "remote_builder_sub_line": "Building on {receiver}",
     "force_local_action": "Build locally instead",

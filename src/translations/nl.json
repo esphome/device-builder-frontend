@@ -292,6 +292,7 @@
     "queued_title": "In wachtrij",
     "queued_message": "Er draait al een andere firmwaretaak. Deze start zodra die klaar is.",
     "queued_waiting_for": "Wachten tot {name} klaar is.",
+    "queued_waiting_for_build_server": "Wachten op een andere taak op de bouwserver.",
     "queued_view_all": "Firmwaretaken bekijken",
     "force_local_action": "In plaats daarvan lokaal bouwen",
     "force_local_switching": "Overschakelen…",

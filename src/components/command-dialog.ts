@@ -22,11 +22,13 @@ import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import {
   apiContext,
+  buildOffloadJobsContext,
   darkModeContext,
   devicesContext,
   firmwareJobsContext,
   localizeContext,
 } from "../context/index.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
@@ -103,6 +105,14 @@ export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: devicesContext, subscribe: true })
   @state()
   _devices: ConfiguredDevice[] = [];
+
+  // Receiver-side projection of jobs this offloader submitted. The local
+  // FirmwareJob flips to RUNNING the moment the runner dispatches to peer-
+  // link, so _isQueued can't see the cross-offloader case where our job
+  // parks behind another offloader's build on the same receiver.
+  @consume({ context: buildOffloadJobsContext, subscribe: true })
+  @state()
+  _offloadJobs: Map<string, RemoteBuildJobState> | null = null;
 
   @property() configuration = "";
   @property() name = "";
@@ -267,6 +277,15 @@ export class ESPHomeCommandDialog extends LitElement {
     if (!this._jobId) return false;
     const ctxStatus = this._jobs.get(this._jobId)?.status;
     return (ctxStatus ?? this._jobStatus) === JobStatus.QUEUED;
+  }
+
+  // True when our job is parked on the receiver behind another offloader's
+  // build. The local FirmwareJob flips to RUNNING the moment the runner
+  // dispatches to peer-link, so _isQueued above misses this case; the
+  // receiver's job_state_changed{queued} surfaces it here.
+  get _isRemoteQueued(): boolean {
+    if (!this._jobId || !this._offloadJobs) return false;
+    return this._offloadJobs.get(this._jobId)?.status === JobStatus.QUEUED;
   }
 
   _openFirmwareJobs = () => {
