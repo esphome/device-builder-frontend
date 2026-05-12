@@ -101,7 +101,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
-        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
 
       .btn {
@@ -220,7 +220,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
             type="text"
             .value=${this._friendlyName}
             placeholder=${this._localize(
-              "dashboard.action_clone_friendly_name_placeholder",
+              "dashboard.action_clone_friendly_name_placeholder"
             )}
             @input=${(e: Event) => {
               this._friendlyName = (e.target as HTMLInputElement).value;
@@ -255,14 +255,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     if (validateDeviceName(newName)) return;
     this.close();
     this.dispatchEvent(
-      new CustomEvent<{ newName: string; newFriendlyName: string }>(
-        "clone-confirm",
-        {
-          detail: { newName, newFriendlyName: this._friendlyName.trim() },
-          bubbles: true,
-          composed: true,
-        },
-      ),
+      new CustomEvent<{ newName: string; newFriendlyName: string }>("clone-confirm", {
+        detail: { newName, newFriendlyName: this._friendlyName.trim() },
+        bubbles: true,
+        composed: true,
+      })
     );
   };
 }

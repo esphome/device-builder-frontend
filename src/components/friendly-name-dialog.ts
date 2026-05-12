@@ -112,7 +112,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
-        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
 
       .btn {
@@ -186,9 +186,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     const trimmed = this._value.trim();
     const unchanged = trimmed === this.currentFriendlyName;
     const empty = !trimmed;
-    const err = empty
-      ? { code: "dashboard.action_friendly_name_required" }
-      : null;
+    const err = empty ? { code: "dashboard.action_friendly_name_required" } : null;
     const canSubmit = !empty && !unchanged && !err;
 
     return html`
@@ -219,9 +217,7 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
           ${err
             ? renderInlineError(this._localize(err.code))
             : html`<span class="helper"
-                >${this._localize(
-                  "dashboard.action_friendly_name_helper",
-                )}</span
+                >${this._localize("dashboard.action_friendly_name_helper")}</span
               >`}
         </div>
         <div class="install-row">
@@ -231,16 +227,14 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
               this._install = (e.target as HTMLInputElement).checked;
             }}
             >${this._localize(
-              "dashboard.action_friendly_name_install_after",
+              "dashboard.action_friendly_name_install_after"
             )}</wa-checkbox
           >
         </div>
         ${!this._install
           ? html`<div class="field">
               <span class="helper"
-                >${this._localize(
-                  "dashboard.action_friendly_name_install_skipped",
-                )}</span
+                >${this._localize("dashboard.action_friendly_name_install_skipped")}</span
               >
             </div>`
           : nothing}
@@ -273,8 +267,8 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
           detail: { newFriendlyName, install: this._install },
           bubbles: true,
           composed: true,
-        },
-      ),
+        }
+      )
     );
   };
 }

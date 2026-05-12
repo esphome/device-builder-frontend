@@ -99,7 +99,7 @@ export const modalDialogStyles = css`
     justify-content: flex-end;
     gap: var(--wa-space-s);
     flex-wrap: wrap;
-    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    padding: var(--wa-space-m) 0 var(--wa-space-l);
   }
 
   .btn {

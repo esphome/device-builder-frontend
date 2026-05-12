@@ -13,58 +13,88 @@ import {
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
-export function renderBanner(host: ESPHomePageDashboard): TemplateResult | string {
-  const visible = host._visibleImportableDevices;
-  if (visible.length === 0) return "";
-  return html`
-    <div class="discovered-banner-wrap">
-      <div class="discovered-banner">
-        <div class="discovered-banner-empty"></div>
-        <div style="justify-content: center; display: flex; align-items: center">
-          <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
-          <span
-            >${host._localize(
-              visible.length === 1
-                ? "dashboard.discovered_count_singular"
-                : "dashboard.discovered_count_plural",
-              { count: visible.length },
-            )}</span
-          >
-        </div>
-        <button
-          class="discovered-banner-toggle"
-          type="button"
-          aria-expanded=${host._showDiscovered}
-          aria-controls="discovered-grid"
-          @click=${() => {
-            host._showDiscovered = !host._showDiscovered;
-          }}
-        >
-          ${host._localize(host._showDiscovered ? "dashboard.hide" : "dashboard.show")}
-        </button>
-      </div>
-    </div>
-  `;
-}
+const discoveryCollator = new Intl.Collator(undefined, {
+  sensitivity: "base",
+  numeric: true,
+});
 
-export function renderDiscoveredGrid(host: ESPHomePageDashboard): TemplateResult {
-  const visible = host._visibleImportableDevices;
+export function renderDiscoveredSection(
+  host: ESPHomePageDashboard,
+): TemplateResult | string {
+  // Render when there are any importable devices, even if all are
+  // currently filtered out by the show-ignored flag — the banner is
+  // the only way to flip that flag now.
+  if (host._importableDevices.length === 0) return "";
+  // Non-ignored discoveries first, then ignored ones — both
+  // alphabetical by friendly name (fallback hostname) within each
+  // group. Ignored cards are already dimmed via [data-ignored];
+  // pushing them to the bottom keeps active discoveries on top.
+  const visible = [...host._visibleImportableDevices].sort((a, b) => {
+    if (a.ignored !== b.ignored) return a.ignored ? 1 : -1;
+    return discoveryCollator.compare(
+      a.friendly_name || a.name,
+      b.friendly_name || b.name,
+    );
+  });
+  const ignoredCount = host._importableDevices.filter((d) => d.ignored).length;
+  const expanded = host._showDiscovered && visible.length > 0;
   return html`
-    <div
-      id="discovered-grid"
-      class="devices-grid"
-      ?hidden=${!host._showDiscovered || visible.length === 0}
-    >
-      ${visible.map(
-        (device: AdoptableDevice) => html`
-          <esphome-discovered-device-card
-            .device=${device}
-            @adopt=${() => host._adoptDialog.open(device)}
-            @toggle-ignore=${() => host._toggleIgnore(device)}
-          ></esphome-discovered-device-card>
-        `,
-      )}
-    </div>
+    <section class="discovered-section">
+      <header class="discovered-section-header">
+        <wa-icon library="mdi" name="clipboard-text-search-outline"></wa-icon>
+        <span class="discovered-section-count"
+          >${host._localize(
+            visible.length === 1
+              ? "dashboard.discovered_count_singular"
+              : "dashboard.discovered_count_plural",
+            { count: visible.length },
+          )}</span
+        >
+        ${visible.length > 0
+          ? html`<button
+              class="discovered-section-toggle"
+              type="button"
+              aria-expanded=${expanded}
+              aria-controls="discovered-grid"
+              @click=${() => {
+                host._showDiscovered = !host._showDiscovered;
+              }}
+            >
+              ${host._localize(expanded ? "dashboard.hide" : "dashboard.show")}
+            </button>`
+          : ""}
+        ${ignoredCount > 0
+          ? html`<button
+              class="discovered-section-toggle discovered-section-toggle--ignored"
+              type="button"
+              aria-pressed=${host._showIgnored}
+              @click=${host._toggleShowIgnored}
+            >
+              ${host._showIgnored
+                ? host._localize("dashboard.hide_ignored")
+                : host._localize("dashboard.show_ignored", {
+                    count: ignoredCount,
+                  })}
+            </button>`
+          : ""}
+      </header>
+      <div
+        id="discovered-grid"
+        class="discovered-section-grid"
+        ?hidden=${!expanded}
+      >
+        ${visible.map(
+          (device: AdoptableDevice) => html`
+            <esphome-discovered-device-card
+              compact
+              .device=${device}
+              @adopt=${() => host._adoptDialog.open(device)}
+              @toggle-ignore=${() => host._toggleIgnore(device)}
+            ></esphome-discovered-device-card>
+          `,
+        )}
+      </div>
+    </section>
   `;
 }
 

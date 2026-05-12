@@ -1,9 +1,5 @@
 import { consume } from "@lit/context";
-import {
-  mdiArchiveArrowUpOutline,
-  mdiArchiveOutline,
-  mdiTrashCanOutline,
-} from "@mdi/js";
+import { mdiArchiveArrowUpOutline, mdiArchiveOutline, mdiTrashCanOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -296,13 +292,17 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
 
   private _renderBody() {
     if (this._loading && this._devices.length === 0) {
-      return html`<div class="loading">${this._localize("dashboard.archived_dialog_loading")}</div>`;
+      return html`<div class="loading">
+        ${this._localize("dashboard.archived_dialog_loading")}
+      </div>`;
     }
     if (this._error) {
       return html`<div class="error">${this._error}</div>`;
     }
     if (this._devices.length === 0) {
-      return html`<div class="empty">${this._localize("dashboard.archived_dialog_empty")}</div>`;
+      return html`<div class="empty">
+        ${this._localize("dashboard.archived_dialog_empty")}
+      </div>`;
     }
     return html`
       ${this._devices.map(
@@ -334,7 +334,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
               </button>
             </div>
           </div>
-        `,
+        `
       )}
     `;
   }
@@ -345,7 +345,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         detail: device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -355,7 +355,7 @@ export class ESPHomeArchivedDevicesDialog extends LitElement {
         detail: device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

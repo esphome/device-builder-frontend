@@ -70,12 +70,11 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
-
       .actions {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
-        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
 
       .btn {
@@ -159,20 +158,30 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
             type="text"
             class=${err ? "invalid" : ""}
             .value=${this._value}
-            @input=${(e: Event) => { this._value = (e.target as HTMLInputElement).value; }}
-            @keydown=${(e: KeyboardEvent) => { if (e.key === "Enter" && canSubmit) this._confirm(); }}
+            @input=${(e: Event) => {
+              this._value = (e.target as HTMLInputElement).value;
+            }}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "Enter" && canSubmit) this._confirm();
+            }}
           />
           ${err
             ? renderInlineError(this._localize(err.code, err.params))
             : warning
-              ? html`<span class="field-warning">${this._localize(warning.code, warning.params)}</span>`
+              ? html`<span class="field-warning"
+                  >${this._localize(warning.code, warning.params)}</span
+                >`
               : nothing}
         </div>
         <div class="actions">
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
-          <button class="btn btn--primary" ?disabled=${!canSubmit} @click=${this._confirm}>
+          <button
+            class="btn btn--primary"
+            ?disabled=${!canSubmit}
+            @click=${this._confirm}
+          >
             ${this._localize("dashboard.action_rename_confirm")}
           </button>
         </div>
@@ -190,7 +199,7 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
         detail: newName,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

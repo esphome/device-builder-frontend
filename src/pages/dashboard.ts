@@ -68,9 +68,8 @@ import {
   renderYamlToolbar,
 } from "../components/dashboard/render-toolbar.js";
 import {
-  renderBanner,
   renderCardGrid,
-  renderDiscoveredGrid,
+  renderDiscoveredSection,
   renderDrawer,
   renderTable,
 } from "../components/dashboard/render-content.js";
@@ -204,6 +203,17 @@ export class ESPHomePageDashboard extends LitElement {
   private _onShowIgnoredChanged = (e: Event) => {
     this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
   };
+
+  _toggleShowIgnored = () => {
+    this._showIgnored = !this._showIgnored;
+    localStorage.setItem("esphome-show-ignored", String(this._showIgnored));
+    // Other components / future tabs hook in via this window event.
+    window.dispatchEvent(
+      new CustomEvent("esphome-show-ignored-changed", {
+        detail: { value: this._showIgnored },
+      }),
+    );
+  };
   private _onShowArchivedDialog = () => this._archivedDialog?.open();
 
   _onEnterSelectMode = (configuration?: string) => {
@@ -285,7 +295,7 @@ export class ESPHomePageDashboard extends LitElement {
     // snippets.
     if (this._yamlMode) {
       return html`
-        ${renderBanner(this)} ${renderDiscoveredGrid(this)}
+        ${renderDiscoveredSection(this)}
         ${renderYamlToolbar(this)}
         ${renderYamlMode(this)}
         ${renderDrawer(this)} ${renderSelectBarOrFab(this)} ${renderDialogs(this)}
@@ -299,7 +309,7 @@ export class ESPHomePageDashboard extends LitElement {
       : labelFiltered;
 
     return html`
-      ${renderBanner(this)} ${renderDiscoveredGrid(this)}
+      ${renderDiscoveredSection(this)}
       ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? renderToolbar(this, filtered.length, this._devices.length)
         : ""}

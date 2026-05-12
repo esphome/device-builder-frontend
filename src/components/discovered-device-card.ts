@@ -32,6 +32,12 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
   @property({ attribute: false })
   device!: AdoptableDevice;
 
+  // When set, the card renders as a single horizontal row instead of
+  // the default vertical card layout — used inside the dashboard's
+  // discovered-section banner where the cards must fit a compact pill.
+  @property({ type: Boolean, reflect: true })
+  compact = false;
+
   static styles = [
     espHomeStyles,
     css`
@@ -186,6 +192,66 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
       .btn wa-icon {
         font-size: 15px;
       }
+
+      /* ── Compact / single-line mode ──────────────────────────
+         Used inside the dashboard's discovered-section banner.
+         Collapses the card to one horizontal row so multiple
+         discoveries can stack as a list. */
+      :host([compact]) .card {
+        flex-direction: row;
+        align-items: center;
+        gap: var(--wa-space-s);
+        padding: var(--wa-space-s) var(--wa-space-m);
+        background: transparent;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      :host([compact]) .card:hover {
+        box-shadow: none;
+      }
+
+      /* "DISCOVERED" / "IGNORED" pill — hidden in compact mode to
+         save horizontal space; the container itself already conveys
+         that these are discoveries. */
+      :host([compact]) .status {
+        display: none;
+      }
+
+      :host([compact]) .header {
+        flex: 1;
+        min-width: 0;
+        padding: 0;
+        border-bottom: none;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      :host([compact]) .title {
+        margin: 0;
+        font-size: var(--wa-font-size-m);
+      }
+
+      :host([compact]) .subtitle {
+        font-size: var(--wa-font-size-xs);
+      }
+
+      :host([compact]) .actions {
+        padding: 0;
+        flex-shrink: 0;
+      }
+
+      /* Rows divider between stacked compact cards. */
+      :host([compact]) {
+        border-bottom: var(--wa-border-width-s) solid
+          color-mix(in srgb, var(--esphome-primary), transparent 80%);
+      }
+
+      :host([compact]:last-child) {
+        border-bottom: none;
+      }
     `,
   ];
 
@@ -228,7 +294,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
                   ${this._localize("dashboard.action_take_control")}
                 </button>
               `}
-          ${safeWebUrl
+          ${safeWebUrl && !this.compact
             ? html`<a
                 class="btn btn--ghost btn--icon"
                 href=${safeWebUrl}

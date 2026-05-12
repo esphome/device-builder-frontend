@@ -1,8 +1,8 @@
 import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import type { AdoptableDevice } from "../api/types.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
+import type { AdoptableDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -177,7 +177,7 @@ export class ESPHomeAdoptDialog extends LitElement {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
-        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+        padding: var(--wa-space-m) 0 var(--wa-space-l);
       }
 
       .btn {
@@ -312,9 +312,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                   }}
                 />
                 ${renderInlineError(
-                  nameErr
-                    ? this._localize(nameErr.code, nameErr.params)
-                    : undefined,
+                  nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
                 )}
               </div>
 
@@ -347,9 +345,7 @@ export class ESPHomeAdoptDialog extends LitElement {
                 />
                 <span class="checkbox-text">
                   <span class="checkbox-title"
-                    >${this._localize(
-                      "dashboard.adopt_encryption_title",
-                    )}</span
+                    >${this._localize("dashboard.adopt_encryption_title")}</span
                   >
                   <span class="checkbox-hint"
                     >${this._localize("dashboard.adopt_encryption_hint")}</span
@@ -451,7 +447,7 @@ export class ESPHomeAdoptDialog extends LitElement {
           detail: { name, friendlyName },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       this._error =

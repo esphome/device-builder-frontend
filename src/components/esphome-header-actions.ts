@@ -64,13 +64,6 @@ export class ESPHomeHeaderActions extends LitElement {
   @state()
   private _open = false;
 
-  /** Persisted "Show ignored discoveries" preference. The dashboard
-   *  filters its discovered banner / grid against this flag; we own
-   *  the toggle UI here so the menu sits next to other dashboard-
-   *  level settings. */
-  @state()
-  private _showIgnored = false;
-
   /** True when onboarding still has work to do (currently:
    *  Wi-Fi step pending — data-derived from ``secrets.yaml``).
    *  Gates a dedicated ``Set up Wi-Fi…`` kebab entry so a user
@@ -295,26 +288,6 @@ export class ESPHomeHeaderActions extends LitElement {
                   </div>`
                 : nothing}
               <div
-                class="menu-item ${this._showIgnored ? "menu-item--active" : ""}"
-                role="menuitemcheckbox"
-                tabindex="0"
-                aria-checked=${this._showIgnored}
-                @click=${this._toggleShowIgnored}
-                @keydown=${this._onShowIgnoredKeydown}
-              >
-                <wa-icon library="mdi" name="eye-outline"></wa-icon>
-                <span class="menu-item-label"
-                  >${this._localize("layout.show_ignored_discoveries")}</span
-                >
-                ${this._showIgnored
-                  ? html`<wa-icon
-                      class="check"
-                      library="mdi"
-                      name="check"
-                    ></wa-icon>`
-                  : nothing}
-              </div>
-              <div
                 class="menu-item"
                 role="menuitem"
                 tabindex="0"
@@ -366,12 +339,6 @@ export class ESPHomeHeaderActions extends LitElement {
   }
 
   private _toggle() {
-    if (!this._open) {
-      // Re-read the persisted flag on each open so a second tab's
-      // change to localStorage is reflected when the user revisits
-      // the menu.
-      this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
-    }
     this._open = !this._open;
   }
 
@@ -401,37 +368,9 @@ export class ESPHomeHeaderActions extends LitElement {
     }
   };
 
-  private _onShowIgnoredKeydown = (e: KeyboardEvent) => {
-    /* The toggle is a ``<div role="menuitemcheckbox">`` rather than
-       a ``<button>`` so it sits visually flush with the surrounding
-       menu items (the menu was built with div items predating this
-       PR). The role + tabindex make it focusable and AT-readable as
-       a checkable control; this handler wires Enter / Space activation
-       so keyboard users get the same toggle a click would produce. */
-    if (e.key === "Enter" || e.key === " ") {
-      e.preventDefault();
-      this._toggleShowIgnored();
-    }
-  };
-
-  private _toggleShowIgnored() {
-    this._showIgnored = !this._showIgnored;
-    localStorage.setItem("esphome-show-ignored", String(this._showIgnored));
-    /* Dashboard listens on ``window`` for this event so we don't have
-       to thread a context through the layout for a single-pref toggle. */
-    window.dispatchEvent(
-      new CustomEvent("esphome-show-ignored-changed", {
-        detail: { value: this._showIgnored },
-      }),
-    );
-  }
-
   private _openArchivedDevices = () => {
     /* Dashboard hosts the dialog instance and listens for this
-       window event to open it. Same window-event bridge the rest
-       of the kebab menu uses (show-ignored toggle) so we stay
-       consistent and don't have to thread a context through the
-       layout for a single trigger. */
+       window event to open it. */
     this._close();
     window.dispatchEvent(new Event("esphome-show-archived-dialog"));
   };

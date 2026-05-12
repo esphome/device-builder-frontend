@@ -96,7 +96,7 @@ export const pairBuildServerDialogStyles = css`
     display: flex;
     justify-content: flex-end;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    padding: var(--wa-space-m) 0 var(--wa-space-l);
   }
 
   .field-error {
@@ -115,11 +115,7 @@ export const pairBuildServerDialogStyles = css`
     margin-bottom: var(--wa-space-m);
     padding: var(--wa-space-s) var(--wa-space-m);
     border-left: 3px solid var(--esphome-warning, #f59e0b);
-    background: color-mix(
-      in srgb,
-      var(--esphome-warning, #f59e0b),
-      transparent 90%
-    );
+    background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 90%);
     color: var(--wa-color-text-normal);
     font-size: var(--wa-font-size-s);
   }

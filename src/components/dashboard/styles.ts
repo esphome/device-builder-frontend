@@ -4,6 +4,7 @@ export const dashboardStyles = css`
   :host {
     display: flex;
     flex-direction: column;
+    position: relative;
     height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
@@ -38,6 +39,8 @@ export const dashboardStyles = css`
 
   /* ─── Discovered Banner ─── */
 
+  /* ─── Discovered section ─── */
+
   @keyframes banner-slide-in {
     from {
       transform: translateY(-100%);
@@ -47,62 +50,117 @@ export const dashboardStyles = css`
     }
   }
 
-  .discovered-banner-wrap {
+  /* Floating wrapper anchored to the top center of the dashboard.
+     Absolutely positioned so opening the panel does NOT push the
+     toolbar / cards below it — matches the original banner's
+     "hanging from the top" behaviour. */
+  .discovered-section {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 5;
     display: flex;
-    justify-content: center;
-    overflow: hidden;
-    flex-shrink: 0;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
   }
 
-  .discovered-banner {
-    display: inline-flex;
-    justify-content: space-between;
+  /* Inner elements re-enable pointer events so they're still
+     clickable; only the empty space inside the wrapper is
+     pass-through. */
+  .discovered-section-header,
+  .discovered-section-grid {
+    pointer-events: auto;
+    width: min(570px, 92%);
+    box-sizing: border-box;
+  }
+
+  /* Header pill (the "first banner"). Classic / collapsed state:
+     left + right + bottom borders outline the pill on its own; the
+     top edge stays unbordered because the pill "hangs" from the
+     page header. */
+  .discovered-section-header {
+    display: flex;
     align-items: center;
-    gap: var(--wa-space-xs);
-    padding: var(--wa-space-xs) var(--wa-space-l) var(--wa-space-s);
-    background: var(--esphome-secondary);
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-s) var(--wa-space-l);
+    background: var(--esphome-primary-light);
+    color: var(--esphome-primary);
+    border: var(--wa-border-width-s) solid var(--esphome-primary);
+    border-top: none;
     border-radius: 0 0 var(--wa-border-radius-l) var(--wa-border-radius-l);
     font-size: var(--wa-font-size-s);
-    color: var(--esphome-on-primary);
     animation: banner-slide-in 1s cubic-bezier(0.4, 0, 0.2, 1) both;
   }
 
-  .discovered-banner wa-icon {
-    font-size: var(--wa-font-size-m);
-    color: var(--esphome-on-primary);
-    margin-right: 10px;
+  /* When the grid is visible, the pill keeps only its left + right
+     borders and drops its bottom rounding — its sides flow into the
+     panel below, whose own borders complete the outline. */
+  .discovered-section:has(.discovered-section-grid:not([hidden]))
+    .discovered-section-header {
+    border-bottom: none;
+    border-radius: 0;
   }
-  /* Rendered as a real <button> (not an <a> without href) so the
-     toggle is keyboard-focusable and announced as a button by
-     assistive tech. The styling resets the native button chrome to
-     keep the link-like look the design has always had. */
-  .discovered-banner-toggle {
+
+  .discovered-section-header wa-icon {
+    font-size: var(--wa-font-size-l);
+    color: var(--esphome-primary);
+  }
+
+  .discovered-section-count {
+    font-weight: var(--wa-font-weight-bold);
+    font-size: var(--wa-font-size-s);
+  }
+
+  .discovered-section-toggle {
     background: transparent;
     border: none;
     padding: 0;
-    color: var(--esphome-primary-light);
+    color: var(--esphome-primary);
     cursor: pointer;
     text-decoration: underline;
     font-weight: var(--wa-font-weight-bold);
-    font-size: var(--wa-font-size-2xs);
+    font-size: var(--wa-font-size-xs);
     font-family: inherit;
-    margin-left: var(--wa-space-4xl);
     opacity: 0.85;
   }
-  .discovered-banner-toggle:hover {
+  /* First toggle on the row (Show / Hide for visible devices) is
+     pushed against the right edge; any subsequent toggles (Show
+     ignored) sit immediately after it with a small gap. */
+  .discovered-section-toggle:first-of-type {
+    margin-left: auto;
+  }
+  .discovered-section-toggle + .discovered-section-toggle {
+    margin-left: var(--wa-space-s);
+  }
+  .discovered-section-toggle:hover {
     opacity: 1;
   }
-  .discovered-banner-toggle:focus-visible {
-    outline: 2px solid var(--esphome-primary-light);
+  .discovered-section-toggle:focus-visible {
+    outline: 2px solid var(--esphome-primary);
     outline-offset: 2px;
     opacity: 1;
   }
-  .discovered-banner span {
-    font-weight: var(--wa-font-weight-bold);
-    font-size: var(--wa-font-size-xs);
+
+  /* Second banner: directly under the header (no gap), white
+     background, primary border so the discovered-element panel is
+     clearly outlined against the page. Rounded bottom corners.
+     Caps height + scrolls internally so a long discoveries list
+     stays inside the floating panel instead of stretching off-screen. */
+  .discovered-section-grid {
+    display: flex;
+    flex-direction: column;
+    background: var(--wa-color-surface-raised);
+    border: var(--wa-border-width-s) solid var(--esphome-primary);
+    border-top: none;
+    border-radius: 0 0 var(--wa-border-radius-l) var(--wa-border-radius-l);
+    max-height: min(50vh, 400px);
+    overflow-y: auto;
   }
-  .discovered-banner-empty {
-    margin-right: var(--wa-space-4xl);
+
+  .discovered-section-grid[hidden] {
+    display: none;
   }
 
   /* ─── Card Grid ─── */
@@ -128,8 +186,7 @@ export const dashboardStyles = css`
   /* display:grid wins over the user-agent hidden rule, so an
      explicitly hidden grid would still take its padding-worth of
      vertical space. Force display:none to honour the hidden
-     attribute — used for #discovered-grid when the banner is
-     collapsed or every discovery is filtered out. */
+     attribute. */
   .devices-grid[hidden] {
     display: none;
   }
@@ -246,7 +303,7 @@ export const dashboardStyles = css`
   .yaml-hits {
     display: flex;
     flex-direction: column;
-    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    padding: var(--wa-space-m) 0 var(--wa-space-l);
     gap: var(--wa-space-l);
   }
   .yaml-hit-group {
@@ -294,7 +351,9 @@ export const dashboardStyles = css`
     font-family: var(--wa-font-family-code, ui-monospace, monospace);
     font-size: var(--wa-font-size-s);
     overflow: hidden;
-    transition: border-color 0.1s ease, background-color 0.1s ease;
+    transition:
+      border-color 0.1s ease,
+      background-color 0.1s ease;
   }
   .yaml-snippet:hover,
   .yaml-snippet:focus-visible {
@@ -307,11 +366,7 @@ export const dashboardStyles = css`
     padding: 1px 0;
   }
   .yaml-snippet-line--match {
-    background: color-mix(
-      in srgb,
-      var(--esphome-primary),
-      transparent 92%
-    );
+    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
   }
   .yaml-snippet-gutter {
     flex: 0 0 auto;
@@ -330,11 +385,7 @@ export const dashboardStyles = css`
     padding-right: var(--wa-space-s);
   }
   .yaml-snippet-text mark {
-    background: color-mix(
-      in srgb,
-      var(--esphome-primary),
-      transparent 70%
-    );
+    background: color-mix(in srgb, var(--esphome-primary), transparent 70%);
     color: inherit;
     padding: 0 1px;
     border-radius: 2px;
