@@ -241,13 +241,17 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
   }
 
   private _toastApiFailure(prefix: string, err: unknown) {
-    if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
-      this._toast("warning", `${prefix}_already_gone`);
-      return;
-    }
-    if (err instanceof APIError && err.details) {
-      this._toast("error", `${prefix}_failed_detail`, { reason: err.details });
-      return;
+    if (err instanceof APIError) {
+      if (err.errorCode === ErrorCode.NOT_FOUND) {
+        this._toast("warning", `${prefix}_already_gone`);
+        return;
+      }
+      if (err.details) {
+        this._toast("error", `${prefix}_failed_detail`, {
+          reason: err.details,
+        });
+        return;
+      }
     }
     this._toast("error", `${prefix}_failed`);
   }
