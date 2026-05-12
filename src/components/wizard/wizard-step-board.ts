@@ -398,6 +398,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     return html`
       <input
         type="search"
+        autocomplete="off"
         .value=${this._search}
         @input=${this._onSearchInput}
         placeholder=${this._localize("wizard.search_boards_placeholder")}

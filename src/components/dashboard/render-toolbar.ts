@@ -100,6 +100,7 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
       class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
       type="search"
       with-clear
+      autocomplete="off"
       placeholder=${placeholder}
       .value=${host._search}
       @input=${(e: Event) => {

@@ -212,6 +212,7 @@ export class ESPHomeComponentCatalog extends LitElement {
       <div class="main">
         <input
           type="search"
+          autocomplete="off"
           .value=${this._search}
           @input=${this._onSearchInput}
           placeholder=${this._localize("device.search_components_placeholder")}
