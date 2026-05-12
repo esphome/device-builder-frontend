@@ -15,38 +15,27 @@ import {
   disconnect,
   readDeviceManifest,
   readMacAddress,
-  type DeviceManifest,
 } from "../../util/web-serial.js";
+import { WIZARD_BOARD_PLATFORMS } from "../wizard/wizard-step-board-platforms.js";
 
 /**
- * Known (manufacturer, product) tuples → board id in the catalog.
- * The frontend reads the manifest at 0xC000 and looks up the board
- * here; future products land by adding a row. A backend-driven
- * mapping would be cleaner long-term, but a static table is fine
- * while there's one supported product line.
+ * Map an esptool-js chip name (e.g. ``"ESP32-C6 (QFN32) (revision
+ * v0.2)"``) to the platform-filter label the board picker uses
+ * (e.g. ``"ESP32-C6"``). Strips the parenthesised chip-package /
+ * revision suffix, normalises to lowercase, drops dashes — that's
+ * the same family slug we previously used to build
+ * ``generic-{family}`` board ids, just compared against the
+ * ``WIZARD_BOARD_PLATFORMS`` catalog so the wizard's picker opens
+ * with the right chip already filtered.
  */
-const MANIFEST_TO_BOARD_ID: Array<{
-  manufacturer: string;
-  product: string;
-  board_id: string;
-}> = [
-  {
-    manufacturer: "Apollo Automation",
-    product: "esphome-starterkit",
-    board_id: "apollo-esk-1",
-  },
-];
-
-function lookupBoardForManifest(manifest: DeviceManifest): string | null {
-  for (const row of MANIFEST_TO_BOARD_ID) {
-    if (
-      manifest.manufacturer === row.manufacturer &&
-      manifest.product === row.product
-    ) {
-      return row.board_id;
-    }
-  }
-  return null;
+function chipNameToFilterLabel(chipName: string): string | null {
+  const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
+  const byVariant = WIZARD_BOARD_PLATFORMS.find((p) => p.variant === family);
+  if (byVariant) return byVariant.label;
+  const byPlatform = WIZARD_BOARD_PLATFORMS.find(
+    (p) => p.platform === family && !p.variant,
+  );
+  return byPlatform?.label ?? null;
 }
 
 export function editDevice(device: ConfiguredDevice) {
@@ -325,6 +314,7 @@ export async function detectAndOpenWizard(
   createDialog: {
     open(step?: string): void;
     openWithBoard(board: BoardCatalogEntry): void;
+    openAtBoardStep(filterLabel?: string): void;
   },
   options: {
     /** Port captured from the ``navigator.serial`` ``connect`` event —
@@ -387,32 +377,27 @@ export async function detectAndOpenWizard(
       return;
     }
 
-    if (manifest) {
-      const boardId = lookupBoardForManifest(manifest);
-      if (boardId) {
-        const board = await api.getBoard(boardId);
-        if (board) {
-          if (options.localize) {
-            toast.success(
-              options.localize("dashboard.serial_starterkit_detected", {
-                name: board.name,
-              }),
-              { richColors: true },
-            );
-          }
-          createDialog.openWithBoard(board);
-          return;
+    if (manifest?.board_id) {
+      const board = await api.getBoard(manifest.board_id);
+      if (board) {
+        if (options.localize) {
+          toast.success(
+            options.localize("dashboard.serial_starterkit_detected", {
+              name: board.name,
+            }),
+            { richColors: true },
+          );
         }
+        createDialog.openWithBoard(board);
+        return;
       }
+      // ``board_id`` in the manifest but the catalog doesn't know it
+      // (older dashboard / unreleased product). Fall through to the
+      // chip-family picker rather than failing — the user still
+      // gets a useful onboarding path.
     }
 
-    const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
-    const board = await api.getBoard(`generic-${family}`);
-    if (board) {
-      createDialog.openWithBoard(board);
-    } else {
-      createDialog.open("board");
-    }
+    createDialog.openAtBoardStep(chipNameToFilterLabel(chipName) ?? undefined);
   } catch {
     createDialog.open("board");
   }

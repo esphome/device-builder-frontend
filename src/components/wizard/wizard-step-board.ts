@@ -8,7 +8,7 @@ import {
   mdiUsbPort,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -44,6 +44,13 @@ export class ESPHomeWizardStepBoard extends LitElement {
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
 
+  /** Platform-filter chip label to apply on first mount (e.g.
+   *  ``"ESP32-C6"``). Set by the parent dialog when a chip family
+   *  is known up front — the serial-detect flow uses this to land
+   *  the user on a picker already narrowed to their hardware. */
+  @property({ attribute: false })
+  presetFilterLabel: string | null = null;
+
   @state()
   private _boards: BoardCatalogEntry[] = [];
 
@@ -68,6 +75,9 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    if (this.presetFilterLabel) {
+      this._selectedFilter = this.presetFilterLabel;
+    }
     this._fetchBoards();
   }
 

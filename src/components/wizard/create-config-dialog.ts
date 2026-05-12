@@ -45,6 +45,14 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
 
+  /** Initial platform-filter label for the board step. Set by
+   *  ``openAtBoardStep`` when the caller knows the chip family
+   *  (e.g. from serial chip detection) so the picker opens with
+   *  the matching chip's filter chip already active. ``null``
+   *  means no preset — the picker shows everything. */
+  @state()
+  private _initialBoardFilter: string | null = null;
+
   @state()
   private _creationMethod: CreationMethod = "basic";
 
@@ -161,6 +169,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   public open(startStep?: WizardStep) {
     this._step = startStep ?? "method";
     this._selectedBoard = null;
+    this._initialBoardFilter = null;
     this._resetTransientState();
   }
 
@@ -168,6 +177,19 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   public openWithBoard(board: BoardCatalogEntry) {
     this._step = "setup";
     this._selectedBoard = board;
+    this._initialBoardFilter = null;
+    this._resetTransientState();
+  }
+
+  /** Open directly at the board-picker step with an optional
+   *  platform filter pre-applied. Used by the serial-detect flow
+   *  when the chip family is known but no specific board is
+   *  recognised — the user lands on a picker already narrowed to
+   *  their chip instead of the full catalog. */
+  public openAtBoardStep(filterLabel?: string) {
+    this._step = "board";
+    this._selectedBoard = null;
+    this._initialBoardFilter = filterLabel ?? null;
     this._resetTransientState();
   }
 
@@ -254,7 +276,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       case "method":
         return html`<esphome-wizard-step-method></esphome-wizard-step-method>`;
       case "board":
-        return html`<esphome-wizard-step-board></esphome-wizard-step-board>`;
+        return html`<esphome-wizard-step-board
+          .presetFilterLabel=${this._initialBoardFilter}
+        ></esphome-wizard-step-board>`;
       case "setup":
         return html`<esphome-wizard-step-setup .board=${this._selectedBoard}></esphome-wizard-step-setup>`;
       case "empty-config":

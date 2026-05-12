@@ -170,6 +170,11 @@ export interface DeviceManifest {
   manufacturer?: string;
   product?: string;
   hw_rev?: string;
+  /** Board catalog id this product maps to. The factory bakes it in;
+   *  the frontend just calls ``api.getBoard(board_id)`` and routes
+   *  the wizard accordingly. Lets new products onboard without any
+   *  dashboard / backend change — only a manifest edit. */
+  board_id?: string;
 }
 
 const DEVICE_INFO_OFFSET = 0xc000;
