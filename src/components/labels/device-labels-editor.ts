@@ -385,6 +385,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           <wa-input
             type="search"
             with-clear
+            autocomplete="off"
             placeholder=${this._localize("dashboard.labels_search_placeholder")}
             .value=${this._filter}
             @input=${(e: Event) => {

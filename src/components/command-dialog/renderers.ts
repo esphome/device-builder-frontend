@@ -62,19 +62,23 @@ function runningJob(jobs: Map<string, FirmwareJob>): FirmwareJob | null {
 export function renderQueuedOverlay(
   host: ESPHomeCommandDialog,
 ): TemplateResult | typeof nothing {
-  if (!host._isQueued) return nothing;
-  const running = runningJob(host._jobs);
+  if (!host._isQueued && !host._isRemoteQueued) return nothing;
+  // Only surface the "waiting for <device>" hint for same-offloader queues
+  // where we know the predecessor; cross-offloader queues get a generic
+  // message that doesn't reveal what another user is building.
+  const running = host._isQueued ? runningJob(host._jobs) : null;
+  const message = running
+    ? host._localize("command.queued_waiting_for", {
+        name: firmwareJobDisplayName(running, host._devices, host._localize),
+      })
+    : host._isRemoteQueued
+      ? host._localize("command.queued_waiting_for_build_server")
+      : host._localize("command.queued_message");
   return html`
     <div class="queued-overlay" role="status" aria-live="polite">
       <wa-icon library="mdi" name="timer-sand"></wa-icon>
       <div class="queued-title">${host._localize("command.queued_title")}</div>
-      <div class="queued-message">
-        ${running
-          ? host._localize("command.queued_waiting_for", {
-              name: firmwareJobDisplayName(running, host._devices, host._localize),
-            })
-          : host._localize("command.queued_message")}
-      </div>
+      <div class="queued-message">${message}</div>
       <button class="term-btn term-btn--start" @click=${host._openFirmwareJobs}>
         <wa-icon library="mdi" name="playlist-check"></wa-icon>
         ${host._localize("command.queued_view_all")}
