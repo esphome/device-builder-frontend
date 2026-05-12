@@ -88,48 +88,10 @@ export class ESPHomeHeaderActions extends LitElement {
   static styles = [
     espHomeStyles,
     css`
-      /* inline-flex (instead of display: contents) so the parent
-         header's flex gap doesn't squeeze a gutter between the
-         inline-actions row and the kebab — they should read as one
-         cluster, not as separate header sections. */
       :host {
         display: inline-flex;
         align-items: center;
         gap: 0;
-      }
-
-      /* Inline icon buttons surface the most-used kebab items on
-         desktop where there's room. We promote two — Firmware jobs
-         (lives behind a live badge) and Settings (the only kebab
-         entry users hit reliably) — and leave the rest in the menu.
-         Three would already crowd the header on tighter viewports;
-         fewer would defeat the discoverability point. */
-      .inline-actions {
-        display: none;
-        align-items: center;
-        gap: 2px;
-      }
-
-      @media (min-width: 768px) {
-        .inline-actions {
-          display: inline-flex;
-        }
-      }
-
-      /* On desktop the inline buttons cover Firmware jobs + Settings,
-         so duplicating them inside the kebab muddies the menu (users
-         see two ways to do the same thing in adjacent UI). Hide the
-         duplicates above the breakpoint; mobile keeps them as the
-         only access point. Chained selector (.menu-item.menu-item--
-         inline) bumps specificity above the bare .menu-item rule
-         defined later in this stylesheet — without it, source order
-         would let the bare display: flex win and the items would
-         stay visible. */
-      @media (min-width: 768px) {
-        .menu-item.menu-item--inline,
-        .menu-divider.menu-divider--inline {
-          display: none;
-        }
       }
 
       .menu-btn {
@@ -170,16 +132,6 @@ export class ESPHomeHeaderActions extends LitElement {
         border-radius: 50%;
         background: var(--esphome-warning, #f59e0b);
         box-shadow: 0 0 0 2px var(--esphome-primary);
-      }
-
-      /* When the inline buttons are visible, the badge moves to the
-         Firmware-jobs inline button (more discoverable). The kebab
-         keeps its own badge for mobile where the inline row is
-         hidden — two parallel badges, only one ever shown. */
-      @media (min-width: 768px) {
-        .menu-kebab .menu-btn-badge {
-          display: none;
-        }
       }
 
       .backdrop {
@@ -279,49 +231,12 @@ export class ESPHomeHeaderActions extends LitElement {
         activeCount++;
       }
     }
-    /* Single source of truth for the firmware-jobs and kebab labels —
-       the count-aware string drives both ``title`` and ``aria-label``
-       so the hover tooltip and the screen-reader announcement stay in
-       sync (Copilot flagged the divergence). */
-    const firmwareJobsLabel =
-      activeCount > 0
-        ? this._localize("firmware_jobs.menu_item_with_count", { count: activeCount })
-        : this._localize("firmware_jobs.menu_item");
     const kebabLabel =
       activeCount > 0
         ? this._localize("layout.more_options_with_count", { count: activeCount })
         : this._localize("dashboard.more_options");
+    const hasAlerts = this._offloaderAlertsCount() > 0;
     return html`
-      <div
-        class="inline-actions"
-        role="toolbar"
-        aria-label=${this._localize("layout.header_actions_label")}
-      >
-        <button
-          type="button"
-          class="menu-btn"
-          @click=${this._openFirmwareJobs}
-          title=${firmwareJobsLabel}
-          aria-label=${firmwareJobsLabel}
-        >
-          <wa-icon library="mdi" name="playlist-check"></wa-icon>
-          ${activeCount > 0
-            ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
-            : nothing}
-        </button>
-        <button
-          type="button"
-          class="menu-btn"
-          @click=${this._openSettings}
-          title=${this._settingsButtonLabel()}
-          aria-label=${this._settingsButtonLabel()}
-        >
-          <wa-icon library="mdi" name="cog"></wa-icon>
-          ${this._offloaderAlertsCount() > 0
-            ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
-            : nothing}
-        </button>
-      </div>
       <button
         type="button"
         class="menu-btn menu-kebab"
@@ -330,7 +245,7 @@ export class ESPHomeHeaderActions extends LitElement {
         aria-label=${kebabLabel}
       >
         <wa-icon library="mdi" name="dots-vertical"></wa-icon>
-        ${activeCount > 0
+        ${activeCount > 0 || hasAlerts
           ? html`<span class="menu-btn-badge" aria-hidden="true"></span>`
           : nothing}
       </button>
@@ -343,7 +258,7 @@ export class ESPHomeHeaderActions extends LitElement {
               style="position:fixed;top:var(--esphome-header-height, 48px);right:var(--wa-space-s);"
             >
               <div
-                class="menu-item menu-item--inline"
+                class="menu-item"
                 role="menuitem"
                 tabindex="0"
                 @click=${this._openFirmwareJobs}
@@ -419,16 +334,19 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="cog-refresh"></wa-icon>
                 ${this._localize("layout.reset_build_env")}
               </div>
-              <div class="menu-divider menu-divider--inline" role="separator"></div>
+              <div class="menu-divider" role="separator"></div>
               <div
-                class="menu-item menu-item--inline"
+                class="menu-item"
                 role="menuitem"
                 tabindex="0"
                 @click=${this._openSettings}
                 @keydown=${this._onMenuItemKeydown}
               >
                 <wa-icon library="mdi" name="cog"></wa-icon>
-                ${this._localize("layout.settings")}
+                <span class="menu-item-label">${this._localize("layout.settings")}</span>
+                ${hasAlerts
+                  ? html`<span class="menu-item-count">${this._offloaderAlertsCount()}</span>`
+                  : nothing}
               </div>
               <div class="menu-divider" role="separator"></div>
               <div
@@ -568,26 +486,8 @@ export class ESPHomeHeaderActions extends LitElement {
     );
   }
 
-  /** Count offloader-side alerts (pin_mismatch / peer_revoked)
-   *  that need operator attention. Drives the settings-gear
-   *  notification dot so the operator notices an alert without
-   *  having to open Settings → Send builds first. Returns 0 when
-   *  the alerts snapshot hasn't arrived yet (null) or is empty. */
   private _offloaderAlertsCount(): number {
     return this._offloaderAlerts === null ? 0 : this._offloaderAlerts.size;
-  }
-
-  /** Settings-button accessible name. When offloader alerts are
-   *  pending, the label embeds the count so screen-reader users
-   *  get the same "attention needed" signal sighted users see
-   *  from the visual badge. Mirrors the firmware-jobs button's
-   *  count-in-label pattern. */
-  private _settingsButtonLabel(): string {
-    const count = this._offloaderAlertsCount();
-    if (count > 0) {
-      return this._localize("layout.settings_with_alerts", { count });
-    }
-    return this._localize("layout.settings");
   }
 
   private _openFeedback() {

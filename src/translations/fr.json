@@ -559,7 +559,6 @@
     "theme_dark": "Sombre",
     "theme_system": "Système",
     "settings": "Paramètres",
-    "settings_with_alerts": "Paramètres ({count} alerte(s) en attente)",
     "show_ignored_discoveries": "Afficher les découvertes ignorées",
     "archived_devices": "Appareils archivés",
     "reset_build_env": "Réinitialiser l'environnement de compilation",
@@ -569,7 +568,6 @@
     "home_assistant": "Home Assistant",
     "editor": "Éditeur",
     "yaml_diff_button": "Bouton de diff YAML",
-    "header_actions_label": "Actions du tableau de bord",
     "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))",
     "preview_badge": "Aperçu"
   },
@@ -598,7 +596,6 @@
   },
   "firmware_jobs": {
     "menu_item": "Tâches firmware",
-    "menu_item_with_count": "Tâches firmware ({count} active(s))",
     "submitted_by": "de {label}"
   },
   "secrets": {

@@ -559,7 +559,6 @@
     "theme_dark": "Donker",
     "theme_system": "Systeem",
     "settings": "Instellingen",
-    "settings_with_alerts": "Instellingen ({count} melding(en) in behandeling)",
     "show_ignored_discoveries": "Genegeerde ontdekkingen tonen",
     "archived_devices": "Gearchiveerde apparaten",
     "reset_build_env": "Bouw-omgeving resetten",
@@ -569,7 +568,6 @@
     "home_assistant": "Home Assistant",
     "editor": "Editor",
     "yaml_diff_button": "YAML-diff-knop",
-    "header_actions_label": "Dashboardacties",
     "more_options_with_count": "Meer opties ({count} firmwaretaken actief)",
     "preview_badge": "Preview"
   },
@@ -598,7 +596,6 @@
   },
   "firmware_jobs": {
     "menu_item": "Firmwaretaken",
-    "menu_item_with_count": "Firmwaretaken ({count} actief)",
     "submitted_by": "van {label}"
   },
   "secrets": {

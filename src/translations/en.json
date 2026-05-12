@@ -682,7 +682,6 @@
     "theme_dark": "Dark",
     "theme_system": "System",
     "settings": "Settings",
-    "settings_with_alerts": "Settings ({count} alert(s) pending)",
     "show_ignored_discoveries": "Show ignored discoveries",
     "archived_devices": "Archived devices",
     "reset_build_env": "Reset build environment",
@@ -692,7 +691,6 @@
     "home_assistant": "Home Assistant",
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button",
-    "header_actions_label": "Dashboard actions",
     "more_options_with_count": "More options ({count} firmware task(s) active)",
     "preview_badge": "Preview"
   },
@@ -1012,7 +1010,6 @@
   },
   "firmware_jobs": {
     "menu_item": "Firmware tasks",
-    "menu_item_with_count": "Firmware tasks ({count} active)",
     "title": "Firmware tasks",
     "badge_label": "{count} active firmware task(s)",
     "empty_title": "No firmware tasks yet",
