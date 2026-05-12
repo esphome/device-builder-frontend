@@ -40,7 +40,7 @@ export function isWebSerialSupported(): boolean {
  * at the start (and the toast click handler in ``app-shell`` does
  * the same to cover the gap between the user's click and the first
  * internal op). ``isRecentSerialActivity`` answers whether we're
- * inside that ~3-second window.
+ * inside the window defined by ``SERIAL_ACTIVITY_WINDOW_MS``.
  */
 let _lastSerialActivityMs = 0;
 
@@ -62,13 +62,18 @@ export function isRecentSerialActivity(
 }
 
 /**
- * Prompt the user to select a serial port and detect the connected chip.
- * Returns chip info + the open connection for subsequent operations.
+ * Open an already-authorized serial port and detect the connected chip.
+ *
+ * Used for both first-time detect (via ``detectChip`` after the
+ * browser picker) and follow-on reconnects (install-flow's resume
+ * after compile, the connect-event fast-path that skips the picker).
+ *
+ * On ``loader.main()`` failure, tries ``transport.disconnect()`` first
+ * and falls back to ``port.close()`` so we never leak an open port —
+ * a still-open port silently breaks the next ``port.open()`` call.
  */
-export async function detectChip(onLog?: LogCallback): Promise<DetectedChip> {
+export async function connectToPort(port: SerialPort, onLog?: LogCallback): Promise<DetectedChip> {
   markSerialActivity();
-  const port = await navigator.serial.requestPort();
-
   const transport = new Transport(port, false);
 
   const loader = new ESPLoader({
@@ -101,50 +106,13 @@ export async function detectChip(onLog?: LogCallback): Promise<DetectedChip> {
 }
 
 /**
- * Reconnect to an already-authorized serial port (no browser picker).
- * Use after disconnect + compile to resume the connection for flashing.
+ * Prompt the user to select a serial port and detect the connected chip.
+ * Returns chip info + the open connection for subsequent operations.
  */
-export async function connectToPort(port: SerialPort, onLog?: LogCallback): Promise<DetectedChip> {
+export async function detectChip(onLog?: LogCallback): Promise<DetectedChip> {
   markSerialActivity();
-  const transport = new Transport(port, false);
-
-  const loader = new ESPLoader({
-    transport,
-    baudrate: 115200,
-    terminal: onLog
-      ? {
-          clean: () => {},
-          writeLine: (line: string) => onLog(line),
-          write: (text: string) => onLog(text),
-        }
-      : undefined,
-  });
-
-  const chipName = await loader.main();
-  return { chipName, port, transport, loader };
-}
-
-/**
- * Detect the chip on an already-authorized port — same as ``detectChip``
- * but without the browser picker. The ``connect`` event on
- * ``navigator.serial`` carries the port via ``event.target``; that port
- * is already permitted for this origin, so we can go straight to
- * ``loader.main()`` without an extra user gesture.
- *
- * Cleans up the transport on failure so we never leak an open port
- * (same shape as ``detectChip``'s error path).
- */
-export async function detectChipOnPort(port: SerialPort, onLog?: LogCallback): Promise<DetectedChip> {
-  try {
-    return await connectToPort(port, onLog);
-  } catch (error) {
-    try {
-      await port.close();
-    } catch {
-      // Best-effort cleanup; rethrow the original detection error below.
-    }
-    throw error;
-  }
+  const port = await navigator.serial.requestPort();
+  return connectToPort(port, onLog);
 }
 
 /**

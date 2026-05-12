@@ -10,8 +10,8 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import { downloadBase64Binary } from "../../util/download-text.js";
 import {
+  connectToPort,
   detectChip,
-  detectChipOnPort,
   disconnect,
   readDeviceManifest,
   readMacAddress,
@@ -335,7 +335,7 @@ export async function detectAndOpenWizard(
 ): Promise<void> {
   try {
     const detected = options.port
-      ? await detectChipOnPort(options.port)
+      ? await connectToPort(options.port)
       : await detectChip();
     const chipName = detected.chipName;
 
