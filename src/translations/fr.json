@@ -73,6 +73,8 @@
     "action_validate_failed": "Échec de la validation pour \"{name}\"",
     "action_install_started": "Installation de \"{name}\"…",
     "action_install_success": "\"{name}\" installé avec succès",
+    "serial_recognized": "\"{name}\" reconnu",
+    "serial_starterkit_detected": "{name} détecté",
     "action_clean_success": "Fichiers de compilation nettoyés pour \"{name}\"",
     "action_clean_failed": "Échec du nettoyage des fichiers pour \"{name}\"",
     "action_download_yaml_failed": "Échec du téléchargement YAML pour \"{name}\"",

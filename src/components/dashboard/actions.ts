@@ -9,7 +9,45 @@ import type {
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import { downloadBase64Binary } from "../../util/download-text.js";
-import { detectChip, disconnect } from "../../util/web-serial.js";
+import {
+  detectChip,
+  detectChipOnPort,
+  disconnect,
+  readDeviceManifest,
+  readMacAddress,
+  type DeviceManifest,
+} from "../../util/web-serial.js";
+
+/**
+ * Known (manufacturer, product) tuples → board id in the catalog.
+ * The frontend reads the manifest at 0xC000 and looks up the board
+ * here; future products land by adding a row. A backend-driven
+ * mapping would be cleaner long-term, but a static table is fine
+ * while there's one supported product line.
+ */
+const MANIFEST_TO_BOARD_ID: Array<{
+  manufacturer: string;
+  product: string;
+  board_id: string;
+}> = [
+  {
+    manufacturer: "Apollo Automation",
+    product: "esphome-starterkit",
+    board_id: "apollo-esk-1",
+  },
+];
+
+function lookupBoardForManifest(manifest: DeviceManifest): string | null {
+  for (const row of MANIFEST_TO_BOARD_ID) {
+    if (
+      manifest.manufacturer === row.manufacturer &&
+      manifest.product === row.product
+    ) {
+      return row.board_id;
+    }
+  }
+  return null;
+}
 
 export function editDevice(device: ConfiguredDevice) {
   window.history.pushState({}, "", withBase(`/device/${device.configuration}`));
@@ -288,11 +326,86 @@ export async function detectAndOpenWizard(
     open(step?: string): void;
     openWithBoard(board: BoardCatalogEntry): void;
   },
+  options: {
+    /** Port captured from the ``navigator.serial`` ``connect`` event —
+     *  when present we skip the browser picker (the user already
+     *  granted permission for this port in a prior session). */
+    port?: SerialPort | null;
+    /** Configured-device list to match the serial-read MAC against.
+     *  When a match is found, the caller's ``onRecognized`` runs
+     *  instead of the new-device wizard. */
+    devices?: ConfiguredDevice[];
+    /** Called when the MAC lookup matches an existing
+     *  ``ConfiguredDevice``. Caller wires this to "open device
+     *  drawer / re-flash flow" — we don't route there ourselves so
+     *  this function stays UI-agnostic. */
+    onRecognized?: (device: ConfiguredDevice) => void;
+    localize?: LocalizeFunc;
+  } = {},
 ): Promise<void> {
   try {
-    const detected = await detectChip();
+    const detected = options.port
+      ? await detectChipOnPort(options.port)
+      : await detectChip();
     const chipName = detected.chipName;
+
+    // MAC lookup is best-effort — a failure here shouldn't sink the
+    // wizard fallback. Wrap in its own try so we always disconnect.
+    let recognized: ConfiguredDevice | null = null;
+    if (options.devices?.length && options.onRecognized) {
+      try {
+        const mac = await readMacAddress(detected.loader);
+        recognized =
+          options.devices.find(
+            (d) => d.mac_address && d.mac_address.toUpperCase() === mac,
+          ) ?? null;
+      } catch {
+        // MAC read failed (unsupported chip family, transport flap);
+        // fall through to the wizard.
+      }
+    }
+
+    // Manifest lookup — runs only when MAC didn't match an existing
+    // device. ``readDeviceManifest`` already swallows read / parse
+    // failures and returns null, so this can't throw.
+    const manifest = recognized
+      ? null
+      : await readDeviceManifest(detected.loader);
+
     await disconnect(detected.transport);
+
+    if (recognized && options.onRecognized) {
+      if (options.localize) {
+        toast.success(
+          options.localize("dashboard.serial_recognized", {
+            name: recognized.friendly_name || recognized.name,
+          }),
+          { richColors: true },
+        );
+      }
+      options.onRecognized(recognized);
+      return;
+    }
+
+    if (manifest) {
+      const boardId = lookupBoardForManifest(manifest);
+      if (boardId) {
+        const board = await api.getBoard(boardId);
+        if (board) {
+          if (options.localize) {
+            toast.success(
+              options.localize("dashboard.serial_starterkit_detected", {
+                name: board.name,
+              }),
+              { richColors: true },
+            );
+          }
+          createDialog.openWithBoard(board);
+          return;
+        }
+      }
+    }
+
     const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
     const board = await api.getBoard(`generic-${family}`);
     if (board) {

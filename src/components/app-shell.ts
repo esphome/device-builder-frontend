@@ -58,6 +58,10 @@ import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { BASE_PATH } from "../util/base-path.js";
 import {
+  isRecentSerialActivity,
+  markSerialActivity,
+} from "../util/web-serial.js";
+import {
   loadIntegrationDocs,
   loadLabels,
   loadOnboardingState,
@@ -187,13 +191,65 @@ export class ESPHomeApp extends LitElement {
     `,
   ];
 
-  private _onSerialConnect = () => {
+  private _portToastMs = new Map<SerialPort, number>();
+  private static readonly PORT_TOAST_DEDUP_MS = 60_000;
+
+  private _onSerialConnect = (event: Event) => {
+    // Suppress connect events that fire as a side-effect of our own
+    // serial ops. esptool-js's chip reset toggles DTR/RTS, which on
+    // native-USB chips (ESP32-C6 / S3 / C3) drops the USB device and
+    // re-enumerates it — firing a fresh connect event for the same
+    // port. Without this guard the toast loops every time the user
+    // clicks "Set it up" (each click triggers another reset).
+    const recent = isRecentSerialActivity();
+    if (recent) {
+      // Self-extend the window: a burst of re-enum events from the
+      // same chip reset keeps the suppression alive even if the
+      // events trickle in slower than the static window. Without
+      // this a slow re-enum could land outside the original window
+      // and leak a toast through despite the op being ongoing.
+      markSerialActivity();
+      return;
+    }
+
+    // Per-port dedup. A bare-flash board with no app to feed the
+    // RTC watchdog can reboot-loop, which on native-USB chips
+    // re-enumerates the device on every restart — firing a fresh
+    // connect event each cycle. Don't re-toast for the same port
+    // within a generous window; the user already saw it the first
+    // time. SerialPort identity is stable across re-enums per the
+    // Web Serial spec, so reference equality is the right key.
+    const target = event.target;
+    const port =
+      target && target !== navigator.serial
+        ? (target as SerialPort)
+        : null;
+    if (port) {
+      const last = this._portToastMs.get(port);
+      if (last !== undefined && Date.now() - last < ESPHomeApp.PORT_TOAST_DEDUP_MS) {
+        return;
+      }
+      this._portToastMs.set(port, Date.now());
+    }
     toast.info(this._localize("layout.usb_device_connected"), {
+      // Stable id so multiple connect events collapse onto the same
+      // toast instead of stacking — defence in depth on top of the
+      // time-window suppression above.
+      id: "esphome-usb-device-connected",
       richColors: true,
       duration: 8000,
       action: {
         label: this._localize("layout.usb_device_setup"),
-        onClick: () => window.dispatchEvent(new CustomEvent("esphome-serial-setup")),
+        onClick: () => {
+          // Bridge the gap between the click and the first internal
+          // markSerialActivity inside detectChipOnPort — the chip
+          // reset can fire a new connect event before that runs.
+          markSerialActivity();
+          toast.dismiss("esphome-usb-device-connected");
+          window.dispatchEvent(
+            new CustomEvent("esphome-serial-setup", { detail: { port } }),
+          );
+        },
       },
     });
   };

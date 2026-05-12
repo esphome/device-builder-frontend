@@ -108,6 +108,8 @@
     "action_validate_failed": "Validation failed for \"{name}\"",
     "action_install_started": "Installing \"{name}\"…",
     "action_install_success": "\"{name}\" installed successfully",
+    "serial_recognized": "Recognized \"{name}\"",
+    "serial_starterkit_detected": "Detected {name}",
     "action_clean_success": "Build files cleaned for \"{name}\"",
     "action_clean_failed": "Failed to clean build files for \"{name}\"",
     "action_download_yaml_failed": "Failed to download YAML for \"{name}\"",
