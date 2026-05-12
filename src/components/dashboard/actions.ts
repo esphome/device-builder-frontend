@@ -1,12 +1,15 @@
 import toast from "sonner-js";
-import type { ESPHomeAPI } from "../api/index.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type {
   ArchivedDevice,
+  BoardCatalogEntry,
   BulkActionResult,
   ConfiguredDevice,
-} from "../api/types.js";
-import type { LocalizeFunc } from "../common/localize.js";
-import { withBase } from "../util/base-path.js";
+} from "../../api/types.js";
+import type { LocalizeFunc } from "../../common/localize.js";
+import { withBase } from "../../util/base-path.js";
+import { downloadBase64Binary } from "../../util/download-text.js";
+import { detectChip, disconnect } from "../../util/web-serial.js";
 
 export function editDevice(device: ConfiguredDevice) {
   window.history.pushState({}, "", withBase(`/device/${device.configuration}`));
@@ -252,6 +255,53 @@ export async function downloadYaml(
     if (url) {
       URL.revokeObjectURL(url);
     }
+  }
+}
+
+export async function downloadFirmware(
+  device: ConfiguredDevice,
+  api: ESPHomeAPI,
+  localize: LocalizeFunc,
+): Promise<void> {
+  const name = device.friendly_name || device.name;
+  try {
+    const binaries = await api.firmwareGetBinaries(device.configuration);
+    if (binaries.length === 0) {
+      toast.error(localize("dashboard.download_no_binaries", { name }), {
+        richColors: true,
+      });
+      return;
+    }
+    const binary = binaries[0];
+    const result = await api.firmwareDownload(device.configuration, binary.file);
+    downloadBase64Binary(result.data, result.filename);
+  } catch {
+    toast.error(localize("dashboard.download_firmware_failed", { name }), {
+      richColors: true,
+    });
+  }
+}
+
+export async function detectAndOpenWizard(
+  api: ESPHomeAPI,
+  createDialog: {
+    open(step?: string): void;
+    openWithBoard(board: BoardCatalogEntry): void;
+  },
+): Promise<void> {
+  try {
+    const detected = await detectChip();
+    const chipName = detected.chipName;
+    await disconnect(detected.transport);
+    const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
+    const board = await api.getBoard(`generic-${family}`);
+    if (board) {
+      createDialog.openWithBoard(board);
+    } else {
+      createDialog.open("board");
+    }
+  } catch {
+    createDialog.open("board");
   }
 }
 

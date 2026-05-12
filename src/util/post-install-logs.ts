@@ -1,5 +1,5 @@
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import { streamSerialToDialog } from "../pages/dashboard-actions.js";
+import { streamSerialToDialog } from "../components/dashboard/actions.js";
 
 /**
  * Detail shape of the cancelable ``request-show-logs-after-install``
