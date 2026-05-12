@@ -24,7 +24,7 @@ describe("renderBooleanField default-value fallback", () => {
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
       here,
-      "../../../src/components/device/config-entry-renderers.ts",
+      "../../../src/components/device/config-entry-renderers/primitives.ts",
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
 

@@ -13,12 +13,10 @@ import {
   mdiRenameOutline,
   mdiUpload,
 } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobSource, JobStatus, JobType } from "../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
-import { activeLocale } from "../common/localize.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
@@ -27,14 +25,16 @@ import {
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import {
-  formatAbsoluteTime,
-  formatRelativeTime,
-} from "../util/format-job-time.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
+import {
+  compareJobs,
+  renderEmpty,
+  renderGroups,
+} from "./firmware-jobs-dialog/renderers.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -60,58 +60,26 @@ registerMdiIcons({
   upload: mdiUpload,
 });
 
-const TYPE_ICONS: Record<JobType, string> = {
-  [JobType.COMPILE]: "hammer-wrench",
-  [JobType.UPLOAD]: "upload",
-  [JobType.INSTALL]: "upload",
-  [JobType.CLEAN]: "broom",
-  [JobType.RESET_BUILD_ENV]: "cog-refresh",
-  [JobType.RENAME]: "rename-outline",
-};
-
 @customElement("esphome-firmware-jobs-dialog")
 export class ESPHomeFirmwareJobsDialog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: apiContext }) _api!: ESPHomeAPI;
+  @consume({ context: firmwareJobsContext, subscribe: true }) @state() _jobs: Map<string, FirmwareJob> = new Map();
+  @consume({ context: devicesContext, subscribe: true }) @state() _devices: ConfiguredDevice[] = [];
 
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
-
-  @consume({ context: firmwareJobsContext, subscribe: true })
-  @state()
-  private _jobs: Map<string, FirmwareJob> = new Map();
-
-  @consume({ context: devicesContext, subscribe: true })
-  @state()
-  private _devices: ConfiguredDevice[] = [];
-
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
-
-  @query("esphome-command-dialog")
-  private _commandDialog!: ESPHomeCommandDialog;
-
-  /** Logs dialog for the post-install hand-off when reattaching to
-   *  a job from this surface. Without one, the
-   *  ``request-show-logs-after-install`` event the nested command
-   *  dialog dispatches has no listener — both the auto-flip and the
-   *  post-success "Logs" button no-op. (issue #139) */
-  @query("esphome-logs-dialog")
-  private _logsDialog!: ESPHomeLogsDialog;
+  @query("wa-dialog") private _dialog!: HTMLElement & { open: boolean };
+  @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
+  // Logs dialog for the post-install hand-off when reattaching from this
+  // surface. Without one, request-show-logs-after-install would no-op. (#139)
+  @query("esphome-logs-dialog") private _logsDialog!: ESPHomeLogsDialog;
+  @query("esphome-confirm-dialog") private _confirmDialog!: ESPHomeConfirmDialog;
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
   );
 
-  @query("esphome-confirm-dialog")
-  private _confirmDialog!: ESPHomeConfirmDialog;
-
-  // Ticker for live relative-time strings ("started 2m ago"). Only
-  // runs while the dialog is open.
-  @state()
-  private _now: number = Date.now();
-
+  // Ticker for live relative-time strings ("started 2m ago"). Open-only.
+  @state() _now: number = Date.now();
   private _tickHandle: ReturnType<typeof setInterval> | null = null;
 
   open() {
@@ -125,23 +93,18 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._stopTicker();
   }
 
-  /** Trigger the Reset Build Environment confirm flow without
-   *  needing the firmware-tasks dialog itself to be open. The
-   *  confirm-dialog and command-dialog instances live as siblings
-   *  of the wa-dialog inside this host's shadow DOM, so they work
-   *  even when the wa-dialog is closed — surfaces like the header
-   *  kebab and a failed install's error banner can entry-point
-   *  the same flow. */
+  // Open the Reset Build Environment confirm flow without needing this
+  // dialog open. The confirm + command dialogs are siblings of the wa-dialog
+  // in this host's shadow DOM, so they work even when the wa-dialog is closed
+  // — surfaces like the header kebab can entry-point the same flow.
   openResetBuildEnv() {
     this._confirmDialog.open();
   }
 
-  /** Catch ``open-reset-build-env`` from the inner command-dialog so
-   *  the post-failure hint also works when the user is reviewing a
-   *  past failed install from the Firmware Tasks list. The app-shell
-   *  listener sits on ``<esphome-layout>``, but this dialog is a
-   *  sibling of the layout (both mounted under app-shell), so the
-   *  event would otherwise bubble past with nothing to handle it. */
+  // Catch open-reset-build-env from the inner command-dialog so the
+  // post-failure hint works when reviewing a past failed install from this
+  // list. The app-shell listener sits on esphome-layout, but this dialog is
+  // a sibling of that layout — without local handling the event bubbles past.
   private _onLocalResetEvent = (e: Event) => {
     e.stopPropagation();
     this.openResetBuildEnv();
@@ -152,306 +115,10 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._stopTicker();
   }
 
-  static styles = [
-    espHomeStyles,
-    css`
-      wa-dialog {
-        --width: min(620px, 95vw);
-      }
-
-      wa-dialog::part(header) {
-        background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
-        height: 40px;
-        box-sizing: border-box;
-      }
-
-      wa-dialog::part(title) {
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        padding: 0;
-        min-width: unset;
-        min-height: unset;
-        color: var(--esphome-on-primary);
-        cursor: pointer;
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
-      }
-
-      wa-dialog::part(body) {
-        padding: 0;
-      }
-
-      .toolbar {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
-      }
-
-      .toolbar .spacer {
-        flex: 1;
-      }
-
-      .tool-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
-        border-radius: var(--wa-border-radius-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
-        font-family: inherit;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-        cursor: pointer;
-        transition: background 0.1s, border-color 0.1s, color 0.1s;
-      }
-
-      .tool-btn:hover {
-        background: var(--wa-color-surface-lowered);
-        border-color: var(--wa-color-text-quiet);
-      }
-
-      .tool-btn wa-icon {
-        font-size: 16px;
-      }
-
-      .tool-btn--ghost {
-        background: transparent;
-        border-color: transparent;
-        color: var(--wa-color-text-quiet);
-      }
-
-      .tool-btn--ghost:hover {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-      }
-
-      .empty {
-        padding: var(--wa-space-2xl) var(--wa-space-m);
-        text-align: center;
-        color: var(--wa-color-text-quiet);
-      }
-
-      .empty wa-icon {
-        display: block;
-        margin: 0 auto var(--wa-space-s);
-        font-size: 48px;
-        opacity: 0.4;
-      }
-
-      .empty-title {
-        font-size: var(--wa-font-size-m);
-        color: var(--wa-color-text-normal);
-        margin-bottom: var(--wa-space-2xs);
-      }
-
-      .empty-desc {
-        font-size: var(--wa-font-size-s);
-      }
-
-      .jobs {
-        display: flex;
-        flex-direction: column;
-        gap: 0;
-        padding: var(--wa-space-2xs);
-        max-height: 60vh;
-        overflow-y: auto;
-      }
-
-      .group-label {
-        padding: var(--wa-space-s) var(--wa-space-m) var(--wa-space-2xs);
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-quiet);
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }
-
-      .job {
-        display: grid;
-        grid-template-columns: auto 1fr auto;
-        align-items: center;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        transition: background 0.1s;
-        text-align: left;
-        background: transparent;
-        border: none;
-        font-family: inherit;
-        color: inherit;
-        width: 100%;
-      }
-
-      .job:hover,
-      .job:focus-visible {
-        background: var(--wa-color-surface-lowered);
-        outline: none;
-      }
-
-      .job-icon {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        flex-shrink: 0;
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
-        color: var(--esphome-primary);
-      }
-
-      .job-icon--terminal {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-quiet);
-      }
-
-      .job-icon wa-icon {
-        font-size: 18px;
-      }
-
-      .job-content {
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .job-name {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      .job-meta {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-      }
-
-      /* "Building on <receiver-label>" sub-line under the meta
-         row. Only renders when the job carries a REMOTE source
-         (see _renderSourceLine). Matches the meta line's quiet
-         palette but lives on its own line so a long receiver
-         label doesn't push the status / timestamp off-screen
-         on narrow viewports. */
-      .job-source {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        margin-top: 2px;
-      }
-
-      .job-status {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-      }
-
-      .job-status wa-spinner {
-        font-size: 12px;
-        --indicator-color: var(--esphome-primary);
-        --track-color: transparent;
-      }
-
-      .job-status wa-icon {
-        font-size: 13px;
-      }
-
-      .job-time {
-        white-space: nowrap;
-      }
-
-      .job-status--success {
-        color: var(--esphome-success);
-      }
-
-      .job-status--error {
-        color: var(--esphome-error);
-      }
-
-      .progress {
-        margin-top: 4px;
-        width: 100%;
-        height: 4px;
-        border-radius: 2px;
-        background: var(--wa-color-surface-lowered);
-        overflow: hidden;
-      }
-
-      .progress-fill {
-        height: 100%;
-        background: var(--esphome-primary);
-        transition: width 0.2s;
-      }
-
-      .row-action {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 30px;
-        height: 30px;
-        border-radius: var(--wa-border-radius-m);
-        border: none;
-        background: transparent;
-        color: var(--wa-color-text-quiet);
-        cursor: pointer;
-        transition: background 0.1s, color 0.1s;
-      }
-
-      .row-action:hover {
-        background: color-mix(in srgb, var(--esphome-error), transparent 90%);
-        color: var(--esphome-error);
-      }
-
-      .row-action wa-icon {
-        font-size: 18px;
-      }
-
-      .row-status-icon {
-        width: 30px;
-        height: 30px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 18px;
-      }
-
-      .row-status-icon--success {
-        color: var(--esphome-success);
-      }
-
-      .row-status-icon--error {
-        color: var(--esphome-error);
-      }
-
-      .row-status-icon--cancelled {
-        color: var(--wa-color-text-quiet);
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, firmwareJobsDialogStyles];
 
   protected render() {
-    const sorted = [...this._jobs.values()].sort(this._compareJobs);
+    const sorted = [...this._jobs.values()].sort(compareJobs);
     const active = sorted.filter((j) => !isTerminal(j));
     const terminal = sorted.filter((j) => isTerminal(j));
     const hasJobs = sorted.length > 0;
@@ -486,8 +153,8 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
             : nothing}
         </div>
         ${hasJobs
-          ? this._renderGroups(active, terminal)
-          : this._renderEmpty()}
+          ? renderGroups(this, active, terminal)
+          : renderEmpty(this._localize)}
       </wa-dialog>
       <esphome-command-dialog
         @open-reset-build-env=${this._onLocalResetEvent}
@@ -501,228 +168,6 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
         @confirm=${this._onResetConfirmed}
       ></esphome-confirm-dialog>
     `;
-  }
-
-  private _renderEmpty() {
-    return html`
-      <div class="empty">
-        <wa-icon library="mdi" name="playlist-remove"></wa-icon>
-        <div class="empty-title">${this._localize("firmware_jobs.empty_title")}</div>
-        <div class="empty-desc">${this._localize("firmware_jobs.empty_desc")}</div>
-      </div>
-    `;
-  }
-
-  private _renderGroups(active: FirmwareJob[], terminal: FirmwareJob[]) {
-    return html`
-      <div class="jobs">
-        ${active.length > 0
-          ? html`
-              <div class="group-label">
-                ${this._localize("firmware_jobs.group_active")}
-              </div>
-              ${active.map((j) => this._renderJob(j))}
-            `
-          : nothing}
-        ${terminal.length > 0
-          ? html`
-              <div class="group-label">
-                ${this._localize("firmware_jobs.group_history")}
-              </div>
-              ${terminal.map((j) => this._renderJob(j))}
-            `
-          : nothing}
-      </div>
-    `;
-  }
-
-  private _renderJob(job: FirmwareJob) {
-    const name = this._jobDisplayName(job);
-    const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
-    const typeLabel = this._localize(`firmware_jobs.type_${job.job_type}`);
-    const showProgress =
-      job.status === JobStatus.RUNNING && typeof job.progress === "number";
-    const terminal = isTerminal(job);
-
-    return html`
-      <button
-        class="job"
-        @click=${() => this._openJob(job)}
-      >
-        <div class="job-icon ${terminal ? "job-icon--terminal" : ""}">
-          <wa-icon library="mdi" name=${typeIcon}></wa-icon>
-        </div>
-        <div class="job-content">
-          <div class="job-name">${name}</div>
-          <div class="job-meta">
-            <span>${typeLabel}</span>
-            <span>•</span>
-            ${this._renderStatus(job)}
-            ${this._renderTimestamp(job)}
-          </div>
-          ${this._renderSourceLine(job)}
-          ${showProgress
-            ? html`
-                <div class="progress">
-                  <div class="progress-fill" style="width:${job.progress}%"></div>
-                </div>
-              `
-            : nothing}
-        </div>
-        ${this._renderRowAction(job)}
-      </button>
-    `;
-  }
-
-  private _renderRowAction(job: FirmwareJob) {
-    if (job.status === JobStatus.COMPLETED) {
-      return html`
-        <span class="row-status-icon row-status-icon--success" aria-label=${this._localize("firmware_jobs.status_completed")}>
-          <wa-icon library="mdi" name="check-circle"></wa-icon>
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.FAILED) {
-      return html`
-        <span class="row-status-icon row-status-icon--error" aria-label=${this._localize("firmware_jobs.status_failed")}>
-          <wa-icon library="mdi" name="close-circle"></wa-icon>
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.CANCELLED) {
-      return html`
-        <span class="row-status-icon row-status-icon--cancelled" aria-label=${this._localize("firmware_jobs.status_cancelled")}>
-          <wa-icon library="mdi" name="cancel"></wa-icon>
-        </span>
-      `;
-    }
-    return html`
-      <button
-        class="row-action"
-        title=${this._localize("firmware_jobs.cancel")}
-        aria-label=${this._localize("firmware_jobs.cancel")}
-        @click=${(e: Event) => this._onCancelClick(e, job)}
-      >
-        <wa-icon library="mdi" name="close"></wa-icon>
-      </button>
-    `;
-  }
-
-  /** Sub-line under the meta row naming the paired receiver a
-   *  REMOTE-routed install is building on. Picked up from
-   *  job.source_label, snapshotted at job-creation time so the
-   *  row text doesn't churn if the pairing is later renamed.
-   *  LOCAL jobs (and anything from before 7a-2a's source field
-   *  landed) carry an empty source_label, so this row is
-   *  effectively a no-op for them.
-   *
-   *  Symmetric receiver-side rendering: when ``remote_peer`` is
-   *  set, the job was submitted to this dashboard by another
-   *  dashboard's offloader. Render "from {peer}" with the
-   *  peer's snapshotted label (or the raw dashboard_id as a
-   *  fallback when an older offloader's submit didn't carry
-   *  ``remote_peer_label``). The same .job-source style runs
-   *  for both directions so the visual treatment matches.
-   */
-  private _renderSourceLine(job: FirmwareJob) {
-    if (job.source === JobSource.REMOTE && job.source_label) {
-      return html`
-        <div class="job-source">
-          ${this._localize("firmware_jobs.building_on", { label: job.source_label })}
-        </div>
-      `;
-    }
-    if (job.remote_peer) {
-      const peer = job.remote_peer_label || job.remote_peer;
-      return html`
-        <div class="job-source">
-          ${this._localize("firmware_jobs.submitted_by", { label: peer })}
-        </div>
-      `;
-    }
-    return nothing;
-  }
-
-  private _renderStatus(job: FirmwareJob) {
-    if (job.status === JobStatus.RUNNING) {
-      return html`
-        <span class="job-status">
-          <wa-spinner></wa-spinner>
-          ${typeof job.progress === "number"
-            ? `${job.progress}%`
-            : this._localize("firmware_jobs.status_running")}
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.QUEUED) {
-      return html`
-        <span class="job-status">
-          <wa-icon library="mdi" name="clock-outline"></wa-icon>
-          ${this._localize("firmware_jobs.status_queued")}
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.COMPLETED) {
-      return html`
-        <span class="job-status job-status--success">
-          ${this._localize("firmware_jobs.status_completed")}
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.FAILED) {
-      return html`
-        <span class="job-status job-status--error">
-          ${this._localize("firmware_jobs.status_failed")}
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.CANCELLED) {
-      return html`
-        <span class="job-status">
-          ${this._localize("firmware_jobs.status_cancelled")}
-        </span>
-      `;
-    }
-    return nothing;
-  }
-
-  /** Active rows show a relative time ("started 2m ago") that ticks
-   *  alongside the dialog's `_now` ticker; terminal rows show an
-   *  absolute "finished HH:MM" since the moment doesn't change once
-   *  it lands. */
-  private _renderTimestamp(job: FirmwareJob) {
-    const locale = activeLocale();
-    if (job.status === JobStatus.RUNNING && job.started_at) {
-      return html`
-        <span>•</span>
-        <span class="job-time">
-          ${this._localize("firmware_jobs.time_started", {
-            time: formatRelativeTime(job.started_at, this._now, locale),
-          })}
-        </span>
-      `;
-    }
-    if (job.status === JobStatus.QUEUED) {
-      return html`
-        <span>•</span>
-        <span class="job-time">
-          ${this._localize("firmware_jobs.time_queued", {
-            time: formatRelativeTime(job.created_at, this._now, locale),
-          })}
-        </span>
-      `;
-    }
-    if (isTerminal(job) && job.completed_at) {
-      return html`
-        <span>•</span>
-        <span class="job-time">
-          ${this._localize("firmware_jobs.time_finished", {
-            time: formatAbsoluteTime(job.completed_at, this._now, locale),
-          })}
-        </span>
-      `;
-    }
-    return nothing;
   }
 
   private _startTicker() {
@@ -739,53 +184,32 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     }
   };
 
-  /** Sort: running → queued → terminal. Active queued/running by oldest
-   *  first (FIFO order); terminal by most-recent first so the latest
-   *  finished job is at the top of the history. */
-  private _compareJobs = (a: FirmwareJob, b: FirmwareJob) => {
-    const rank = (j: FirmwareJob) =>
-      j.status === JobStatus.RUNNING
-        ? 0
-        : j.status === JobStatus.QUEUED
-          ? 1
-          : 2;
-    const ra = rank(a);
-    const rb = rank(b);
-    if (ra !== rb) return ra - rb;
-    if (ra === 2) {
-      const ta = a.completed_at ?? a.created_at;
-      const tb = b.completed_at ?? b.created_at;
-      return tb.localeCompare(ta);
-    }
-    return a.created_at.localeCompare(b.created_at);
-  };
-
-  private _jobDisplayName(job: FirmwareJob): string {
+  _jobDisplayName(job: FirmwareJob): string {
     return firmwareJobDisplayName(job, this._devices, this._localize);
   }
 
-  private _openJob(job: FirmwareJob) {
+  _openJob(job: FirmwareJob) {
     this._commandDialog.followJob(job, this._jobDisplayName(job));
   }
 
-  private _onCancelClick(e: Event, job: FirmwareJob) {
+  _onCancelClick(e: Event, job: FirmwareJob) {
     e.stopPropagation();
-    this._cancel(job);
+    void this._cancel(job);
   }
 
   private async _cancel(job: FirmwareJob) {
     try {
       await this._api.firmwareCancel(job.job_id);
     } catch {
-      /* The job may have already finished — follow_jobs will reconcile. */
+      /* job may have finished — follow_jobs will reconcile */
     }
   }
 
-  private _onResetClick() {
+  private _onResetClick = () => {
     this._confirmDialog.open();
-  }
+  };
 
-  private async _onResetConfirmed() {
+  private _onResetConfirmed = async () => {
     let job: FirmwareJob;
     try {
       job = await this._api.firmwareResetBuildEnv();
@@ -795,24 +219,23 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     }
     // Drop the user into the log viewer so they can watch the wipe.
     this._commandDialog.followJob(job, this._jobDisplayName(job));
-  }
+  };
 
-  private async _onClearHistory() {
+  private _onClearHistory = async () => {
     try {
       await this._api.firmwareClear();
     } catch (err) {
       console.error("Failed to clear firmware history:", err);
       return;
     }
-    // firmware/clear has no broadcast event — let app-shell prune
-    // the local context so the "Recent" group updates immediately.
+    // firmware/clear has no broadcast event — let app-shell prune local context.
     this.dispatchEvent(
       new CustomEvent("firmware-history-cleared", {
         bubbles: true,
         composed: true,
       }),
     );
-  }
+  };
 }
 
 declare global {

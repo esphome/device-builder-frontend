@@ -7,7 +7,7 @@ import {
   mdiPackageVariantClosed,
   mdiPlus,
 } from "@mdi/js";
-import { css, html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type {
   BoardCatalogEntry,
@@ -21,16 +21,17 @@ import { localizeContext, apiContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
-import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { componentCatalogStyles } from "./component-catalog/styles.js";
 import {
-  categoryChipLabel,
-  shouldShowCategoryChip,
-} from "./component-card-category-label.js";
+  buildCategories,
+  filteredBundles,
+  visibleComponents,
+} from "./component-catalog/filters.js";
 import {
-  parseConfiguredPlatforms,
-  parseTopLevelComponents,
-} from "../../util/yaml-serialize.js";
+  renderBundleCard,
+  renderCard,
+} from "./component-catalog/renderers.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -46,186 +47,55 @@ registerMdiIcons({
 
 @customElement("esphome-component-catalog")
 export class ESPHomeComponentCatalog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true })
-  @state()
-  private _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
-  @consume({ context: apiContext })
-  private _api!: ESPHomeAPI;
+  // Forwarded to the backend so per-platform cv.SplitDefault defaults are pre-resolved.
+  @property() platform = "";
 
-  /** Device's target platform (e.g. "esp32"). Forwarded to the backend
-   * so any per-platform `cv.SplitDefault` defaults are pre-resolved. */
-  @property()
-  platform = "";
+  // Forwarded so once components grow board-level constraints the catalog can
+  // narrow. Currently a no-op on the BE; plumbing now to avoid later churn.
+  @property({ attribute: "board-id" }) boardId = "";
 
-  /** Device's board id (e.g. "esp32-c6-devkitc-1"). Forwarded to the
-   * backend so once components grow board-level constraints the
-   * catalog can narrow down to what this board can actually run.
-   * Currently a no-op filter on the BE; sending it now so we don't
-   * have to plumb it through later. */
-  @property({ attribute: "board-id" })
-  boardId = "";
+  // Used to surface featured_bundles (not on components/*) and to render
+  // the bundle cards' "Recommended for {board}" section title.
+  @property({ attribute: false }) board: BoardCatalogEntry | null = null;
 
-  /** Full board metadata. Used to surface `featured_bundles` (those
-   * aren't returned through `components/*`, only via `boards/get_board`)
-   * and to render the bundle cards' "Recommended for {board name}"
-   * section title. */
-  @property({ attribute: false })
-  board: BoardCatalogEntry | null = null;
+  // Current YAML — used to hide single-instance components already configured.
+  @property() yaml = "";
 
-  /** Current device YAML. Used to hide components that are already
-   *  configured AND are not multi-conf — a single-instance component
-   *  like `esphome:` or `wifi:` shouldn't show up in the catalog
-   *  once it's in the YAML. */
-  @property()
-  yaml = "";
+  // When non-empty, locks the catalog to these categories and hides the
+  // sidebar. The core-config dialog passes CORE_CATEGORIES.
+  @property({ attribute: false }) lockedCategories: string[] = [];
 
-  /** When non-empty, locks the catalog to these categories (logical
-   *  OR across the list) and hides the category sidebar. The
-   *  "Add core configuration" dialog passes `CORE_CATEGORIES` so
-   *  the same UI can drive both flows without showing irrelevant
-   *  filter options. */
-  @property({ attribute: false })
-  lockedCategories: string[] = [];
+  // Hidden server-side. Normal "Add component" dialog passes CORE_CATEGORIES
+  // so core/ota/time/update entries only appear in their dedicated dialog.
+  // Ignored when lockedCategories is set.
+  @property({ attribute: false }) excludeCategories: string[] = [];
 
-  /** Categories to hide server-side. The normal "Add component"
-   *  dialog passes `CORE_CATEGORIES` so the core/ota/time/update
-   *  entries only appear in their dedicated dialog. Ignored when
-   *  `lockedCategories` is set (a positive filter already restricts
-   *  the set). */
-  @property({ attribute: false })
-  excludeCategories: string[] = [];
+  @state() _components: ComponentCatalogEntry[] = [];
+  @state() _categories: Array<{ id: string; name: string; count: number }> = [];
+  @state() _total = 0;
+  @state() _loading = true;
+  @state() _initialLoad = true;
+  @state() _search = "";
+  @state() _category = "all";
+  @state() _expandedId: string | null = null;
 
-  @state()
-  private _components: ComponentCatalogEntry[] = [];
-
-  @state()
-  private _categories: Array<{ id: string; name: string; count: number }> = [];
-
-  @state()
-  private _total = 0;
-
-  @state()
-  private _loading = true;
-
-  @state()
-  private _initialLoad = true;
-
-  @state()
-  private _search = "";
-
-  @state()
-  private _category = "all";
-
-  @state()
-  private _expandedId: string | null = null;
-
-  /** Component IDs whose `image_url` errored out — those fall back to
-   *  the memory-icon placeholder. Tracked per-id so a single broken
-   *  image doesn't pull every other card down. */
-  @state()
-  private _imageFailed: Set<string> = new Set();
+  // Per-id tracking — a single broken image_url shouldn't pull every other
+  // card down to the placeholder.
+  @state() _imageFailed: Set<string> = new Set();
 
   private _debouncedSearch = debounce(() => this._fetchComponents(), 300);
 
-  /**
-   * Catalog list with two filters applied client-side:
-   *
-   *   1. Single-instance components are hidden once they're already
-   *      in the YAML — `esphome:` shouldn't show up after it's been
-   *      added. Multi-conf components (most platform components,
-   *      `output`, `sensor`, …) and platform-style ids (anything
-   *      containing a `.`) always stay visible.
-   *
-   *   2. In core-locked mode (the "Add core configuration" dialog),
-   *      platform variants whose dependencies aren't satisfied get
-   *      hidden — `time.zigbee` requires the `zigbee` component,
-   *      `ota.zephyr_mcumgr` requires the nRF52-only `zephyr` build,
-   *      and so on. A dep counts as satisfied when it's either (a)
-   *      already configured in the user's YAML or (b) one of the
-   *      core-compatible IDs the response itself contains (so
-   *      `time.sntp` shows because `network` is in the response, but
-   *      `time.gps` is hidden because `gps` is a misc component that
-   *      neither the user nor the core dialog brings in).
-   */
-  private get _visibleComponents(): ComponentCatalogEntry[] {
-    const present = this.yaml
-      ? parseTopLevelComponents(this.yaml)
-      : new Set<string>();
-    // Set of `<domain>.<platform>` keys currently configured —
-    // e.g. when the YAML has `time: [- platform: homeassistant]`
-    // this contains `time.homeassistant`, which lets us hide the
-    // matching catalog card if the platform is single-instance.
-    const presentPlatforms = this.yaml
-      ? parseConfiguredPlatforms(this.yaml)
-      : new Set<string>();
-    const lockedToCore = this.lockedCategories.length > 0;
-    // The set of IDs that the core dialog can offer right now —
-    // every component currently in the response. A dep that points
-    // to one of these is satisfiable from inside this same flow.
-    const coreCompatible = lockedToCore
-      ? new Set(this._components.map((c) => c.id))
-      : null;
-
-    return this._components.filter((c) => {
-      // (1) Hide single-instance components already configured.
-      //     Two flavours of single-instance:
-      //       a. bare top-level component (`web_server`, `wifi`) —
-      //          hide when the matching `<id>:` block exists.
-      //       b. platform variant (`time.homeassistant`) — hide
-      //          when the same `<domain>.<platform>` is already
-      //          listed under its umbrella block. Multi-conf
-      //          platform variants (most of them — `output.gpio`,
-      //          `sensor.dht`, …) skip this check and stay visible
-      //          so the user can add another one.
-      if (!c.multi_conf) {
-        if (c.id.includes(".")) {
-          if (presentPlatforms.has(c.id)) return false;
-        } else if (present.has(c.id)) {
-          return false;
-        }
-      }
-
-      // (2) Core-locked: drop platform variants whose deps the user
-      //     can't reasonably satisfy from this dialog. We only apply
-      //     this to platform-style ids (`time.zigbee`, `ota.zephyr_mcumgr`,
-      //     …); the bare core entries (api, wifi, …) shouldn't trip
-      //     it because they don't have peer-component deps.
-      if (
-        coreCompatible &&
-        c.id.includes(".") &&
-        c.dependencies.length > 0
-      ) {
-        const allSatisfied = c.dependencies.every(
-          (dep) => coreCompatible.has(dep) || present.has(dep),
-        );
-        if (!allSatisfied) return false;
-      }
-
-      return true;
-    });
-  }
-
-  /**
-   * Trigger initial or refresh load of the catalog. Called by the
-   * parent dialog's `open()` — we deliberately do NOT fetch in
-   * `connectedCallback` or in response to prop changes, because the
-   * catalog stays mounted (hidden) inside the dialog and its parents
-   * mount on page load. Eager fetching there would (a) burn 1+
-   * `components/get_components` calls per page load even when the
-   * user never opens the dialog, and (b) race the device-page's
-   * async board load — the very first request would go out with
-   * empty `platform` / `board_id` filters. Lazy load on open dodges
-   * both problems: by the time the user clicks "Add component" the
-   * board has long since arrived, and we issue exactly one request
-   * per dialog open.
-   */
+  // Not in connectedCallback or prop-reactive: the catalog stays mounted
+  // (hidden) inside its dialog whose parents mount on page load. Eager
+  // fetching there would (a) burn calls per page load even without dialog
+  // open, and (b) race the device-page's async board load — the first
+  // request would go out with empty platform / board_id.
   public load() {
-    // Auto-select the "Featured" tab on open when the board has any
-    // recommendations — that's the curated short list users on those
-    // boards reach for first. Falls back to "all" otherwise (and resets
-    // away from "featured" if the dialog is reopened against a board
-    // without recommendations).
+    // Auto-select "Featured" when the board has any recommendations; reset
+    // away from it when reopening against a board without any.
     const featuredCount =
       (this.board?.featured_components?.length ?? 0) +
       (this.board?.featured_bundles?.length ?? 0);
@@ -241,17 +111,9 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._fetchComponents();
   }
 
-  /**
-   * Filter the catalog to a specific component domain (e.g. "output",
-   * "sensor"). When the domain matches a known ComponentCategory we
-   * use the category filter — that's an exact match against
-   * `output.gpio`, `output.ledc`, ... — which is much more precise
-   * than putting the word "output" through the search box (where it
-   * also matches anything mentioning "output" in name or description).
-   *
-   * For domains that aren't categories (e.g. bus IDs like "i2c") we
-   * fall back to the search query.
-   */
+  // Filter to a specific component domain. If the domain matches a known
+  // ComponentCategory we use the category filter (exact match against
+  // output.gpio, output.ledc, …); otherwise fall back to the search query.
   public filterByDomain(domain: string) {
     const isCategory = Object.values(ComponentCategory).includes(
       domain as ComponentCategory,
@@ -270,10 +132,8 @@ export class ESPHomeComponentCatalog extends LitElement {
     this._loading = true;
     try {
       const query = this._search.trim() || undefined;
-      // `lockedCategories` (set by the parent — e.g. CORE_CATEGORIES
-      // for the core-config dialog) wins over the user's sidebar
-      // selection. Otherwise fall back to the in-component filter,
-      // with "all" meaning "no filter".
+      // lockedCategories (parent-set, e.g. CORE_CATEGORIES) wins over the
+      // user's sidebar selection.
       const locked = this.lockedCategories.length > 0;
       const category: string | string[] | undefined = locked
         ? this.lockedCategories
@@ -284,14 +144,12 @@ export class ESPHomeComponentCatalog extends LitElement {
         !locked && this.excludeCategories.length > 0
           ? this.excludeCategories
           : undefined;
-      const platform = this.platform || undefined;
-      const board_id = this.boardId || undefined;
       const response = await this._api.getComponents({
         query,
         category,
         exclude_category,
-        platform,
-        board_id,
+        platform: this.platform || undefined,
+        board_id: this.boardId || undefined,
         limit: 50,
       });
       this._components = response.components;
@@ -305,443 +163,37 @@ export class ESPHomeComponentCatalog extends LitElement {
     }
   }
 
-  /**
-   * Bundles surfaced from the board manifest, optionally filtered by
-   * the search query. Bundles aren't returned through `components/*`
-   * — they live on `boards/get_board` and we filter them client-side
-   * so a search behaves consistently across featured + bundles +
-   * regular components.
-   */
-  private get _filteredBundles(): FeaturedBundle[] {
-    const bundles = this.board?.featured_bundles ?? [];
-    const q = this._search.trim().toLowerCase();
-    if (!q) return bundles;
-    return bundles.filter(
-      (b) =>
-        b.name.toLowerCase().includes(q) ||
-        b.description.toLowerCase().includes(q) ||
-        b.id.toLowerCase().includes(q),
-    );
-  }
-
-  static styles = [
-    espHomeStyles,
-    inputStyles,
-    css`
-      :host {
-        display: flex;
-        height: 480px;
-        gap: 0;
-      }
-
-      :host([hidden]) {
-        display: none;
-      }
-
-      .sidebar {
-        width: 160px;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
-        padding-right: var(--wa-space-m);
-        border-right: 1px solid var(--wa-color-surface-border);
-        overflow-y: auto;
-      }
-
-      .sidebar-label {
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-subtle);
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        margin: 0 0 var(--wa-space-2xs);
-        flex-shrink: 0;
-      }
-
-      .category-btn {
-        border: none;
-        background: none;
-        cursor: pointer;
-        text-align: left;
-        padding: var(--wa-space-xs) var(--wa-space-s);
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
-        color: var(--wa-color-text-normal);
-        transition: background 0.1s;
-        font-family: inherit;
-        flex-shrink: 0;
-      }
-
-      .category-btn:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
-        color: var(--esphome-primary);
-      }
-
-      .category-btn--active {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
-        color: var(--esphome-primary);
-      }
-
-      .category-btn-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--wa-space-xs);
-      }
-
-      .category-count {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 18px;
-        height: 18px;
-        padding: 0 4px;
-        border-radius: 9px;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        background: var(--wa-color-surface-raised);
-        color: var(--wa-color-text-subtle);
-        flex-shrink: 0;
-        box-sizing: border-box;
-      }
-
-      .category-btn--active .category-count {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .main {
-        flex: 1;
-        min-width: 0;
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-m);
-        padding-left: var(--wa-space-m);
-        padding-top: 3px;
-        padding-right: 3px;
-        overflow: hidden;
-      }
-
-      input[type="search"] {
-        flex-shrink: 0;
-      }
-
-      .result-count {
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-        margin-top: -6px;
-      }
-
-      .grid-scroll {
-        flex: 1;
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding-right: var(--wa-space-2xs);
-      }
-
-      /* Cards have a 56px thumbnail + title + expand button + footer
-         actions, so they need a fair bit of horizontal room before
-         the title stops being readable. Use auto-fill + minmax so
-         the grid drops from 2 → 1 column as soon as a card would
-         shrink below ~340px, regardless of the dialog/sidebar
-         width. Avoids hard viewport breakpoints for the card count. */
-      .components-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-        gap: 8px;
-        align-content: start;
-      }
-
-      /* Below ~600px (modal viewport on phones) the fixed 160px
-         category sidebar + search input no longer fit alongside the
-         grid. Collapse the sidebar into a horizontal scrolling chip
-         row above the grid. The grid itself already collapses to a
-         single column via the auto-fill rule above. */
-      @media (max-width: 600px) {
-        :host {
-          flex-direction: column;
-          height: auto;
-          max-height: 70vh;
-        }
-
-        .sidebar {
-          width: 100%;
-          flex-direction: row;
-          gap: var(--wa-space-2xs);
-          padding-right: 0;
-          padding-bottom: var(--wa-space-s);
-          margin-bottom: var(--wa-space-s);
-          overflow-x: auto;
-          overflow-y: hidden;
-          border-right: none;
-          border-bottom: 1px solid var(--wa-color-surface-border);
-        }
-
-        .sidebar-label {
-          display: none;
-        }
-
-        .category-btn {
-          flex-shrink: 0;
-          white-space: nowrap;
-        }
-
-        .main {
-          padding-left: 0;
-          padding-right: 0;
-        }
-      }
-
-      .component-card {
-        border-radius: var(--wa-border-radius-l);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
-        padding: var(--wa-space-s) var(--wa-space-m);
-        box-sizing: border-box;
-        min-width: 0;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        transition: border-color var(--wa-transition-normal) var(--wa-transition-easing);
-      }
-
-      .component-card:hover {
-        border-color: var(--esphome-primary);
-      }
-
-      .component-card--expanded {
-        grid-column: 1 / -1;
-      }
-
-      .expand-button {
-        border: none;
-        background: none;
-        cursor: pointer;
-        padding: 2px;
-        border-radius: 4px;
-        display: inline-flex;
-        align-items: center;
-        flex-shrink: 0;
-        color: var(--esphome-primary);
-        font-size: 15px;
-      }
-
-      .expand-button wa-icon {
-        transition: transform var(--wa-transition-normal) var(--wa-transition-easing);
-      }
-
-      .component-card-header {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
-      .component-image,
-      .component-image--placeholder {
-        width: 56px;
-        height: 56px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: var(--wa-border-radius-m);
-        background: var(--wa-color-surface-subtle);
-        flex-shrink: 0;
-        color: var(--esphome-primary);
-        font-size: 28px;
-        box-sizing: border-box;
-      }
-
-      .component-image {
-        padding: 4px;
-      }
-
-      .component-image img {
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
-      }
-
-      /* ESPHome's monochrome line-art SVG illustrations are
-         black-on-transparent — invisible against the dark surface
-         in dark mode. --esphome-svg-filter is none in light mode
-         and invert(1)+hue-rotate(180deg) in dark mode, defined at
-         the document root in apply-theme.ts. The attribute selector
-         scopes this to SVGs only — JPGs / PNGs (board photos, etc.)
-         keep their original colours. */
-      .component-image img[src$=".svg"] {
-        filter: var(--esphome-svg-filter, none);
-      }
-
-      .component-card-header-text {
-        flex: 1;
-        min-width: 0;
-      }
-
-      .component-title {
-        margin: 0;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-        line-height: 1.3;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-
-      /* Small badge under the title spelling out the category
-         (Sensor / Text Sensor / Switch / ...). Disambiguates
-         same-name catalog entries from different platforms --
-         e.g. sensor.debug vs text_sensor.debug, both inheriting
-         the upstream "Debug Component" name. Only shown under
-         the "All" and "Recommended"/Featured sidebar filters
-         (heterogeneous result sets where the chip earns its
-         place); once the user narrows to a specific category
-         every visible card carries the same badge and it just
-         adds noise. See shouldShowCategoryChip for the
-         exact rule. Sits inline rather than floated so it
-         doesn't collide with the expand-button on the header's
-         right edge. */
-      .component-category-chip {
-        display: inline-block;
-        margin-top: 2px;
-        padding: 0 6px;
-        font-size: 9px;
-        font-weight: var(--wa-font-weight-semibold);
-        line-height: 1.6;
-        color: var(--wa-color-text-quiet);
-        background: var(--wa-color-surface-raised);
-        border: 1px solid var(--wa-color-border);
-        border-radius: 999px;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-
-      .component-description {
-        margin: 0;
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
-      }
-
-      .component-description--clamp {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-
-      .card-footer {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: var(--wa-space-xs);
-        margin-top: auto;
-      }
-
-      .more-info {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        font-size: var(--wa-font-size-2xs);
-        color: var(--esphome-primary);
-        text-decoration: none;
-      }
-
-      .more-info:hover {
-        text-decoration: underline;
-      }
-
-      .more-info wa-icon {
-        font-size: 11px;
-      }
-
-      .select-component {
-        display: flex;
-        align-items: center;
-        gap: 3px;
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--esphome-primary);
-        cursor: pointer;
-      }
-
-      .empty {
-        text-align: center;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-        padding: var(--wa-space-xl);
-        grid-column: 1 / -1;
-      }
-
-      .loading {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-s);
-      }
-
-      /* Cards in the "Featured" view get a subtle primary-coloured
-         border accent so they read as the curated set, distinct from
-         the regular catalog. */
-      .component-card--featured {
-        border-color: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 70%
-        );
-      }
-
-      .bundle-badge {
-        display: inline-flex;
-        align-items: center;
-        gap: 2px;
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
-        border-radius: var(--wa-border-radius-s);
-        padding: 1px 6px;
-      }
-
-      .bundle-badge wa-icon {
-        font-size: 11px;
-      }
-    `,
-  ];
+  static styles = [espHomeStyles, inputStyles, componentCatalogStyles];
 
   protected render() {
     if (this._initialLoad && this._loading) {
-      return html`<div class="loading">${this._localize("device.loading_components")}</div>`;
+      return html`<div class="loading">
+        ${this._localize("device.loading_components")}
+      </div>`;
     }
 
-    const categories = this._buildCategories();
-    // When the parent locks us to a category set (e.g. core-config
-    // dialog passes `CORE_CATEGORIES`), the sidebar's filter options
-    // are noise — the categories that matter are already pinned.
-    // Hide the sidebar entirely so the catalog acts like a simple
-    // filtered list.
+    const categories = buildCategories(this, this._localize);
+    // When the parent locks us to a category set, the sidebar's filter
+    // options are noise — the relevant categories are already pinned.
     const showSidebar = this.lockedCategories.length === 0;
 
-    // Bundle cards live alongside featured components and only surface
-    // in the dedicated "Featured" view. In every other view the grid
-    // is just the regular component slice from the backend.
-    const filteredBundles =
-      this._category === ComponentCategory.FEATURED ? this._filteredBundles : [];
+    // Bundles only surface in the dedicated "Featured" view.
+    const bundles =
+      this._category === ComponentCategory.FEATURED ? filteredBundles(this) : [];
+    const visible = visibleComponents(this);
 
     return html`
       ${showSidebar
         ? html`<div class="sidebar">
-            <p class="sidebar-label">${this._localize("device.component_categories")}</p>
+            <p class="sidebar-label">
+              ${this._localize("device.component_categories")}
+            </p>
             ${categories.map(
               ({ id, label, count }) => html`
                 <button
-                  class="category-btn ${this._category === id ? "category-btn--active" : ""}"
+                  class="category-btn ${this._category === id
+                    ? "category-btn--active"
+                    : ""}"
                   type="button"
                   @click=${() => {
                     this._category = id;
@@ -753,7 +205,7 @@ export class ESPHomeComponentCatalog extends LitElement {
                     <span class="category-count">${count}</span>
                   </span>
                 </button>
-              `
+              `,
             )}
           </div>`
         : nothing}
@@ -765,221 +217,66 @@ export class ESPHomeComponentCatalog extends LitElement {
           placeholder=${this._localize("device.search_components_placeholder")}
         />
         ${!this._loading
-          ? html`<span class="result-count">${this._visibleComponents.length + filteredBundles.length} of ${this._total + filteredBundles.length} components</span>`
+          ? html`<span class="result-count"
+              >${visible.length + bundles.length} of
+              ${this._total + bundles.length} components</span
+            >`
           : ""}
         <div class="grid-scroll">
           <div class="components-grid">
             ${this._loading
-              ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
-              : this._visibleComponents.length + filteredBundles.length
+              ? html`<p class="empty">
+                  ${this._localize("device.loading_components")}
+                </p>`
+              : visible.length + bundles.length
                 ? html`
-                    ${filteredBundles.map((b) => this._renderBundleCard(b))}
-                    ${this._visibleComponents.map((c) =>
-                      this._renderCard(
+                    ${bundles.map((b) => renderBundleCard(this, b))}
+                    ${visible.map((c) =>
+                      renderCard(
+                        this,
                         c,
                         c.id === this._expandedId,
                         this._category === ComponentCategory.FEATURED,
+                        this._localize,
                       ),
                     )}
                   `
-                : html`<p class="empty">${this._localize("device.no_components_found")}</p>`}
+                : html`<p class="empty">
+                    ${this._localize("device.no_components_found")}
+                  </p>`}
           </div>
         </div>
       </div>
     `;
   }
 
-  private _renderBundleCard(bundle: FeaturedBundle) {
-    return html`
-      <article class="component-card component-card--featured">
-        <div class="component-card-header">
-          <div class="component-image--placeholder">
-            <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-          </div>
-          <div class="component-card-header-text">
-            <h3 class="component-title">${bundle.name}</h3>
-          </div>
-          <span class="bundle-badge">
-            <wa-icon library="mdi" name="package-variant-closed"></wa-icon>
-            ${this._localize("device.featured_bundle_badge")}
-          </span>
-        </div>
-        ${bundle.description
-          ? html`<p class="component-description component-description--clamp">
-              ${renderMarkdown(bundle.description)}
-            </p>`
-          : nothing}
-        <div class="card-footer">
-          <span></span>
-          <div class="select-component" @click=${() => this._onAddBundle(bundle)}>
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            ${this._localize("device.add_component_action")}
-          </div>
-        </div>
-      </article>
-    `;
-  }
-
-  private _buildCategories() {
-    // Hide categories the parent told us to exclude (e.g. the regular
-    // "Add component" dialog passes CORE_CATEGORIES so the sidebar
-    // doesn't list "Core" / "Update" / "OTA" / "Time" buttons that
-    // would return empty results — those live in the dedicated core
-    // dialog instead). The total count is also adjusted to match.
-    const excluded = new Set(this.excludeCategories);
-    const visibleCats = this._categories.filter((c) => !excluded.has(c.id));
-    // The "Featured" category gets its own pinned slot at the top —
-    // peel it out of the alphabetical list so it doesn't appear twice.
-    const featuredCat = visibleCats.find(
-      (c) => c.id === ComponentCategory.FEATURED,
-    );
-    const bundleCount = this.board?.featured_bundles?.length ?? 0;
-    // Bundles are surfaced under the Featured tab too but live on the
-    // board manifest, not in the components categories response. Add
-    // them to the headline count so the badge matches the rendered
-    // grid.
-    const featuredBadge = featuredCat
-      ? featuredCat.count + bundleCount
-      : bundleCount;
-    const sortableCats = visibleCats.filter(
-      (c) => c.id !== ComponentCategory.FEATURED,
-    );
-    const visibleTotal = excluded.size
-      ? sortableCats.reduce((sum, c) => sum + c.count, 0)
-      : this._total;
-    // Resolve each category's display label first (i18n key when one
-    // exists, otherwise the backend-provided fallback), then sort
-    // alphabetically by what the user actually reads. The backend
-    // sorts by component count which doesn't help discovery — finding
-    // "Sensor" in a 30-entry list is much faster when it's in
-    // alphabetical order. "Featured" (when present) and "All" stay
-    // pinned at the top.
-    const collator = new Intl.Collator(undefined, { sensitivity: "base" });
-    const sortedCats = sortableCats
-      .map((cat) => {
-        const key = `device.component_category_${cat.id}`;
-        const translated = this._localize(key);
-        return {
-          id: cat.id,
-          label: translated !== key ? translated : cat.name,
-          count: cat.count,
-        };
-      })
-      .sort((a, b) => collator.compare(a.label, b.label));
-    const cats: Array<{ id: string; label: string; count: number }> = [];
-    if (featuredBadge > 0) {
-      cats.push({
-        id: ComponentCategory.FEATURED,
-        label: this._localize("device.component_category_featured"),
-        count: featuredBadge,
-      });
-    }
-    cats.push({
-      id: "all",
-      label: this._localize("device.component_category_all"),
-      count: visibleTotal,
-    });
-    cats.push(...sortedCats);
-    return cats;
-  }
-
-  private _renderCard(
-    component: ComponentCatalogEntry,
-    expanded: boolean,
-    featured: boolean = false,
-  ) {
-    const hasImage =
-      !!component.image_url && !this._imageFailed.has(component.id);
-    // Compute once: skip the chip entirely when the label is empty
-    // (defensive against an API/schema regression that yields a
-    // missing or all-whitespace category id) so we don't render a
-    // blank pill.
-    const categoryLabel = shouldShowCategoryChip(this._category)
-      ? categoryChipLabel(component.category)
-      : "";
-    return html`
-      <article
-        class="component-card ${expanded ? "component-card--expanded" : ""} ${featured ? "component-card--featured" : ""}"
-      >
-        <div class="component-card-header">
-          ${hasImage
-            ? html`<div class="component-image">
-                <img
-                  src=${component.image_url}
-                  alt=${component.name}
-                  referrerpolicy="no-referrer"
-                  loading="lazy"
-                  @error=${() => this._onImageError(component.id)}
-                />
-              </div>`
-            : html`<div class="component-image--placeholder">
-                <wa-icon library="mdi" name="memory"></wa-icon>
-              </div>`}
-          <div class="component-card-header-text">
-            <h3 class="component-title">${component.name}</h3>
-            ${categoryLabel
-              ? html`<span class="component-category-chip"
-                  >${categoryLabel}</span
-                >`
-              : nothing}
-          </div>
-          <button
-            class="expand-button"
-            type="button"
-            aria-pressed=${expanded}
-            title=${this._localize("wizard.expand_board")}
-            @click=${() => this._onToggleExpand(component)}
-          >
-            <wa-icon
-              library="mdi"
-              name=${expanded ? "arrow-collapse-all" : "arrow-expand-all"}
-            ></wa-icon>
-          </button>
-        </div>
-        <p class="component-description ${expanded ? "" : "component-description--clamp"}">
-          ${renderMarkdown(component.description)}
-        </p>
-        <div class="card-footer">
-          <a class="more-info" href=${component.docs_url} target="_blank" rel="noreferrer">
-            ${this._localize("device.more_info")}
-            <wa-icon library="mdi" name="open-in-new"></wa-icon>
-          </a>
-          <div class="select-component" @click=${() => this._onAdd(component)}>
-            <wa-icon library="mdi" name="plus"></wa-icon>
-            ${this._localize("device.add_component_action")}
-          </div>
-        </div>
-      </article>
-    `;
-  }
-
-  private _onToggleExpand(component: ComponentCatalogEntry) {
+  _onToggleExpand(component: ComponentCatalogEntry) {
     this._expandedId = this._expandedId === component.id ? null : component.id;
   }
 
-  private _onImageError(id: string) {
+  _onImageError(id: string) {
     if (this._imageFailed.has(id)) return;
     const next = new Set(this._imageFailed);
     next.add(id);
     this._imageFailed = next;
   }
 
-  private _onSearchInput(ev: Event) {
+  private _onSearchInput = (ev: Event) => {
     this._search = (ev.target as HTMLInputElement).value;
     this._debouncedSearch();
-  }
+  };
 
-  private _onAdd(component: ComponentCatalogEntry) {
+  _onAdd(component: ComponentCatalogEntry) {
     this.dispatchEvent(
       new CustomEvent("add-component", {
         detail: { component },
         bubbles: true,
         composed: true,
-      })
+      }),
     );
   }
 
-  private _onAddBundle(bundle: FeaturedBundle) {
+  _onAddBundle(bundle: FeaturedBundle) {
     this.dispatchEvent(
       new CustomEvent("add-bundle", {
         detail: { bundle, boardId: this.boardId },
