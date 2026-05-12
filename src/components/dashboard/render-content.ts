@@ -4,7 +4,6 @@ import type { AdoptableDevice, ConfiguredDevice } from "../../api/types.js";
 import { downloadYaml, editDevice } from "./actions.js";
 import {
   renderAddDeviceCard,
-  renderDiscoveryHint,
   renderFilterGroup,
   renderNoResultsExtras,
   renderSearchInput,
@@ -172,12 +171,10 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
     >
       <div slot="toolbar" class="toolbar-stack">
         <div class="toolbar-row">
-          ${renderSearchInput(host)} ${renderSelectToggle(host)}
-          ${renderViewToggle(host)}
+          ${renderSearchInput(host)} ${renderViewToggle(host)}
           <span class="toolbar-spacer"></span>
-          ${renderFilterGroup(host)}
+          ${renderFilterGroup(host)} ${renderSelectToggle(host)}
         </div>
-        ${renderDiscoveryHint(host)}
       </div>
       <button
         slot="actions"

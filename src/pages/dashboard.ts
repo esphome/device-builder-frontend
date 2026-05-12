@@ -279,11 +279,15 @@ export class ESPHomePageDashboard extends LitElement {
         : cardSkeletonTemplate;
     }
 
+    // YAML view: a list of device titles. With an empty query it shows
+    // every device's name only; once the user types, devices without
+    // matches drop out and matching ones expand to show their YAML
+    // snippets.
     if (this._yamlMode) {
       return html`
         ${renderBanner(this)} ${renderDiscoveredGrid(this)}
         ${renderYamlToolbar(this)}
-        ${renderYamlMode(this._localize, this._yamlSearch.hits, this._search.trim())}
+        ${renderYamlMode(this)}
         ${renderDrawer(this)} ${renderSelectBarOrFab(this)} ${renderDialogs(this)}
       `;
     }
@@ -389,6 +393,8 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   _enterDeviceView = (view: DashboardView) => {
+    // YAML is a third view option: clicking cards or table exits YAML
+    // search and returns to the device list.
     if (this._yamlMode) this._setSearchMode(false);
     this._view = view;
     this._api.updatePreferences({ dashboard_view: view }).catch(() => {});

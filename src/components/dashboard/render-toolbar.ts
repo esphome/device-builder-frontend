@@ -9,6 +9,10 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
   const yaml = host._yamlMode;
   const cardsLabel = host._localize("dashboard.view_cards");
   const tableLabel = host._localize("dashboard.view_table");
+  const yamlLabel = host._localize("yaml_search.switch_to_yaml");
+  // Three mutually-exclusive view options: cards (default), table,
+  // and YAML search (a list of device titles that expands to show
+  // matching YAML snippets when the user types a query).
   return html`
     <div
       class="view-toggle"
@@ -35,6 +39,16 @@ export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
       >
         <wa-icon library="mdi" name="table"></wa-icon>
       </button>
+      <button
+        class="view-toggle-btn ${yaml ? "active" : ""}"
+        type="button"
+        title=${yamlLabel}
+        aria-label=${yamlLabel}
+        aria-pressed=${yaml ? "true" : "false"}
+        @click=${() => host._setSearchMode(true)}
+      >
+        <wa-icon library="mdi" name="code-braces"></wa-icon>
+      </button>
     </div>
   `;
 }
@@ -52,23 +66,9 @@ export function renderLabelsFilter(host: ESPHomePageDashboard): TemplateResult {
 }
 
 export function renderFilterGroup(host: ESPHomePageDashboard): TemplateResult {
-  const yaml = host._yamlMode;
-  const yamlLabel = host._localize(
-    yaml ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml",
-  );
   return html`
     <div class="filter-group">
       ${renderLabelsFilter(host)}
-      <button
-        class="select-toggle-btn ${yaml ? "active" : ""}"
-        type="button"
-        title=${yamlLabel}
-        aria-label=${yamlLabel}
-        aria-pressed=${yaml ? "true" : "false"}
-        @click=${host._toggleSearchMode}
-      >
-        <wa-icon library="mdi" name="code-braces"></wa-icon>
-      </button>
     </div>
   `;
 }
@@ -92,31 +92,14 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
   const placeholder = host._yamlMode
     ? host._localize("yaml_search.placeholder")
     : host._localize("dashboard.search_placeholder");
-  const toggleLabel = host._localize(
-    host._yamlMode ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml",
-  );
-  // Native <input class="search-input"> + absolutely-positioned leading icon
-  // — same shape as the project-wide inputStyles (matches .combobox-input /
-  // .multi-input in the device editor). The icon doubles as the
-  // yaml-mode toggle, so it stays focusable / clickable rather than
-  // pointer-events:none like a decorative search glyph.
+  // Decorative leading magnifier — the YAML-mode toggle lives as a
+  // third option in the view-toggle radio group, not in here.
   return html`<div class="search-wrap">
     <wa-icon
-      class="search-mode-toggle"
+      class="search-input-icon"
       library="mdi"
       name=${host._yamlMode ? "code-braces" : "magnify"}
-      role="button"
-      tabindex="0"
-      title=${toggleLabel}
-      aria-label=${toggleLabel}
-      aria-pressed=${host._yamlMode ? "true" : "false"}
-      @click=${host._toggleSearchMode}
-      @keydown=${(e: KeyboardEvent) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          host._toggleSearchMode();
-        }
-      }}
+      aria-hidden="true"
     ></wa-icon>
     <input
       class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
@@ -130,20 +113,6 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
       @keydown=${host._onSearchKeyDown}
     />
   </div>`;
-}
-
-export function renderDiscoveryHint(host: ESPHomePageDashboard): TemplateResult | string {
-  if (!host._yamlMode) return "";
-  return html`<small class="search-discover-hint">
-    <button
-      type="button"
-      class="search-discover-back"
-      @click=${host._toggleSearchMode}
-    >
-      <wa-icon library="mdi" name="arrow-left"></wa-icon>
-      ${host._localize("yaml_search.back_to_devices")}
-    </button>
-  </small>`;
 }
 
 export function renderToolbar(
@@ -160,12 +129,10 @@ export function renderToolbar(
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderSelectToggle(host)}
-        ${renderViewToggle(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)}
         <span class="toolbar-spacer"></span>
-        ${renderFilterGroup(host)}
+        ${renderFilterGroup(host)} ${renderSelectToggle(host)}
       </div>
-      ${renderDiscoveryHint(host)}
       <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
     </div>
   `;
@@ -188,7 +155,6 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
         <span class="toolbar-spacer"></span>
         ${renderFilterGroup(host)}
       </div>
-      ${renderDiscoveryHint(host)}
       ${matchCount !== null
         ? html`<span class="device-count"
             ><strong>${matchCount}</strong> ${unit}</span

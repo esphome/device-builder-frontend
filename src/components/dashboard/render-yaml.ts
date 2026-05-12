@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit";
-import type { YamlSearchHit } from "../../api/types.js";
+import type { ConfiguredDevice, YamlSearchHit } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   buildYamlSnippetBlocks,
@@ -9,6 +9,7 @@ import {
   type YamlSnippetBlock,
 } from "../../util/yaml-search-helpers.js";
 import { navigate } from "../../util/navigation.js";
+import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export function highlightMatch(text: string, needle: string): unknown {
   if (!needle) return text;
@@ -71,17 +72,51 @@ function renderSnippetBlock(
   `;
 }
 
-export function renderYamlMode(
-  localize: LocalizeFunc,
-  hits: YamlSearchHit[] | null,
-  query: string,
+function renderYamlDeviceTitle(
+  configuration: string,
+  trailing: TemplateResult | string,
+  body: TemplateResult | string,
 ): TemplateResult {
-  if (!query) return renderYamlEmptyState(localize, "yaml_search.placeholder");
-  const emptyKey = yamlEmptyMessageKey(hits);
-  if (emptyKey) return renderYamlEmptyState(localize, emptyKey);
+  const deviceHref = `/device/${encodeURIComponent(configuration)}`;
+  return html`
+    <section class="yaml-hit-group">
+      <header class="yaml-hit-group-header">
+        <wa-icon library="mdi" name="code-braces"></wa-icon>
+        <a
+          class="yaml-hit-group-name"
+          href=${deviceHref}
+          @click=${(e: MouseEvent) => {
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+            e.preventDefault();
+            navigate(deviceHref);
+          }}
+          >${configuration}</a
+        >
+        ${trailing}
+      </header>
+      ${body}
+    </section>
+  `;
+}
+
+function renderYamlTitleList(
+  devices: ConfiguredDevice[],
+): TemplateResult {
   return html`
     <div class="yaml-hits">
-      ${(hits ?? []).map((hit) => {
+      ${devices.map((d) => renderYamlDeviceTitle(d.configuration, "", ""))}
+    </div>
+  `;
+}
+
+function renderYamlHits(
+  localize: LocalizeFunc,
+  hits: YamlSearchHit[],
+  query: string,
+): TemplateResult {
+  return html`
+    <div class="yaml-hits">
+      ${hits.map((hit) => {
         const blocks = buildYamlSnippetBlocks(hit.matches);
         const matchCount = hit.matches.length;
         const countUnit = localize(
@@ -89,19 +124,25 @@ export function renderYamlMode(
             ? "yaml_search.match_count_singular"
             : "yaml_search.match_count_plural",
         );
-        return html`
-          <section class="yaml-hit-group">
-            <header class="yaml-hit-group-header">
-              <wa-icon library="mdi" name="code-braces"></wa-icon>
-              <span class="yaml-hit-group-name">${yamlHitDeviceLabel(hit)}</span>
-              <span class="yaml-hit-group-count">${matchCount} ${countUnit}</span>
-            </header>
-            ${blocks.map((block) => renderSnippetBlock(hit, block, query))}
-          </section>
-        `;
+        const trailing = html`<span class="yaml-hit-group-count"
+          >${matchCount} ${countUnit}</span
+        >`;
+        const body = html`${blocks.map((block) =>
+          renderSnippetBlock(hit, block, query),
+        )}`;
+        return renderYamlDeviceTitle(yamlHitDeviceLabel(hit), trailing, body);
       })}
     </div>
   `;
+}
+
+export function renderYamlMode(host: ESPHomePageDashboard): TemplateResult {
+  const query = host._search.trim();
+  const hits = host._yamlSearch.hits;
+  if (!query) return renderYamlTitleList(host._sortedDevices);
+  const emptyKey = yamlEmptyMessageKey(hits);
+  if (emptyKey) return renderYamlEmptyState(host._localize, emptyKey);
+  return renderYamlHits(host._localize, hits ?? [], query);
 }
 
 export function renderYamlPreviewPivot(

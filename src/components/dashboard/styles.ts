@@ -186,77 +186,18 @@ export const dashboardStyles = css`
     padding-left: 36px;
   }
 
-  /* Leading wa-icon doubles as the YAML-mode toggle —
-     role=button + tabindex makes it keyboard-accessible without
-     wrapping it in an HTML <button>. Absolutely positioned over
-     the native input's padding-left gutter; sits on top of
-     the input so the click target is the icon itself, not the
-     surrounding empty space. */
-  .search-mode-toggle {
+  /* Decorative leading icon — magnifier in device mode, code-braces
+     in YAML mode. Not clickable: the YAML toggle lives next to the
+     view-toggle buttons. */
+  .search-input-icon {
     position: absolute;
     left: 10px;
     top: 50%;
     transform: translateY(-50%);
     font-size: 18px;
     color: var(--wa-color-text-quiet);
-    cursor: pointer;
-    border-radius: 4px;
-    padding: 2px;
+    pointer-events: none;
     z-index: 1;
-    transition:
-      color 0.15s ease,
-      background-color 0.15s ease;
-  }
-  .search-mode-toggle:hover {
-    color: var(--esphome-primary);
-  }
-  .search-mode-toggle:focus-visible {
-    outline: 2px solid var(--esphome-primary);
-    outline-offset: 1px;
-  }
-  .search-mode-toggle[aria-pressed="true"] {
-    color: var(--esphome-primary);
-  }
-
-  /* Wrapper for the YAML-mode "Back to device search" link.
-     Single-line, quiet treatment so the affordance reads as a
-     subtle pointer back to the device-name search rather than a
-     primary action. The toolbar's flex gap handles vertical
-     spacing; no extra margin needed. */
-  .search-discover-hint {
-    display: block;
-    color: var(--wa-color-text-quiet);
-    font-size: var(--wa-font-size-xs);
-  }
-  /* Back-to-device-search link in YAML mode. A regular text
-     link — not a kbd cap — because the action is "navigate
-     back", not "press this key". Plain inline so it flows on
-     the same baseline as any leading icon. */
-  .search-discover-back {
-    display: inline;
-    padding: 0;
-    background: transparent;
-    border: none;
-    color: var(--wa-color-text-quiet);
-    font: inherit;
-    cursor: pointer;
-    text-decoration: underline;
-    text-decoration-color: var(--wa-color-text-quieter, transparent);
-    text-underline-offset: 2px;
-    transition:
-      color 0.15s ease,
-      text-decoration-color 0.15s ease;
-  }
-  .search-discover-back:hover,
-  .search-discover-back:focus-visible {
-    color: var(--wa-color-brand-on-quiet);
-    text-decoration-color: currentColor;
-    outline: none;
-  }
-  .search-discover-back wa-icon {
-    font-size: var(--wa-font-size-s);
-    vertical-align: middle;
-    margin-right: 2px;
   }
 
   /* Empty-device-search YAML pivot (option (d)) — sits between
@@ -323,6 +264,16 @@ export const dashboardStyles = css`
   .yaml-hit-group-name {
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.12s;
+  }
+  .yaml-hit-group-name:hover,
+  .yaml-hit-group-name:focus-visible {
+    color: var(--esphome-primary);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    outline: none;
   }
   .yaml-hit-group-count {
     font-size: var(--wa-font-size-xs);
