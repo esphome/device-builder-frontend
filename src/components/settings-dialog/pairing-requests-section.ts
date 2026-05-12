@@ -124,7 +124,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
           ? this._statusRow("settings.build_server_pairing_requests_empty")
           : pending.map((p) => this._renderPendingRow(p))}
       <esphome-accept-peer-dialog
-        @accept=${this._onAcceptFromDialog}
+        @confirm=${this._onAcceptConfirm}
         @reject=${this._onRejectFromDialog}
       ></esphome-accept-peer-dialog>
     `;
@@ -212,7 +212,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     this._acceptPeerDialog?.open(peer);
   }
 
-  private async _onAcceptFromDialog(e: CustomEvent<{ dashboardId: string }>) {
+  private async _onAcceptConfirm(e: CustomEvent<{ dashboardId: string }>) {
     if (this._api === undefined) return;
     const prefix = "settings.build_server_peer_approve";
     try {
