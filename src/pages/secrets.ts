@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowLeft, mdiContentSave, mdiEye, mdiEyeOff } from "@mdi/js";
+import { mdiContentSave, mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -16,7 +16,6 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "../components/yaml-editor.js";
 
 registerMdiIcons({
-  "arrow-left": mdiArrowLeft,
   "content-save": mdiContentSave,
   eye: mdiEye,
   "eye-off": mdiEyeOff,
@@ -193,46 +192,36 @@ export class ESPHomePageSecrets extends LitElement {
         font-size: 16px;
       }
 
-      .back {
-        cursor: pointer;
-      }
-
-      .back wa-icon {
-        font-size: var(--wa-font-size-l);
-        color: var(--esphome-primary);
-      }
-
       .reveal-toggle {
-        border: none;
-        background: transparent;
+        border: var(--wa-border-width-s) solid var(--esphome-primary);
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 90%
+        );
         color: var(--esphome-primary);
-        padding: 6px 8px;
+        padding: 6px 12px;
         border-radius: var(--wa-border-radius-m);
         cursor: pointer;
         display: inline-flex;
         align-items: center;
-        justify-content: center;
+        gap: 6px;
         font-family: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        transition: background 0.12s;
       }
 
       .reveal-toggle:hover {
         background: color-mix(
           in srgb,
           var(--esphome-primary),
-          transparent 90%
-        );
-      }
-
-      .reveal-toggle[aria-pressed="true"] {
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 85%
+          transparent 80%
         );
       }
 
       .reveal-toggle wa-icon {
-        font-size: var(--wa-font-size-l);
+        font-size: 16px;
       }
     `,
   ];
@@ -244,9 +233,6 @@ export class ESPHomePageSecrets extends LitElement {
     return html`
       <div class="page">
         <div class="page-header">
-          <div class="back" @click=${this._goBack} title=${this._localize("layout.back")}>
-            <wa-icon library="mdi" name="arrow-left"></wa-icon>
-          </div>
           <div class="page-title">
             <h1>${this._localize("secrets.title")}</h1>
             <p>${this._localize("secrets.desc")}</p>
@@ -255,14 +241,13 @@ export class ESPHomePageSecrets extends LitElement {
             type="button"
             class="reveal-toggle"
             aria-pressed=${this._revealSensitive}
-            aria-label=${revealLabel}
-            title=${revealLabel}
             @click=${this._toggleRevealSensitive}
           >
             <wa-icon
               library="mdi"
               name=${this._revealSensitive ? "eye-off" : "eye"}
             ></wa-icon>
+            ${revealLabel}
           </button>
         </div>
         <wa-divider></wa-divider>
@@ -293,10 +278,6 @@ export class ESPHomePageSecrets extends LitElement {
 
   private _toggleRevealSensitive() {
     this._revealSensitive = !this._revealSensitive;
-  }
-
-  private _goBack() {
-    window.history.back();
   }
 
   private _save() {
