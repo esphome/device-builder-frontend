@@ -162,24 +162,18 @@ export class ESPHomeConfirmDialog extends LitElement {
   private _confirm() {
     this._decided = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("confirm", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
   }
 
   private _secondary() {
     this._decided = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("secondary", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("secondary", { bubbles: true }));
   }
 
   private _onAfterHide() {
     if (!this._decided) {
-      this.dispatchEvent(
-        new CustomEvent("cancel", { bubbles: true, composed: true }),
-      );
+      this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
     }
   }
 }
