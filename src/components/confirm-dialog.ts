@@ -162,24 +162,24 @@ export class ESPHomeConfirmDialog extends LitElement {
   private _confirm() {
     this._decided = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("confirm", { bubbles: true, composed: true }),
-    );
+    // composed:false (omitted) so wrappers like
+    // ``esphome-accept-peer-dialog`` that re-dispatch this event
+    // with enriched detail don't see the *original* event keep
+    // bubbling past the wrapper's shadow boundary and fire the
+    // outer parent's handler a second time without our detail.
+    // Same reasoning applies to ``secondary`` and ``cancel`` below.
+    this.dispatchEvent(new CustomEvent("confirm", { bubbles: true }));
   }
 
   private _secondary() {
     this._decided = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("secondary", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("secondary", { bubbles: true }));
   }
 
   private _onAfterHide() {
     if (!this._decided) {
-      this.dispatchEvent(
-        new CustomEvent("cancel", { bubbles: true, composed: true }),
-      );
+      this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
     }
   }
 }

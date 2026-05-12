@@ -214,19 +214,16 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
 
   private async _onAcceptConfirm(e: CustomEvent<{ dashboardId: string }>) {
     if (this._api === undefined) return;
+    const prefix = "settings.build_server_peer_approve";
     try {
       await this._api.approveRemoteBuildPeer({
         dashboard_id: e.detail.dashboardId,
       });
     } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
-        this._toast("warning", "settings.build_server_peer_approve_already_gone");
-      } else {
-        this._toast("error", "settings.build_server_peer_approve_failed");
-      }
+      this._toastApiFailure(prefix, err);
       return;
     }
-    this._toast("success", "settings.build_server_peer_approve_success");
+    this._toast("success", `${prefix}_success`);
   }
 
   private async _onRejectFromDialog(e: CustomEvent<{ dashboardId: string }>) {
@@ -237,14 +234,26 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
         dashboard_id: e.detail.dashboardId,
       });
     } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NOT_FOUND) {
-        this._toast("warning", `${prefix}_already_gone`);
-      } else {
-        this._toast("error", `${prefix}_failed`);
-      }
+      this._toastApiFailure(prefix, err);
       return;
     }
     this._toast("success", `${prefix}_success`);
+  }
+
+  private _toastApiFailure(prefix: string, err: unknown) {
+    if (err instanceof APIError) {
+      if (err.errorCode === ErrorCode.NOT_FOUND) {
+        this._toast("warning", `${prefix}_already_gone`);
+        return;
+      }
+      if (err.details) {
+        this._toast("error", `${prefix}_failed_detail`, {
+          reason: err.details,
+        });
+        return;
+      }
+    }
+    this._toast("error", `${prefix}_failed`);
   }
 
   private _onExtend = () => {

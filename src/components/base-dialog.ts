@@ -122,6 +122,13 @@ export class ESPHomeBaseDialog extends LitElement {
   @property({ type: Boolean, reflect: true }) busy = false;
 
   private _onWaRequestClose = (e: Event): void => {
+    // ``wa-dialog``'s events bubble + compose, so the same
+    // event type fired by a nested ``wa-dialog`` (e.g. an
+    // ``esphome-confirm-dialog`` inside our slotted body)
+    // bubbles up here and would otherwise close this dialog
+    // too. Filter to events whose ``currentTarget`` is our
+    // own wa-dialog before reacting.
+    if (e.target !== e.currentTarget) return;
     // Busy gate first: refuse close regardless of source
     // (Esc / outside-click / X / programmatic) while a WS
     // round-trip is in flight. Consumers don't have to
@@ -143,7 +150,11 @@ export class ESPHomeBaseDialog extends LitElement {
     if (passthrough.defaultPrevented) e.preventDefault();
   };
 
-  private _onWaAfterHide = (): void => {
+  private _onWaAfterHide = (e: Event): void => {
+    // Same nested-wa-dialog leak as ``_onWaRequestClose``:
+    // ignore ``wa-after-hide`` events that came from a
+    // descendant ``wa-dialog`` rather than our own.
+    if (e.target !== e.currentTarget) return;
     this.dispatchEvent(
       new CustomEvent("after-hide", { bubbles: false, composed: false }),
     );
