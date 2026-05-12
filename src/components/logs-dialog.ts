@@ -431,7 +431,10 @@ export class ESPHomeLogsDialog extends LitElement {
     // with the old one's. Same shape as ``_detachStream`` in
     // command-dialog.ts; different stream type, identical bug.
     this._stopSerial();
-    this._port = "";
+    // _port is only consulted if the user hits Stop and then Start
+    // after the serial reader is gone — default to OTA so the
+    // restart targets the freshly flashed device, not "" (#636).
+    this._port = "OTA";
     this._lines = [];
     this._streaming = true;
     this._expanded = false;
