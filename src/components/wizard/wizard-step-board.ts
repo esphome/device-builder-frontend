@@ -7,7 +7,7 @@ import {
   mdiPlus,
   mdiUsbPort,
 } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
@@ -75,10 +75,27 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Lit usually sets ``.presetFilterLabel`` before connectedCallback
+    // fires (property bindings are applied during element upgrade), so
+    // this path handles the common case. ``willUpdate`` below covers
+    // the parent-updates-after-mount case where the element is reused
+    // and the preset arrives later.
     if (this.presetFilterLabel) {
       this._selectedFilter = this.presetFilterLabel;
     }
     this._fetchBoards();
+  }
+
+  willUpdate(changed: PropertyValues<this>) {
+    super.willUpdate(changed);
+    if (
+      changed.has("presetFilterLabel") &&
+      this.presetFilterLabel &&
+      !this._selectedFilter
+    ) {
+      this._selectedFilter = this.presetFilterLabel;
+      void this._fetchBoards();
+    }
   }
 
   private async _fetchBoards() {

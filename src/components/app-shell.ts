@@ -225,11 +225,23 @@ export class ESPHomeApp extends LitElement {
         ? (target as SerialPort)
         : null;
     if (port) {
+      const now = Date.now();
+      // Lazy eviction of stale entries so the map can't grow
+      // unbounded over a long session that sees many distinct
+      // ports. ``navigator.serial`` holds permitted SerialPort
+      // references for the lifetime of the page, so a WeakMap
+      // wouldn't free them either — explicit time-based eviction
+      // is the right tool.
+      for (const [p, ts] of this._portToastMs) {
+        if (now - ts >= ESPHomeApp.PORT_TOAST_DEDUP_MS) {
+          this._portToastMs.delete(p);
+        }
+      }
       const last = this._portToastMs.get(port);
-      if (last !== undefined && Date.now() - last < ESPHomeApp.PORT_TOAST_DEDUP_MS) {
+      if (last !== undefined && now - last < ESPHomeApp.PORT_TOAST_DEDUP_MS) {
         return;
       }
-      this._portToastMs.set(port, Date.now());
+      this._portToastMs.set(port, now);
     }
     toast.info(this._localize("layout.usb_device_connected"), {
       // Stable id so multiple connect events collapse onto the same
