@@ -95,38 +95,40 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
   const toggleLabel = host._localize(
     host._yamlMode ? "yaml_search.switch_to_devices" : "yaml_search.switch_to_yaml",
   );
+  // Native <input class="search-input"> + absolutely-positioned leading icon
+  // — same shape as the project-wide inputStyles (matches .combobox-input /
+  // .multi-input in the device editor). The icon doubles as the
+  // yaml-mode toggle, so it stays focusable / clickable rather than
+  // pointer-events:none like a decorative search glyph.
   return html`<div class="search-wrap">
-    <wa-input
+    <wa-icon
+      class="search-mode-toggle"
+      library="mdi"
+      name=${host._yamlMode ? "code-braces" : "magnify"}
+      role="button"
+      tabindex="0"
+      title=${toggleLabel}
+      aria-label=${toggleLabel}
+      aria-pressed=${host._yamlMode ? "true" : "false"}
+      @click=${host._toggleSearchMode}
+      @keydown=${(e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          host._toggleSearchMode();
+        }
+      }}
+    ></wa-icon>
+    <input
       class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
       type="search"
-      with-clear
       placeholder=${placeholder}
       .value=${host._search}
       @input=${(e: Event) => {
-        host._search = (e.currentTarget as unknown as { value: string }).value;
+        host._search = (e.currentTarget as HTMLInputElement).value;
         host._syncYamlSearch();
       }}
       @keydown=${host._onSearchKeyDown}
-    >
-      <wa-icon
-        slot="start"
-        class="search-mode-toggle"
-        library="mdi"
-        name=${host._yamlMode ? "code-braces" : "magnify"}
-        role="button"
-        tabindex="0"
-        title=${toggleLabel}
-        aria-label=${toggleLabel}
-        aria-pressed=${host._yamlMode ? "true" : "false"}
-        @click=${host._toggleSearchMode}
-        @keydown=${(e: KeyboardEvent) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            host._toggleSearchMode();
-          }
-        }}
-      ></wa-icon>
-    </wa-input>
+    />
   </div>`;
 }
 

@@ -5,6 +5,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { readStoredLocale } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { LANGUAGES, type LanguageChoice } from "./types.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
@@ -21,7 +22,12 @@ export class ESPHomeSettingsLanguage extends LitElement {
   @state()
   private _language: LanguageChoice = readStoredLocale() ?? "system";
 
-  static styles = [espHomeStyles, settingsSharedStyles, settingsRowStyles];
+  static styles = [
+    espHomeStyles,
+    inputStyles,
+    settingsSharedStyles,
+    settingsRowStyles,
+  ];
 
   protected render() {
     return html`

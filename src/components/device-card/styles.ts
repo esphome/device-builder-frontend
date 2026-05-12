@@ -17,6 +17,7 @@ export const deviceCardStyles = [
     :host {
       display: block;
       outline: none;
+      height: 100%;
     }
 
     .device-card {
@@ -26,6 +27,7 @@ export const deviceCardStyles = [
       overflow: visible;
       display: flex;
       flex-direction: column;
+      height: 100%;
       transition: box-shadow 0.15s;
     }
 
@@ -258,6 +260,7 @@ export const deviceCardStyles = [
       align-items: center;
       gap: var(--wa-space-2xs);
       padding: var(--wa-space-s) var(--wa-space-m);
+      margin-top: auto;
     }
 
     .action-btn {

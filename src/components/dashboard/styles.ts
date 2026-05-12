@@ -167,37 +167,55 @@ export const dashboardStyles = css`
   }
 
   .search-wrap {
+    position: relative;
     max-width: 380px;
     flex: 1;
   }
-  .search-input {
-    width: 100%;
-    /* wa-input owns its own border / radius / focus ring; we only
-       set the font size so it tracks the rest of the toolbar. */
-    --font-size-medium: var(--wa-font-size-s);
+  /* Native <input class="search-input"> picks up the shared
+     border / radius / focus-ring shape from inputStyles
+     (src/styles/inputs.ts) — matches the .combobox-input shape
+     used in the device editor. We only add padding-left to make
+     room for the absolutely-positioned leading icon below.
+
+     Selector specificity (0,2,0) — has to beat the
+     input[type="search"] { padding: 0 14px } rule from
+     inputStyles (0,1,1), otherwise the shorthand resets
+     padding-left back to 14px and the icon ends up overlapping
+     the placeholder. */
+  .search-wrap .search-input {
+    padding-left: 36px;
   }
 
-  /* The leading wa-icon doubles as the YAML-mode toggle —
-     role=button + tabindex makes it accessible without wrapping
-     it in an HTML button element, which would break wa-input's
-     internal slot=start sizing/centering. Just add a cursor +
-     hover affordance + colour shift when pressed. */
+  /* Leading wa-icon doubles as the YAML-mode toggle —
+     role=button + tabindex makes it keyboard-accessible without
+     wrapping it in an HTML <button>. Absolutely positioned over
+     the native input's padding-left gutter; sits on top of
+     the input so the click target is the icon itself, not the
+     surrounding empty space. */
   .search-mode-toggle {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 18px;
+    color: var(--wa-color-text-quiet);
     cursor: pointer;
     border-radius: 4px;
+    padding: 2px;
+    z-index: 1;
     transition:
       color 0.15s ease,
       background-color 0.15s ease;
   }
   .search-mode-toggle:hover {
-    color: var(--wa-color-brand-on-quiet);
+    color: var(--esphome-primary);
   }
   .search-mode-toggle:focus-visible {
-    outline: 2px solid var(--wa-color-brand-on-quiet);
+    outline: 2px solid var(--esphome-primary);
     outline-offset: 1px;
   }
   .search-mode-toggle[aria-pressed="true"] {
-    color: var(--wa-color-brand-on-quiet);
+    color: var(--esphome-primary);
   }
 
   /* Wrapper for the YAML-mode "Back to device search" link.

@@ -33,6 +33,7 @@ import {
   localizeContext,
   recentJobsContext,
 } from "../context/index.js";
+import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
@@ -94,7 +95,6 @@ import {
 } from "../components/dashboard/install.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/input/input.js";
 import "../components/api-key-dialog.js";
 import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
 import "../components/archived-devices-dialog.js";
@@ -196,7 +196,7 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-logs-dialog") _logsDialog!: ESPHomeLogsDialog;
   @query(".search-input") _searchInputEl?: HTMLElement & { focus: () => void };
 
-  static styles = [espHomeStyles, dashboardStyles];
+  static styles = [espHomeStyles, inputStyles, dashboardStyles];
 
   private _onSerialSetup = () => {
     void detectAndOpenWizard(this._api, this._createDialog);
