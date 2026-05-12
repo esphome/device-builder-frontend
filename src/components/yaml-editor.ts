@@ -3,8 +3,8 @@ import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { StateEffect, StateField } from "@codemirror/state";
-import { oneDark } from "@codemirror/theme-one-dark";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
+import { vscodeDark, vscodeLight } from "../util/yaml-editor-theme.js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { basicSetup, EditorView } from "codemirror";
@@ -317,7 +317,7 @@ export class ESPHomeYamlEditor extends LitElement {
           }
         }
       }),
-      ...(this._darkMode ? [oneDark] : []),
+      this._darkMode ? vscodeDark : vscodeLight,
     ];
 
     if (this._api && this.configuration) {
