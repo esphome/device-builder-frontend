@@ -470,45 +470,64 @@ export const dashboardStyles = css`
     font-size: 18px;
   }
 
-  /* Standalone toggle for "select multiple devices" mode. Sits next to
-   * the view-toggle and matches its size/feel, but is its own button so
-   * users don't read it as part of the view-type group. */
+  /* "Select multiple devices" toggle. Lives in the results row,
+   * styled as a quiet text-link with a leading icon — secondary to
+   * the filter pills above. Active state flips to primary so the
+   * mode-change reads at a glance. */
   .select-toggle-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    gap: 6px;
+    height: 28px;
+    padding: 0 8px;
     border-radius: var(--wa-border-radius-m);
-    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    background: var(--wa-color-surface-raised);
+    border: var(--wa-border-width-s) solid transparent;
+    background: transparent;
     color: var(--wa-color-text-quiet);
+    font-family: inherit;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold, 600);
     cursor: pointer;
     transition:
       background 0.12s,
       color 0.12s,
       border-color 0.12s;
-    padding: 0;
     flex-shrink: 0;
   }
 
   .select-toggle-btn:hover {
-    background: var(--wa-color-surface-lowered);
+    background: color-mix(
+      in srgb,
+      var(--wa-color-text-normal),
+      transparent 94%
+    );
     color: var(--wa-color-text-normal);
   }
 
+  .select-toggle-btn:focus-visible {
+    outline: none;
+    color: var(--wa-color-text-normal);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--esphome-primary), transparent 70%);
+  }
+
   .select-toggle-btn.active {
-    background: var(--esphome-primary);
-    color: var(--esphome-on-primary);
-    border-color: var(--esphome-primary);
+    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    color: var(--esphome-primary);
+    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
   }
 
   .select-toggle-btn.active:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
   }
 
   .select-toggle-btn wa-icon {
-    font-size: 18px;
+    font-size: 15px;
+  }
+
+  .select-toggle-btn-label {
+    line-height: 1;
   }
 
   /* ─── Empty search state ─── */

@@ -82,7 +82,13 @@ export function renderLabelsFilter(host: ESPHomePageDashboard): TemplateResult {
  *  the configured-device list has at least one usable value to
  *  filter by, so a fresh dashboard with a single-platform fleet
  *  doesn't sprout an empty / single-bucket pill that adds no
- *  signal. */
+ *  signal.
+ *
+ *  In YAML-search mode the *labels* and *status* facets are
+ *  suppressed — labels are device metadata (not in the YAML) and
+ *  online/offline is runtime state (also not in the YAML), so
+ *  filtering YAML matches by either is misleading. Area and
+ *  platform stay because both come from the YAML itself. */
 export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
   const areaOptions = computeAreaFacet(host._devices);
   const platformOptions = computePlatformFacet(host._devices);
@@ -91,10 +97,11 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
     count: "{count}",
   });
   const clearLabel = host._localize("dashboard.filter_clear_all");
+  const yamlMode = host._yamlMode;
 
   return html`
     <div class="filter-group">
-      ${renderLabelsFilter(host)}
+      ${yamlMode ? nothing : renderLabelsFilter(host)}
       ${areaOptions.length > 0
         ? html`<esphome-facet-filter
             name=${host._localize("dashboard.filter_area")}
@@ -122,16 +129,18 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
             }}
           ></esphome-facet-filter>`
         : nothing}
-      <esphome-facet-filter
-        name=${host._localize("dashboard.filter_status")}
-        clear-label=${clearLabel}
-        multi-selected-label=${multiSelectedLabel}
-        .options=${stateOptions}
-        .selected=${host._selectedStates}
-        @facet-change=${(e: CustomEvent<string[]>) => {
-          host._selectedStates = e.detail;
-        }}
-      ></esphome-facet-filter>
+      ${yamlMode
+        ? nothing
+        : html`<esphome-facet-filter
+            name=${host._localize("dashboard.filter_status")}
+            clear-label=${clearLabel}
+            multi-selected-label=${multiSelectedLabel}
+            .options=${stateOptions}
+            .selected=${host._selectedStates}
+            @facet-change=${(e: CustomEvent<string[]>) => {
+              host._selectedStates = e.detail;
+            }}
+          ></esphome-facet-filter>`}
     </div>
   `;
 }
@@ -147,6 +156,7 @@ export function renderSelectToggle(host: ESPHomePageDashboard): TemplateResult {
       @click=${host._toggleSelectMode}
     >
       <wa-icon library="mdi" name="checkbox-multiple-marked-outline"></wa-icon>
+      <span class="select-toggle-btn-label">${label}</span>
     </button>
   `;
 }
@@ -191,21 +201,22 @@ export function renderToolbar(
       ? host._localize("dashboard.device_singular")
       : host._localize("dashboard.device_plural");
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
-  // Layout: [search] [view-toggle] [facets…] [select-toggle]
-  // — and the spacer at the end keeps the row left-aligned so a
-  //   wide viewport doesn't stretch the trailing cluster halfway
-  //   across the page. Facets and select-toggle stay grouped so a
-  //   wrap on narrow viewports drops them onto a second line
-  //   together instead of orphaning the select-toggle off on its
-  //   own row.
+  // Layout: [search] [view-toggle] [facets…] <spacer> [Select multiple]
+  //         [X devices]
+  // The spacer between the facet cluster and the select-mode
+  // toggle visually separates "filter the list" from "operate on
+  // the list" so the toggle no longer reads as another facet.
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
         ${renderSearchInput(host)} ${renderViewToggle(host)}
-        ${renderFacets(host)} ${renderSelectToggle(host)}
+        ${renderFacets(host)}
         <span class="toolbar-spacer"></span>
+        ${renderSelectToggle(host)}
       </div>
-      <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+      <span class="device-count"
+        ><strong>${matchCount}</strong> ${unit}${suffix}</span
+      >
     </div>
   `;
 }

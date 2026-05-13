@@ -44,6 +44,7 @@
     "no_results_desc": "Aucun appareil ne correspond à \"{query}\". Essayez un autre nom ou fichier de configuration.",
     "no_results_desc_filtered": "Aucun appareil ne correspond aux filtres actuels.",
     "no_results_clear": "Effacer les filtres",
+    "toggle_select_mode": "Sélectionner plusieurs",
     "select_all": "Tout sélectionner",
     "deselect_all": "Tout désélectionner",
     "selected_count": "{count} sélectionné(s)",

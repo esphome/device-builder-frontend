@@ -199,7 +199,7 @@
     "table_action_logs": "View logs",
     "table_action_install": "Install pending changes",
     "table_action_update": "Update to latest version",
-    "toggle_select_mode": "Select multiple devices",
+    "toggle_select_mode": "Select multiple",
     "table_status_online": "Online",
     "table_status_offline": "Offline",
     "table_status_unknown": "Unknown",
