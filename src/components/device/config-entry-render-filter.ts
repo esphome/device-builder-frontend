@@ -43,6 +43,23 @@ import { YamlRawValue } from "../../util/yaml-serialize.js";
  */
 export const ALWAYS_SHOWN_KEYS: ReadonlySet<string> = new Set(["name"]);
 
+/**
+ * Structural ``ConfigEntryType`` members — entries whose role is
+ * layout, grouping, or annotation rather than a single editable
+ * value. The templatable-field wrapper skips these because a
+ * literal/lambda toggle on a divider or a nested group doesn't
+ * make sense; only leaf-shaped entries can be templatable.
+ */
+export function _isStructuralType(t: ConfigEntryType): boolean {
+  return (
+    t === ConfigEntryType.NESTED ||
+    t === ConfigEntryType.MAP ||
+    t === ConfigEntryType.DIVIDER ||
+    t === ConfigEntryType.LABEL ||
+    t === ConfigEntryType.ALERT
+  );
+}
+
 export interface RenderFilterOptions {
   /** When true, drop non-required leaves (except ALWAYS_SHOWN_KEYS). */
   requiredOnly: boolean;
