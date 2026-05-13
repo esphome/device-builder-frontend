@@ -69,6 +69,12 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
   @property({ type: Boolean })
   disabled = false;
 
+  /** Lock the kind / instance pickers — used in edit-mode where the
+   *  YAML splice destination must stay pinned. The user can still
+   *  see what they're editing but can't move the automation. */
+  @property({ type: Boolean })
+  locked = false;
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
@@ -81,7 +87,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         <wa-select
           aria-labelledby="target-kind-label"
           value=${kind}
-          ?disabled=${this.disabled}
+          ?disabled=${this.disabled || this.locked}
           @change=${this._onKindChange}
         >
           ${ORDER.map(
@@ -132,7 +138,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         <wa-select
           aria-labelledby="component-id-label"
           value=${selectedId}
-          ?disabled=${this.disabled}
+          ?disabled=${this.disabled || this.locked}
           @change=${(e: Event) =>
             this._onComponentChange((e.target as HTMLSelectElement).value)}
         >
@@ -158,7 +164,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         <wa-select
           aria-labelledby="script-id-label"
           value=${selectedId}
-          ?disabled=${this.disabled}
+          ?disabled=${this.disabled || this.locked}
           @change=${(e: Event) =>
             this._onScriptChange((e.target as HTMLSelectElement).value)}
         >
@@ -188,7 +194,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         <wa-select
           aria-labelledby="light-id-label"
           value=${selectedId}
-          ?disabled=${this.disabled}
+          ?disabled=${this.disabled || this.locked}
           @change=${(e: Event) =>
             this._onLightChange((e.target as HTMLSelectElement).value)}
         >

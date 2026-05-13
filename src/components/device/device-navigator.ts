@@ -377,7 +377,17 @@ export class ESPHomeDeviceNavigator extends LitElement {
       components,
       automations: topLevelAutomations,
     } = categorizeSections(parseYamlTopLevelSections(this.yaml));
-    const automations = [...topLevelAutomations, ...parseYamlAutomations(this.yaml)].sort(
+    // ``parseYamlAutomations`` now enumerates individual ``script:``
+    // / ``interval:`` list items as stable-keyed entries
+    // (``automation:script:<id>``, ``automation:interval:<index>``),
+    // so the bare ``script:`` / ``interval:`` top-level blocks
+    // returned by the top-level parser would duplicate them. Drop
+    // those bare keys here so each automation shows up exactly once.
+    const detailed = parseYamlAutomations(this.yaml);
+    const filteredTopLevel = topLevelAutomations.filter(
+      (s) => s.key !== "script" && s.key !== "interval",
+    );
+    const automations = [...filteredTopLevel, ...detailed].sort(
       (a, b) => a.fromLine - b.fromLine
     );
 

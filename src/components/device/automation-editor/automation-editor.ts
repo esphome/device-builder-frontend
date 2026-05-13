@@ -106,6 +106,16 @@ export class ESPHomeAutomationEditor extends LitElement {
   @state() private _deleting = false;
   @state() private _error = "";
 
+  /**
+   * True when the editor was mounted with a ``location`` already
+   * picked — i.e. the user is editing an existing automation rather
+   * than creating one from scratch. Locks the target picker because
+   * changing the target after the fact would move the YAML splice
+   * to a different range (a "rename" operation we don't support
+   * inline — the user can delete + re-add instead).
+   */
+  @state() private _editMode = false;
+
   /** In-flight write guard — parents that re-fetch on reconnect
    *  should consult this to skip clobbering an optimistic update. */
   public get inFlightWrite(): boolean {
@@ -116,6 +126,11 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
+    // Snapshot the add-vs-edit context once at mount so subsequent
+    // property changes (the hydrate-from-backend cycle fills value
+    // and re-pins location) don't accidentally unlock the picker
+    // after it should stay locked.
+    this._editMode = this.location !== null;
     void this._loadCatalogs();
   }
 
@@ -123,8 +138,17 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (changed.has("configuration")) {
       void this._loadAvailable();
     }
+    // Hydrate as soon as: (a) we have a location, (b) no value is
+    // mounted yet, and (c) the catalog load has finished. Triggering
+    // on ``_loading`` covers the common case where the editor was
+    // mounted with the location already set — the first ``location``
+    // change fires while ``_loading=true``, so we re-check after
+    // catalogs finish loading rather than waiting for another
+    // location mutation that may never come.
     if (
-      (changed.has("location") || changed.has("configuration")) &&
+      (changed.has("location") ||
+        changed.has("configuration") ||
+        changed.has("_loading")) &&
       this.location &&
       this.value === null &&
       !this._loading
@@ -242,17 +266,26 @@ export class ESPHomeAutomationEditor extends LitElement {
     // location alongside the YAML splice destination. Mirror it into
     // the editor's effective trigger id so the picker shows the right
     // selection on first paint without a manual sync step.
+    //
+    // ``trigger_id`` is the catalog-qualified id
+    // (``"switch.on_turn_on"``). ``location.trigger`` is the bare
+    // YAML key (``"on_turn_on"``) the writer splices under the
+    // component. For ``device_on`` the two coincide because
+    // device-level catalog ids carry no domain prefix.
     const effectiveTriggerId =
       automation.trigger_id ??
-      (target?.kind === "device_on" || target?.kind === "component_on"
+      (target?.kind === "device_on"
         ? target.trigger || null
-        : null);
+        : target?.kind === "component_on"
+          ? this._catalogIdFor(target) || null
+          : null);
     return html`
       <esphome-automation-target-picker
         .value=${target}
         .devices=${devices}
         .scripts=${scripts}
         ?disabled=${disabled}
+        ?locked=${this._editMode}
         @target-change=${this._onTargetChange}
       ></esphome-automation-target-picker>
 
@@ -388,13 +421,46 @@ export class ESPHomeAutomationEditor extends LitElement {
     // trigger id into the location so save/delete target the right
     // range. ``interval`` / ``script`` / ``light_effect`` carry no
     // ``trigger`` field.
-    if (
-      this.location?.kind === "device_on" ||
-      this.location?.kind === "component_on"
-    ) {
+    //
+    // Wire-shape detail: ``AutomationTree.trigger_id`` is the
+    // catalog-qualified id (``"switch.on_turn_on"`` — what
+    // ``catalog.trigger_by_id`` returns a hit for).
+    // ``location.component_on.trigger`` is the BARE YAML key
+    // (``"on_turn_on"``) the writer splices under the component;
+    // the backend reconstructs the catalog id by combining the
+    // component's domain with the bare key. Device-level catalog
+    // ids carry no domain prefix so the two coincide for
+    // ``device_on``.
+    if (this.location?.kind === "device_on") {
       this.location = { ...this.location, trigger: e.detail.triggerId };
+    } else if (this.location?.kind === "component_on") {
+      const bare = this._bareTriggerKey(e.detail.triggerId);
+      this.location = { ...this.location, trigger: bare };
     }
   };
+
+  /**
+   * Drop the ``<domain>.`` prefix from a catalog trigger id to get
+   * the bare YAML key. ``"switch.on_turn_on"`` → ``"on_turn_on"``.
+   * Ids that already lack a domain are passed through.
+   */
+  private _bareTriggerKey(catalogId: string): string {
+    const dotIdx = catalogId.indexOf(".");
+    return dotIdx >= 0 ? catalogId.slice(dotIdx + 1) : catalogId;
+  }
+
+  /**
+   * Build the catalog-qualified trigger id for a ``component_on``
+   * location, using the bound device's domain. Returns ``null``
+   * when the device isn't yet loaded or the location has no
+   * trigger picked.
+   */
+  private _catalogIdFor(loc: AutomationLocation): string | null {
+    if (loc.kind !== "component_on" || !loc.trigger) return null;
+    const device = this._available?.devices.find((d) => d.id === loc.component_id);
+    const domain = device?.component_id.split(".")[0] ?? null;
+    return domain ? `${domain}.${loc.trigger}` : loc.trigger;
+  }
 
   private _onTriggerParamsChange = (
     e: CustomEvent<{ params: Record<string, unknown> }>,
