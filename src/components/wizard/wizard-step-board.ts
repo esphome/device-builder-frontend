@@ -19,7 +19,12 @@ import { withBase } from "../../util/base-path.js";
 import { debounce } from "../../util/debounce.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { detectChip, disconnect, isWebSerialSupported } from "../../util/web-serial.js";
+import {
+  detectChip,
+  disconnect,
+  isWebSerialSupported,
+  readDeviceManifest,
+} from "../../util/web-serial.js";
 
 import { inputStyles } from "../../styles/inputs.js";
 
@@ -626,7 +631,25 @@ export class ESPHomeWizardStepBoard extends LitElement {
       const detected = await detectChip();
       // e.g. "ESP32-S3 (QFN56) (revision v0.2)"
       const chipName = detected.chipName;
+
+      // Read the IDF app descriptor before disconnecting — when the
+      // chip is running a factory-flashed firmware that sets
+      // ``esphome.name`` to a catalog id, ``project_name`` points us
+      // straight at the right board. Same flow as
+      // ``detectAndOpenWizard`` so both entry points behave alike.
+      const manifest = await readDeviceManifest(detected.loader);
+
       await disconnect(detected.transport);
+
+      if (manifest?.board_id) {
+        const knownBoard = await this._api.getBoard(manifest.board_id);
+        if (knownBoard) {
+          this._onAdd(knownBoard);
+          return;
+        }
+        // ``board_id`` set but the catalog doesn't know it — fall
+        // through to chip-family detection rather than failing.
+      }
 
       // Extract chip family: "ESP32-S3 (QFN56) ..." → "esp32s3"
       const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
