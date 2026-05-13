@@ -144,7 +144,11 @@ export class ESPHomeCommandDialog extends LitElement {
   // sub-line paint on the first frame instead of waiting for the next jobs
   // context update.
   @state() _jobStatus: JobStatus | null = null;
-  _primedSource: { source: JobSource; source_label: string } | null = null;
+  _primedSource: {
+    source: JobSource;
+    source_label: string;
+    source_esphome_version: string;
+  } | null = null;
 
   // True while "Build locally instead" override is mid-flight.
   @state() _switchingToLocal = false;
@@ -231,6 +235,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._primedSource = {
       source: job.source,
       source_label: job.source_label,
+      source_esphome_version: job.source_esphome_version,
     };
     // Cancel any prior follow before starting a new one — without this,
     // every reopen layered fresh streams while previous ones still pumped

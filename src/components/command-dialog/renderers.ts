@@ -23,6 +23,14 @@ export function renderRemoteBuilderSubLine(
   const source = liveJob?.source ?? host._primedSource?.source;
   const label = liveJob?.source_label ?? host._primedSource?.source_label;
   if (source !== JobSource.REMOTE || !label) return nothing;
+  // source_esphome_version is also a job-creation-time snapshot; empty when
+  // the pairing hadn't completed a peer-link session yet. Render "<label>
+  // (<version>)" so the operator can spot version skew vs the offloader.
+  const version =
+    liveJob?.source_esphome_version ??
+    host._primedSource?.source_esphome_version ??
+    "";
+  const display = version ? `${label} (${version})` : label;
   // Only allow override for in-flight install — switching mid-upload or
   // mid-compile is a power-user shape without a UI today.
   const canOverride = host._commandType === "install";
@@ -31,7 +39,7 @@ export function renderRemoteBuilderSubLine(
       <wa-icon library="mdi" name="server-network"></wa-icon>
       <span
         >${host._localize("command.remote_builder_sub_line", {
-          receiver: label,
+          receiver: display,
         })}</span
       >
       ${canOverride

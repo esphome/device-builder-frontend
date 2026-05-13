@@ -130,6 +130,7 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
   host._primedSource = {
     source: job.source,
     source_label: job.source_label,
+    source_esphome_version: job.source_esphome_version,
   };
   followJob(host, job.job_id);
 }

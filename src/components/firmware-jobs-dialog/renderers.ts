@@ -146,10 +146,13 @@ function renderSourceLine(
   job: FirmwareJob,
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
+    const display = job.source_esphome_version
+      ? `${job.source_label} (${job.source_esphome_version})`
+      : job.source_label;
     return html`
       <div class="job-source">
         ${host._localize("firmware_jobs.building_on", {
-          label: job.source_label,
+          label: display,
         })}
       </div>
     `;
