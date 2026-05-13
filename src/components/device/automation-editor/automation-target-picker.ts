@@ -80,6 +80,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         >
         <wa-select
           aria-labelledby="target-kind-label"
+          value=${kind}
           ?disabled=${this.disabled}
           @change=${this._onKindChange}
         >
@@ -119,12 +120,18 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
     if (kind === "component_on") {
       const selectedId =
         this.value?.kind === "component_on" ? this.value.component_id : "";
+      if (this.devices.length === 0) {
+        return html`<p class="ae-empty" role="status">
+          ${this._localize("device.automation_target_no_components")}
+        </p>`;
+      }
       return html`
         <label class="ae-section-label" id="component-id-label"
-          >${this._localize("device.automation_target_component")}</label
+          >${this._localize("device.automation_target_component_label")}</label
         >
         <wa-select
           aria-labelledby="component-id-label"
+          value=${selectedId}
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
             this._onComponentChange((e.target as HTMLSelectElement).value)}
@@ -139,12 +146,18 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
     }
     if (kind === "script") {
       const selectedId = this.value?.kind === "script" ? this.value.id : "";
+      if (this.scripts.length === 0) {
+        return html`<p class="ae-empty" role="status">
+          ${this._localize("device.automation_target_no_scripts")}
+        </p>`;
+      }
       return html`
         <label class="ae-section-label" id="script-id-label"
-          >${this._localize("device.automation_target_script")}</label
+          >${this._localize("device.automation_target_script_label")}</label
         >
         <wa-select
           aria-labelledby="script-id-label"
+          value=${selectedId}
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
             this._onScriptChange((e.target as HTMLSelectElement).value)}
@@ -163,12 +176,18 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
       const lights = this.devices.filter((d) =>
         d.component_id.startsWith("light."),
       );
+      if (lights.length === 0) {
+        return html`<p class="ae-empty" role="status">
+          ${this._localize("device.automation_target_no_lights")}
+        </p>`;
+      }
       return html`
         <label class="ae-section-label" id="light-id-label"
-          >${this._localize("device.automation_target_component")}</label
+          >${this._localize("device.automation_target_light_label")}</label
         >
         <wa-select
           aria-labelledby="light-id-label"
+          value=${selectedId}
           ?disabled=${this.disabled}
           @change=${(e: Event) =>
             this._onLightChange((e.target as HTMLSelectElement).value)}

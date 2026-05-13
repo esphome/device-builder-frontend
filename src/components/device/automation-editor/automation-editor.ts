@@ -34,11 +34,8 @@ import { mdiContentSave, mdiDelete } from "@mdi/js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
-  AutomationAction,
-  AutomationCondition,
   AutomationLocation,
   AutomationTree,
-  AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
@@ -51,12 +48,7 @@ import { apiContext, localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import {
-  fetchAutomationActions,
-  fetchAutomationConditions,
-  fetchAutomationTriggers,
-  fetchLightEffects,
-} from "../../../util/automation-catalog-cache.js";
+import { fetchLightEffects } from "../../../util/automation-catalog-cache.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   emptyAutomationTree,
@@ -101,9 +93,11 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   @property() yaml = "";
 
-  @state() private _triggers: AutomationTrigger[] = [];
-  @state() private _actions: AutomationAction[] = [];
-  @state() private _conditions: AutomationCondition[] = [];
+  /** Light-effect catalog — only fetched on demand since effects
+   *  aren't currently scoped on the backend. The trigger / action /
+   *  condition lists come from ``_available`` (scoped to this
+   *  device) so dropdowns only show items the YAML can actually
+   *  use. */
   @state() private _effects: LightEffect[] = [];
   @state() private _available: AvailableAutomations | null = null;
 
@@ -136,6 +130,27 @@ export class ESPHomeAutomationEditor extends LitElement {
       !this._loading
     ) {
       void this._hydrateFromBackend();
+    }
+    // Add-mode default: when the dialog opens with no location, the
+    // target picker visually defaults to "the device itself" — pin a
+    // matching ``device_on`` location so the trigger picker mounts a
+    // real trigger dropdown instead of showing the empty placeholder.
+    // Mirrors what ``automation-target-picker._onKindChange`` would do
+    // on a user click, but eagerly so the form is usable on first
+    // paint.
+    if (
+      (changed.has("location") || changed.has("_available")) &&
+      this.location === null &&
+      this._available
+    ) {
+      this.location = { kind: "device_on", trigger: "on_boot" };
+      this.dispatchEvent(
+        new CustomEvent("automation-change", {
+          detail: { value: this.value, location: this.location },
+          bubbles: true,
+          composed: true,
+        }),
+      );
     }
   }
 
@@ -174,17 +189,17 @@ export class ESPHomeAutomationEditor extends LitElement {
     this._loading = true;
     this._error = "";
     try {
-      const [triggers, actions, conditions, effects] = await Promise.all([
-        fetchAutomationTriggers(this._api, this.platform),
-        fetchAutomationActions(this._api, this.platform),
-        fetchAutomationConditions(this._api, this.platform),
+      // The trigger / action / condition lists are scoped on the
+      // backend by what's in the device YAML — pulled via
+      // ``getAvailableAutomations`` below. Effects aren't yet
+      // scoped, so the cached full catalog is still the source
+      // here (the effects editor filters by the picked light
+      // platform locally).
+      const [effects] = await Promise.all([
         fetchLightEffects(this._api, this.platform),
+        this.configuration ? this._loadAvailable() : Promise.resolve(),
       ]);
-      this._triggers = triggers;
-      this._actions = actions;
-      this._conditions = conditions;
       this._effects = effects;
-      if (this.configuration) await this._loadAvailable();
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -212,9 +227,26 @@ export class ESPHomeAutomationEditor extends LitElement {
     const target = this.location;
     const devices = this._available?.devices ?? [];
     const scripts = this._available?.scripts ?? [];
+    // Catalog dropdowns read from the scoped lists so they only
+    // surface what this device's YAML can actually use (per the
+    // backend's filtering — see ``catalog.triggers_for_domains``
+    // etc.). When ``_available`` hasn't loaded yet the dropdowns
+    // are empty rather than showing the unfiltered universe.
+    const triggers = this._available?.triggers ?? [];
+    const actions = this._available?.actions ?? [];
+    const conditions = this._available?.conditions ?? [];
     const isLightEffect = target?.kind === "light_effect";
     const isScript = target?.kind === "script";
     const disabled = this._saving || this._deleting;
+    // For ``device_on`` and ``component_on`` the trigger lives in the
+    // location alongside the YAML splice destination. Mirror it into
+    // the editor's effective trigger id so the picker shows the right
+    // selection on first paint without a manual sync step.
+    const effectiveTriggerId =
+      automation.trigger_id ??
+      (target?.kind === "device_on" || target?.kind === "component_on"
+        ? target.trigger || null
+        : null);
     return html`
       <esphome-automation-target-picker
         .value=${target}
@@ -251,9 +283,9 @@ export class ESPHomeAutomationEditor extends LitElement {
       ${!isLightEffect && !isScript
         ? html`<esphome-automation-trigger-picker
             .target=${target}
-            .triggers=${this._triggers}
+            .triggers=${triggers}
             .devices=${devices}
-            .triggerId=${automation.trigger_id}
+            .triggerId=${effectiveTriggerId}
             .triggerParams=${automation.trigger_params}
             .board=${this.board}
             .yaml=${this.yaml}
@@ -266,7 +298,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       ${!isLightEffect
         ? html`<esphome-automation-condition-tree
             .conditions=${automation.conditions}
-            .catalog=${this._conditions}
+            .catalog=${conditions}
             .board=${this.board}
             .yaml=${this.yaml}
             ?disabled=${disabled}
@@ -277,8 +309,8 @@ export class ESPHomeAutomationEditor extends LitElement {
       ${!isLightEffect
         ? html`<esphome-automation-action-list
             .actions=${automation.actions}
-            .catalog=${this._actions}
-            .conditionCatalog=${this._conditions}
+            .catalog=${actions}
+            .conditionCatalog=${conditions}
             .scripts=${scripts}
             .board=${this.board}
             .yaml=${this.yaml}
@@ -350,6 +382,18 @@ export class ESPHomeAutomationEditor extends LitElement {
       trigger_id: e.detail.triggerId,
       trigger_params: e.detail.params,
     });
+    // For device-level and component-level automations the trigger
+    // name is part of the YAML splice destination (it's the
+    // ``on_*:`` key the writer renders under). Mirror the new
+    // trigger id into the location so save/delete target the right
+    // range. ``interval`` / ``script`` / ``light_effect`` carry no
+    // ``trigger`` field.
+    if (
+      this.location?.kind === "device_on" ||
+      this.location?.kind === "component_on"
+    ) {
+      this.location = { ...this.location, trigger: e.detail.triggerId };
+    }
   };
 
   private _onTriggerParamsChange = (

@@ -85,22 +85,42 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
     }
     const filtered = this._filteredTriggers();
     const active = filtered.find((t) => t.id === this.triggerId);
+    const componentId =
+      this.target.kind === "component_on" ? this.target.component_id : null;
+    const boundDevice = componentId
+      ? this.devices.find((d) => d.id === componentId) ?? null
+      : null;
     return html`
       <div class="ae-section">
         <label class="ae-section-label" id="trigger-label"
           >${this._localize("device.automation_trigger")}</label
         >
-        <wa-select
-          aria-labelledby="trigger-label"
-          ?disabled=${this.disabled}
-          @change=${this._onTriggerChange}
-        >
-          ${filtered.map(
-            (t) => html`<wa-option value=${t.id} ?selected=${t.id === this.triggerId}
-              >${t.name}</wa-option
-            >`,
-          )}
-        </wa-select>
+        ${boundDevice
+          ? html`<p class="ae-section-desc">
+              ${this._localize("device.automation_trigger_on_component", {
+                component: boundDevice.name ?? boundDevice.id,
+                domain: boundDevice.component_id,
+              })}
+            </p>`
+          : nothing}
+        ${filtered.length === 0
+          ? html`<p class="ae-empty" role="status">
+              ${this._localize("device.automation_trigger_none_available")}
+            </p>`
+          : html`<wa-select
+              aria-labelledby="trigger-label"
+              value=${this.triggerId ?? ""}
+              ?disabled=${this.disabled}
+              @change=${this._onTriggerChange}
+            >
+              ${filtered.map(
+                (t) => html`<wa-option
+                  value=${t.id}
+                  ?selected=${t.id === this.triggerId}
+                  >${t.name}</wa-option
+                >`,
+              )}
+            </wa-select>`}
         ${active?.description
           ? html`<p class="ae-section-desc">${active.description}</p>`
           : nothing}
