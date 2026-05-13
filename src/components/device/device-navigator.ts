@@ -457,6 +457,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
           ? html`<esphome-add-automation-dialog
               .boardName=${this.boardName}
               .configuration=${this.configuration}
+              .board=${this.board}
+              .yaml=${this.yaml}
             ></esphome-add-automation-dialog>`
           : nothing}
         <header class="card-header">

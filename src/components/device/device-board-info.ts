@@ -443,6 +443,8 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         ? html`<esphome-add-automation-dialog
             .boardName=${board?.name ?? ""}
             .configuration=${this.configuration}
+            .board=${board}
+            .yaml=${this.yaml}
           ></esphome-add-automation-dialog>`
         : nothing}
     `;
