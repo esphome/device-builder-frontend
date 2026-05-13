@@ -219,11 +219,13 @@ export class ESPHomeApp extends LitElement {
     // within a generous window; the user already saw it the first
     // time. SerialPort identity is stable across re-enums per the
     // Web Serial spec, so reference equality is the right key.
-    const target = event.target;
-    const port =
-      target && target !== navigator.serial
-        ? (target as SerialPort)
-        : null;
+    //
+    // The spec fires the event at ``navigator.serial`` with the
+    // SerialPort as ``event.target``. An ``instanceof SerialPort``
+    // narrows to that without relying on the ``!== navigator.serial``
+    // check, and guards against any future variant that dispatches
+    // the event with a different target shape.
+    const port = event.target instanceof SerialPort ? event.target : null;
     if (port) {
       const now = Date.now();
       // Lazy eviction of stale entries so the map can't grow
