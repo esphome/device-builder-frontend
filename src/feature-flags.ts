@@ -11,9 +11,8 @@
  * The "Automations" section of the device editor (the navigator group,
  * the step CTA on the right pane, and the "+ Add automation" dialog).
  *
- * Disabled because the backend WebSocket API doesn't yet expose the
- * automation endpoints the UI needs (catalog of triggers/conditions/
- * actions, schema lookups, save-back hooks). Re-enable by setting this
- * to `true` once those land.
+ * Pairs with the backend automations controller (catalog +
+ * parse/upsert/delete WS commands); the frontend automation editor
+ * package consumes those endpoints to render the structured form.
  */
-export const AUTOMATIONS_ENABLED = false;
+export const AUTOMATIONS_ENABLED = true;
