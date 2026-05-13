@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { WIZARD_BOARD_PLATFORMS } from "../../../src/components/wizard/wizard-step-board-platforms.js";
+import {
+  WIZARD_BOARD_PLATFORMS,
+  chipNameToFilterLabel,
+} from "../../../src/components/wizard/wizard-step-board-platforms.js";
 
 describe("wizard step-board platform chips", () => {
   it("includes an LN882x chip backed by the ln882x platform", () => {
@@ -53,6 +56,51 @@ describe("wizard step-board platform chips", () => {
     expect(bk).toBeGreaterThanOrEqual(0);
     expect(rtl).toBe(bk + 1);
     expect(ln).toBe(rtl + 1);
+  });
+
+  describe("chipNameToFilterLabel", () => {
+    it("maps an esptool-js chip name with package + revision suffix to the variant label", () => {
+      // esptool-js returns names like "ESP32-C6 (QFN32) (revision v0.2)".
+      // The function must strip everything from the first `(` onward
+      // before matching, otherwise the variant lookup misses.
+      expect(chipNameToFilterLabel("ESP32-C6 (QFN32) (revision v0.2)")).toBe(
+        "ESP32-C6",
+      );
+    });
+
+    it("maps every ESP32 variant to its filter label", () => {
+      // Sanity-check the variant column of WIZARD_BOARD_PLATFORMS round-trips
+      // through the chip-name → label normalisation. Catches accidental
+      // renames in either the catalog or the parser.
+      expect(chipNameToFilterLabel("ESP32")).toBe("ESP32");
+      expect(chipNameToFilterLabel("ESP32-S2")).toBe("ESP32-S2");
+      expect(chipNameToFilterLabel("ESP32-S3")).toBe("ESP32-S3");
+      expect(chipNameToFilterLabel("ESP32-C3")).toBe("ESP32-C3");
+      expect(chipNameToFilterLabel("ESP32-H2")).toBe("ESP32-H2");
+    });
+
+    it("maps a platform-only chip (variant === '') via the platform fallback", () => {
+      // ESP8266 / RP2040 / BK72xx / RTL87xx / LN882x / nRF52 don't have
+      // variants in WIZARD_BOARD_PLATFORMS — the function must fall back
+      // to a platform match when the variant lookup misses.
+      expect(chipNameToFilterLabel("ESP8266")).toBe("ESP8266");
+      expect(chipNameToFilterLabel("RP2040")).toBe("RP2040 / RP2350");
+    });
+
+    it("returns null for a chip name with no matching platform or variant", () => {
+      // An unknown chip name shouldn't yield a misleading filter; the
+      // caller treats null as "no filter, show the full picker".
+      expect(chipNameToFilterLabel("FooBar")).toBeNull();
+      expect(chipNameToFilterLabel("STM32F4")).toBeNull();
+    });
+
+    it("normalises case and dashes so lowercase / unconventional inputs still match", () => {
+      // The normalisation strips dashes and lowercases — protects against
+      // upstream chip-name format drift (older esptool versions, custom
+      // ROMs that lowercase the chip name, etc.).
+      expect(chipNameToFilterLabel("esp32-c6")).toBe("ESP32-C6");
+      expect(chipNameToFilterLabel("ESP32C6")).toBe("ESP32-C6");
+    });
   });
 
   it("every chip's platform is in the backend's accepted set", () => {

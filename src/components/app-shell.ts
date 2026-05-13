@@ -220,12 +220,19 @@ export class ESPHomeApp extends LitElement {
     // time. SerialPort identity is stable across re-enums per the
     // Web Serial spec, so reference equality is the right key.
     //
-    // The spec fires the event at ``navigator.serial`` with the
-    // SerialPort as ``event.target``. An ``instanceof SerialPort``
-    // narrows to that without relying on the ``!== navigator.serial``
-    // check, and guards against any future variant that dispatches
-    // the event with a different target shape.
-    const port = event.target instanceof SerialPort ? event.target : null;
+    // Modern Chromium follows the current WICG spec: the event is
+    // fired at ``navigator.serial`` with the SerialPort as
+    // ``event.target``. An older draft of the spec exposed the port
+    // on a ``SerialConnectionEvent.port`` property instead, so check
+    // both — covers legacy / non-Chromium implementations without
+    // changing the modern path.
+    const eventPort = (event as { port?: unknown }).port;
+    const port =
+      eventPort instanceof SerialPort
+        ? eventPort
+        : event.target instanceof SerialPort
+          ? event.target
+          : null;
     if (port) {
       const now = Date.now();
       // Lazy eviction of stale entries so the map can't grow
@@ -256,7 +263,7 @@ export class ESPHomeApp extends LitElement {
         label: this._localize("layout.usb_device_setup"),
         onClick: () => {
           // Bridge the gap between the click and the first internal
-          // markSerialActivity inside detectChipOnPort — the chip
+          // markSerialActivity inside connectToPort — the chip
           // reset can fire a new connect event before that runs.
           markSerialActivity();
           toast.dismiss("esphome-usb-device-connected");
