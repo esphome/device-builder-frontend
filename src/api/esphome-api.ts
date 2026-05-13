@@ -12,6 +12,12 @@ import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-t
 import type {
   AddComponentResponse,
   ArchivedDevice,
+  AutomationAction,
+  AutomationCondition,
+  AutomationTree,
+  AutomationTrigger,
+  AutomationLocation,
+  AvailableAutomations,
   BoardCatalogEntry,
   BulkActionResult,
   CommandMessage,
@@ -24,6 +30,8 @@ import type {
   EventSubscriptionCallback,
   FirmwareBinary,
   Label,
+  LightEffect,
+  ParsedAutomation,
   ReachabilityStateEvent,
   ReachabilitySubscription,
   FirmwareDownload,
@@ -47,6 +55,7 @@ import type {
   UpdateDeviceResponse,
   UserPreferences,
   WizardResponse,
+  YamlDiff,
   YamlSearchHit,
 } from "./types.js";
 
@@ -1276,6 +1285,155 @@ export class ESPHomeAPI {
       }
     }
     return result;
+  }
+
+  // ─── Automations ─────────────────────────────────────────
+
+  /**
+   * Catalog of every trigger ESPHome knows about for the pinned
+   * version. Pass ``platform`` to have the backend resolve any
+   * per-platform ``cv.SplitDefault`` fields on trigger-parameter
+   * schemas (same mechanism as ``getComponent``). ``boardId``
+   * additionally narrows board-level constraints.
+   *
+   * The list is immutable for the lifetime of the WS session —
+   * callers should round-trip through
+   * ``src/util/automation-catalog-cache.ts`` rather than re-issuing
+   * the command on every render.
+   */
+  async getAutomationTriggers(
+    platform?: string,
+    boardId?: string,
+  ): Promise<AutomationTrigger[]> {
+    return this.sendCommand<AutomationTrigger[]>("automations/get_triggers", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /** Catalog of every automation action. Same caching guidance as
+   *  ``getAutomationTriggers``. */
+  async getAutomationActions(
+    platform?: string,
+    boardId?: string,
+  ): Promise<AutomationAction[]> {
+    return this.sendCommand<AutomationAction[]>("automations/get_actions", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /** Catalog of every automation condition. Same caching guidance as
+   *  ``getAutomationTriggers``. */
+  async getAutomationConditions(
+    platform?: string,
+    boardId?: string,
+  ): Promise<AutomationCondition[]> {
+    return this.sendCommand<AutomationCondition[]>(
+      "automations/get_conditions",
+      {
+        ...(platform ? { platform } : {}),
+        ...(boardId ? { board_id: boardId } : {}),
+      },
+    );
+  }
+
+  /** Catalog of every light effect registered with ESPHome.
+   *  Surfaced as a separate command because effects sit on a
+   *  different editor surface (per-light list ergonomics) than the
+   *  trigger/action/condition tree. */
+  async getLightEffects(
+    platform?: string,
+    boardId?: string,
+  ): Promise<LightEffect[]> {
+    return this.sendCommand<LightEffect[]>("automations/get_light_effects", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /**
+   * Context-aware automation catalog for a single device's YAML.
+   * Triggers are scoped to component types actually present in the
+   * config; actions / conditions are returned in full;
+   * ``scripts`` / ``devices`` feed action-parameter dropdowns
+   * (``script.execute`` needs declared script ids and their
+   * ``parameters:``; ``switch.turn_on`` needs the configured switch
+   * instance ids).
+   *
+   * Unlike the static catalog commands, the result depends on YAML
+   * contents — callers should re-fetch on each YAML change rather
+   * than caching across edits.
+   */
+  async getAvailableAutomations(
+    configuration: string,
+  ): Promise<AvailableAutomations> {
+    return this.sendCommand<AvailableAutomations>(
+      "automations/get_available",
+      { configuration },
+    );
+  }
+
+  /**
+   * Parse every automation in a device YAML into structured form.
+   * Returns one ``ParsedAutomation`` per top-level ``script:`` /
+   * ``interval:`` list item, per inline ``on_*:`` handler under a
+   * component, per device-level ``esphome.on_*``, and per light
+   * effect.
+   *
+   * The frontend treats this as the authoritative source for the
+   * automations navigator group and the editor's
+   * existing-automation hydrate path. The regex-based
+   * ``parseYamlAutomations`` in ``util/yaml-sections.ts`` remains
+   * as a synchronous fallback used during the brief window between
+   * a keystroke and the next round-trip.
+   */
+  async parseDeviceAutomations(
+    configuration: string,
+  ): Promise<ParsedAutomation[]> {
+    return this.sendCommand<ParsedAutomation[]>("automations/parse", {
+      configuration,
+    });
+  }
+
+  /**
+   * Insert a new automation or replace an existing one. ``location``
+   * discriminates top-level vs inline placement and pins the YAML
+   * range to splice; ``automation`` is the structured tree the
+   * editor maintains.
+   *
+   * Returns a ``YamlDiff`` (same shape the component flow uses) that
+   * the caller applies to its in-memory YAML and saves through the
+   * normal config-write debounce. The backend does NOT write the
+   * YAML file directly — the editor pane remains the single writer
+   * so optimistic-update + revert-on-failure stays exactly as it is
+   * for component edits.
+   */
+  async upsertAutomation(
+    configuration: string,
+    automation: AutomationTree,
+    location: AutomationLocation,
+  ): Promise<{ yaml_diff: YamlDiff }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/upsert", {
+      configuration,
+      automation,
+      location,
+    });
+  }
+
+  /** Remove the automation at ``location`` from the YAML. Returns a
+   *  ``YamlDiff`` the caller applies to its in-memory YAML.
+   *  Adjacent siblings (other ``on_*:`` handlers on the same
+   *  component, other list items in the same ``script:`` block) are
+   *  left untouched. */
+  async deleteAutomation(
+    configuration: string,
+    location: AutomationLocation,
+  ): Promise<{ yaml_diff: YamlDiff }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/delete", {
+      configuration,
+      location,
+    });
   }
 
   // ─── Config Commands ──────────────────────────────────────
