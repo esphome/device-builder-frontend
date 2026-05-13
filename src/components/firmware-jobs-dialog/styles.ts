@@ -113,7 +113,13 @@ export const firmwareJobsDialogStyles = css`
     display: flex;
     flex-direction: column;
     gap: 0;
-    padding: var(--wa-space-2xs);
+    /* Horizontal inset matches the toolbar's left/right padding
+       (var(--wa-space-m)) so each row's hover/focus background lines
+       up with the "Reset build environment" / "Clear history" buttons
+       sitting directly above. Top stays tight so the first row hugs
+       the toolbar separator; small bottom padding keeps the last row
+       off the dialog edge. */
+    padding: var(--wa-space-2xs) var(--wa-space-m) var(--wa-space-xs);
     max-height: 60vh;
     overflow-y: auto;
   }
