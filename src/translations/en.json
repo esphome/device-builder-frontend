@@ -427,6 +427,8 @@
     "no_boards_found": "No boards found. Try a different search.",
     "dont_know_board": "I don't know what board I have",
     "connect_your_board": "Connect your board",
+    "detected_chip_family": "{family} detected — pick your specific board",
+    "show_all_boards": "Show all boards",
     "how_create": "How would you like to create your project?",
     "create_new": "Create new project",
     "create_new_desc": "A guided process to get you started with a starter kit or any other ESP boards",

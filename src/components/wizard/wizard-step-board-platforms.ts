@@ -40,3 +40,23 @@ export const WIZARD_BOARD_PLATFORMS: readonly WizardBoardPlatform[] = [
   { platform: "ln882x", variant: "", label: "LN882x" },
   { platform: "nrf52", variant: "", label: "nRF52" },
 ];
+
+/**
+ * Map an esptool-js chip name (e.g. ``"ESP32-C6 (QFN32) (revision
+ * v0.2)"``) to the platform-filter label the board picker uses
+ * (e.g. ``"ESP32-C6"``). Strips the parenthesised chip-package /
+ * revision suffix, normalises to lowercase, drops dashes, then
+ * looks the family up in ``WIZARD_BOARD_PLATFORMS`` — that's the
+ * same shape the picker's filter chips use, so callers can hand
+ * the result straight to ``_selectedFilter`` /
+ * ``openAtBoardStep``.
+ */
+export function chipNameToFilterLabel(chipName: string): string | null {
+  const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
+  const byVariant = WIZARD_BOARD_PLATFORMS.find((p) => p.variant === family);
+  if (byVariant) return byVariant.label;
+  const byPlatform = WIZARD_BOARD_PLATFORMS.find(
+    (p) => p.platform === family && !p.variant,
+  );
+  return byPlatform?.label ?? null;
+}

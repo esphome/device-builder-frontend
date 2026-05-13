@@ -328,6 +328,8 @@
     "no_boards_found": "Aucune carte trouvée. Essayez une autre recherche.",
     "dont_know_board": "Je ne sais pas quelle carte j'ai",
     "connect_your_board": "Connecter votre carte",
+    "detected_chip_family": "{family} détecté — choisissez votre carte",
+    "show_all_boards": "Afficher toutes les cartes",
     "how_create": "Comment souhaitez-vous créer votre projet ?",
     "create_new": "Créer un nouveau projet",
     "create_new_desc": "Un processus guidé pour démarrer avec un kit de démarrage ou toute autre carte ESP",

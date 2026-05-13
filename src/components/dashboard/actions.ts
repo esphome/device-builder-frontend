@@ -16,27 +16,7 @@ import {
   readDeviceManifest,
   readMacAddress,
 } from "../../util/web-serial.js";
-import { WIZARD_BOARD_PLATFORMS } from "../wizard/wizard-step-board-platforms.js";
-
-/**
- * Map an esptool-js chip name (e.g. ``"ESP32-C6 (QFN32) (revision
- * v0.2)"``) to the platform-filter label the board picker uses
- * (e.g. ``"ESP32-C6"``). Strips the parenthesised chip-package /
- * revision suffix, normalises to lowercase, drops dashes — that's
- * the same family slug we previously used to build
- * ``generic-{family}`` board ids, just compared against the
- * ``WIZARD_BOARD_PLATFORMS`` catalog so the wizard's picker opens
- * with the right chip already filtered.
- */
-function chipNameToFilterLabel(chipName: string): string | null {
-  const family = chipName.split("(")[0].trim().toLowerCase().replace(/-/g, "");
-  const byVariant = WIZARD_BOARD_PLATFORMS.find((p) => p.variant === family);
-  if (byVariant) return byVariant.label;
-  const byPlatform = WIZARD_BOARD_PLATFORMS.find(
-    (p) => p.platform === family && !p.variant,
-  );
-  return byPlatform?.label ?? null;
-}
+import { chipNameToFilterLabel } from "../wizard/wizard-step-board-platforms.js";
 
 export function editDevice(device: ConfiguredDevice) {
   window.history.pushState({}, "", withBase(`/device/${device.configuration}`));

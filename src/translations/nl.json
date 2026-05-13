@@ -328,6 +328,8 @@
     "no_boards_found": "Geen borden gevonden. Probeer een andere zoekopdracht.",
     "dont_know_board": "Ik weet niet welk bord ik heb",
     "connect_your_board": "Verbind uw bord",
+    "detected_chip_family": "{family} gedetecteerd — kies uw specifieke bord",
+    "show_all_boards": "Toon alle borden",
     "how_create": "Hoe wilt u uw project aanmaken?",
     "create_new": "Nieuw project aanmaken",
     "create_new_desc": "Een begeleid proces om aan de slag te gaan met een starterkit of andere ESP-borden",
