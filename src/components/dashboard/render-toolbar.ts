@@ -1,8 +1,7 @@
 import { html, type TemplateResult } from "lit";
 import { DashboardView, type Label } from "../../api/types.js";
-import type { LocalizeFunc } from "../../common/localize.js";
-import { renderYamlPreviewPivot } from "./render-yaml.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { renderYamlPreviewPivot } from "./render-yaml.js";
 
 export function renderViewToggle(host: ESPHomePageDashboard): TemplateResult {
   const view = host._view;
@@ -66,11 +65,7 @@ export function renderLabelsFilter(host: ESPHomePageDashboard): TemplateResult {
 }
 
 export function renderFilterGroup(host: ESPHomePageDashboard): TemplateResult {
-  return html`
-    <div class="filter-group">
-      ${renderLabelsFilter(host)}
-    </div>
-  `;
+  return html` <div class="filter-group">${renderLabelsFilter(host)}</div> `;
 }
 
 export function renderSelectToggle(host: ESPHomePageDashboard): TemplateResult {
@@ -120,7 +115,7 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
 export function renderToolbar(
   host: ESPHomePageDashboard,
   matchCount: number,
-  total: number,
+  total: number
 ): TemplateResult {
   const q = host._search.trim();
   const unit =
@@ -143,9 +138,7 @@ export function renderToolbar(
 export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   const hits = host._yamlSearch.hits;
   const matchCount =
-    hits === null
-      ? null
-      : hits.reduce((sum, hit) => sum + hit.matches.length, 0);
+    hits === null ? null : hits.reduce((sum, hit) => sum + hit.matches.length, 0);
   const unit =
     matchCount === 1
       ? host._localize("yaml_search.match_count_singular")
@@ -158,9 +151,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
         ${renderFilterGroup(host)}
       </div>
       ${matchCount !== null
-        ? html`<span class="device-count"
-            ><strong>${matchCount}</strong> ${unit}</span
-          >`
+        ? html`<span class="device-count"><strong>${matchCount}</strong> ${unit}</span>`
         : ""}
     </div>
   `;
@@ -169,7 +160,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
 export function renderNoResultsExtras(host: ESPHomePageDashboard): TemplateResult {
   return html`
     ${renderYamlPreviewPivot(host._localize, host._yamlPreviewCount, () =>
-      host._setSearchMode(true),
+      host._setSearchMode(true)
     )}
     <button
       class="empty-search-clear"
@@ -186,9 +177,7 @@ export function renderEmptySearch(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <div class="empty-search">
       <wa-icon class="empty-search-icon" library="mdi" name="magnify"></wa-icon>
-      <h3 class="empty-search-title">
-        ${host._localize("dashboard.no_results_title")}
-      </h3>
+      <h3 class="empty-search-title">${host._localize("dashboard.no_results_title")}</h3>
       <p class="empty-search-desc">
         ${host._localize("dashboard.no_results_desc", { query: host._search.trim() })}
       </p>
@@ -203,9 +192,7 @@ export function renderAddDeviceCard(host: ESPHomePageDashboard): TemplateResult 
       <div class="add-device-icon-wrap">
         <wa-icon library="mdi" name="plus"></wa-icon>
       </div>
-      <span class="add-device-label"
-        >${host._localize("dashboard.add_new_device")}</span
-      >
+      <span class="add-device-label">${host._localize("dashboard.add_new_device")}</span>
       <span class="add-device-hint"
         >${host._localize("dashboard.add_new_device_hint")}</span
       >
@@ -217,7 +204,7 @@ export function renderAddDeviceCard(host: ESPHomePageDashboard): TemplateResult 
         @click=${(e: Event) => e.stopPropagation()}
       >
         <wa-icon library="mdi" name="web"></wa-icon> ${host._localize(
-          "dashboard.esphome_web",
+          "dashboard.esphome_web"
         )}
       </a>
     </div>
@@ -225,15 +212,14 @@ export function renderAddDeviceCard(host: ESPHomePageDashboard): TemplateResult 
 }
 
 export function renderSelectBarOrFab(
-  host: ESPHomePageDashboard,
+  host: ESPHomePageDashboard
 ): TemplateResult | string {
   if (host._selectMode) {
     return html`
       <esphome-select-bar
         selected-count=${host._selectedDevices.size}
         ?all-visible-selected=${host._allVisibleSelected}
-        @select-all=${() =>
-          host._addToSelection(host._currentlyVisibleConfigurations())}
+        @select-all=${() => host._addToSelection(host._currentlyVisibleConfigurations())}
         @deselect-all=${() =>
           host._removeFromSelection(host._currentlyVisibleConfigurations())}
         @cancel=${() => {

@@ -37,6 +37,13 @@ export const dashboardStyles = css`
     padding-bottom: var(--esphome-footer-height);
   }
 
+  /* When the discovered banner is present, push toolbar / content
+     down so the collapsed pill doesn't sit on top of the view-toggle
+     buttons.*/
+  :host([has-discovered]) {
+    padding-top: var(--wa-space-2xl);
+  }
+
   /* ─── Discovered Banner ─── */
 
   /* ─── Discovered section ─── */

@@ -248,6 +248,9 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected willUpdate(changed: PropertyValues) {
     if (changed.has("_view")) this.setAttribute("view", this._view);
+    if (changed.has("_importableDevices")) {
+      this.toggleAttribute("has-discovered", this._importableDevices.length > 0);
+    }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // Re-bind drawer to live device so renames / state flaps / DHCP renews
     // don't leave the drawer showing stale fields.
