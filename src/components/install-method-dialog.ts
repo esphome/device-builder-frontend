@@ -2,9 +2,11 @@ import { consume } from "@lit/context";
 import {
   mdiArrowLeft,
   mdiChevronDown,
+  mdiChevronRight,
   mdiChevronUp,
   mdiCloudDownload,
   mdiDownload,
+  mdiIpNetworkOutline,
   mdiSerialPort,
   mdiUsb,
   mdiWifi,
@@ -12,8 +14,8 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { DeviceState } from "../api/types.js";
 import type { SerialPort } from "../api/types.js";
+import { DeviceState } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
@@ -27,12 +29,14 @@ import "./base-dialog.js";
 registerMdiIcons({
   "arrow-left": mdiArrowLeft,
   "chevron-down": mdiChevronDown,
+  "chevron-right": mdiChevronRight,
   "chevron-up": mdiChevronUp,
   wifi: mdiWifi,
   usb: mdiUsb,
   "serial-port": mdiSerialPort,
   "cloud-download": mdiCloudDownload,
   download: mdiDownload,
+  "ip-network-outline": mdiIpNetworkOutline,
 });
 
 type DialogView = "method" | "port-select";
@@ -72,14 +76,21 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @state() private _ports: SerialPort[] = [];
   @state() private _loadingPorts = false;
   /**
-   * `true` when the user has clicked the chevron on the OTA row
-   * to reveal the address-override input. Clicking the OTA row
-   * itself (default click target) still triggers a default-
-   * address OTA — the chevron is the explicit "I want to pick a
-   * specific IP" path. Reset whenever the dialog re-opens (the
+   * `true` when the user has opened the "Advanced options"
+   * disclosure at the bottom of the method list. Holds the
+   * OTA address-override form and the manual binary-download
+   * option. Reset whenever the dialog re-opens (the
    * `willUpdate` hook below).
    */
-  @state() private _otaAddressExpanded = false;
+  @state() private _advancedExpanded = false;
+  /**
+   * `true` when the chevron on the OTA address-override card
+   * is expanded, revealing the IP / hostname input inside the
+   * card. Independent of `_advancedExpanded` (the disclosure
+   * that holds the card itself) so collapsing and reopening
+   * Advanced options doesn't lose this state mid-session.
+   */
+  @state() private _otaAddressCardExpanded = false;
   @state() private _otaAddressValue = "";
 
   private get _supportsWebSerial(): boolean {
@@ -106,7 +117,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     if (changed.has("open") && this.open) {
       this._view = "method";
       this._ports = [];
-      this._otaAddressExpanded = false;
+      this._advancedExpanded = false;
+      this._otaAddressCardExpanded = false;
       this._otaAddressValue = this.deviceCurrentAddress;
     }
   }
@@ -172,13 +184,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         cursor: not-allowed;
       }
 
-      /* Fade only the row's content (icon + title/desc) on
-         disabled — NOT the container — so a child like
-         .chevron-btn (the OTA row's address-override disclosure,
-         which works regardless of online state) can override
-         back to full opacity. opacity on the container would
-         cascade to every descendant regardless of child rules;
-         targeted children let exceptions exist. */
       .option--disabled > wa-icon,
       .option--disabled .info {
         opacity: 0.45;
@@ -194,100 +199,135 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         color: var(--wa-color-text-quiet);
       }
 
-      /* The chevron is a disclosure affordance on the OTA row —
-         click the row for default-address OTA, click the chevron
-         to expand the address-override form below. Always-on
-         pill background (not just on hover) so the chevron reads
-         as clickable at a glance; without it the bare icon was
-         hard to spot in the dark theme.
-
-         e.stopPropagation in the chevron's click handler keeps
-         the row's default-OTA from also firing on chevron clicks.
-         margin-left: auto pins it to the row's trailing edge
-         regardless of text width. */
-      .chevron-btn {
-        margin-left: auto;
-        width: 32px;
-        height: 32px;
-        padding: 0;
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
-        border: var(--wa-border-width-s) solid
-          color-mix(in srgb, var(--esphome-primary), transparent 70%);
-        border-radius: 999px;
-        cursor: pointer;
+      /* "Advanced options" disclosure rendered below the method
+         list. Holds the OTA address-override form and the manual
+         binary-download option — paths that aren't part of the
+         everyday install flow. Styled as an underlined inline
+         link rather than a button card so it doesn't compete
+         visually with the main method options above. */
+      .advanced-toggle {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
+        margin-top: var(--wa-space-m);
+        padding: 0;
+        background: none;
+        border: none;
+        font-family: inherit;
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
         color: var(--esphome-primary);
-        flex-shrink: 0;
-        transition: background 0.12s, border-color 0.12s, color 0.12s;
+        cursor: pointer;
+        /* Underline targets the text only (via text-underline-offset);
+           the chevron is excluded from text-decoration below so it
+           doesn't sit on the underline rail. */
+        text-decoration: underline;
+        text-underline-offset: 2px;
       }
 
-      .chevron-btn:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 75%);
-        border-color: var(--esphome-primary);
+      .advanced-toggle__chevron {
+        font-size: 16px;
+        text-decoration: none;
       }
 
-      .chevron-btn:focus-visible {
+      .advanced-toggle:focus-visible {
         outline: 2px solid var(--esphome-primary);
         outline-offset: 2px;
       }
 
-      .chevron-btn wa-icon {
-        font-size: 18px;
-        color: inherit;
-      }
-
-      /* When the OTA row is disabled (device not online), the row's
-         click handler is suppressed and the icon + info fade. The
-         chevron-driven address override is the path that's MOST
-         useful in that case — typing an IP doesn't depend on the
-         dashboard having resolved the device — so explicitly
-         restore the chevron's pointer cursor on top of the parent
-         .option--disabled's not-allowed default. (Opacity doesn't
-         need overriding here because the disabled rule targets
-         icon + info only, not the chevron.) */
-      .option--disabled .chevron-btn {
-        cursor: pointer;
-      }
-
-      /* The expanded address form is a separate card directly
-         below the OTA row, sized to match it: full row width
-         (no left-inset) and the same default surface background
-         so the dialog reads as a uniform list of options + the
-         option's own expanded panel. Same border + radius as
-         the .option rule to preserve the visual rhythm.
-         A standalone wrapper rather than reusing the .option
-         class so we don't inherit .option's flex-row +
-         align-items: center, which would re-center the form's
-         contents and clip its width. */
-      .ota-form {
-        padding: var(--wa-space-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
+      /* Container for the disclosed advanced controls. Stacks
+         the OTA address form and the manual-download option with
+         the same gap as the main list so the visual rhythm
+         stays uniform when expanded. */
+      .advanced-panel {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-xs);
+        gap: var(--wa-space-s);
+        margin-top: var(--wa-space-s);
       }
 
-      .ota-form label {
-        font-size: var(--wa-font-size-2xs);
-        font-weight: var(--wa-font-weight-bold);
+      /* Trailing chevron on option cards. chevron-right on
+         direct-action rows (e.g. "Download firmware binary")
+         signals "click to proceed"; chevron-down on the IP /
+         hostname row signals an expandable card whose form opens
+         inline inside the same card. */
+      .option-chevron {
+        margin-left: auto;
+        font-size: 20px;
         color: var(--wa-color-text-quiet);
+        flex-shrink: 0;
+        transition: color 0.12s;
       }
 
-      .ota-form input {
+      .option:hover .option-chevron,
+      .option-collapsible:hover .option-chevron {
+        color: var(--esphome-primary);
+      }
+
+      /* Expandable option card. The header row reuses the same
+         icon + title/desc layout as a plain .option; clicking it
+         (or any part of the card) toggles an inline body below
+         that holds the OTA address form, so the configuration
+         lives INSIDE the card rather than as a separate panel. */
+      .option-collapsible {
+        display: flex;
+        flex-direction: column;
+        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border-radius: var(--wa-border-radius-l);
+        overflow: hidden;
+        transition:
+          border-color 0.12s,
+          background 0.12s;
+      }
+
+      .option-collapsible:hover {
+        border-color: var(--esphome-primary);
+        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+      }
+
+      .option-collapsible__header {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-m);
+        padding: var(--wa-space-m);
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        width: 100%;
+        font-family: inherit;
+        color: inherit;
+        text-align: left;
+      }
+
+      .option-collapsible__header:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: -2px;
+      }
+
+      .option-collapsible__header wa-icon:first-child {
+        font-size: 28px;
+        color: var(--esphome-primary);
+        flex-shrink: 0;
+      }
+
+      .option-collapsible__body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-s);
+        padding: 0 var(--wa-space-m) var(--wa-space-m);
+      }
+
+      .ota-form-input {
         width: 100%;
         box-sizing: border-box;
       }
 
-      .ota-form .actions {
+      .ota-form-actions {
         display: flex;
         gap: var(--wa-space-s);
         justify-content: flex-end;
       }
 
-      .ota-form .btn {
+      .ota-form-actions .btn {
         padding: 6px 14px;
         border-radius: var(--wa-border-radius-m);
         font-size: var(--wa-font-size-xs);
@@ -298,16 +338,16 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         transition: background 0.12s;
       }
 
-      .ota-form .btn--primary {
+      .ota-form-actions .btn--primary {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
       }
 
-      .ota-form .btn--primary:hover:not(:disabled) {
+      .ota-form-actions .btn--primary:hover:not(:disabled) {
         background: color-mix(in srgb, var(--esphome-primary), black 10%);
       }
 
-      .ota-form .btn--primary:disabled {
+      .ota-form-actions .btn--primary:disabled {
         opacity: 0.5;
         cursor: not-allowed;
       }
@@ -419,7 +459,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     return html`
       <div class="list">
         ${this._renderOtaOption(isOnline)}
-        ${swapInWebDownload ? this._renderWebDownloadOption() : this._renderWebSerialOption(hasWebSerial)}
+        ${swapInWebDownload
+          ? this._renderWebDownloadOption()
+          : this._renderWebSerialOption(hasWebSerial)}
         <div class="option" @click=${this._onServerSerial}>
           <wa-icon library="mdi" name="serial-port"></wa-icon>
           <div class="info">
@@ -431,8 +473,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
             >
           </div>
         </div>
-        ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
       </div>
+      ${this._renderAdvancedSection()}
     `;
   }
 
@@ -566,24 +608,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     `;
   }
 
-  /**
-   * The OTA "Install over network" option is split: the main row
-   * runs a default-address OTA (current behaviour), and a chevron
-   * at the row's trailing edge expands an inline address-override
-   * form so the user can target a specific IP without leaving
-   * this dialog. Folds in the previous "Install to specific
-   * address" kebab item — kebab now shows a single Install entry
-   * that opens this dialog and surfaces the variant inline.
-   *
-   * Disabled rows still show the chevron — the override path
-   * works against an offline / not-yet-resolved device too
-   * (typing an IP doesn't depend on dashboard's auto-resolve),
-   * which is exactly the case where the override is most useful.
-   */
   private _renderOtaOption(isOnline: boolean) {
-    const expanded = this._otaAddressExpanded;
-    const trimmed = this._otaAddressValue.trim();
-    const canSubmit = trimmed.length > 0 && trimmed !== "OTA";
     return html`
       <div
         class="option ${!isOnline ? "option--disabled" : ""}"
@@ -591,77 +616,128 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       >
         <wa-icon library="mdi" name="wifi"></wa-icon>
         <div class="info">
-          <span class="title"
-            >${this._localize("dashboard.install_method_network")}</span
-          >
+          <span class="title">${this._localize("dashboard.install_method_network")}</span>
           <span class="desc"
             >${this._localize("dashboard.install_method_network_desc")}</span
           >
         </div>
-        <button
-          type="button"
-          class="chevron-btn"
-          aria-expanded=${expanded ? "true" : "false"}
-          aria-controls=${expanded ? "ota-address-form" : nothing}
-          aria-label=${this._localize(
-            "dashboard.install_method_network_address_toggle",
-          )}
-          @click=${this._onToggleOtaAddress}
-        >
-          <wa-icon
-            library="mdi"
-            name=${expanded ? "chevron-up" : "chevron-down"}
-          ></wa-icon>
-        </button>
       </div>
+    `;
+  }
+
+  /**
+   * "Advanced options" disclosure at the bottom of the method
+   * list. Holds the OTA address-override card (target a specific
+   * IP / hostname — useful when the device hasn't been resolved
+   * yet, or when overriding the dashboard's auto-detected
+   * address) and, in install mode, the manual binary-download
+   * option (compile here, flash with an external tool).
+   */
+  private _renderAdvancedSection() {
+    const expanded = this._advancedExpanded;
+    return html`
+      <button
+        type="button"
+        class="advanced-toggle"
+        aria-expanded=${expanded ? "true" : "false"}
+        aria-controls=${expanded ? "advanced-panel" : nothing}
+        @click=${this._onToggleAdvanced}
+      >
+        ${this._localize("dashboard.install_method_advanced_toggle")}
+        <wa-icon
+          class="advanced-toggle__chevron"
+          library="mdi"
+          name=${expanded ? "chevron-up" : "chevron-down"}
+        ></wa-icon>
+      </button>
       ${expanded
         ? html`
-            <div id="ota-address-form" class="ota-form">
-              <label for="ota-address-input"
-                >${this._localize(
-                  "dashboard.install_method_network_address_label",
-                )}</label
-              >
-              <input
-                id="ota-address-input"
-                type="text"
-                autocomplete="off"
-                spellcheck="false"
-                placeholder="192.168.1.42"
-                .value=${this._otaAddressValue}
-                @input=${(e: Event) => {
-                  this._otaAddressValue = (
-                    e.target as HTMLInputElement
-                  ).value;
-                }}
-                @keydown=${(e: KeyboardEvent) => {
-                  if (e.key === "Enter" && canSubmit) {
-                    this._submitOtaAddress();
-                  }
-                }}
-              />
-              <div class="actions">
-                <button
-                  class="btn btn--primary"
-                  ?disabled=${!canSubmit}
-                  @click=${this._submitOtaAddress}
-                >
-                  ${this._localize(
-                    "dashboard.install_method_network_address_submit",
-                  )}
-                </button>
-              </div>
+            <div id="advanced-panel" class="advanced-panel">
+              ${this._renderOtaAddressCard()}
+              ${this.mode === "install" ? this._renderManualDownloadOption() : nothing}
             </div>
           `
         : nothing}
     `;
   }
 
-  private _onToggleOtaAddress = (e: MouseEvent) => {
-    // Stop the click from bubbling to the parent OTA row, which
-    // would otherwise fire the default-address OTA path.
-    e.stopPropagation();
-    this._otaAddressExpanded = !this._otaAddressExpanded;
+  /**
+   * OTA address-override card. Header row mirrors the other
+   * .option cards (icon + title + description) and the chevron
+   * toggles an inline form INSIDE the same card so the address
+   * input lives within the card's outline rather than dangling
+   * below as a separate panel.
+   */
+  private _renderOtaAddressCard() {
+    const expanded = this._otaAddressCardExpanded;
+    const trimmed = this._otaAddressValue.trim();
+    const canSubmit = trimmed.length > 0 && trimmed !== "OTA";
+    return html`
+      <div class="option-collapsible">
+        <button
+          type="button"
+          class="option-collapsible__header"
+          aria-expanded=${expanded ? "true" : "false"}
+          aria-controls=${expanded ? "ota-address-form" : nothing}
+          @click=${this._onToggleOtaAddressCard}
+        >
+          <wa-icon library="mdi" name="ip-network-outline"></wa-icon>
+          <div class="info">
+            <span class="title" id="ota-address-title"
+              >${this._localize("dashboard.install_method_network_address_label")}</span
+            >
+            <span class="desc"
+              >${this._localize("dashboard.install_method_network_address_desc")}</span
+            >
+          </div>
+          <wa-icon
+            class="option-chevron"
+            library="mdi"
+            name=${expanded ? "chevron-up" : "chevron-down"}
+          ></wa-icon>
+        </button>
+        ${expanded
+          ? html`
+              <div id="ota-address-form" class="option-collapsible__body">
+                <input
+                  class="ota-form-input"
+                  type="text"
+                  autocomplete="off"
+                  spellcheck="false"
+                  placeholder="192.168.1.42"
+                  aria-labelledby="ota-address-title"
+                  .value=${this._otaAddressValue}
+                  @input=${(e: Event) => {
+                    this._otaAddressValue = (e.target as HTMLInputElement).value;
+                  }}
+                  @keydown=${(e: KeyboardEvent) => {
+                    if (e.key === "Enter" && canSubmit) {
+                      this._submitOtaAddress();
+                    }
+                  }}
+                />
+                <div class="ota-form-actions">
+                  <button
+                    class="btn btn--primary"
+                    ?disabled=${!canSubmit}
+                    @click=${this._submitOtaAddress}
+                  >
+                    ${this._localize("dashboard.install_method_network_address_submit")}
+                  </button>
+                </div>
+              </div>
+            `
+          : nothing}
+      </div>
+    `;
+  }
+
+  private _onToggleAdvanced = () => {
+    this._advancedExpanded = !this._advancedExpanded;
+  };
+
+  private _onToggleOtaAddressCard = () => {
+    this._otaAddressCardExpanded = !this._otaAddressCardExpanded;
   };
 
   private _submitOtaAddress = () => {
