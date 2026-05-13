@@ -9,6 +9,7 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SerialPort } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -790,6 +791,10 @@ export class ESPHomeWizardStepBoard extends LitElement {
     } catch (e) {
       console.error("Failed to load server serial ports:", e);
       this._serverPorts = [];
+      this._detectError = this._extractErrorDetail(
+        e,
+        this._localize("wizard.connect_your_board_detect_failed"),
+      );
     } finally {
       this._loadingServerPorts = false;
     }
@@ -825,13 +830,25 @@ export class ESPHomeWizardStepBoard extends LitElement {
       this._view = "boards";
       void this._fetchBoards();
     } catch (err) {
-      const message = (err as { message?: string } | undefined)?.message;
-      this._detectError =
-        message || this._localize("wizard.connect_your_board_detect_failed");
+      this._detectError = this._extractErrorDetail(
+        err,
+        this._localize("wizard.connect_your_board_detect_failed"),
+      );
     } finally {
       this._detectingChip = false;
     }
   };
+
+  /**
+   * Prefer ``APIError.details`` (the human-readable bit) over
+   * ``Error.message`` (which carries the ``<code>:`` prefix for an
+   * APIError) so the wizard's inline error reads cleanly to a user.
+   */
+  private _extractErrorDetail(err: unknown, fallback: string): string {
+    if (err instanceof APIError) return err.details || fallback;
+    if (err instanceof Error) return err.message || fallback;
+    return fallback;
+  }
 
   private _onBackFromPortSelect = () => {
     this._view = "boards";

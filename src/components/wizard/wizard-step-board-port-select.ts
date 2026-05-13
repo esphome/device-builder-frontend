@@ -19,22 +19,12 @@ registerMdiIcons({
 });
 
 /**
- * Server-side serial-port picker rendered inline inside the new-
- * device wizard's board step when WebSerial isn't available.
- *
- * Presentation-only: the parent (``wizard-step-board``) owns the
- * port list and the ``config/detect_chip`` call. This element
- * fires ``select-port`` / ``back`` and otherwise just renders the
- * current state. Splitting it out keeps ``wizard-step-board.ts``
- * from blowing past the file-size cap and lines the markup up with
- * the install dialog's port-select view ([install-method-dialog.ts]
- * lines 569-609) so the two stay visually consistent.
- *
- * The heading key varies by where the backend lives: on
- * ``localhost`` the user is plugging the board into their own
- * computer; on the HA add-on they're plugging it into the HA
- * server; remote setups fall back to the generic "computer
- * running the device builder" phrasing.
+ * Server-side serial-port picker rendered inline in the wizard's
+ * board step when WebSerial isn't available. Presentation only —
+ * the parent owns the port list and the ``config/detect_chip``
+ * call; this element fires ``select-port`` / ``back`` and renders
+ * the current state. Heading copy varies by where the backend
+ * lives (localhost / HA add-on / remote).
  */
 @customElement("esphome-wizard-step-board-port-select")
 export class ESPHomeWizardStepBoardPortSelect extends LitElement {
@@ -107,6 +97,11 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
         padding: var(--wa-space-m);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         border-radius: var(--wa-border-radius-l);
+        background: transparent;
+        font-family: inherit;
+        color: inherit;
+        text-align: left;
+        width: 100%;
         cursor: pointer;
         transition:
           background 0.12s,
@@ -116,6 +111,11 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       .option:hover {
         background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
         border-color: var(--esphome-primary);
+      }
+
+      .option:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 2px;
       }
 
       .option wa-icon {
@@ -213,13 +213,17 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       <div class="list">
         ${this.ports.map(
           (p) => html`
-            <div class="option" @click=${() => this._onSelect(p.port)}>
+            <button
+              type="button"
+              class="option"
+              @click=${() => this._onSelect(p.port)}
+            >
               <wa-icon library="mdi" name="serial-port"></wa-icon>
               <div class="info">
                 <span class="title">${p.port}</span>
                 ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
               </div>
-            </div>
+            </button>
           `,
         )}
       </div>
