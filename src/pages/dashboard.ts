@@ -506,7 +506,10 @@ export class ESPHomePageDashboard extends LitElement {
   _onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) =>
     onInstallMethodSelect(this, e);
   _openLogs = (device: ConfiguredDevice) => openLogs(this, device);
-  _onPostInstallShowLogs = postInstallShowLogsHandler(() => this._logsDialog);
+  _onPostInstallShowLogs = postInstallShowLogsHandler(
+    () => this._logsDialog,
+    () => this._localize,
+  );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };

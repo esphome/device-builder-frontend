@@ -162,7 +162,11 @@ export async function startWebSerialInstall(
   // 6. Reset
   host._statusMessage = host._localize("firmware.status_resetting");
   try {
-    await resetAndDisconnect(flashDetected.loader, flashDetected.transport);
+    await resetAndDisconnect(
+      flashDetected.loader,
+      flashDetected.transport,
+      flashDetected.port,
+    );
   } catch {
     /* ignore reset errors */
   }

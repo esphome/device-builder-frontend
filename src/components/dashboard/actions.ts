@@ -415,26 +415,42 @@ export async function fetchApiKey(
  *     readable would throw.
  */
 export function streamSerialToDialog(port: any, dialog: any): () => void {
-  const decoder = new TextDecoderStream();
-  port.readable.pipeTo(decoder.writable).catch(() => {
-    /* Pipe rejection happens when the reader is cancelled below;
-       swallow it so the unhandled promise rejection doesn't bubble
-       up into the console. */
-  });
-  const reader = decoder.readable.getReader();
+  // Defence in depth: ``port.readable`` is ``null`` when the port is
+  // closed. Without this guard the caller (e.g. post-install-logs
+  // handler) hangs with a dialog stuck on "Waiting for logs…".
+  if (!port.readable) {
+    console.error("[Web Serial] streamSerialToDialog called on a closed port");
+    return () => {};
+  }
+  /* Read directly from ``port.readable.getReader()`` and decode in
+     userland rather than going through ``port.readable.pipeTo()`` +
+     a ``TextDecoderStream``. The pipeTo plumbing has been observed
+     to silently swallow bytes on some bridge chips (notably CH9102F)
+     after a close/reopen within the same USB session — direct reads
+     do not. */
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
   let buffer = "";
   let cancelled = false;
   const readLoop = async () => {
     try {
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        if (cancelled) break;
-        buffer += value;
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          dialog._lines = [...dialog._lines, line];
+        if (done || cancelled) break;
+        if (value && value.length) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            /* Strip trailing CR (CRLF endings from the ROM
+               bootloader and many serial sources). ``ansi-log``
+               treats any chunk ending in ``\r`` as a progress-style
+               overwrite — it pops the previous visual line and
+               replaces it in place — so a stream of CRLF-terminated
+               boot lines would collapse to just the last one. */
+            const cleaned = line.endsWith("\r") ? line.slice(0, -1) : line;
+            dialog._lines = [...dialog._lines, cleaned];
+          }
         }
       }
     } catch {

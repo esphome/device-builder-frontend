@@ -76,6 +76,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
+    () => this._localize,
   );
 
   // Ticker for live relative-time strings ("started 2m ago"). Open-only.

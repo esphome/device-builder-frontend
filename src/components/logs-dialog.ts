@@ -416,6 +416,21 @@ export class ESPHomeLogsDialog extends LitElement {
     this._serialCancel = cancel;
   }
 
+  /**
+   * Surface a failure to reopen the Web Serial port for post-install
+   * logs. Appends the message into the log pane (so a user who looked
+   * away during the install still sees the cause) and flips
+   * ``_streaming`` off so the toolbar shows "Start" — the right
+   * affordance for "this is broken, try again" — instead of "Stop".
+   * The caller pairs this with a ``toast.error`` for at-a-glance
+   * surfacing.
+   */
+  public setSerialOpenFailed(message: string) {
+    this._stopSerial();
+    this._lines = [...this._lines, message];
+    this._streaming = false;
+  }
+
   private _stopSerial() {
     if (this._serialCancel) {
       const cancel = this._serialCancel;

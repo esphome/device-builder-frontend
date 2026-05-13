@@ -5,7 +5,15 @@
  * Web Serial API. No backend involvement — talks directly to the
  * USB-connected ESP device.
  */
-import { ESPLoader, Transport } from "esptool-js";
+import {
+  ClassicReset,
+  ESPLoader,
+  Transport,
+  UsbJtagSerialReset,
+} from "esptool-js";
+
+/** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
+const ESPRESSIF_USB_VID = 0x303a;
 
 export interface DetectedChip {
   chipName: string;
@@ -216,14 +224,158 @@ export async function flashFirmware(
   });
 }
 
+/**
+ * RTC-WDT register layout for chips that support the
+ * watchdog-triggered reset trick. Same layout (offsets +0x94 /
+ * +0x98 / +0xAC from RTC_CNTL_BASE) across ESP32-S2 / S3 / C2 / C3;
+ * only the RTC_CNTL_BASE address differs by chip.
+ *
+ * Watchdog reset is the most reliable way to exit the stub bootloader
+ * on these chips. esptool's ``--after watchdog-reset`` uses the same
+ * trick precisely because DTR/RTS-based resets are unreliable on
+ * native-USB / USB-Serial-JTAG chips and on boards whose auto-reset
+ * circuit doesn't have the cross-coupled "cancellation" behaviour the
+ * standard ClassicReset sequence assumes (M5Stamp C3 with CH9102F is
+ * one such combination — the user-reported repro of this fix).
+ *
+ * Disabled on ESP32-C6 (causes full system freeze per Espressif docs)
+ * and on chips without RTC_WDT (ESP8266, classic ESP32, ESP32-H2 /
+ * H4 / E22).
+ */
+/* WDT register addresses per chip. Offsets vary by chip — verified
+   against esptool python's per-target files (S2/S3/C2/C3.py). */
+const WDT_RESET_CHIPS: Record<
+  string,
+  { wdtConfig0: number; wdtConfig1: number; wdtWProtect: number }
+> = {
+  "ESP32-S2": {
+    wdtConfig0: 0x3f408094, // base 0x3F408000 + 0x94
+    wdtConfig1: 0x3f408098, // + 0x98
+    wdtWProtect: 0x3f4080ac, // + 0xAC
+  },
+  "ESP32-S3": {
+    wdtConfig0: 0x60008098, // base 0x60008000 + 0x98
+    wdtConfig1: 0x6000809c, // + 0x9C
+    wdtWProtect: 0x600080b0, // + 0xB0
+  },
+  "ESP32-C2": {
+    wdtConfig0: 0x60008084, // + 0x84
+    wdtConfig1: 0x60008088, // + 0x88
+    wdtWProtect: 0x6000809c, // + 0x9C
+  },
+  "ESP32-C3": {
+    wdtConfig0: 0x60008090, // + 0x90
+    wdtConfig1: 0x60008094, // + 0x94
+    wdtWProtect: 0x600080a8, // + 0xA8
+  },
+};
+
+/** Magic key that unlocks the RTC WDT write-protect register. */
+const RTC_CNTL_WDT_WKEY = 0x50d83aa1;
+
+/**
+ * Trigger a full chip reset via the RTC watchdog. The chip's stub
+ * bootloader processes the writeReg commands, the WDT fires shortly
+ * after, and the chip resets all the way through ROM bootloader to
+ * the user firmware. Works even when DTR/RTS-based reset doesn't
+ * reach the chip (CH9102F / native USB-Serial-JTAG / boards with
+ * non-cross-coupled auto-reset circuits).
+ *
+ * Returns ``false`` for chip types where this isn't safe (ESP32-C6
+ * freezes; classic ESP32 / ESP8266 don't have the WDT at all).
+ */
+async function watchdogReset(
+  loader: ESPLoader,
+  transport: Transport,
+): Promise<boolean> {
+  const regs = loader.chip?.CHIP_NAME
+    ? WDT_RESET_CHIPS[loader.chip.CHIP_NAME]
+    : undefined;
+  if (!regs) return false;
+  /* Release the boot-strap pin (IO9 on C3 / IO0 on others) before
+     the WDT fires so the chip boots from flash on the new reset, not
+     back into download mode. The DTR line is wired to the strap pin
+     via the auto-reset circuit on most dev boards. */
+  try {
+    await transport.setDTR(false);
+    await transport.setRTS(false);
+  } catch {
+    /* If setSignals fails the chip might still WDT-reset OK; don't
+       abort the reset path. */
+  }
+  /* Exact sequence + magic value from esptool python's
+     ``watchdog_reset()`` (esptool/targets/esp32c3.py and siblings).
+     Order: unlock → set timeout → enable+arm → re-lock. The
+     ``(1<<31) | (5<<28) | (1<<8) | 2`` config0 bit pattern is what
+     esptool ships — exact bit semantics aren't documented per-chip;
+     trust the authoritative source. */
+  try {
+    await loader.writeReg(regs.wdtWProtect, RTC_CNTL_WDT_WKEY);
+    await loader.writeReg(regs.wdtConfig1, 2000);
+    await loader.writeReg(
+      regs.wdtConfig0,
+      (1 << 31) | (5 << 28) | (1 << 8) | 2,
+    );
+    await loader.writeReg(regs.wdtWProtect, 0);
+  } catch {
+    /* A writeReg may race the actual reset firing — the chip is
+       supposed to reset within ~14ms of the timeout write. If the
+       last writeReg throws because the chip is mid-reset, the WDT
+       has already done its job. */
+  }
+  /* WDT timeout ≈ 2000 ticks of the slow clock (~14ms on the
+     150kHz default). Wait for the chip to reset + reach ROM
+     bootloader before we close the port — closing mid-reset can
+     leave the kernel-side handle in a weird state on some OSes. */
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  return true;
+}
+
+/**
+ * Pick a reset strategy based on the chip and how it's connected.
+ *
+ * esptool-js's ``loader.after("hard_reset")`` resolves to its
+ * ``HardReset`` class which only calls ``setRTS(false)`` — that does
+ * not pulse DTR / EN and leaves the chip running the stub bootloader
+ * after ``writeFlash``, so the just-flashed firmware never boots and
+ * the post-install logs view stays empty forever.
+ *
+ * - ESP32-S2 / S3 / C2 / C3: trigger an RTC-watchdog reset (the same
+ *   trick esptool's ``--after watchdog-reset`` uses). Most reliable
+ *   on these chips — works through external UART bridges (CH9102F,
+ *   CP210x, etc.) and the chip's own USB-Serial-JTAG alike, and
+ *   doesn't depend on the board's auto-reset circuit having the
+ *   "cancellation" behaviour the DTR/RTS sequence implicitly assumes.
+ * - Native USB-Serial/JTAG (VID 0x303A) for chips not in the WDT
+ *   list (mostly fall-through; safety net): esptool-js's
+ *   ``UsbJtagSerialReset``.
+ * - Everything else (classic ESP32 / ESP8266 via CP210x / CH340 /
+ *   FTDI / etc. bridges): the standard DTR/RTS pulse esptool's
+ *   ``--after hard-reset`` uses (``ClassicReset``).
+ */
+async function hardResetChip(
+  loader: ESPLoader,
+  transport: Transport,
+  port: SerialPort,
+): Promise<void> {
+  if (await watchdogReset(loader, transport)) return;
+  const vendorId = port.getInfo().usbVendorId;
+  if (vendorId === ESPRESSIF_USB_VID) {
+    await new UsbJtagSerialReset(transport).reset();
+  } else {
+    await new ClassicReset(transport, 50).reset();
+  }
+}
+
 /** Hard-reset the device and disconnect. */
 export async function resetAndDisconnect(
   loader: ESPLoader,
-  transport: Transport
+  transport: Transport,
+  port: SerialPort,
 ): Promise<void> {
   markSerialActivity();
   try {
-    await loader.after("hard_reset");
+    await hardResetChip(loader, transport, port);
   } finally {
     await transport.disconnect();
     // hard_reset triggers a USB re-enumeration on native-USB chips;

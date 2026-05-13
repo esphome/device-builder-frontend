@@ -217,6 +217,7 @@
     "logs_states": "Statussen",
     "logs_hide_states": "Statussen verbergen",
     "logs_show_states": "Statussen tonen",
+    "logs_port_reopen_failed": "Kon de seriële poort niet heropenen voor logs. Het apparaat start mogelijk nog op — klik op Start om opnieuw te verbinden.",
     "install_method_title": "Hoe wilt u de firmware installeren?",
     "install_method_network": "Via het netwerk",
     "install_method_network_desc": "Vereist dat het apparaat online is",

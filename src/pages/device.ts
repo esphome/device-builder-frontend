@@ -191,6 +191,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
+    () => this._localize,
   );
 
   private _installCtrl = this._createInstallController();
