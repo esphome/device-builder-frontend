@@ -58,7 +58,10 @@ import {
   fetchLightEffects,
 } from "../../../util/automation-catalog-cache.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
-import { emptyAutomationTree } from "./serialise.js";
+import {
+  emptyAutomationTree,
+  sectionKeyFromLocation,
+} from "./serialise.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import "./automation-condition-tree.js";
@@ -125,6 +128,44 @@ export class ESPHomeAutomationEditor extends LitElement {
   protected updated(changed: Map<string, unknown>) {
     if (changed.has("configuration")) {
       void this._loadAvailable();
+    }
+    if (
+      (changed.has("location") || changed.has("configuration")) &&
+      this.location &&
+      this.value === null &&
+      !this._loading
+    ) {
+      void this._hydrateFromBackend();
+    }
+  }
+
+  /**
+   * When the editor is mounted in edit mode (a navigator click
+   * landed us here with a ``location`` but no ``value``), pull the
+   * parsed automation list and match by stable section key. This
+   * keeps the editor self-contained — the parent only needs to
+   * pass the section key's location.
+   */
+  private async _hydrateFromBackend() {
+    if (!this._api || !this.configuration || !this.location) return;
+    try {
+      const parsed = await this._api.parseDeviceAutomations(this.configuration);
+      const wantKey = sectionKeyFromLocation(this.location);
+      const match = parsed.find(
+        (p) => sectionKeyFromLocation(p.location) === wantKey,
+      );
+      if (match) {
+        this.value = match.automation;
+        // Re-pin location so the writer round-trips with the parser's
+        // canonical form (script id matched, light_effect index
+        // resolved against the actual YAML, …).
+        this.location = match.location;
+      }
+    } catch (err) {
+      this._error =
+        err instanceof Error
+          ? err.message
+          : this._localize("device.automation_parse_error");
     }
   }
 

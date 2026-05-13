@@ -6,6 +6,14 @@ export interface YamlSection {
   id?: string; // "id:" value from a YAML list item
   platform?: string; // "platform:" value from a YAML list item
   parentKey?: string; // top-level key when this is an expanded list item
+  /**
+   * Human-readable label for the navigator. Set when ``key`` is a
+   * stable machine identifier (e.g. an automation's
+   * ``automation:component_on:<id>:on_press``) that wouldn't render
+   * well in the UI. Navigator consumers prefer ``displayLabel`` when
+   * present and fall back to ``key`` otherwise.
+   */
+  displayLabel?: string;
 }
 
 export interface CategorizedSections {
@@ -291,9 +299,28 @@ function _expandListItems(
 }
 
 /**
- * Finds inline ESPHome automation handlers (on_press:, on_value_range:, etc.)
- * nested inside component definitions and returns them as navigable sections.
- * The key is formatted as "<component name> → <event>" when a name is available.
+ * Synchronous fallback parser for automation sections. The navigator
+ * needs to paint instantly on every keystroke, so we can't wait for
+ * the backend's ``automations/parse`` round-trip; this regex-based
+ * pass detects:
+ *
+ * - Inline ``on_*:`` handlers nested inside component instances
+ *   (``component_on`` automations).
+ * - Device-level ``on_*:`` handlers directly under ``esphome:``
+ *   (``device_on`` automations).
+ * - List items under top-level ``script:`` and ``interval:`` blocks
+ *   (``script`` and ``interval`` automations).
+ *
+ * Emits stable machine-readable keys
+ * (``automation:component_on:<id>:on_press`` etc.) plus a separate
+ * ``displayLabel`` for the navigator UI. Section routing reads
+ * ``key`` (stable identifier the page can match against a
+ * ``ParsedAutomation.location``); the navigator displays
+ * ``displayLabel``.
+ *
+ * The backend's ``automations/parse`` is the canonical source — this
+ * fallback only sees what the regex catches, but it's load-bearing
+ * for keystroke-time UI responsiveness.
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
@@ -306,37 +333,206 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     const indent = match[1].length;
     const eventName = match[2];
     const fromLine = i + 1; // 1-indexed CM line
+    const toLine = _findBlockEnd(lines, i, indent);
 
-    // End of block = first non-empty line at same or lower indentation
-    let toLine = lines.length;
-    for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() === "") continue;
-      const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
-      if (lineIndent <= indent) {
-        toLine = j; // array index j = CM line j (last line of this block is j-1+1 = j)
-        break;
-      }
+    // Walk backwards to identify the enclosing block (esphome:
+    // device-level, or a configured-component instance with its id).
+    const ancestry = _walkAncestry(lines, i, indent);
+
+    if (ancestry.parentKey === "esphome") {
+      automations.push({
+        key: `automation:device_on:${eventName}`,
+        displayLabel: `esphome → ${eventName}`,
+        fromLine,
+        toLine,
+      });
+    } else if (ancestry.componentId) {
+      const labelHead = ancestry.parentName || ancestry.componentId;
+      automations.push({
+        key: `automation:component_on:${ancestry.componentId}:${eventName}`,
+        displayLabel: `${labelHead} → ${eventName}`,
+        fromLine,
+        toLine,
+        id: ancestry.componentId,
+      });
+    } else {
+      // No clear ancestry — keep the event as the bare display
+      // label and emit a non-namespaced key so it doesn't collide
+      // with a properly-resolved automation later.
+      automations.push({
+        key: `automation:unscoped:${eventName}:${fromLine}`,
+        displayLabel: eventName,
+        fromLine,
+        toLine,
+      });
     }
+  }
 
-    // Look backwards for the nearest `name:` within the same component item
-    let parentName = "";
-    for (let j = i - 1; j >= 0; j--) {
-      if (lines[j].match(/^[a-zA-Z]/)) break; // hit a top-level key
-      const nameMatch = lines[j].match(/^\s+name:\s*["']?(.+?)["']?\s*$/);
-      if (nameMatch) {
-        parentName = nameMatch[1];
-        break;
-      }
-    }
-
-    automations.push({
-      key: parentName ? `${parentName} → ${eventName}` : eventName,
-      fromLine,
-      toLine,
+  // Top-level ``script:`` / ``interval:`` list items. These don't
+  // carry an ``on_*:`` key — the block kind is implied by the
+  // location's discriminator.
+  for (const top of ["script", "interval"] as const) {
+    const block = _findTopLevelBlock(lines, top);
+    if (!block) continue;
+    const items = _enumerateListItems(lines, block.fromLine, block.toLine);
+    items.forEach((item, idx) => {
+      const itemId =
+        top === "script" ? _readKeyOnLine(lines, item.fromLine, "id") : null;
+      const key =
+        top === "script" && itemId
+          ? `automation:script:${itemId}`
+          : `automation:interval:${idx}`;
+      const display =
+        top === "script" && itemId ? `script: ${itemId}` : `interval #${idx + 1}`;
+      automations.push({
+        key,
+        displayLabel: display,
+        fromLine: item.fromLine,
+        toLine: item.toLine,
+      });
     });
   }
 
   return automations;
+}
+
+/** First non-empty line at indent ≤ ``indent`` after ``startIdx``,
+ *  or end-of-file. */
+function _findBlockEnd(
+  lines: string[],
+  startIdx: number,
+  indent: number,
+): number {
+  for (let j = startIdx + 1; j < lines.length; j++) {
+    if (lines[j].trim() === "") continue;
+    const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
+    if (lineIndent <= indent) return j;
+  }
+  return lines.length;
+}
+
+interface Ancestry {
+  parentKey: string | null;
+  parentName: string | null;
+  componentId: string | null;
+}
+
+/**
+ * Walk backwards from an ``on_*:`` line to identify the enclosing
+ * block. Returns:
+ *
+ * - ``parentKey`` — the nearest top-level key
+ *   (``esphome``, ``binary_sensor``, …) discovered by scanning to
+ *   a column-0 anchor.
+ * - ``parentName`` — the configured component's ``name:`` if found,
+ *   used as a display label.
+ * - ``componentId`` — the configured component's ``id:`` if found,
+ *   used as the stable identifier.
+ */
+function _walkAncestry(
+  lines: string[],
+  startIdx: number,
+  childIndent: number,
+): Ancestry {
+  let parentKey: string | null = null;
+  let parentName: string | null = null;
+  let componentId: string | null = null;
+  for (let j = startIdx - 1; j >= 0; j--) {
+    const line = lines[j];
+    if (line.trim() === "") continue;
+    const topLevel = line.match(/^([a-zA-Z_][\w]*)\s*:/);
+    if (topLevel) {
+      parentKey = topLevel[1];
+      break;
+    }
+    const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
+    // A list-item dash at an indent shallower than our handler is
+    // this item's boundary. Cross it and we'd start grabbing the
+    // previous item's id / name — stop walking.
+    if (lineIndent < childIndent && /^\s*-\s/.test(line)) break;
+    // Same-indent siblings of the handler (or shallower
+    // non-boundary lines) are candidates for id / name.
+    if (lineIndent > childIndent) continue;
+    const idMatch = line.match(
+      /^\s+(?:-\s+)?id:\s*["']?([^"'\s]+)["']?\s*$/,
+    );
+    if (idMatch && !componentId) componentId = idMatch[1];
+    const nameMatch = line.match(
+      /^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/,
+    );
+    if (nameMatch && !parentName) parentName = nameMatch[1];
+  }
+  return { parentKey, parentName, componentId };
+}
+
+/** Top-level key block (``script:`` / ``interval:``) with its
+ *  inclusive 1-indexed line range, or ``null`` when the key is
+ *  absent. */
+function _findTopLevelBlock(
+  lines: string[],
+  key: string,
+): { fromLine: number; toLine: number } | null {
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(new RegExp(`^${key}\\s*:`));
+    if (!m) continue;
+    return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, 0) };
+  }
+  return null;
+}
+
+/** List items (``- key: value`` ...) directly inside a top-level
+ *  block. Nested list markers (the ``- logger.log`` inside a
+ *  ``then:`` clause) are deeper and skipped by pinning to the
+ *  block's first-row dash indent. */
+function _enumerateListItems(
+  lines: string[],
+  blockFromLine: number,
+  blockToLine: number,
+): Array<{ fromLine: number; toLine: number }> {
+  const out: Array<{ fromLine: number; toLine: number }> = [];
+  let topIndent: number | null = null;
+  let inItem: { fromLine: number } | null = null;
+  for (let i = blockFromLine; i < blockToLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const dash = line.match(/^(\s*)-\s/);
+    if (!dash) continue;
+    const indent = dash[1].length;
+    if (topIndent === null) topIndent = indent;
+    // Skip dashes deeper than the block's first row — those are
+    // nested action lists inside ``then:`` clauses, not block-level
+    // items.
+    if (indent > topIndent) continue;
+    if (inItem) out.push({ fromLine: inItem.fromLine, toLine: i });
+    inItem = { fromLine: i + 1 };
+  }
+  if (inItem) out.push({ fromLine: inItem.fromLine, toLine: blockToLine });
+  return out;
+}
+
+/** Read a leading ``key: value`` line inside a list item — used to
+ *  pull the script's ``id:`` for the stable section key. */
+function _readKeyOnLine(
+  lines: string[],
+  fromLine: number,
+  key: string,
+): string | null {
+  const target = lines[fromLine - 1];
+  // The script id can be on the same line as the leading dash:
+  // ``- id: my_alarm`` — or on the next non-empty line.
+  const inlineRe = new RegExp(`^\\s*-\\s*${key}:\\s*["']?([^"'\\s]+)["']?`);
+  const m = target.match(inlineRe);
+  if (m) return m[1];
+  const dashIndent = target.match(/^(\s*)-/)?.[1].length ?? 0;
+  for (let i = fromLine; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
+    if (lineIndent <= dashIndent) break;
+    const kv = line.match(new RegExp(`^\\s+${key}:\\s*["']?([^"'\\s]+)["']?`));
+    if (kv) return kv[1];
+  }
+  return null;
 }
 
 /**

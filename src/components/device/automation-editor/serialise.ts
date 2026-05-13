@@ -9,6 +9,7 @@
  */
 import type {
   ActionNode,
+  AutomationLocation,
   AutomationTree,
   ConditionNode,
 } from "../../../api/types.js";
@@ -97,4 +98,61 @@ export function swap<T>(arr: T[], i: number, j: number): T[] {
   const out = arr.slice();
   [out[i], out[j]] = [out[j], out[i]];
   return out;
+}
+
+/**
+ * Convert an ``AutomationLocation`` into the stable section key the
+ * navigator emits (and the page consumes to route a click into the
+ * automation editor). Mirrors the construction in
+ * ``util/yaml-sections.ts::parseYamlAutomations``.
+ */
+export function sectionKeyFromLocation(loc: AutomationLocation): string {
+  switch (loc.kind) {
+    case "device_on":
+      return `automation:device_on:${loc.trigger}`;
+    case "component_on":
+      return `automation:component_on:${loc.component_id}:${loc.trigger}`;
+    case "script":
+      return `automation:script:${loc.id}`;
+    case "interval":
+      return `automation:interval:${loc.index}`;
+    case "light_effect":
+      return `automation:light_effect:${loc.component_id}:${loc.index}`;
+  }
+}
+
+/**
+ * Parse a stable section key back into an ``AutomationLocation``.
+ * Returns ``null`` for unrecognised forms (the synchronous fallback
+ * parser emits ``automation:unscoped:…`` for unscoped handlers; those
+ * have no canonical location).
+ */
+export function locationFromSectionKey(
+  key: string,
+): AutomationLocation | null {
+  if (!key.startsWith("automation:")) return null;
+  const parts = key.split(":");
+  // parts[0] = "automation"
+  switch (parts[1]) {
+    case "device_on":
+      return parts[2] ? { kind: "device_on", trigger: parts[2] } : null;
+    case "component_on":
+      return parts.length >= 4
+        ? { kind: "component_on", component_id: parts[2], trigger: parts[3] }
+        : null;
+    case "script":
+      return parts[2] ? { kind: "script", id: parts[2] } : null;
+    case "interval": {
+      const idx = Number(parts[2]);
+      return Number.isFinite(idx) ? { kind: "interval", index: idx } : null;
+    }
+    case "light_effect": {
+      const idx = Number(parts[3]);
+      return parts[2] && Number.isFinite(idx)
+        ? { kind: "light_effect", component_id: parts[2], index: idx }
+        : null;
+    }
+    default:
+      return null;
+  }
 }

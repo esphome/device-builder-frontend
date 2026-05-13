@@ -344,33 +344,25 @@ describe("parseYamlAutomations", () => {
     expect(parseYamlAutomations(yaml)).toEqual([]);
   });
 
-  it("finds inline on_* handlers", () => {
+  it("emits a stable component_on key for inline on_* handlers", () => {
     const yaml = `binary_sensor:
   - platform: gpio
-    name: "my_button"
+    id: my_button
+    name: "My Button"
     on_press:
       - logger.log: "pressed"
 `;
     const result = parseYamlAutomations(yaml);
     expect(result).toHaveLength(1);
-    expect(result[0].key).toContain("on_press");
-  });
-
-  it("prefixes the nearest parent name:", () => {
-    const yaml = `binary_sensor:
-  - platform: gpio
-    name: "my_button"
-    on_press:
-      - logger.log: "pressed"
-`;
-    const [entry] = parseYamlAutomations(yaml);
-    expect(entry.key).toBe("my_button → on_press");
+    expect(result[0].key).toBe("automation:component_on:my_button:on_press");
+    expect(result[0].displayLabel).toBe("My Button → on_press");
   });
 
   it("handles multiple handlers on the same component", () => {
     const yaml = `switch:
   - platform: gpio
-    name: "light"
+    id: my_relay
+    name: "Light"
     on_turn_on:
       - logger.log: "on"
     on_turn_off:
@@ -378,17 +370,58 @@ describe("parseYamlAutomations", () => {
 `;
     const result = parseYamlAutomations(yaml);
     expect(result).toHaveLength(2);
-    expect(result[0].key).toBe("light → on_turn_on");
-    expect(result[1].key).toBe("light → on_turn_off");
+    expect(result[0].key).toBe("automation:component_on:my_relay:on_turn_on");
+    expect(result[0].displayLabel).toBe("Light → on_turn_on");
+    expect(result[1].key).toBe("automation:component_on:my_relay:on_turn_off");
+    expect(result[1].displayLabel).toBe("Light → on_turn_off");
   });
 
-  it("falls back to the event name when no parent name exists", () => {
+  it("recognises device-level on_* handlers under esphome:", () => {
     const yaml = `esphome:
   on_boot:
     - logger.log: "boot"
 `;
     const [entry] = parseYamlAutomations(yaml);
-    expect(entry.key).toBe("on_boot");
+    expect(entry.key).toBe("automation:device_on:on_boot");
+    expect(entry.displayLabel).toBe("esphome → on_boot");
+  });
+
+  it("enumerates top-level script: list items by their id", () => {
+    const yaml = `script:
+  - id: my_alarm
+    then:
+      - logger.log: "alarm"
+  - id: cleanup
+    then:
+      - logger.log: "cleanup"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:script:"),
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:script:my_alarm",
+      "automation:script:cleanup",
+    ]);
+    expect(items[0].displayLabel).toBe("script: my_alarm");
+  });
+
+  it("enumerates top-level interval: list items by index", () => {
+    const yaml = `interval:
+  - interval: 60s
+    then:
+      - logger.log: "tick"
+  - interval: 5s
+    then:
+      - logger.log: "fast"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:interval:"),
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:interval:0",
+      "automation:interval:1",
+    ]);
+    expect(items[0].displayLabel).toBe("interval #1");
   });
 });
 

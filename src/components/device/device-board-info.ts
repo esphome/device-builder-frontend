@@ -35,7 +35,9 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./add-automation-dialog.js";
 import "./add-component-dialog.js";
 import "./add-config-dialog.js";
+import "./automation-editor/automation-editor.js";
 import "./device-section-config.js";
+import { locationFromSectionKey } from "./automation-editor/serialise.js";
 
 registerMdiIcons({
   "open-in-new": mdiOpenInNew,
@@ -397,16 +399,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
           `
         : nothing}
       ${this.selectedSection
-        ? html`
-            <esphome-device-section-config
-              .configuration=${this.configuration}
-              .sectionKey=${this.selectedSection}
-              .fromLine=${this.selectedFromLine}
-              .yaml=${this.yaml}
-              .board=${this.board}
-              ?yamlPaneVisible=${this.yamlPaneVisible}
-            ></esphome-device-section-config>
-          `
+        ? this._renderSelectedSection()
         : html`
             ${this.justCreated ? this._renderWelcomeBanner() : nothing}
             ${this._renderStepSection({
@@ -463,6 +456,40 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * is to teach the user that the navigator is where you manage
    * these things, rather than handing them an add-button right here.
    */
+  /**
+   * Route an automation section key (``automation:component_on:…``)
+   * into the structured ``<esphome-automation-editor>``; everything
+   * else lands in the regular ``<esphome-device-section-config>``.
+   *
+   * The automation editor self-loads its parsed value from the
+   * backend on mount based on ``.location``; we just resolve the
+   * key into a typed location here so the editor doesn't have to
+   * know about navigator routing.
+   */
+  private _renderSelectedSection() {
+    const key = this.selectedSection!;
+    const automationLocation = key.startsWith("automation:")
+      ? locationFromSectionKey(key)
+      : null;
+    if (automationLocation) {
+      return html`<esphome-automation-editor
+        .configuration=${this.configuration}
+        .board=${this.board}
+        .platform=${this.board?.esphome.platform ?? ""}
+        .location=${automationLocation}
+        .yaml=${this.yaml}
+      ></esphome-automation-editor>`;
+    }
+    return html`<esphome-device-section-config
+      .configuration=${this.configuration}
+      .sectionKey=${key}
+      .fromLine=${this.selectedFromLine}
+      .yaml=${this.yaml}
+      .board=${this.board}
+      ?yamlPaneVisible=${this.yamlPaneVisible}
+    ></esphome-device-section-config>`;
+  }
+
   private _renderStepSection(opts: {
     title: string;
     desc: string;

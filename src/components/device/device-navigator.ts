@@ -597,7 +597,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const raw = sectionKeyOf(item);
 
     let primary = raw;
-    if (category !== "automation") {
+    if (category === "automation") {
+      // Automations carry a stable machine identifier in ``key``
+      // (``automation:component_on:<id>:on_press``) — show the
+      // human-readable ``displayLabel`` when available, otherwise
+      // fall back to the raw key.
+      if (item.displayLabel) primary = item.displayLabel;
+    } else {
       const cached = getCachedComponent(raw, this.platform || undefined);
       if (cached?.name) primary = cached.name;
     }
