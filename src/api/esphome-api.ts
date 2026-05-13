@@ -39,6 +39,7 @@ import type {
   RemoteBuildSettings,
   RemoteBuildSubmitTarget,
   ResultMessage,
+  DetectChipResult,
   SerialPort,
   ServerInfoMessage,
   OnboardingState,
@@ -1287,6 +1288,16 @@ export class ESPHomeAPI {
   /** List available serial ports. */
   async getSerialPorts(): Promise<SerialPort[]> {
     return this.sendCommand<SerialPort[]>("config/serial_ports");
+  }
+
+  /**
+   * Detect what's plugged into a server-side serial port. Runs
+   * esptool chip-id + a best-effort read of the IDF app descriptor
+   * so the wizard's server-serial branch can auto-route on factory
+   * firmware the same way WebSerial does.
+   */
+  async detectChip(port: string): Promise<DetectChipResult> {
+    return this.sendCommand<DetectChipResult>("config/detect_chip", { port });
   }
 
   /** Get user preferences. */

@@ -811,6 +811,30 @@ export interface SerialPort {
   desc: string;
 }
 
+/**
+ * Result of ``config/detect_chip`` — backend ran esptool against a
+ * server-side serial port and identified what's connected. Mirrors
+ * what the WebSerial path returns from ``detectChip`` +
+ * ``readDeviceManifest`` so the wizard can route both branches
+ * the same way.
+ *
+ * ``chip_family`` is the human-readable family string and matches
+ * one of the ``WIZARD_BOARD_PLATFORMS.label`` values — callers
+ * hand it straight to ``_selectedFilter`` to narrow the board
+ * picker.
+ *
+ * ``board_id`` comes from ``esp_app_desc_t.project_name`` (the
+ * CMake project name baked in at build time). Present only when
+ * the device is running an IDF app whose descriptor parses
+ * cleanly; routes the wizard to a specific catalogue board.
+ */
+export interface DetectChipResult {
+  chip_family: string;
+  variant: string;
+  platform: string;
+  board_id?: string;
+}
+
 export enum DashboardView {
   CARDS = "cards",
   TABLE = "table",

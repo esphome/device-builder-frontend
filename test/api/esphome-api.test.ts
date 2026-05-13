@@ -624,6 +624,42 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.args).toEqual({ theme: "dark" });
   });
 
+  it("detectChip sends config/detect_chip with the port arg and unwraps the chip info", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      chip_family: "ESP32-C3",
+      variant: "esp32c3",
+      platform: "esp32",
+      board_id: "starter-kit",
+    };
+    const pending = api.detectChip("/dev/cu.usbserial-10");
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("config/detect_chip");
+    expect(sent.args).toEqual({ port: "/dev/cu.usbserial-10" });
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("detectChip surfaces a backend error message to the caller", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.detectChip("/dev/cu.usbserial-10");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      error_code: "unavailable",
+      details: "Could not detect a chip on /dev/cu.usbserial-10",
+    });
+    await expect(pending).rejects.toThrow(
+      /Could not detect a chip on \/dev\/cu\.usbserial-10/,
+    );
+  });
+
   it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);

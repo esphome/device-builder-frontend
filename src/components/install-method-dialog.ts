@@ -20,6 +20,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -95,6 +96,10 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   private get _supportsWebSerial(): boolean {
     return "serial" in navigator;
+  }
+
+  private get _environment(): DeploymentEnvironment {
+    return detectEnvironment(this._api);
   }
 
   /**
@@ -449,33 +454,82 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   private _renderMethodList() {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
+    const env = this._environment;
     // Web-download replaces (rather than supplements) the local USB row
     // when the user can't use Web Serial here AND can't use OTA — the
     // same situation that disabled the USB row before. Keeps the list
     // short by not showing two USB options where only one is reachable.
     const swapInWebDownload =
       this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
+    // On localhost the WebSerial option and the server-serial option
+    // target the same physical USB stack. There are two collapse cases:
+    //
+    // - With WebSerial: drop the server-serial row (WebSerial is the
+    //   better path, no backend round-trip).
+    // - Without WebSerial: drop the *disabled* WebSerial row — the
+    //   active server-serial row directly below carries the same
+    //   "Plug into this computer" label, so the disabled row only
+    //   added a duplicate title and a "you need Chrome" hint that
+    //   doesn't apply (the user has a working path right here).
+    //
+    // On HA / remote the two rows point at different machines, so
+    // both stay and the disabled-WebSerial hint is still useful.
+    const showServerSerialRow = !(env === "localhost" && hasWebSerial);
+    const dropDisabledWebSerial =
+      env === "localhost" && !hasWebSerial && !swapInWebDownload;
+    const serverSerialKeys = this._serverSerialCopyKeys(env);
 
     return html`
       <div class="list">
         ${this._renderOtaOption(isOnline)}
         ${swapInWebDownload
           ? this._renderWebDownloadOption()
-          : this._renderWebSerialOption(hasWebSerial)}
-        <div class="option" @click=${this._onServerSerial}>
-          <wa-icon library="mdi" name="serial-port"></wa-icon>
-          <div class="info">
-            <span class="title"
-              >${this._localize("dashboard.install_method_usb_server")}</span
-            >
-            <span class="desc"
-              >${this._localize("dashboard.install_method_usb_server_desc")}</span
-            >
-          </div>
-        </div>
+          : dropDisabledWebSerial
+            ? nothing
+            : this._renderWebSerialOption(hasWebSerial)}
+        ${showServerSerialRow
+          ? html`<div class="option" @click=${this._onServerSerial}>
+              <wa-icon library="mdi" name="serial-port"></wa-icon>
+              <div class="info">
+                <span class="title">${this._localize(serverSerialKeys.title)}</span>
+                <span class="desc">${this._localize(serverSerialKeys.desc)}</span>
+              </div>
+            </div>`
+          : nothing}
       </div>
       ${this._renderAdvancedSection()}
     `;
+  }
+
+  /**
+   * Pick the title/desc localisation keys for the server-serial row
+   * based on where the backend is running. On HA the user is
+   * plugging into their HA server; on a local backend without
+   * WebSerial they're plugging into their own machine; remote
+   * setups use the generic phrasing.
+   */
+  private _serverSerialCopyKeys(env: DeploymentEnvironment): {
+    title: string;
+    desc: string;
+  } {
+    switch (env) {
+      case "ha-addon":
+        return {
+          title: "dashboard.install_method_usb_server_ha",
+          desc: "dashboard.install_method_usb_server_ha_desc",
+        };
+      case "localhost":
+        return {
+          title: "dashboard.install_method_usb_server_localhost",
+          desc: "dashboard.install_method_usb_server_localhost_desc",
+        };
+      case "remote":
+      default:
+        return {
+          title: "dashboard.install_method_usb_server",
+          desc: "dashboard.install_method_usb_server_desc",
+        };
+    }
   }
 
   private _renderWebSerialOption(hasWebSerial: boolean) {
