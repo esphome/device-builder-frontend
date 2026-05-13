@@ -10,11 +10,11 @@ import {
   mdiViewGrid,
   mdiWeb,
 } from "@mdi/js";
+import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { DashboardView } from "../api/types.js";
 import type {
   AdoptableDevice,
   ArchivedDevice,
@@ -22,8 +22,62 @@ import type {
   FirmwareJob,
   Label,
 } from "../api/types.js";
-import type { SortingState, VisibilityState } from "@tanstack/lit-table";
+import { DashboardView } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
+import {
+  deleteLabel,
+  executeClone,
+  executeFriendlyName,
+  executeRename,
+  scheduleScrollIntoView,
+  toggleIgnore,
+} from "../components/dashboard/actions-ui.js";
+import {
+  archiveDevice,
+  deleteArchivedDevice,
+  detectAndOpenWizard,
+  downloadFirmware,
+  fetchApiKey,
+  unarchiveDevice,
+} from "../components/dashboard/actions.js";
+import {
+  onInstallMethodSelect,
+  openCommand,
+  openInstallMethod,
+  openLogs,
+  showJobProgress,
+} from "../components/dashboard/install.js";
+import { loadPreferences, saveTablePreference } from "../components/dashboard/prefs.js";
+import {
+  renderCardGrid,
+  renderDiscoveredSection,
+  renderDrawer,
+  renderTable,
+} from "../components/dashboard/render-content.js";
+import {
+  renderDialogs,
+  executeConfirm as runExecuteConfirm,
+  type PendingConfirm,
+} from "../components/dashboard/render-dialogs.js";
+import {
+  renderEmptySearch,
+  renderSelectBarOrFab,
+  renderToolbar,
+  renderYamlToolbar,
+} from "../components/dashboard/render-toolbar.js";
+import { renderYamlMode } from "../components/dashboard/render-yaml.js";
+import {
+  maybeFireEmptyStatePreview,
+  onSearchKeyDown,
+  setSearchMode,
+  syncYamlSearch,
+} from "../components/dashboard/search.js";
+import {
+  cardSkeletonTemplate,
+  tableSkeletonTemplate,
+} from "../components/dashboard/skeletons.js";
+import { dashboardStyles } from "../components/dashboard/styles.js";
+import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
   apiContext,
@@ -36,97 +90,43 @@ import {
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { YamlSearchController } from "../components/yaml-search-controller.js";
+import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import { matchesDeviceName } from "../util/device-search.js";
-import {
-  readDashboardUrl,
-  writeDashboardUrl,
-} from "../util/dashboard-url.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import {
-  archiveDevice,
-  deleteArchivedDevice,
-  detectAndOpenWizard,
-  downloadFirmware,
-  fetchApiKey,
-  unarchiveDevice,
-} from "../components/dashboard/actions.js";
-import {
-  deleteLabel,
-  executeClone,
-  executeFriendlyName,
-  executeRename,
-  scheduleScrollIntoView,
-  toggleIgnore,
-} from "../components/dashboard/actions-ui.js";
-import { cardSkeletonTemplate, tableSkeletonTemplate } from "../components/dashboard/skeletons.js";
-import { dashboardStyles } from "../components/dashboard/styles.js";
-import { renderYamlMode } from "../components/dashboard/render-yaml.js";
-import {
-  renderEmptySearch,
-  renderSelectBarOrFab,
-  renderToolbar,
-  renderYamlToolbar,
-} from "../components/dashboard/render-toolbar.js";
-import {
-  renderCardGrid,
-  renderDiscoveredSection,
-  renderDrawer,
-  renderTable,
-} from "../components/dashboard/render-content.js";
-import {
-  executeConfirm as runExecuteConfirm,
-  renderDialogs,
-  type PendingConfirm,
-} from "../components/dashboard/render-dialogs.js";
-import {
-  maybeFireEmptyStatePreview,
-  onSearchKeyDown,
-  setSearchMode,
-  syncYamlSearch,
-} from "../components/dashboard/search.js";
-import { loadPreferences, saveTablePreference } from "../components/dashboard/prefs.js";
-import {
-  onInstallMethodSelect,
-  openCommand,
-  openInstallMethod,
-  openLogs,
-  showJobProgress,
-} from "../components/dashboard/install.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../components/adopt-dialog.js";
+import type { ESPHomeAdoptDialog } from "../components/adopt-dialog.js";
 import "../components/api-key-dialog.js";
 import type { ESPHomeApiKeyDialog } from "../components/api-key-dialog.js";
 import "../components/archived-devices-dialog.js";
 import type { ESPHomeArchivedDevicesDialog } from "../components/archived-devices-dialog.js";
+import "../components/clone-device-dialog.js";
+import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
+import "../components/command-dialog.js";
+import type { CommandType, ESPHomeCommandDialog } from "../components/command-dialog.js";
 import "../components/confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../components/confirm-dialog.js";
 import "../components/dashboard/device-drawer.js";
 import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
+import "../components/discovered-device-card.js";
+import "../components/firmware-install-dialog.js";
+import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
+import "../components/friendly-name-dialog.js";
+import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
+import "../components/install-method-dialog.js";
 import "../components/labels/labels-filter.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
-import "../components/firmware-install-dialog.js";
-import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
-import "../components/install-method-dialog.js";
-import "../components/clone-device-dialog.js";
-import type { ESPHomeCloneDeviceDialog } from "../components/clone-device-dialog.js";
-import "../components/friendly-name-dialog.js";
-import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
 import "../components/rename-device-dialog.js";
 import type { ESPHomeRenameDeviceDialog } from "../components/rename-device-dialog.js";
-import "../components/discovered-device-card.js";
-import "../components/adopt-dialog.js";
-import type { ESPHomeAdoptDialog } from "../components/adopt-dialog.js";
 import "../components/select-bar.js";
-import "../components/command-dialog.js";
-import type { ESPHomeCommandDialog, CommandType } from "../components/command-dialog.js";
 import "../components/wizard/create-config-dialog.js";
 import type { ESPHomeCreateConfigDialog } from "../components/wizard/create-config-dialog.js";
 
@@ -144,17 +144,31 @@ registerMdiIcons({
 
 @customElement("esphome-page-dashboard")
 export class ESPHomePageDashboard extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
-  @consume({ context: devicesContext, subscribe: true }) @state() _devices: ConfiguredDevice[] = [];
-  @consume({ context: importableDevicesContext, subscribe: true }) @state() _importableDevices: AdoptableDevice[] = [];
-  @consume({ context: devicesLoadedContext, subscribe: true }) @state() _devicesLoaded = false;
-  @consume({ context: activeJobsContext, subscribe: true }) @state() _activeJobs: Map<string, FirmwareJob> = new Map();
-  @consume({ context: recentJobsContext, subscribe: true }) @state() _recentJobs: Map<string, FirmwareJob> = new Map();
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  _devices: ConfiguredDevice[] = [];
+  @consume({ context: importableDevicesContext, subscribe: true })
+  @state()
+  _importableDevices: AdoptableDevice[] = [];
+  @consume({ context: devicesLoadedContext, subscribe: true }) @state() _devicesLoaded =
+    false;
+  @consume({ context: activeJobsContext, subscribe: true }) @state() _activeJobs: Map<
+    string,
+    FirmwareJob
+  > = new Map();
+  @consume({ context: recentJobsContext, subscribe: true }) @state() _recentJobs: Map<
+    string,
+    FirmwareJob
+  > = new Map();
   /** Labels catalog from the WS push. Consumed here so the
    *  dashboard can translate the URL's label *names* (what shared
    *  links carry) into the *ids* the filter pipeline expects, and
    *  back on write. */
-  @consume({ context: labelsContext, subscribe: true }) @state() _labelsCatalog: Label[] = [];
+  @consume({ context: labelsContext, subscribe: true }) @state() _labelsCatalog: Label[] =
+    [];
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
   @state() _showDiscovered = false;
@@ -204,11 +218,18 @@ export class ESPHomePageDashboard extends LitElement {
     sensitivity: "base",
     numeric: true,
   });
-  private _sortedDevicesCache: { source: ConfiguredDevice[]; sorted: ConfiguredDevice[] } | null = null;
-  private _labelUsageCache: { source: ConfiguredDevice[]; map: Record<string, number> } | null = null;
+  private _sortedDevicesCache: {
+    source: ConfiguredDevice[];
+    sorted: ConfiguredDevice[];
+  } | null = null;
+  private _labelUsageCache: {
+    source: ConfiguredDevice[];
+    map: Record<string, number>;
+  } | null = null;
 
   @query("esphome-api-key-dialog") _apiKeyDialog!: ESPHomeApiKeyDialog;
-  @query("esphome-archived-devices-dialog") _archivedDialog?: ESPHomeArchivedDevicesDialog;
+  @query("esphome-archived-devices-dialog")
+  _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") _confirmDialog!: ESPHomeConfirmDialog;
   @query("esphome-create-config-dialog") _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-clone-device-dialog") _cloneDialog!: ESPHomeCloneDeviceDialog;
@@ -216,7 +237,8 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-rename-device-dialog") _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") _commandDialog!: ESPHomeCommandDialog;
-  @query("esphome-firmware-install-dialog") _firmwareDialog!: ESPHomeFirmwareInstallDialog;
+  @query("esphome-firmware-install-dialog")
+  _firmwareDialog!: ESPHomeFirmwareInstallDialog;
   @query("esphome-logs-dialog") _logsDialog!: ESPHomeLogsDialog;
   @query(".search-input") _searchInputEl?: HTMLElement & { focus: () => void };
 
@@ -236,7 +258,7 @@ export class ESPHomePageDashboard extends LitElement {
     window.dispatchEvent(
       new CustomEvent("esphome-show-ignored-changed", {
         detail: { value: this._showIgnored },
-      }),
+      })
     );
   };
   private _onShowArchivedDialog = () => this._archivedDialog?.open();
@@ -278,11 +300,12 @@ export class ESPHomePageDashboard extends LitElement {
       this._resolvePendingLabelNames();
     }
     if (urlState.areas !== undefined) this._selectedAreas = urlState.areas;
-    if (urlState.platforms !== undefined)
-      this._selectedPlatforms = urlState.platforms;
+    if (urlState.platforms !== undefined) this._selectedPlatforms = urlState.platforms;
     if (urlState.states !== undefined) this._selectedStates = urlState.states;
     if (urlState.view !== undefined) this._view = urlState.view;
     if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;
+
+    this._syncYamlSearch();
   }
 
   /** Convert pending URL-sourced label names to ids using the
@@ -296,7 +319,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (!this._pendingLabelNames) return;
     if (this._labelsCatalog.length === 0) return;
     const byNameLower = new Map<string, string>(
-      this._labelsCatalog.map((l) => [l.name.toLowerCase(), l.id]),
+      this._labelsCatalog.map((l) => [l.name.toLowerCase(), l.id])
     );
     const ids = this._pendingLabelNames
       .map((name) => byNameLower.get(name.toLowerCase()))
@@ -327,9 +350,7 @@ export class ESPHomePageDashboard extends LitElement {
       this._pendingLabelNames !== null
         ? this._pendingLabelNames
         : this._selectedLabels
-            .map(
-              (id) => this._labelsCatalog.find((l) => l.id === id)?.name,
-            )
+            .map((id) => this._labelsCatalog.find((l) => l.id === id)?.name)
             .filter((n): n is string => !!n);
     writeDashboardUrl({
       search: this._search,
@@ -345,8 +366,14 @@ export class ESPHomePageDashboard extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback();
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
-    window.removeEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
-    window.removeEventListener("esphome-show-archived-dialog", this._onShowArchivedDialog);
+    window.removeEventListener(
+      "esphome-show-ignored-changed",
+      this._onShowIgnoredChanged
+    );
+    window.removeEventListener(
+      "esphome-show-archived-dialog",
+      this._onShowArchivedDialog
+    );
     if (this._adoptHighlightTimer !== null) {
       clearTimeout(this._adoptHighlightTimer);
       this._adoptHighlightTimer = null;
@@ -366,7 +393,7 @@ export class ESPHomePageDashboard extends LitElement {
     // don't leave the drawer showing stale fields.
     if (changed.has("_devices") && this._drawerDevice) {
       const live = this._devices.find(
-        (d) => d.configuration === this._drawerDevice!.configuration,
+        (d) => d.configuration === this._drawerDevice!.configuration
       );
       if (live && live !== this._drawerDevice) {
         this._drawerDevice = live;
@@ -398,9 +425,7 @@ export class ESPHomePageDashboard extends LitElement {
     // "changed" because Lit treats initial assignment as a change) —
     // the initial state already came from the URL via
     // ``_hydrateFromUrl``, so writing it back is a no-op.
-    if (
-      ESPHomePageDashboard._urlSyncedFields.some((f) => changed.has(f))
-    ) {
+    if (ESPHomePageDashboard._urlSyncedFields.some((f) => changed.has(f))) {
       this._syncUrl();
     }
   }
@@ -418,10 +443,9 @@ export class ESPHomePageDashboard extends LitElement {
     // snippets.
     if (this._yamlMode) {
       return html`
-        ${renderDiscoveredSection(this)}
-        ${renderYamlToolbar(this)}
-        ${renderYamlMode(this)}
-        ${renderDrawer(this)} ${renderSelectBarOrFab(this)} ${renderDialogs(this)}
+        ${renderDiscoveredSection(this)} ${renderYamlToolbar(this)}
+        ${renderYamlMode(this)} ${renderDrawer(this)} ${renderSelectBarOrFab(this)}
+        ${renderDialogs(this)}
       `;
     }
 
@@ -458,10 +482,10 @@ export class ESPHomePageDashboard extends LitElement {
 
   get _sortedDevices(): ConfiguredDevice[] {
     const source = this._devices;
-    if (this._sortedDevicesCache?.source === source) return this._sortedDevicesCache.sorted;
+    if (this._sortedDevicesCache?.source === source)
+      return this._sortedDevicesCache.sorted;
     const collator = ESPHomePageDashboard._cardCollator;
-    const sortKey = (d: ConfiguredDevice) =>
-      d.friendly_name || d.name || d.configuration;
+    const sortKey = (d: ConfiguredDevice) => d.friendly_name || d.name || d.configuration;
     const sorted = [...source].sort((a, b) => collator.compare(sortKey(a), sortKey(b)));
     this._sortedDevicesCache = { source, sorted };
     return sorted;
@@ -598,7 +622,8 @@ export class ESPHomePageDashboard extends LitElement {
 
   _onSearchKeyDown = (e: KeyboardEvent) => onSearchKeyDown(this, e);
   _syncYamlSearch = () => syncYamlSearch(this);
-  _setSearchMode = (yamlMode: boolean, search?: string) => setSearchMode(this, yamlMode, search);
+  _setSearchMode = (yamlMode: boolean, search?: string) =>
+    setSearchMode(this, yamlMode, search);
   _toggleSearchMode = () => setSearchMode(this, !this._yamlMode);
 
   _highlightFreshDevice(configuration: string): void {
@@ -642,7 +667,7 @@ export class ESPHomePageDashboard extends LitElement {
   _executeClone = (e: CustomEvent<{ newName: string; newFriendlyName: string }>) =>
     void executeClone(this, e);
   _executeFriendlyName = (
-    e: CustomEvent<{ newFriendlyName: string; install: boolean }>,
+    e: CustomEvent<{ newFriendlyName: string; install: boolean }>
   ) => void executeFriendlyName(this, e);
 
   _showApiKey = async (device: ConfiguredDevice) => {
@@ -688,10 +713,9 @@ export class ESPHomePageDashboard extends LitElement {
       toast.info(this._localize("layout.update_all_none"), { richColors: true });
       return;
     }
-    toast.info(
-      this._localize("layout.update_all_started", { count: selected.length }),
-      { richColors: true },
-    );
+    toast.info(this._localize("layout.update_all_started", { count: selected.length }), {
+      richColors: true,
+    });
     try {
       await this._api.firmwareInstallBulk(selected);
     } catch {

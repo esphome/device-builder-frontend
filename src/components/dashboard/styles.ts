@@ -325,20 +325,59 @@ export const dashboardStyles = css`
   .yaml-hits {
     display: flex;
     flex-direction: column;
-    padding: var(--wa-space-m) 0 var(--wa-space-l);
+    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
     gap: var(--wa-space-l);
   }
+  /* Title-only list (no search query): pack rows tightly so the
+     navigable file list reads as a dense browser. Search-results
+     mode keeps a larger inter-card gap so each device's snippet
+     stack reads as its own section. */
+  .yaml-hits:not(:has(.yaml-snippet)) {
+    gap: var(--wa-space-2xs);
+  }
+  /* Each device's hits live inside one unified card — the header
+     sits at the top and any snippet blocks stack below it within
+     the same border. Switching between title-only and search-result
+     mode swaps the *contents* of the card, not the card itself. */
   .yaml-hit-group {
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-xs);
+    border: 1px solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-raised);
+    overflow: hidden;
+  }
+  /* Card-level hover only makes sense in title-only mode where the
+     entire card is one click target. In search-results mode the
+     card hosts multiple independently-clickable snippet rows, so
+     per-row hover (below) is what tracks the cursor. */
+  .yaml-hits:not(:has(.yaml-snippet)) .yaml-hit-group {
+    transition:
+      background-color 0.12s,
+      border-color 0.12s;
+  }
+  .yaml-hits:not(:has(.yaml-snippet)) .yaml-hit-group:hover {
+    border-color: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 50%
+    );
+    background: var(--wa-color-surface-lowered);
   }
   .yaml-hit-group-header {
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding-bottom: var(--wa-space-xs);
+    padding: var(--wa-space-s) var(--wa-space-m);
+  }
+  /* Divider between the device header and the snippet stack inside
+     the same card. */
+  .yaml-hit-group:has(.yaml-snippet) .yaml-hit-group-header {
     border-bottom: 1px solid var(--wa-color-surface-border);
+  }
+  .yaml-hit-group-header wa-icon {
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-l);
   }
   .yaml-hit-group-name {
     font-weight: var(--wa-font-weight-bold);
@@ -359,27 +398,24 @@ export const dashboardStyles = css`
     color: var(--wa-color-text-quiet);
     margin-left: auto;
   }
-  /* The legacy .yaml-hit / .yaml-hit-label rows (palette-style
-     flat per-match listing) are gone from the dashboard; the
-     snippet-block styles below replace them with a grouped
-     code-search shape. */
+  /* Snippet rows sit inside the parent .yaml-hit-group card —
+     no individual border / radius (the card already has them),
+     just dividers between rows and a per-row hover highlight. */
   .yaml-snippet {
     display: block;
-    background: var(--wa-color-surface-lowered);
-    border: 1px solid var(--wa-color-surface-border);
-    border-radius: 6px;
     color: var(--wa-color-text-normal);
     text-decoration: none;
     font-family: var(--wa-font-family-code, ui-monospace, monospace);
     font-size: var(--wa-font-size-s);
-    overflow: hidden;
-    transition:
-      border-color 0.1s ease,
-      background-color 0.1s ease;
+    padding: var(--wa-space-2xs) 0;
+    transition: background-color 0.12s;
+  }
+  .yaml-snippet + .yaml-snippet {
+    border-top: 1px solid var(--wa-color-surface-border);
   }
   .yaml-snippet:hover,
   .yaml-snippet:focus-visible {
-    border-color: var(--esphome-primary);
+    background: var(--wa-color-surface-lowered);
     outline: none;
   }
   .yaml-snippet-line {
