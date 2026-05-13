@@ -1,0 +1,247 @@
+/**
+ * Step 1 of the automation editor: pick the automation's target.
+ *
+ * Five target kinds, matching the ``AutomationLocation`` discriminator
+ * the backend writer consumes:
+ *
+ * - ``device_on`` — the device itself (``on_boot`` / ``on_loop`` /
+ *   ``on_shutdown`` under ``esphome:``).
+ * - ``component_on`` — an inline ``on_*:`` handler on a configured
+ *   component instance (a specific binary_sensor, switch, …).
+ * - ``interval`` — a top-level ``interval:`` block.
+ * - ``script`` — a top-level ``script:`` block.
+ * - ``light_effect`` — a user-defined effect inside a light's
+ *   ``effects:`` list.
+ *
+ * The picker is presentational: parent owns the selected
+ * ``AutomationLocation`` and the list of available component
+ * instances (from ``getAvailableAutomations``).
+ */
+import { consume } from "@lit/context";
+import { html, LitElement, nothing } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
+
+import type {
+  AutomationLocation,
+  AvailableComponentInstance,
+  AvailableScript,
+} from "../../../api/types.js";
+import type { LocalizeFunc } from "../../../common/localize.js";
+import { localizeContext } from "../../../context/index.js";
+import { espHomeStyles } from "../../../styles/shared.js";
+import { inputStyles } from "../../../styles/inputs.js";
+import { automationEditorStyles } from "./automation-editor.styles.js";
+
+import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/select/select.js";
+
+type TargetKind = AutomationLocation["kind"];
+
+const ORDER: readonly TargetKind[] = [
+  "device_on",
+  "component_on",
+  "interval",
+  "script",
+  "light_effect",
+] as const;
+
+@customElement("esphome-automation-target-picker")
+export class ESPHomeAutomationTargetPicker extends LitElement {
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
+
+  /** Selected target — null in add-mode before the user picks. */
+  @property({ attribute: false })
+  value: AutomationLocation | null = null;
+
+  /** Configured component instances on this device — feeds the
+   *  ``component_on`` and ``light_effect`` pickers. */
+  @property({ attribute: false })
+  devices: AvailableComponentInstance[] = [];
+
+  /** Declared ``script:`` ids on this device. Empty list disables
+   *  the ``script`` kind. */
+  @property({ attribute: false })
+  scripts: AvailableScript[] = [];
+
+  /** Disable picker (during save). */
+  @property({ type: Boolean })
+  disabled = false;
+
+  static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+
+  protected render() {
+    const kind = this.value?.kind ?? "device_on";
+    return html`
+      <div class="ae-section">
+        <label class="ae-section-label" id="target-kind-label"
+          >${this._localize("device.automation_target")}</label
+        >
+        <wa-select
+          aria-labelledby="target-kind-label"
+          ?disabled=${this.disabled}
+          @change=${this._onKindChange}
+        >
+          ${ORDER.map(
+            (k) => html`<wa-option value=${k} ?selected=${k === kind}
+              >${this._kindLabel(k)}</wa-option
+            >`,
+          )}
+        </wa-select>
+        ${this._renderKindBody(kind)}
+      </div>
+    `;
+  }
+
+  private _kindLabel(kind: TargetKind): string {
+    switch (kind) {
+      case "device_on":
+        return this._localize("device.automation_target_device");
+      case "component_on":
+        return this._localize("device.automation_target_component");
+      case "interval":
+        return this._localize("device.automation_target_interval");
+      case "script":
+        return this._localize("device.automation_target_script");
+      case "light_effect":
+        return this._localize("device.automation_light_effect");
+    }
+  }
+
+  private _renderKindBody(kind: TargetKind) {
+    if (kind === "device_on" || kind === "interval") {
+      // No further selection needed — device-level triggers are
+      // picked in the trigger step, intervals carry an array index
+      // that the writer resolves.
+      return nothing;
+    }
+    if (kind === "component_on") {
+      const selectedId =
+        this.value?.kind === "component_on" ? this.value.component_id : "";
+      return html`
+        <label class="ae-section-label" id="component-id-label"
+          >${this._localize("device.automation_target_component")}</label
+        >
+        <wa-select
+          aria-labelledby="component-id-label"
+          ?disabled=${this.disabled}
+          @change=${(e: Event) =>
+            this._onComponentChange((e.target as HTMLSelectElement).value)}
+        >
+          ${this.devices.map(
+            (d) => html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
+              >${d.name ?? d.id} <span class="ae-muted">(${d.component_id})</span></wa-option
+            >`,
+          )}
+        </wa-select>
+      `;
+    }
+    if (kind === "script") {
+      const selectedId = this.value?.kind === "script" ? this.value.id : "";
+      return html`
+        <label class="ae-section-label" id="script-id-label"
+          >${this._localize("device.automation_target_script")}</label
+        >
+        <wa-select
+          aria-labelledby="script-id-label"
+          ?disabled=${this.disabled}
+          @change=${(e: Event) =>
+            this._onScriptChange((e.target as HTMLSelectElement).value)}
+        >
+          ${this.scripts.map(
+            (s) => html`<wa-option value=${s.id} ?selected=${s.id === selectedId}
+              >${s.id}</wa-option
+            >`,
+          )}
+        </wa-select>
+      `;
+    }
+    if (kind === "light_effect") {
+      const selectedId =
+        this.value?.kind === "light_effect" ? this.value.component_id : "";
+      const lights = this.devices.filter((d) =>
+        d.component_id.startsWith("light."),
+      );
+      return html`
+        <label class="ae-section-label" id="light-id-label"
+          >${this._localize("device.automation_target_component")}</label
+        >
+        <wa-select
+          aria-labelledby="light-id-label"
+          ?disabled=${this.disabled}
+          @change=${(e: Event) =>
+            this._onLightChange((e.target as HTMLSelectElement).value)}
+        >
+          ${lights.map(
+            (d) => html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
+              >${d.name ?? d.id}</wa-option
+            >`,
+          )}
+        </wa-select>
+      `;
+    }
+    return nothing;
+  }
+
+  private _onKindChange(e: Event) {
+    const kind = (e.target as HTMLSelectElement).value as TargetKind;
+    const next: AutomationLocation | null = (() => {
+      switch (kind) {
+        case "device_on":
+          return { kind, trigger: "on_boot" };
+        case "interval":
+          return { kind, index: 0 };
+        case "component_on":
+          return this.devices.length
+            ? {
+                kind,
+                component_id: this.devices[0].id,
+                trigger: "",
+              }
+            : null;
+        case "script":
+          return this.scripts.length
+            ? { kind, id: this.scripts[0].id }
+            : null;
+        case "light_effect": {
+          const light = this.devices.find((d) =>
+            d.component_id.startsWith("light."),
+          );
+          return light ? { kind, component_id: light.id, index: 0 } : null;
+        }
+      }
+    })();
+    this._emit(next);
+  }
+
+  private _onComponentChange(componentId: string) {
+    if (this.value?.kind !== "component_on") return;
+    this._emit({ ...this.value, component_id: componentId });
+  }
+
+  private _onScriptChange(id: string) {
+    this._emit({ kind: "script", id });
+  }
+
+  private _onLightChange(componentId: string) {
+    if (this.value?.kind !== "light_effect") return;
+    this._emit({ ...this.value, component_id: componentId });
+  }
+
+  private _emit(target: AutomationLocation | null) {
+    this.dispatchEvent(
+      new CustomEvent<{ target: AutomationLocation | null }>("target-change", {
+        detail: { target },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    "esphome-automation-target-picker": ESPHomeAutomationTargetPicker;
+  }
+}
