@@ -29,13 +29,18 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { labelChipStyles } from "../../util/label-chip-template.js";
 import { isLabelNameDuplicate } from "../../util/label-usage.js";
-import { LABEL_COLOR_SWATCHES } from "../../util/label-style.js";
+import {
+  LABEL_COLOR_SWATCHES,
+  labelChipStyle,
+  labelChipStyleString,
+} from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/input/input.js";
 
 registerMdiIcons({
   check: mdiCheck,
@@ -104,6 +109,15 @@ export class ESPHomeLabelForm extends LitElement {
   @state()
   private _saving = false;
 
+  /** True once the user has explicitly clicked a swatch (or we
+   *  seeded from an existing ``editing`` label). While false, the
+   *  form auto-picks a colour from the typed name so a fresh
+   *  create feels instant — the user can override any time, and
+   *  then we stop fighting their choice. Reset on cancel/collapse
+   *  so the next open starts in auto mode again. */
+  @state()
+  private _colorManual = false;
+
   /** Track which label we last seeded the form for so we don't
    *  clobber the user's in-progress edits on every parent
    *  re-render. We only re-seed when ``editing`` actually points
@@ -131,6 +145,10 @@ export class ESPHomeLabelForm extends LitElement {
         if (this._seededFor !== this.editing.id) {
           this._name = this.editing.name;
           this._color = this.editing.color;
+          // An edited label's existing colour is, by definition,
+          // a user choice — lock auto-pick out so the form doesn't
+          // recolour the chip from the typed name on first edit.
+          this._colorManual = true;
           this._seededFor = this.editing.id;
         }
         this._open = true;
@@ -141,6 +159,7 @@ export class ESPHomeLabelForm extends LitElement {
         // clean.
         this._name = "";
         this._color = null;
+        this._colorManual = false;
         this._open = false;
       }
     }
@@ -154,90 +173,302 @@ export class ESPHomeLabelForm extends LitElement {
     }
   }
 
+  /** Deterministic hash → swatch index. djb2-ish; we don't need
+   *  cryptographic distribution, just a stable mapping from name
+   *  → palette slot so the auto-picked colour stays put while the
+   *  user types and only shifts when the name itself shifts. */
+  private _autoColorFor(name: string): string {
+    const trimmed = name.trim().toLowerCase();
+    if (!trimmed) return LABEL_COLOR_SWATCHES[0];
+    let hash = 5381;
+    for (let i = 0; i < trimmed.length; i++) {
+      hash = ((hash << 5) + hash + trimmed.charCodeAt(i)) | 0;
+    }
+    const idx = Math.abs(hash) % LABEL_COLOR_SWATCHES.length;
+    return LABEL_COLOR_SWATCHES[idx];
+  }
+
+  private _onNameInput(value: string) {
+    this._name = value;
+    if (this._colorManual) return;
+    const trimmed = value.trim();
+    if (!trimmed) {
+      // Cleared back to empty — drop the auto-pick so the next
+      // non-empty char re-rolls a fresh colour. Without this, a
+      // user backspacing past empty and re-typing would stay on
+      // the first colour we ever picked.
+      this._color = null;
+      return;
+    }
+    // Lock in the first auto-pick and leave it alone as the user
+    // keeps typing — the previous behaviour recomputed the hash on
+    // every keystroke, which made the chip flicker through colours
+    // mid-word. Only re-roll once the input has gone empty (above)
+    // or the user manually picks a swatch.
+    if (this._color === null) {
+      this._color = this._autoColorFor(trimmed);
+    }
+  }
+
+  private _onSwatchClick(c: string | null) {
+    this._color = c;
+    this._colorManual = true;
+  }
+
+  private _onSuggestionClick(name: string) {
+    this._name = name;
+    if (!this._colorManual) {
+      this._color = this._autoColorFor(name);
+    }
+    // Move focus to the name input so the user can immediately
+    // refine the suggestion (add a room number, etc.).
+    requestAnimationFrame(() => {
+      const input = this.renderRoot.querySelector<HTMLInputElement>(
+        'input[type="text"]',
+      );
+      input?.focus();
+      input?.setSelectionRange(name.length, name.length);
+    });
+  }
+
+  /** Catalog of suggested names sourced from the ``labels_suggestions``
+   *  translation (comma-separated per locale — keeps the localisation
+   *  surface area small while still letting each language pick
+   *  culturally fitting defaults). Filtered against ``existingNames``
+   *  so a suggestion already in the catalog doesn't surface as a
+   *  duplicate trap. Empty when every suggestion is taken or the
+   *  translation came back empty. */
+  private _suggestionNames(): string[] {
+    const raw = this._localize("dashboard.labels_suggestions");
+    if (!raw || raw === "dashboard.labels_suggestions") return [];
+    const taken = new Set(this.existingNames.map((n) => n.toLowerCase()));
+    return raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => s && !taken.has(s.toLowerCase()));
+  }
+
   static styles = [
     espHomeStyles,
+    inputStyles,
+    labelChipStyles,
     css`
       :host {
         display: block;
       }
 
-      .create-toggle {
+      .preview-stage {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: var(--wa-space-m) var(--wa-space-s);
+        background: var(--wa-color-surface-lowered);
+        border-radius: var(--wa-border-radius-l);
+        border: var(--wa-border-width-s) dashed
+          var(--wa-color-surface-border);
+        min-height: 56px;
+      }
+
+      .preview-stage .label-chip {
+        font-size: var(--wa-font-size-s);
+        padding: 6px 14px;
+        max-width: 100%;
+        transition:
+          background-color 0.18s,
+          color 0.18s,
+          border-color 0.18s;
+      }
+
+      .preview-stage .preview-placeholder {
+        font-size: var(--wa-font-size-2xs);
+        font-weight: var(--wa-font-weight-bold);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--wa-color-text-quiet);
+      }
+
+      .suggestions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+      }
+
+      .suggestion-chip {
         display: inline-flex;
         align-items: center;
         gap: 4px;
-        padding: 6px 8px;
-        background: transparent;
-        border: none;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
+        padding: 3px 10px;
+        border-radius: 999px;
+        font-size: var(--wa-font-size-2xs);
+        font-weight: var(--wa-font-weight-semibold);
+        line-height: 1.4;
+        border: var(--wa-border-width-s) solid transparent;
+        background: var(--wa-color-surface-lowered);
+        color: var(--wa-color-text-quiet);
+        cursor: pointer;
+        font-family: inherit;
+        transition:
+          background-color 0.12s,
+          color 0.12s,
+          transform 0.12s;
+      }
+
+      .suggestion-chip:hover {
+        background: var(--suggestion-color, var(--wa-color-surface-lowered));
+        color: var(--suggestion-fg, var(--wa-color-text-normal));
+        transform: translateY(-1px);
+      }
+
+      .suggestion-chip:focus-visible {
+        outline: none;
+        box-shadow: 0 0 0 2px
+          color-mix(in srgb, var(--esphome-primary), transparent 70%);
+      }
+
+      .suggestion-chip wa-icon {
+        font-size: 11px;
+      }
+
+      .create-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+        border: var(--wa-border-width-s) dashed
+          color-mix(in srgb, var(--esphome-primary), transparent 60%);
+        border-radius: var(--wa-border-radius-m);
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-semibold);
         color: var(--esphome-primary);
         cursor: pointer;
-        align-self: flex-start;
+        align-self: stretch;
+        justify-content: center;
         font-family: inherit;
+        transition:
+          background-color 0.15s,
+          border-color 0.15s;
+      }
+
+      .create-toggle:hover {
+        background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+        border-color: color-mix(in srgb, var(--esphome-primary), transparent 40%);
       }
 
       .create-toggle wa-icon {
-        font-size: 14px;
+        font-size: 16px;
       }
 
       .create-form {
         display: flex;
         flex-direction: column;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-s) 0;
+        gap: var(--wa-space-m);
       }
 
-      .create-form-label {
-        font-size: var(--wa-font-size-xs);
+      .field-label {
+        display: block;
+        font-size: var(--wa-font-size-2xs);
         font-weight: var(--wa-font-weight-bold);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
         color: var(--wa-color-text-quiet);
+        margin-bottom: var(--wa-space-2xs);
+      }
+
+      .form-header {
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-semibold);
+        color: var(--wa-color-text-normal);
       }
 
       .swatch-row {
         display: flex;
         flex-wrap: wrap;
-        gap: 6px;
+        gap: 8px;
       }
 
       .swatch {
-        width: 24px;
-        height: 24px;
+        position: relative;
+        width: 30px;
+        height: 30px;
         border-radius: 50%;
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+        border: none;
         cursor: pointer;
         padding: 0;
-      }
-
-      .swatch--selected {
-        outline: 2px solid var(--esphome-primary);
-        outline-offset: 2px;
-      }
-
-      .swatch--clear {
-        background: transparent;
-        color: var(--wa-color-text-quiet);
-        font-size: 12px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        transition: transform 0.12s ease, box-shadow 0.12s ease;
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, #000, transparent 88%);
+      }
+
+      .swatch:hover {
+        transform: scale(1.08);
+      }
+
+      .swatch:focus-visible {
+        outline: none;
+        box-shadow:
+          inset 0 0 0 1px color-mix(in srgb, #000, transparent 88%),
+          0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+      }
+
+      .swatch--selected {
+        box-shadow:
+          inset 0 0 0 2px var(--wa-color-surface-default),
+          0 0 0 2px currentColor;
+      }
+
+      .swatch wa-icon {
+        font-size: 16px;
+        line-height: 0;
+      }
+
+      .swatch--clear {
+        background: var(--wa-color-surface-raised);
+        color: var(--wa-color-text-quiet);
+        border: var(--wa-border-width-s) dashed var(--wa-color-surface-border);
+        box-shadow: none;
+      }
+
+      .swatch--clear:hover {
+        color: var(--wa-color-text-normal);
+        border-color: var(--wa-color-text-quiet);
+      }
+
+      .swatch--clear.swatch--selected {
+        border-style: solid;
+        border-color: var(--esphome-primary);
+        color: var(--esphome-primary);
+        box-shadow: 0 0 0 2px
+          color-mix(in srgb, var(--esphome-primary), transparent 75%);
       }
 
       .create-actions {
         display: flex;
         gap: var(--wa-space-xs);
         justify-content: flex-end;
+        margin-top: var(--wa-space-2xs);
       }
 
       .btn {
-        padding: 6px 14px;
-        font-size: var(--wa-font-size-xs);
-        font-weight: var(--wa-font-weight-bold);
-        border-radius: var(--wa-border-radius-s);
+        padding: 8px 16px;
+        font-size: var(--wa-font-size-s);
+        font-weight: var(--wa-font-weight-semibold);
+        border-radius: var(--wa-border-radius-m);
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        background: var(--wa-color-surface-default);
+        background: var(--wa-color-surface-raised);
         color: var(--wa-color-text-normal);
         cursor: pointer;
         font-family: inherit;
+        transition:
+          background-color 0.15s,
+          border-color 0.15s;
+      }
+
+      .btn:hover {
+        background: var(--wa-color-surface-lowered);
       }
 
       .btn--primary {
@@ -246,9 +477,22 @@ export class ESPHomeLabelForm extends LitElement {
         border-color: var(--esphome-primary);
       }
 
-      .btn:disabled {
+      .btn--primary:hover {
+        background: color-mix(in srgb, var(--esphome-primary), #000 10%);
+        border-color: color-mix(in srgb, var(--esphome-primary), #000 10%);
+      }
+
+      .btn:disabled,
+      .btn:disabled:hover {
         opacity: 0.5;
         cursor: not-allowed;
+        background: var(--wa-color-surface-raised);
+      }
+
+      .btn--primary:disabled,
+      .btn--primary:disabled:hover {
+        background: var(--esphome-primary);
+        border-color: var(--esphome-primary);
       }
     `,
   ];
@@ -259,7 +503,10 @@ export class ESPHomeLabelForm extends LitElement {
    *  — edit mode is always open. */
   expand(seed = "") {
     if (this.editing) return;
-    this._name = seed || this.nameSeed;
+    const initial = seed || this.nameSeed;
+    this._name = initial;
+    this._colorManual = false;
+    this._color = initial.trim() ? this._autoColorFor(initial) : null;
     this._open = true;
   }
 
@@ -272,6 +519,7 @@ export class ESPHomeLabelForm extends LitElement {
     this._open = false;
     this._name = "";
     this._color = null;
+    this._colorManual = false;
   }
 
   protected render() {
@@ -324,6 +572,10 @@ export class ESPHomeLabelForm extends LitElement {
     const inputAriaLabel = this._localize(
       isEdit ? "dashboard.labels_edit_label" : "dashboard.labels_create",
     );
+    const previewName =
+      trimmed ||
+      this._localize("dashboard.labels_create_placeholder");
+    const previewIsPlaceholder = trimmed.length === 0;
     return html`
       <form
         id="label-form"
@@ -335,18 +587,34 @@ export class ESPHomeLabelForm extends LitElement {
       >
         ${this.compact
           ? nothing
-          : html`<span class="create-form-label"
+          : html`<span class="form-header"
               >${this._localize(headerKey)}</span
             >`}
-        <wa-input
+        <div class="preview-stage" aria-hidden="true">
+          ${previewIsPlaceholder
+            ? html`<span
+                class="label-chip"
+                style=${labelChipStyleString(this._color)}
+                ><span class="preview-placeholder">${previewName}</span></span
+              >`
+            : html`<span
+                class="label-chip"
+                style=${labelChipStyleString(this._color)}
+                >${previewName}</span
+              >`}
+        </div>
+        <input
+          type="text"
+          autocomplete="off"
           placeholder=${this._localize("dashboard.labels_create_placeholder")}
           maxlength="50"
           .value=${this._name}
           aria-label=${inputAriaLabel}
-          @input=${(e: Event) => {
-            this._name = (e.currentTarget as unknown as { value: string }).value;
-          }}
-        ></wa-input>
+          class=${duplicate ? "invalid" : ""}
+          @input=${(e: Event) =>
+            this._onNameInput((e.currentTarget as HTMLInputElement).value)}
+        />
+        ${this._renderSuggestions(trimmed, isEdit)}
         <div
           class="swatch-row"
           role="radiogroup"
@@ -361,31 +629,38 @@ export class ESPHomeLabelForm extends LitElement {
                 role="radio"
                 aria-checked=${selected ? "true" : "false"}
                 tabindex=${selected ? "0" : "-1"}
-                class="swatch swatch--clear ${selected ? "swatch--selected" : ""}"
+                class="swatch swatch--clear ${selected
+                  ? "swatch--selected"
+                  : ""}"
                 aria-label=${this._localize("dashboard.labels_color_none")}
                 title=${this._localize("dashboard.labels_color_none")}
-                @click=${() => {
-                  this._color = null;
-                }}
+                @click=${() => this._onSwatchClick(null)}
               >
                 ${selected
                   ? html`<wa-icon library="mdi" name="check"></wa-icon>`
                   : nothing}
               </button>`;
             }
+            // Compute the contrasting foreground so the inset check
+            // mark on a selected swatch reads cleanly against the
+            // swatch's own colour (white on dark hues, dark on
+            // light hues — same heuristic the chip uses).
+            const checkColor = labelChipStyle(c).color;
             return html`<button
               type="button"
               role="radio"
               aria-checked=${selected ? "true" : "false"}
               tabindex=${selected ? "0" : "-1"}
               class="swatch ${selected ? "swatch--selected" : ""}"
-              style="background:${c}"
+              style="background:${c};color:${checkColor}"
               aria-label=${c}
               title=${c}
-              @click=${() => {
-                this._color = c;
-              }}
-            ></button>`;
+              @click=${() => this._onSwatchClick(c)}
+            >
+              ${selected
+                ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                : nothing}
+            </button>`;
           })}
         </div>
         <div class="create-actions">
@@ -408,6 +683,35 @@ export class ESPHomeLabelForm extends LitElement {
     `;
   }
 
+  /** Render a row of clickable preset name chips (HA-style room
+   *  suggestions). Hidden in edit mode, when the user has already
+   *  typed past two characters (intent is clear, suggestions just
+   *  add noise), and when every suggestion is already in the
+   *  catalog. */
+  private _renderSuggestions(trimmed: string, isEdit: boolean) {
+    if (isEdit) return nothing;
+    if (trimmed.length > 2) return nothing;
+    const names = this._suggestionNames();
+    if (names.length === 0) return nothing;
+    return html`<div class="suggestions">
+      ${names.map((n) => {
+        // Tint each chip with the colour the form would auto-pick
+        // if the user typed this name — gives the suggestions row
+        // visual variety and previews the chip-to-be.
+        const c = this._autoColorFor(n);
+        const fg = labelChipStyle(c).color;
+        return html`<button
+          type="button"
+          class="suggestion-chip"
+          style=${`--suggestion-color:${c};--suggestion-fg:${fg}`}
+          @click=${() => this._onSuggestionClick(n)}
+        >
+          ${n}
+        </button>`;
+      })}
+    </div>`;
+  }
+
   private _cancel() {
     if (this.editing) {
       // Edit mode owns "exit" at the host level — fire an event
@@ -427,6 +731,7 @@ export class ESPHomeLabelForm extends LitElement {
     if (this.defaultOpen) {
       this._name = "";
       this._color = null;
+      this._colorManual = false;
       return;
     }
     this.collapse();
@@ -483,6 +788,7 @@ export class ESPHomeLabelForm extends LitElement {
         );
         this._name = "";
         this._color = null;
+        this._colorManual = false;
         if (!this.defaultOpen) this._open = false;
       }
     } catch (err) {
@@ -527,7 +833,7 @@ export class ESPHomeLabelForm extends LitElement {
         return;
     }
     e.preventDefault();
-    this._color = values[next];
+    this._onSwatchClick(values[next]);
     requestAnimationFrame(() => {
       const swatch = this.renderRoot.querySelectorAll<HTMLButtonElement>(
         ".swatch",

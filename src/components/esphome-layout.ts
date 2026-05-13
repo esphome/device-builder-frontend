@@ -217,6 +217,21 @@ export class ESPHomeLayout extends LitElement {
   ];
 
   private _goHome() {
+    // Prefer popping the history stack so the previous URL — and
+    // therefore the dashboard's filter / search state encoded in
+    // its query string — is restored verbatim. ``history.state`` is
+    // set to ``{}`` by our own ``navigate()`` helper on every
+    // pushState; ``null`` means we landed on this route via a fresh
+    // page load (deep link / refresh) so there's nothing useful to
+    // pop and we fall back to ``navigate("/")`` to stay inside the
+    // SPA instead of exiting to the previous site.
+    if (
+      window.history.state !== null &&
+      typeof window.history.state === "object"
+    ) {
+      window.history.back();
+      return;
+    }
     navigate("/");
   }
 

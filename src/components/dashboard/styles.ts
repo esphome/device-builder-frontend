@@ -211,29 +211,44 @@ export const dashboardStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
+    flex-wrap: wrap;
+    row-gap: var(--wa-space-xs);
   }
 
-  /* Pushes the filter group to the right edge of the toolbar so
-     view-toggles (left of the spacer) and filter affordances
-     (right of the spacer) read as separate clusters. Collapses to
-     zero on viewports too narrow to afford it — the row wraps via
-     'flex-wrap' higher up if individual buttons overflow. */
+  /* Pushes the select-toggle to the right edge of the toolbar.
+     The facet pills sit in the middle of the row (between the
+     view-toggle and the spacer) so they read as part of the
+     "view / filter" cluster; on narrow viewports the row wraps
+     so the facets flow onto a second line without crowding the
+     search input. */
   .toolbar-spacer {
     flex: 1 1 auto;
     min-width: var(--wa-space-s);
   }
 
+  /* Facet pills cluster inline with the view-toggle. flex-wrap
+     lets pills flow onto a second row of their own if too many
+     accumulate (large fleets with several areas / platforms). */
   .filter-group {
     display: inline-flex;
     align-items: center;
-    gap: var(--wa-space-xs);
-    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: var(--wa-space-2xs);
+    row-gap: var(--wa-space-2xs);
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .search-wrap {
     position: relative;
     max-width: 380px;
-    flex: 1;
+    /* The search input grows to fill the row, but never below
+       ~140px so the placeholder copy stays readable when the
+       facets row claims toolbar real estate. flex-basis seeds
+       the input wider than the floor; min-width is the hard
+       lower bound for the squeezed state. */
+    flex: 1 1 220px;
+    min-width: 140px;
   }
   /* Native <input class="search-input"> picks up the shared
      border / radius / focus-ring shape from inputStyles

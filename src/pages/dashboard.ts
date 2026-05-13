@@ -30,6 +30,7 @@ import {
   devicesContext,
   devicesLoadedContext,
   importableDevicesContext,
+  labelsContext,
   localizeContext,
   recentJobsContext,
 } from "../context/index.js";
@@ -37,6 +38,10 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { YamlSearchController } from "../components/yaml-search-controller.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import {
+  readDashboardUrl,
+  writeDashboardUrl,
+} from "../util/dashboard-url.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -145,11 +150,31 @@ export class ESPHomePageDashboard extends LitElement {
   @consume({ context: devicesLoadedContext, subscribe: true }) @state() _devicesLoaded = false;
   @consume({ context: activeJobsContext, subscribe: true }) @state() _activeJobs: Map<string, FirmwareJob> = new Map();
   @consume({ context: recentJobsContext, subscribe: true }) @state() _recentJobs: Map<string, FirmwareJob> = new Map();
+  /** Labels catalog from the WS push. Consumed here so the
+   *  dashboard can translate the URL's label *names* (what shared
+   *  links carry) into the *ids* the filter pipeline expects, and
+   *  back on write. */
+  @consume({ context: labelsContext, subscribe: true }) @state() _labelsCatalog: Label[] = [];
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
   @state() _showDiscovered = false;
   @state() _search = "";
   @state() _selectedLabels: string[] = [];
+  /** Label *names* read from the URL on first paint, waiting to be
+   *  resolved to ids once ``_labelsCatalog`` arrives. ``null``
+   *  means "no resolution pending" — either the URL had no labels
+   *  param or we've already converted them. URL sync prefers this
+   *  list while it's set so we round-trip the names verbatim
+   *  without dropping the param mid-load. */
+  @state() private _pendingLabelNames: string[] | null = null;
+  /** Free-text ``esphome.area`` values currently selected in the
+   *  Area facet. OR semantics — devices match if their area is in
+   *  the set. Combined with other facets via AND at the row level. */
+  @state() _selectedAreas: string[] = [];
+  /** ``target_platform`` stems selected in the Platform facet. */
+  @state() _selectedPlatforms: string[] = [];
+  /** ``DeviceState`` values selected in the Status facet. */
+  @state() _selectedStates: string[] = [];
   @state() _yamlMode = false;
   @state() _yamlPreviewCount = 0;
   _yamlSearch = new YamlSearchController(this, () => this._api);
@@ -223,6 +248,11 @@ export class ESPHomePageDashboard extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    // Hydrate filter / search state from the URL before anything
+    // else mounts — a refresh, deep link, or browser-back must land
+    // the user on the same view they left, not the default-empty
+    // state that would otherwise flash through on first paint.
+    this._hydrateFromUrl();
     this.setAttribute("view", this._view);
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
@@ -233,6 +263,83 @@ export class ESPHomePageDashboard extends LitElement {
       this._highlightFreshDevice(pending);
       this._tryConsumePendingScroll();
     }
+  }
+
+  private _hydrateFromUrl(): void {
+    const urlState = readDashboardUrl();
+    if (urlState.search !== undefined) this._search = urlState.search;
+    if (urlState.labels !== undefined) {
+      // URL carries label *names* (human-readable, share-friendly).
+      // Stash them in ``_pendingLabelNames`` and resolve to ids in
+      // ``willUpdate`` once ``_labelsCatalog`` arrives over WS —
+      // catalog isn't guaranteed to be loaded yet at this point in
+      // ``connectedCallback``.
+      this._pendingLabelNames = urlState.labels;
+      this._resolvePendingLabelNames();
+    }
+    if (urlState.areas !== undefined) this._selectedAreas = urlState.areas;
+    if (urlState.platforms !== undefined)
+      this._selectedPlatforms = urlState.platforms;
+    if (urlState.states !== undefined) this._selectedStates = urlState.states;
+    if (urlState.view !== undefined) this._view = urlState.view;
+    if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;
+  }
+
+  /** Convert pending URL-sourced label names to ids using the
+   *  current catalog. Case-insensitive match — a shared URL typed
+   *  in mixed case shouldn't fail to match a catalog entry that
+   *  was created lowercase, or vice versa. Names that don't
+   *  resolve are dropped silently; the user sees an empty
+   *  selection where the unknown label would have been, which is
+   *  the best we can do for a deleted / renamed label. */
+  private _resolvePendingLabelNames(): void {
+    if (!this._pendingLabelNames) return;
+    if (this._labelsCatalog.length === 0) return;
+    const byNameLower = new Map<string, string>(
+      this._labelsCatalog.map((l) => [l.name.toLowerCase(), l.id]),
+    );
+    const ids = this._pendingLabelNames
+      .map((name) => byNameLower.get(name.toLowerCase()))
+      .filter((id): id is string => id !== undefined);
+    this._selectedLabels = ids;
+    this._pendingLabelNames = null;
+  }
+
+  /** Set of state fields whose changes need to round-trip to the
+   *  URL. Keyed off the Lit ``changed`` map in ``updated``. */
+  private static readonly _urlSyncedFields = [
+    "_search",
+    "_selectedLabels",
+    "_selectedAreas",
+    "_selectedPlatforms",
+    "_selectedStates",
+    "_view",
+    "_yamlMode",
+  ] as const;
+
+  private _syncUrl(): void {
+    // While name resolution is still pending (catalog hasn't loaded
+    // yet), round-trip the unresolved names back to the URL so a
+    // refresh during that window doesn't drop the param. Once the
+    // catalog arrives and we resolve to ids, the catalog → name
+    // mapping kicks in below.
+    const labelNames =
+      this._pendingLabelNames !== null
+        ? this._pendingLabelNames
+        : this._selectedLabels
+            .map(
+              (id) => this._labelsCatalog.find((l) => l.id === id)?.name,
+            )
+            .filter((n): n is string => !!n);
+    writeDashboardUrl({
+      search: this._search,
+      labels: labelNames,
+      areas: this._selectedAreas,
+      platforms: this._selectedPlatforms,
+      states: this._selectedStates,
+      view: this._view,
+      yaml: this._yamlMode,
+    });
   }
 
   disconnectedCallback() {
@@ -252,6 +359,9 @@ export class ESPHomePageDashboard extends LitElement {
       this.toggleAttribute("has-discovered", this._importableDevices.length > 0);
     }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
+    // The catalog arrives over WS after ``connectedCallback`` runs.
+    // Resolve any URL-sourced pending label names the moment it does.
+    if (changed.has("_labelsCatalog")) this._resolvePendingLabelNames();
     // Re-bind drawer to live device so renames / state flaps / DHCP renews
     // don't leave the drawer showing stale fields.
     if (changed.has("_devices") && this._drawerDevice) {
@@ -283,6 +393,16 @@ export class ESPHomePageDashboard extends LitElement {
       const next = hits.reduce((sum, h) => sum + h.matches.length, 0);
       if (next !== this._yamlPreviewCount) this._yamlPreviewCount = next;
     }
+    // Mirror filter / search / view state to the URL on every
+    // change, but skip the first paint cycle (where every prop is
+    // "changed" because Lit treats initial assignment as a change) —
+    // the initial state already came from the URL via
+    // ``_hydrateFromUrl``, so writing it back is a no-op.
+    if (
+      ESPHomePageDashboard._urlSyncedFields.some((f) => changed.has(f))
+    ) {
+      this._syncUrl();
+    }
   }
 
   protected render() {
@@ -306,19 +426,25 @@ export class ESPHomePageDashboard extends LitElement {
     }
 
     const q = this._search.trim().toLowerCase();
-    const labelFiltered = this._applyLabelFilter(this._sortedDevices);
+    const facetFiltered = this._applyFacetFilters(this._sortedDevices);
     const filtered = q
-      ? labelFiltered.filter((d) => matchesDeviceName(d, q))
-      : labelFiltered;
+      ? facetFiltered.filter((d) => matchesDeviceName(d, q))
+      : facetFiltered;
+    // Show the no-results pivot whenever facets and/or search hide
+    // every device that actually exists — facet-only filtering used
+    // to silently leave the card grid empty with no escape hatch.
+    const showCardEmptyState =
+      this._view === DashboardView.CARDS &&
+      this._devices.length > 0 &&
+      filtered.length === 0 &&
+      this._hasActiveFilters;
 
     return html`
       ${renderDiscoveredSection(this)}
       ${this._devices.length > 0 && this._view === DashboardView.CARDS
         ? renderToolbar(this, filtered.length, this._devices.length)
         : ""}
-      ${filtered.length === 0 && q && this._view === DashboardView.CARDS
-        ? renderEmptySearch(this)
-        : ""}
+      ${showCardEmptyState ? renderEmptySearch(this) : ""}
       ${this._view === DashboardView.CARDS
         ? renderCardGrid(this, filtered)
         : renderTable(this)}
@@ -341,22 +467,70 @@ export class ESPHomePageDashboard extends LitElement {
     return sorted;
   }
 
-  _applyLabelFilter(devices: ConfiguredDevice[]): ConfiguredDevice[] {
-    if (this._selectedLabels.length === 0) return devices;
-    const required = this._selectedLabels;
-    return devices.filter((d) => {
-      const ids = d.labels;
-      if (!ids || ids.length === 0) return false;
-      const set = new Set(ids);
-      return required.every((id) => set.has(id));
-    });
+  /** True when any facet or text search would currently narrow the
+   *  device list — used by the empty state to decide whether to
+   *  render the "no devices match" pivot, and by the toolbar to
+   *  pick the right messaging for the clear button. */
+  get _hasActiveFilters(): boolean {
+    return (
+      this._search.trim().length > 0 ||
+      this._selectedLabels.length > 0 ||
+      this._selectedAreas.length > 0 ||
+      this._selectedPlatforms.length > 0 ||
+      this._selectedStates.length > 0
+    );
+  }
+
+  /** Wipe search + every facet selection in one shot. Wired to the
+   *  empty-state's "Clear filters" button, which only renders when
+   *  ``_hasActiveFilters`` — so this is always doing something
+   *  visible from the user's perspective. */
+  _clearAllFilters = () => {
+    this._search = "";
+    this._selectedLabels = [];
+    this._selectedAreas = [];
+    this._selectedPlatforms = [];
+    this._selectedStates = [];
+    this._syncYamlSearch();
+  };
+
+  /** Apply every active facet filter to the device list. Labels
+   *  use AND semantics (a device must carry every selected label
+   *  — the original "drill down by tag stack" behaviour we shipped
+   *  with the labels filter); area, platform, and status use OR
+   *  within the facet and AND across facets, the conventional
+   *  faceted-search shape. */
+  _applyFacetFilters(devices: ConfiguredDevice[]): ConfiguredDevice[] {
+    let out = devices;
+    if (this._selectedLabels.length > 0) {
+      const required = this._selectedLabels;
+      out = out.filter((d) => {
+        const ids = d.labels;
+        if (!ids || ids.length === 0) return false;
+        const set = new Set(ids);
+        return required.every((id) => set.has(id));
+      });
+    }
+    if (this._selectedAreas.length > 0) {
+      const set = new Set(this._selectedAreas);
+      out = out.filter((d) => !!d.area && set.has(d.area));
+    }
+    if (this._selectedPlatforms.length > 0) {
+      const set = new Set(this._selectedPlatforms);
+      out = out.filter((d) => set.has(d.target_platform));
+    }
+    if (this._selectedStates.length > 0) {
+      const set = new Set(this._selectedStates);
+      out = out.filter((d) => set.has(d.state));
+    }
+    return out;
   }
 
   // Card view: name match. Table view: also matches address/IP/platform so
   // "Select all" tracks the table's global filter.
   _currentlyVisibleConfigurations(): string[] {
     const q = this._search.trim().toLowerCase();
-    const sorted = this._applyLabelFilter(this._sortedDevices);
+    const sorted = this._applyFacetFilters(this._sortedDevices);
     if (!q) return sorted.map((d) => d.configuration);
     const isTable = this._view === DashboardView.TABLE;
     return sorted

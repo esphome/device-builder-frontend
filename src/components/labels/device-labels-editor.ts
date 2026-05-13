@@ -49,7 +49,6 @@ import type { ESPHomeLabelForm } from "./label-form.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/input/input.js";
 
 registerMdiIcons({
   check: mdiCheck,
@@ -74,11 +73,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   @property({ attribute: false })
   device!: ConfiguredDevice;
-
-  /** Substring filter applied to the catalog inside the dialog.
-   *  Case-insensitive. */
-  @state()
-  private _filter = "";
 
   /** True while a ``set_labels`` round trip is in flight. Used to
    *  gate optimistic-state cleanup; toggle clicks are still
@@ -210,7 +204,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       /* ─── Dialog ──────────────────────────────────────────── */
 
       wa-dialog {
-        --width: 460px;
+        --width: 480px;
       }
 
       wa-dialog::part(header) {
@@ -237,15 +231,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         display: none;
       }
 
-      .dialog-search {
-        margin-bottom: var(--wa-space-s);
-      }
-
       .options {
         display: flex;
         flex-direction: column;
         gap: 2px;
-        max-height: 300px;
+        max-height: 320px;
         overflow-y: auto;
         margin: 0 calc(var(--wa-space-l) * -1);
         padding: 0 var(--wa-space-l);
@@ -254,31 +244,40 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       .option {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 6px 8px;
-        border-radius: var(--wa-border-radius-s);
+        gap: 12px;
+        padding: 8px 10px;
+        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
         background: transparent;
         border: none;
         text-align: left;
         font-family: inherit;
         color: inherit;
+        transition: background-color 0.12s;
       }
 
       .option:hover {
         background: var(--wa-color-surface-lowered);
       }
 
+      .option:focus-visible {
+        outline: none;
+        background: var(--wa-color-surface-lowered);
+        box-shadow: 0 0 0 2px
+          color-mix(in srgb, var(--esphome-primary), transparent 70%);
+      }
+
       .option-check {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 18px;
-        height: 18px;
-        border-radius: 4px;
+        width: 20px;
+        height: 20px;
+        border-radius: 5px;
         border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         flex-shrink: 0;
         color: var(--esphome-on-primary);
+        background: var(--wa-color-surface-default);
       }
 
       .option-check--checked {
@@ -287,7 +286,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       }
 
       .option-check wa-icon {
-        font-size: 13px;
+        font-size: 14px;
       }
 
       .option-empty {
@@ -297,10 +296,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         padding: var(--wa-space-m);
       }
 
-      .divider {
-        height: 1px;
-        background: var(--wa-color-surface-border);
-        margin: var(--wa-space-s) 0;
+      .create-section {
+        margin-top: var(--wa-space-l);
+        padding-top: var(--wa-space-m);
+        border-top: var(--wa-border-width-s) solid
+          var(--wa-color-surface-border);
       }
 
     `,
@@ -314,7 +314,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       // chained against the previous device would gate this one's
       // ``_saving`` indicator until that promise settled.
       if (this._dialog) this._dialog.open = false;
-      this._filter = "";
       this._createForm?.collapse();
       this._optimisticLabels = null;
       this._saving = false;
@@ -371,64 +370,44 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
 
   private _renderDialog() {
     const assignedSet = new Set(this._currentLabelIds);
-    const filter = this._filter.trim().toLowerCase();
-    const filtered = filter
-      ? this._catalog.filter((l) => l.name.toLowerCase().includes(filter))
-      : this._catalog;
     return html`
       <wa-dialog
         label=${this._localize("dashboard.labels_dialog_title")}
         light-dismiss
         @wa-after-hide=${this._onDialogClose}
       >
-        <div class="dialog-search">
-          <wa-input
-            type="search"
-            with-clear
-            autocomplete="off"
-            placeholder=${this._localize("dashboard.labels_search_placeholder")}
-            .value=${this._filter}
-            @input=${(e: Event) => {
-              this._filter = (e.currentTarget as unknown as { value: string }).value;
-            }}
-          ></wa-input>
-        </div>
         <div class="options" role="group" aria-label=${this._localize("dashboard.drawer_labels")}>
           ${this._catalog.length === 0
             ? html`<div class="option-empty">
                 ${this._localize("dashboard.labels_dialog_empty")}
               </div>`
-            : filtered.length === 0
-              ? html`<div class="option-empty">
-                  ${this._localize("dashboard.labels_no_matches")}
-                </div>`
-              : filtered.map((label) => {
-                  const checked = assignedSet.has(label.id);
-                  return html`<button
-                    class="option"
-                    type="button"
-                    role="checkbox"
-                    aria-checked=${checked ? "true" : "false"}
-                    @click=${() => this._toggleAssignment(label.id, !checked)}
+            : this._catalog.map((label) => {
+                const checked = assignedSet.has(label.id);
+                return html`<button
+                  class="option"
+                  type="button"
+                  role="checkbox"
+                  aria-checked=${checked ? "true" : "false"}
+                  @click=${() => this._toggleAssignment(label.id, !checked)}
+                >
+                  <span class="option-check ${checked ? "option-check--checked" : ""}">
+                    ${checked
+                      ? html`<wa-icon library="mdi" name="check"></wa-icon>`
+                      : nothing}
+                  </span>
+                  <span class="label-chip" style=${labelChipStyleString(label.color)}
+                    >${label.name}</span
                   >
-                    <span class="option-check ${checked ? "option-check--checked" : ""}">
-                      ${checked
-                        ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                        : nothing}
-                    </span>
-                    <span class="label-chip" style=${labelChipStyleString(label.color)}
-                      >${label.name}</span
-                    >
-                  </button>`;
-                })}
+                </button>`;
+              })}
         </div>
-        <div class="divider"></div>
-        <esphome-label-form
-          .existingNames=${this._catalog.map((l) => l.name)}
-          .nameSeed=${this._filter}
-          @submitting=${this._onCreateSubmitting}
-          @label-created=${this._onCreateResolved}
-        ></esphome-label-form>
+        <div class="create-section">
+          <esphome-label-form
+            .existingNames=${this._catalog.map((l) => l.name)}
+            @submitting=${this._onCreateSubmitting}
+            @label-created=${this._onCreateResolved}
+          ></esphome-label-form>
+        </div>
       </wa-dialog>
     `;
   }
@@ -449,13 +428,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   };
 
   private _openDialog = () => {
-    this._filter = "";
     this._createForm?.collapse();
     if (this._dialog) this._dialog.open = true;
   };
 
   private _onDialogClose = () => {
-    this._filter = "";
     this._createForm?.collapse();
   };
 
@@ -509,7 +486,6 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   private async _assignNewLabel(label: Label) {
     const next = [...this._currentLabelIds, label.id];
     this._optimisticLabels = next;
-    this._filter = "";
     await this._persist(next);
   }
 }

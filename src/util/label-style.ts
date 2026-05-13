@@ -66,19 +66,21 @@ export function labelChipStyleString(color: string | null | undefined): string {
   return `background:${s.background};color:${s.color};border-color:${s.borderColor}`;
 }
 
-/** Curated swatch palette for the label-creation UI. Mirrors the
- *  GitHub-style "pick a color" affordance — eight saturated tones
- *  plus a neutral fallback so the user has good contrast options on
- *  both light and dark themes without having to reach for a full
- *  color picker. */
+/** Curated swatch palette for the label-creation UI. Warm-leaning
+ *  hues (reds / oranges / ambers / olives / earth tones / warm
+ *  violet & magenta) plus a warm stone neutral — picked to feel
+ *  cohesive against the dashboard's surface tokens on both light
+ *  and dark themes without straying into neon territory. The
+ *  contrasting-text heuristic in ``contrastingTextColor`` keeps
+ *  every swatch readable as a chip fill. */
 export const LABEL_COLOR_SWATCHES: readonly string[] = [
-  "#ef4444", // red
-  "#f97316", // orange
-  "#eab308", // yellow
-  "#22c55e", // green
-  "#14b8a6", // teal
-  "#3b82f6", // blue
-  "#8b5cf6", // violet
-  "#ec4899", // pink
-  "#64748b", // slate
+  "#dc2626", // red
+  "#ea580c", // burnt orange
+  "#f59e0b", // amber
+  "#ca8a04", // mustard
+  "#84cc16", // lime / olive
+  "#a16207", // bronze
+  "#9333ea", // warm violet
+  "#db2777", // rose
+  "#78716c", // warm stone
 ];
