@@ -1,7 +1,7 @@
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { tags as t } from "@lezer/highlight";
-import type { Extension } from "@codemirror/state";
 
 /**
  * VSCode-flavored CodeMirror themes for the YAML editor.
@@ -29,7 +29,7 @@ const LIGHT_SELECTION = "#add6ff";
 const LIGHT_ACTIVE_LINE = "#f6f8fa";
 const LIGHT_CURSOR = "#1f2328";
 
-const darkHighlight = HighlightStyle.define([
+export const darkHighlight = HighlightStyle.define([
   { tag: t.keyword, color: "#569cd6" },
   { tag: t.string, color: "#98c379" },
   { tag: t.special(t.string), color: "#98c379" },
@@ -38,17 +38,24 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.bool, color: "#569cd6" },
   { tag: t.null, color: "#569cd6" },
   { tag: t.atom, color: "#569cd6" },
-  { tag: [t.lineComment, t.blockComment, t.comment], color: "#6a9955", fontStyle: "italic" },
+  {
+    tag: [t.lineComment, t.blockComment, t.comment],
+    color: "#6a9955",
+    fontStyle: "italic",
+  },
   { tag: t.definition(t.propertyName), color: "#9cdcfe" },
   { tag: t.propertyName, color: "#9cdcfe" },
   { tag: t.labelName, color: "#dcdcaa" },
   { tag: t.typeName, color: "#4ec9b0" },
   { tag: t.meta, color: "#c586c0" },
-  { tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace], color: DARK_FG },
+  {
+    tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace],
+    color: DARK_FG,
+  },
   { tag: t.content, color: DARK_FG },
 ]);
 
-const lightHighlight = HighlightStyle.define([
+export const lightHighlight = HighlightStyle.define([
   { tag: t.keyword, color: "#a626a4" },
   { tag: t.string, color: "#50a14f" },
   { tag: t.special(t.string), color: "#50a14f" },
@@ -57,13 +64,20 @@ const lightHighlight = HighlightStyle.define([
   { tag: t.bool, color: "#0550ae" },
   { tag: t.null, color: "#0550ae" },
   { tag: t.atom, color: "#0550ae" },
-  { tag: [t.lineComment, t.blockComment, t.comment], color: "#6e7781", fontStyle: "italic" },
+  {
+    tag: [t.lineComment, t.blockComment, t.comment],
+    color: "#6e7781",
+    fontStyle: "italic",
+  },
   { tag: t.definition(t.propertyName), color: "#0550ae" },
   { tag: t.propertyName, color: "#0550ae" },
   { tag: t.labelName, color: "#6f42c1" },
   { tag: t.typeName, color: "#953800" },
   { tag: t.meta, color: "#8250df" },
-  { tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace], color: LIGHT_FG },
+  {
+    tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace],
+    color: LIGHT_FG,
+  },
   { tag: t.content, color: LIGHT_FG },
 ]);
 
@@ -101,7 +115,7 @@ const darkBase = EditorView.theme(
       backgroundColor: "#9d550f",
     },
   },
-  { dark: true },
+  { dark: true }
 );
 
 const lightBase = EditorView.theme(
@@ -138,7 +152,7 @@ const lightBase = EditorView.theme(
       backgroundColor: "#ffd33d",
     },
   },
-  { dark: false },
+  { dark: false }
 );
 
 export const vscodeDark: Extension = [darkBase, syntaxHighlighting(darkHighlight)];
