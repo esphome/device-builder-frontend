@@ -415,13 +415,6 @@ export async function fetchApiKey(
  *     readable would throw.
  */
 export function streamSerialToDialog(port: any, dialog: any): () => void {
-  // Defence in depth: ``port.readable`` is ``null`` when the port is
-  // closed. Without this guard the caller (e.g. post-install-logs
-  // handler) hangs with a dialog stuck on "Waiting for logs…".
-  if (!port.readable) {
-    console.error("[Web Serial] streamSerialToDialog called on a closed port");
-    return () => {};
-  }
   /* Read directly from ``port.readable.getReader()`` and decode in
      userland rather than going through ``port.readable.pipeTo()`` +
      a ``TextDecoderStream``. The pipeTo plumbing has been observed

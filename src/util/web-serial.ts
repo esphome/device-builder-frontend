@@ -225,10 +225,12 @@ export async function flashFirmware(
 }
 
 /**
- * RTC-WDT register layout for chips that support the
- * watchdog-triggered reset trick. Same layout (offsets +0x94 /
- * +0x98 / +0xAC from RTC_CNTL_BASE) across ESP32-S2 / S3 / C2 / C3;
- * only the RTC_CNTL_BASE address differs by chip.
+ * RTC-WDT register addresses per chip — verified against esptool
+ * python's per-target files (esptool/targets/{esp32s2,esp32s3,
+ * esp32c2,esp32c3}.py). Both the RTC_CNTL_BASE address AND the
+ * register offsets within it vary by chip (e.g. WDTCONFIG0 is at
+ * +0x84 on C2, +0x90 on C3, +0x94 on S2, +0x98 on S3), so each
+ * entry has to spell out the full absolute address.
  *
  * Watchdog reset is the most reliable way to exit the stub bootloader
  * on these chips. esptool's ``--after watchdog-reset`` uses the same
@@ -242,8 +244,6 @@ export async function flashFirmware(
  * and on chips without RTC_WDT (ESP8266, classic ESP32, ESP32-H2 /
  * H4 / E22).
  */
-/* WDT register addresses per chip. Offsets vary by chip — verified
-   against esptool python's per-target files (S2/S3/C2/C3.py). */
 const WDT_RESET_CHIPS: Record<
   string,
   { wdtConfig0: number; wdtConfig1: number; wdtWProtect: number }
