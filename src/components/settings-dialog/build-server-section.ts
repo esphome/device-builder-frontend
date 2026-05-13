@@ -373,7 +373,7 @@ export class ESPHomeSettingsBuildServer extends LitElement {
     const minHours = CLEANUP_TTL_MIN_SECONDS / 3600;
     const maxHours = CLEANUP_TTL_MAX_SECONDS / 3600;
     return html`
-      <div class="row">
+      <div class="row row--stacked">
         <div class="row-label">
           <span id="remote-build-cleanup-ttl-title" class="row-title">
             ${this._localize("settings.remote_build_cleanup_ttl_title")}

@@ -1,10 +1,14 @@
 import { consume } from "@lit/context";
 import {
   mdiClose,
+  mdiHandshake,
   mdiHandshakeOutline,
+  mdiPalette,
   mdiPaletteOutline,
+  mdiSend,
   mdiSendOutline,
   mdiServerNetwork,
+  mdiServerNetworkOutline,
   mdiTranslate,
   mdiVectorDifference,
 } from "@mdi/js";
@@ -36,10 +40,14 @@ import "./settings-dialog/pairing-requests-section.js";
 
 registerMdiIcons({
   close: mdiClose,
+  handshake: mdiHandshake,
   "handshake-outline": mdiHandshakeOutline,
+  palette: mdiPalette,
   "palette-outline": mdiPaletteOutline,
+  send: mdiSend,
   "send-outline": mdiSendOutline,
   "server-network": mdiServerNetwork,
+  "server-network-outline": mdiServerNetworkOutline,
   translate: mdiTranslate,
   "vector-difference": mdiVectorDifference,
 });
@@ -134,13 +142,20 @@ export class ESPHomeSettingsDialog extends LitElement {
       const ariaLabel = sectionAlerted(s.id)
         ? this._localize("settings.nav_item_attention_aria", { label })
         : label;
+      // Swap to the filled MDI variant when this nav item is the
+      // active section so the icon matches the bolded label.
+      // Icons without an outline/filled pair (e.g. translate)
+      // fall back to the same name.
+      const isActive = s.id === this._section;
+      const iconName =
+        isActive && s.iconActive !== undefined ? s.iconActive : s.icon;
       return html`
         <button
-          class="nav-item ${s.id === this._section ? "nav-item--active" : ""}"
+          class="nav-item ${isActive ? "nav-item--active" : ""}"
           @click=${() => this._selectSection(s.id)}
           aria-label=${ariaLabel}
         >
-          <wa-icon library="mdi" name=${s.icon}></wa-icon>
+          <wa-icon library="mdi" name=${iconName}></wa-icon>
           <span>${label}</span>
           ${sectionAlerted(s.id)
             ? html`<span class="nav-item-dot" aria-hidden="true"></span>`

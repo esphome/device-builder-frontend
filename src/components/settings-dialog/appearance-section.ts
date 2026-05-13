@@ -29,7 +29,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
 
   protected render() {
     return html`
-      <div class="row">
+      <div class="row row--stacked">
         <div class="row-label">
           <span class="row-title">${this._localize("layout.theme")}</span>
           <span class="row-desc">${this._localize("settings.theme_desc")}</span>

@@ -161,6 +161,17 @@ export const settingsRowStyles = css`
     border-bottom: none;
   }
 
+  /* Stacked variant: input drops below the label/description so the
+     description has the full row width to wrap into instead of
+     fighting a 180px-wide select on the right. Used by rows whose
+     description is long enough to wrap into the input column
+     (Theme, Language, Cache retention). */
+  .row--stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--wa-space-s);
+  }
+
   .row-label {
     display: flex;
     flex-direction: column;
@@ -220,16 +231,22 @@ export const settingsRowStyles = css`
   .section-intro {
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-quiet);
-    margin: 0 0 var(--wa-space-s);
+    margin: 0 0 var(--wa-space-m);
+  }
+
+  /* When intro follows a heading, tighten the top gap so they
+     read as one heading-block instead of two stacked paragraphs. */
+  .section-heading + .section-intro {
+    margin-top: var(--wa-space-2xs);
   }
 
   .section-heading {
     font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-semibold);
+    font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-quiet);
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    margin: var(--wa-space-l) 0 var(--wa-space-xs);
+    margin: var(--wa-space-xl) 0 var(--wa-space-2xs);
     display: flex;
     align-items: center;
     flex-wrap: wrap;

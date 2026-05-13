@@ -58,20 +58,41 @@ export const pairingRowStyles = css`
   }
 
   .btn-pair-build-server {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     height: 36px;
-    padding: 0 var(--wa-space-m);
+    padding: 0 14px;
     border: none;
-    border-radius: var(--wa-border-radius-s);
+    /* Match the rest of the dashboard's primary buttons — the old
+       border-radius-s gave the button an unfinished-rectangle look
+       that read out of place next to the rounded toggles / cards /
+       chips elsewhere in the settings dialog. */
+    border-radius: var(--wa-border-radius-m);
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     font: inherit;
     font-weight: var(--wa-font-weight-semibold);
     cursor: pointer;
     flex-shrink: 0;
+    transition:
+      background-color 0.12s,
+      transform 0.05s ease-out;
   }
 
   .btn-pair-build-server:hover:not(:disabled) {
     background: color-mix(in srgb, var(--esphome-primary), black 10%);
+  }
+
+  .btn-pair-build-server:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .btn-pair-build-server:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
 
   .btn-pair-build-server:disabled {
@@ -79,9 +100,20 @@ export const pairingRowStyles = css`
     cursor: not-allowed;
   }
 
+  .btn-pair-build-server wa-icon {
+    font-size: 16px;
+    line-height: 0;
+  }
+
   .btn-pair-row {
     height: 32px;
+    padding: 0 12px;
     font-size: var(--wa-font-size-xs);
+    gap: 4px;
+  }
+
+  .btn-pair-row wa-icon {
+    font-size: 14px;
   }
 
   .btn-unpair {

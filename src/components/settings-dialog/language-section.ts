@@ -31,7 +31,7 @@ export class ESPHomeSettingsLanguage extends LitElement {
 
   protected render() {
     return html`
-      <div class="row">
+      <div class="row row--stacked">
         <div class="row-label">
           <span class="row-title">${this._localize("settings.language")}</span>
           <span class="row-desc">${this._localize("settings.language_desc")}</span>

@@ -121,7 +121,12 @@ export const deviceEditorStyles = css`
   }
 
   .save-button:disabled {
-    opacity: 0.4;
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary) 35%,
+      var(--wa-color-surface-default)
+    );
+    color: color-mix(in srgb, var(--esphome-on-primary), transparent 30%);
     cursor: not-allowed;
     box-shadow: none;
     transform: none;
@@ -143,23 +148,35 @@ export const deviceEditorStyles = css`
   }
 
   .validate-button:disabled {
-    opacity: 0.4;
+    background: var(--wa-color-surface-default);
+    color: color-mix(in srgb, var(--wa-color-text-normal), transparent 55%);
+    border-color: var(--wa-color-surface-border);
     cursor: not-allowed;
   }
 
   .install-fab {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary) 10%,
+      var(--wa-color-surface-default)
+    );
     color: var(--esphome-primary);
     border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
 
   .install-fab:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+    background: color-mix(
+      in srgb,
+      var(--esphome-primary) 18%,
+      var(--wa-color-surface-default)
+    );
     border-color: var(--esphome-primary);
   }
 
   .install-fab:disabled {
-    opacity: 0.4;
+    background: var(--wa-color-surface-default);
+    color: color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    border-color: var(--wa-color-surface-border);
     cursor: not-allowed;
   }
 
