@@ -26,6 +26,10 @@ jobs:
   apply_label:
     name: Apply
     runs-on: ubuntu-latest
+    # Bot-authored PRs (Dependabot, etc.) don't follow the PR template
+    # and apply their own labels — release-drafter picks those up
+    # without this job's help.
+    if: github.event.pull_request.user.type != 'Bot'
     steps:
       - name: 🏷 Apply label from PR description checkbox
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
