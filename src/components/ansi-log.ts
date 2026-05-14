@@ -211,6 +211,67 @@ function parseAnsiLine(line: string, state: AnsiState): AnsiSpan[] {
   return spans;
 }
 
+/**
+ * Strip trailing whitespace + leading non-SGR ANSI control sequences
+ * (cursor moves, erase-line, OSC) from one chunk.
+ *
+ * Leading whitespace AND leading SGR colour codes are intentionally
+ * preserved: ESPHome's multi-line WARNING records open the colour
+ * on the first line and only reset it on the last, and the
+ * continuation lines (``clk:`` / ``  mode: CLK_OUT`` / ``  pin: 0``)
+ * use indentation as part of the rendered formatting.
+ */
+export function cleanLine(line: string): string {
+  return line
+    .replace(
+      /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
+      ""
+    )
+    .replace(/\s+$/, "");
+}
+
+/**
+ * Fold an incoming stream of subprocess output chunks into the
+ * sequence of "visual" lines we want to render. The backend splits
+ * stdout at every ``\n`` *or* ``\r`` and forwards each chunk
+ * including its terminator, which means progress updates (esptool's
+ * ``Writing at 0x10000... (5%)\r``, PlatformIO's ``Downloading
+ * [###] N%\r``) arrive as CR-terminated chunks.
+ *
+ * Rules:
+ *   - A *content* chunk that ends with ``\r`` replaces the previous
+ *     visual line if the previous chunk also ended in ``\r`` (the
+ *     progress-bar overwrite). Without a prior ``\r``, it's a new
+ *     line at the bottom.
+ *   - A content chunk that ends with ``\n`` (or ``\r\n``) appends a
+ *     new line and finalises any prior ``\r``-overwrite intent.
+ *   - An *empty-after-cleaning* chunk (PIO's ``\x1b[K\r`` clear-line
+ *     between progress ticks, a bare ``\r``) is a terminal no-op:
+ *     it doesn't push a line, and it doesn't toggle the overwrite
+ *     flag. The next real progress tick still replaces the prior
+ *     one, but a non-progress line above the bar isn't eaten by an
+ *     accidental pop. An empty chunk ending in ``\n`` does reset
+ *     the overwrite flag (it finalises the line).
+ */
+export function chunksToVisualLines(chunks: string[]): string[] {
+  const visual: string[] = [];
+  let prevEndedInCR = false;
+  for (const chunk of chunks) {
+    const text = cleanLine(chunk.replace(/[\r\n]+$/, ""));
+    const hasContent = text.replace(ANSI_ESCAPE_RE, "").trim().length > 0;
+    if (hasContent) {
+      if (prevEndedInCR && chunk !== "\n" && visual.length > 0) {
+        visual.pop();
+      }
+      visual.push(text);
+      prevEndedInCR = chunk.endsWith("\r");
+    } else if (chunk.endsWith("\n")) {
+      prevEndedInCR = false;
+    }
+  }
+  return visual;
+}
+
 @customElement("esphome-ansi-log")
 export class ESPHomeAnsiLog extends LitElement {
   /** Use light theme instead of dark. */
@@ -314,7 +375,7 @@ export class ESPHomeAnsiLog extends LitElement {
   }
 
   protected render() {
-    const visual = this._chunksToVisualLines(this.lines);
+    const visual = chunksToVisualLines(this.lines);
     // One state object threaded through every line so multi-line
     // records (a WARNING that opens ``\x1b[33m`` on line 1 and only
     // resets on line 5) keep their colour on the continuation lines.
@@ -326,59 +387,6 @@ export class ESPHomeAnsiLog extends LitElement {
           : visual.map((line) => this._renderLine(line, state))}
       </div>
     `;
-  }
-
-  /**
-   * Fold an incoming stream of subprocess output chunks into the
-   * sequence of "visual" lines we want to render. The backend splits
-   * stdout at every `\n` _or_ `\r` and forwards each chunk including
-   * its terminator, which means progress updates (esptool's
-   * `Writing at 0x10000... (5%)\r`) arrive as CR-terminated chunks.
-   * Same rules the old ESPHome dashboard uses:
-   *   - A chunk that ends with `\r` "owns" the last visual line; the
-   *     next chunk (unless it's a bare `\n`) replaces that line in
-   *     place — that's how progress bars overwrite themselves.
-   *   - A bare `\n` chunk (the trailing half of a `\r\n` pair)
-   *     finalises the line in place — no replacement.
-   *   - Everything else is a new line appended to the bottom.
-   * Empty visual lines are dropped so stray newlines don't punch
-   * blank gaps into the output.
-   */
-  private _chunksToVisualLines(chunks: string[]): string[] {
-    const visual: string[] = [];
-    let prevEndedInCR = false;
-    for (const chunk of chunks) {
-      if (prevEndedInCR && chunk !== "\n" && visual.length > 0) {
-        visual.pop();
-      }
-      const text = this._cleanLine(chunk.replace(/[\r\n]+$/, ""));
-      if (text.replace(ANSI_ESCAPE_RE, "").trim().length > 0) {
-        visual.push(text);
-      }
-      prevEndedInCR = chunk.endsWith("\r");
-    }
-    return visual;
-  }
-
-  /**
-   * Strip trailing whitespace and any leading non-SGR ANSI control
-   * sequences (cursor moves, erase-line, OSC) from one chunk.
-   *
-   * Leading whitespace AND leading SGR colour codes are intentionally
-   * preserved: ESPHome's multi-line WARNING records open the colour
-   * on the first line and only reset it on the last, and the
-   * continuation lines (``clk:`` / ``  mode: CLK_OUT`` / ``  pin: 0``)
-   * use indentation as part of the rendered formatting. Stripping
-   * either would left-align continuation lines and drop the colour
-   * carry-over.
-   */
-  private _cleanLine(line: string): string {
-    return line
-      .replace(
-        /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
-        ""
-      )
-      .replace(/\s+$/, "");
   }
 
   private _renderLine(line: string, state: AnsiState) {
