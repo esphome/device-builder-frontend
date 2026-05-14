@@ -455,10 +455,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
     const env = this._environment;
-    // Web-download replaces (rather than supplements) the local USB row
-    // when the user can't use Web Serial here AND can't use OTA — the
-    // same situation that disabled the USB row before. Keeps the list
-    // short by not showing two USB options where only one is reachable.
+    // Web-download replaces (rather than supplements) the disabled
+    // WebSerial row when the device is offline and the browser has no
+    // Web Serial. OTA is still offered above, but the upload step will
+    // likely fail until the device comes online, so surfacing a
+    // guaranteed-flashable alternative in the main list keeps the
+    // offline-no-USB path actionable without expanding Advanced.
     const swapInWebDownload =
       this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
     // On localhost the WebSerial option and the server-serial option
@@ -663,17 +665,20 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   private _renderOtaOption(isOnline: boolean) {
+    // OTA stays clickable when offline so the compile (the slow
+    // step) can start before the device is reachable. `esphome
+    // run` compiles, then attempts the upload; if the device
+    // never comes online the upload fails and the cached binary
+    // is reused on the next run.
+    const descKey = isOnline
+      ? "dashboard.install_method_network_desc"
+      : "dashboard.install_method_network_desc_offline";
     return html`
-      <div
-        class="option ${!isOnline ? "option--disabled" : ""}"
-        @click=${isOnline ? () => this._selectMethod("ota") : undefined}
-      >
+      <div class="option" @click=${() => this._selectMethod("ota")}>
         <wa-icon library="mdi" name="wifi"></wa-icon>
         <div class="info">
           <span class="title">${this._localize("dashboard.install_method_network")}</span>
-          <span class="desc"
-            >${this._localize("dashboard.install_method_network_desc")}</span
-          >
+          <span class="desc">${this._localize(descKey)}</span>
         </div>
       </div>
     `;
