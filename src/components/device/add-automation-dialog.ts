@@ -14,7 +14,11 @@ import { mdiClose } from "@mdi/js";
 import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 
-import type { BoardCatalogEntry, YamlDiff } from "../../api/types.js";
+import type {
+  AutomationLocation,
+  BoardCatalogEntry,
+  YamlDiff,
+} from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -44,6 +48,28 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
+  /**
+   * Seed location for the embedded editor. Reset on every ``open()``
+   * call so a dialog reused across "+ Add automation" and "+ Add
+   * script" clicks doesn't carry the previous kind forward.
+   *
+   * ``device_on`` is the default for automation mode — matches the
+   * target picker's visual default. ``script`` mode is set by the
+   * "+ Add script" handler in the navigator.
+   */
+  @state()
+  private _initialLocation: AutomationLocation = {
+    kind: "device_on",
+    trigger: "on_boot",
+  };
+
+  /** Bump on every ``open()`` so the embedded editor re-mounts with
+   *  a fresh state — otherwise wa-dialog keeps the previous one
+   *  alive and add-mode for script after add-mode for automation
+   *  would inherit the prior session. */
+  @state()
+  private _instanceId = 0;
+
   static styles = [
     espHomeStyles,
     css`
@@ -56,27 +82,59 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     `,
   ];
 
-  public open() {
+  /**
+   * Open the dialog. Pass ``"script"`` to seed the editor with a
+   * blank script declaration (id input + mode + body); the default
+   * (``"automation"``) opens with a ``device_on`` target — what the
+   * "+ Add automation" button uses.
+   */
+  public open(kind: "automation" | "script" = "automation") {
+    this._initialLocation =
+      kind === "script"
+        ? { kind: "script", id: "" }
+        : { kind: "device_on", trigger: "on_boot" };
+    this._instanceId += 1;
     this._dialog.open = true;
   }
 
   protected render() {
-    return html`<wa-dialog
-      light-dismiss
-      label=${this.boardName
+    const isScript = this._initialLocation.kind === "script";
+    const title = isScript
+      ? this.boardName
+        ? this._localize("device.add_script_dialog_title", {
+            name: this.boardName,
+          })
+        : this._localize("device.add_script")
+      : this.boardName
         ? this._localize("device.add_automation_dialog_title", {
             name: this.boardName,
           })
-        : this._localize("device.add_automation")}
-    >
-      <esphome-automation-editor
-        .configuration=${this.configuration}
-        .board=${this.board}
-        .platform=${this.board?.esphome.platform ?? ""}
-        .yaml=${this.yaml}
-        @automation-save=${this._onSave}
-      ></esphome-automation-editor>
+        : this._localize("device.add_automation");
+    return html`<wa-dialog light-dismiss label=${title}>
+      ${this._renderEditor(this._instanceId)}
     </wa-dialog>`;
+  }
+
+  /**
+   * Render the editor keyed by ``_instanceId`` so each ``open()``
+   * call produces a fresh element. Reusing the same element across
+   * opens would carry the previous session's catalog cache and
+   * editor state — confusing when switching from "+ Add automation"
+   * to "+ Add script" or vice versa.
+   */
+  private _renderEditor(instanceId: number) {
+    // The element id changes per open so Lit treats it as a new
+    // template node (no patch — fresh mount).
+    return html`<esphome-automation-editor
+      id="editor-${instanceId}"
+      add-mode
+      .configuration=${this.configuration}
+      .board=${this.board}
+      .platform=${this.board?.esphome.platform ?? ""}
+      .yaml=${this.yaml}
+      .location=${this._initialLocation}
+      @automation-save=${this._onSave}
+    ></esphome-automation-editor>`;
   }
 
   private _onSave = (e: CustomEvent<{ yamlDiff: YamlDiff }>) => {

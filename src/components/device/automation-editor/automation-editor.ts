@@ -91,6 +91,20 @@ export class ESPHomeAutomationEditor extends LitElement {
   @property({ attribute: false })
   location: AutomationLocation | null = null;
 
+  /**
+   * True when the editor is mounted from the "+ Add automation" /
+   * "+ Add script" entry point. Add-mode lets the user pick / edit
+   * the target (kind + component / script id); edit-mode locks the
+   * target picker (changing it would move the YAML splice to a
+   * different range, which we don't support inline).
+   *
+   * The add-dialog passes a seed ``location`` (so the editor knows
+   * which target kind to render) AND sets ``addMode``, which is
+   * what we'd otherwise have to infer racily.
+   */
+  @property({ type: Boolean, attribute: "add-mode" })
+  addMode = false;
+
   @property() yaml = "";
 
   /** Light-effect catalog — only fetched on demand since effects
@@ -107,12 +121,8 @@ export class ESPHomeAutomationEditor extends LitElement {
   @state() private _error = "";
 
   /**
-   * True when the editor was mounted with a ``location`` already
-   * picked — i.e. the user is editing an existing automation rather
-   * than creating one from scratch. Locks the target picker because
-   * changing the target after the fact would move the YAML splice
-   * to a different range (a "rename" operation we don't support
-   * inline — the user can delete + re-add instead).
+   * Derived: edit-mode = not add-mode. Snapshot taken in
+   * ``connectedCallback`` so hydrate doesn't flip it back.
    */
   @state() private _editMode = false;
 
@@ -130,7 +140,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     // property changes (the hydrate-from-backend cycle fills value
     // and re-pins location) don't accidentally unlock the picker
     // after it should stay locked.
-    this._editMode = this.location !== null;
+    this._editMode = !this.addMode;
     void this._loadCatalogs();
   }
 
@@ -138,14 +148,16 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (changed.has("configuration")) {
       void this._loadAvailable();
     }
-    // Hydrate as soon as: (a) we have a location, (b) no value is
-    // mounted yet, and (c) the catalog load has finished. Triggering
-    // on ``_loading`` covers the common case where the editor was
-    // mounted with the location already set — the first ``location``
-    // change fires while ``_loading=true``, so we re-check after
-    // catalogs finish loading rather than waiting for another
-    // location mutation that may never come.
+    // Hydrate from the backend in edit-mode: when the editor was
+    // mounted with a known location but no value, we look up the
+    // matching ParsedAutomation and populate value/location from
+    // it. Triggering on ``_loading`` covers the common case where
+    // the editor was mounted with the location already set — the
+    // first ``location`` change fires while ``_loading=true``, so
+    // we re-check after catalogs finish loading rather than waiting
+    // for another location mutation that may never come.
     if (
+      !this.addMode &&
       (changed.has("location") ||
         changed.has("configuration") ||
         changed.has("_loading")) &&
@@ -154,27 +166,6 @@ export class ESPHomeAutomationEditor extends LitElement {
       !this._loading
     ) {
       void this._hydrateFromBackend();
-    }
-    // Add-mode default: when the dialog opens with no location, the
-    // target picker visually defaults to "the device itself" — pin a
-    // matching ``device_on`` location so the trigger picker mounts a
-    // real trigger dropdown instead of showing the empty placeholder.
-    // Mirrors what ``automation-target-picker._onKindChange`` would do
-    // on a user click, but eagerly so the form is usable on first
-    // paint.
-    if (
-      (changed.has("location") || changed.has("_available")) &&
-      this.location === null &&
-      this._available
-    ) {
-      this.location = { kind: "device_on", trigger: "on_boot" };
-      this.dispatchEvent(
-        new CustomEvent("automation-change", {
-          detail: { value: this.value, location: this.location },
-          bubbles: true,
-          composed: true,
-        }),
-      );
     }
   }
 

@@ -7,6 +7,7 @@ import {
   mdiCog,
   mdiMemory,
   mdiPlusCircleOutline,
+  mdiScriptTextOutline,
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -47,6 +48,7 @@ registerMdiIcons({
   "arrow-decision-outline": mdiArrowDecisionOutline,
   memory: mdiMemory,
   "plus-circle-outline": mdiPlusCircleOutline,
+  "script-text-outline": mdiScriptTextOutline,
 });
 
 @customElement("esphome-device-navigator")
@@ -387,9 +389,15 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const filteredTopLevel = topLevelAutomations.filter(
       (s) => s.key !== "script" && s.key !== "interval",
     );
-    const automations = [...filteredTopLevel, ...detailed].sort(
-      (a, b) => a.fromLine - b.fromLine
-    );
+    // Light effects belong to their parent light component now, not
+    // the automations surface — clicking one in the navigator
+    // routed to the automation editor in a confusing standalone
+    // mode. Effects are managed through the light's own section
+    // editor; drop them here so they don't appear orphaned in the
+    // automations group.
+    const automations = [...filteredTopLevel, ...detailed]
+      .filter((s) => !s.key.startsWith("automation:light_effect:"))
+      .sort((a, b) => a.fromLine - b.fromLine);
 
     interface NavAction {
       label: string;
@@ -403,7 +411,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
       desc: string;
       items: YamlSection[];
       category: "core" | "component" | "automation";
-      action: NavAction;
+      /** A section can carry multiple "+ Add X" affordances —
+       *  Automations has both "+ Add automation" and "+ Add script",
+       *  the others have one. */
+      actions: NavAction[];
     }
     const sections: NavSection[] = [
       {
@@ -411,39 +422,48 @@ export class ESPHomeDeviceNavigator extends LitElement {
         desc: this._localize("device.section_core_desc"),
         items: core,
         category: "core",
-        action: {
-          label: this._localize("device.add_config"),
-          icon: "cog",
-          onClick: () => this._addConfigDialog.open(),
-        },
+        actions: [
+          {
+            label: this._localize("device.add_config"),
+            icon: "cog",
+            onClick: () => this._addConfigDialog.open(),
+          },
+        ],
       },
       {
         label: this._localize("device.section_components"),
         desc: this._localize("device.section_components_desc"),
         items: components,
         category: "component",
-        action: {
-          label: this._localize("device.add_component"),
-          icon: "memory",
-          onClick: () => this._addComponentDialog.open(),
-        },
+        actions: [
+          {
+            label: this._localize("device.add_component"),
+            icon: "memory",
+            onClick: () => this._addComponentDialog.open(),
+          },
+        ],
       },
       {
         label: this._localize("device.section_automations"),
         desc: this._localize("device.section_automations_desc"),
         items: automations,
         category: "automation",
-        // Add-automation is gated on a backend that doesn't yet exist
-        // — see `feature-flags.ts` and the README "Status" section.
-        // The list still renders existing automations parsed from
-        // YAML; only the action button is disabled.
-        action: {
-          label: this._localize("device.add_automation"),
-          icon: "arrow-decision-outline",
-          onClick: () => this._addAutomationDialog.open(),
-          disabled: !AUTOMATIONS_ENABLED,
-          disabledReason: this._localize("device.add_automation_unavailable"),
-        },
+        actions: [
+          {
+            label: this._localize("device.add_automation"),
+            icon: "arrow-decision-outline",
+            onClick: () => this._addAutomationDialog.open(),
+            disabled: !AUTOMATIONS_ENABLED,
+            disabledReason: this._localize("device.add_automation_unavailable"),
+          },
+          {
+            label: this._localize("device.add_script"),
+            icon: "script-text-outline",
+            onClick: () => this._addAutomationDialog.open("script"),
+            disabled: !AUTOMATIONS_ENABLED,
+            disabledReason: this._localize("device.add_automation_unavailable"),
+          },
+        ],
       },
     ];
 
@@ -477,7 +497,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
         <div class="card-body">
           <p class="italic">${this._localize("device.navigator_desc")}</p>
           <div class="separator"></div>
-          ${sections.map(({ label, desc, items, category, action }, i) => {
+          ${sections.map(({ label, desc, items, category, actions }, i) => {
             const open = this.openSections.has(i);
             return html`
               <div class="nav-content" @click=${() => this._toggleSection(i)}>
@@ -524,27 +544,27 @@ export class ESPHomeDeviceNavigator extends LitElement {
                           </div>
                         `
                       : nothing}
-                    <div
-                      class="nav-items"
-                      @click=${action.disabled
-                        ? undefined
-                        : () => action.onClick()}
-                    >
-                      <div
-                        class="action-item ${action.disabled
-                          ? "action-item--disabled"
-                          : ""}"
-                        title=${action.disabled
-                          ? action.disabledReason ?? ""
-                          : ""}
-                        aria-disabled=${action.disabled ? "true" : "false"}
-                      >
-                        <div>
-                          <wa-icon library="mdi" name=${action.icon}></wa-icon>
-                          <p>${action.label}</p>
-                        </div>
-                        <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-                      </div>
+                    <div class="nav-items">
+                      ${actions.map(
+                        (action) => html`<div
+                          class="action-item ${action.disabled
+                            ? "action-item--disabled"
+                            : ""}"
+                          title=${action.disabled
+                            ? action.disabledReason ?? ""
+                            : ""}
+                          aria-disabled=${action.disabled ? "true" : "false"}
+                          @click=${action.disabled
+                            ? undefined
+                            : () => action.onClick()}
+                        >
+                          <div>
+                            <wa-icon library="mdi" name=${action.icon}></wa-icon>
+                            <p>${action.label}</p>
+                          </div>
+                          <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+                        </div>`,
+                      )}
                     </div>
                   `
                 : nothing}

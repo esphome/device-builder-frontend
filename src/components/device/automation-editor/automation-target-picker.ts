@@ -37,12 +37,21 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 
 type TargetKind = AutomationLocation["kind"];
 
+/**
+ * Kinds the user can pick when creating an automation from the
+ * automation dialog. ``light_effect`` is intentionally absent —
+ * effects belong to a light's own config and live under the light
+ * component's section editor, not the automations group. The
+ * automation editor still HANDLES a pre-existing
+ * ``LightEffectLocation`` (so a navigator click on a parsed effect
+ * automation still works) but the picker doesn't let the user
+ * create one through this surface.
+ */
 const ORDER: readonly TargetKind[] = [
   "device_on",
   "component_on",
   "interval",
   "script",
-  "light_effect",
 ] as const;
 
 @customElement("esphome-automation-target-picker")
@@ -152,28 +161,37 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
     }
     if (kind === "script") {
       const selectedId = this.value?.kind === "script" ? this.value.id : "";
-      if (this.scripts.length === 0) {
-        return html`<p class="ae-empty" role="status">
-          ${this._localize("device.automation_target_no_scripts")}
-        </p>`;
+      // In edit-mode the user is changing an existing script — pin
+      // the id so save targets the right YAML range. In add-mode
+      // they're declaring a new script: render a text input so they
+      // can name it. ``scripts`` is the list of already-declared
+      // scripts; in add-mode it isn't used (we're creating one, not
+      // picking one), but the empty-state hint stays useful as a
+      // hand-off when the editor is opened in edit-mode and nothing
+      // is declared yet.
+      if (this.locked) {
+        return html`
+          <label class="ae-section-label">
+            ${this._localize("device.automation_target_script_label")}
+          </label>
+          <p class="ae-section-desc">${selectedId}</p>
+        `;
       }
       return html`
-        <label class="ae-section-label" id="script-id-label"
-          >${this._localize("device.automation_target_script_label")}</label
-        >
-        <wa-select
-          aria-labelledby="script-id-label"
-          value=${selectedId}
-          ?disabled=${this.disabled || this.locked}
-          @change=${(e: Event) =>
-            this._onScriptChange((e.target as HTMLSelectElement).value)}
-        >
-          ${this.scripts.map(
-            (s) => html`<wa-option value=${s.id} ?selected=${s.id === selectedId}
-              >${s.id}</wa-option
-            >`,
+        <label class="ae-section-label" for="script-id-input">
+          ${this._localize("device.automation_target_script_new_id_label")}
+        </label>
+        <input
+          id="script-id-input"
+          type="text"
+          .value=${selectedId}
+          placeholder=${this._localize(
+            "device.automation_target_script_id_placeholder",
           )}
-        </wa-select>
+          ?disabled=${this.disabled}
+          @input=${(e: Event) =>
+            this._onScriptChange((e.target as HTMLInputElement).value)}
+        />
       `;
     }
     if (kind === "light_effect") {
