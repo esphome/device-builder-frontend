@@ -665,16 +665,27 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   private _renderOtaOption(isOnline: boolean) {
-    // OTA stays clickable when offline so the compile (the slow
-    // step) can start before the device is reachable. `esphome
-    // run` compiles, then attempts the upload; if the device
-    // never comes online the upload fails and the cached binary
-    // is reused on the next run.
-    const descKey = isOnline
-      ? "dashboard.install_method_network_desc"
-      : "dashboard.install_method_network_desc_offline";
+    // In install mode the network row stays clickable when the
+    // device isn't online: the compile (the slow step) runs
+    // regardless and the binary stays cached if the upload
+    // fails, so users can fire off an install before plugging
+    // the device in. Logs mode has no compile-equivalent so
+    // the row stays gated on the device being online.
+    //
+    // The "offline" desc is reserved for confirmed-OFFLINE; an
+    // UNKNOWN-state device gets the generic online desc since
+    // the dashboard doesn't yet know the device is unreachable.
+    const enabled = isOnline || this.mode === "install";
+    const isOffline = this.deviceState === DeviceState.OFFLINE;
+    const descKey =
+      this.mode === "install" && isOffline
+        ? "dashboard.install_method_network_desc_offline"
+        : "dashboard.install_method_network_desc";
     return html`
-      <div class="option" @click=${() => this._selectMethod("ota")}>
+      <div
+        class="option ${!enabled ? "option--disabled" : ""}"
+        @click=${enabled ? () => this._selectMethod("ota") : undefined}
+      >
         <wa-icon library="mdi" name="wifi"></wa-icon>
         <div class="info">
           <span class="title">${this._localize("dashboard.install_method_network")}</span>
