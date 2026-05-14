@@ -455,12 +455,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const isOnline = this.deviceState === DeviceState.ONLINE;
     const hasWebSerial = this._supportsWebSerial;
     const env = this._environment;
-    // Web-download replaces (rather than supplements) the disabled
-    // WebSerial row when the device is offline and the browser has no
-    // Web Serial. OTA is still offered above, but the upload step will
-    // likely fail until the device comes online, so surfacing a
-    // guaranteed-flashable alternative in the main list keeps the
-    // offline-no-USB path actionable without expanding Advanced.
+    // Replaces the disabled WebSerial row with web-download when
+    // offline and the browser has no Web Serial. OTA is offered
+    // above but may fail; web-download is the guaranteed fallback.
     const swapInWebDownload =
       this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
     // On localhost the WebSerial option and the server-serial option
@@ -665,16 +662,9 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   }
 
   private _renderOtaOption(isOnline: boolean) {
-    // In install mode the network row stays clickable when the
-    // device isn't online: the compile (the slow step) runs
-    // regardless and the binary stays cached if the upload
-    // fails, so users can fire off an install before plugging
-    // the device in. Logs mode has no compile-equivalent so
-    // the row stays gated on the device being online.
-    //
-    // The "offline" desc is reserved for confirmed-OFFLINE; an
-    // UNKNOWN-state device gets the generic online desc since
-    // the dashboard doesn't yet know the device is unreachable.
+    // Install mode keeps the row clickable when not online; the
+    // compile runs even if the upload fails. Logs mode has no
+    // compile-equivalent so it stays gated on isOnline.
     const enabled = isOnline || this.mode === "install";
     const isOffline = this.deviceState === DeviceState.OFFLINE;
     const descKey =
