@@ -172,11 +172,14 @@ export const componentCatalogStyles = css`
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: border-color var(--wa-transition-normal) var(--wa-transition-easing);
+    cursor: pointer;
+    transition: border-color var(--wa-transition-normal) var(--wa-transition-easing),
+      background var(--wa-transition-normal) var(--wa-transition-easing);
   }
 
   .component-card:hover {
     border-color: var(--esphome-primary);
+    background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
   }
 
   .component-card--expanded {
