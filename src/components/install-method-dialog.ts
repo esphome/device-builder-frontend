@@ -456,8 +456,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     const hasWebSerial = this._supportsWebSerial;
     const env = this._environment;
     // Replaces the disabled WebSerial row with web-download when
-    // offline and the browser has no Web Serial. OTA is offered
-    // above but may fail; web-download is the guaranteed fallback.
+    // not online (offline or unknown) and no Web Serial. OTA is
+    // offered above but may fail; web-download always works.
     const swapInWebDownload =
       this.mode === "install" && !hasWebSerial && !isOnline && this._supportsWebDownload;
     // On localhost the WebSerial option and the server-serial option
@@ -667,10 +667,18 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     // compile-equivalent so it stays gated on isOnline.
     const enabled = isOnline || this.mode === "install";
     const isOffline = this.deviceState === DeviceState.OFFLINE;
-    const descKey =
-      this.mode === "install" && isOffline
-        ? "dashboard.install_method_network_desc_offline"
-        : "dashboard.install_method_network_desc";
+    const titleKey =
+      this.mode === "logs"
+        ? "dashboard.logs_method_wireless"
+        : "dashboard.install_method_network";
+    let descKey: string;
+    if (this.mode === "logs") {
+      descKey = "dashboard.logs_method_wireless_desc";
+    } else if (isOffline) {
+      descKey = "dashboard.install_method_network_desc_offline";
+    } else {
+      descKey = "dashboard.install_method_network_desc";
+    }
     return html`
       <div
         class="option ${!enabled ? "option--disabled" : ""}"
@@ -678,7 +686,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       >
         <wa-icon library="mdi" name="wifi"></wa-icon>
         <div class="info">
-          <span class="title">${this._localize("dashboard.install_method_network")}</span>
+          <span class="title">${this._localize(titleKey)}</span>
           <span class="desc">${this._localize(descKey)}</span>
         </div>
       </div>
