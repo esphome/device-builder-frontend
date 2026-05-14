@@ -24,20 +24,13 @@ describe("chunksToVisualLines", () => {
     expect(chunksToVisualLines(chunks)).toEqual(["Downloading [###] 3%"]);
   });
 
-  it("appends the first \\r chunk after a \\n line — no over-pop (regression: #840)", () => {
-    /* The bug: when a control-only chunk like ``\x1b[K\r`` arrived
-       between a real log line and the first progress tick, the
-       prevEndedInCR flag was set without anything pushed; the next
-       progress chunk would then pop the real log line above it
-       instead of starting a fresh progress slot. Repeated across
-       every tick, the WARNING block above the bar disappeared one
-       line per tick. */
+  it("keeps lines above the progress bar despite empty-CR chunks (regression: #840)", () => {
     const chunks = [
       "INFO ESPHome 2026.6.0-dev\n",
       "INFO Reading config\n",
       "WARNING GPIO5 is a strapping PIN\n",
       "Attaching external pullup/down resistors\n",
-      "\u001b[K\r", // pure cursor-home + erase, between print and first tick
+      "\u001b[K\r",
       "Downloading [#] 1%\r",
       "\u001b[K\r",
       "Downloading [##] 2%\r",
@@ -59,9 +52,6 @@ describe("chunksToVisualLines", () => {
   });
 
   it("a bare \\n chunk after a \\r-terminated line finalises the overwrite", () => {
-    /* If a standalone \n arrives after a \r-terminated content line
-       (i.e. the chunker couldn't coalesce the pair), it should
-       finalise the prior line rather than pop it on the next chunk. */
     const chunks = ["Downloading 100%\r", "\n", "INFO Build finished\n"];
     expect(chunksToVisualLines(chunks)).toEqual([
       "Downloading 100%",
@@ -70,9 +60,6 @@ describe("chunksToVisualLines", () => {
   });
 
   it("strips leading non-SGR ANSI sequences but keeps SGR colour codes", () => {
-    /* Leading erase-line / cursor-move escapes are noise; leading SGR
-       (``\u001b[33m``) carries the WARNING colour that ESPHome opens on
-       the first line of a multi-line record. */
     const chunks = ["\u001b[K\u001b[33mWARNING something\n"];
     expect(chunksToVisualLines(chunks)).toEqual(["\u001b[33mWARNING something"]);
   });

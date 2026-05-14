@@ -211,16 +211,7 @@ function parseAnsiLine(line: string, state: AnsiState): AnsiSpan[] {
   return spans;
 }
 
-/**
- * Strip trailing whitespace + leading non-SGR ANSI control sequences
- * (cursor moves, erase-line, OSC) from one chunk.
- *
- * Leading whitespace AND leading SGR colour codes are intentionally
- * preserved: ESPHome's multi-line WARNING records open the colour
- * on the first line and only reset it on the last, and the
- * continuation lines (``clk:`` / ``  mode: CLK_OUT`` / ``  pin: 0``)
- * use indentation as part of the rendered formatting.
- */
+/** Strip leading non-SGR ANSI controls and trailing whitespace. */
 export function cleanLine(line: string): string {
   return line
     .replace(
@@ -231,27 +222,12 @@ export function cleanLine(line: string): string {
 }
 
 /**
- * Fold an incoming stream of subprocess output chunks into the
- * sequence of "visual" lines we want to render. The backend splits
- * stdout at every ``\n`` *or* ``\r`` and forwards each chunk
- * including its terminator, which means progress updates (esptool's
- * ``Writing at 0x10000... (5%)\r``, PlatformIO's ``Downloading
- * [###] N%\r``) arrive as CR-terminated chunks.
+ * Fold ``\r``- and ``\n``-terminated output chunks into visual lines.
  *
- * Rules:
- *   - A *content* chunk that ends with ``\r`` replaces the previous
- *     visual line if the previous chunk also ended in ``\r`` (the
- *     progress-bar overwrite). Without a prior ``\r``, it's a new
- *     line at the bottom.
- *   - A content chunk that ends with ``\n`` (or ``\r\n``) appends a
- *     new line and finalises any prior ``\r``-overwrite intent.
- *   - An *empty-after-cleaning* chunk (PIO's ``\x1b[K\r`` clear-line
- *     between progress ticks, a bare ``\r``) is a terminal no-op:
- *     it doesn't push a line, and it doesn't toggle the overwrite
- *     flag. The next real progress tick still replaces the prior
- *     one, but a non-progress line above the bar isn't eaten by an
- *     accidental pop. An empty chunk ending in ``\n`` does reset
- *     the overwrite flag (it finalises the line).
+ * An empty-after-cleaning chunk (PIO's ``\x1b[K\r`` between progress
+ * ticks, a bare ``\r``) is a no-op that doesn't toggle the overwrite
+ * flag; without that, the next real tick pops a non-progress line
+ * above the bar instead of starting fresh (#840).
  */
 export function chunksToVisualLines(chunks: string[]): string[] {
   const visual: string[] = [];
