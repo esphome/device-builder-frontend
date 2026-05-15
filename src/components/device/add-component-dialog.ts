@@ -282,12 +282,22 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
+  /**
+   * Per-call sequence for in-flight ``_onNavigateToDep`` getComponent
+   * requests. Bumped on every navigate and on every detour reset so
+   * a stale response that resolves after the user moved on (closed
+   * the dialog, picked a different dep, submitted the form) can't
+   * overwrite ``_selected`` from underneath them.
+   */
+  private _depNavSeq = 0;
+
   private _resetDetourState() {
     this._returnTo = null;
     this._depDomain = null;
     this._prefillReference = null;
     this._bundleQueue = [];
     this._bundleProgress = null;
+    this._depNavSeq++;
   }
 
   protected render() {
@@ -485,6 +495,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._depDomain = domain;
     }
     this._submitError = "";
+    const seq = ++this._depNavSeq;
     let direct: ComponentCatalogEntry | null = null;
     try {
       direct = await this._api.getComponent(
@@ -495,12 +506,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
     } catch {
       direct = null;
     }
+    if (seq !== this._depNavSeq) return;
     if (direct) {
       this._selected = direct;
       return;
     }
     this._selected = null;
     await this.updateComplete;
+    if (seq !== this._depNavSeq) return;
     this._catalog?.filterByDomain(domain);
   }
 
