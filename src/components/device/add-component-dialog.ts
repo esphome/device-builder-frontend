@@ -291,6 +291,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   private _depNavSeq = 0;
 
+  /** Fetch a component by id, scoped to the dialog's current
+   *  platform + board so per-platform defaults resolve. */
+  private _fetchComponentForBoard(id: string) {
+    return this._api.getComponent(
+      id,
+      this.platform || undefined,
+      this.board?.id ?? undefined,
+    );
+  }
+
   private _resetDetourState() {
     this._returnTo = null;
     this._depDomain = null;
@@ -498,11 +508,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     const seq = ++this._depNavSeq;
     let direct: ComponentCatalogEntry | null = null;
     try {
-      direct = await this._api.getComponent(
-        domain,
-        this.platform || undefined,
-        this.board?.id ?? undefined,
-      );
+      direct = await this._fetchComponentForBoard(domain);
     } catch {
       direct = null;
     }
@@ -583,11 +589,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
-        const nextComponent = await this._api.getComponent(
-          nextId,
-          this.platform || undefined,
-          this.board?.id ?? undefined,
-        );
+        const nextComponent = await this._fetchComponentForBoard(nextId);
         if (!nextComponent) {
           this._submitError = this._localize("device.add_component_error");
           return;

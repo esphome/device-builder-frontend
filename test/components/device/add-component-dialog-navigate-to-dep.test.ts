@@ -77,13 +77,20 @@ function depEvent(domain: string): CustomEvent<{ domain: string }> {
   return new CustomEvent("navigate-to-dep", { detail: { domain } });
 }
 
+function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
+  let resolve!: (v: T) => void;
+  const promise = new Promise<T>((r) => {
+    resolve = r;
+  });
+  return { promise, resolve };
+}
+
 describe("ESPHomeAddComponentDialog._onNavigateToDep", () => {
+  const aht20 = makeComponent("sensor.aht10");
+  const i2c = makeComponent("i2c");
+  const uart = makeComponent("uart");
+
   test("exact-id dep retargets the form to the fetched component", async () => {
-    const aht20 = makeComponent("sensor.aht10", {
-      category: ComponentCategory.SENSOR,
-      dependencies: ["i2c"],
-    });
-    const i2c = makeComponent("i2c");
     const getComponent = vi.fn().mockResolvedValue(i2c);
     const filterByDomain = vi.fn();
     const dialog = makeDialog(getComponent, { filterByDomain });
@@ -99,10 +106,6 @@ describe("ESPHomeAddComponentDialog._onNavigateToDep", () => {
   });
 
   test("domain-level dep with no matching id falls back to the catalog filter", async () => {
-    const aht20 = makeComponent("sensor.aht10", {
-      category: ComponentCategory.SENSOR,
-      dependencies: ["output"],
-    });
     const getComponent = vi.fn().mockResolvedValue(null);
     const filterByDomain = vi.fn();
     const dialog = makeDialog(getComponent, { filterByDomain });
@@ -118,7 +121,6 @@ describe("ESPHomeAddComponentDialog._onNavigateToDep", () => {
   });
 
   test("a transient getComponent failure falls back to the catalog filter", async () => {
-    const aht20 = makeComponent("sensor.aht10");
     const getComponent = vi.fn().mockRejectedValue(new Error("boom"));
     const filterByDomain = vi.fn();
     const dialog = makeDialog(getComponent, { filterByDomain });
@@ -135,22 +137,14 @@ describe("ESPHomeAddComponentDialog._onNavigateToDep", () => {
     // reopen the dialog (which calls _resetDetourState) before the
     // response lands. The continuation must NOT silently retarget
     // the form to i2c after the user has moved on.
-    const aht20 = makeComponent("sensor.aht10");
-    const i2c = makeComponent("i2c");
-    let resolveGetComponent: (value: ComponentCatalogEntry) => void = () => {};
-    const getComponent = vi.fn(
-      () =>
-        new Promise<ComponentCatalogEntry>((resolve) => {
-          resolveGetComponent = resolve;
-        }),
-    );
+    const d = deferred<ComponentCatalogEntry>();
     const filterByDomain = vi.fn();
-    const dialog = makeDialog(getComponent, { filterByDomain });
+    const dialog = makeDialog(() => d.promise, { filterByDomain });
     dialog._selected = aht20;
 
     const navPromise = dialog._onNavigateToDep(depEvent("i2c"));
     dialog._resetDetourState();
-    resolveGetComponent(i2c);
+    d.resolve(i2c);
     await navPromise;
 
     expect(dialog._selected).toBe(aht20);
@@ -158,25 +152,12 @@ describe("ESPHomeAddComponentDialog._onNavigateToDep", () => {
   });
 
   test("a superseded navigation does not race against the latest one", async () => {
-    const aht20 = makeComponent("sensor.aht10");
-    const i2c = makeComponent("i2c");
-    const uart = makeComponent("uart");
-    let resolveFirst: (value: ComponentCatalogEntry) => void = () => {};
-    let resolveSecond: (value: ComponentCatalogEntry) => void = () => {};
+    const first = deferred<ComponentCatalogEntry>();
+    const second = deferred<ComponentCatalogEntry>();
     const getComponent = vi
       .fn()
-      .mockImplementationOnce(
-        () =>
-          new Promise<ComponentCatalogEntry>((resolve) => {
-            resolveFirst = resolve;
-          }),
-      )
-      .mockImplementationOnce(
-        () =>
-          new Promise<ComponentCatalogEntry>((resolve) => {
-            resolveSecond = resolve;
-          }),
-      );
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
     const dialog = makeDialog(getComponent);
     dialog._selected = aht20;
 
@@ -184,8 +165,8 @@ describe("ESPHomeAddComponentDialog._onNavigateToDep", () => {
     const secondNav = dialog._onNavigateToDep(depEvent("uart"));
     // First responds *after* second was issued — late arrival must
     // not stomp on the newer navigation's result.
-    resolveSecond(uart);
-    resolveFirst(i2c);
+    second.resolve(uart);
+    first.resolve(i2c);
     await Promise.all([firstNav, secondNav]);
 
     expect(dialog._selected).toBe(uart);
