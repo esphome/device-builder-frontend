@@ -329,8 +329,7 @@ export const componentCatalogStyles = css`
     gap: 3px;
     border: none;
     background: none;
-    padding: 2px 4px;
-    margin: -2px -4px;
+    padding: 0;
     border-radius: 4px;
     font-family: inherit;
     font-size: var(--wa-font-size-2xs);
@@ -341,7 +340,7 @@ export const componentCatalogStyles = css`
 
   .select-component:focus-visible {
     outline: 2px solid var(--esphome-primary);
-    outline-offset: 1px;
+    outline-offset: 3px;
   }
 
   .empty {

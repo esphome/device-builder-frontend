@@ -13,7 +13,7 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 
 // Skip when the click landed on an inner anchor or button so they
 // keep their own behavior (more-info, expand, "+ Add", md links).
-function shouldHandleCardClick(ev: MouseEvent): boolean {
+export function shouldHandleCardClick(ev: MouseEvent): boolean {
   const target = ev.target as Element | null;
   return !target?.closest("a, button");
 }
