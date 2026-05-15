@@ -11,14 +11,8 @@ import {
 } from "../component-card-category-label.js";
 import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 
-// Click anywhere on the card adds (issue #778). Inner anchors / buttons
-// keep their own behavior — `closest('a, button')` skips the add path
-// when the click originated from one (more-info link, expand button,
-// the explicit "+ Add" button, markdown-rendered links in the
-// description). The "+ Add" button stays a real <button> so keyboard
-// users have a focusable, Enter-activatable equivalent of the
-// card-surface click — making the <article> itself focusable would
-// nest a button inside a button (an ARIA anti-pattern).
+// Skip when the click landed on an inner anchor or button so they
+// keep their own behavior (more-info, expand, "+ Add", md links).
 function shouldHandleCardClick(ev: MouseEvent): boolean {
   const target = ev.target as Element | null;
   return !target?.closest("a, button");

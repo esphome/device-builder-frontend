@@ -182,9 +182,6 @@ export const componentCatalogStyles = css`
     background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
   }
 
-  /* Mirror the hover treatment when the inner "+ Add" / expand /
-     more-info control is keyboard-focused, so keyboard users see the
-     same "this card is the active one" cue mouse users get. */
   .component-card:focus-within {
     border-color: var(--esphome-primary);
   }
@@ -326,8 +323,6 @@ export const componentCatalogStyles = css`
     font-size: 11px;
   }
 
-  /* Real <button> so keyboard users can tab to it and Enter to add —
-     reset browser button chrome to keep the existing visual. */
   .select-component {
     display: flex;
     align-items: center;
