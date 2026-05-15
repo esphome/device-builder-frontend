@@ -467,10 +467,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
   }
 
   /**
-   * Switch to the catalog view filtered to a missing dependency's
-   * domain. Remember the component the user was in the middle of
-   * adding (and the domain) so we can restore + prefill after they
-   * finish adding the dependency.
+   * Open the form for a missing dependency, remembering the
+   * in-progress component so we can restore + prefill after the
+   * dependency is added. When the dep resolves to a single catalog
+   * id (i2c, uart, spi) we jump straight to that form; the catalog's
+   * fuzzy search ranks the bus entry below every sensor whose
+   * description mentions the bus name. Domain-level deps (output,
+   * sensor) keep the category-filtered catalog so the user picks a
+   * variant.
    */
   private async _onNavigateToDep(e: CustomEvent<{ domain: string }>) {
     e.stopPropagation();
@@ -480,8 +484,22 @@ export class ESPHomeAddComponentDialog extends LitElement {
       this._returnTo = this._selected;
       this._depDomain = domain;
     }
-    this._selected = null;
     this._submitError = "";
+    let direct: ComponentCatalogEntry | null = null;
+    try {
+      direct = await this._api.getComponent(
+        domain,
+        this.platform || undefined,
+        this.board?.id ?? undefined,
+      );
+    } catch {
+      direct = null;
+    }
+    if (direct) {
+      this._selected = direct;
+      return;
+    }
+    this._selected = null;
     await this.updateComplete;
     this._catalog?.filterByDomain(domain);
   }
