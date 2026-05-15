@@ -5,28 +5,47 @@ import {
 } from "../../src/util/default-component-id.js";
 
 describe("generateDefaultComponentId", () => {
-  it("emits the bare slug for top-level singletons", () => {
-    // `web_server` is the canonical case from issue #776: a
-    // `multi_conf: false` top-level block where `_1` is misleading.
+  it("returns null for top-level singletons", () => {
+    // Issue #776: `web_server_1` implied a non-existent `_2`, and the
+    // bare slug `web_server` would collide with the `web_server::` C++
+    // namespace in ESPHome codegen. These components aren't referenced
+    // by id from elsewhere, so we just don't seed one — power users
+    // can type a value if they need it for `!extend` overrides.
     expect(generateDefaultComponentId("web_server", false, new Set())).toBe(
-      "web_server",
+      null,
     );
-    expect(generateDefaultComponentId("mdns", false, new Set())).toBe("mdns");
+    expect(generateDefaultComponentId("mdns", false, new Set())).toBe(null);
     expect(generateDefaultComponentId("captive_portal", false, new Set())).toBe(
-      "captive_portal",
+      null,
+    );
+    expect(generateDefaultComponentId("logger", false, new Set())).toBe(null);
+    expect(generateDefaultComponentId("api", false, new Set())).toBe(null);
+    expect(generateDefaultComponentId("ota", false, new Set())).toBe(null);
+  });
+
+  it("ignores the existing-id set for singletons", () => {
+    // Singletons return null regardless of what's already in the YAML.
+    // Even an unrelated id collision shouldn't flip them back into
+    // suffix-generation mode.
+    const existing = new Set(["web_server", "web_server_1", "web_server_2"]);
+    expect(generateDefaultComponentId("web_server", false, existing)).toBe(
+      null,
     );
   });
 
   it("suffixes top-level multi_conf components", () => {
+    // `script`, `i2c`, `spi`, etc. — users add several and reference
+    // them by id from automations / bus consumers, so a prefilled
+    // unique id earns its keep.
     expect(generateDefaultComponentId("script", true, new Set())).toBe(
       "script_1",
     );
   });
 
   it("suffixes platform entries even when multi_conf is false", () => {
-    // Platform-style ids (containing `.`) always get a suffix because
-    // users routinely add multiple entries of the same platform; the
-    // suffix is what disambiguates them in the generated YAML.
+    // Platform-style ids (containing `.`) always get a suffix. Users
+    // routinely add multiple entries of the same platform and reference
+    // them by id (`id(my_switch).turn_on()`), so the suffix is useful.
     expect(generateDefaultComponentId("switch.gpio", false, new Set())).toBe(
       "switch_gpio_1",
     );
@@ -51,19 +70,9 @@ describe("generateDefaultComponentId", () => {
     );
   });
 
-  it("falls back to a numeric suffix when the bare singleton slug is taken", () => {
-    // A user could have manually assigned `id: web_server` elsewhere
-    // (e.g. renamed a sensor). The generator must still emit a
-    // unique id rather than producing a duplicate.
-    const existing = new Set(["web_server"]);
-    expect(generateDefaultComponentId("web_server", false, existing)).toBe(
-      "web_server_1",
-    );
-  });
-
-  it("lowercases mixed-case component ids", () => {
-    expect(generateDefaultComponentId("Web_Server", false, new Set())).toBe(
-      "web_server",
+  it("lowercases mixed-case platform ids", () => {
+    expect(generateDefaultComponentId("Switch.GPIO", true, new Set())).toBe(
+      "switch_gpio_1",
     );
   });
 });

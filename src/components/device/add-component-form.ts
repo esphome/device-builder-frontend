@@ -206,7 +206,8 @@ export class ESPHomeAddComponentForm extends LitElement {
       (e) => e.key === "id" && e.type === ConfigEntryType.ID,
     );
     if (idEntry && next["id"] === undefined) {
-      next = { ...next, id: this._generateDefaultId() };
+      const seeded = this._generateDefaultId();
+      if (seeded !== null) next = { ...next, id: seeded };
     }
 
     // Seed pin entries from the board's manifest when the board has
@@ -300,7 +301,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     return out;
   }
 
-  private _generateDefaultId(): string {
+  private _generateDefaultId(): string | null {
     return generateDefaultComponentId(
       this.component.id,
       this.component.multi_conf,
