@@ -14,7 +14,11 @@ import type { ESPHomeComponentCatalog } from "../component-catalog.js";
 // Click anywhere on the card adds (issue #778). Inner anchors / buttons
 // keep their own behavior — `closest('a, button')` skips the add path
 // when the click originated from one (more-info link, expand button,
-// markdown-rendered links inside the description).
+// the explicit "+ Add" button, markdown-rendered links in the
+// description). The "+ Add" button stays a real <button> so keyboard
+// users have a focusable, Enter-activatable equivalent of the
+// card-surface click — making the <article> itself focusable would
+// nest a button inside a button (an ARIA anti-pattern).
 function shouldHandleCardClick(ev: MouseEvent): boolean {
   const target = ev.target as Element | null;
   return !target?.closest("a, button");
@@ -50,10 +54,14 @@ export function renderBundleCard(
         : nothing}
       <div class="card-footer">
         <span></span>
-        <div class="select-component">
+        <button
+          class="select-component"
+          type="button"
+          @click=${() => host._onAddBundle(bundle)}
+        >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${host._localize("device.add_component_action")}
-        </div>
+        </button>
       </div>
     </article>
   `;
@@ -123,10 +131,14 @@ export function renderCard(
           ${localize("device.more_info")}
           <wa-icon library="mdi" name="open-in-new"></wa-icon>
         </a>
-        <div class="select-component">
+        <button
+          class="select-component"
+          type="button"
+          @click=${() => host._onAdd(component)}
+        >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${localize("device.add_component_action")}
-        </div>
+        </button>
       </div>
     </article>
   `;

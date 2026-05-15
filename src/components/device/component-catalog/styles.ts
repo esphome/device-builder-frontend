@@ -182,6 +182,13 @@ export const componentCatalogStyles = css`
     background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
   }
 
+  /* Mirror the hover treatment when the inner "+ Add" / expand /
+     more-info control is keyboard-focused, so keyboard users see the
+     same "this card is the active one" cue mouse users get. */
+  .component-card:focus-within {
+    border-color: var(--esphome-primary);
+  }
+
   .component-card--expanded {
     grid-column: 1 / -1;
   }
@@ -197,6 +204,11 @@ export const componentCatalogStyles = css`
     flex-shrink: 0;
     color: var(--esphome-primary);
     font-size: 15px;
+  }
+
+  .expand-button:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 1px;
   }
 
   .expand-button wa-icon {
@@ -314,14 +326,27 @@ export const componentCatalogStyles = css`
     font-size: 11px;
   }
 
+  /* Real <button> so keyboard users can tab to it and Enter to add —
+     reset browser button chrome to keep the existing visual. */
   .select-component {
     display: flex;
     align-items: center;
     gap: 3px;
+    border: none;
+    background: none;
+    padding: 2px 4px;
+    margin: -2px -4px;
+    border-radius: 4px;
+    font-family: inherit;
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
     color: var(--esphome-primary);
     cursor: pointer;
+  }
+
+  .select-component:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 1px;
   }
 
   .empty {
