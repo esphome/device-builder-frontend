@@ -42,6 +42,15 @@ describe("generateDefaultComponentId", () => {
     );
   });
 
+  it("walks the suffix counter for top-level multi_conf blocks too", () => {
+    // Counter-walk for a top-level (no `.`) multi_conf entry is a
+    // distinct code path from the platform case above — pin it.
+    const existing = new Set(["script_1"]);
+    expect(generateDefaultComponentId("script", true, existing)).toBe(
+      "script_2",
+    );
+  });
+
   it("falls back to a numeric suffix when the bare singleton slug is taken", () => {
     // A user could have manually assigned `id: web_server` elsewhere
     // (e.g. renamed a sensor). The generator must still emit a
@@ -76,6 +85,11 @@ sensor:
     expect(collectExistingIds(yaml)).toEqual(
       new Set(["web_server", "temp_1", "humid_1"]),
     );
+  });
+
+  it("handles single-quoted id values", () => {
+    const yaml = `sensor:\n  - id: 'humid_2'\n    platform: dht\n`;
+    expect(collectExistingIds(yaml)).toEqual(new Set(["humid_2"]));
   });
 
   it("ignores top-level (zero-indent) keys named id", () => {
