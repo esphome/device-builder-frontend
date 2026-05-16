@@ -14,26 +14,12 @@ import {
   matchValuePosition,
   platformValueCompletion,
 } from "../../src/util/yaml-completion.js";
+import { makeComponentEntry } from "./_make-component-entry.js";
 
 type CatalogIndex = Parameters<typeof buildTopLevelCompletions>[0];
 
-function entry(
-  id: string,
-  category: ComponentCategory,
-): ComponentCatalogEntry {
-  return {
-    id,
-    name: id,
-    description: "",
-    category,
-    docs_url: "",
-    image_url: "",
-    dependencies: [],
-    multi_conf: false,
-    supported_platforms: [],
-    config_entries: [],
-  };
-}
+const entry = (id: string, category: ComponentCategory) =>
+  makeComponentEntry(id, { category });
 
 function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
   const byId = new Map<string, ComponentCatalogEntry>();

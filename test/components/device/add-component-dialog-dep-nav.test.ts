@@ -4,28 +4,9 @@ import {
   navigateToDep,
   type DepNavHost,
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
-import { ComponentCategory } from "../../../src/api/types.js";
 import type { ComponentCatalogEntry } from "../../../src/api/types.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-
-function makeComponent(
-  id: string,
-  overrides: Partial<ComponentCatalogEntry> = {},
-): ComponentCatalogEntry {
-  return {
-    id,
-    name: id,
-    description: "",
-    category: ComponentCategory.BUS,
-    docs_url: "",
-    image_url: "",
-    dependencies: [],
-    multi_conf: true,
-    supported_platforms: [],
-    config_entries: [],
-    ...overrides,
-  };
-}
+import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function makeHost(
   getComponent: (...args: unknown[]) => unknown,
@@ -55,9 +36,9 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
 }
 
 describe("navigateToDep", () => {
-  const aht20 = makeComponent("sensor.aht10");
-  const i2c = makeComponent("i2c");
-  const uart = makeComponent("uart");
+  const aht20 = makeComponentEntry("sensor.aht10");
+  const i2c = makeComponentEntry("i2c");
+  const uart = makeComponentEntry("uart");
 
   test("exact-id dep retargets the form to the fetched component", async () => {
     const getComponent = vi.fn().mockResolvedValue(i2c);
