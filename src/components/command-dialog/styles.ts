@@ -217,6 +217,18 @@ export const commandDialogStyles = css`
     text-decoration-thickness: 2px;
     outline: none;
   }
+  /* Visual boundary around a user-controlled receiver label inlined in the
+     remote-build hint — keeps a hostile pairing label from blending into
+     the system-tone copy and crafting coherent-sounding instructions. */
+  .receiver-label {
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--term-bg);
+    border: 1px solid var(--term-border);
+    color: var(--term-fg);
+    font-family: inherit;
+    font-size: inherit;
+  }
 
   .terminal-toolbar {
     flex-shrink: 0;

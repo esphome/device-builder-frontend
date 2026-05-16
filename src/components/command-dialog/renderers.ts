@@ -176,17 +176,20 @@ function renderRemoteBuildFailureSuggestion(
   host: ESPHomeCommandDialog,
   receiver: string,
 ): TemplateResult {
-  // Split the raw template before interpolation so a {receiver} that happens
-  // to contain another placeholder substring (highly unlikely, but receiver
-  // labels are user-controlled) can't slip into the wrong slot.
+  // Split mirrors the local-variant renderer's shape; Lit text interpolation
+  // already escapes HTML in {receiver}, so this isn't doing extra defense.
   const template = host._localize("command.try_reset_suggestion_remote");
   const [before, rest = ""] = template.split("{clean_action}");
   const [middle, after = ""] = rest.split("{receiver}");
+  // The receiver label is user-controlled (set during pairing on another
+  // machine). Wrapping it in a styled <code> gives a visual boundary so a
+  // hostile pairing label can't blend into the system-tone hint and craft
+  // coherent-sounding instructions for the local user.
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
         ${host._localize("command.try_clean_button")}</button
-      >${middle}${receiver}${after}
+      >${middle}<code class="receiver-label">${receiver}</code>${after}
     </div>
   `;
 }

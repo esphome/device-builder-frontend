@@ -112,6 +112,18 @@ export const firmwareInstallDialogStyles = css`
     text-decoration-thickness: 2px;
     outline: none;
   }
+  /* Visual boundary around a user-controlled receiver label inlined in the
+     remote-build hint — keeps a hostile pairing label from blending into
+     the system-tone copy and crafting coherent-sounding instructions. */
+  .receiver-label {
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--wa-color-surface-default);
+    border: 1px solid var(--wa-color-surface-border);
+    font-family: var(--wa-font-family-code, monospace);
+    font-size: inherit;
+    color: var(--wa-color-text-normal);
+  }
 
   .instructions {
     margin: var(--wa-space-m) 0 0;
