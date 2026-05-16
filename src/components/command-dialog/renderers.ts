@@ -142,12 +142,10 @@ function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): Template
 // LOCAL builds (or when the live + primed snapshots both lack a label) so
 // the caller falls back to the local reset-build-env link.
 function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
-  if (!host._jobId) return null;
-  const live = host._jobs.get(host._jobId);
-  const source = live?.source ?? host._primedSource?.source;
-  if (source !== JobSource.REMOTE) return null;
-  const label = live?.source_label ?? host._primedSource?.source_label ?? "";
-  return label || null;
+  const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
+  const primed = host._primedSource;
+  if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
+  return live?.source_label || primed?.source_label || null;
 }
 
 function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {

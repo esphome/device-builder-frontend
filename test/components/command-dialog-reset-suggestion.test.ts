@@ -9,8 +9,7 @@
  * substitutes a plain-text "ask the operator of <peer>" instruction with
  * the receiver label inlined.
  */
-import { describe, expect, it } from "vitest";
-import enMessages from "../../src/translations/en.json";
+import { describe, it } from "vitest";
 import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
 import {
   JobSource,
@@ -18,30 +17,15 @@ import {
   JobType,
   type FirmwareJob,
 } from "../../src/api/types.js";
-import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
-
-const localize = (key: string, values?: Record<string, string | number>) => {
-  // Mirror the runtime resolver enough that the renderer sees real template
-  // strings (with the placeholder tokens it splits on). Tests stay locked to
-  // the same en.json source the production code loads.
-  const parts = key.split(".");
-  let cur: unknown = enMessages as unknown;
-  for (const p of parts) {
-    if (cur && typeof cur === "object") {
-      cur = (cur as Record<string, unknown>)[p];
-    } else {
-      cur = undefined;
-      break;
-    }
-  }
-  const text = typeof cur === "string" ? cur : key;
-  if (!values) return text;
-  return text.replace(
-    /\{(\w+)\}/g,
-    (_, k) => String(values[k] ?? `{${k}}`),
-  );
-};
+import {
+  expectFallbackToLocal,
+  expectLocalSuggestion,
+  expectNoSuggestion,
+  expectRemoteSuggestion,
+  localize,
+  type LocalizeFn,
+} from "./_reset-suggestion-helpers.js";
 
 function fakeJob(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
   return {
@@ -87,7 +71,7 @@ interface Host {
   _tryCleanBuild: () => void;
   _tryResetBuildEnv: () => void;
   _tryOpenInEditor: () => void;
-  _localize: typeof localize;
+  _localize: LocalizeFn;
 }
 
 function baseHost(overrides: Partial<Host> = {}): Host {
@@ -107,6 +91,9 @@ function baseHost(overrides: Partial<Host> = {}): Host {
   };
 }
 
+const render = (host: Host) =>
+  renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
+
 describe("renderResetSuggestion — local build", () => {
   it("emits both clean and reset links when the live job is LOCAL", () => {
     const host = baseHost({
@@ -114,23 +101,14 @@ describe("renderResetSuggestion — local build", () => {
         ["job-1", fakeJob({ source: JobSource.LOCAL, source_label: "" })],
       ]),
     });
-    const result = renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
-    const matches = findTemplatesByAnchor(result, 'class="reset-suggestion"');
-    expect(matches.length).toBe(1);
-    const values = matches[0].values;
-    // Both click handlers wired up — the second button is the reset link
-    // the local variant carries that the remote variant must drop.
-    expect(values).toContain(host._tryCleanBuild);
-    expect(values).toContain(host._tryResetBuildEnv);
+    expectLocalSuggestion(render(host), host);
   });
 
   it("falls back to LOCAL when neither live nor primed source resolves", () => {
     // _jobId is set but the jobs context hasn't caught up and there's no
     // primed snapshot — the renderer must not assume REMOTE.
     const host = baseHost({ _jobs: new Map(), _primedSource: null });
-    const result = renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
-    const matches = findTemplatesByAnchor(result, 'class="reset-suggestion"');
-    expect(matches[0].values).toContain(host._tryResetBuildEnv);
+    expectFallbackToLocal(render(host), host);
   });
 });
 
@@ -147,17 +125,7 @@ describe("renderResetSuggestion — remote build", () => {
         ],
       ]),
     });
-    const result = renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
-    const matches = findTemplatesByAnchor(result, 'class="reset-suggestion"');
-    expect(matches.length).toBe(1);
-    const values = matches[0].values;
-    // Clean still works — fan-out to receivers shipped in db#608.
-    expect(values).toContain(host._tryCleanBuild);
-    // Reset link is the load-bearing assertion: must not render on remote.
-    expect(values).not.toContain(host._tryResetBuildEnv);
-    // Receiver label inlined as plain text so the operator knows which
-    // peer to go act on.
-    expect(values).toContain("build-server-01");
+    expectRemoteSuggestion(render(host), host, "build-server-01");
   });
 
   it("uses the primed source when the live jobs context is empty", () => {
@@ -171,11 +139,7 @@ describe("renderResetSuggestion — remote build", () => {
         source_esphome_version: "",
       },
     });
-    const result = renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
-    const matches = findTemplatesByAnchor(result, 'class="reset-suggestion"');
-    const values = matches[0].values;
-    expect(values).not.toContain(host._tryResetBuildEnv);
-    expect(values).toContain("primed-peer");
+    expectRemoteSuggestion(render(host), host, "primed-peer");
   });
 
   it("falls back to the local hint when the remote label is empty", () => {
@@ -190,9 +154,7 @@ describe("renderResetSuggestion — remote build", () => {
         ],
       ]),
     });
-    const result = renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
-    const matches = findTemplatesByAnchor(result, 'class="reset-suggestion"');
-    expect(matches[0].values).toContain(host._tryResetBuildEnv);
+    expectFallbackToLocal(render(host), host);
   });
 
   it("renders nothing for user-stopped builds even on REMOTE", () => {
@@ -210,7 +172,6 @@ describe("renderResetSuggestion — remote build", () => {
         ],
       ]),
     });
-    const result = renderResetSuggestion(host as unknown as ESPHomeCommandDialog);
-    expect(findTemplatesByAnchor(result, 'class="reset-suggestion"').length).toBe(0);
+    expectNoSuggestion(render(host));
   });
 });

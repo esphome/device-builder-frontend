@@ -7,31 +7,18 @@
  * inside ``renderStatus`` (the only exported surface in renderers.ts), so
  * tests drive it through that.
  */
-import { describe, expect, it } from "vitest";
-import enMessages from "../../src/translations/en.json";
+import { describe, it } from "vitest";
 import { renderStatus } from "../../src/components/firmware-install-dialog/renderers.js";
 import { JobSource } from "../../src/api/types.js";
-import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-
-const localize = (key: string, values?: Record<string, string | number>) => {
-  const parts = key.split(".");
-  let cur: unknown = enMessages as unknown;
-  for (const p of parts) {
-    if (cur && typeof cur === "object") {
-      cur = (cur as Record<string, unknown>)[p];
-    } else {
-      cur = undefined;
-      break;
-    }
-  }
-  const text = typeof cur === "string" ? cur : key;
-  if (!values) return text;
-  return text.replace(
-    /\{(\w+)\}/g,
-    (_, k) => String(values[k] ?? `{${k}}`),
-  );
-};
+import {
+  expectFallbackToLocal,
+  expectLocalSuggestion,
+  expectNoSuggestion,
+  expectRemoteSuggestion,
+  localize,
+  type LocalizeFn,
+} from "./_reset-suggestion-helpers.js";
 
 interface Host {
   _step: string;
@@ -44,7 +31,7 @@ interface Host {
   _tryCleanBuild: () => void;
   _tryResetBuildEnv: () => void;
   _tryOpenInEditor: () => void;
-  _localize: typeof localize;
+  _localize: LocalizeFn;
 }
 
 function baseHost(overrides: Partial<Host> = {}): Host {
@@ -64,15 +51,13 @@ function baseHost(overrides: Partial<Host> = {}): Host {
   };
 }
 
+const render = (host: Host) =>
+  renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
+
 describe("firmware-install-dialog renderStatus failure suggestion", () => {
   it("emits both clean and reset links on a LOCAL build failure", () => {
     const host = baseHost();
-    const tree = renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
-    const matches = findTemplatesByAnchor(tree, 'class="reset-suggestion"');
-    expect(matches.length).toBe(1);
-    const values = matches[0].values;
-    expect(values).toContain(host._tryCleanBuild);
-    expect(values).toContain(host._tryResetBuildEnv);
+    expectLocalSuggestion(render(host), host);
   });
 
   it("drops the reset link and names the receiver on a REMOTE failure", () => {
@@ -80,15 +65,7 @@ describe("firmware-install-dialog renderStatus failure suggestion", () => {
       _jobSource: JobSource.REMOTE,
       _jobSourceLabel: "build-server-01",
     });
-    const tree = renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
-    const matches = findTemplatesByAnchor(tree, 'class="reset-suggestion"');
-    expect(matches.length).toBe(1);
-    const values = matches[0].values;
-    expect(values).toContain(host._tryCleanBuild);
-    // The load-bearing assertion: the reset link doesn't render because the
-    // local reset-build-env command can't touch the receiver's cache.
-    expect(values).not.toContain(host._tryResetBuildEnv);
-    expect(values).toContain("build-server-01");
+    expectRemoteSuggestion(render(host), host, "build-server-01");
   });
 
   it("falls back to the local hint when the REMOTE label is empty", () => {
@@ -98,9 +75,7 @@ describe("firmware-install-dialog renderStatus failure suggestion", () => {
       _jobSource: JobSource.REMOTE,
       _jobSourceLabel: "",
     });
-    const tree = renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
-    const matches = findTemplatesByAnchor(tree, 'class="reset-suggestion"');
-    expect(matches[0].values).toContain(host._tryResetBuildEnv);
+    expectFallbackToLocal(render(host), host);
   });
 
   it("skips the build hint entirely on a peer-link session loss", () => {
@@ -111,7 +86,6 @@ describe("firmware-install-dialog renderStatus failure suggestion", () => {
       _jobSource: JobSource.REMOTE,
       _jobSourceLabel: "build-server-01",
     });
-    const tree = renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
-    expect(findTemplatesByAnchor(tree, 'class="reset-suggestion"').length).toBe(0);
+    expectNoSuggestion(render(host));
   });
 });
