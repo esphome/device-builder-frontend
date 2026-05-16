@@ -100,6 +100,24 @@ describe("navigateToDep", () => {
     expect(filterByDomain).not.toHaveBeenCalled();
   });
 
+  test("_returnTo stays null while the exact-id lookup is in flight", async () => {
+    // The original form is still rendered during the lookup, so a
+    // submit reaching _onFormSubmit must NOT see _returnTo set (which
+    // would misclassify the submit as completing a dep detour).
+    const d = deferred<ComponentCatalogEntry>();
+    const host = makeHost(() => d.promise);
+    host._selected = aht20;
+
+    const navPromise = navigateToDep(host, "i2c");
+    expect(host._returnTo).toBeNull();
+    expect(host._depDomain).toBeNull();
+
+    d.resolve(i2c);
+    await navPromise;
+    expect(host._returnTo).toBe(aht20);
+    expect(host._depDomain).toBe("i2c");
+  });
+
   test("a superseded navigation does not race against the latest one", async () => {
     const first = deferred<ComponentCatalogEntry>();
     const second = deferred<ComponentCatalogEntry>();

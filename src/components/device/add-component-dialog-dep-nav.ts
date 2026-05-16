@@ -43,10 +43,14 @@ export async function navigateToDep(
   domain: string,
 ): Promise<void> {
   if (host._submitting) return;
-  if (host._selected) {
-    host._returnTo = host._selected;
-    host._depDomain = domain;
-  }
+  // Snapshot the in-progress component but DON'T commit ``_returnTo``
+  // yet. The original form is still rendered during the await, so a
+  // request-add-component path where submit is enabled would let the
+  // user submit during this window; ``_onFormSubmit`` reading a set
+  // ``_returnTo`` would misclassify that submit as completing a dep
+  // detour. Commit only once the lookup resolves and we're actually
+  // navigating away.
+  const previousSelected = host._selected;
   host._submitError = "";
   const seq = ++host._depNavSeq;
   let direct: ComponentCatalogEntry | null = null;
@@ -60,6 +64,10 @@ export async function navigateToDep(
     direct = null;
   }
   if (seq !== host._depNavSeq) return;
+  if (previousSelected) {
+    host._returnTo = previousSelected;
+    host._depDomain = domain;
+  }
   if (direct) {
     host._selected = direct;
     return;
