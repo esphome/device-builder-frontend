@@ -1,6 +1,23 @@
-import { html, type TemplateResult } from "lit";
+import { css, html, type TemplateResult } from "lit";
 import type { LocalizeFunc } from "../common/localize.js";
 import { splitTemplate } from "../util/template-split.js";
+
+// Visual boundary around the user-controlled receiver label inlined in the
+// remote-build hint — keeps a hostile pairing label from blending into the
+// system-tone copy and crafting coherent-sounding instructions. Shared by
+// command-dialog and firmware-install-dialog so the wrapper styling stays
+// in lockstep with the renderer it pairs with.
+export const remoteBuildHintStyles = css`
+  .receiver-label {
+    padding: 0 4px;
+    border-radius: 3px;
+    background: var(--term-bg);
+    border: 1px solid var(--term-border);
+    color: var(--term-fg);
+    font-family: inherit;
+    font-size: inherit;
+  }
+`;
 
 // Hosts that can render the remote-build-failure hint. Both
 // command-dialog and firmware-install-dialog satisfy this — the shared

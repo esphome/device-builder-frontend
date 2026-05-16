@@ -19,6 +19,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 import {
   renderFooter,
   renderLogs,
@@ -112,7 +113,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  static styles = [espHomeStyles, firmwareInstallDialogStyles];
+  static styles = [espHomeStyles, firmwareInstallDialogStyles, remoteBuildHintStyles];
 
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
