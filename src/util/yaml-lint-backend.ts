@@ -22,6 +22,39 @@ interface BackendLinterOptions {
   getConfiguration: () => string;
 }
 
+/**
+ * Last successful linter result per configuration, keyed on the exact
+ * content the linter saw. The save path consults this to skip its own
+ * `validateYaml` call when the linter just validated the same buffer —
+ * the backend has a content-hash cache too, but skipping the WS
+ * round-trip entirely is a few tens of ms faster on slow networks and
+ * keeps the editor's "Save" feel snappy.
+ */
+const _lastValidated = new Map<string, { content: string; result: EditorValidateResponse }>();
+
+/** Return the linter's last result if it matches the current buffer exactly. */
+export function getLastValidatedResult(
+  configuration: string,
+  content: string,
+): EditorValidateResponse | null {
+  const entry = _lastValidated.get(configuration);
+  return entry !== undefined && entry.content === content ? entry.result : null;
+}
+
+/**
+ * Test-only seed for ``_lastValidated``. Production code populates the
+ * map exclusively through the linter; tests reach for this so they
+ * don't have to spin up a CodeMirror EditorView just to exercise the
+ * cache lookup helper.
+ */
+export function __setLastValidatedForTesting(
+  configuration: string,
+  content: string,
+  result: EditorValidateResponse,
+): void {
+  _lastValidated.set(configuration, { content, result });
+}
+
 /** Match `line N, column M` (1-indexed) anywhere in a YAML parse error message. */
 const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/i;
 /** Fallback: bare `line N` if the column is missing from the message. */
@@ -110,6 +143,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         console.debug("[yaml-lint] validate_yaml failed:", err);
         return [];
       }
+      _lastValidated.set(configuration, { content, result: res });
 
       const diagnostics: Diagnostic[] = [];
 

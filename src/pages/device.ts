@@ -34,6 +34,7 @@ import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
+import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 
@@ -564,7 +565,12 @@ export class ESPHomePageDevice extends LitElement {
     // toast at this layer would shout-down its result.
     if (this.id) {
       try {
-        const res = await this._api.validateYaml(this.id, this._yaml);
+        // Reuse the linter's last result when it matches the
+        // current buffer exactly — saves a WS round-trip and an
+        // ESPHome validate pass that just ran in the background.
+        const res =
+          getLastValidatedResult(this.id, this._yaml) ??
+          (await this._api.validateYaml(this.id, this._yaml));
         const summary = summarizeValidation(res);
         if (summary.count > 0) {
           this._validationErrorCount = summary.count;
