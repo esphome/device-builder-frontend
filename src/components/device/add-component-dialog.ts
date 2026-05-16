@@ -14,7 +14,11 @@ import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
-import { navigateToDep, type DepNavHost } from "./add-component-dialog-dep-nav.js";
+import {
+  matchesDepDomain,
+  navigateToDep,
+  type DepNavHost,
+} from "./add-component-dialog-dep-nav.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -519,16 +523,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // bundle-advance branch and continue.
         const restore = this._returnTo;
         const depDomain = this._depDomain;
-        // If the component the user just added matches the dep domain
-        // we navigated for, hand the new id to the restored form so
-        // it pre-selects it in the matching reference field. Match by
-        // category to defend against the user picking something else
-        // from the filtered catalog.
+        // Pre-fill the restored form's reference field with the new
+        // id when the just-added component matches what the dep-nav
+        // asked for (defends against the user picking off-domain in
+        // the catalog fallback).
         const newId = e.detail.fields["id"];
         if (
           depDomain &&
           typeof newId === "string" &&
-          this._selected.category === depDomain
+          matchesDepDomain(this._selected, depDomain)
         ) {
           this._prefillReference = { domain: depDomain, id: newId };
         } else {

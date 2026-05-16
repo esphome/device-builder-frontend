@@ -1,10 +1,14 @@
 import { describe, expect, test, vi } from "vitest";
 
 import {
+  matchesDepDomain,
   navigateToDep,
   type DepNavHost,
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
-import type { ComponentCatalogEntry } from "../../../src/api/types.js";
+import {
+  ComponentCategory,
+  type ComponentCatalogEntry,
+} from "../../../src/api/types.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
@@ -83,9 +87,7 @@ describe("navigateToDep", () => {
   });
 
   test("a stale getComponent response is dropped after _depNavSeq bumps", async () => {
-    // Simulates the dialog's _resetDetourState / _onFormSubmit bumping
-    // the seq while the lookup is in flight (user closed + reopened,
-    // submitted the form, or clicked a different dep).
+    // Simulates _resetDetourState or _onFormSubmit bumping mid-flight.
     const d = deferred<ComponentCatalogEntry>();
     const filterByDomain = vi.fn();
     const host = makeHost(() => d.promise, { filterByDomain });
@@ -101,9 +103,8 @@ describe("navigateToDep", () => {
   });
 
   test("_returnTo stays null while the exact-id lookup is in flight", async () => {
-    // The original form is still rendered during the lookup, so a
-    // submit reaching _onFormSubmit must NOT see _returnTo set (which
-    // would misclassify the submit as completing a dep detour).
+    // A submit during this window would otherwise be misclassified
+    // as completing a dep detour by _onFormSubmit.
     const d = deferred<ComponentCatalogEntry>();
     const host = makeHost(() => d.promise);
     host._selected = aht20;
@@ -130,8 +131,7 @@ describe("navigateToDep", () => {
 
     const firstNav = navigateToDep(host, "i2c");
     const secondNav = navigateToDep(host, "uart");
-    // First responds *after* second was issued — late arrival must
-    // not stomp on the newer navigation's result.
+    // First resolves AFTER second — late arrival must not stomp.
     second.resolve(uart);
     first.resolve(i2c);
     await Promise.all([firstNav, secondNav]);
@@ -151,5 +151,29 @@ describe("navigateToDep", () => {
     expect(getComponent).not.toHaveBeenCalled();
     expect(filterByDomain).not.toHaveBeenCalled();
     expect(host._selected).toBe(before);
+  });
+});
+
+describe("matchesDepDomain", () => {
+  test("matches by exact id for top-level bus deps", () => {
+    // i2c.category is "bus", not "i2c"; the prefill check in
+    // _onFormSubmit must still recognise the just-added bus as the
+    // dep so an ID-reference dropdown auto-selects the new id.
+    const i2c = makeComponentEntry("i2c", { category: ComponentCategory.BUS });
+    expect(matchesDepDomain(i2c, "i2c")).toBe(true);
+  });
+
+  test("matches by category for domain-level deps", () => {
+    const gpio = makeComponentEntry("output.gpio", {
+      category: ComponentCategory.OUTPUT,
+    });
+    expect(matchesDepDomain(gpio, "output")).toBe(true);
+  });
+
+  test("rejects an off-domain catalog pick", () => {
+    const sensor = makeComponentEntry("sensor.dht", {
+      category: ComponentCategory.SENSOR,
+    });
+    expect(matchesDepDomain(sensor, "output")).toBe(false);
   });
 });
