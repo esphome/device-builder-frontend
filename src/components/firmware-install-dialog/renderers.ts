@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
+import { JobSource } from "../../api/types.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 
 // Matches the receiver-side _fail_locally "peer-link session lost" shape from
@@ -22,9 +23,16 @@ function renderValidationFailureSuggestion(
 }
 
 // C++ build failure → clean (surgical) → reset (nuclear) staircase.
+// REMOTE-sourced jobs drop the link half — firmware/reset_build_env wipes
+// the LOCAL toolchain cache, which doesn't help when the broken cache is
+// on the paired receiver. Per esphome/device-builder#608 we deliberately
+// don't fan reset out to receivers; the operator-action model handles it.
 function renderBuildFailureSuggestion(
   host: ESPHomeFirmwareInstallDialog,
 ): TemplateResult {
+  if (host._jobSource === JobSource.REMOTE && host._jobSourceLabel) {
+    return renderRemoteBuildFailureSuggestion(host, host._jobSourceLabel);
+  }
   const text = host._localize("command.try_reset_suggestion");
   const [before, rest = ""] = text.split("{clean_action}");
   const [middle, after = ""] = rest.split("{reset_action}");
@@ -35,6 +43,25 @@ function renderBuildFailureSuggestion(
       >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
         ${host._localize("command.try_reset_button")}</button
       >${after}
+    </div>
+  `;
+}
+
+function renderRemoteBuildFailureSuggestion(
+  host: ESPHomeFirmwareInstallDialog,
+  receiver: string,
+): TemplateResult {
+  // Split the raw template before interpolation so a receiver label that
+  // happens to contain another placeholder substring (receiver labels are
+  // user-controlled from the pairing) can't slip into the wrong slot.
+  const template = host._localize("command.try_reset_suggestion_remote");
+  const [before, rest = ""] = template.split("{clean_action}");
+  const [middle, after = ""] = rest.split("{receiver}");
+  return html`
+    <div class="reset-suggestion" role="status">
+      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
+        ${host._localize("command.try_clean_button")}</button
+      >${middle}${receiver}${after}
     </div>
   `;
 }

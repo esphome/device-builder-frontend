@@ -261,6 +261,11 @@ export function compileAndWait(
     try {
       const job = await host._api.firmwareCompile(configuration);
       host._jobId = job.job_id;
+      // Capture so a compile failure can pick the right hint variant:
+      // local jobs get the link-to-reset, remote jobs get the plain-text
+      // "ask the operator of <receiver>" instruction.
+      host._jobSource = job.source;
+      host._jobSourceLabel = job.source_label;
       host._streamId = host._api.firmwareFollowJob(job.job_id, {
         onOutput: (line) => {
           if (host._step === "queued") {

@@ -349,6 +349,7 @@
     "compile_success": "Compilation complete!",
     "compile_failed": "Compilation failed.",
     "try_reset_suggestion": "It looks like you're having trouble with your build. Try {clean_action} first; if that doesn't help, try {reset_action}.",
+    "try_reset_suggestion_remote": "It looks like you're having trouble with your build. Try {clean_action} first; if that doesn't help, ask the operator of {receiver} to reset the build environment from their own dashboard.",
     "try_clean_button": "cleaning the build files for this device",
     "try_reset_button": "resetting the build environment",
     "validation_failed_suggestion": "Looks like a configuration error. Try {editor_action} to fix the YAML.",

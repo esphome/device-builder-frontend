@@ -293,6 +293,7 @@
     "compile_success": "Compilation terminée !",
     "compile_failed": "Échec de la compilation.",
     "try_reset_suggestion": "Il semble que vous ayez un problème avec votre compilation. Essayez d'abord de {clean_action} ; si cela ne résout pas le problème, essayez de {reset_action}.",
+    "try_reset_suggestion_remote": "Il semble que vous ayez un problème avec votre compilation. Essayez d'abord de {clean_action} ; si cela ne résout pas le problème, demandez à l'opérateur de {receiver} de réinitialiser l'environnement de compilation depuis son propre tableau de bord.",
     "try_clean_button": "nettoyer les fichiers de compilation de cet appareil",
     "try_reset_button": "réinitialiser l'environnement de compilation",
     "validation_failed_suggestion": "Cela ressemble à une erreur de configuration. Essayez d'{editor_action} pour corriger le YAML.",

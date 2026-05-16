@@ -136,7 +136,28 @@ function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): Template
   `;
 }
 
+// Resolve the receiver label for a REMOTE-sourced job. Returns null for
+// LOCAL builds (or when the live + primed snapshots both lack a label) so
+// the caller falls back to the local reset-build-env link.
+function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
+  if (!host._jobId) return null;
+  const live = host._jobs.get(host._jobId);
+  const source = live?.source ?? host._primedSource?.source;
+  if (source !== JobSource.REMOTE) return null;
+  const label = live?.source_label ?? host._primedSource?.source_label ?? "";
+  return label || null;
+}
+
 function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
+  // firmware/reset_build_env wipes the LOCAL toolchain cache; on a REMOTE
+  // build the broken cache is on the receiver, so the link would silently
+  // do nothing useful. Swap in a plain-text "ask the operator of <peer>"
+  // hint — esphome/device-builder#608 deliberately didn't fan the reset
+  // out to receivers, so this is the recommended manual path.
+  const remoteLabel = remotePeerLabel(host);
+  if (remoteLabel !== null) {
+    return renderRemoteBuildFailureSuggestion(host, remoteLabel);
+  }
   const text = host._localize("command.try_reset_suggestion");
   const [before, rest = ""] = text.split("{clean_action}");
   const [middle, after = ""] = rest.split("{reset_action}");
@@ -147,6 +168,25 @@ function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResul
       >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
         ${host._localize("command.try_reset_button")}</button
       >${after}
+    </div>
+  `;
+}
+
+function renderRemoteBuildFailureSuggestion(
+  host: ESPHomeCommandDialog,
+  receiver: string,
+): TemplateResult {
+  // Split the raw template before interpolation so a {receiver} that happens
+  // to contain another placeholder substring (highly unlikely, but receiver
+  // labels are user-controlled) can't slip into the wrong slot.
+  const template = host._localize("command.try_reset_suggestion_remote");
+  const [before, rest = ""] = template.split("{clean_action}");
+  const [middle, after = ""] = rest.split("{receiver}");
+  return html`
+    <div class="reset-suggestion" role="status">
+      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
+        ${host._localize("command.try_clean_button")}</button
+      >${middle}${receiver}${after}
     </div>
   `;
 }
