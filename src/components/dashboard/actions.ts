@@ -405,6 +405,11 @@ export async function fetchApiKey(
  * stamps the receive time as the line arrives so the dashboard's
  * log pane has a time anchor. The Web Serial path bypasses that
  * CLI, so we mirror the same prefix here (#338).
+ *
+ * Format and time source match esphome/dashboard's
+ * ``TimestampTransformer`` (``src/util/timestamp-transformer.ts``):
+ * second resolution (no milliseconds), local wall clock, no space
+ * between the timestamp and the level marker.
  */
 function formatSerialTimestamp(now: Date): string {
   const hh = String(now.getHours()).padStart(2, "0");
@@ -457,14 +462,14 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
                replaces it in place — so a stream of CRLF-terminated
                boot lines would collapse to just the last one. */
             const cleaned = line.endsWith("\r") ? line.slice(0, -1) : line;
-            /* Stamp non-empty lines at receive time so the log pane
-               shows the same ``[HH:MM:SS]`` anchor it does for WS-
-               fed sessions. Blank lines stay blank — a timestamp on
-               an otherwise empty visual line reads as noise. */
-            const stamped =
-              cleaned.length > 0
-                ? `${formatSerialTimestamp(new Date())}${cleaned}`
-                : cleaned;
+            /* Stamp every line — including blanks — at receive time
+               so the log pane shows the same ``[HH:MM:SS]`` anchor it
+               does for WS-fed sessions. esphome/dashboard's
+               ``TimestampTransformer`` prefixes every chunk
+               unconditionally (the line break is preserved before
+               stamping), so we match that behaviour here for parity
+               between the two web serial paths. */
+            const stamped = `${formatSerialTimestamp(new Date())}${cleaned}`;
             dialog._lines = [...dialog._lines, stamped];
           }
         }

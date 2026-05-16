@@ -96,7 +96,11 @@ describe("streamSerialToDialog", () => {
     expect(dialog._lines[0].endsWith("\r")).toBe(false);
   });
 
-  it("does not prefix a blank line with a timestamp", async () => {
+  it("stamps blank lines too — matching esphome/dashboard parity", async () => {
+    /* esphome/dashboard's TimestampTransformer prefixes every chunk
+       unconditionally, so we mirror that behaviour: a blank visual
+       line still carries a [HH:MM:SS] anchor so the two web serial
+       paths render identically when viewed side by side. */
     const port = createMockPort([encode("[I][a:1]: hi\n\n[I][a:2]: bye\n")]);
     const dialog: MockDialog = { _lines: [] };
     const cancel = streamSerialToDialog(port, dialog);
@@ -104,7 +108,7 @@ describe("streamSerialToDialog", () => {
     cancel();
     expect(dialog._lines).toHaveLength(3);
     expect(dialog._lines[0]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[a:1\]: hi$/);
-    expect(dialog._lines[1]).toBe("");
+    expect(dialog._lines[1]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]$/);
     expect(dialog._lines[2]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[a:2\]: bye$/);
   });
 
