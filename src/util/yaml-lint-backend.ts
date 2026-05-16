@@ -29,16 +29,27 @@ interface BackendLinterOptions {
  * the backend has a content-hash cache too, but skipping the WS
  * round-trip entirely is a few tens of ms faster on slow networks and
  * keeps the editor's "Save" feel snappy.
+ *
+ * TTL mirrors the backend's `_VALIDATE_CACHE_TTL` (60s). External
+ * `!include` / `external_components` files mutated outside the editor
+ * are stale on both sides; matching the window keeps staleness
+ * semantics symmetric regardless of which cache served the result.
  */
-const _lastValidated = new Map<string, { content: string; result: EditorValidateResponse }>();
+const _LAST_VALIDATED_TTL_MS = 60_000;
+const _lastValidated = new Map<
+  string,
+  { content: string; result: EditorValidateResponse; at: number }
+>();
 
-/** Return the linter's last result if it matches the current buffer exactly. */
+/** Return the linter's last result if it matches the current buffer and is fresh. */
 export function getLastValidatedResult(
   configuration: string,
   content: string,
 ): EditorValidateResponse | null {
   const entry = _lastValidated.get(configuration);
-  return entry !== undefined && entry.content === content ? entry.result : null;
+  if (entry === undefined || entry.content !== content) return null;
+  if (performance.now() - entry.at >= _LAST_VALIDATED_TTL_MS) return null;
+  return entry.result;
 }
 
 /**
@@ -52,7 +63,7 @@ export function __setLastValidatedForTesting(
   content: string,
   result: EditorValidateResponse,
 ): void {
-  _lastValidated.set(configuration, { content, result });
+  _lastValidated.set(configuration, { content, result, at: performance.now() });
 }
 
 /** Match `line N, column M` (1-indexed) anywhere in a YAML parse error message. */
@@ -143,7 +154,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         console.debug("[yaml-lint] validate_yaml failed:", err);
         return [];
       }
-      _lastValidated.set(configuration, { content, result: res });
+      _lastValidated.set(configuration, { content, result: res, at: performance.now() });
 
       const diagnostics: Diagnostic[] = [];
 

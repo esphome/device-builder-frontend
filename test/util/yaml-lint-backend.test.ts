@@ -59,4 +59,25 @@ describe("getLastValidatedResult", () => {
       getLastValidatedResult("kitchen.yaml", "esphome:\n  name: kitchen \n"),
     ).toBeNull();
   });
+
+  it("returns null when the cached entry is past the TTL window", async () => {
+    // Stub ``performance.now`` so the seed lands in the past relative to the
+    // lookup — mirrors the backend's 60s TTL exactly, so a slow user who
+    // keeps the editor open for a minute after the linter runs gets a fresh
+    // validate at save time on either side.
+    const real = performance.now;
+    let fakeNow = 1_000_000;
+    vi.spyOn(performance, "now").mockImplementation(() => fakeNow);
+    try {
+      const { getLastValidatedResult, __setLastValidatedForTesting } = await import(
+        "../../src/util/yaml-lint-backend.js"
+      );
+      const result = { yaml_errors: [], validation_errors: [] };
+      __setLastValidatedForTesting("kitchen.yaml", "esphome:\n", result);
+      fakeNow += 60_001;
+      expect(getLastValidatedResult("kitchen.yaml", "esphome:\n")).toBeNull();
+    } finally {
+      vi.spyOn(performance, "now").mockImplementation(real);
+    }
+  });
 });
