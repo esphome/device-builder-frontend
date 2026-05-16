@@ -14,6 +14,7 @@ import { localizeContext, apiContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
+import { navigateToDep, type DepNavHost } from "./add-component-dialog-dep-nav.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -282,24 +283,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
-  /**
-   * Per-call sequence for in-flight ``_onNavigateToDep`` getComponent
-   * requests. Bumped on every navigate and on every detour reset so
-   * a stale response that resolves after the user moved on (closed
-   * the dialog, picked a different dep, submitted the form) can't
-   * overwrite ``_selected`` from underneath them.
-   */
+  /** See ``navigateToDep`` for the seq-counter contract. */
   private _depNavSeq = 0;
-
-  /** Fetch a component by id, scoped to the dialog's current
-   *  platform + board so per-platform defaults resolve. */
-  private _fetchComponentForBoard(id: string) {
-    return this._api.getComponent(
-      id,
-      this.platform || undefined,
-      this.board?.id ?? undefined,
-    );
-  }
 
   private _resetDetourState() {
     this._returnTo = null;
@@ -486,41 +471,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._submitError = "";
   }
 
-  /**
-   * Open the form for a missing dependency, remembering the
-   * in-progress component so we can restore + prefill after the
-   * dependency is added. When the dep resolves to a single catalog
-   * id (i2c, uart, spi) we jump straight to that form; the catalog's
-   * fuzzy search ranks the bus entry below every sensor whose
-   * description mentions the bus name. Domain-level deps (output,
-   * sensor) keep the category-filtered catalog so the user picks a
-   * variant.
-   */
-  private async _onNavigateToDep(e: CustomEvent<{ domain: string }>) {
+  private _onNavigateToDep(e: CustomEvent<{ domain: string }>) {
     e.stopPropagation();
-    if (this._submitting) return;
-    const { domain } = e.detail;
-    if (this._selected) {
-      this._returnTo = this._selected;
-      this._depDomain = domain;
-    }
-    this._submitError = "";
-    const seq = ++this._depNavSeq;
-    let direct: ComponentCatalogEntry | null = null;
-    try {
-      direct = await this._fetchComponentForBoard(domain);
-    } catch {
-      direct = null;
-    }
-    if (seq !== this._depNavSeq) return;
-    if (direct) {
-      this._selected = direct;
-      return;
-    }
-    this._selected = null;
-    await this.updateComplete;
-    if (seq !== this._depNavSeq) return;
-    this._catalog?.filterByDomain(domain);
+    return navigateToDep(this as unknown as DepNavHost, e.detail.domain);
   }
 
   private async _onFormSubmit(e: CustomEvent<{ fields: Record<string, unknown> }>) {
@@ -528,6 +481,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     if (!this._selected || !this.configuration || this._submitting) return;
     this._submitting = true;
     this._submitError = "";
+    // Invalidate any in-flight dep-nav lookup — a late resolve must
+    // not retarget the form to a dep after the user submitted.
+    this._depNavSeq++;
     try {
       const { yaml } = await this._api.addComponent(this.configuration, {
         component_id: this._selected.id,
@@ -589,7 +545,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
-        const nextComponent = await this._fetchComponentForBoard(nextId);
+        const nextComponent = await this._api.getComponent(
+          nextId,
+          this.platform || undefined,
+          this.board?.id ?? undefined,
+        );
         if (!nextComponent) {
           this._submitError = this._localize("device.add_component_error");
           return;
