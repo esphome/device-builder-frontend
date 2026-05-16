@@ -6,6 +6,8 @@ import {
 } from "../../api/types.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { splitTemplate } from "../../util/template-split.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
@@ -126,7 +128,7 @@ export function renderResetSuggestion(
 
 function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
   const text = host._localize("command.validation_failed_suggestion");
-  const [before, after = ""] = text.split("{editor_action}");
+  const [before, after] = splitTemplate(text, "{editor_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
@@ -149,18 +151,16 @@ function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
 }
 
 function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
-  // firmware/reset_build_env wipes the LOCAL toolchain cache; on a REMOTE
-  // build the broken cache is on the receiver, so the link would silently
-  // do nothing useful. Swap in a plain-text "ask the operator of <peer>"
-  // hint — esphome/device-builder#608 deliberately didn't fan the reset
-  // out to receivers, so this is the recommended manual path.
   const remoteLabel = remotePeerLabel(host);
   if (remoteLabel !== null) {
     return renderRemoteBuildFailureSuggestion(host, remoteLabel);
   }
   const text = host._localize("command.try_reset_suggestion");
-  const [before, rest = ""] = text.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{reset_action}");
+  const [before, middle, after] = splitTemplate(
+    text,
+    "{clean_action}",
+    "{reset_action}",
+  );
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
@@ -168,28 +168,6 @@ function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResul
       >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
         ${host._localize("command.try_reset_button")}</button
       >${after}
-    </div>
-  `;
-}
-
-function renderRemoteBuildFailureSuggestion(
-  host: ESPHomeCommandDialog,
-  receiver: string,
-): TemplateResult {
-  // Split mirrors the local-variant renderer's shape; Lit text interpolation
-  // already escapes HTML in {receiver}, so this isn't doing extra defense.
-  const template = host._localize("command.try_reset_suggestion_remote");
-  const [before, rest = ""] = template.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{receiver}");
-  // The receiver label is user-controlled (set during pairing on another
-  // machine). Wrapping it in a styled <code> gives a visual boundary so a
-  // hostile pairing label can't blend into the system-tone hint and craft
-  // coherent-sounding instructions for the local user.
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
-        ${host._localize("command.try_clean_button")}</button
-      >${middle}<code class="receiver-label">${receiver}</code>${after}
     </div>
   `;
 }

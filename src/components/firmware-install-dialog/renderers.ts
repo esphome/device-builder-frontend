@@ -1,5 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { JobSource } from "../../api/types.js";
+import { splitTemplate } from "../../util/template-split.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 
 // Matches the receiver-side _fail_locally "peer-link session lost" shape from
@@ -12,7 +14,7 @@ function renderValidationFailureSuggestion(
   host: ESPHomeFirmwareInstallDialog,
 ): TemplateResult {
   const text = host._localize("command.validation_failed_suggestion");
-  const [before, after = ""] = text.split("{editor_action}");
+  const [before, after] = splitTemplate(text, "{editor_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
@@ -34,8 +36,11 @@ function renderBuildFailureSuggestion(
     return renderRemoteBuildFailureSuggestion(host, host._jobSourceLabel);
   }
   const text = host._localize("command.try_reset_suggestion");
-  const [before, rest = ""] = text.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{reset_action}");
+  const [before, middle, after] = splitTemplate(
+    text,
+    "{clean_action}",
+    "{reset_action}",
+  );
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
@@ -43,28 +48,6 @@ function renderBuildFailureSuggestion(
       >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
         ${host._localize("command.try_reset_button")}</button
       >${after}
-    </div>
-  `;
-}
-
-function renderRemoteBuildFailureSuggestion(
-  host: ESPHomeFirmwareInstallDialog,
-  receiver: string,
-): TemplateResult {
-  // Split mirrors the local-variant renderer's shape; Lit text interpolation
-  // already escapes HTML in {receiver}, so this isn't doing extra defense.
-  const template = host._localize("command.try_reset_suggestion_remote");
-  const [before, rest = ""] = template.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{receiver}");
-  // The receiver label is user-controlled (set during pairing on another
-  // machine). Wrapping it in a styled <code> gives a visual boundary so a
-  // hostile pairing label can't blend into the system-tone hint and craft
-  // coherent-sounding instructions for the local user.
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
-        ${host._localize("command.try_clean_button")}</button
-      >${middle}<code class="receiver-label">${receiver}</code>${after}
     </div>
   `;
 }
