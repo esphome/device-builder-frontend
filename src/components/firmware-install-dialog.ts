@@ -12,13 +12,14 @@ import {
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types.js";
+import { JobSource, type ConfiguredDevice } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 import {
   renderFooter,
   renderLogs,
@@ -79,6 +80,15 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   // hint from clean/reset (C++ help) to "open in editor" (YAML help).
   @state() _failedDuringValidate = false;
 
+  // Source of the most recent compile job. REMOTE means the toolchain lives
+  // on a paired receiver, so the local "reset build environment" link can't
+  // help — the build-failure hint swaps to a plain-text "ask the operator
+  // of <receiver>" instruction. Populated by compileAndWait once the backend
+  // returns the job; LOCAL until then so a failure before the job creates
+  // (e.g. WS dropped) still shows the local hint.
+  @state() _jobSource: JobSource = JobSource.LOCAL;
+  @state() _jobSourceLabel = "";
+
   @state() _logLines: string[] = [];
   @state() _logsExpanded = false;
   @state() _flashPercent = 0;
@@ -103,7 +113,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  static styles = [espHomeStyles, firmwareInstallDialogStyles];
+  static styles = [espHomeStyles, firmwareInstallDialogStyles, remoteBuildHintStyles];
 
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
@@ -162,6 +172,8 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._installer = null;
     this._failedDuringCompile = false;
     this._failedDuringValidate = false;
+    this._jobSource = JobSource.LOCAL;
+    this._jobSourceLabel = "";
     // _detachStream already cleared _jobId / _streamId / _compileReject.
     this._detected = null;
   }

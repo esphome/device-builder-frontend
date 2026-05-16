@@ -399,6 +399,26 @@ export async function fetchApiKey(
 }
 
 /**
+ * Format a wall-clock ``[HH:MM:SS]`` prefix to prepend to a serial
+ * log line. ESPHome firmware emits ``[LEVEL][component:line]: msg``
+ * over UART without a timestamp; the Python ``esphome logs`` CLI
+ * stamps the receive time as the line arrives so the dashboard's
+ * log pane has a time anchor. The Web Serial path bypasses that
+ * CLI, so we mirror the same prefix here (#338).
+ *
+ * Format and time source match esphome/dashboard's
+ * ``TimestampTransformer`` (``src/util/timestamp-transformer.ts``):
+ * second resolution (no milliseconds), local wall clock, no space
+ * between the timestamp and the level marker.
+ */
+function formatSerialTimestamp(now: Date): string {
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  return `[${hh}:${mm}:${ss}]`;
+}
+
+/**
  * Pipe a Web Serial port into the logs dialog's line buffer.
  *
  * Returns a cancel function the dialog stores and calls on
@@ -442,7 +462,15 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
                replaces it in place — so a stream of CRLF-terminated
                boot lines would collapse to just the last one. */
             const cleaned = line.endsWith("\r") ? line.slice(0, -1) : line;
-            dialog._lines = [...dialog._lines, cleaned];
+            /* Stamp every line — including blanks — at receive time
+               so the log pane shows the same ``[HH:MM:SS]`` anchor it
+               does for WS-fed sessions. esphome/dashboard's
+               ``TimestampTransformer`` prefixes every chunk
+               unconditionally (the line break is preserved before
+               stamping), so we match that behaviour here for parity
+               between the two web serial paths. */
+            const stamped = `${formatSerialTimestamp(new Date())}${cleaned}`;
+            dialog._lines = [...dialog._lines, stamped];
           }
         }
       }

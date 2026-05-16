@@ -35,6 +35,7 @@ import { downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { commandDialogStyles } from "./command-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 import {
   detachStream,
   followJob,
@@ -168,7 +169,12 @@ export class ESPHomeCommandDialog extends LitElement {
   @query("wa-dialog") _dialog!: HTMLElement & { open: boolean };
   @query("esphome-ansi-log") _ansiLog?: ESPHomeAnsiLog;
 
-  static styles = [espHomeStyles, dialogCloseButtonStyles, commandDialogStyles];
+  static styles = [
+    espHomeStyles,
+    dialogCloseButtonStyles,
+    commandDialogStyles,
+    remoteBuildHintStyles,
+  ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_darkMode")) {

@@ -6,6 +6,8 @@ import {
 } from "../../api/types.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { splitTemplate } from "../../util/template-split.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
@@ -126,7 +128,7 @@ export function renderResetSuggestion(
 
 function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
   const text = host._localize("command.validation_failed_suggestion");
-  const [before, after = ""] = text.split("{editor_action}");
+  const [before, after] = splitTemplate(text, "{editor_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
@@ -136,10 +138,27 @@ function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): Template
   `;
 }
 
+// Resolve the receiver label for a REMOTE-sourced job. Returns null for
+// LOCAL builds (or when the live + primed snapshots both lack a label) so
+// the caller falls back to the local reset-build-env link.
+function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
+  const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
+  const primed = host._primedSource;
+  if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
+  return live?.source_label || primed?.source_label || null;
+}
+
 function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
+  const remoteLabel = remotePeerLabel(host);
+  if (remoteLabel !== null) {
+    return renderRemoteBuildFailureSuggestion(host, remoteLabel);
+  }
   const text = host._localize("command.try_reset_suggestion");
-  const [before, rest = ""] = text.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{reset_action}");
+  const [before, middle, after] = splitTemplate(
+    text,
+    "{clean_action}",
+    "{reset_action}",
+  );
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>

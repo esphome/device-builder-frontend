@@ -42,6 +42,12 @@ export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
+  // Clear primed snapshots so a Retry that picks a different source can't
+  // leak the prior job's REMOTE label into renderBuildFailureSuggestion
+  // before the new _jobs context update lands. open() already clears these
+  // on a fresh dialog; startCommand is the Retry path.
+  host._jobStatus = null;
+  host._primedSource = null;
 
   if (host._commandType === "validate") {
     startValidateStream(host);

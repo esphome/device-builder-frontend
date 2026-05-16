@@ -293,6 +293,7 @@
     "compile_success": "Compilatie voltooid!",
     "compile_failed": "Compilatie mislukt.",
     "try_reset_suggestion": "Het lijkt erop dat je een probleem hebt met de compilatie. Probeer eerst {clean_action}; als dat niet helpt, probeer dan {reset_action}.",
+    "try_reset_suggestion_remote": "Het lijkt erop dat je een probleem hebt met de compilatie. Probeer eerst {clean_action}; als dat niet helpt, vraag de beheerder van {receiver} om de bouw-omgeving vanaf hun eigen dashboard te resetten.",
     "try_clean_button": "de bouwbestanden voor dit apparaat op te schonen",
     "try_reset_button": "de bouw-omgeving te resetten",
     "validation_failed_suggestion": "Dit lijkt op een configuratiefout. Probeer {editor_action} om de YAML te repareren.",

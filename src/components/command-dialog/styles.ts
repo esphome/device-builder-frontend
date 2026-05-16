@@ -217,7 +217,6 @@ export const commandDialogStyles = css`
     text-decoration-thickness: 2px;
     outline: none;
   }
-
   .terminal-toolbar {
     flex-shrink: 0;
     display: flex;

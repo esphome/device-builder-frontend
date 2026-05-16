@@ -17,6 +17,10 @@ import {
   type ValidationError,
 } from "../../util/config-validation.js";
 import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
+import {
+  collectExistingIds,
+  generateDefaultComponentId,
+} from "../../util/default-component-id.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -202,7 +206,8 @@ export class ESPHomeAddComponentForm extends LitElement {
       (e) => e.key === "id" && e.type === ConfigEntryType.ID,
     );
     if (idEntry && next["id"] === undefined) {
-      next = { ...next, id: this._generateDefaultId() };
+      const seeded = this._generateDefaultId();
+      if (seeded !== null) next = { ...next, id: seeded };
     }
 
     // Seed pin entries from the board's manifest when the board has
@@ -296,40 +301,12 @@ export class ESPHomeAddComponentForm extends LitElement {
     return out;
   }
 
-  private _generateDefaultId(): string {
-    // "switch.gpio" -> "switch_gpio"; "wifi" -> "wifi"
-    const slug = this.component.id.replace(/\./g, "_").toLowerCase();
-    const existing = this._collectExistingIds(this.yaml);
-
-    // Always start from `_1`. Even single-instance components get a
-    // numeric suffix because the bare slug clashes with the
-    // top-level YAML key — `web_server:` block with `id: web_server`
-    // means `id(web_server)` references are ambiguous and can also
-    // collide with ESPHome's auto-generated component-typed
-    // identifiers. The suffix is cheap insurance.
-    let n = 1;
-    let candidate = `${slug}_${n}`;
-    while (existing.has(candidate)) {
-      n++;
-      candidate = `${slug}_${n}`;
-    }
-    return candidate;
-  }
-
-  /**
-   * Scan the YAML for every `id:` line and return the set of values.
-   * Best-effort regex match — same approach the ID-reference picker
-   * uses, deliberately simple (we only need a uniqueness check, not
-   * a full parse).
-   */
-  private _collectExistingIds(yaml: string): Set<string> {
-    const ids = new Set<string>();
-    if (!yaml) return ids;
-    for (const line of yaml.split("\n")) {
-      const m = line.match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
-      if (m) ids.add(m[1]);
-    }
-    return ids;
+  private _generateDefaultId(): string | null {
+    return generateDefaultComponentId(
+      this.component.id,
+      this.component.multi_conf,
+      collectExistingIds(this.yaml),
+    );
   }
 
   protected render() {
