@@ -27,6 +27,7 @@ export class ESPHomeYamlDiff extends LitElement {
       position: relative;
       overflow: auto;
       font-family: "JetBrains Mono", "Fira Code", monospace;
+      font-variant-ligatures: none;
       font-size: 13px;
       line-height: 1.5;
       background: var(--diff-bg);

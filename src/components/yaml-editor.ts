@@ -127,6 +127,7 @@ export class ESPHomeYamlEditor extends LitElement {
         ".cm-scroller": {
           overflow: "auto",
           fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontVariantLigatures: "none",
           fontSize: "13px",
         },
         ".cm-esphome-highlight": {

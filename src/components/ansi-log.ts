@@ -290,6 +290,7 @@ export class ESPHomeAnsiLog extends LitElement {
         font-family:
           ui-monospace, "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", Menlo,
           Consolas, monospace;
+        font-variant-ligatures: none;
         font-size: 12px;
         padding: 8px 12px;
         border-radius: 8px;
