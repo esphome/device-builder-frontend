@@ -61,10 +61,7 @@ describe("getLastValidatedResult", () => {
   });
 
   it("returns null when the cached entry is past the TTL window", async () => {
-    // Stub ``performance.now`` so the seed lands in the past relative to the
-    // lookup — mirrors the backend's 60s TTL exactly, so a slow user who
-    // keeps the editor open for a minute after the linter runs gets a fresh
-    // validate at save time on either side.
+    // Stub ``performance.now`` so the seed lands past the TTL boundary.
     const real = performance.now;
     let fakeNow = 1_000_000;
     vi.spyOn(performance, "now").mockImplementation(() => fakeNow);

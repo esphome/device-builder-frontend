@@ -23,17 +23,13 @@ interface BackendLinterOptions {
 }
 
 /**
- * Last successful linter result per configuration, keyed on the exact
- * content the linter saw. The save path consults this to skip its own
- * `validateYaml` call when the linter just validated the same buffer —
- * the backend has a content-hash cache too, but skipping the WS
- * round-trip entirely is a few tens of ms faster on slow networks and
- * keeps the editor's "Save" feel snappy.
+ * Last successful linter result per configuration, keyed on exact
+ * content. The save path consults this to skip its own `validateYaml`
+ * WS round-trip when the linter just validated the same buffer.
  *
- * TTL mirrors the backend's `_VALIDATE_CACHE_TTL` (60s). External
- * `!include` / `external_components` files mutated outside the editor
- * are stale on both sides; matching the window keeps staleness
- * semantics symmetric regardless of which cache served the result.
+ * TTL mirrors the backend's `_VALIDATE_CACHE_TTL` (60s) so staleness
+ * semantics for externally-mutated `!include` /
+ * `external_components` files are symmetric on both paths.
  */
 const _LAST_VALIDATED_TTL_MS = 60_000;
 const _lastValidated = new Map<
@@ -52,12 +48,7 @@ export function getLastValidatedResult(
   return entry.result;
 }
 
-/**
- * Test-only seed for ``_lastValidated``. Production code populates the
- * map exclusively through the linter; tests reach for this so they
- * don't have to spin up a CodeMirror EditorView just to exercise the
- * cache lookup helper.
- */
+/** Test-only seed; production populates the map only through the linter. */
 export function __setLastValidatedForTesting(
   configuration: string,
   content: string,
