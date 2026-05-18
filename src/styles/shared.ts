@@ -12,16 +12,28 @@ import { css } from "lit";
 export const espHomeStyles = css`
   :host {
     /* ─── Brand colors ─── */
-    --esphome-primary: #009fee;
-    --esphome-primary-light: #dff3fc;
-    --esphome-secondary: #009ac7;
+    /* Resolve to Home Assistant's primary palette when embedded in HA;
+       fall back to HA Material Light Blue 500 (and matching derivatives)
+       standalone so the standalone palette stays consistent with HA
+       rather than reverting to WebAwesome cyan. */
+    --esphome-primary: var(--primary-color, #009ac7);
+    --esphome-primary-light: color-mix(
+      in srgb,
+      var(--primary-color, #009ac7) 12%,
+      transparent
+    );
+    --esphome-secondary: color-mix(
+      in srgb,
+      var(--primary-color, #009ac7),
+      black 8%
+    );
     --esphome-success: #2ecc71;
     --esphome-warning: #f39c12;
     --esphome-error: #e74c3c;
     --esphome-offline: #95a5a6;
 
     /* Text color for use on primary / dark / colored backgrounds — white in both light and dark modes */
-    --esphome-on-primary: #ffffff;
+    --esphome-on-primary: var(--text-primary-color, #ffffff);
 
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
