@@ -320,17 +320,6 @@ export class ESPHomeAutomationEditor extends LitElement {
         : nothing}
 
       ${!isLightEffect
-        ? html`<esphome-automation-condition-tree
-            .conditions=${automation.conditions}
-            .catalog=${conditions}
-            .board=${this.board}
-            .yaml=${this.yaml}
-            ?disabled=${disabled}
-            @conditions-change=${this._onConditionsChange}
-          ></esphome-automation-condition-tree>`
-        : nothing}
-
-      ${!isLightEffect
         ? html`<esphome-automation-action-list
             .actions=${automation.actions}
             .catalog=${actions}
@@ -458,13 +447,6 @@ export class ESPHomeAutomationEditor extends LitElement {
   ) => {
     e.stopPropagation();
     this._withValue({ trigger_params: e.detail.params });
-  };
-
-  private _onConditionsChange = (
-    e: CustomEvent<{ conditions: AutomationTree["conditions"] }>,
-  ) => {
-    e.stopPropagation();
-    this._withValue({ conditions: e.detail.conditions });
   };
 
   private _onActionsChange = (

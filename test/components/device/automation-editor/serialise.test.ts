@@ -14,8 +14,12 @@ describe("emptyAutomationTree", () => {
     const t = emptyAutomationTree();
     expect(t.trigger_id).toBeNull();
     expect(t.trigger_params).toEqual({});
-    expect(t.conditions).toEqual([]);
     expect(t.actions).toEqual([]);
+    // ESPHome triggers have no top-level boolean gate — there is
+    // no ``conditions`` field at the tree level. Conditional
+    // execution lives inside ``if`` / ``while`` / ``wait_until``
+    // action nodes via their own ``conditions`` field.
+    expect("conditions" in t).toBe(false);
   });
 });
 

@@ -19,7 +19,6 @@ export function emptyAutomationTree(): AutomationTree {
   return {
     trigger_id: null,
     trigger_params: {},
-    conditions: [],
     actions: [],
   };
 }

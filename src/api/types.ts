@@ -921,12 +921,16 @@ export interface ConditionNode {
 /** The full structured form of one automation. ``trigger_id`` is
  *  ``null`` for top-level ``script:`` / ``interval:`` blocks (which
  *  carry no trigger key in YAML — the block kind is implied by the
- *  ``AutomationLocation``). ``conditions`` is the optional
- *  trigger-level "only run if" gate. */
+ *  ``AutomationLocation``).
+ *
+ *  Note: ESPHome triggers don't carry a top-level boolean gate.
+ *  Conditional execution is expressed inline as an ``if`` action
+ *  (or ``while`` / ``wait_until``) inside ``actions`` — those nodes
+ *  carry their own ``conditions`` field. There is intentionally no
+ *  ``conditions`` field at this level. */
 export interface AutomationTree {
   trigger_id: string | null;
   trigger_params: Record<string, unknown>;
-  conditions: ConditionNode[];
   actions: ActionNode[];
 }
 

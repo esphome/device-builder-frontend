@@ -1560,7 +1560,6 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
         automation: {
           trigger_id: "on_boot",
           trigger_params: {},
-          conditions: [],
           actions: [
             { action_id: "logger.log", params: { message: "hi" } },
           ],
@@ -1589,7 +1588,6 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     const automation = {
       trigger_id: "on_press",
       trigger_params: {},
-      conditions: [],
       actions: [
         { action_id: "switch.toggle", params: { id: "my_switch" } },
       ],
