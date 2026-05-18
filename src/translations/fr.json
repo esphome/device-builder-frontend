@@ -509,6 +509,7 @@
     "script_parameters_description": "Paramètres typés que les appelants peuvent passer au script. Référencez-les dans les actions via `id(name)`.",
     "script_add_parameter": "Ajouter un paramètre",
     "script_parameter_name_placeholder": "nom",
+    "script_actions_description": "La liste ordonnée d'actions que ce script exécute lorsqu'il est appelé.",
     "automation_header_title": "{label}",
     "automation_header_description": "S'exécute quand le déclencheur se produit. Définissez la liste d'actions ci-dessous.",
     "automation_wizard_pick_target": "À quoi cette automatisation doit-elle réagir ?",

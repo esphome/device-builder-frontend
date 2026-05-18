@@ -645,6 +645,7 @@
     "script_parameters_description": "Typed parameters callers can pass to the script. Reference them inside actions via `id(name)`.",
     "script_add_parameter": "Add parameter",
     "script_parameter_name_placeholder": "name",
+    "script_actions_description": "The ordered list of actions this script runs when called.",
     "automation_header_title": "{label}",
     "automation_header_description": "Runs when the trigger fires. Define the list of actions below.",
     "automation_wizard_pick_target": "What should this automation react to?",

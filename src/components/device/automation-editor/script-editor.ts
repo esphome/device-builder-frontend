@@ -128,6 +128,16 @@ export class ESPHomeScriptEditor extends LitElement {
   @state() private _deleting = false;
   @state() private _error = "";
 
+  /**
+   * Working list for the parameter editor. The wire shape is a
+   * ``{name: type}`` dict (per ESPHome's YAML), which collapses
+   * empty-name entries and can't represent two in-progress rows.
+   * We keep an editable list locally and project named entries
+   * down to the wire on each change; empty-name rows persist
+   * locally until the user fills them in.
+   */
+  @state() private _params: ParameterDecl[] = [];
+
 
   public get inFlightWrite(): boolean {
     return this._saving || this._deleting;
@@ -154,6 +164,25 @@ export class ESPHomeScriptEditor extends LitElement {
       !this._loading
     ) {
       void this._hydrateFromBackend();
+    }
+    // Sync the local parameter list when ``value`` arrives from
+    // outside (hydrate). We can't tell our own write from an
+    // external mutation cleanly, so use a conservative check: if
+    // the wire's named entries match what we have locally (minus
+    // empty-name rows we're holding), don't disturb the local
+    // state.
+    if (changed.has("value")) {
+      const fromWire = this._readParams(
+        this.value ?? emptyAutomationTree(),
+      );
+      const localNamed = this._params.filter((p) => p.name);
+      const matches =
+        localNamed.length === fromWire.length &&
+        localNamed.every(
+          (p, i) =>
+            p.name === fromWire[i].name && p.type === fromWire[i].type,
+        );
+      if (!matches) this._params = fromWire;
     }
   }
 
@@ -219,17 +248,28 @@ export class ESPHomeScriptEditor extends LitElement {
       ${this._renderIdField(disabled)}
       ${this._renderModeField(automation, disabled)}
       ${this._renderParametersField(automation, disabled)}
-      <esphome-automation-action-list
-        .actions=${automation.actions}
-        .catalog=${actions}
-        .conditionCatalog=${conditions}
-        .scripts=${scripts}
-        .devices=${devices}
-        .board=${this.board}
-        .yaml=${this.yaml}
-        ?disabled=${disabled}
-        @actions-change=${this._onActionsChange}
-      ></esphome-automation-action-list>
+      <div class="field">
+        <label class="field-label">
+          ${this._localize("device.automation_action")}
+        </label>
+        <p class="field-description">
+          ${renderMarkdown(
+            this._localize("device.script_actions_description"),
+          )}
+        </p>
+        <esphome-automation-action-list
+          no-header
+          .actions=${automation.actions}
+          .catalog=${actions}
+          .conditionCatalog=${conditions}
+          .scripts=${scripts}
+          .devices=${devices}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          ?disabled=${disabled}
+          @actions-change=${this._onActionsChange}
+        ></esphome-automation-action-list>
+      </div>
       ${this._error
         ? html`<p class="ae-error" role="alert">${this._error}</p>`
         : nothing}
@@ -368,10 +408,10 @@ export class ESPHomeScriptEditor extends LitElement {
    * parameter with a remove button + a footer "+ Add parameter".
    */
   private _renderParametersField(
-    automation: AutomationTree,
+    _automation: AutomationTree,
     disabled: boolean,
   ) {
-    const params = this._readParams(automation);
+    const params = this._params;
     return html`<div class="field">
       <label class="field-label">
         ${this._localize("device.automation_script_parameters")}
@@ -392,7 +432,7 @@ export class ESPHomeScriptEditor extends LitElement {
         type="button"
         class="script-param-add"
         ?disabled=${disabled}
-        @click=${() => this._addParam(automation)}
+        @click=${this._addParam}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
         ${this._localize("device.script_add_parameter")}
@@ -454,7 +494,15 @@ export class ESPHomeScriptEditor extends LitElement {
     );
   }
 
+  /**
+   * Push the local parameter list down to the wire. Empty-name
+   * rows persist in the local state but are NOT written to the
+   * wire dict (the wire shape is keyed by name and can't represent
+   * unnamed in-progress entries). They become visible to the
+   * writer only when the user fills the name in.
+   */
   private _writeParams(list: ParameterDecl[]) {
+    this._params = list;
     const dict: Record<string, string> = {};
     for (const { name, type } of list) {
       if (name) dict[name] = type;
@@ -465,23 +513,18 @@ export class ESPHomeScriptEditor extends LitElement {
     });
   }
 
-  private _addParam(automation: AutomationTree) {
-    this._writeParams([
-      ...this._readParams(automation),
-      { name: "", type: "int" },
-    ]);
-  }
+  private _addParam = () => {
+    this._writeParams([...this._params, { name: "", type: "int" }]);
+  };
 
   private _updateParam(idx: number, value: ParameterDecl) {
-    const automation = this.value ?? emptyAutomationTree();
-    const list = this._readParams(automation);
+    const list = this._params.slice();
     list[idx] = value;
     this._writeParams(list);
   }
 
   private _removeParam(idx: number) {
-    const automation = this.value ?? emptyAutomationTree();
-    const list = this._readParams(automation);
+    const list = this._params.slice();
     list.splice(idx, 1);
     this._writeParams(list);
   }

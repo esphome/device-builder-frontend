@@ -509,6 +509,7 @@
     "script_parameters_description": "Getypeerde parameters die aanroepers aan het script kunnen meegeven. Refereer ernaar binnen acties via `id(name)`.",
     "script_add_parameter": "Parameter toevoegen",
     "script_parameter_name_placeholder": "naam",
+    "script_actions_description": "De geordende lijst met acties die dit script uitvoert wanneer het wordt aangeroepen.",
     "automation_header_title": "{label}",
     "automation_header_description": "Wordt uitgevoerd wanneer de trigger afgaat. Definieer hieronder de lijst met acties.",
     "automation_wizard_pick_target": "Waar moet deze automatisering op reageren?",
