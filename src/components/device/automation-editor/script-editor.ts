@@ -285,7 +285,7 @@ export class ESPHomeScriptEditor extends LitElement {
             ? this._localize("device.saving")
             : this.addMode
               ? this._localize("device.add_script")
-              : this._localize("dashboard.save")}
+              : this._localize("device.save")}
         </button>
         ${this.location && this.value && !this.addMode
           ? html`<button
