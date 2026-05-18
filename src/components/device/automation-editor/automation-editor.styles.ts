@@ -12,6 +12,75 @@ export const automationEditorStyles = css`
     display: block;
   }
 
+  /* Component-style header card — at the top of the edit pane for
+     automations and scripts. Mirrors the layout from
+     device-board-info's section header so the editor reads as the
+     "section editor" for an automation / script. */
+  .ae-header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: flex-start;
+    gap: var(--wa-space-l);
+    padding-bottom: var(--wa-space-m);
+    margin-bottom: var(--wa-space-m);
+    border-bottom: 1px solid var(--wa-color-neutral-border-quiet, #e1e4e8);
+  }
+
+  .ae-header-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+    min-width: 0;
+  }
+
+  .ae-header-title {
+    margin: 0;
+    font-size: var(--wa-font-size-l);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+
+  .ae-header-docs {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    font-size: var(--wa-font-size-2xs);
+    text-decoration: none;
+    align-self: flex-start;
+  }
+
+  .ae-header-docs:hover {
+    text-decoration: underline;
+  }
+
+  .ae-header-docs wa-icon {
+    font-size: 12px;
+  }
+
+  .ae-header-desc {
+    margin: 0;
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-quiet);
+    line-height: 1.5;
+  }
+
+  .ae-header-icon {
+    flex: 0 0 auto;
+    width: 64px;
+    height: 64px;
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-lowered);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ae-header-icon wa-icon {
+    font-size: 32px;
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+  }
+
   /* One titled panel — used for target, trigger, conditions, actions,
      and for any nested sub-panels inside a control-flow action. */
   .ae-section {

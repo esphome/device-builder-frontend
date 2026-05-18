@@ -30,17 +30,22 @@ import { consume } from "@lit/context";
 import toast from "sonner-js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { mdiContentSave, mdiDelete } from "@mdi/js";
+import {
+  mdiArrowDecisionOutline,
+  mdiContentSave,
+  mdiDelete,
+  mdiOpenInNew,
+} from "@mdi/js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
+  AutomationTrigger,
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
   BoardCatalogEntry,
-  LightEffect,
   YamlDiff,
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
@@ -48,7 +53,7 @@ import { apiContext, localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { fetchLightEffects } from "../../../util/automation-catalog-cache.js";
+import { renderMarkdown } from "../../../util/markdown.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   emptyAutomationTree,
@@ -56,17 +61,16 @@ import {
 } from "./serialise.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
-import "./automation-condition-tree.js";
 import "./automation-action-list.js";
-import "./automation-effects-editor.js";
-import "./automation-script-params.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 registerMdiIcons({
+  "arrow-decision-outline": mdiArrowDecisionOutline,
   "content-save": mdiContentSave,
   delete: mdiDelete,
+  "open-in-new": mdiOpenInNew,
 });
 
 @customElement("esphome-automation-editor")
@@ -107,12 +111,9 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   @property() yaml = "";
 
-  /** Light-effect catalog — only fetched on demand since effects
-   *  aren't currently scoped on the backend. The trigger / action /
-   *  condition lists come from ``_available`` (scoped to this
-   *  device) so dropdowns only show items the YAML can actually
-   *  use. */
-  @state() private _effects: LightEffect[] = [];
+  /** Scoped catalog response. Trigger / action / condition lists
+   *  come from here (the backend filters to what's actually in the
+   *  device's YAML) so the dropdowns only show what's usable. */
   @state() private _available: AvailableAutomations | null = null;
 
   @state() private _loading = true;
@@ -204,17 +205,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     this._loading = true;
     this._error = "";
     try {
-      // The trigger / action / condition lists are scoped on the
-      // backend by what's in the device YAML — pulled via
-      // ``getAvailableAutomations`` below. Effects aren't yet
-      // scoped, so the cached full catalog is still the source
-      // here (the effects editor filters by the picked light
-      // platform locally).
-      const [effects] = await Promise.all([
-        fetchLightEffects(this._api, this.platform),
-        this.configuration ? this._loadAvailable() : Promise.resolve(),
-      ]);
-      this._effects = effects;
+      if (this.configuration) await this._loadAvailable();
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -250,8 +241,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     const triggers = this._available?.triggers ?? [];
     const actions = this._available?.actions ?? [];
     const conditions = this._available?.conditions ?? [];
-    const isLightEffect = target?.kind === "light_effect";
-    const isScript = target?.kind === "script";
     const disabled = this._saving || this._deleting;
     // For ``device_on`` and ``component_on`` the trigger lives in the
     // location alongside the YAML splice destination. Mirror it into
@@ -270,7 +259,11 @@ export class ESPHomeAutomationEditor extends LitElement {
         : target?.kind === "component_on"
           ? this._catalogIdFor(target) || null
           : null);
+    const activeTrigger = effectiveTriggerId
+      ? triggers.find((t) => t.id === effectiveTriggerId) ?? null
+      : null;
     return html`
+      ${this._renderHeader(activeTrigger)}
       <esphome-automation-target-picker
         .value=${target}
         .devices=${devices}
@@ -279,64 +272,32 @@ export class ESPHomeAutomationEditor extends LitElement {
         ?locked=${this._editMode}
         @target-change=${this._onTargetChange}
       ></esphome-automation-target-picker>
-
-      ${isLightEffect
-        ? html`<esphome-automation-effects-editor
-            .target=${target}
-            .effects=${this._effects}
-            .devices=${devices}
-            .effectId=${automation.trigger_id}
-            .effectParams=${automation.trigger_params}
-            .board=${this.board}
-            .yaml=${this.yaml}
-            ?disabled=${disabled}
-            @effect-change=${this._onEffectChange}
-            @effect-params-change=${this._onEffectParamsChange}
-          ></esphome-automation-effects-editor>`
-        : nothing}
-
-      ${isScript
-        ? html`<esphome-automation-script-params
-            .target=${target}
-            .triggerParams=${automation.trigger_params}
-            ?disabled=${disabled}
-            @script-params-change=${this._onScriptParamsChange}
-          ></esphome-automation-script-params>`
-        : nothing}
-
-      ${!isLightEffect && !isScript
-        ? html`<esphome-automation-trigger-picker
-            .target=${target}
-            .triggers=${triggers}
-            .devices=${devices}
-            .triggerId=${effectiveTriggerId}
-            .triggerParams=${automation.trigger_params}
-            .board=${this.board}
-            .yaml=${this.yaml}
-            ?disabled=${disabled}
-            @trigger-change=${this._onTriggerChange}
-            @trigger-params-change=${this._onTriggerParamsChange}
-          ></esphome-automation-trigger-picker>`
-        : nothing}
-
-      ${!isLightEffect
-        ? html`<esphome-automation-action-list
-            .actions=${automation.actions}
-            .catalog=${actions}
-            .conditionCatalog=${conditions}
-            .scripts=${scripts}
-            .devices=${devices}
-            .board=${this.board}
-            .yaml=${this.yaml}
-            ?disabled=${disabled}
-            @actions-change=${this._onActionsChange}
-          ></esphome-automation-action-list>`
-        : nothing}
-
+      <esphome-automation-trigger-picker
+        .target=${target}
+        .triggers=${triggers}
+        .devices=${devices}
+        .triggerId=${effectiveTriggerId}
+        .triggerParams=${automation.trigger_params}
+        .board=${this.board}
+        .yaml=${this.yaml}
+        ?disabled=${disabled}
+        @trigger-change=${this._onTriggerChange}
+        @trigger-params-change=${this._onTriggerParamsChange}
+      ></esphome-automation-trigger-picker>
+      <esphome-automation-action-list
+        .actions=${automation.actions}
+        .catalog=${actions}
+        .conditionCatalog=${conditions}
+        .scripts=${scripts}
+        .devices=${devices}
+        .board=${this.board}
+        .yaml=${this.yaml}
+        ?disabled=${disabled}
+        @actions-change=${this._onActionsChange}
+      ></esphome-automation-action-list>
       ${this._error
         ? html`<p class="ae-error" role="alert">${this._error}</p>`
         : nothing}
-
       <div class="ae-actions">
         <button
           type="button"
@@ -347,9 +308,11 @@ export class ESPHomeAutomationEditor extends LitElement {
           <wa-icon library="mdi" name="content-save"></wa-icon>
           ${this._saving
             ? this._localize("device.saving")
-            : this._localize("device.add_automation")}
+            : this.addMode
+              ? this._localize("device.add_automation")
+              : this._localize("dashboard.save")}
         </button>
-        ${this.location && this.value
+        ${this.location && this.value && !this.addMode
           ? html`<button
               type="button"
               class="ae-danger"
@@ -362,6 +325,44 @@ export class ESPHomeAutomationEditor extends LitElement {
           : nothing}
       </div>
     `;
+  }
+
+  /**
+   * Component-style header card. In edit-mode this shows the
+   * trigger's name + description + docs link so the section reads
+   * like a component editor. In add-mode it's a generic "New
+   * automation" intro (the trigger isn't picked yet).
+   */
+  private _renderHeader(activeTrigger: AutomationTrigger | null) {
+    const title =
+      this.addMode || !activeTrigger
+        ? this._localize("device.add_automation")
+        : this._localize("device.automation_header_title", {
+            label: activeTrigger.name,
+          });
+    const desc = activeTrigger?.description
+      ? renderMarkdown(activeTrigger.description)
+      : renderMarkdown(this._localize("device.automation_header_description"));
+    return html`<div class="ae-header">
+      <div class="ae-header-text">
+        <h2 class="ae-header-title">${title}</h2>
+        ${activeTrigger?.docs_url
+          ? html`<a
+              class="ae-header-docs"
+              href=${activeTrigger.docs_url}
+              target="_blank"
+              rel="noreferrer"
+            >
+              ${this._localize("device.docs")}
+              <wa-icon library="mdi" name="open-in-new"></wa-icon>
+            </a>`
+          : nothing}
+        <p class="ae-header-desc">${desc}</p>
+      </div>
+      <div class="ae-header-icon">
+        <wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>
+      </div>
+    </div>`;
   }
 
   // ─── State mutations ─────────────────────────────────────────
@@ -455,33 +456,6 @@ export class ESPHomeAutomationEditor extends LitElement {
   ) => {
     e.stopPropagation();
     this._withValue({ actions: e.detail.actions });
-  };
-
-  private _onEffectChange = (
-    e: CustomEvent<{ effectId: string; params: Record<string, unknown> }>,
-  ) => {
-    e.stopPropagation();
-    // For light effects we abuse trigger_id/trigger_params as the
-    // effect-id / effect-params storage. The writer translates this
-    // back into a regular ``effects:`` list item on save.
-    this._withValue({
-      trigger_id: e.detail.effectId,
-      trigger_params: e.detail.params,
-    });
-  };
-
-  private _onEffectParamsChange = (
-    e: CustomEvent<{ params: Record<string, unknown> }>,
-  ) => {
-    e.stopPropagation();
-    this._withValue({ trigger_params: e.detail.params });
-  };
-
-  private _onScriptParamsChange = (
-    e: CustomEvent<{ triggerParams: Record<string, unknown> }>,
-  ) => {
-    e.stopPropagation();
-    this._withValue({ trigger_params: e.detail.triggerParams });
   };
 
   // ─── Save / delete ───────────────────────────────────────────

@@ -36,6 +36,7 @@ import "./add-automation-dialog.js";
 import "./add-component-dialog.js";
 import "./add-config-dialog.js";
 import "./automation-editor/automation-editor.js";
+import "./automation-editor/script-editor.js";
 import "./device-section-config.js";
 import { locationFromSectionKey } from "./automation-editor/serialise.js";
 
@@ -459,26 +460,44 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * these things, rather than handing them an add-button right here.
    */
   /**
-   * Route an automation section key (``automation:component_on:…``)
-   * into the structured ``<esphome-automation-editor>``; everything
-   * else lands in the regular ``<esphome-device-section-config>``.
+   * Route an automation / script section key into the right
+   * structured editor; everything else lands in the regular
+   * ``<esphome-device-section-config>``.
    *
-   * The automation editor self-loads its parsed value from the
+   * Three kinds today:
+   *
+   * - ``automation:script:<id>`` → ``<esphome-script-editor>``
+   *   (scripts have their own chrome — id + run mode + parameters
+   *   + actions, no trigger).
+   * - other ``automation:…`` keys → ``<esphome-automation-editor>``
+   *   (trigger-based automations).
+   * - anything else → component section editor.
+   *
+   * Each structured editor self-loads its parsed value from the
    * backend on mount based on ``.location``; we just resolve the
-   * key into a typed location here so the editor doesn't have to
+   * key into a typed location here so the editors don't have to
    * know about navigator routing.
    */
   private _renderSelectedSection() {
     const key = this.selectedSection!;
-    const automationLocation = key.startsWith("automation:")
+    const location = key.startsWith("automation:")
       ? locationFromSectionKey(key)
       : null;
-    if (automationLocation) {
+    if (location?.kind === "script") {
+      return html`<esphome-script-editor
+        .configuration=${this.configuration}
+        .board=${this.board}
+        .platform=${this.board?.esphome.platform ?? ""}
+        .location=${location}
+        .yaml=${this.yaml}
+      ></esphome-script-editor>`;
+    }
+    if (location) {
       return html`<esphome-automation-editor
         .configuration=${this.configuration}
         .board=${this.board}
         .platform=${this.board?.esphome.platform ?? ""}
-        .location=${automationLocation}
+        .location=${location}
         .yaml=${this.yaml}
       ></esphome-automation-editor>`;
     }

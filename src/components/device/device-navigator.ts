@@ -39,6 +39,8 @@ import "./add-component-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import "./add-config-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
+import "./add-script-dialog.js";
+import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
@@ -100,6 +102,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @query("esphome-add-automation-dialog")
   private _addAutomationDialog!: ESPHomeAddAutomationDialog;
+
+  @query("esphome-add-script-dialog")
+  private _addScriptDialog!: ESPHomeAddScriptDialog;
 
   @property({ attribute: false })
   selectedKey: string | null = null;
@@ -459,7 +464,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
           {
             label: this._localize("device.add_script"),
             icon: "script-text-outline",
-            onClick: () => this._addAutomationDialog.open("script"),
+            onClick: () => this._addScriptDialog.open(),
             disabled: !AUTOMATIONS_ENABLED,
             disabledReason: this._localize("device.add_automation_unavailable"),
           },
@@ -485,11 +490,19 @@ export class ESPHomeDeviceNavigator extends LitElement {
         ></esphome-add-component-dialog>
         ${AUTOMATIONS_ENABLED
           ? html`<esphome-add-automation-dialog
-              .boardName=${this.boardName}
-              .configuration=${this.configuration}
-              .board=${this.board}
-              .yaml=${this.yaml}
-            ></esphome-add-automation-dialog>`
+                .boardName=${this.boardName}
+                .configuration=${this.configuration}
+                .board=${this.board}
+                .yaml=${this.yaml}
+                @automation-added=${this._onAutomationAdded}
+              ></esphome-add-automation-dialog>
+              <esphome-add-script-dialog
+                .boardName=${this.boardName}
+                .configuration=${this.configuration}
+                .board=${this.board}
+                .yaml=${this.yaml}
+                @automation-added=${this._onAutomationAdded}
+              ></esphome-add-script-dialog>`
           : nothing}
         <header class="card-header">
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
@@ -694,6 +707,22 @@ export class ESPHomeDeviceNavigator extends LitElement {
       })
     );
   }
+
+  /**
+   * Bubble up from the add-automation / add-script wizards. After
+   * a successful upsert we want the navigator to route to the new
+   * section so the user lands in the inline edit pane to fill in
+   * actions (and parameters, for scripts). The wizard emits with
+   * a stable section key built via ``sectionKeyFromLocation`` —
+   * the same key parseYamlAutomations will produce on the next
+   * navigator render once the YAML refresh propagates.
+   */
+  private _onAutomationAdded = (
+    e: CustomEvent<{ sectionKey: string }>,
+  ) => {
+    e.stopPropagation();
+    this._emitSectionSelect(e.detail.sectionKey, undefined);
+  };
 }
 
 declare global {
