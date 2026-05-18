@@ -274,7 +274,11 @@ export class ESPHomeAutomationEditor extends LitElement {
             automation,
             disabled,
           )
-        : this._renderTriggerParamsForm(activeTrigger, automation, disabled)}
+        : html`${this._renderIdentityFields(activeTrigger)}${this._renderTriggerParamsForm(
+            activeTrigger,
+            automation,
+            disabled,
+          )}`}
       <div class="field">
         <label class="field-label">
           ${this._localize("device.automation_action")}
@@ -445,16 +449,14 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Component-style header card. Title is always "Automation";
-   * the trigger label sits as a subtitle so the user sees both
-   * the section type and the specific trigger at a glance. Below
-   * sits the docs link + description, then a compact metadata
-   * block showing target / component / trigger as read-only
-   * "Label: Value" rows — those are pinned for an existing
-   * automation and don't need to look like form fields.
+   * Component-style header card. Just the section type as a
+   * title, the docs link, and a one-line description of what
+   * automations are. The specific identity (target + trigger) is
+   * carried by the read-only form fields below the header — no
+   * subtitle here because it would just duplicate the trigger
+   * field that's already in the form.
    */
   private _renderHeader(activeTrigger: AutomationTrigger | null) {
-    const subtitle = activeTrigger?.name ?? "";
     const desc = activeTrigger?.description
       ? renderMarkdown(activeTrigger.description)
       : renderMarkdown(this._localize("device.automation_header_description"));
@@ -463,9 +465,6 @@ export class ESPHomeAutomationEditor extends LitElement {
         <h2 class="ae-header-title">
           ${this._localize("device.automation_header_title_static")}
         </h2>
-        ${subtitle
-          ? html`<p class="ae-header-subtitle">${subtitle}</p>`
-          : nothing}
         ${activeTrigger?.docs_url
           ? html`<a
               class="ae-header-docs"
@@ -478,7 +477,6 @@ export class ESPHomeAutomationEditor extends LitElement {
             </a>`
           : nothing}
         <p class="ae-header-desc">${desc}</p>
-        ${!this.addMode ? this._renderMetadata() : nothing}
       </div>
       <div class="ae-header-icon">
         <wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>
@@ -487,25 +485,35 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Read-only metadata block. One row per piece of pinned identity
-   * that isn't editable on an existing automation. We collapse the
-   * kind + bound component into a single TARGET row so the user
-   * sees, at a glance, what this automation is wired to — without
-   * needing to read 'A configured component' as a separate piece
-   * of meta. The trigger name lives in the header subtitle and is
-   * not repeated here.
+   * Read-only target / trigger fields — styled like a component
+   * config form so the eye reads them as the same kind of thing
+   * as the editable rows above. The inputs are disabled (the
+   * values are pinned for an existing automation) but still
+   * convey the identity at a glance.
    */
-  private _renderMetadata() {
+  private _renderIdentityFields(activeTrigger: AutomationTrigger | null) {
     const loc = this.location;
     if (!loc) return nothing;
-    const value = this._targetMetadataValue(loc);
-    if (!value) return nothing;
-    return html`<dl class="ae-metadata">
-      <dt class="ae-metadata-label">
-        ${this._localize("device.automation_target")}
-      </dt>
-      <dd class="ae-metadata-value">${value}</dd>
-    </dl>`;
+    const targetValue = this._targetMetadataValue(loc);
+    const triggerValue = activeTrigger?.name ?? "";
+    const showTrigger =
+      loc.kind === "device_on" || loc.kind === "component_on";
+    return html`
+      <div class="field">
+        <label class="field-label">
+          ${this._localize("device.automation_target")}
+        </label>
+        <input type="text" readonly .value=${targetValue} />
+      </div>
+      ${showTrigger
+        ? html`<div class="field">
+            <label class="field-label">
+              ${this._localize("device.automation_trigger")}
+            </label>
+            <input type="text" readonly .value=${triggerValue} />
+          </div>`
+        : nothing}
+    `;
   }
 
   /**

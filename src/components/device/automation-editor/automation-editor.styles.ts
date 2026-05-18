@@ -40,10 +40,11 @@ export const automationEditorStyles = css`
     color: var(--wa-color-text-normal);
   }
 
-  /* Section-type subtitle under the main header title. The user
-     sees the kind ("Automation" / "Script") in the title and the
-     specific identity ("Switch → On Turn Off" / the script id) on
-     the line below. */
+  /* Section-type subtitle under the main header title. Kept for
+     the script editor which renders the id as a subtitle below
+     the static "Script" title. The automation editor doesn't use
+     a subtitle anymore — its identity (target + trigger) is in
+     the read-only form fields below the header. */
   .ae-header-subtitle {
     margin: 0;
     font-size: var(--wa-font-size-m);
@@ -51,35 +52,14 @@ export const automationEditorStyles = css`
     color: var(--wa-color-text-quiet);
   }
 
-  /* Read-only metadata block below the header description. Used
-     in edit-mode to show pinned identity fields (target kind,
-     bound component, trigger key) as definition-list rows
-     instead of disabled form inputs — they're not editable on an
-     existing automation. */
-  .ae-metadata {
-    display: grid;
-    grid-template-columns: max-content 1fr;
-    column-gap: var(--wa-space-m);
-    row-gap: var(--wa-space-2xs);
-    margin: var(--wa-space-s) 0 0 0;
-    padding: var(--wa-space-s) 0 0 0;
-    border-top: 1px solid var(--wa-color-neutral-border-quiet, #e1e4e8);
-  }
-
-  .ae-metadata-label {
-    margin: 0;
-    font-size: var(--wa-font-size-2xs);
-    font-weight: var(--wa-font-weight-semibold);
+  /* Readonly inputs (target / trigger identity fields on the
+     automation editor) read as form fields but the user can't
+     edit them. Slightly different from the editable inputs:
+     muted background + cursor: default to signal non-interactive. */
+  input[readonly] {
+    background: var(--wa-color-surface-lowered);
+    cursor: default;
     color: var(--wa-color-text-quiet);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-
-  .ae-metadata-value {
-    margin: 0;
-    font-size: var(--wa-font-size-s);
-    color: var(--wa-color-text-normal);
-    word-break: break-word;
   }
 
   .ae-header-docs {
