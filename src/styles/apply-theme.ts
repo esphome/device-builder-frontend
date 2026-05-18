@@ -42,12 +42,15 @@ function applyWaTheme(): void {
  * cyan brand palette to Home Assistant's primary palette when
  * embedded as an HA panel. ``--primary-color`` and friends are set
  * by HA's theme on the root; when the panel runs standalone those
- * variables are undefined and the fallback values (HA Material
- * Blue 500 / its translucent and white companions) keep the panel
- * looking consistent with HA's palette anyway. Without this, the
- * panel headers, primary buttons, FAB, and active view-toggle pip
- * burst in WebAwesome cyan, which clashes hard against HA's blue
- * sidebar and chrome.
+ * variables are undefined and the fallback values (HA's current
+ * ``--ha-color-primary-40`` = #009ac7, plus matching translucent
+ * and white companions) keep the panel looking consistent with
+ * HA's default theme anyway. (Note: HA used to resolve
+ * ``--primary-color`` to the legacy Material Light Blue 500 value
+ * ``#03a9f4`` — that's been retired upstream in favour of
+ * ``#009ac7``.) Without this, the panel headers, primary buttons,
+ * FAB, and active view-toggle pip burst in WebAwesome cyan, which
+ * clashes hard against HA's blue sidebar and chrome.
  */
 function applyEspHomeTokens(): void {
   const style = document.createElement("style");

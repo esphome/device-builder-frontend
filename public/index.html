@@ -116,9 +116,10 @@
       .wa-light,
       .wa-dark .wa-invert {
         /* Match Home Assistant's primary palette when embedded as an
-           HA panel; fall back to HA Material Light Blue 500 standalone
-           so the standalone palette stays consistent with HA rather
-           than reverting to WebAwesome cyan. */
+           HA panel; fall back to HA's current --ha-color-primary-40
+           (#009ac7) standalone so the standalone palette stays
+           consistent with HA's default theme rather than reverting
+           to WebAwesome cyan. */
         --wa-color-brand-fill-loud: var(--primary-color, #009ac7);
         --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
       }
