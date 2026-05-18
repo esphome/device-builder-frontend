@@ -264,37 +264,39 @@ export class ESPHomeAutomationEditor extends LitElement {
       : null;
     return html`
       ${this._renderHeader(activeTrigger)}
-      <esphome-automation-target-picker
-        .value=${target}
-        .devices=${devices}
-        .scripts=${scripts}
-        ?disabled=${disabled}
-        ?locked=${this._editMode}
-        @target-change=${this._onTargetChange}
-      ></esphome-automation-target-picker>
-      <esphome-automation-trigger-picker
-        .target=${target}
-        .triggers=${triggers}
-        .devices=${devices}
-        .triggerId=${effectiveTriggerId}
-        .triggerParams=${automation.trigger_params}
-        .board=${this.board}
-        .yaml=${this.yaml}
-        ?disabled=${disabled}
-        @trigger-change=${this._onTriggerChange}
-        @trigger-params-change=${this._onTriggerParamsChange}
-      ></esphome-automation-trigger-picker>
-      <esphome-automation-action-list
-        .actions=${automation.actions}
-        .catalog=${actions}
-        .conditionCatalog=${conditions}
-        .scripts=${scripts}
-        .devices=${devices}
-        .board=${this.board}
-        .yaml=${this.yaml}
-        ?disabled=${disabled}
-        @actions-change=${this._onActionsChange}
-      ></esphome-automation-action-list>
+      ${this.addMode
+        ? this._renderAddModePickers(
+            target,
+            triggers,
+            devices,
+            scripts,
+            effectiveTriggerId,
+            automation,
+            disabled,
+          )
+        : this._renderTriggerParamsForm(activeTrigger, automation, disabled)}
+      <div class="field">
+        <label class="field-label">
+          ${this._localize("device.automation_action")}
+        </label>
+        <p class="field-description">
+          ${renderMarkdown(
+            this._localize("device.automation_actions_description"),
+          )}
+        </p>
+        <esphome-automation-action-list
+          no-header
+          .actions=${automation.actions}
+          .catalog=${actions}
+          .conditionCatalog=${conditions}
+          .scripts=${scripts}
+          .devices=${devices}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          ?disabled=${disabled}
+          @actions-change=${this._onActionsChange}
+        ></esphome-automation-action-list>
+      </div>
       ${this._error
         ? html`<p class="ae-error" role="alert">${this._error}</p>`
         : nothing}
@@ -328,24 +330,142 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Component-style header card. In edit-mode this shows the
-   * trigger's name + description + docs link so the section reads
-   * like a component editor. In add-mode it's a generic "New
-   * automation" intro (the trigger isn't picked yet).
+   * Trigger param form for edit-mode. The target / trigger
+   * dropdowns are gone — those become read-only metadata in the
+   * header. Only the trigger's ``config_entries`` need a form,
+   * since those ARE editable on an existing automation (e.g.
+   * tweaking ``min_length`` on an ``on_click`` trigger after the
+   * fact).
+   */
+  private _renderTriggerParamsForm(
+    activeTrigger: AutomationTrigger | null,
+    automation: AutomationTree,
+    disabled: boolean,
+  ) {
+    if (!activeTrigger || activeTrigger.config_entries.length === 0) {
+      return nothing;
+    }
+    return html`<div class="field">
+      <label class="field-label">
+        ${this._localize("device.automation_trigger_options")}
+      </label>
+      <esphome-config-entry-form
+        .entries=${activeTrigger.config_entries}
+        .values=${automation.trigger_params}
+        .board=${this.board}
+        .yaml=${this.yaml}
+        ?disabled=${disabled}
+        @value-change=${this._onTriggerParamsValueChange}
+      ></esphome-config-entry-form>
+    </div>`;
+  }
+
+  /**
+   * Legacy add-mode pickers. The "+ Add automation" wizard now
+   * collects target / trigger before mounting the editor, so this
+   * path isn't normally reached from the navigator — kept for
+   * back-compat if a parent ever instantiates the editor in
+   * add-mode directly.
+   */
+  private _renderAddModePickers(
+    target: AutomationLocation | null,
+    triggers: AutomationTrigger[],
+    devices: AvailableComponentInstance[],
+    scripts: AvailableScript[],
+    effectiveTriggerId: string | null,
+    automation: AutomationTree,
+    disabled: boolean,
+  ) {
+    return html`
+      <esphome-automation-target-picker
+        .value=${target}
+        .devices=${devices}
+        .scripts=${scripts}
+        ?disabled=${disabled}
+        @target-change=${this._onTargetChange}
+      ></esphome-automation-target-picker>
+      <esphome-automation-trigger-picker
+        .target=${target}
+        .triggers=${triggers}
+        .devices=${devices}
+        .triggerId=${effectiveTriggerId}
+        .triggerParams=${automation.trigger_params}
+        .board=${this.board}
+        .yaml=${this.yaml}
+        ?disabled=${disabled}
+        @trigger-change=${this._onTriggerChange}
+        @trigger-params-change=${this._onTriggerParamsChange}
+      ></esphome-automation-trigger-picker>
+    `;
+  }
+
+  private _onTriggerParamsValueChange = (
+    e: CustomEvent<{ path: string[]; value: unknown }>,
+  ) => {
+    e.stopPropagation();
+    // Form's value-change events carry path-based updates; merge
+    // into the trigger_params dict.
+    const { path, value } = e.detail;
+    const automation = this.value ?? emptyAutomationTree();
+    const next = this._applyParamPatch(automation.trigger_params, path, value);
+    this._withValue({ trigger_params: next });
+  };
+
+  /** Apply a single value-change patch into a params dict. */
+  private _applyParamPatch(
+    params: Record<string, unknown>,
+    path: string[],
+    value: unknown,
+  ): Record<string, unknown> {
+    if (path.length === 0) {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return { ...(value as Record<string, unknown>) };
+      }
+      return {};
+    }
+    const [head, ...rest] = path;
+    if (rest.length === 0) {
+      if (value === undefined || value === "") {
+        const next = { ...params };
+        delete next[head];
+        return next;
+      }
+      return { ...params, [head]: value };
+    }
+    const child =
+      params[head] &&
+      typeof params[head] === "object" &&
+      !Array.isArray(params[head])
+        ? (params[head] as Record<string, unknown>)
+        : {};
+    return {
+      ...params,
+      [head]: this._applyParamPatch(child, rest, value),
+    };
+  }
+
+  /**
+   * Component-style header card. Title is always "Automation";
+   * the trigger label sits as a subtitle so the user sees both
+   * the section type and the specific trigger at a glance. Below
+   * sits the docs link + description, then a compact metadata
+   * block showing target / component / trigger as read-only
+   * "Label: Value" rows — those are pinned for an existing
+   * automation and don't need to look like form fields.
    */
   private _renderHeader(activeTrigger: AutomationTrigger | null) {
-    const title =
-      this.addMode || !activeTrigger
-        ? this._localize("device.add_automation")
-        : this._localize("device.automation_header_title", {
-            label: activeTrigger.name,
-          });
+    const subtitle = activeTrigger?.name ?? "";
     const desc = activeTrigger?.description
       ? renderMarkdown(activeTrigger.description)
       : renderMarkdown(this._localize("device.automation_header_description"));
     return html`<div class="ae-header">
       <div class="ae-header-text">
-        <h2 class="ae-header-title">${title}</h2>
+        <h2 class="ae-header-title">
+          ${this._localize("device.automation_header_title_static")}
+        </h2>
+        ${subtitle
+          ? html`<p class="ae-header-subtitle">${subtitle}</p>`
+          : nothing}
         ${activeTrigger?.docs_url
           ? html`<a
               class="ae-header-docs"
@@ -358,11 +478,75 @@ export class ESPHomeAutomationEditor extends LitElement {
             </a>`
           : nothing}
         <p class="ae-header-desc">${desc}</p>
+        ${!this.addMode ? this._renderMetadata() : nothing}
       </div>
       <div class="ae-header-icon">
         <wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>
       </div>
     </div>`;
+  }
+
+  /**
+   * Read-only metadata block. Renders one row per piece of
+   * identity that isn't editable on an existing automation: the
+   * target kind, the bound component (if applicable), and the
+   * trigger key. Used in edit-mode below the header description.
+   */
+  private _renderMetadata() {
+    const loc = this.location;
+    if (!loc) return nothing;
+    const rows: Array<{ label: string; value: string }> = [];
+    rows.push({
+      label: this._localize("device.automation_target"),
+      value: this._targetKindLabel(loc.kind),
+    });
+    if (loc.kind === "component_on") {
+      const device = this._available?.devices.find(
+        (d) => d.id === loc.component_id,
+      );
+      const value = device
+        ? `${device.name ?? device.id} (${device.component_id})`
+        : loc.component_id;
+      rows.push({
+        label: this._localize("device.automation_target_component_label"),
+        value,
+      });
+    }
+    if (loc.kind === "interval") {
+      rows.push({
+        label: this._localize("device.automation_target_interval"),
+        value: `#${loc.index + 1}`,
+      });
+    }
+    // We deliberately don't add a TRIGGER row — the trigger's
+    // human-readable name is already the header subtitle right
+    // above, so a "Trigger: on_turn_off" row here would be both
+    // redundant and less readable than the subtitle.
+    return html`<dl class="ae-metadata">
+      ${rows.map(
+        ({ label, value }) => html`
+          <dt class="ae-metadata-label">${label}</dt>
+          <dd class="ae-metadata-value">${value}</dd>
+        `,
+      )}
+    </dl>`;
+  }
+
+  private _targetKindLabel(
+    kind: "device_on" | "component_on" | "interval" | "script" | "light_effect",
+  ): string {
+    switch (kind) {
+      case "device_on":
+        return this._localize("device.automation_target_device");
+      case "component_on":
+        return this._localize("device.automation_target_component");
+      case "interval":
+        return this._localize("device.automation_target_interval");
+      case "script":
+        return this._localize("device.automation_target_script");
+      case "light_effect":
+        return this._localize("device.automation_light_effect");
+    }
   }
 
   // ─── State mutations ─────────────────────────────────────────
