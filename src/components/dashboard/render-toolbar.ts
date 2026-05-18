@@ -180,9 +180,6 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
       name="dashboard-search"
       with-clear
       autocomplete="off"
-      autocorrect="off"
-      autocapitalize="off"
-      spellcheck="false"
       data-form-type="other"
       data-lpignore="true"
       data-1p-ignore="true"
