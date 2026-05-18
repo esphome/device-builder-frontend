@@ -12,11 +12,18 @@
  */
 import { consume } from "@lit/context";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import { mdiArrowDown, mdiArrowUp, mdiClose, mdiPlus } from "@mdi/js";
+import { customElement, property, query, state } from "lit/decorators.js";
+import {
+  mdiArrowDown,
+  mdiArrowUp,
+  mdiClose,
+  mdiPencilOutline,
+  mdiPlus,
+} from "@mdi/js";
 
 import type {
   AutomationCondition,
+  AvailableComponentInstance,
   BoardCatalogEntry,
   ConditionNode,
 } from "../../../api/types.js";
@@ -36,15 +43,19 @@ import {
 } from "./serialise.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
+import "./catalog-picker-dialog.js";
+import type {
+  CatalogPickedDetail,
+  ESPHomeCatalogPickerDialog,
+} from "./catalog-picker-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/option/option.js";
-import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
   "arrow-down": mdiArrowDown,
   "arrow-up": mdiArrowUp,
   close: mdiClose,
+  "pencil-outline": mdiPencilOutline,
   plus: mdiPlus,
 });
 
@@ -76,6 +87,23 @@ export class ESPHomeAutomationConditionTree extends LitElement {
   @property({ type: Boolean, attribute: "no-header" })
   noHeader = false;
 
+  /** Configured component instances — forwarded into the catalog
+   *  picker dialog so the user can scope by configured device when
+   *  building a condition (e.g. ``binary_sensor.is_on`` for which
+   *  configured binary_sensor). */
+  @property({ attribute: false })
+  devices: AvailableComponentInstance[] = [];
+
+  @query("esphome-catalog-picker-dialog")
+  private _picker!: ESPHomeCatalogPickerDialog;
+
+  /**
+   * Tracks which row the user is currently changing the kind of.
+   * ``-1`` means "we're not changing an existing row — the picker
+   * was opened from the bottom-of-list '+ Add condition' button".
+   */
+  @state() private _changingIdx = -1;
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
@@ -95,11 +123,17 @@ export class ESPHomeAutomationConditionTree extends LitElement {
           type="button"
           class="ae-add"
           ?disabled=${this.disabled || this.catalog.length === 0}
-          @click=${this._addCondition}
+          @click=${this._openPickerForAdd}
         >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("device.add_condition")}
         </button>
+        <esphome-catalog-picker-dialog
+          kind="condition"
+          .items=${this.catalog}
+          .devices=${this.devices}
+          @catalog-picked=${this._onConditionPicked}
+        ></esphome-catalog-picker-dialog>
       </div>
     `;
   }
@@ -110,17 +144,17 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     return html`
       <div class="ae-row">
         <div class="ae-row-body">
-          <wa-select
+          <button
+            type="button"
+            class="ae-row-picker"
             ?disabled=${this.disabled}
-            @change=${(e: Event) =>
-              this._changeId(idx, (e.target as HTMLSelectElement).value)}
+            @click=${() => this._openPickerForChange(idx)}
           >
-            ${this.catalog.map(
-              (c) => html`<wa-option value=${c.id} ?selected=${c.id === node.condition_id}
-                >${c.name}</wa-option
-              >`,
-            )}
-          </wa-select>
+            <span class="ae-row-picker-name">
+              ${def?.name ?? node.condition_id}
+            </span>
+            <wa-icon library="mdi" name="pencil-outline"></wa-icon>
+          </button>
           ${def?.description
             ? html`<p class="ae-section-desc">
                 ${renderMarkdown(def.description)}
@@ -146,6 +180,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
                   no-header
                   .conditions=${node.children ?? []}
                   .catalog=${this.catalog}
+                  .devices=${this.devices}
                   .board=${this.board}
                   .yaml=${this.yaml}
                   ?disabled=${this.disabled}
@@ -186,19 +221,35 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     `;
   }
 
-  private _addCondition = () => {
+  private _openPickerForAdd = () => {
     if (this.catalog.length === 0) return;
-    const next = [...this.conditions, emptyConditionNode(this.catalog[0].id)];
-    this._emit(next);
+    this._changingIdx = -1;
+    this._picker.open();
   };
 
-  private _changeId(idx: number, newId: string) {
+  private _openPickerForChange(idx: number) {
+    if (this.catalog.length === 0) return;
+    this._changingIdx = idx;
+    this._picker.open();
+  }
+
+  private _onConditionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
+    e.stopPropagation();
     // Switching condition kinds drops the old params — the new
     // condition's schema is different, so retaining values would
     // surface fields the renderer wouldn't paint and re-emit values
     // the writer wouldn't understand.
-    this._emit(replaceAt(this.conditions, idx, emptyConditionNode(newId)));
-  }
+    const node: ConditionNode = emptyConditionNode(e.detail.id);
+    if (e.detail.preFilledParams) {
+      node.params = { ...node.params, ...e.detail.preFilledParams };
+    }
+    if (this._changingIdx >= 0) {
+      this._emit(replaceAt(this.conditions, this._changingIdx, node));
+    } else {
+      this._emit([...this.conditions, node]);
+    }
+    this._changingIdx = -1;
+  };
 
   private _onParamChange(idx: number, e: CustomEvent<ConfigEntryValueChange>) {
     e.stopPropagation();

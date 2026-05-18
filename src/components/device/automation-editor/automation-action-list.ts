@@ -12,13 +12,14 @@
  */
 import { consume } from "@lit/context";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import { mdiPlus } from "@mdi/js";
 
 import type {
   ActionNode,
   AutomationAction,
   AutomationCondition,
+  AvailableComponentInstance,
   AvailableScript,
   BoardCatalogEntry,
 } from "../../../api/types.js";
@@ -30,6 +31,11 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import { emptyActionNode, removeAt, replaceAt, swap } from "./serialise.js";
 import "./automation-action-node.js";
+import "./catalog-picker-dialog.js";
+import type {
+  CatalogPickedDetail,
+  ESPHomeCatalogPickerDialog,
+} from "./catalog-picker-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -53,6 +59,11 @@ export class ESPHomeAutomationActionList extends LitElement {
   @property({ attribute: false })
   scripts: AvailableScript[] = [];
 
+  /** Configured component instances — forwarded to the picker
+   *  dialog for its "By target" tab. */
+  @property({ attribute: false })
+  devices: AvailableComponentInstance[] = [];
+
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
@@ -66,6 +77,9 @@ export class ESPHomeAutomationActionList extends LitElement {
    *  action). The parent action-node already labels the slot. */
   @property({ type: Boolean, attribute: "no-header" })
   noHeader = false;
+
+  @query("esphome-catalog-picker-dialog")
+  private _picker!: ESPHomeCatalogPickerDialog;
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
@@ -86,11 +100,17 @@ export class ESPHomeAutomationActionList extends LitElement {
           type="button"
           class="ae-add"
           ?disabled=${this.disabled || this.catalog.length === 0}
-          @click=${this._addAction}
+          @click=${this._openPicker}
         >
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("device.add_action")}
         </button>
+        <esphome-catalog-picker-dialog
+          kind="action"
+          .items=${this.catalog}
+          .devices=${this.devices}
+          @catalog-picked=${this._onActionPicked}
+        ></esphome-catalog-picker-dialog>
       </div>
     `;
   }
@@ -101,6 +121,7 @@ export class ESPHomeAutomationActionList extends LitElement {
       .catalog=${this.catalog}
       .conditionCatalog=${this.conditionCatalog}
       .scripts=${this.scripts}
+      .devices=${this.devices}
       .board=${this.board}
       .yaml=${this.yaml}
       ?disabled=${this.disabled}
@@ -114,9 +135,18 @@ export class ESPHomeAutomationActionList extends LitElement {
     ></esphome-automation-action-node>`;
   }
 
-  private _addAction = () => {
+  private _openPicker = () => {
     if (this.catalog.length === 0) return;
-    this._emit([...this.actions, emptyActionNode(this.catalog[0].id)]);
+    this._picker.open();
+  };
+
+  private _onActionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
+    e.stopPropagation();
+    const node = emptyActionNode(e.detail.id);
+    if (e.detail.preFilledParams) {
+      node.params = { ...node.params, ...e.detail.preFilledParams };
+    }
+    this._emit([...this.actions, node]);
   };
 
   private _onActionChange(idx: number, e: CustomEvent<{ value: ActionNode }>) {

@@ -325,6 +325,7 @@ export class ESPHomeAutomationEditor extends LitElement {
             .catalog=${actions}
             .conditionCatalog=${conditions}
             .scripts=${scripts}
+            .devices=${devices}
             .board=${this.board}
             .yaml=${this.yaml}
             ?disabled=${disabled}

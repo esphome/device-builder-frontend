@@ -61,6 +61,45 @@ export const automationEditorStyles = css`
     margin-top: var(--wa-space-2xs);
   }
 
+  /* The big "select action / condition" button inside a row that
+     opens the catalog picker. Reads as the primary control of the
+     row — clicking it is how the user changes what the row IS. */
+  .ae-row-picker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wa-space-s);
+    appearance: none;
+    width: 100%;
+    background: var(--wa-color-surface-default);
+    border: 1px solid var(--wa-color-neutral-border-quiet, #d1d5db);
+    border-radius: var(--wa-border-radius-s);
+    padding: var(--wa-space-xs) var(--wa-space-s);
+    cursor: pointer;
+    font-size: var(--wa-font-size-s);
+    color: var(--wa-color-text-normal);
+    text-align: left;
+  }
+
+  .ae-row-picker:hover:not(:disabled) {
+    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
+  }
+
+  .ae-row-picker:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .ae-row-picker-name {
+    font-weight: var(--wa-font-weight-semibold);
+  }
+
+  .ae-row-picker wa-icon {
+    color: var(--wa-color-text-quiet);
+    font-size: 14px;
+    flex: 0 0 auto;
+  }
+
   .ae-row-body {
     display: flex;
     flex-direction: column;

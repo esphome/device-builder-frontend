@@ -13,13 +13,19 @@
  */
 import { consume } from "@lit/context";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
-import { mdiArrowDown, mdiArrowUp, mdiClose } from "@mdi/js";
+import { customElement, property, query, state } from "lit/decorators.js";
+import {
+  mdiArrowDown,
+  mdiArrowUp,
+  mdiClose,
+  mdiPencilOutline,
+} from "@mdi/js";
 
 import type {
   ActionNode,
   AutomationAction,
   AutomationCondition,
+  AvailableComponentInstance,
   AvailableScript,
   BoardCatalogEntry,
   ConditionNode,
@@ -35,6 +41,11 @@ import { applyParamChange } from "./serialise.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "./automation-condition-tree.js";
+import "./catalog-picker-dialog.js";
+import type {
+  CatalogPickedDetail,
+  ESPHomeCatalogPickerDialog,
+} from "./catalog-picker-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -44,6 +55,7 @@ registerMdiIcons({
   "arrow-down": mdiArrowDown,
   "arrow-up": mdiArrowUp,
   close: mdiClose,
+  "pencil-outline": mdiPencilOutline,
 });
 
 @customElement("esphome-automation-action-node")
@@ -69,6 +81,11 @@ export class ESPHomeAutomationActionNode extends LitElement {
   @property({ attribute: false })
   scripts: AvailableScript[] = [];
 
+  /** Configured component instances — forwarded into the catalog
+   *  picker dialog's "By target" tab. */
+  @property({ attribute: false })
+  devices: AvailableComponentInstance[] = [];
+
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
@@ -83,6 +100,9 @@ export class ESPHomeAutomationActionNode extends LitElement {
   @property({ type: Boolean })
   last = false;
 
+  @query("esphome-catalog-picker-dialog")
+  private _picker!: ESPHomeCatalogPickerDialog;
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
@@ -90,18 +110,23 @@ export class ESPHomeAutomationActionNode extends LitElement {
     return html`
       <div class="ae-row">
         <div class="ae-row-body">
-          <wa-select
+          <button
+            type="button"
+            class="ae-row-picker"
             ?disabled=${this.disabled}
-            @change=${this._onActionChange}
+            @click=${this._openPicker}
           >
-            ${this.catalog.map(
-              (a) => html`<wa-option
-                value=${a.id}
-                ?selected=${a.id === this.value.action_id}
-                >${a.name}</wa-option
-              >`,
-            )}
-          </wa-select>
+            <span class="ae-row-picker-name">
+              ${def?.name ?? this.value.action_id}
+            </span>
+            <wa-icon library="mdi" name="pencil-outline"></wa-icon>
+          </button>
+          <esphome-catalog-picker-dialog
+            kind="action"
+            .items=${this.catalog}
+            .devices=${this.devices}
+            @catalog-picked=${this._onActionPicked}
+          ></esphome-catalog-picker-dialog>
           ${def?.description
             ? html`<p class="ae-section-desc">
                 ${renderMarkdown(def.description)}
@@ -213,6 +238,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
         no-header
         .conditions=${this.value.conditions ?? []}
         .catalog=${this.conditionCatalog}
+        .devices=${this.devices}
         .board=${this.board}
         .yaml=${this.yaml}
         ?disabled=${this.disabled}
@@ -247,6 +273,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
           .catalog=${this.catalog}
           .conditionCatalog=${this.conditionCatalog}
           .scripts=${this.scripts}
+          .devices=${this.devices}
           .board=${this.board}
           .yaml=${this.yaml}
           ?disabled=${this.disabled}
@@ -257,14 +284,19 @@ export class ESPHomeAutomationActionNode extends LitElement {
     );
   }
 
-  private _onActionChange = (e: Event) => {
-    const newId = (e.target as HTMLSelectElement).value;
+  private _openPicker = () => {
+    this._picker.open();
+  };
+
+  private _onActionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
+    e.stopPropagation();
     // Switching kinds drops params / nested children — different
     // schemas, parallel state would surface fields the renderer
-    // wouldn't paint.
+    // wouldn't paint. Pre-filled params from the "By target" tab
+    // are seeded on top of the reset.
     this._emit({
-      action_id: newId,
-      params: {},
+      action_id: e.detail.id,
+      params: { ...(e.detail.preFilledParams ?? {}) },
       children: {},
       conditions: [],
     });
