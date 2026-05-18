@@ -30,6 +30,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { renderMarkdown } from "../../../util/markdown.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import { applyParamChange } from "./serialise.js";
 import "../config-entry-form.js";
@@ -122,7 +123,9 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
               )}
             </wa-select>`}
         ${active?.description
-          ? html`<p class="ae-section-desc">${active.description}</p>`
+          ? html`<p class="ae-section-desc">
+              ${renderMarkdown(active.description)}
+            </p>`
           : nothing}
         ${active && active.config_entries.length > 0
           ? html`<esphome-config-entry-form

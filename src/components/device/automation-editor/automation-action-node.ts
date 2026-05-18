@@ -28,6 +28,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import { applyParamChange } from "./serialise.js";
@@ -102,7 +103,9 @@ export class ESPHomeAutomationActionNode extends LitElement {
             )}
           </wa-select>
           ${def?.description
-            ? html`<p class="ae-section-desc">${def.description}</p>`
+            ? html`<p class="ae-section-desc">
+                ${renderMarkdown(def.description)}
+              </p>`
             : nothing}
           ${def && def.config_entries.length > 0
             ? html`<esphome-config-entry-form
