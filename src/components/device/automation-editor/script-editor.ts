@@ -24,7 +24,14 @@ import { consume } from "@lit/context";
 import toast from "sonner-js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { mdiContentSave, mdiDelete, mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
+import {
+  mdiClose,
+  mdiContentSave,
+  mdiDelete,
+  mdiOpenInNew,
+  mdiPlus,
+  mdiScriptTextOutline,
+} from "@mdi/js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -51,17 +58,40 @@ import {
   sectionKeyFromLocation,
 } from "./serialise.js";
 import "./automation-action-list.js";
-import "./automation-script-params.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 
 registerMdiIcons({
+  close: mdiClose,
   "content-save": mdiContentSave,
   delete: mdiDelete,
   "open-in-new": mdiOpenInNew,
+  plus: mdiPlus,
   "script-text-outline": mdiScriptTextOutline,
 });
+
+/** One declared script parameter — captures the {name, type} pair
+ *  that round-trips through ``triggerParams.parameters`` as a
+ *  ``{name: type}`` map. Local to the editor since the wire shape
+ *  is just the map. */
+interface ParameterDecl {
+  name: string;
+  type: string;
+}
+
+/** ESPHome script run modes — see
+ *  https://esphome.io/components/script.html#script-mode for each
+ *  one's semantics. ``single`` is the default; the writer omits
+ *  the mode key when set to single. */
+const RUN_MODES = ["single", "restart", "queued", "parallel"] as const;
+
+/** Parameter types supported by ESPHome's script: ``parameters:``
+ *  block. The catalog already validates these on save, so we just
+ *  pin the user to the same set here. */
+const PARAM_TYPES = ["int", "float", "bool", "string"] as const;
 
 @customElement("esphome-script-editor")
 export class ESPHomeScriptEditor extends LitElement {
@@ -98,9 +128,6 @@ export class ESPHomeScriptEditor extends LitElement {
   @state() private _deleting = false;
   @state() private _error = "";
 
-  /** Snapshot of add-vs-edit at mount so hydrate doesn't flip the
-   *  id picker back to unlocked. */
-  @state() private _editMode = false;
 
   public get inFlightWrite(): boolean {
     return this._saving || this._deleting;
@@ -110,7 +137,6 @@ export class ESPHomeScriptEditor extends LitElement {
 
   connectedCallback(): void {
     super.connectedCallback();
-    this._editMode = !this.addMode;
     void this._load();
   }
 
@@ -190,13 +216,9 @@ export class ESPHomeScriptEditor extends LitElement {
     const disabled = this._saving || this._deleting;
     return html`
       ${this._renderHeader()}
-      ${this._renderIdRow(disabled)}
-      <esphome-automation-script-params
-        .target=${this.location}
-        .triggerParams=${automation.trigger_params}
-        ?disabled=${disabled}
-        @script-params-change=${this._onScriptParamsChange}
-      ></esphome-automation-script-params>
+      ${this._renderIdField(disabled)}
+      ${this._renderModeField(automation, disabled)}
+      ${this._renderParametersField(automation, disabled)}
       <esphome-automation-action-list
         .actions=${automation.actions}
         .catalog=${actions}
@@ -278,26 +300,21 @@ export class ESPHomeScriptEditor extends LitElement {
   }
 
   /**
-   * Id row. In add-mode this is an editable text input — the user
-   * names the script before it can be saved. In edit-mode the id is
-   * pinned (changing it would move the YAML splice destination, an
-   * operation we don't support inline) so render it as a read-only
-   * label.
+   * Id field. Editable in both add-mode and edit-mode — renaming a
+   * script via the input becomes a delete + insert on save. The
+   * description warns the user that ``script.execute`` callers
+   * still reference the old id and need to be updated separately.
    */
-  private _renderIdRow(disabled: boolean) {
+  private _renderIdField(disabled: boolean) {
     const id = this.location?.id ?? "";
-    if (this._editMode) {
-      return html`<div class="ae-section">
-        <label class="ae-section-label">
-          ${this._localize("device.automation_target_script_label")}
-        </label>
-        <p class="ae-section-desc">${id}</p>
-      </div>`;
-    }
-    return html`<div class="ae-section">
-      <label class="ae-section-label" for="script-id-input">
-        ${this._localize("device.automation_target_script_new_id_label")}
+    return html`<div class="field">
+      <label class="field-label" for="script-id-input">
+        ${this._localize("device.script_id_label")}
+        <span class="required">*</span>
       </label>
+      <p class="field-description">
+        ${renderMarkdown(this._localize("device.script_id_description"))}
+      </p>
       <input
         id="script-id-input"
         type="text"
@@ -311,6 +328,164 @@ export class ESPHomeScriptEditor extends LitElement {
     </div>`;
   }
 
+  /**
+   * Run-mode field. Single / restart / queued / parallel — see
+   * the script docs for the semantic of each. Stored as
+   * ``triggerParams.mode`` per the writer's contract.
+   */
+  private _renderModeField(automation: AutomationTree, disabled: boolean) {
+    const mode = String(automation.trigger_params.mode ?? "single");
+    return html`<div class="field">
+      <label class="field-label">
+        ${this._localize("device.automation_script_mode")}
+      </label>
+      <p class="field-description">
+        ${renderMarkdown(this._localize("device.script_mode_description"))}
+      </p>
+      <wa-select
+        value=${mode}
+        ?disabled=${disabled}
+        @change=${(e: Event) =>
+          this._withValue({
+            trigger_params: {
+              ...automation.trigger_params,
+              mode: (e.target as HTMLSelectElement).value,
+            },
+          })}
+      >
+        ${RUN_MODES.map(
+          (m) => html`<wa-option value=${m} ?selected=${m === mode}
+            >${m}</wa-option
+          >`,
+        )}
+      </wa-select>
+    </div>`;
+  }
+
+  /**
+   * Declared parameter list. ``{name: type}`` map under
+   * ``triggerParams.parameters``. Rendered as one row per declared
+   * parameter with a remove button + a footer "+ Add parameter".
+   */
+  private _renderParametersField(
+    automation: AutomationTree,
+    disabled: boolean,
+  ) {
+    const params = this._readParams(automation);
+    return html`<div class="field">
+      <label class="field-label">
+        ${this._localize("device.automation_script_parameters")}
+      </label>
+      <p class="field-description">
+        ${renderMarkdown(
+          this._localize("device.script_parameters_description"),
+        )}
+      </p>
+      ${params.length === 0
+        ? nothing
+        : html`<div class="script-params-list">
+            ${params.map((p, idx) =>
+              this._renderParameterRow(p, idx, disabled),
+            )}
+          </div>`}
+      <button
+        type="button"
+        class="script-param-add"
+        ?disabled=${disabled}
+        @click=${() => this._addParam(automation)}
+      >
+        <wa-icon library="mdi" name="plus"></wa-icon>
+        ${this._localize("device.script_add_parameter")}
+      </button>
+    </div>`;
+  }
+
+  private _renderParameterRow(
+    p: ParameterDecl,
+    idx: number,
+    disabled: boolean,
+  ) {
+    return html`<div class="script-param-row">
+      <input
+        type="text"
+        ?disabled=${disabled}
+        placeholder=${this._localize(
+          "device.script_parameter_name_placeholder",
+        )}
+        .value=${p.name}
+        @input=${(e: Event) =>
+          this._updateParam(idx, {
+            ...p,
+            name: (e.target as HTMLInputElement).value,
+          })}
+      />
+      <wa-select
+        value=${p.type}
+        ?disabled=${disabled}
+        @change=${(e: Event) =>
+          this._updateParam(idx, {
+            ...p,
+            type: (e.target as HTMLSelectElement).value,
+          })}
+      >
+        ${PARAM_TYPES.map(
+          (t) => html`<wa-option value=${t} ?selected=${t === p.type}
+            >${t}</wa-option
+          >`,
+        )}
+      </wa-select>
+      <button
+        type="button"
+        class="script-param-remove"
+        ?disabled=${disabled}
+        aria-label=${this._localize("device.automation_remove")}
+        @click=${() => this._removeParam(idx)}
+      >
+        <wa-icon library="mdi" name="close"></wa-icon>
+      </button>
+    </div>`;
+  }
+
+  private _readParams(automation: AutomationTree): ParameterDecl[] {
+    const raw = automation.trigger_params.parameters;
+    if (!raw || typeof raw !== "object") return [];
+    return Object.entries(raw as Record<string, unknown>).map(
+      ([name, type]) => ({ name, type: String(type ?? "string") }),
+    );
+  }
+
+  private _writeParams(list: ParameterDecl[]) {
+    const dict: Record<string, string> = {};
+    for (const { name, type } of list) {
+      if (name) dict[name] = type;
+    }
+    const automation = this.value ?? emptyAutomationTree();
+    this._withValue({
+      trigger_params: { ...automation.trigger_params, parameters: dict },
+    });
+  }
+
+  private _addParam(automation: AutomationTree) {
+    this._writeParams([
+      ...this._readParams(automation),
+      { name: "", type: "int" },
+    ]);
+  }
+
+  private _updateParam(idx: number, value: ParameterDecl) {
+    const automation = this.value ?? emptyAutomationTree();
+    const list = this._readParams(automation);
+    list[idx] = value;
+    this._writeParams(list);
+  }
+
+  private _removeParam(idx: number) {
+    const automation = this.value ?? emptyAutomationTree();
+    const list = this._readParams(automation);
+    list.splice(idx, 1);
+    this._writeParams(list);
+  }
+
   private _onIdInput = (e: Event) => {
     const id = (e.target as HTMLInputElement).value.trim();
     this.location = { kind: "script", id };
@@ -321,13 +496,6 @@ export class ESPHomeScriptEditor extends LitElement {
         composed: true,
       }),
     );
-  };
-
-  private _onScriptParamsChange = (
-    e: CustomEvent<{ triggerParams: Record<string, unknown> }>,
-  ) => {
-    e.stopPropagation();
-    this._withValue({ trigger_params: e.detail.triggerParams });
   };
 
   private _onActionsChange = (

@@ -103,6 +103,118 @@ export const automationEditorStyles = css`
     color: var(--wa-color-text-normal);
   }
 
+  /* Component-config-form-equivalent .field styles. Used in the
+     script editor so the id / mode / parameters rows read the
+     same as the regular component edit form (which uses
+     config-entry-form.styles.ts's own .field family). Two
+     separate style files because the scopes are different, but
+     the visual contract is identical. */
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+  }
+
+  .field + .field {
+    margin-top: var(--wa-space-m);
+  }
+
+  .field-label {
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-normal);
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+  }
+
+  .field-label .required {
+    color: var(--esphome-error, #d92d20);
+  }
+
+  .field-description {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    margin: 0;
+  }
+
+  .field-description + input,
+  .field-description + textarea,
+  .field-description + wa-select {
+    margin-top: 8px;
+  }
+
+  /* Script-parameter list row — one (name, type, remove) tuple per
+     declared script parameter. Inline 3-column grid because each
+     row has fixed-ish widths and we want them to align tidily. */
+  .script-params-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+    margin-bottom: var(--wa-space-2xs);
+  }
+
+  .script-param-row {
+    display: grid;
+    grid-template-columns: 1fr 7rem auto;
+    gap: var(--wa-space-2xs);
+    align-items: center;
+  }
+
+  .script-param-remove {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    width: 32px;
+    height: 32px;
+    border-radius: var(--wa-border-radius-s);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .script-param-remove:hover:not(:disabled) {
+    background: var(--wa-color-surface-lowered);
+    color: var(--wa-color-text-normal);
+  }
+
+  .script-param-remove:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Standalone "+ Add parameter" button — same modest styling as
+     the nested action-list add buttons (not the prominent
+     full-width primary). */
+  .script-param-add {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    appearance: none;
+    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    border-radius: var(--wa-border-radius-s);
+    cursor: pointer;
+    font-size: var(--wa-font-size-2xs);
+    font-weight: var(--wa-font-weight-semibold);
+    margin-top: var(--wa-space-2xs);
+  }
+
+  .script-param-add:hover:not(:disabled) {
+    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+  }
+
+  .script-param-add:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
   .ae-section-desc {
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);
