@@ -303,23 +303,22 @@ export class ESPHomeScriptEditor extends LitElement {
   }
 
   /**
-   * Component-style header card. In edit-mode this is the section's
-   * identity at a glance: the script id, a short description of
-   * what scripts are, and a docs link to the ESPHome reference.
-   * In add-mode the header is more generic ("New script") since the
-   * id isn't picked yet.
+   * Component-style header card. Title is always "Script"; the
+   * id sits as a subtitle below — same shape as the automation
+   * editor's "Automation" / trigger-name pair. In add-mode the
+   * id is empty so the subtitle drops out and only the title
+   * shows.
    */
   private _renderHeader() {
     const id = this.location?.id || "";
     return html`<div class="ae-header">
       <div class="ae-header-text">
         <h2 class="ae-header-title">
-          ${this.addMode
-            ? this._localize("device.add_script")
-            : id
-              ? this._localize("device.script_header_title", { id })
-              : this._localize("device.add_script")}
+          ${this._localize("device.script_header_title_static")}
         </h2>
+        ${id
+          ? html`<p class="ae-header-subtitle">${id}</p>`
+          : nothing}
         <a
           class="ae-header-docs"
           href="https://esphome.io/components/script.html"

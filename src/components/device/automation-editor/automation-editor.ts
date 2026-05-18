@@ -487,65 +487,55 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Read-only metadata block. Renders one row per piece of
-   * identity that isn't editable on an existing automation: the
-   * target kind, the bound component (if applicable), and the
-   * trigger key. Used in edit-mode below the header description.
+   * Read-only metadata block. One row per piece of pinned identity
+   * that isn't editable on an existing automation. We collapse the
+   * kind + bound component into a single TARGET row so the user
+   * sees, at a glance, what this automation is wired to — without
+   * needing to read 'A configured component' as a separate piece
+   * of meta. The trigger name lives in the header subtitle and is
+   * not repeated here.
    */
   private _renderMetadata() {
     const loc = this.location;
     if (!loc) return nothing;
-    const rows: Array<{ label: string; value: string }> = [];
-    rows.push({
-      label: this._localize("device.automation_target"),
-      value: this._targetKindLabel(loc.kind),
-    });
-    if (loc.kind === "component_on") {
-      const device = this._available?.devices.find(
-        (d) => d.id === loc.component_id,
-      );
-      const value = device
-        ? `${device.name ?? device.id} (${device.component_id})`
-        : loc.component_id;
-      rows.push({
-        label: this._localize("device.automation_target_component_label"),
-        value,
-      });
-    }
-    if (loc.kind === "interval") {
-      rows.push({
-        label: this._localize("device.automation_target_interval"),
-        value: `#${loc.index + 1}`,
-      });
-    }
-    // We deliberately don't add a TRIGGER row — the trigger's
-    // human-readable name is already the header subtitle right
-    // above, so a "Trigger: on_turn_off" row here would be both
-    // redundant and less readable than the subtitle.
+    const value = this._targetMetadataValue(loc);
+    if (!value) return nothing;
     return html`<dl class="ae-metadata">
-      ${rows.map(
-        ({ label, value }) => html`
-          <dt class="ae-metadata-label">${label}</dt>
-          <dd class="ae-metadata-value">${value}</dd>
-        `,
-      )}
+      <dt class="ae-metadata-label">
+        ${this._localize("device.automation_target")}
+      </dt>
+      <dd class="ae-metadata-value">${value}</dd>
     </dl>`;
   }
 
-  private _targetKindLabel(
-    kind: "device_on" | "component_on" | "interval" | "script" | "light_effect",
-  ): string {
-    switch (kind) {
+  /**
+   * Compose the single TARGET row value. For component_on this is
+   * the bound device's display name + catalog id (e.g.
+   * "Warmtepomp (switch.gpio)") — no separate "Which component?"
+   * row. For device_on it's "The device itself"; for interval
+   * it's "Interval #N"; for script / light_effect we fall back
+   * to the kind label (those land in their own editors anyway).
+   */
+  private _targetMetadataValue(loc: AutomationLocation): string {
+    switch (loc.kind) {
       case "device_on":
         return this._localize("device.automation_target_device");
-      case "component_on":
-        return this._localize("device.automation_target_component");
+      case "component_on": {
+        const device = this._available?.devices.find(
+          (d) => d.id === loc.component_id,
+        );
+        if (!device) return loc.component_id;
+        const label = device.name ?? device.id;
+        return `${label} (${device.component_id})`;
+      }
       case "interval":
-        return this._localize("device.automation_target_interval");
+        return this._localize("device.automation_target_interval_n", {
+          index: loc.index + 1,
+        });
       case "script":
-        return this._localize("device.automation_target_script");
+        return loc.id;
       case "light_effect":
-        return this._localize("device.automation_light_effect");
+        return loc.component_id;
     }
   }
 
