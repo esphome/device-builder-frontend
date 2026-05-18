@@ -37,6 +37,17 @@ function applyWaTheme(): void {
  * complementary hue rotation so any colour-tinted strokes survive
  * the round trip). Components apply it via
  * `filter: var(--esphome-svg-filter)` on `img[src$=".svg"]`.
+ *
+ * The ``--wa-color-brand-*`` overrides remap WebAwesome's default
+ * cyan brand palette to Home Assistant's primary palette when
+ * embedded as an HA panel. ``--primary-color`` and friends are set
+ * by HA's theme on the root; when the panel runs standalone those
+ * variables are undefined and the fallback values (HA Material
+ * Blue 500 / its translucent and white companions) keep the panel
+ * looking consistent with HA's palette anyway. Without this, the
+ * panel headers, primary buttons, FAB, and active view-toggle pip
+ * burst in WebAwesome cyan, which clashes hard against HA's blue
+ * sidebar and chrome.
  */
 function applyEspHomeTokens(): void {
   const style = document.createElement("style");
@@ -44,6 +55,10 @@ function applyEspHomeTokens(): void {
   style.textContent = `
     :root {
       --esphome-svg-filter: none;
+      --wa-color-brand-fill-loud: var(--primary-color, #03a9f4);
+      --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
+      --wa-color-brand-fill-quiet: var(--state-active-color, rgba(3, 169, 244, 0.12));
+      --wa-color-brand-on-quiet: var(--primary-color, #03a9f4);
     }
     .wa-dark {
       --esphome-svg-filter: invert(1) hue-rotate(180deg);
