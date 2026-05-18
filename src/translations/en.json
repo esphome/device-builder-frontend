@@ -642,7 +642,7 @@
     "automation_trigger": "Trigger",
     "automation_trigger_label": "When",
     "automation_trigger_field_placeholder": "Nested actions are edited as a list below — not as a single field.",
-    "automation_action": "Action",
+    "automation_action": "Actions",
     "automation_action_label": "Then do",
     "automation_condition": "Condition",
     "automation_only_when": "Only run when",

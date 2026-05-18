@@ -506,7 +506,7 @@
     "automation_trigger": "Déclencheur",
     "automation_trigger_label": "Quand",
     "automation_trigger_field_placeholder": "Les actions imbriquées se modifient dans la liste ci-dessous — pas comme un champ unique.",
-    "automation_action": "Action",
+    "automation_action": "Actions",
     "automation_action_label": "Alors faire",
     "automation_condition": "Condition",
     "automation_only_when": "À exécuter uniquement si",

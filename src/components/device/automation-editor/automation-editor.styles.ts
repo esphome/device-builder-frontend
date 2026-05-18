@@ -118,7 +118,12 @@ export const automationEditorStyles = css`
     margin-bottom: var(--wa-space-2xs);
   }
 
-  /* Add button — used at the bottom of every list. */
+  /* Add button — used at the bottom of every list. The default is
+     a modest dashed affordance for nested lists (then/else inside
+     an "if"). The top-level list (wrapped in .ae-section) gets
+     the prominent overlay below — that's the primary "Add action"
+     / "Add condition" the user reaches for from a fresh
+     automation, so it should pop. */
   .ae-add {
     display: inline-flex;
     align-items: center;
@@ -143,6 +148,31 @@ export const automationEditorStyles = css`
   .ae-add:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  /* Primary add affordance — the bottom-of-section ".ae-add" the
+     user sees right under the "Actions" header. Solid border in
+     brand color, full-width so it reads as the obvious next step
+     when the list is empty or has one item. The nested variants
+     (then / else branches inside "if") keep the modest style
+     above. */
+  .ae-section > .ae-add {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    border: 1px solid var(--wa-color-brand-fill-loud, #0b5cad);
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    padding: var(--wa-space-xs) var(--wa-space-m);
+    font-size: var(--wa-font-size-s);
+    margin-top: var(--wa-space-s);
+  }
+
+  .ae-section > .ae-add:hover:not(:disabled) {
+    background: color-mix(
+      in srgb,
+      var(--wa-color-brand-fill-loud, #0b5cad) 10%,
+      transparent
+    );
   }
 
   .ae-error {

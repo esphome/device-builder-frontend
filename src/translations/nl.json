@@ -506,7 +506,7 @@
     "automation_trigger": "Trigger",
     "automation_trigger_label": "Wanneer",
     "automation_trigger_field_placeholder": "Geneste acties worden in de lijst hieronder bewerkt — niet als afzonderlijk veld.",
-    "automation_action": "Actie",
+    "automation_action": "Acties",
     "automation_action_label": "Dan doen",
     "automation_condition": "Voorwaarde",
     "automation_only_when": "Alleen uitvoeren als",
