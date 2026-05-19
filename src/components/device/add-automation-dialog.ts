@@ -352,10 +352,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         trigger_params: {},
         actions: [],
       };
+      // Hand the backend our current draft yaml so the splice
+      // lands relative to any pending edits the user hasn't saved
+      // yet — matches the auto-apply path in the editor.
       const { yaml_diff } = await this._api.upsertAutomation(
         this.configuration,
         tree,
         location,
+        this.yaml,
       );
       this._dispatchAdded(location, yaml_diff);
       this._dialog.open = false;

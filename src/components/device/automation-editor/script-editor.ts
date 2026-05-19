@@ -742,6 +742,7 @@ export class ESPHomeScriptEditor extends LitElement {
         this.configuration,
         this.value,
         this.location,
+        this.yaml,
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       this.dispatchEvent(
@@ -804,6 +805,7 @@ export class ESPHomeScriptEditor extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         this.location,
+        this.yaml,
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);

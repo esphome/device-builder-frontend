@@ -809,10 +809,17 @@ export class ESPHomeAutomationEditor extends LitElement {
     this._applyInFlight = true;
     this._applyDirty = false;
     try {
+      // Pass ``this.yaml`` so the backend computes the diff against
+      // the current draft buffer rather than the on-disk YAML —
+      // otherwise repeated auto-applies (the user typing into the
+      // same field) would each re-insert the automation on top of
+      // the previous draft's insertion. See backend's
+      // ``automations/upsert`` for the matching parameter.
       const { yaml_diff } = await this._api.upsertAutomation(
         this.configuration,
         this.value,
         this.location,
+        this.yaml,
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       this.dispatchEvent(
@@ -972,6 +979,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         this.location,
+        this.yaml,
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);

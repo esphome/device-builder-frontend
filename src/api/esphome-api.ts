@@ -1413,11 +1413,21 @@ export class ESPHomeAPI {
     configuration: string,
     automation: AutomationTree,
     location: AutomationLocation,
+    /**
+     * Optional in-memory YAML override. The editor's auto-apply
+     * runs multiple times before the user clicks Save, and each
+     * run's diff has to be computed against the previous run's
+     * draft — not against on-disk YAML. Pass the page's current
+     * ``_yaml`` here so the backend works with the same text the
+     * frontend is about to splice into.
+     */
+    yaml?: string,
   ): Promise<{ yaml_diff: YamlDiff }> {
     return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/upsert", {
       configuration,
       automation,
       location,
+      ...(yaml !== undefined ? { yaml } : {}),
     });
   }
 
@@ -1429,9 +1439,13 @@ export class ESPHomeAPI {
   async deleteAutomation(
     configuration: string,
     location: AutomationLocation,
+    /** Optional in-memory YAML override — same purpose as for
+     *  ``upsertAutomation``. */
+    yaml?: string,
   ): Promise<{ yaml_diff: YamlDiff }> {
     return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/delete", {
       configuration,
+      ...(yaml !== undefined ? { yaml } : {}),
       location,
     });
   }

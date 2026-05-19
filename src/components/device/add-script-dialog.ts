@@ -220,10 +220,14 @@ export class ESPHomeAddScriptDialog extends LitElement {
         trigger_params: { mode: "single" },
         actions: [],
       };
+      // Hand the backend our current draft yaml so the splice
+      // lands relative to any pending edits the user hasn't saved
+      // yet — matches the auto-apply path in the editor.
       const { yaml_diff } = await this._api.upsertAutomation(
         this.configuration,
         tree,
         location,
+        this.yaml,
       );
       // Apply the diff to the page's YAML so the new script
       // lands in ``_yaml`` and the global save button activates.
