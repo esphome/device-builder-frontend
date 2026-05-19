@@ -139,6 +139,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
                 .board=${this.board}
                 .yaml=${this.yaml}
                 ?disabled=${this.disabled}
+                ?show-advanced=${this._defaultShowAdvanced(def)}
                 @value-change=${this._onParamChange}
               ></esphome-config-entry-form>`
             : nothing}
@@ -282,6 +283,26 @@ export class ESPHomeAutomationActionNode extends LitElement {
         ></esphome-automation-action-list>
       </div>`,
     );
+  }
+
+  /**
+   * Default ``show-advanced`` for the action's param form.
+   *
+   * The catalog occasionally marks every entry of an action as
+   * ``advanced: true`` (the ``delay`` action, for instance, has
+   * ``days`` / ``hours`` / ``minutes`` / ``seconds`` / … all
+   * tagged advanced). With our usual ``showAdvanced=false``
+   * default the form would render zero rows and the user would be
+   * staring at a Delay box with no inputs. Pop the advanced gate
+   * open here when no non-advanced field exists, so the user can
+   * actually configure the action they just picked. Actions that
+   * mix required + advanced (the common case) still hide the
+   * advanced tail until the user explicitly opens it via the
+   * form's own toggle (when one is rendered higher up).
+   */
+  private _defaultShowAdvanced(def: AutomationAction): boolean {
+    const entries = def.config_entries ?? [];
+    return entries.length > 0 && entries.every((e) => e.advanced);
   }
 
   private _openPicker = () => {
