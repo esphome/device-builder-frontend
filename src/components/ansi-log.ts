@@ -347,7 +347,9 @@ export class ESPHomeAnsiLog extends LitElement {
 
   protected updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("lines") && this.autoScroll && !this._isUserScrolled) {
-      this._scrollToBottom();
+      // Sync (not rAF-deferred): ``updated`` runs post-DOM-commit,
+      // and a one-frame lag clips the bottom line during bursts.
+      this._syncScrollToBottom();
     }
   }
 
@@ -420,13 +422,14 @@ export class ESPHomeAnsiLog extends LitElement {
     this._isUserScrolled = scrollHeight - scrollTop - clientHeight > 40;
   }
 
+  private _syncScrollToBottom() {
+    if (!this._container) return;
+    this._ignoreNextScroll = true;
+    this._container.scrollTop = this._container.scrollHeight;
+  }
+
   private _scrollToBottom() {
-    requestAnimationFrame(() => {
-      if (this._container) {
-        this._ignoreNextScroll = true;
-        this._container.scrollTop = this._container.scrollHeight;
-      }
-    });
+    requestAnimationFrame(() => this._syncScrollToBottom());
   }
 
   /** Public method to scroll to bottom programmatically. */

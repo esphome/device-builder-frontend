@@ -123,6 +123,11 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() _lines: string[] = [];
   @state() _statusMessage = "";
 
+  // rAF batch buffer for streamed output — coalesce per-line writes
+  // into one render per frame instead of one per line (#348).
+  private _pendingLines: string[] = [];
+  private _flushScheduled = 0;
+
   // Distinguishes user-stopped from backend-failed. Both flip _state to "error"
   // but only real failures get the reset-build-env hint.
   @state() _userStopped = false;
@@ -201,6 +206,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = options?.port ?? "OTA";
     this._state = null;
     this._lines = [];
+    this._resetPendingLines();
     this._statusMessage = "";
     this._jobId = "";
     this._jobStatus = null;
@@ -230,6 +236,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = job.port || "OTA";
     this._state = "running";
     this._lines = [];
+    this._resetPendingLines();
     this._statusMessage = "";
     this._userStopped = false;
     // Fresh attach is a fresh session — reset toggle defaults so a prior
@@ -346,7 +353,37 @@ export class ESPHomeCommandDialog extends LitElement {
     void onForceLocalClick(this);
   };
 
+  // Buffer a streamed line; flushed on the next animation frame.
+  _enqueueLine(line: string): void {
+    this._pendingLines.push(line);
+    if (this._flushScheduled) return;
+    this._flushScheduled = requestAnimationFrame(() => {
+      this._flushScheduled = 0;
+      this._flushPendingLines();
+    });
+  }
+
+  // Drain pending lines into ``_lines`` now. Called from terminal
+  // callbacks, detachStream, and _downloadOutput so consumers
+  // don't race the rAF.
+  _flushPendingLines(): void {
+    if (this._pendingLines.length === 0) return;
+    this._lines = [...this._lines, ...this._pendingLines];
+    this._pendingLines = [];
+  }
+
+  // Drop the pending batch and cancel any scheduled flush. Paired
+  // with every ``_lines = []`` reset.
+  _resetPendingLines(): void {
+    this._pendingLines = [];
+    if (this._flushScheduled) {
+      cancelAnimationFrame(this._flushScheduled);
+      this._flushScheduled = 0;
+    }
+  }
+
   _downloadOutput = () => {
+    this._flushPendingLines();
     const stem = this.configuration.replace(/\.ya?ml$/, "") || "output";
     downloadAnsiText(this._lines, `${stem}-${this._commandType}.txt`);
   };
