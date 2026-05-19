@@ -20,6 +20,9 @@ const DARK_FG = "#d4d4d4";
 const DARK_GUTTER_FG = "#858585";
 const DARK_SELECTION = "#264f78";
 const DARK_ACTIVE_LINE = "#2a2d2e";
+// Translucent variant for the content-layer overlay; opaque
+// active-line bg hides the selection layer behind it (#326).
+const DARK_ACTIVE_LINE_TINT = "#ffffff0a";
 const DARK_CURSOR = "#aeafad";
 
 const LIGHT_BG = "#ffffff";
@@ -27,6 +30,9 @@ const LIGHT_FG = "#1f2328";
 const LIGHT_GUTTER_FG = "#6e7781";
 const LIGHT_SELECTION = "#add6ff";
 const LIGHT_ACTIVE_LINE = "#f6f8fa";
+// Translucent variant for the content-layer overlay; opaque
+// active-line bg hides the selection layer behind it (#326).
+const LIGHT_ACTIVE_LINE_TINT = "#0000000a";
 const LIGHT_CURSOR = "#1f2328";
 
 const darkHighlight = HighlightStyle.define([
@@ -79,7 +85,7 @@ const darkBase = EditorView.theme(
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: DARK_CURSOR },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       { backgroundColor: DARK_SELECTION },
-    ".cm-activeLine": { backgroundColor: DARK_ACTIVE_LINE },
+    ".cm-activeLine": { backgroundColor: DARK_ACTIVE_LINE_TINT },
     ".cm-activeLineGutter": { backgroundColor: DARK_ACTIVE_LINE },
     ".cm-gutters": {
       backgroundColor: DARK_BG,
@@ -116,7 +122,7 @@ const lightBase = EditorView.theme(
     ".cm-cursor, .cm-dropCursor": { borderLeftColor: LIGHT_CURSOR },
     "&.cm-focused .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
       { backgroundColor: LIGHT_SELECTION },
-    ".cm-activeLine": { backgroundColor: LIGHT_ACTIVE_LINE },
+    ".cm-activeLine": { backgroundColor: LIGHT_ACTIVE_LINE_TINT },
     ".cm-activeLineGutter": { backgroundColor: LIGHT_ACTIVE_LINE },
     ".cm-gutters": {
       backgroundColor: LIGHT_BG,
