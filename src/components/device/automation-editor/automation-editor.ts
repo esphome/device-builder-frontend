@@ -703,46 +703,27 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Read-only trigger / target fields — styled like a component
-   * config form so the eye reads them as the same kind of thing
-   * as the editable rows above. The inputs are disabled (the
-   * values are pinned for an existing automation) but still
-   * convey the identity at a glance.
-   *
-   * Trigger comes first because it reads naturally as "when X
-   * happens on Y" — the trigger is the verb, the target is the
-   * subject.
-   *
-   * Intervals deliberately skip both rows: the actual ``interval:``
-   * time gets rendered by ``_renderTriggerParamsForm`` (from the
-   * ``interval`` component's catalog schema), and "Target: Interval
-   * #1" is a redundant marker — the user already knows they're on
-   * an interval from the header + navigator.
+   * Read-only target field — the only identity field we still
+   * surface, and only for ``component_on``: the catalog name
+   * (``Switch → On Turn On``) already sits as the editor's header
+   * title so a separate "Trigger" row underneath was just a copy
+   * of it, and ``device_on`` / ``interval`` have no meaningful
+   * target to display either ("the device itself" / "Interval #1"
+   * read as filler). Leaves only "which component instance is
+   * this automation bound to" — the one piece of identity the
+   * header can't carry.
    */
-  private _renderIdentityFields(activeTrigger: AutomationTrigger | null) {
+  private _renderIdentityFields(_activeTrigger: AutomationTrigger | null) {
     const loc = this.location;
     if (!loc) return nothing;
-    if (loc.kind === "interval") return nothing;
+    if (loc.kind !== "component_on") return nothing;
     const targetValue = this._targetMetadataValue(loc);
-    const triggerValue = activeTrigger?.name ?? "";
-    const showTrigger =
-      loc.kind === "device_on" || loc.kind === "component_on";
-    return html`
-      ${showTrigger
-        ? html`<div class="field">
-            <label class="field-label">
-              ${this._localize("device.automation_trigger")}
-            </label>
-            <input type="text" readonly .value=${triggerValue} />
-          </div>`
-        : nothing}
-      <div class="field">
-        <label class="field-label">
-          ${this._localize("device.automation_target")}
-        </label>
-        <input type="text" readonly .value=${targetValue} />
-      </div>
-    `;
+    return html`<div class="field">
+      <label class="field-label">
+        ${this._localize("device.automation_target")}
+      </label>
+      <input type="text" readonly .value=${targetValue} />
+    </div>`;
   }
 
   /**
