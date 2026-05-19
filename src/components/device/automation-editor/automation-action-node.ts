@@ -58,6 +58,25 @@ registerMdiIcons({
   "pencil-outline": mdiPencilOutline,
 });
 
+/** Time units the Delay action picker offers. Ordered from
+ *  least → most coarse so the dropdown opens with the most
+ *  common pick (seconds) near the top of the visible options
+ *  without making the list feel reversed. */
+const DELAY_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
+type DelayUnit = (typeof DELAY_UNITS)[number];
+
+/** Maps each picker unit to the catalog field key the backend's
+ *  YAML writer expects. ESPHome's time_period coercer accepts any
+ *  of these; we always write through exactly one. */
+const DELAY_UNIT_TO_KEY: Record<DelayUnit, string> = {
+  us: "microseconds",
+  ms: "milliseconds",
+  s: "seconds",
+  min: "minutes",
+  h: "hours",
+  d: "days",
+};
+
 @customElement("esphome-automation-action-node")
 export class ESPHomeAutomationActionNode extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -132,17 +151,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
                 ${renderMarkdown(def.description)}
               </p>`
             : nothing}
-          ${def && def.config_entries.length > 0
-            ? html`<esphome-config-entry-form
-                .entries=${def.config_entries}
-                .values=${this.value.params}
-                .board=${this.board}
-                .yaml=${this.yaml}
-                ?disabled=${this.disabled}
-                ?show-advanced=${this._defaultShowAdvanced(def)}
-                @value-change=${this._onParamChange}
-              ></esphome-config-entry-form>`
-            : nothing}
+          ${this._renderActionParams(def)}
           ${this._renderScriptParams(def)}
           ${this._renderConditionGate(def)}
           ${this._renderNestedLists(def)}
@@ -283,6 +292,133 @@ export class ESPHomeAutomationActionNode extends LitElement {
         ></esphome-automation-action-list>
       </div>`,
     );
+  }
+
+  /**
+   * Render the action's parameter form. Most actions go through
+   * the catalog-driven ``<esphome-config-entry-form>``; specific
+   * "shortcut" actions (currently: ``delay``) need a bespoke
+   * surface because their catalog shape doesn't match the
+   * one-knob user-facing UX. See ``_renderDelayParams`` for the
+   * exact substitution.
+   */
+  private _renderActionParams(def: AutomationAction | undefined) {
+    if (!def) return nothing;
+    if (def.id === "delay") return this._renderDelayParams();
+    if (def.config_entries.length === 0) return nothing;
+    return html`<esphome-config-entry-form
+      .entries=${def.config_entries}
+      .values=${this.value.params}
+      .board=${this.board}
+      .yaml=${this.yaml}
+      ?disabled=${this.disabled}
+      ?show-advanced=${this._defaultShowAdvanced(def)}
+      @value-change=${this._onParamChange}
+    ></esphome-config-entry-form>`;
+  }
+
+  /**
+   * Bespoke renderer for the ``delay`` action.
+   *
+   * The catalog exposes Delay as six separate string fields
+   * (``days``, ``hours``, ``minutes``, ``seconds``, ``milliseconds``,
+   * ``microseconds``) all tagged advanced + optional, but
+   * semantically only one knob is being set — the user picks a
+   * unit and types a number. Surfacing six empty inputs invites
+   * filling several of them by accident and looks nothing like
+   * the single ``interval: 5s`` widget the interval automation
+   * already uses.
+   *
+   * Replace it with a number + unit pair. On write we put the
+   * value into the matching catalog field and clear the others;
+   * on read we pick whichever field carries a value and split it
+   * back into number + unit. ``delay: 2s`` written by the
+   * backend's shortcut writer lands as ``params.id = "2s"`` —
+   * fall back to that key as a last resort so we don't lose
+   * historic shortcut values when the user opens the editor.
+   */
+  private _renderDelayParams() {
+    const { value: numericValue, unit } = this._readDelay();
+    return html`<div class="ae-delay-row">
+      <div class="ae-delay-value">
+        <label class="field-label" for="ae-delay-value-input">
+          ${this._localize("device.automation_action_delay_value")}
+        </label>
+        <input
+          id="ae-delay-value-input"
+          type="text"
+          inputmode="decimal"
+          .value=${numericValue}
+          placeholder="0"
+          ?disabled=${this.disabled}
+          @input=${(e: Event) =>
+            this._writeDelay(
+              (e.target as HTMLInputElement).value,
+              unit,
+            )}
+        />
+      </div>
+      <div class="ae-delay-unit">
+        <label class="field-label" for="ae-delay-unit-select">
+          ${this._localize("device.automation_action_delay_unit")}
+        </label>
+        <select
+          id="ae-delay-unit-select"
+          ?disabled=${this.disabled}
+          @change=${(e: Event) =>
+            this._writeDelay(
+              numericValue,
+              (e.target as HTMLSelectElement).value as DelayUnit,
+            )}
+        >
+          ${DELAY_UNITS.map(
+            (u) => html`<option value=${u} ?selected=${u === unit}>
+              ${this._localize(`device.automation_action_delay_unit_${u}`)}
+            </option>`,
+          )}
+        </select>
+      </div>
+    </div>`;
+  }
+
+  /** Pick a (numeric value, unit) pair out of the delay action's
+   *  params dict. Falls back to seconds when no field is set. */
+  private _readDelay(): { value: string; unit: DelayUnit } {
+    const params = this.value.params ?? {};
+    for (const u of DELAY_UNITS) {
+      const key = DELAY_UNIT_TO_KEY[u];
+      const v = params[key];
+      if (v !== undefined && v !== "" && v !== null) {
+        return { value: String(v), unit: u };
+      }
+    }
+    // Backend shortcut form: ``delay: 2s`` → ``params.id = "2s"``.
+    // Split into numeric prefix + unit suffix so the picker
+    // doesn't blank out for round-tripped historic values.
+    const shortcut = params.id;
+    if (typeof shortcut === "string") {
+      const m = shortcut.match(/^(\d+(?:\.\d+)?)(us|ms|s|min|h|d)$/);
+      if (m) {
+        const [, num, suf] = m;
+        return { value: num, unit: suf as DelayUnit };
+      }
+    }
+    return { value: "", unit: "s" };
+  }
+
+  /** Write a (numeric value, unit) pair into the delay action's
+   *  params dict. Clears every other delay field so we never end
+   *  up with two competing values; also drops the legacy ``id``
+   *  shortcut slot so the next round-trip uses the canonical
+   *  ``<unit>: <value>`` form. */
+  private _writeDelay(value: string, unit: DelayUnit) {
+    const trimmed = value.trim();
+    const next: Record<string, unknown> = { ...(this.value.params ?? {}) };
+    // Clear all six fields + the shortcut slot before re-setting.
+    for (const u of DELAY_UNITS) delete next[DELAY_UNIT_TO_KEY[u]];
+    delete next.id;
+    if (trimmed) next[DELAY_UNIT_TO_KEY[unit]] = trimmed;
+    this._emit({ ...this.value, params: next });
   }
 
   /**

@@ -294,14 +294,20 @@ export const automationEditorStyles = css`
     display: grid;
     grid-template-columns: 1fr auto;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-s);
+    padding: var(--wa-space-m);
     border: 1px solid var(--wa-color-neutral-border-quiet, #e1e4e8);
-    border-radius: var(--wa-border-radius-s);
+    border-radius: var(--wa-border-radius-m);
     background: var(--wa-color-surface-lowered);
   }
 
+  /* Bigger gap between siblings so a long action chain reads as a
+     clear sequence of cards instead of one tall striped block. The
+     previous 2xs gap was too tight — once a row carried its own
+     form (Delay's six time inputs, Wait Until's timeout + nested
+     condition list), the boundary between cards visually merged
+     with the boundary between fields inside a card. */
   .ae-row + .ae-row {
-    margin-top: var(--wa-space-2xs);
+    margin-top: var(--wa-space-m);
   }
 
   /* The big "select action / condition" button inside a row that
@@ -406,6 +412,33 @@ export const automationEditorStyles = css`
      the prominent overlay below — that's the primary "Add action"
      / "Add condition" the user reaches for from a fresh
      automation, so it should pop. */
+  /* Bespoke value + unit picker the Delay action uses instead of
+     its six separate time-component string inputs. Keeps the user
+     in the same "one knob" mental model as the interval form
+     (which is a single time_period string). */
+  .ae-delay-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--wa-space-m);
+  }
+  .ae-delay-row .field-label {
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-normal);
+    margin-bottom: var(--wa-space-2xs);
+    display: block;
+  }
+  .ae-delay-row input,
+  .ae-delay-row select {
+    width: 100%;
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    border: 1px solid var(--wa-color-neutral-border-quiet, #d1d5db);
+    border-radius: var(--wa-border-radius-s);
+    background: var(--wa-color-surface-default);
+    font-size: var(--wa-font-size-s);
+    box-sizing: border-box;
+  }
+
   /* "Add action" / "Add condition" button. Full-width, solid
      brand-colored border so it reads as the obvious next step
      from the user — easy to spot on a long list of actions or
