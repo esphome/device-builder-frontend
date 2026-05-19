@@ -347,7 +347,15 @@ export class ESPHomeAnsiLog extends LitElement {
 
   protected updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("lines") && this.autoScroll && !this._isUserScrolled) {
-      this._scrollToBottom();
+      // Sync scroll: ``updated`` runs after Lit has committed the
+      // DOM mutation, so reading ``scrollHeight`` here forces a
+      // layout that reflects the just-appended lines. Deferring
+      // to rAF (as the public ``scrollToBottom`` does for the
+      // dialog-open path) lags by one frame, which is invisible
+      // when one line lands per render but produces a visible
+      // "bottom line clipped" cliff during the rAF-batched
+      // streaming bursts now coming from command-dialog.
+      this._syncScrollToBottom();
     }
   }
 
@@ -420,13 +428,14 @@ export class ESPHomeAnsiLog extends LitElement {
     this._isUserScrolled = scrollHeight - scrollTop - clientHeight > 40;
   }
 
+  private _syncScrollToBottom() {
+    if (!this._container) return;
+    this._ignoreNextScroll = true;
+    this._container.scrollTop = this._container.scrollHeight;
+  }
+
   private _scrollToBottom() {
-    requestAnimationFrame(() => {
-      if (this._container) {
-        this._ignoreNextScroll = true;
-        this._container.scrollTop = this._container.scrollHeight;
-      }
-    });
+    requestAnimationFrame(() => this._syncScrollToBottom());
   }
 
   /** Public method to scroll to bottom programmatically. */
