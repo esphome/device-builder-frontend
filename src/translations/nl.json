@@ -707,6 +707,7 @@
     "language_en": "English",
     "language_fr": "Français",
     "language_nl": "Nederlands",
+    "language_hu": "Magyar",
     "theme_desc": "Kies tussen licht, donker of volg uw systeemvoorkeur.",
     "yaml_diff_desc": "Toon een diff-knop in de YAML-editor om niet-opgeslagen wijzigingen te vergelijken met de laatste opgeslagen versie.",
     "show_yaml_diff_button": "YAML-diff-knop tonen",

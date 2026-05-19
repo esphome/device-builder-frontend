@@ -174,6 +174,17 @@ export const commandPaletteStyles = css`
     color: var(--esphome-primary);
   }
 
+  /* Flag emojis stand in for the MDI icon on language rows.
+     Width is pinned to the icon's font-size so language and
+     non-language rows have aligned labels. */
+  .item-flag {
+    width: 16px;
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+    text-align: center;
+  }
+
   .item-label {
     flex: 1;
     white-space: nowrap;

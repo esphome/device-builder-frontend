@@ -2,12 +2,11 @@ import { consume } from "@lit/context";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
-import type { LocalizeFunc } from "../../common/localize.js";
-import { readStoredLocale } from "../../common/localize.js";
+import type { LanguageChoice, LocalizeFunc } from "../../common/localize.js";
+import { LANGUAGES, readStoredLocale } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { LANGUAGES, type LanguageChoice } from "./types.js";
 import { settingsRowStyles, settingsSharedStyles } from "./shared-styles.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -39,7 +38,9 @@ export class ESPHomeSettingsLanguage extends LitElement {
         <wa-select value=${this._language} @change=${this._onChange}>
           ${LANGUAGES.map(
             (l) => html`
-              <wa-option value=${l.value}>${this._localize(l.labelKey)}</wa-option>
+              <wa-option value=${l.value}
+                >${l.flag} ${this._localize(l.labelKey)}</wa-option
+              >
             `,
           )}
         </wa-select>

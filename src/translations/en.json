@@ -768,6 +768,7 @@
     "language_en": "English",
     "language_fr": "Français",
     "language_nl": "Nederlands",
+    "language_hu": "Magyar",
     "theme_desc": "Choose between light, dark, or follow your system preference.",
     "yaml_diff_desc": "Show a diff button in the YAML editor to compare unsaved changes with the last saved version.",
     "show_yaml_diff_button": "Show YAML diff button",

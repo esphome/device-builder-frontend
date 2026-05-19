@@ -1,7 +1,3 @@
-import type { SupportedLocale } from "../../common/localize.js";
-
-export type LanguageChoice = SupportedLocale | "system";
-
 export type Section =
   | "appearance"
   | "language"
@@ -58,9 +54,3 @@ export const SECTIONS: SectionDef[] = [
   },
 ];
 
-export const LANGUAGES: { value: LanguageChoice; labelKey: string }[] = [
-  { value: "system", labelKey: "settings.language_system" },
-  { value: "en", labelKey: "settings.language_en" },
-  { value: "fr", labelKey: "settings.language_fr" },
-  { value: "nl", labelKey: "settings.language_nl" },
-];
