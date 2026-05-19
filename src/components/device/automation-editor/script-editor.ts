@@ -397,7 +397,6 @@ export class ESPHomeScriptEditor extends LitElement {
    */
   private _renderHeader() {
     const comp = this._scriptComponent;
-    const id = this.location?.id || "";
     const title =
       comp?.name ?? this._localize("device.script_header_title_static");
     const descText =
@@ -407,9 +406,6 @@ export class ESPHomeScriptEditor extends LitElement {
     return html`<div class="ae-header">
       <div class="ae-header-text">
         <h2 class="ae-header-title">${title}</h2>
-        ${id
-          ? html`<p class="ae-header-subtitle">${id}</p>`
-          : nothing}
         <a
           class="ae-header-docs"
           href=${docsUrl}
