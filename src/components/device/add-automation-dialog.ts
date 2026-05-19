@@ -78,6 +78,12 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   @state() private _kind: TargetKind = "device_on";
   @state() private _componentId = "";
   @state() private _triggerId: string | null = null;
+  /** Interval-only: numeric value the user typed. Paired with
+   *  ``_intervalUnit`` to compose ``trigger_params.interval`` as
+   *  "<value><unit>" on submit (mirrors the inline TIME_PERIOD
+   *  renderer's storage shape). */
+  @state() private _intervalValue = "";
+  @state() private _intervalUnit: "us" | "ms" | "s" | "min" | "h" | "d" = "s";
   @state() private _available: AvailableAutomations | null = null;
   @state() private _loading = true;
   @state() private _saving = false;
@@ -147,6 +153,23 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         margin: 0 0 var(--wa-space-m) 0;
         line-height: 1.5;
       }
+      /* Interval-row pairing: matches the editor's inline
+         TIME_PERIOD layout so the dialog reads as the same
+         kind of compound input the user will see again in the
+         section editor. */
+      .interval-inputs {
+        display: flex;
+        align-items: center;
+        gap: var(--wa-space-s);
+      }
+      .interval-inputs > input {
+        flex: 1 1 auto;
+        min-width: 0;
+      }
+      .interval-inputs > wa-select {
+        flex: 0 0 auto;
+        min-width: 6rem;
+      }
     `,
   ];
 
@@ -154,6 +177,8 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     this._kind = "device_on";
     this._componentId = "";
     this._triggerId = null;
+    this._intervalValue = "";
+    this._intervalUnit = "s";
     this._error = "";
     this._dialog.open = true;
     void this._loadAvailable();
@@ -221,6 +246,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       ${this._kind === "component_on"
         ? this._renderComponentRow(componentLocked)
         : nothing}
+      ${this._kind === "interval" ? this._renderIntervalRow() : nothing}
       ${!triggerLocked ? this._renderTriggerRow(filteredTriggers) : nothing}
       ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
       <div class="actions">
@@ -262,6 +288,49 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           </wa-option>`,
         )}
       </wa-select>
+    </div>`;
+  }
+
+  /**
+   * Interval-only row: value + unit picker mirroring the inline
+   * TIME_PERIOD renderer's UX. Asks for the time up front so the
+   * user doesn't land in the editor with an empty interval block.
+   */
+  private _renderIntervalRow() {
+    const units = ["us", "ms", "s", "min", "h", "d"] as const;
+    return html`<div class="field">
+      <label class="field-label" id="interval-label">
+        ${this._localize("device.automation_interval_label")}
+      </label>
+      <div class="interval-inputs">
+        <input
+          type="text"
+          inputmode="decimal"
+          aria-labelledby="interval-label"
+          .value=${this._intervalValue}
+          placeholder="0"
+          ?disabled=${this._saving}
+          @input=${(e: Event) => {
+            this._intervalValue = (e.target as HTMLInputElement).value;
+          }}
+        />
+        <wa-select
+          aria-label=${this._localize("device.automation_action_delay_unit")}
+          ?disabled=${this._saving}
+          @change=${(e: Event) => {
+            this._intervalUnit = (e.target as HTMLSelectElement)
+              .value as typeof this._intervalUnit;
+          }}
+        >
+          ${units.map(
+            (u) => html`<wa-option
+              value=${u}
+              ?selected=${u === this._intervalUnit}
+              >${this._localize(`device.automation_action_delay_unit_${u}`)}</wa-option
+            >`,
+          )}
+        </wa-select>
+      </div>
     </div>`;
   }
 
@@ -335,7 +404,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   }
 
   private _canContinue(): boolean {
-    if (this._kind === "interval") return true;
+    if (this._kind === "interval") return this._intervalValue.trim() !== "";
     if (!this._triggerId) return false;
     if (this._kind === "component_on" && !this._componentId) return false;
     return true;
@@ -349,7 +418,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       const location = this._buildLocation();
       const tree: AutomationTree = {
         trigger_id: this._catalogTriggerId(location),
-        trigger_params: {},
+        // Interval picks up the value+unit pair the user typed; for
+        // device_on / component_on the trigger's own config_entries
+        // are still empty at this point (filled in the inline editor
+        // after the wizard closes).
+        trigger_params:
+          this._kind === "interval"
+            ? { interval: `${this._intervalValue.trim()}${this._intervalUnit}` }
+            : {},
         actions: [],
       };
       // Hand the backend our current draft yaml so the splice
