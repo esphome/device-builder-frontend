@@ -210,7 +210,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = options?.port ?? "OTA";
     this._state = null;
     this._lines = [];
-    this.resetPendingLines();
+    this._resetPendingLines();
     this._statusMessage = "";
     this._jobId = "";
     this._jobStatus = null;
@@ -240,7 +240,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = job.port || "OTA";
     this._state = "running";
     this._lines = [];
-    this.resetPendingLines();
+    this._resetPendingLines();
     this._statusMessage = "";
     this._userStopped = false;
     // Fresh attach is a fresh session — reset toggle defaults so a prior
@@ -362,12 +362,12 @@ export class ESPHomeCommandDialog extends LitElement {
   // O(n²) array-copy + render storm on historical replay (and
   // bursty live output: pip install, esptool block writes) is
   // bounded to ~one render per frame.
-  enqueueLine(line: string): void {
+  _enqueueLine(line: string): void {
     this._pendingLines.push(line);
     if (this._flushScheduled) return;
     this._flushScheduled = requestAnimationFrame(() => {
       this._flushScheduled = 0;
-      this.flushPendingLines();
+      this._flushPendingLines();
     });
   }
 
@@ -375,7 +375,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // to call at any time — terminal callbacks (onResult / onError),
   // detachStream, and _downloadOutput call it so downstream
   // consumers see the full buffer instead of racing the rAF.
-  flushPendingLines(): void {
+  _flushPendingLines(): void {
     if (this._pendingLines.length === 0) return;
     this._lines = [...this._lines, ...this._pendingLines];
     this._pendingLines = [];
@@ -385,7 +385,7 @@ export class ESPHomeCommandDialog extends LitElement {
   // ``_lines = []`` resets (open, followJob, startCommand,
   // toggleShowSecrets restart) so a stale frame can't paint
   // pre-reset lines onto the fresh buffer.
-  resetPendingLines(): void {
+  _resetPendingLines(): void {
     this._pendingLines = [];
     if (this._flushScheduled) {
       cancelAnimationFrame(this._flushScheduled);
@@ -394,7 +394,7 @@ export class ESPHomeCommandDialog extends LitElement {
   }
 
   _downloadOutput = () => {
-    this.flushPendingLines();
+    this._flushPendingLines();
     const stem = this.configuration.replace(/\.ya?ml$/, "") || "output";
     downloadAnsiText(this._lines, `${stem}-${this._commandType}.txt`);
   };
