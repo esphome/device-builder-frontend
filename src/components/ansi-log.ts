@@ -347,14 +347,8 @@ export class ESPHomeAnsiLog extends LitElement {
 
   protected updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("lines") && this.autoScroll && !this._isUserScrolled) {
-      // Sync scroll: ``updated`` runs after Lit has committed the
-      // DOM mutation, so reading ``scrollHeight`` here forces a
-      // layout that reflects the just-appended lines. Deferring
-      // to rAF (as the public ``scrollToBottom`` does for the
-      // dialog-open path) lags by one frame, which is invisible
-      // when one line lands per render but produces a visible
-      // "bottom line clipped" cliff during the rAF-batched
-      // streaming bursts now coming from command-dialog.
+      // Sync (not rAF-deferred): ``updated`` runs post-DOM-commit,
+      // and a one-frame lag clips the bottom line during bursts.
       this._syncScrollToBottom();
     }
   }

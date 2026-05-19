@@ -27,13 +27,9 @@ export async function detachStream(host: ESPHomeCommandDialog): Promise<void> {
   if (!host._streamId) return;
   const streamId = host._streamId;
   host._streamId = "";
-  // Flush any rAF-batched lines so a teardown mid-burst that
-  // keeps the buffer visible (dialog close, follow → install
-  // hand-off, force-local switch) still shows the lines that
-  // arrived but hadn't been rendered yet. Restart paths that
-  // immediately clear ``_lines`` after this call (validate-
-  // secrets-toggle, startCommand) follow up with
-  // ``_resetPendingLines`` to drop the pending batch too.
+  // Flush the rAF batch so teardowns that keep the buffer visible
+  // (close, hand-off, force-local) paint every line that arrived.
+  // Restart paths follow up with ``_resetPendingLines``.
   host._flushPendingLines();
   try {
     await host._api.stopStream(streamId);

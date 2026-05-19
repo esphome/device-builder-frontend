@@ -123,12 +123,8 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() _lines: string[] = [];
   @state() _statusMessage = "";
 
-  // rAF batch buffer for streamed output. Replaying ~2000 historical
-  // lines as 2000 separate ``_lines = [...]`` writes is O(n²) array
-  // copies plus one ansi-log render per write (issue #348). Coalesce
-  // within a frame so the render count becomes proportional to the
-  // burst's wall-clock duration (at most one render per animation
-  // frame) instead of to the line count.
+  // rAF batch buffer for streamed output — coalesce per-line writes
+  // into one render per frame instead of one per line (#348).
   private _pendingLines: string[] = [];
   private _flushScheduled = 0;
 
@@ -357,11 +353,7 @@ export class ESPHomeCommandDialog extends LitElement {
     void onForceLocalClick(this);
   };
 
-  // Push a streamed output line through the rAF batcher. Both the
-  // validate-stream and follow_job callbacks call this so the
-  // O(n²) array-copy + render storm on historical replay (and
-  // bursty live output: pip install, esptool block writes) is
-  // bounded to ~one render per frame.
+  // Buffer a streamed line; flushed on the next animation frame.
   _enqueueLine(line: string): void {
     this._pendingLines.push(line);
     if (this._flushScheduled) return;
@@ -371,20 +363,17 @@ export class ESPHomeCommandDialog extends LitElement {
     });
   }
 
-  // Drain ``_pendingLines`` into ``_lines`` in one assignment. Safe
-  // to call at any time — terminal callbacks (onResult / onError),
-  // detachStream, and _downloadOutput call it so downstream
-  // consumers see the full buffer instead of racing the rAF.
+  // Drain pending lines into ``_lines`` now. Called from terminal
+  // callbacks, detachStream, and _downloadOutput so consumers
+  // don't race the rAF.
   _flushPendingLines(): void {
     if (this._pendingLines.length === 0) return;
     this._lines = [...this._lines, ...this._pendingLines];
     this._pendingLines = [];
   }
 
-  // Drop any pending lines and cancel a scheduled flush. Called on
-  // ``_lines = []`` resets (open, followJob, startCommand,
-  // toggleShowSecrets restart) so a stale frame can't paint
-  // pre-reset lines onto the fresh buffer.
+  // Drop the pending batch and cancel any scheduled flush. Paired
+  // with every ``_lines = []`` reset.
   _resetPendingLines(): void {
     this._pendingLines = [];
     if (this._flushScheduled) {
