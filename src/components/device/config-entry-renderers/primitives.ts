@@ -115,6 +115,108 @@ function hexDisplayOrFallback(rawValue: unknown): string {
   return formatHexInt(rawValue) || String(rawValue);
 }
 
+/**
+ * Time-period field: ESPHome accepts "<value><unit>" strings like
+ * "5s" / "100ms" / "30min" / "1h" (and "5" = 5 seconds, "1h30s" =
+ * compound — the latter is rare enough that we render it as a
+ * plain text fallback when parsing fails).
+ *
+ * Splits the value into a numeric input + a unit picker so the
+ * user never has to remember the suffix grammar. Serializes back
+ * to a single "<value><unit>" string on every change so the
+ * backend's parser handles it the same as if the user had typed
+ * it raw into YAML.
+ */
+const TIME_PERIOD_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
+type TimePeriodUnit = (typeof TIME_PERIOD_UNITS)[number];
+
+function parseTimePeriod(raw: unknown): {
+  value: string;
+  unit: TimePeriodUnit;
+  parseable: boolean;
+} {
+  if (raw === undefined || raw === null || raw === "") {
+    return { value: "", unit: "s", parseable: true };
+  }
+  const text = String(raw).trim();
+  // Single "<number><unit>" form. Number can be a fraction. Unit is
+  // optional — a bare number is interpreted as seconds by ESPHome.
+  const m = text.match(/^(\d+(?:\.\d+)?)(us|ms|s|min|h|d)?$/);
+  if (m) {
+    const [, num, suf] = m;
+    return {
+      value: num,
+      unit: ((suf as TimePeriodUnit) ?? "s"),
+      parseable: true,
+    };
+  }
+  // Compound form ("1h30s") or unrecognised — surface the raw string
+  // so the user can edit it as plain text without us mangling it.
+  return { value: text, unit: "s", parseable: false };
+}
+
+function serializeTimePeriod(value: string, unit: TimePeriodUnit): string {
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+  return `${trimmed}${unit}`;
+}
+
+export function renderTimePeriodField(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+) {
+  const raw = ctx.getAt(path);
+  const parsed = parseTimePeriod(raw);
+  const invalid = ctx.errorAt(path) !== null;
+  const disabled = effectiveDisabled(entry, ctx);
+  // Compound / unparseable strings fall through to a plain text
+  // input so the user can keep editing the raw form they pasted.
+  if (!parsed.parseable) {
+    return renderStringField(entry, "text", path, ctx);
+  }
+  const placeholderText = entry.default_value
+    ? String(entry.default_value)
+    : "";
+  return html`
+    <div class="field time-period" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      <div class="time-period-inputs">
+        <input
+          type="text"
+          inputmode="decimal"
+          class=${invalid ? "invalid" : ""}
+          .value=${parsed.value}
+          ?disabled=${disabled}
+          placeholder=${placeholderText}
+          @input=${(e: Event) => {
+            const next = (e.target as HTMLInputElement).value;
+            ctx.emitChange(path, serializeTimePeriod(next, parsed.unit));
+          }}
+        />
+        <wa-select
+          data-no-value-sync
+          ?disabled=${disabled}
+          @change=${(e: Event) => {
+            const nextUnit = (e.target as HTMLSelectElement)
+              .value as TimePeriodUnit;
+            ctx.emitChange(path, serializeTimePeriod(parsed.value, nextUnit));
+          }}
+        >
+          ${TIME_PERIOD_UNITS.map(
+            (u) => html`<wa-option
+              value=${u}
+              ?selected=${u === parsed.unit}
+              >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option
+            >`,
+          )}
+        </wa-select>
+      </div>
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
 // YAML shape is a single "<value><unit>" string; render the two halves as
 // separate controls and serialize back on every change. range constrains
 // only the numeric part — omit when the picked unit isn't canonical to

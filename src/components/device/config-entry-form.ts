@@ -63,6 +63,7 @@ import {
   renderSelectField,
   renderStringField,
   renderTextareaField,
+  renderTimePeriodField,
   type RenderCtx,
 } from "./config-entry-renderers.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
@@ -461,6 +462,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
         return renderNumberField(entry, path, ctx);
       case ConfigEntryType.FLOAT_WITH_UNIT:
         return renderFloatWithUnitField(entry, path, ctx);
+      case ConfigEntryType.TIME_PERIOD:
+        return renderTimePeriodField(entry, path, ctx);
       case ConfigEntryType.PIN:
         return renderPinField(entry, path, ctx);
       case ConfigEntryType.COLOR:

@@ -584,6 +584,26 @@ export const configEntryFormStyles = css`
     min-width: 6rem;
   }
 
+  /* Time-period field: numeric input + unit picker. Same layout
+     as float_with_unit so the eye reads them as the same kind of
+     compound control. */
+  .time-period-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+  }
+
+  .time-period-inputs > input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .time-period-inputs > wa-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 6rem;
+  }
+
   .float-with-unit-suffix {
     flex: 0 0 auto;
     color: var(--wa-color-text-subtle);
