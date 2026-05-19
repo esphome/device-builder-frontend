@@ -149,6 +149,27 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (changed.has("configuration")) {
       void this._loadAvailable();
     }
+    // Navigator-driven location swap: when the parent passes in a
+    // different ``location`` (user clicked a sibling automation),
+    // the editor element is reused — its previous ``value`` is
+    // stale. Invalidate it so the hydrate path below re-fetches
+    // the matching ParsedAutomation. Without this guard the
+    // trigger / actions panels keep showing the old automation's
+    // content while the location-derived metadata fields update.
+    if (changed.has("location") && !this.addMode) {
+      const prev = changed.get("location") as
+        | AutomationLocation
+        | null
+        | undefined;
+      if (
+        prev &&
+        this.location &&
+        sectionKeyFromLocation(prev) !==
+          sectionKeyFromLocation(this.location)
+      ) {
+        this.value = null;
+      }
+    }
     // Hydrate from the backend in edit-mode: when the editor was
     // mounted with a known location but no value, we look up the
     // matching ParsedAutomation and populate value/location from

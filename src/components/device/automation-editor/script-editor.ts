@@ -154,6 +154,15 @@ export class ESPHomeScriptEditor extends LitElement {
     if (changed.has("configuration")) {
       void this._loadAvailable();
     }
+    // Navigator-driven location swap (user clicked a different
+    // script in the navigator) — invalidate the stale value so
+    // the hydrate path below re-fetches.
+    if (changed.has("location") && !this.addMode) {
+      const prev = changed.get("location") as ScriptLocation | null | undefined;
+      if (prev && this.location && prev.id !== this.location.id) {
+        this.value = null;
+      }
+    }
     if (
       !this.addMode &&
       (changed.has("location") ||
