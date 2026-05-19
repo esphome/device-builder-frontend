@@ -31,7 +31,6 @@ import type {
   AvailableComponentInstance,
   AutomationTrigger,
   BoardCatalogEntry,
-  YamlDiff,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -357,7 +356,15 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         tree,
         location,
       );
-      this._dispatchAdded(location, yaml_diff);
+      // Add-component-dialog parity: the add flow is one-shot, so
+      // write the new block to disk immediately rather than leaving
+      // it as a draft the user still has to commit via the global
+      // Save button. Apply the diff client-side (backend's
+      // upsertAutomation only returns the splice; it doesn't touch
+      // the file) and forward the new YAML through updateConfig.
+      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+      await this._api.updateConfig(this.configuration, newYaml);
+      this._dispatchAdded(location, newYaml);
       this._dialog.open = false;
     } catch (err) {
       const msg =
@@ -414,16 +421,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     return this._triggerId;
   }
 
-  private _dispatchAdded(location: AutomationLocation, yamlDiff: YamlDiff) {
-    // Apply the backend-emitted splice to the device's YAML
-    // buffer so the new automation lands in the page's YAML state
-    // (and thus the YAML pane + the global save button see the
-    // change). The page listens to ``yaml-draft`` and advances
-    // ``_yaml`` without touching ``_savedYaml`` — that's the
-    // existing "dirty buffer, click Save to write" path.
-    const newYaml = applyYamlDiff(this.yaml, yamlDiff);
+  private _dispatchAdded(location: AutomationLocation, newYaml: string) {
+    // ``yaml-updated`` (not ``yaml-draft``) — the new automation is
+    // already on disk by the time we get here, so the page advances
+    // both ``_yaml`` AND ``_savedYaml``. Clean state, no spurious
+    // dirty indicator from the add path. Same shape as the
+    // add-component-dialog post-write dispatch.
     this.dispatchEvent(
-      new CustomEvent<{ yaml: string }>("yaml-draft", {
+      new CustomEvent<{ yaml: string }>("yaml-updated", {
         detail: { yaml: newYaml },
         bubbles: true,
         composed: true,

@@ -26,7 +26,6 @@ import type {
   AutomationTree,
   AvailableAutomations,
   BoardCatalogEntry,
-  YamlDiff,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
@@ -225,11 +224,15 @@ export class ESPHomeAddScriptDialog extends LitElement {
         tree,
         location,
       );
-      // Apply the diff to the page's YAML so the new script
-      // lands in ``_yaml`` and the global save button activates.
+      // Add-component-dialog parity: one-shot add writes to disk
+      // immediately instead of leaving a draft for the global save
+      // to commit. Apply the diff client-side (backend returns the
+      // splice only) then forward through ``updateConfig`` so the
+      // page reads a clean (non-dirty) state.
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+      await this._api.updateConfig(this.configuration, newYaml);
       this.dispatchEvent(
-        new CustomEvent<{ yaml: string }>("yaml-draft", {
+        new CustomEvent<{ yaml: string }>("yaml-updated", {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
