@@ -12,6 +12,7 @@ import type {
   AutomationLocation,
   AutomationTree,
   ConditionNode,
+  YamlDiff,
 } from "../../../api/types.js";
 
 /** Build a fresh empty automation tree (add-mode initial state). */
@@ -118,6 +119,46 @@ export function sectionKeyFromLocation(loc: AutomationLocation): string {
     case "light_effect":
       return `automation:light_effect:${loc.component_id}:${loc.index}`;
   }
+}
+
+/**
+ * Apply a backend-emitted ``YamlDiff`` to a YAML string locally.
+ * The backend's ``automations/upsert`` and ``automations/delete``
+ * commands return a diff rather than writing to disk — this is
+ * how the frontend reflects the change into its in-memory YAML
+ * buffer so the YAML pane updates and the global save button
+ * activates (per the "editor pane is the single writer" rule
+ * from the design).
+ *
+ * Diff shapes (per the backend's docs):
+ * - Replace: ``fromLine <= toLine`` → lines ``[fromLine, toLine]``
+ *   (1-indexed, inclusive) are replaced with ``replacement``.
+ * - Insert: ``toLine == fromLine - 1`` → no lines replaced;
+ *   ``replacement`` is inserted before line ``fromLine``.
+ *
+ * Both shapes funnel through one slice / concat pattern; a
+ * trailing newline on ``replacement`` is normalised so the
+ * resulting YAML doesn't grow a blank line on each edit.
+ */
+export function applyYamlDiff(yaml: string, diff: YamlDiff): string {
+  const lines = yaml.split("\n");
+  const startIdx = diff.fromLine - 1;
+  const deleteCount = Math.max(0, diff.toLine - diff.fromLine + 1);
+  // Strip a single trailing "\n" from replacement so when we
+  // split on "\n" we don't end up with a phantom empty line at
+  // the end of the inserted block. Multi-line replacements
+  // emitted by the backend include their own intra-block
+  // newlines; the trailing one is a delimiter we don't need.
+  const replacementStr = diff.replacement.endsWith("\n")
+    ? diff.replacement.slice(0, -1)
+    : diff.replacement;
+  const replacementLines = replacementStr === "" ? [] : replacementStr.split("\n");
+  const newLines = [
+    ...lines.slice(0, startIdx),
+    ...replacementLines,
+    ...lines.slice(startIdx + deleteCount),
+  ];
+  return newLines.join("\n");
 }
 
 /**

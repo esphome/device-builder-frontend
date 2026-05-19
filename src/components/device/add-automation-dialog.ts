@@ -39,7 +39,10 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { sectionKeyFromLocation } from "./automation-editor/serialise.js";
+import {
+  applyYamlDiff,
+  sectionKeyFromLocation,
+} from "./automation-editor/serialise.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -412,12 +415,23 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   }
 
   private _dispatchAdded(location: AutomationLocation, yamlDiff: YamlDiff) {
+    // Apply the backend-emitted splice to the device's YAML
+    // buffer so the new automation lands in the page's YAML state
+    // (and thus the YAML pane + the global save button see the
+    // change). The page listens to ``yaml-draft`` and advances
+    // ``_yaml`` without touching ``_savedYaml`` — that's the
+    // existing "dirty buffer, click Save to write" path.
+    const newYaml = applyYamlDiff(this.yaml, yamlDiff);
     this.dispatchEvent(
-      new CustomEvent<{
-        sectionKey: string;
-        yamlDiff: YamlDiff;
-      }>("automation-added", {
-        detail: { sectionKey: sectionKeyFromLocation(location), yamlDiff },
+      new CustomEvent<{ yaml: string }>("yaml-draft", {
+        detail: { yaml: newYaml },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+    this.dispatchEvent(
+      new CustomEvent<{ sectionKey: string }>("automation-added", {
+        detail: { sectionKey: sectionKeyFromLocation(location) },
         bubbles: true,
         composed: true,
       }),

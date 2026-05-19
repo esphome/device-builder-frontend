@@ -537,8 +537,13 @@ export class ESPHomePageDevice extends LitElement {
   private _saveYaml = async (): Promise<boolean> => {
     // Promote any in-flight form keystroke (still inside its 200ms
     // debounce window) into ``_yaml`` so the save commits exactly
-    // what the user typed — not what was last flushed.
-    this._activeSection?.flushPending();
+    // what the user typed — not what was last flushed. The
+    // component editor's flushPending is sync (local YAML splice
+    // only); the automation/script editors return a Promise
+    // because their pending change is a backend upsert call.
+    // ``await`` handles both shapes — awaiting ``undefined``
+    // resolves immediately.
+    await this._activeSection?.flushPending();
     // The Save button activates on ``_isDirty`` (yaml diff OR the
     // section editor's transient pre-flush dirty flag), so a click
     // inside the debounce window can land here with the form
@@ -747,6 +752,8 @@ export class ESPHomePageDevice extends LitElement {
         @section-toggle=${this._onSectionToggle}
         @section-select=${this._onSectionSelect}
         @yaml-highlight=${this._onYamlHighlight}
+        @yaml-updated=${this._onYamlUpdated}
+        @yaml-draft=${this._onYamlDraft}
       >
         ${this._renderNavigator("drawer-nav")}
       </div>
