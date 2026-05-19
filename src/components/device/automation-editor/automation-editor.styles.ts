@@ -300,14 +300,24 @@ export const automationEditorStyles = css`
     background: var(--wa-color-surface-lowered);
   }
 
-  /* Bigger gap between siblings so a long action chain reads as a
-     clear sequence of cards instead of one tall striped block. The
-     previous 2xs gap was too tight — once a row carried its own
-     form (Delay's six time inputs, Wait Until's timeout + nested
-     condition list), the boundary between cards visually merged
-     with the boundary between fields inside a card. */
-  .ae-row + .ae-row {
+  /* Collapsed variant — tighter padding so the compact one-line
+     view doesn't visually look the same height as an expanded row.
+     The controls stay full-size; only the body gets squeezed. */
+  .ae-row.ae-row--collapsed {
+    padding: var(--wa-space-2xs) var(--wa-space-m);
+  }
+
+  /* Each action / condition row lives inside its own custom
+     element shadow, so .ae-row + .ae-row would never match — the
+     rows aren't siblings in any one tree. The selector below
+     targets where the elements ARE siblings (inside the
+     action-list / condition-tree shadow), and that's exactly
+     where the rule fires because the list/tree pulls in this same
+     stylesheet. */
+  esphome-automation-action-node + esphome-automation-action-node,
+  esphome-automation-condition-node + esphome-automation-condition-node {
     margin-top: var(--wa-space-m);
+    display: block;
   }
 
   /* The big "select action / condition" button inside a row that

@@ -684,6 +684,8 @@
     "automation_interval_label": "Interval",
     "automation_action_delay_value": "Value",
     "automation_action_delay_unit": "Unit",
+    "automation_action_collapse": "Collapse",
+    "automation_action_expand": "Expand",
     "automation_action_delay_unit_us": "Microseconds",
     "automation_action_delay_unit_ms": "Milliseconds",
     "automation_action_delay_unit_s": "Seconds",

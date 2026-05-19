@@ -548,6 +548,8 @@
     "automation_interval_label": "Interval",
     "automation_action_delay_value": "Waarde",
     "automation_action_delay_unit": "Eenheid",
+    "automation_action_collapse": "Inklappen",
+    "automation_action_expand": "Uitklappen",
     "automation_action_delay_unit_us": "Microseconden",
     "automation_action_delay_unit_ms": "Milliseconden",
     "automation_action_delay_unit_s": "Seconden",

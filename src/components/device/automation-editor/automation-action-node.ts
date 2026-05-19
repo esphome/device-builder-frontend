@@ -17,6 +17,8 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import {
   mdiArrowDown,
   mdiArrowUp,
+  mdiChevronDown,
+  mdiChevronUp,
   mdiClose,
   mdiPencilOutline,
 } from "@mdi/js";
@@ -54,6 +56,8 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 registerMdiIcons({
   "arrow-down": mdiArrowDown,
   "arrow-up": mdiArrowUp,
+  "chevron-down": mdiChevronDown,
+  "chevron-up": mdiChevronUp,
   close: mdiClose,
   "pencil-outline": mdiPencilOutline,
 });
@@ -122,12 +126,23 @@ export class ESPHomeAutomationActionNode extends LitElement {
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
 
+  /**
+   * Collapsed = compact one-line view (just the picker / action
+   * name + the controls strip). Expanded = full body with the
+   * description, the params form, the condition gate, and any
+   * nested action lists. Default expanded so a freshly-picked
+   * action shows its fields without an extra click; the user can
+   * collapse cards manually once a chain gets long.
+   */
+  @state() private _collapsed = false;
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
   protected render() {
     const def = this.catalog.find((a) => a.id === this.value.action_id);
+    const collapsed = this._collapsed;
     return html`
-      <div class="ae-row">
+      <div class="ae-row ${collapsed ? "ae-row--collapsed" : ""}">
         <div class="ae-row-body">
           <button
             type="button"
@@ -146,17 +161,36 @@ export class ESPHomeAutomationActionNode extends LitElement {
             .devices=${this.devices}
             @catalog-picked=${this._onActionPicked}
           ></esphome-catalog-picker-dialog>
-          ${def?.description
-            ? html`<p class="ae-section-desc">
-                ${renderMarkdown(def.description)}
-              </p>`
-            : nothing}
-          ${this._renderActionParams(def)}
-          ${this._renderScriptParams(def)}
-          ${this._renderConditionGate(def)}
-          ${this._renderNestedLists(def)}
+          ${collapsed
+            ? nothing
+            : html`
+                ${def?.description
+                  ? html`<p class="ae-section-desc">
+                      ${renderMarkdown(def.description)}
+                    </p>`
+                  : nothing}
+                ${this._renderActionParams(def)}
+                ${this._renderScriptParams(def)}
+                ${this._renderConditionGate(def)}
+                ${this._renderNestedLists(def)}
+              `}
         </div>
         <div class="ae-row-controls">
+          <button
+            type="button"
+            aria-label=${collapsed
+              ? this._localize("device.automation_action_expand")
+              : this._localize("device.automation_action_collapse")}
+            aria-expanded=${collapsed ? "false" : "true"}
+            @click=${() => {
+              this._collapsed = !this._collapsed;
+            }}
+          >
+            <wa-icon
+              library="mdi"
+              name=${collapsed ? "chevron-down" : "chevron-up"}
+            ></wa-icon>
+          </button>
           <button
             type="button"
             ?disabled=${this.disabled || this.first}
