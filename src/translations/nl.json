@@ -544,6 +544,8 @@
     "automation_script_parameters": "Parameters",
     "automation_script_mode": "Uitvoermodus",
     "automation_interval_every": "Elke",
+    "automation_interval_every_n": "Elke {time}",
+    "automation_interval_label": "Interval",
     "automation_light_effect": "Effect",
     "automation_parse_error": "Kon deze automatisering niet ontleden. Bewerk de YAML rechtstreeks om verder te kunnen.",
     "automation_save_error": "Opslaan van automatisering mislukt",

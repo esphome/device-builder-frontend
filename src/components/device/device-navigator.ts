@@ -18,6 +18,10 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
+  fetchAutomationTriggers,
+  getCachedAutomationTriggers,
+} from "../../util/automation-catalog-cache.js";
+import {
   fetchComponent,
   getCachedComponent,
   subscribeComponentCache,
@@ -611,6 +615,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const sections = parseYamlTopLevelSections(this.yaml);
     const { core, components } = categorizeSections(sections);
     const platform = this.platform || undefined;
+    const boardId = this.board?.id;
     for (const item of [...core, ...components]) {
       const id = sectionKeyOf(item);
       if (getCachedComponent(id, platform) !== undefined) continue;
@@ -619,6 +624,27 @@ export class ESPHomeDeviceNavigator extends LitElement {
         // catalog entry is available, so a transient backend hiccup
         // shouldn't surface as an error here.
       });
+    }
+    // Trigger catalog: needed so automation entries can render as
+    // "Switch → Turn on" (catalog-pretty domain + trigger name)
+    // instead of "warmtepomp → on_turn_on" (raw YAML key). The cache
+    // is process-wide and the subscription path re-renders when an
+    // entry lands.
+    if (
+      AUTOMATIONS_ENABLED &&
+      getCachedAutomationTriggers(platform, boardId) === undefined
+    ) {
+      void fetchAutomationTriggers(this._api, platform, boardId).then(
+        () => {
+          // Manual nudge — the subscription handler only fires for
+          // ``component-name`` writes; the trigger cache has no
+          // observer surface, so we force a re-render directly.
+          this._cacheTick++;
+        },
+        () => {
+          /* swallow — same rationale as the component fetch above. */
+        },
+      );
     }
   }
 
@@ -641,22 +667,113 @@ export class ESPHomeDeviceNavigator extends LitElement {
   ): { primary: string; secondary?: string } {
     const raw = sectionKeyOf(item);
 
-    let primary = raw;
     if (category === "automation") {
-      // Automations carry a stable machine identifier in ``key``
-      // (``automation:component_on:<id>:on_press``) — show the
-      // human-readable ``displayLabel`` when available, otherwise
-      // fall back to the raw key.
-      if (item.displayLabel) primary = item.displayLabel;
-    } else {
-      const cached = getCachedComponent(raw, this.platform || undefined);
-      if (cached?.name) primary = cached.name;
+      return this._automationLabels(item, raw);
     }
+
+    let primary = raw;
+    const cached = getCachedComponent(raw, this.platform || undefined);
+    if (cached?.name) primary = cached.name;
 
     const named = item.name || item.id;
     const secondary = named && named !== primary ? named : undefined;
 
     return { primary, secondary };
+  }
+
+  /**
+   * Two-line layout for automation entries — keeps the navigator
+   * consistent with how components render (catalog name on top,
+   * instance name/id below):
+   *
+   *   on_*: under a component  →  "Switch → Turn on" / instance name+id
+   *   script entry             →  "Script"           / id
+   *   interval entry           →  "Interval"         / "Every 60s"
+   *
+   * The catalog-derived "Switch" / "Turn on" pair comes from the
+   * automation triggers catalog. While the catalog is still loading
+   * we render a graceful fallback ("Switch → on_turn_on") so the
+   * navigator never blanks out on first paint.
+   */
+  private _automationLabels(
+    item: YamlSection,
+    raw: string,
+  ): { primary: string; secondary?: string } {
+    // Script: line 1 = "Script", line 2 = id.
+    if (item.parentKey === "script") {
+      const primary = this._localize("device.script_header_title_static");
+      const secondary = item.id ?? raw;
+      return { primary, secondary: secondary !== primary ? secondary : undefined };
+    }
+    // Interval: line 1 = "Interval", line 2 = the time if known.
+    // Uses the bare "automation_interval_label" key (not the
+    // longer-form "On an interval" used by the kind picker) so the
+    // nav row stays scannable.
+    if (item.parentKey === "interval") {
+      const primary = this._localize("device.automation_interval_label");
+      const every = item.meta?.every;
+      const secondary = every
+        ? this._localize("device.automation_interval_every_n", { time: every })
+        : undefined;
+      return { primary, secondary };
+    }
+    // Device-level (``esphome → on_boot``) — no instance to show on
+    // line 2; keep line 2 empty since the trigger name already
+    // identifies the automation uniquely.
+    if (item.parentKey === "esphome" && item.eventKey) {
+      const primary = this._resolveTriggerName(
+        "esphome",
+        item.eventKey,
+        `${this._prettyDomain("esphome")} → ${item.eventKey}`,
+      );
+      return { primary };
+    }
+    // Component-bound (``Switch → On Turn On`` resolved from the
+    // catalog; "Warmtepomp" on line 2).
+    if (item.parentKey && item.eventKey) {
+      const fallback = `${this._prettyDomain(item.parentKey)} → ${item.eventKey}`;
+      const primary = this._resolveTriggerName(
+        item.parentKey,
+        item.eventKey,
+        fallback,
+      );
+      const named = item.name || item.id;
+      const secondary = named && named !== primary ? named : undefined;
+      return { primary, secondary };
+    }
+    // Unscoped / unrecognised — fall back to displayLabel.
+    return { primary: item.displayLabel || raw };
+  }
+
+  /** Resolve the catalog's pretty name for ``<domain>.<event>`` or
+   *  return ``fallback`` (typically the raw event key) when the
+   *  catalog hasn't loaded yet. The catalog's ``name`` field is the
+   *  full display label including the domain prefix
+   *  (``"Switch → On Turn On"``), so callers use the resolved value
+   *  as-is — no separate domain prepend. */
+  private _resolveTriggerName(
+    domain: string,
+    eventKey: string,
+    fallback: string,
+  ): string {
+    const triggers = getCachedAutomationTriggers(
+      this.platform || undefined,
+      this.board?.id,
+    );
+    if (!triggers) return fallback;
+    const catalogId =
+      domain === "esphome" ? eventKey : `${domain}.${eventKey}`;
+    const hit = triggers.find((t) => t.id === catalogId);
+    return hit?.name || fallback;
+  }
+
+  /** Capitalize a YAML domain key for display (``binary_sensor`` →
+   *  ``Binary sensor``). Used only for the pre-catalog fallback
+   *  label so the navigator never shows a raw lowercase domain
+   *  while the trigger fetch is still in flight. */
+  private _prettyDomain(domain: string): string {
+    const spaced = domain.replace(/_/g, " ");
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
   }
 
   private _onItemHover(line: number, fromLine: number, toLine: number) {

@@ -526,22 +526,23 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Component-style header card. Just the section type as a
-   * title, the docs link, and a one-line description of what
-   * automations are. The specific identity (target + trigger) is
-   * carried by the read-only form fields below the header — no
-   * subtitle here because it would just duplicate the trigger
-   * field that's already in the form.
+   * Component-style header card. Title is the catalog-resolved
+   * domain + trigger name (``Switch → Turn on``) so it matches the
+   * navigator's primary label and gives the user the same eye-line
+   * cue they get from clicking a regular component.
+   *
+   * Title decomposes to the kind label (``Automation``) when we
+   * don't have enough metadata yet — fresh add-mode (no trigger
+   * picked) or interval / script / light_effect locations.
    */
   private _renderHeader(activeTrigger: AutomationTrigger | null) {
     const desc = activeTrigger?.description
       ? renderMarkdown(activeTrigger.description)
       : renderMarkdown(this._localize("device.automation_header_description"));
+    const title = this._headerTitle(activeTrigger);
     return html`<div class="ae-header">
       <div class="ae-header-text">
-        <h2 class="ae-header-title">
-          ${this._localize("device.automation_header_title_static")}
-        </h2>
+        <h2 class="ae-header-title">${title}</h2>
         ${activeTrigger?.docs_url
           ? html`<a
               class="ae-header-docs"
@@ -559,6 +560,26 @@ export class ESPHomeAutomationEditor extends LitElement {
         <wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>
       </div>
     </div>`;
+  }
+
+  /**
+   * Compose the header title:
+   *
+   *   device_on / component_on (trigger picked)  → catalog's
+   *     ``trigger.name`` ("Switch → On Turn On") — already domain-
+   *     qualified, no extra prefix.
+   *   interval                                   → "Interval"
+   *   anything else / fallback                   → static "Automation"
+   */
+  private _headerTitle(trigger: AutomationTrigger | null): string {
+    const loc = this.location;
+    if (loc?.kind === "interval") {
+      return this._localize("device.automation_interval_label");
+    }
+    if (trigger && (loc?.kind === "device_on" || loc?.kind === "component_on")) {
+      return trigger.name;
+    }
+    return this._localize("device.automation_header_title_static");
   }
 
   /**

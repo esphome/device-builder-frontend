@@ -274,30 +274,43 @@ sensor:
     expect(sectionAtLine("", 1)).toBeNull();
   });
 
-  // Pinning current behaviour for the known follow-up: when the
-  // cursor is inside an inline automation block (e.g. `on_press:`
-  // nested under a `binary_sensor` list item), `sectionAtLine`
-  // returns the enclosing component item, NOT the automation.
-  // Until the helper is extended to consult `parseYamlAutomations`
-  // and prefer the most-specific (smallest) range, this asymmetry
-  // means cursor-following picks the parent component while
-  // clicking the navigator's matching automation entry takes you
-  // to the automation. The test locks the contract so the
-  // follow-up doesn't accidentally regress the common case.
-  it("attributes inline automation lines to the enclosing component (known gap)", () => {
+  // Cursor inside an inline automation block (``on_press:`` nested
+  // under a ``binary_sensor`` list item) now resolves to the
+  // automation entry, not the enclosing component — the helper
+  // prefers the most-specific (smallest containing range) match so
+  // the YAML pane's cursor-follow lands on the same section the
+  // navigator routes to.
+  it("routes inline automation lines to the automation entry, not the component", () => {
     const yaml = `binary_sensor:
   - platform: gpio
+    id: door_sensor
     name: door
     pin: D2
     on_press:
       then:
         - logger.log: pressed
 `;
-    // `on_press:` itself is line 5; its body is lines 6-7.
+    // ``on_press:`` itself is line 6; its body is lines 7-8.
+    const m = sectionAtLine(yaml, 7);
+    expect(m?.key).toBe(
+      "automation:component_on:door_sensor:on_press",
+    );
+  });
+
+  // Click inside a top-level ``script:`` entry resolves to that
+  // entry's automation key, not the bare ``script:`` block.
+  it("routes a click inside a script entry to the script automation key", () => {
+    const yaml = `esphome:
+  name: dev
+script:
+  - id: my_routine
+    mode: single
+    then:
+      - logger.log: hello
+`;
+    // ``- id: my_routine`` is line 4; the ``then:`` body lives on 6-7.
     const m = sectionAtLine(yaml, 6);
-    expect(m?.key).toBe("binary_sensor");
-    expect(m?.platform).toBe("gpio");
-    expect(m?.name).toBe("door");
+    expect(m?.key).toBe("automation:script:my_routine");
   });
 });
 

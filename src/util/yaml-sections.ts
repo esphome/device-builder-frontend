@@ -14,6 +14,20 @@ export interface YamlSection {
    * present and fall back to ``key`` otherwise.
    */
   displayLabel?: string;
+  /**
+   * Bare trigger event key (``on_press``, ``on_turn_on``) for
+   * automation entries. The navigator combines this with
+   * ``parentKey`` to look up the trigger's pretty name in the
+   * catalog (``binary_sensor.on_press`` → "Pressed").
+   */
+  eventKey?: string;
+  /**
+   * Free-form metadata payload — currently used to surface the
+   * ``interval: 60s`` time on an interval entry so the navigator
+   * can show "Every 60s" instead of "interval #1". Optional for
+   * everything else.
+   */
+  meta?: Record<string, string>;
 }
 
 export interface CategorizedSections {
@@ -342,9 +356,15 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     if (ancestry.parentKey === "esphome") {
       automations.push({
         key: `automation:device_on:${eventName}`,
+        // ``displayLabel`` is the legacy "Esphome → on_boot" label;
+        // the navigator now prefers catalog-resolved labels but
+        // keeps ``displayLabel`` as a graceful fallback for
+        // pre-catalog renders.
         displayLabel: `esphome → ${eventName}`,
         fromLine,
         toLine,
+        parentKey: "esphome",
+        eventKey: eventName,
       });
     } else if (ancestry.componentId) {
       const labelHead = ancestry.parentName || ancestry.componentId;
@@ -354,6 +374,9 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
         fromLine,
         toLine,
         id: ancestry.componentId,
+        name: ancestry.parentName ?? undefined,
+        parentKey: ancestry.parentKey ?? undefined,
+        eventKey: eventName,
       });
     } else {
       // No clear ancestry — keep the event as the bare display
@@ -364,6 +387,7 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
         displayLabel: eventName,
         fromLine,
         toLine,
+        eventKey: eventName,
       });
     }
   }
@@ -384,11 +408,23 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
           : `automation:interval:${idx}`;
       const display =
         top === "script" && itemId ? `script: ${itemId}` : `interval #${idx + 1}`;
+      const meta: Record<string, string> = {};
+      if (top === "interval") {
+        // ``interval: 60s`` lives directly on the list item — pull
+        // it so the navigator can render "Every 60s" instead of
+        // a generic "interval #N". Optional; we fall back to the
+        // index when the field is missing or unparseable.
+        const every = _readKeyOnLine(lines, item.fromLine, "interval");
+        if (every) meta.every = every;
+      }
       automations.push({
         key,
         displayLabel: display,
         fromLine: item.fromLine,
         toLine: item.toLine,
+        id: top === "script" && itemId ? itemId : undefined,
+        parentKey: top,
+        meta: Object.keys(meta).length > 0 ? meta : undefined,
       });
     });
   }
@@ -437,6 +473,11 @@ function _walkAncestry(
   let parentKey: string | null = null;
   let parentName: string | null = null;
   let componentId: string | null = null;
+  // True once we've crossed our list item's leading ``-`` (at indent
+  // < childIndent). Beyond that boundary we keep scanning *only* to
+  // find the top-level key; we no longer harvest id / name (those
+  // would belong to a previous sibling, not us).
+  let crossedItemBoundary = false;
   for (let j = startIdx - 1; j >= 0; j--) {
     const line = lines[j];
     if (line.trim() === "") continue;
@@ -447,12 +488,16 @@ function _walkAncestry(
     }
     const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
     // A list-item dash at an indent shallower than our handler is
-    // this item's boundary. Cross it and we'd start grabbing the
-    // previous item's id / name — stop walking.
-    if (lineIndent < childIndent && /^\s*-\s/.test(line)) break;
-    // Same-indent siblings of the handler (or shallower
-    // non-boundary lines) are candidates for id / name.
+    // our own item's leading row (we're somewhere inside it). Cross
+    // it but keep walking — the top-level key still sits above us.
+    if (lineIndent < childIndent && /^\s*-\s/.test(line)) {
+      crossedItemBoundary = true;
+      continue;
+    }
+    // Deeper lines (nested blocks under our handler's siblings)
+    // can't contribute id / name for our automation.
     if (lineIndent > childIndent) continue;
+    if (crossedItemBoundary) continue;
     const idMatch = line.match(
       /^\s+(?:-\s+)?id:\s*["']?([^"'\s]+)["']?\s*$/,
     );
@@ -629,8 +674,40 @@ export function sectionAtLine(
   yaml: string,
   line: number,
 ): YamlSection | null {
-  const sections = parseYamlTopLevelSections(yaml);
-  return sections.find((s) => line >= s.fromLine && line <= s.toLine) ?? null;
+  // Automations take precedence over top-level sections whenever a
+  // click falls inside one: a click inside ``script: - id: proost``
+  // routes to the script editor (not the enclosing ``script:``
+  // component-editor); a click inside ``on_press:`` under a
+  // ``binary_sensor`` routes to the automation editor for that
+  // trigger (not the binary_sensor component editor).
+  //
+  // Within each layer we still prefer the smallest containing range
+  // — for example a nested ``if:`` block's ``then:`` versus its
+  // enclosing automation. Top-level fallback covers cases the
+  // automation parser doesn't touch (regular components, ``wifi:``,
+  // ``esphome:``, etc.).
+  const autos = parseYamlAutomations(yaml);
+  const autoHit = _smallestContaining(autos, line);
+  if (autoHit) return autoHit;
+  const tops = parseYamlTopLevelSections(yaml);
+  return _smallestContaining(tops, line);
+}
+
+function _smallestContaining(
+  sections: YamlSection[],
+  line: number,
+): YamlSection | null {
+  let best: YamlSection | null = null;
+  let bestSpan = Number.POSITIVE_INFINITY;
+  for (const s of sections) {
+    if (line < s.fromLine || line > s.toLine) continue;
+    const span = s.toLine - s.fromLine;
+    if (span < bestSpan) {
+      best = s;
+      bestSpan = span;
+    }
+  }
+  return best;
 }
 
 /**

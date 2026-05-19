@@ -544,6 +544,8 @@
     "automation_script_parameters": "Paramètres",
     "automation_script_mode": "Mode d'exécution",
     "automation_interval_every": "Toutes les",
+    "automation_interval_every_n": "Toutes les {time}",
+    "automation_interval_label": "Intervalle",
     "automation_light_effect": "Effet",
     "automation_parse_error": "Impossible d'analyser cette automatisation. Modifiez directement le YAML pour la récupérer.",
     "automation_save_error": "Échec de l'enregistrement de l'automatisation",
