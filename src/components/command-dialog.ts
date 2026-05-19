@@ -123,6 +123,15 @@ export class ESPHomeCommandDialog extends LitElement {
   @state() _lines: string[] = [];
   @state() _statusMessage = "";
 
+  // rAF batch buffer for streamed output. Replaying ~2000 historical
+  // lines as 2000 separate ``_lines = [...]`` writes is O(n²) array
+  // copies plus one ansi-log render per write (issue #348). Coalesce
+  // within a frame so the render count becomes proportional to the
+  // burst's wall-clock duration (at most one render per animation
+  // frame) instead of to the line count.
+  private _pendingLines: string[] = [];
+  private _flushScheduled = 0;
+
   // Distinguishes user-stopped from backend-failed. Both flip _state to "error"
   // but only real failures get the reset-build-env hint.
   @state() _userStopped = false;
@@ -201,6 +210,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = options?.port ?? "OTA";
     this._state = null;
     this._lines = [];
+    this.resetPendingLines();
     this._statusMessage = "";
     this._jobId = "";
     this._jobStatus = null;
@@ -230,6 +240,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._port = job.port || "OTA";
     this._state = "running";
     this._lines = [];
+    this.resetPendingLines();
     this._statusMessage = "";
     this._userStopped = false;
     // Fresh attach is a fresh session — reset toggle defaults so a prior
@@ -346,7 +357,44 @@ export class ESPHomeCommandDialog extends LitElement {
     void onForceLocalClick(this);
   };
 
+  // Push a streamed output line through the rAF batcher. Both the
+  // validate-stream and follow_job callbacks call this so the
+  // O(n²) array-copy + render storm on historical replay (and
+  // bursty live output: pip install, esptool block writes) is
+  // bounded to ~one render per frame.
+  enqueueLine(line: string): void {
+    this._pendingLines.push(line);
+    if (this._flushScheduled) return;
+    this._flushScheduled = requestAnimationFrame(() => {
+      this._flushScheduled = 0;
+      this.flushPendingLines();
+    });
+  }
+
+  // Drain ``_pendingLines`` into ``_lines`` in one assignment. Safe
+  // to call at any time — terminal callbacks (onResult / onError),
+  // detachStream, and _downloadOutput call it so downstream
+  // consumers see the full buffer instead of racing the rAF.
+  flushPendingLines(): void {
+    if (this._pendingLines.length === 0) return;
+    this._lines = [...this._lines, ...this._pendingLines];
+    this._pendingLines = [];
+  }
+
+  // Drop any pending lines and cancel a scheduled flush. Called on
+  // ``_lines = []`` resets (open, followJob, startCommand,
+  // toggleShowSecrets restart) so a stale frame can't paint
+  // pre-reset lines onto the fresh buffer.
+  resetPendingLines(): void {
+    this._pendingLines = [];
+    if (this._flushScheduled) {
+      cancelAnimationFrame(this._flushScheduled);
+      this._flushScheduled = 0;
+    }
+  }
+
   _downloadOutput = () => {
+    this.flushPendingLines();
     const stem = this.configuration.replace(/\.ya?ml$/, "") || "output";
     downloadAnsiText(this._lines, `${stem}-${this._commandType}.txt`);
   };

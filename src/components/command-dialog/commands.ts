@@ -27,6 +27,11 @@ export async function detachStream(host: ESPHomeCommandDialog): Promise<void> {
   if (!host._streamId) return;
   const streamId = host._streamId;
   host._streamId = "";
+  // Flush any rAF-batched lines so a teardown mid-burst (user
+  // closed the dialog, switched to local, restarted with
+  // --show-secrets) still paints the lines that arrived but
+  // hadn't been rendered yet.
+  host.flushPendingLines();
   try {
     await host._api.stopStream(streamId);
   } catch {
@@ -39,6 +44,7 @@ export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   host._jobId = "";
   host._state = "running";
   host._lines = [];
+  host.resetPendingLines();
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
@@ -62,11 +68,12 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
     host.configuration,
     {
       onOutput: (line) => {
-        host._lines = [...host._lines, line];
+        host.enqueueLine(line);
         if (isValidationFailureLine(line)) host._failedDuringValidate = true;
       },
       onResult: (data) => {
         host._streamId = "";
+        host.flushPendingLines();
         host._state = data.success ? "success" : "error";
         host._statusMessage = host._localize(
           data.success ? "command.validate_success" : "command.validate_failed",
@@ -74,6 +81,7 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
       },
       onError: (error) => {
         host._streamId = "";
+        host.flushPendingLines();
         host._state = "error";
         host._statusMessage = error;
       },
@@ -96,6 +104,7 @@ export async function toggleShowSecrets(host: ESPHomeCommandDialog): Promise<voi
   try {
     await detachStream(host);
     host._lines = [];
+    host.resetPendingLines();
     host._state = "running";
     host._statusMessage = "";
     host._resetAnsiLogScroll();
@@ -148,11 +157,12 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
   const wasLiveAtAttach = !isTerminalJobStatus(host._jobStatus);
   host._streamId = host._api.firmwareFollowJob(jobId, {
     onOutput: (line) => {
-      host._lines = [...host._lines, line];
+      host.enqueueLine(line);
       if (isValidationFailureLine(line)) host._failedDuringValidate = true;
     },
     onResult: (data) => {
       host._streamId = "";
+      host.flushPendingLines();
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
       host._state = success ? "success" : "error";
@@ -173,6 +183,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
     },
     onError: (error) => {
       host._streamId = "";
+      host.flushPendingLines();
       host._state = "error";
       host._statusMessage = error;
       host._jobId = "";
@@ -230,7 +241,10 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     host._state = "error";
     host._statusMessage = host._localize("command.force_local_failed");
     const detail = formatForceLocalError(err);
-    if (detail) host._lines = [...host._lines, detail];
+    if (detail) {
+      host.flushPendingLines();
+      host._lines = [...host._lines, detail];
+    }
   } finally {
     host._switchingToLocal = false;
   }
