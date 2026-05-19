@@ -485,11 +485,15 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   /**
-   * Read-only target / trigger fields — styled like a component
+   * Read-only trigger / target fields — styled like a component
    * config form so the eye reads them as the same kind of thing
    * as the editable rows above. The inputs are disabled (the
    * values are pinned for an existing automation) but still
    * convey the identity at a glance.
+   *
+   * Trigger comes first because it reads naturally as "when X
+   * happens on Y" — the trigger is the verb, the target is the
+   * subject.
    */
   private _renderIdentityFields(activeTrigger: AutomationTrigger | null) {
     const loc = this.location;
@@ -499,12 +503,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     const showTrigger =
       loc.kind === "device_on" || loc.kind === "component_on";
     return html`
-      <div class="field">
-        <label class="field-label">
-          ${this._localize("device.automation_target")}
-        </label>
-        <input type="text" readonly .value=${targetValue} />
-      </div>
       ${showTrigger
         ? html`<div class="field">
             <label class="field-label">
@@ -513,6 +511,12 @@ export class ESPHomeAutomationEditor extends LitElement {
             <input type="text" readonly .value=${triggerValue} />
           </div>`
         : nothing}
+      <div class="field">
+        <label class="field-label">
+          ${this._localize("device.automation_target")}
+        </label>
+        <input type="text" readonly .value=${targetValue} />
+      </div>
     `;
   }
 
