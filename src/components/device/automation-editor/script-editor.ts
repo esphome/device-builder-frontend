@@ -39,6 +39,8 @@ import type {
   AutomationTree,
   AvailableAutomations,
   BoardCatalogEntry,
+  ComponentCatalogEntry,
+  ConfigEntry,
   YamlDiff,
 } from "../../../api/types.js";
 
@@ -52,18 +54,25 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import {
+  fetchComponent,
+  getCachedComponent,
+} from "../../../util/component-name-cache.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
+import "../config-entry-form.js";
 import "./automation-action-list.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   close: mdiClose,
@@ -82,12 +91,6 @@ interface ParameterDecl {
   name: string;
   type: string;
 }
-
-/** ESPHome script run modes — see
- *  https://esphome.io/components/script.html#script-mode for each
- *  one's semantics. ``single`` is the default; the writer omits
- *  the mode key when set to single. */
-const RUN_MODES = ["single", "restart", "queued", "parallel"] as const;
 
 /** Parameter types supported by ESPHome's script: ``parameters:``
  *  block. The catalog already validates these on save, so we just
@@ -127,6 +130,19 @@ export class ESPHomeScriptEditor extends LitElement {
   @state() private _loading = true;
   @state() private _deleting = false;
   @state() private _error = "";
+
+  /** Component catalog entry for the ``script`` component, lazily
+   *  fetched on mount. Drives the header (name / description /
+   *  docs / image) and the inline config-entry form (``id``,
+   *  ``mode``, ``max_runs`` — ``parameters`` and ``then`` stay
+   *  under bespoke surfaces because the form's generic ``map``
+   *  type wouldn't validate the typed-parameter shape). */
+  @state() private _scriptComponent: ComponentCatalogEntry | null = null;
+
+  /** Mirrors the automation editor: gates non-required entries
+   *  in the form behind a toggle so the casual "id only" case
+   *  isn't drowned out by the rarely-used options. */
+  @state() private _showAdvanced = false;
 
   /** Debounce timer + in-flight guard for the auto-apply path —
    *  same pattern as the automation editor. Each value change
@@ -254,6 +270,7 @@ export class ESPHomeScriptEditor extends LitElement {
     this._error = "";
     try {
       if (this.configuration) await this._loadAvailable();
+      void this._loadScriptComponent();
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -269,6 +286,27 @@ export class ESPHomeScriptEditor extends LitElement {
       );
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
+    }
+  }
+
+  /** Lazy fetch of the ``script`` component catalog entry. Reuses
+   *  the shared component-name cache so a navigator pre-fetch
+   *  (for the label) doubles as the editor's source. */
+  private async _loadScriptComponent() {
+    if (!this._api) return;
+    const platform = this.platform || undefined;
+    const boardId = this.board?.id;
+    const cached = getCachedComponent("script", platform, boardId);
+    if (cached) {
+      this._scriptComponent = cached;
+      return;
+    }
+    try {
+      const entry = await fetchComponent(this._api, "script", platform, boardId);
+      if (entry) this._scriptComponent = entry;
+    } catch {
+      /* swallow — the editor falls back to the static label if
+         the catalog entry isn't available. */
     }
   }
 
@@ -307,8 +345,7 @@ export class ESPHomeScriptEditor extends LitElement {
     const disabled = this._deleting;
     return html`
       ${this._renderHeader()}
-      ${this._renderIdField(disabled)}
-      ${this._renderModeField(automation, disabled)}
+      ${this._renderConfigForm(automation, disabled)}
       ${this._renderParametersField(automation, disabled)}
       <div class="field">
         <label class="field-label">
@@ -352,102 +389,147 @@ export class ESPHomeScriptEditor extends LitElement {
   }
 
   /**
-   * Component-style header card. Title is always "Script"; the
-   * id sits as a subtitle below — same shape as the automation
-   * editor's "Automation" / trigger-name pair. In add-mode the
-   * id is empty so the subtitle drops out and only the title
-   * shows.
+   * Component-style header card. Pulls the ``script`` component's
+   * catalog entry (name / description / docs / image) when it's
+   * loaded so the editor reads as the same kind of surface as the
+   * regular component editor. Falls back to the local translation
+   * keys before the catalog lands.
    */
   private _renderHeader() {
+    const comp = this._scriptComponent;
     const id = this.location?.id || "";
+    const title =
+      comp?.name ?? this._localize("device.script_header_title_static");
+    const descText =
+      comp?.description ?? this._localize("device.script_header_description");
+    const docsUrl = comp?.docs_url ?? "https://esphome.io/components/script.html";
+    const imageUrl = comp?.image_url ?? "";
     return html`<div class="ae-header">
       <div class="ae-header-text">
-        <h2 class="ae-header-title">
-          ${this._localize("device.script_header_title_static")}
-        </h2>
+        <h2 class="ae-header-title">${title}</h2>
         ${id
           ? html`<p class="ae-header-subtitle">${id}</p>`
           : nothing}
         <a
           class="ae-header-docs"
-          href="https://esphome.io/components/script.html"
+          href=${docsUrl}
           target="_blank"
           rel="noreferrer"
         >
           ${this._localize("device.docs")}
           <wa-icon library="mdi" name="open-in-new"></wa-icon>
         </a>
-        <p class="ae-header-desc">
-          ${renderMarkdown(this._localize("device.script_header_description"))}
-        </p>
+        <p class="ae-header-desc">${renderMarkdown(descText)}</p>
       </div>
       <div class="ae-header-icon">
-        <wa-icon library="mdi" name="script-text-outline"></wa-icon>
+        ${imageUrl
+          ? html`<img alt="" src=${imageUrl} />`
+          : html`<wa-icon
+              library="mdi"
+              name="script-text-outline"
+            ></wa-icon>`}
       </div>
     </div>`;
   }
 
   /**
-   * Id field. Editable in both add-mode and edit-mode — renaming a
-   * script via the input becomes a delete + insert on save. The
-   * description warns the user that ``script.execute`` callers
-   * still reference the old id and need to be updated separately.
+   * Inline ``<esphome-config-entry-form>`` driven by the script
+   * component's catalog config_entries — gives us the same form
+   * surface a regular component gets (catalog descriptions, id /
+   * mode / max_runs renderers, advanced-toggle, validation) for
+   * free.
+   *
+   * ``parameters`` and ``then`` are filtered out: ``parameters``
+   * has a typed-declaration UI that's still bespoke (the generic
+   * map renderer can't validate the ``{name: type}`` constraint),
+   * and ``then`` is the actions block, rendered by the action-list
+   * below the form.
    */
-  private _renderIdField(disabled: boolean) {
-    const id = this.location?.id ?? "";
+  private _renderConfigForm(
+    automation: AutomationTree,
+    disabled: boolean,
+  ) {
+    const comp = this._scriptComponent;
+    if (!comp) return nothing;
+    const entries = comp.config_entries.filter(
+      (e) => e.key !== "parameters" && e.key !== "then",
+    );
+    if (entries.length === 0) return nothing;
+    const hasAdvanced = anyAdvancedEntry(entries);
     return html`<div class="field">
-      <label class="field-label" for="script-id-input">
-        ${this._localize("device.script_id_label")}
-        <span class="required">*</span>
-      </label>
-      <p class="field-description">
-        ${renderMarkdown(this._localize("device.script_id_description"))}
-      </p>
-      <input
-        id="script-id-input"
-        type="text"
-        .value=${id}
-        placeholder=${this._localize(
-          "device.automation_target_script_id_placeholder",
-        )}
+      <esphome-config-entry-form
+        .entries=${entries}
+        .values=${automation.trigger_params}
+        .board=${this.board}
+        .yaml=${this.yaml}
         ?disabled=${disabled}
-        @input=${this._onIdInput}
-      />
+        ?show-advanced=${this._showAdvanced}
+        @value-change=${this._onConfigFormValueChange}
+      ></esphome-config-entry-form>
+      ${hasAdvanced
+        ? html`<div class="advanced-toggle-row">
+            <wa-switch
+              .checked=${this._showAdvanced}
+              @change=${(e: Event) => {
+                this._showAdvanced = (
+                  e.target as HTMLInputElement & { checked: boolean }
+                ).checked;
+              }}
+            >
+              ${this._localize("device.show_advanced")}
+            </wa-switch>
+          </div>`
+        : nothing}
     </div>`;
   }
 
-  /**
-   * Run-mode field. Single / restart / queued / parallel — see
-   * the script docs for the semantic of each. Stored as
-   * ``triggerParams.mode`` per the writer's contract.
-   */
-  private _renderModeField(automation: AutomationTree, disabled: boolean) {
-    const mode = String(automation.trigger_params.mode ?? "single");
-    return html`<div class="field">
-      <label class="field-label">
-        ${this._localize("device.automation_script_mode")}
-      </label>
-      <p class="field-description">
-        ${renderMarkdown(this._localize("device.script_mode_description"))}
-      </p>
-      <wa-select
-        value=${mode}
-        ?disabled=${disabled}
-        @change=${(e: Event) =>
-          this._withValue({
-            trigger_params: {
-              ...automation.trigger_params,
-              mode: (e.target as HTMLSelectElement).value,
-            },
-          })}
-      >
-        ${RUN_MODES.map(
-          (m) => html`<wa-option value=${m} ?selected=${m === mode}
-            >${m}</wa-option
-          >`,
-        )}
-      </wa-select>
-    </div>`;
+  /** Bridge ``<esphome-config-entry-form>`` patch events into the
+   *  AutomationTree shape. Special-cases the ``id`` field: changing
+   *  it has to also mutate ``this.location`` because the YAML splice
+   *  destination is keyed by location.id — without the mirror the
+   *  next upsert would target the OLD slot. */
+  private _onConfigFormValueChange = (
+    e: CustomEvent<{ path: string[]; value: unknown }>,
+  ) => {
+    e.stopPropagation();
+    const { path, value } = e.detail;
+    const automation = this.value ?? emptyAutomationTree();
+    const next = this._patchParams(automation.trigger_params, path, value);
+    if (path.length === 1 && path[0] === "id") {
+      // Match wire shape: ``trigger_params.id`` round-trips with
+      // ``location.id``, so keep both pinned to whatever the user
+      // typed. Empty id falls back to the previous location so we
+      // don't dispatch a write with no destination.
+      const newId = String(value ?? "").trim();
+      if (newId) {
+        this.location = { kind: "script", id: newId };
+      }
+    }
+    this._withValue({ trigger_params: next });
+  };
+
+  /** Shallow path patch — mirrors automation-editor's helper but
+   *  inlined here because the script form's shape is flat (one
+   *  level of keys). Returning a fresh object so Lit's
+   *  property-update mechanism actually re-renders. */
+  private _patchParams(
+    params: Record<string, unknown>,
+    path: string[],
+    value: unknown,
+  ): Record<string, unknown> {
+    if (path.length === 0) {
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        return { ...(value as Record<string, unknown>) };
+      }
+      return {};
+    }
+    const [head] = path;
+    if (value === undefined || value === "") {
+      const next = { ...params };
+      delete next[head];
+      return next;
+    }
+    return { ...params, [head]: value };
   }
 
   /**
@@ -576,18 +658,6 @@ export class ESPHomeScriptEditor extends LitElement {
     list.splice(idx, 1);
     this._writeParams(list);
   }
-
-  private _onIdInput = (e: Event) => {
-    const id = (e.target as HTMLInputElement).value.trim();
-    this.location = { kind: "script", id };
-    this.dispatchEvent(
-      new CustomEvent("automation-change", {
-        detail: { value: this.value, location: this.location },
-        bubbles: true,
-        composed: true,
-      }),
-    );
-  };
 
   private _onActionsChange = (
     e: CustomEvent<{ actions: AutomationTree["actions"] }>,
