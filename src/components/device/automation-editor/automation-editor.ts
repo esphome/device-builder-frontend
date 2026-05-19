@@ -46,6 +46,8 @@ import type {
   AvailableComponentInstance,
   AvailableScript,
   BoardCatalogEntry,
+  ComponentCatalogEntry,
+  ConfigEntry,
   YamlDiff,
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
@@ -54,18 +56,25 @@ import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import {
+  fetchComponent,
+  getCachedComponent,
+} from "../../../util/component-name-cache.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
+import "../config-entry-form.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import "./automation-action-list.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   "arrow-decision-outline": mdiArrowDecisionOutline,
@@ -117,9 +126,22 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  device's YAML) so the dropdowns only show what's usable. */
   @state() private _available: AvailableAutomations | null = null;
 
+  /** Component catalog entry for the ``interval`` component, lazily
+   *  fetched the first time we render an interval automation. Drives
+   *  the header (name / description / docs / image) and the inline
+   *  config-entry form (the ``interval:`` time field that used to
+   *  live in a dead "Target #N" readonly box). */
+  @state() private _intervalComponent: ComponentCatalogEntry | null = null;
+
   @state() private _loading = true;
   @state() private _deleting = false;
   @state() private _error = "";
+
+  /** "Show advanced settings" toggle state for the params form.
+   *  Mirrors ``device-section-config``'s same-named state but
+   *  scoped to this editor instance — switching away and back
+   *  resets to collapsed, matching the component-editor UX. */
+  @state() private _showAdvanced = false;
 
   /**
    * Debounce timer for auto-apply. Each value change schedules a
@@ -257,6 +279,44 @@ export class ESPHomeAutomationEditor extends LitElement {
       !this._loading
     ) {
       void this._hydrateFromBackend();
+    }
+    // Interval automations need the ``interval`` component schema
+    // so the header can show its description + docs link + image
+    // and the form can render its config_entries (the actual
+    // ``interval: 5s`` time field). Fetch lazily — only when we
+    // actually land on an interval.
+    if (
+      (changed.has("location") || changed.has("platform")) &&
+      this.location?.kind === "interval"
+    ) {
+      void this._loadIntervalComponent();
+    }
+  }
+
+  /** Lazy fetch of the ``interval`` component catalog entry.
+   *  Reuses the shared component-name cache so the navigator's
+   *  pre-fetch (for the label) doubles as the editor's source. */
+  private async _loadIntervalComponent() {
+    if (!this._api) return;
+    const platform = this.platform || undefined;
+    const boardId = this.board?.id;
+    const cached = getCachedComponent(`interval`, platform, boardId);
+    if (cached) {
+      this._intervalComponent = cached;
+      return;
+    }
+    try {
+      const entry = await fetchComponent(
+        this._api,
+        `interval`,
+        platform,
+        boardId,
+      );
+      if (entry) this._intervalComponent = entry;
+    } catch {
+      /* swallow — the editor falls back to the static label when no
+         catalog entry is available; transient backend hiccups
+         shouldn't surface as an error here. */
     }
   }
 
@@ -417,28 +477,69 @@ export class ESPHomeAutomationEditor extends LitElement {
    * since those ARE editable on an existing automation (e.g.
    * tweaking ``min_length`` on an ``on_click`` trigger after the
    * fact).
+   *
+   * ``interval`` automations special-case: the trigger
+   * (``interval.then``) carries no config_entries, but the parent
+   * ``interval`` *component* does — ``interval:`` (time), ``id:``,
+   * ``startup_delay:`` etc. all live in ``trigger_params`` in the
+   * AutomationTree, so render them from the component schema
+   * (filtered to drop ``then:``, which is the actions block).
    */
   private _renderTriggerParamsForm(
     activeTrigger: AutomationTrigger | null,
     automation: AutomationTree,
     disabled: boolean,
   ) {
-    if (!activeTrigger || activeTrigger.config_entries.length === 0) {
-      return nothing;
-    }
+    const entries = this._paramFormEntries(activeTrigger);
+    if (entries.length === 0) return nothing;
+    const isInterval = this.location?.kind === "interval";
+    const label = isInterval
+      ? this._localize("device.automation_interval_label")
+      : this._localize("device.automation_trigger_options");
+    const hasAdvanced = anyAdvancedEntry(entries);
     return html`<div class="field">
-      <label class="field-label">
-        ${this._localize("device.automation_trigger_options")}
-      </label>
+      <label class="field-label">${label}</label>
       <esphome-config-entry-form
-        .entries=${activeTrigger.config_entries}
+        .entries=${entries}
         .values=${automation.trigger_params}
         .board=${this.board}
         .yaml=${this.yaml}
         ?disabled=${disabled}
+        ?show-advanced=${this._showAdvanced}
         @value-change=${this._onTriggerParamsValueChange}
       ></esphome-config-entry-form>
+      ${hasAdvanced
+        ? html`<div class="advanced-toggle-row">
+            <wa-switch
+              .checked=${this._showAdvanced}
+              @change=${(e: Event) => {
+                this._showAdvanced = (
+                  e.target as HTMLInputElement & { checked: boolean }
+                ).checked;
+              }}
+            >
+              ${this._localize("device.show_advanced")}
+            </wa-switch>
+          </div>`
+        : nothing}
     </div>`;
+  }
+
+  /** Resolve the config_entries list that drives the trigger-params
+   *  form. Interval pulls from the component schema (since
+   *  ``interval.then``'s own config_entries is empty); everything
+   *  else stays on the trigger's own config_entries. */
+  private _paramFormEntries(
+    activeTrigger: AutomationTrigger | null,
+  ): ConfigEntry[] {
+    if (this.location?.kind === "interval") {
+      const comp = this._intervalComponent;
+      if (!comp) return [];
+      // ``then:`` is the actions block — we render it via the
+      // action-list, not the form.
+      return comp.config_entries.filter((e) => e.key !== "then");
+    }
+    return activeTrigger?.config_entries ?? [];
   }
 
   /**
@@ -531,22 +632,33 @@ export class ESPHomeAutomationEditor extends LitElement {
    * navigator's primary label and gives the user the same eye-line
    * cue they get from clicking a regular component.
    *
+   * For ``interval`` automations we reach further and pull the
+   * ``interval`` component catalog entry so the user gets the same
+   * name / description / docs / image they'd see in a regular
+   * component editor — no more bland generic "Automation".
+   *
    * Title decomposes to the kind label (``Automation``) when we
    * don't have enough metadata yet — fresh add-mode (no trigger
-   * picked) or interval / script / light_effect locations.
+   * picked) or script / light_effect locations.
    */
   private _renderHeader(activeTrigger: AutomationTrigger | null) {
-    const desc = activeTrigger?.description
-      ? renderMarkdown(activeTrigger.description)
-      : renderMarkdown(this._localize("device.automation_header_description"));
-    const title = this._headerTitle(activeTrigger);
+    const loc = this.location;
+    const intervalComp =
+      loc?.kind === "interval" ? this._intervalComponent : null;
+    const title = intervalComp?.name ?? this._headerTitle(activeTrigger);
+    const docsUrl = intervalComp?.docs_url ?? activeTrigger?.docs_url ?? "";
+    const descText =
+      intervalComp?.description ??
+      activeTrigger?.description ??
+      this._localize("device.automation_header_description");
+    const imageUrl = intervalComp?.image_url ?? "";
     return html`<div class="ae-header">
       <div class="ae-header-text">
         <h2 class="ae-header-title">${title}</h2>
-        ${activeTrigger?.docs_url
+        ${docsUrl
           ? html`<a
               class="ae-header-docs"
-              href=${activeTrigger.docs_url}
+              href=${docsUrl}
               target="_blank"
               rel="noreferrer"
             >
@@ -554,10 +666,15 @@ export class ESPHomeAutomationEditor extends LitElement {
               <wa-icon library="mdi" name="open-in-new"></wa-icon>
             </a>`
           : nothing}
-        <p class="ae-header-desc">${desc}</p>
+        <p class="ae-header-desc">${renderMarkdown(descText)}</p>
       </div>
       <div class="ae-header-icon">
-        <wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>
+        ${imageUrl
+          ? html`<img alt="" src=${imageUrl} />`
+          : html`<wa-icon
+              library="mdi"
+              name="arrow-decision-outline"
+            ></wa-icon>`}
       </div>
     </div>`;
   }
@@ -568,7 +685,9 @@ export class ESPHomeAutomationEditor extends LitElement {
    *   device_on / component_on (trigger picked)  → catalog's
    *     ``trigger.name`` ("Switch → On Turn On") — already domain-
    *     qualified, no extra prefix.
-   *   interval                                   → "Interval"
+   *   interval                                   → catalog component
+   *     name (handled by ``_renderHeader``); this is the fallback
+   *     when the component hasn't loaded yet.
    *   anything else / fallback                   → static "Automation"
    */
   private _headerTitle(trigger: AutomationTrigger | null): string {
@@ -592,10 +711,17 @@ export class ESPHomeAutomationEditor extends LitElement {
    * Trigger comes first because it reads naturally as "when X
    * happens on Y" — the trigger is the verb, the target is the
    * subject.
+   *
+   * Intervals deliberately skip both rows: the actual ``interval:``
+   * time gets rendered by ``_renderTriggerParamsForm`` (from the
+   * ``interval`` component's catalog schema), and "Target: Interval
+   * #1" is a redundant marker — the user already knows they're on
+   * an interval from the header + navigator.
    */
   private _renderIdentityFields(activeTrigger: AutomationTrigger | null) {
     const loc = this.location;
     if (!loc) return nothing;
+    if (loc.kind === "interval") return nothing;
     const targetValue = this._targetMetadataValue(loc);
     const triggerValue = activeTrigger?.name ?? "";
     const showTrigger =

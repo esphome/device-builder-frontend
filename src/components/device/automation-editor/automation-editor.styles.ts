@@ -103,6 +103,30 @@ export const automationEditorStyles = css`
     color: var(--wa-color-brand-fill-loud, #0b5cad);
   }
 
+  /* Component-catalog image (used for interval automations: we pull
+     the parent component's image_url to give the same visual cue a
+     user gets from a regular component editor). Sized to fit the
+     64x64 slot without stretching pixel art. */
+  .ae-header-icon img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }
+
+  /* "Show advanced settings" toggle row — mirrors the device
+     section-config layout so the eye reads the two surfaces as
+     the same kind of form. */
+  .advanced-toggle-row {
+    display: flex;
+    justify-content: flex-start;
+    margin-top: var(--wa-space-s);
+    font-size: var(--wa-font-size-s);
+  }
+  .advanced-toggle-row wa-switch {
+    font-weight: var(--wa-font-weight-semibold);
+    color: var(--wa-color-text-quiet);
+  }
+
   /* One titled panel — used for target, trigger, conditions, actions,
      and for any nested sub-panels inside a control-flow action. */
   .ae-section {
