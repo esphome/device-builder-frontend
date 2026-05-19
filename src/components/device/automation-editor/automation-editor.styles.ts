@@ -406,25 +406,37 @@ export const automationEditorStyles = css`
      the prominent overlay below — that's the primary "Add action"
      / "Add condition" the user reaches for from a fresh
      automation, so it should pop. */
+  /* "Add action" / "Add condition" button. Full-width, solid
+     brand-colored border so it reads as the obvious next step
+     from the user — easy to spot on a long list of actions or
+     a fresh empty automation. Nested action lists (then / else
+     branches inside an "if") use the slightly toned-down
+     variant under .ae-nested below to keep the inner tree from
+     reading as a series of equally-loud primary CTAs. */
   .ae-add {
-    display: inline-flex;
+    display: flex;
+    justify-content: center;
     align-items: center;
     gap: var(--wa-space-2xs);
+    width: 100%;
     appearance: none;
-    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
+    border: 1px solid var(--wa-color-brand-fill-loud, #0b5cad);
     background: transparent;
-    color: var(--wa-color-text-quiet);
-    padding: var(--wa-space-2xs) var(--wa-space-s);
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    padding: var(--wa-space-xs) var(--wa-space-m);
     border-radius: var(--wa-border-radius-s);
     cursor: pointer;
-    font-size: var(--wa-font-size-2xs);
+    font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-semibold);
-    margin-top: var(--wa-space-2xs);
+    margin-top: var(--wa-space-s);
   }
 
   .ae-add:hover:not(:disabled) {
-    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
-    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    background: color-mix(
+      in srgb,
+      var(--wa-color-brand-fill-loud, #0b5cad) 10%,
+      transparent
+    );
   }
 
   .ae-add:disabled {
@@ -432,29 +444,25 @@ export const automationEditorStyles = css`
     cursor: not-allowed;
   }
 
-  /* Primary add affordance — the bottom-of-section ".ae-add" the
-     user sees right under the "Actions" header. Solid border in
-     brand color, full-width so it reads as the obvious next step
-     when the list is empty or has one item. The nested variants
-     (then / else branches inside "if") keep the modest style
-     above. */
-  .ae-section > .ae-add {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    border: 1px solid var(--wa-color-brand-fill-loud, #0b5cad);
-    color: var(--wa-color-brand-fill-loud, #0b5cad);
-    padding: var(--wa-space-xs) var(--wa-space-m);
-    font-size: var(--wa-font-size-s);
-    margin-top: var(--wa-space-s);
+  /* Nested add buttons (inside then / else / while / repeat) —
+     dashed, quiet so the eye reads the prominent outer button as
+     the primary CTA. :host-context() reaches across the
+     action-list's shadow boundary into the parent action-node's
+     .ae-nested wrapper, which is the only way a sibling
+     custom-element with its own shadow can scope the rule. They
+     still pick up the brand color on hover for affordance. */
+  :host-context(.ae-nested) .ae-add {
+    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
+    color: var(--wa-color-text-quiet);
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    font-size: var(--wa-font-size-2xs);
+    margin-top: var(--wa-space-2xs);
   }
 
-  .ae-section > .ae-add:hover:not(:disabled) {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-brand-fill-loud, #0b5cad) 10%,
-      transparent
-    );
+  :host-context(.ae-nested) .ae-add:hover:not(:disabled) {
+    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+    background: transparent;
   }
 
   .ae-error {
