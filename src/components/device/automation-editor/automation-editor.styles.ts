@@ -9,7 +9,15 @@ import { css } from "lit";
  */
 export const automationEditorStyles = css`
   :host {
-    display: block;
+    display: flex;
+    flex-direction: column;
+    /* Matches config-entry-form's :host gap so the editor's
+       top-level rows (header, form, parameters, actions, …) sit
+       at the same vertical rhythm as the catalog form's fields.
+       Without this, the bespoke .field siblings render in a
+       different cadence and the page reads as two different forms
+       stitched together. */
+    gap: var(--wa-space-m);
   }
 
   /* Component-style header card — at the top of the edit pane for
@@ -22,7 +30,10 @@ export const automationEditorStyles = css`
     align-items: flex-start;
     gap: var(--wa-space-l);
     padding-bottom: var(--wa-space-m);
-    margin-bottom: var(--wa-space-m);
+    /* The :host gap takes care of vertical spacing between the
+       header and the next row, so the legacy margin-bottom would
+       compound. Just keep the border + bottom padding so the
+       divider line still reads as a section break. */
     border-bottom: 1px solid var(--wa-color-neutral-border-quiet, #e1e4e8);
   }
 
@@ -161,9 +172,14 @@ export const automationEditorStyles = css`
     gap: var(--wa-space-2xs);
   }
 
-  .field + .field {
-    margin-top: var(--wa-space-m);
-  }
+  /* No .field + .field margin: the :host above hands out
+     --wa-space-m gap to every direct child via flex layout,
+     so a sibling-adjacent rule would double up the spacing.
+     Components that render the script editor inside a different
+     container (e.g. tests, the legacy add-mode pane) just lose the
+     between-field gap on those isolated cases — acceptable for now;
+     the canonical mount path goes through the page which always
+     gets the :host gap. */
 
   .field-label {
     font-size: var(--wa-font-size-s);

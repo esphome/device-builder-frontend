@@ -346,7 +346,9 @@ export class ESPHomeScriptEditor extends LitElement {
     return html`
       ${this._renderHeader()}
       ${this._renderConfigForm(automation, disabled)}
-      ${this._renderParametersField(automation, disabled)}
+      ${this._showAdvanced
+        ? this._renderParametersField(automation, disabled)
+        : nothing}
       <div class="field">
         <label class="field-label">
           ${this._localize("device.automation_action")}
@@ -451,8 +453,13 @@ export class ESPHomeScriptEditor extends LitElement {
       (e) => e.key !== "parameters" && e.key !== "then",
     );
     if (entries.length === 0) return nothing;
-    const hasAdvanced = anyAdvancedEntry(entries);
-    return html`<div class="field">
+    // The form is its own flex-column with gap, and the toggle and
+    // parameters/actions sit as siblings of it at the editor's root.
+    // No outer ``.field`` wrapper: that would add a label-shaped
+    // empty row of vertical rhythm above the form's first row, which
+    // is what made the spacing look "off" against the bespoke
+    // Parameters / Actions sections.
+    return html`
       <esphome-config-entry-form
         .entries=${entries}
         .values=${automation.trigger_params}
@@ -462,21 +469,47 @@ export class ESPHomeScriptEditor extends LitElement {
         ?show-advanced=${this._showAdvanced}
         @value-change=${this._onConfigFormValueChange}
       ></esphome-config-entry-form>
-      ${hasAdvanced
-        ? html`<div class="advanced-toggle-row">
-            <wa-switch
-              .checked=${this._showAdvanced}
-              @change=${(e: Event) => {
-                this._showAdvanced = (
-                  e.target as HTMLInputElement & { checked: boolean }
-                ).checked;
-              }}
-            >
-              ${this._localize("device.show_advanced")}
-            </wa-switch>
-          </div>`
-        : nothing}
+      ${this._renderAdvancedToggle(entries)}
+    `;
+  }
+
+  /** "Show advanced settings" toggle row. Pulled out so the same
+   *  toggle can drive both the form's advanced fields AND the
+   *  bespoke Parameters block — keeping them gated behind a single
+   *  switch matches the user's expectation that "advanced" is one
+   *  surface, not per-section. */
+  private _renderAdvancedToggle(entries: ConfigEntry[]) {
+    // Always show the toggle when ``parameters`` exists in the
+    // component schema (it does), even if the entries we're handing
+    // the form have no non-required fields — the toggle is now also
+    // gating the Parameters editor.
+    const hasAdvanced =
+      anyAdvancedEntry(entries) || this._hasParametersEntry();
+    if (!hasAdvanced) return nothing;
+    return html`<div class="advanced-toggle-row">
+      <wa-switch
+        .checked=${this._showAdvanced}
+        @change=${(e: Event) => {
+          this._showAdvanced = (
+            e.target as HTMLInputElement & { checked: boolean }
+          ).checked;
+        }}
+      >
+        ${this._localize("device.show_advanced")}
+      </wa-switch>
     </div>`;
+  }
+
+  /** Does the script catalog define a ``parameters`` entry? Used to
+   *  decide whether to show the advanced toggle even when the form
+   *  itself has no non-required fields — Parameters is gated by the
+   *  same switch. */
+  private _hasParametersEntry(): boolean {
+    return (
+      this._scriptComponent?.config_entries.some(
+        (e) => e.key === "parameters",
+      ) ?? false
+    );
   }
 
   /** Bridge ``<esphome-config-entry-form>`` patch events into the

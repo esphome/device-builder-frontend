@@ -492,13 +492,14 @@ export class ESPHomeAutomationEditor extends LitElement {
   ) {
     const entries = this._paramFormEntries(activeTrigger);
     if (entries.length === 0) return nothing;
-    const isInterval = this.location?.kind === "interval";
-    const label = isInterval
-      ? this._localize("device.automation_interval_label")
-      : this._localize("device.automation_trigger_options");
     const hasAdvanced = anyAdvancedEntry(entries);
-    return html`<div class="field">
-      <label class="field-label">${label}</label>
+    // No outer wrapper / no synthetic group label: the form renders
+    // each entry with its own catalog-derived label + description,
+    // and a section header above that ("Interval" / "Trigger
+    // options") would just duplicate the first field's name. Sit as
+    // a sibling of the header and the action-list so the :host gap
+    // alone handles vertical rhythm.
+    return html`
       <esphome-config-entry-form
         .entries=${entries}
         .values=${automation.trigger_params}
@@ -522,7 +523,7 @@ export class ESPHomeAutomationEditor extends LitElement {
             </wa-switch>
           </div>`
         : nothing}
-    </div>`;
+    `;
   }
 
   /** Resolve the config_entries list that drives the trigger-params
