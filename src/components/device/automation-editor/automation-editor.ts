@@ -330,7 +330,15 @@ export class ESPHomeAutomationEditor extends LitElement {
   private async _hydrateFromBackend() {
     if (!this._api || !this.configuration || !this.location) return;
     try {
-      const parsed = await this._api.parseDeviceAutomations(this.configuration);
+      // Pass ``this.yaml`` so the parser sees the user's current
+      // draft buffer — without it the post-add hydrate would read
+      // the on-disk YAML, miss the just-inserted automation, and
+      // leave the form empty even though the YAML pane shows the
+      // user's input.
+      const parsed = await this._api.parseDeviceAutomations(
+        this.configuration,
+        this.yaml,
+      );
       const wantKey = sectionKeyFromLocation(this.location);
       const match = parsed.find(
         (p) => sectionKeyFromLocation(p.location) === wantKey,

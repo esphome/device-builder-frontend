@@ -1390,9 +1390,18 @@ export class ESPHomeAPI {
    */
   async parseDeviceAutomations(
     configuration: string,
+    /**
+     * Optional in-memory YAML override — same purpose as the
+     * matching parameter on ``upsertAutomation``. Pass when the
+     * caller is reading from a draft buffer the user hasn't
+     * saved yet (e.g. the editor's post-add hydrate that runs
+     * before global save).
+     */
+    yaml?: string,
   ): Promise<ParsedAutomation[]> {
     return this.sendCommand<ParsedAutomation[]>("automations/parse", {
       configuration,
+      ...(yaml !== undefined ? { yaml } : {}),
     });
   }
 

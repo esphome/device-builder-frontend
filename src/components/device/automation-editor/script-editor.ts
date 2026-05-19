@@ -313,7 +313,15 @@ export class ESPHomeScriptEditor extends LitElement {
   private async _hydrateFromBackend() {
     if (!this._api || !this.configuration || !this.location) return;
     try {
-      const parsed = await this._api.parseDeviceAutomations(this.configuration);
+      // ``this.yaml`` override mirrors the automation-editor's
+      // hydrate path: post-add the user's draft buffer holds the
+      // new script, but the on-disk YAML doesn't yet. Without the
+      // override the parse returns the stale on-disk state and the
+      // form lands empty.
+      const parsed = await this._api.parseDeviceAutomations(
+        this.configuration,
+        this.yaml,
+      );
       const wantKey = sectionKeyFromLocation(this.location);
       const match = parsed.find(
         (p) => sectionKeyFromLocation(p.location) === wantKey,
