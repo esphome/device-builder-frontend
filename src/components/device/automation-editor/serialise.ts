@@ -118,6 +118,8 @@ export function sectionKeyFromLocation(loc: AutomationLocation): string {
       return `automation:interval:${loc.index}`;
     case "light_effect":
       return `automation:light_effect:${loc.component_id}:${loc.index}`;
+    case "api_action":
+      return `automation:api_action:${loc.action_name}`;
   }
 }
 
@@ -192,6 +194,8 @@ export function locationFromSectionKey(
         ? { kind: "light_effect", component_id: parts[2], index: idx }
         : null;
     }
+    case "api_action":
+      return parts[2] ? { kind: "api_action", action_name: parts[2] } : null;
     default:
       return null;
   }

@@ -8,6 +8,7 @@ import {
   mdiMemory,
   mdiPlusCircleOutline,
   mdiScriptTextOutline,
+  mdiWebhook,
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -43,6 +44,8 @@ import "./add-component-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import "./add-config-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
+import "./add-api-action-dialog.js";
+import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import "./add-script-dialog.js";
 import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
 
@@ -55,6 +58,7 @@ registerMdiIcons({
   memory: mdiMemory,
   "plus-circle-outline": mdiPlusCircleOutline,
   "script-text-outline": mdiScriptTextOutline,
+  webhook: mdiWebhook,
 });
 
 @customElement("esphome-device-navigator")
@@ -109,6 +113,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @query("esphome-add-script-dialog")
   private _addScriptDialog!: ESPHomeAddScriptDialog;
+
+  @query("esphome-add-api-action-dialog")
+  private _addApiActionDialog!: ESPHomeAddApiActionDialog;
 
   @property({ attribute: false })
   selectedKey: string | null = null;
@@ -483,6 +490,13 @@ export class ESPHomeDeviceNavigator extends LitElement {
             disabled: !AUTOMATIONS_ENABLED,
             disabledReason: this._localize("device.add_automation_unavailable"),
           },
+          {
+            label: this._localize("device.add_api_action"),
+            icon: "webhook",
+            onClick: () => this._addApiActionDialog.open(),
+            disabled: !AUTOMATIONS_ENABLED,
+            disabledReason: this._localize("device.add_automation_unavailable"),
+          },
         ],
       },
     ];
@@ -517,7 +531,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
                 .board=${this.board}
                 .yaml=${this.yaml}
                 @automation-added=${this._onAutomationAdded}
-              ></esphome-add-script-dialog>`
+              ></esphome-add-script-dialog>
+              <esphome-add-api-action-dialog
+                .boardName=${this.boardName}
+                .configuration=${this.configuration}
+                .board=${this.board}
+                .yaml=${this.yaml}
+                @automation-added=${this._onAutomationAdded}
+              ></esphome-add-api-action-dialog>`
           : nothing}
         <header class="card-header">
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>

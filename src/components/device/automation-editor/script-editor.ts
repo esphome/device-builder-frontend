@@ -25,10 +25,8 @@ import toast from "sonner-js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
-  mdiClose,
   mdiDelete,
   mdiOpenInNew,
-  mdiPlus,
   mdiScriptTextOutline,
 } from "@mdi/js";
 
@@ -66,6 +64,7 @@ import {
 } from "./serialise.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
+import "./callable-params-editor.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -74,26 +73,10 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
-  close: mdiClose,
   delete: mdiDelete,
   "open-in-new": mdiOpenInNew,
-  plus: mdiPlus,
   "script-text-outline": mdiScriptTextOutline,
 });
-
-/** One declared script parameter — captures the {name, type} pair
- *  that round-trips through ``triggerParams.parameters`` as a
- *  ``{name: type}`` map. Local to the editor since the wire shape
- *  is just the map. */
-interface ParameterDecl {
-  name: string;
-  type: string;
-}
-
-/** Parameter types supported by ESPHome's script: ``parameters:``
- *  block. The catalog already validates these on save, so we just
- *  pin the user to the same set here. */
-const PARAM_TYPES = ["int", "float", "bool", "string"] as const;
 
 @customElement("esphome-script-editor")
 export class ESPHomeScriptEditor extends LitElement {
@@ -171,17 +154,6 @@ export class ESPHomeScriptEditor extends LitElement {
     );
   }
 
-  /**
-   * Working list for the parameter editor. The wire shape is a
-   * ``{name: type}`` dict (per ESPHome's YAML), which collapses
-   * empty-name entries and can't represent two in-progress rows.
-   * We keep an editable list locally and project named entries
-   * down to the wire on each change; empty-name rows persist
-   * locally until the user fills them in.
-   */
-  @state() private _params: ParameterDecl[] = [];
-
-
   public get inFlightWrite(): boolean {
     return this._deleting || this._applyInFlight;
   }
@@ -240,25 +212,6 @@ export class ESPHomeScriptEditor extends LitElement {
       !this._loading
     ) {
       void this._hydrateFromBackend();
-    }
-    // Sync the local parameter list when ``value`` arrives from
-    // outside (hydrate). We can't tell our own write from an
-    // external mutation cleanly, so use a conservative check: if
-    // the wire's named entries match what we have locally (minus
-    // empty-name rows we're holding), don't disturb the local
-    // state.
-    if (changed.has("value")) {
-      const fromWire = this._readParams(
-        this.value ?? emptyAutomationTree(),
-      );
-      const localNamed = this._params.filter((p) => p.name);
-      const matches =
-        localNamed.length === fromWire.length &&
-        localNamed.every(
-          (p, i) =>
-            p.name === fromWire[i].name && p.type === fromWire[i].type,
-        );
-      if (!matches) this._params = fromWire;
     }
   }
 
@@ -569,130 +522,43 @@ export class ESPHomeScriptEditor extends LitElement {
 
   /**
    * Declared parameter list. ``{name: type}`` map under
-   * ``triggerParams.parameters``. Rendered as one row per declared
-   * parameter with a remove button + a footer "+ Add parameter".
+   * ``trigger_params.parameters``. The actual list editing UI
+   * lives in the shared ``<esphome-callable-params-editor>``; we
+   * just wire the wire-shape in and out of it here.
    */
   private _renderParametersField(
-    _automation: AutomationTree,
+    automation: AutomationTree,
     disabled: boolean,
   ) {
-    const params = this._params;
-    return html`<div class="field">
-      <label class="field-label">
-        ${this._localize("device.automation_script_parameters")}
-      </label>
-      <p class="field-description">
-        ${renderMarkdown(
-          this._localize("device.script_parameters_description"),
-        )}
-      </p>
-      ${params.length === 0
-        ? nothing
-        : html`<div class="script-params-list">
-            ${params.map((p, idx) =>
-              this._renderParameterRow(p, idx, disabled),
-            )}
-          </div>`}
-      <button
-        type="button"
-        class="script-param-add"
-        ?disabled=${disabled}
-        @click=${this._addParam}
-      >
-        <wa-icon library="mdi" name="plus"></wa-icon>
-        ${this._localize("device.script_add_parameter")}
-      </button>
-    </div>`;
+    const value = (automation.trigger_params.parameters ?? {}) as Record<
+      string,
+      string
+    >;
+    return html`<esphome-callable-params-editor
+      .value=${value}
+      ?disabled=${disabled}
+      .fieldLabel=${this._localize("device.automation_script_parameters")}
+      .description=${this._localize("device.script_parameters_description")}
+      .addLabel=${this._localize("device.script_add_parameter")}
+      .namePlaceholder=${this._localize(
+        "device.script_parameter_name_placeholder",
+      )}
+      @value-change=${this._onParametersChange}
+    ></esphome-callable-params-editor>`;
   }
 
-  private _renderParameterRow(
-    p: ParameterDecl,
-    idx: number,
-    disabled: boolean,
-  ) {
-    return html`<div class="script-param-row">
-      <input
-        type="text"
-        ?disabled=${disabled}
-        placeholder=${this._localize(
-          "device.script_parameter_name_placeholder",
-        )}
-        .value=${p.name}
-        @input=${(e: Event) =>
-          this._updateParam(idx, {
-            ...p,
-            name: (e.target as HTMLInputElement).value,
-          })}
-      />
-      <wa-select
-        value=${p.type}
-        ?disabled=${disabled}
-        @change=${(e: Event) =>
-          this._updateParam(idx, {
-            ...p,
-            type: (e.target as HTMLSelectElement).value,
-          })}
-      >
-        ${PARAM_TYPES.map(
-          (t) => html`<wa-option value=${t} ?selected=${t === p.type}
-            >${t}</wa-option
-          >`,
-        )}
-      </wa-select>
-      <button
-        type="button"
-        class="script-param-remove"
-        ?disabled=${disabled}
-        aria-label=${this._localize("device.automation_remove")}
-        @click=${() => this._removeParam(idx)}
-      >
-        <wa-icon library="mdi" name="close"></wa-icon>
-      </button>
-    </div>`;
-  }
-
-  private _readParams(automation: AutomationTree): ParameterDecl[] {
-    const raw = automation.trigger_params.parameters;
-    if (!raw || typeof raw !== "object") return [];
-    return Object.entries(raw as Record<string, unknown>).map(
-      ([name, type]) => ({ name, type: String(type ?? "string") }),
-    );
-  }
-
-  /**
-   * Push the local parameter list down to the wire. Empty-name
-   * rows persist in the local state but are NOT written to the
-   * wire dict (the wire shape is keyed by name and can't represent
-   * unnamed in-progress entries). They become visible to the
-   * writer only when the user fills the name in.
-   */
-  private _writeParams(list: ParameterDecl[]) {
-    this._params = list;
-    const dict: Record<string, string> = {};
-    for (const { name, type } of list) {
-      if (name) dict[name] = type;
-    }
+  private _onParametersChange = (
+    e: CustomEvent<{ value: Record<string, string> }>,
+  ) => {
+    e.stopPropagation();
     const automation = this.value ?? emptyAutomationTree();
     this._withValue({
-      trigger_params: { ...automation.trigger_params, parameters: dict },
+      trigger_params: {
+        ...automation.trigger_params,
+        parameters: e.detail.value,
+      },
     });
-  }
-
-  private _addParam = () => {
-    this._writeParams([...this._params, { name: "", type: "int" }]);
   };
-
-  private _updateParam(idx: number, value: ParameterDecl) {
-    const list = this._params.slice();
-    list[idx] = value;
-    this._writeParams(list);
-  }
-
-  private _removeParam(idx: number) {
-    const list = this._params.slice();
-    list.splice(idx, 1);
-    this._writeParams(list);
-  }
 
   private _onActionsChange = (
     e: CustomEvent<{ actions: AutomationTree["actions"] }>,

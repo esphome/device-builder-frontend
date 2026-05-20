@@ -36,6 +36,7 @@ import "./add-automation-dialog.js";
 import "./add-component-dialog.js";
 import "./add-config-dialog.js";
 import "./automation-editor/automation-editor.js";
+import "./automation-editor/api-action-editor.js";
 import "./automation-editor/script-editor.js";
 import "./device-section-config.js";
 import { locationFromSectionKey } from "./automation-editor/serialise.js";
@@ -464,11 +465,14 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    * structured editor; everything else lands in the regular
    * ``<esphome-device-section-config>``.
    *
-   * Three kinds today:
+   * Four kinds today:
    *
    * - ``automation:script:<id>`` → ``<esphome-script-editor>``
    *   (scripts have their own chrome — id + run mode + parameters
    *   + actions, no trigger).
+   * - ``automation:api_action:<name>`` → ``<esphome-api-action-editor>``
+   *   (Home Assistant-callable actions — action name + variables +
+   *   actions, no trigger).
    * - other ``automation:…`` keys → ``<esphome-automation-editor>``
    *   (trigger-based automations).
    * - anything else → component section editor.
@@ -491,6 +495,15 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .location=${location}
         .yaml=${this.yaml}
       ></esphome-script-editor>`;
+    }
+    if (location?.kind === "api_action") {
+      return html`<esphome-api-action-editor
+        .configuration=${this.configuration}
+        .board=${this.board}
+        .platform=${this.board?.esphome.platform ?? ""}
+        .location=${location}
+        .yaml=${this.yaml}
+      ></esphome-api-action-editor>`;
     }
     if (location) {
       return html`<esphome-automation-editor

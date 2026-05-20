@@ -429,6 +429,42 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     });
   }
 
+  // ``api.actions:`` list items — Home Assistant-callable actions
+  // nested under the top-level ``api:`` block. Same callable shape
+  // as ``script:`` (named entry, no trigger key) but one level
+  // deeper in the YAML tree. Each item's ``action:`` (or legacy
+  // ``service:``) value is the stable discriminator.
+  const apiBlock = _findTopLevelBlock(lines, "api");
+  if (apiBlock) {
+    const actionsBlock = _findChildBlock(
+      lines,
+      apiBlock.fromLine,
+      apiBlock.toLine,
+      "actions",
+    );
+    if (actionsBlock) {
+      const items = _enumerateListItems(
+        lines,
+        actionsBlock.fromLine,
+        actionsBlock.toLine,
+      );
+      for (const item of items) {
+        const actionName =
+          _readKeyOnLine(lines, item.fromLine, "action") ??
+          _readKeyOnLine(lines, item.fromLine, "service");
+        if (!actionName) continue;
+        automations.push({
+          key: `automation:api_action:${actionName}`,
+          displayLabel: `API: ${actionName}`,
+          fromLine: item.fromLine,
+          toLine: item.toLine,
+          id: actionName,
+          parentKey: "api",
+        });
+      }
+    }
+  }
+
   return automations;
 }
 
@@ -521,6 +557,37 @@ function _findTopLevelBlock(
     const m = lines[i].match(new RegExp(`^${key}\\s*:`));
     if (!m) continue;
     return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, 0) };
+  }
+  return null;
+}
+
+/** Find a nested key directly under a parent block (e.g.
+ *  ``actions:`` inside ``api:``). Returns the matched key's
+ *  inclusive 1-indexed line range. */
+function _findChildBlock(
+  lines: string[],
+  parentFromLine: number,
+  parentToLine: number,
+  childKey: string,
+): { fromLine: number; toLine: number } | null {
+  // Locate the parent block's child indent by reading the first
+  // non-blank child line and capturing its leading whitespace —
+  // matches the convention used by ``_walkAncestry``.
+  let childIndent: number | null = null;
+  for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const leading = (line.match(/^(\s+)/) ?? ["", ""])[1].length;
+    if (leading > 0) {
+      childIndent = leading;
+      break;
+    }
+  }
+  if (childIndent === null) return null;
+  const pattern = new RegExp(`^\\s{${childIndent}}${childKey}\\s*:`);
+  for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
+    if (!pattern.test(lines[i])) continue;
+    return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, childIndent) };
   }
   return null;
 }

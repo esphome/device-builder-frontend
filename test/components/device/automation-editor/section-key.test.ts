@@ -36,6 +36,12 @@ describe("sectionKeyFromLocation", () => {
         index: 0,
       }),
     ).toBe("automation:light_effect:strip:0");
+    expect(
+      sectionKeyFromLocation({
+        kind: "api_action",
+        action_name: "start_laundry",
+      }),
+    ).toBe("automation:api_action:start_laundry");
   });
 });
 
@@ -54,6 +60,7 @@ describe("locationFromSectionKey", () => {
     expect(locationFromSectionKey("automation:device_on:")).toBeNull();
     expect(locationFromSectionKey("automation:component_on:my_button")).toBeNull();
     expect(locationFromSectionKey("automation:interval:notanumber")).toBeNull();
+    expect(locationFromSectionKey("automation:api_action:")).toBeNull();
   });
 
   const cases: [string, AutomationLocation][] = [
@@ -67,6 +74,10 @@ describe("locationFromSectionKey", () => {
     [
       "automation:light_effect:strip:0",
       { kind: "light_effect", component_id: "strip", index: 0 },
+    ],
+    [
+      "automation:api_action:start_laundry",
+      { kind: "api_action", action_name: "start_laundry" },
     ],
   ];
 

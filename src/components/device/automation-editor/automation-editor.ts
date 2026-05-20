@@ -758,6 +758,8 @@ export class ESPHomeAutomationEditor extends LitElement {
         });
       case "script":
         return loc.id;
+      case "api_action":
+        return loc.action_name;
       case "light_effect":
         return loc.component_id;
     }

@@ -436,6 +436,42 @@ describe("parseYamlAutomations", () => {
     ]);
     expect(items[0].displayLabel).toBe("interval #1");
   });
+
+  it("enumerates api.actions: list items by action name", () => {
+    const yaml = `api:
+  actions:
+    - action: start_laundry
+      then:
+        - logger.log: "starting"
+    - action: stop_laundry
+      then:
+        - logger.log: "stopping"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:api_action:"),
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:api_action:start_laundry",
+      "automation:api_action:stop_laundry",
+    ]);
+    expect(items[0].displayLabel).toBe("API: start_laundry");
+    expect(items[0].parentKey).toBe("api");
+  });
+
+  it("accepts the legacy service: discriminator on api.actions:", () => {
+    const yaml = `api:
+  actions:
+    - service: legacy_name
+      then:
+        - logger.log: "old"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:api_action:"),
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:api_action:legacy_name",
+    ]);
+  });
 });
 
 describe("resolveCurrentFromLine", () => {

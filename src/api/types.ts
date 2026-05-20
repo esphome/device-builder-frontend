@@ -894,7 +894,8 @@ export type AutomationLocation =
   | { kind: "interval"; index: number }
   | { kind: "component_on"; component_id: string; trigger: string }
   | { kind: "device_on"; trigger: string }
-  | { kind: "light_effect"; component_id: string; index: number };
+  | { kind: "light_effect"; component_id: string; index: number }
+  | { kind: "api_action"; action_name: string };
 
 /** A single action inside an automation tree. ``children`` carries
  *  nested action lists for control-flow actions, keyed by the

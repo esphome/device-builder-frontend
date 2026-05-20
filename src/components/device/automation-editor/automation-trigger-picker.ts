@@ -75,11 +75,13 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
         ${this._localize("device.automation_target_placeholder")}
       </p>`;
     }
-    // Top-level blocks (interval, script, light_effect) carry no
-    // trigger key — the writer infers them from the location.
+    // Top-level / nested callable blocks (interval, script,
+    // api_action, light_effect) carry no trigger key — the writer
+    // infers them from the location.
     if (
       this.target.kind === "interval" ||
       this.target.kind === "script" ||
+      this.target.kind === "api_action" ||
       this.target.kind === "light_effect"
     ) {
       return nothing;
