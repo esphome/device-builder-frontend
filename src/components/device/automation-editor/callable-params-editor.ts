@@ -22,6 +22,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -132,7 +133,11 @@ export class ESPHomeCallableParamsEditor extends LitElement {
         @input=${(e: Event) =>
           this._updateRow(idx, {
             ...p,
-            name: (e.target as HTMLInputElement).value,
+            // Parameter names map to C++ lambda variables on the
+            // backend, so they have to be valid identifiers.
+            // Normalizing on input keeps the field's value and the
+            // wire-shape key in lockstep.
+            name: normalizeEspHomeId((e.target as HTMLInputElement).value),
           })}
       />
       <wa-select

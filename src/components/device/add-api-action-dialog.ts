@@ -26,6 +26,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { normalizeEspHomeId } from "../../util/esphome-id.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
@@ -163,7 +164,9 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           )}
           ?disabled=${this._saving}
           @input=${(e: Event) => {
-            this._name = (e.target as HTMLInputElement).value.trim();
+            this._name = normalizeEspHomeId(
+              (e.target as HTMLInputElement).value,
+            );
             this._error = "";
           }}
         />

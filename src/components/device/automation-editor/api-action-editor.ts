@@ -38,6 +38,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
@@ -394,9 +395,12 @@ export class ESPHomeApiActionEditor extends LitElement {
   }
 
   private _onActionNameChange(name: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    this.location = { kind: "api_action", action_name: trimmed };
+    // Normalize so the field reshapes invalid characters
+    // (``"my action"`` → ``"my_action"``) as the user types and the
+    // YAML key the upsert produces is always valid.
+    const normalized = normalizeEspHomeId(name);
+    if (!normalized) return;
+    this.location = { kind: "api_action", action_name: normalized };
     this._scheduleAutoApply();
   }
 

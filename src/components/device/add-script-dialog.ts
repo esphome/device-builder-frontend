@@ -31,6 +31,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { normalizeEspHomeId } from "../../util/esphome-id.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import {
@@ -178,7 +179,9 @@ export class ESPHomeAddScriptDialog extends LitElement {
           )}
           ?disabled=${this._saving}
           @input=${(e: Event) => {
-            this._id = (e.target as HTMLInputElement).value.trim();
+            this._id = normalizeEspHomeId(
+              (e.target as HTMLInputElement).value,
+            );
             this._error = "";
           }}
         />

@@ -49,6 +49,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
@@ -482,13 +483,25 @@ export class ESPHomeScriptEditor extends LitElement {
     e.stopPropagation();
     const { path, value } = e.detail;
     const automation = this.value ?? emptyAutomationTree();
-    const next = this._patchParams(automation.trigger_params, path, value);
+    // ``id`` runs through the shared normalizer so a stray space or
+    // dash the user typed lands as a valid YAML key
+    // (``"my script"`` → ``"my_script"``) — without this the input
+    // would round-trip a value that breaks compilation on save.
+    const normalizedValue =
+      path.length === 1 && path[0] === "id"
+        ? normalizeEspHomeId(String(value ?? ""))
+        : value;
+    const next = this._patchParams(
+      automation.trigger_params,
+      path,
+      normalizedValue,
+    );
     if (path.length === 1 && path[0] === "id") {
       // Match wire shape: ``trigger_params.id`` round-trips with
-      // ``location.id``, so keep both pinned to whatever the user
-      // typed. Empty id falls back to the previous location so we
-      // don't dispatch a write with no destination.
-      const newId = String(value ?? "").trim();
+      // ``location.id``, so keep both pinned to the normalized id.
+      // Empty id falls back to the previous location so we don't
+      // dispatch a write with no destination.
+      const newId = String(normalizedValue ?? "");
       if (newId) {
         this.location = { kind: "script", id: newId };
       }
