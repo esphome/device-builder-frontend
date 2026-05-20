@@ -200,11 +200,22 @@ export class ESPHomeAddAutomationDialog extends LitElement {
    * instance or the esphome: section). The kind + component
    * pickers are hidden — the shortcut already answered those — and
    * only the trigger picker is shown.
+   *
+   * The prefill is a discriminated union so ``component_on``
+   * always carries its ``componentId``: passing
+   * ``{ kind: "component_on" }`` without an id would hide the
+   * component picker AND block ``_canContinue`` (no instance to
+   * scope the trigger to), making the dialog non-recoverable.
    */
-  public open(prefill?: { kind: AddAutomationKind; componentId?: string }) {
+  public open(
+    prefill?:
+      | { kind: "device_on" }
+      | { kind: "component_on"; componentId: string },
+  ) {
     this._prefilled = prefill !== undefined;
     this._kind = prefill?.kind ?? "device_on";
-    this._componentId = prefill?.componentId ?? "";
+    this._componentId =
+      prefill?.kind === "component_on" ? prefill.componentId : "";
     this._triggerId = null;
     this._intervalValue = "";
     this._intervalUnit = "s";

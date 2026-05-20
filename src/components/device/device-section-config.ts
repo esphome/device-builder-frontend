@@ -111,11 +111,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state() _deletingApiAction = "";
 
   /** Inline delete in flight against the per-component triggers
-   *  list. Same role as ``_deletingApiAction`` but for the
-   *  ``component_on`` / ``device_on`` shortcut surface. Held as the
-   *  trigger's stable section key (``automation:component_on:<id>:on_press``
-   *  or ``automation:device_on:on_boot``) so the table can disable
-   *  the in-flight row specifically. */
+   *  list. Same role as ``_deletingApiAction`` (and same table-wide
+   *  lock — one delete at a time, all rows disabled while it's in
+   *  flight) but for the ``component_on`` / ``device_on`` shortcut
+   *  surface. Held as the trigger's stable section key
+   *  (``automation:component_on:<id>:on_press`` or
+   *  ``automation:device_on:on_boot``) so the value is informative
+   *  for debugging / future per-row spinner UI; the lock itself is
+   *  the empty / non-empty boolean. */
   @state() _deletingTrigger = "";
 
   // Custom / external component the backend catalog doesn't describe —
