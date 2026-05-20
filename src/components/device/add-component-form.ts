@@ -13,11 +13,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  fetchComponent,
-  getCachedComponent,
-  subscribeComponentCache,
-} from "../../util/component-name-cache.js";
+import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
 import {
   validateEntries,
   type ValidationError,
@@ -98,15 +94,14 @@ export class ESPHomeAddComponentForm extends LitElement {
   @state()
   private _showYaml = false;
 
-  /**
-   * Bumped whenever a fresh entry lands in the component-name cache.
-   * Triggers a re-render so the missing-deps banner picks up freshly
-   * resolved catalog names without the user re-opening the form.
-   */
-  @state()
-  private _cacheTick = 0;
-
-  private _unsubscribeCache?: () => void;
+  /** Resolves dep ids (``i2c``) to their catalog name (``I²C Bus``)
+   * for the missing-deps banner. Owns the cache subscription so a
+   * fresh entry triggers a re-render without bookkeeping here. */
+  private readonly _depResolver = new ComponentNameResolverController(
+    this,
+    () => this._api,
+    () => this.board?.esphome.platform || undefined,
+  );
 
   static styles = [
     espHomeStyles,
@@ -182,19 +177,6 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** True once we've seeded `_values` for the current component. */
   private _initialized = false;
 
-  connectedCallback(): void {
-    super.connectedCallback();
-    this._unsubscribeCache = subscribeComponentCache(() => {
-      this._cacheTick++;
-    });
-  }
-
-  disconnectedCallback(): void {
-    super.disconnectedCallback();
-    this._unsubscribeCache?.();
-    this._unsubscribeCache = undefined;
-  }
-
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
     // Initialize the form values once we have both `component` and
@@ -213,29 +195,8 @@ export class ESPHomeAddComponentForm extends LitElement {
         // detour the form gets reused for) would leak into the next
         // component's form.
         this._localBlockMessage = "";
-        this._kickoffDepNameResolves(this.component.dependencies ?? []);
+        this._depResolver.kickoff(this.component.dependencies ?? []);
       }
-    }
-  }
-
-  /**
-   * Fire-and-forget catalog lookups for each declared dependency id,
-   * so the missing-deps banner can show the friendly catalog name
-   * (e.g. ``I²C Bus``) instead of the raw domain (``i2c``). Resolved
-   * entries land in the shared cache; the subscription bumps
-   * ``_cacheTick`` to trigger a re-render. Cache misses keep the raw
-   * id as fallback.
-   */
-  private _kickoffDepNameResolves(deps: string[]): void {
-    if (!this._api) return;
-    const platform = this.board?.esphome.platform || undefined;
-    for (const id of deps) {
-      if (getCachedComponent(id, platform) !== undefined) continue;
-      void fetchComponent(this._api, id, platform).catch(() => {
-        // Swallow — the banner falls back to the raw id when the
-        // lookup fails, so a transient backend hiccup shouldn't
-        // surface as an error here.
-      });
     }
   }
 
@@ -458,7 +419,6 @@ export class ESPHomeAddComponentForm extends LitElement {
    * ``willUpdate``).
    */
   private _renderMissingDeps(missing: string[]) {
-    const platform = this.board?.esphome.platform || undefined;
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
@@ -470,18 +430,17 @@ export class ESPHomeAddComponentForm extends LitElement {
           </div>
           <div>${this._localize("device.missing_dependencies_body")}</div>
           <div class="deps-warning-actions">
-            ${missing.map((d) => {
-              const label = getCachedComponent(d, platform)?.name ?? d;
-              return html`<button
+            ${missing.map(
+              (d) => html`<button
                 type="button"
                 class="dep-button"
                 @click=${() => this._onAddDep(d)}
               >
                 ${this._localize("device.missing_dependencies_add", {
-                  domain: label,
+                  domain: this._depResolver.resolve(d),
                 })}
-              </button>`;
-            })}
+              </button>`,
+            )}
           </div>
         </div>
       </div>
