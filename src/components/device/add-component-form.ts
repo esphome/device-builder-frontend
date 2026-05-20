@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import { mdiAlertCircleOutline } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type {
   BoardCatalogEntry,
   ComponentCatalogEntry,
@@ -9,9 +10,14 @@ import type {
 } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import {
+  fetchComponent,
+  getCachedComponent,
+  subscribeComponentCache,
+} from "../../util/component-name-cache.js";
 import {
   validateEntries,
   type ValidationError,
@@ -43,6 +49,9 @@ export class ESPHomeAddComponentForm extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  @consume({ context: apiContext })
+  private _api?: ESPHomeAPI;
 
   @property({ attribute: false })
   component!: ComponentCatalogEntry;
@@ -88,6 +97,16 @@ export class ESPHomeAddComponentForm extends LitElement {
 
   @state()
   private _showYaml = false;
+
+  /**
+   * Bumped whenever a fresh entry lands in the component-name cache.
+   * Triggers a re-render so the missing-deps banner picks up freshly
+   * resolved catalog names without the user re-opening the form.
+   */
+  @state()
+  private _cacheTick = 0;
+
+  private _unsubscribeCache?: () => void;
 
   static styles = [
     espHomeStyles,
@@ -163,6 +182,19 @@ export class ESPHomeAddComponentForm extends LitElement {
   /** True once we've seeded `_values` for the current component. */
   private _initialized = false;
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._unsubscribeCache = subscribeComponentCache(() => {
+      this._cacheTick++;
+    });
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unsubscribeCache?.();
+    this._unsubscribeCache = undefined;
+  }
+
   willUpdate(changedProperties: Map<string, unknown>) {
     super.willUpdate(changedProperties);
     // Initialize the form values once we have both `component` and
@@ -181,7 +213,29 @@ export class ESPHomeAddComponentForm extends LitElement {
         // detour the form gets reused for) would leak into the next
         // component's form.
         this._localBlockMessage = "";
+        this._kickoffDepNameResolves(this.component.dependencies ?? []);
       }
+    }
+  }
+
+  /**
+   * Fire-and-forget catalog lookups for each declared dependency id,
+   * so the missing-deps banner can show the friendly catalog name
+   * (e.g. ``I²C Bus``) instead of the raw domain (``i2c``). Resolved
+   * entries land in the shared cache; the subscription bumps
+   * ``_cacheTick`` to trigger a re-render. Cache misses keep the raw
+   * id as fallback.
+   */
+  private _kickoffDepNameResolves(deps: string[]): void {
+    if (!this._api) return;
+    const platform = this.board?.esphome.platform || undefined;
+    for (const id of deps) {
+      if (getCachedComponent(id, platform) !== undefined) continue;
+      void fetchComponent(this._api, id, platform).catch(() => {
+        // Swallow — the banner falls back to the raw id when the
+        // lookup fails, so a transient backend hiccup shouldn't
+        // surface as an error here.
+      });
     }
   }
 
@@ -397,8 +451,14 @@ export class ESPHomeAddComponentForm extends LitElement {
    * disabled while this is showing. Each missing dep is rendered as a
    * button that takes the user back to the catalog filtered to that
    * domain — they pick one, add it, then come back to this component.
+   *
+   * The dep id is resolved to the catalog entry's friendly ``name`` so
+   * the button reads ``Add I²C Bus`` instead of ``Add i2c``. Falls
+   * back to the raw id until the cache lookup lands (kicked off in
+   * ``willUpdate``).
    */
   private _renderMissingDeps(missing: string[]) {
+    const platform = this.board?.esphome.platform || undefined;
     return html`
       <div class="deps-warning" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
@@ -410,17 +470,18 @@ export class ESPHomeAddComponentForm extends LitElement {
           </div>
           <div>${this._localize("device.missing_dependencies_body")}</div>
           <div class="deps-warning-actions">
-            ${missing.map(
-              (d) => html`<button
+            ${missing.map((d) => {
+              const label = getCachedComponent(d, platform)?.name ?? d;
+              return html`<button
                 type="button"
                 class="dep-button"
                 @click=${() => this._onAddDep(d)}
               >
                 ${this._localize("device.missing_dependencies_add", {
-                  domain: d,
+                  domain: label,
                 })}
-              </button>`,
-            )}
+              </button>`;
+            })}
           </div>
         </div>
       </div>
