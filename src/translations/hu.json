@@ -636,7 +636,6 @@
     "add_api_action": "API-művelet hozzáadása",
     "add_api_action_dialog_title": "Új API-művelet ehhez: {name}",
     "api_actions_list_title": "API-műveletek",
-    "api_actions_list_empty": "Még nincs API-művelet.",
     "api_actions_list_edit": "Szerkesztés",
     "api_actions_list_delete": "Törlés",
     "api_action_header_title_static": "API-művelet",

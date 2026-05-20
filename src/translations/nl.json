@@ -510,7 +510,6 @@
     "add_api_action": "API-actie toevoegen",
     "add_api_action_dialog_title": "Nieuwe API-actie voor {name}",
     "api_actions_list_title": "API-acties",
-    "api_actions_list_empty": "Nog geen API-acties.",
     "api_actions_list_edit": "Bewerken",
     "api_actions_list_delete": "Verwijderen",
     "api_action_header_title_static": "API-actie",

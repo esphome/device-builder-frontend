@@ -84,6 +84,12 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   @property({ attribute: false }) board: BoardCatalogEntry | null = null;
 
+  /** Human-readable board name ("Athom Smart Plug v3"). Forwarded
+   *  to per-section dialogs (e.g. the api section's add-action
+   *  dialog) so their titles read as "New X for <device>" rather
+   *  than falling back to the section's own title. */
+  @property() boardName = "";
+
   @state() _config: SectionConfigResponse | null = null;
   @state() _values: Record<string, unknown> = {};
   @state() _loading = false;
@@ -409,6 +415,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       s.key.startsWith("automation:api_action:"),
     );
     if (items.length === 0) return nothing;
+    // One delete is in flight at a time; lock the whole table so
+    // the user can't fire a second delete (or jump into the editor
+    // on a sibling row) before the first round-trip settles.
+    const locked = this._deletingApiAction !== "";
     return html`<div class="api-actions-table">
       <h4 class="api-actions-title">
         ${this._localize("device.api_actions_list_title")}
@@ -423,6 +433,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                 class="api-actions-row-edit"
                 aria-label=${this._localize("device.api_actions_list_edit")}
                 title=${this._localize("device.api_actions_list_edit")}
+                ?disabled=${locked}
                 @click=${() => this._onEditApiAction(item.key)}
               >
                 <wa-icon library="mdi" name="pencil"></wa-icon>
@@ -432,7 +443,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                 class="api-actions-row-delete"
                 aria-label=${this._localize("device.api_actions_list_delete")}
                 title=${this._localize("device.api_actions_list_delete")}
-                ?disabled=${this._deletingApiAction === item.id}
+                ?disabled=${locked}
                 @click=${() => this._onDeleteApiAction(item.id ?? "")}
               >
                 <wa-icon library="mdi" name="delete"></wa-icon>
@@ -475,7 +486,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _renderApiActionDialog() {
     if (this.sectionKey !== "api" || !AUTOMATIONS_ENABLED) return nothing;
     return html`<esphome-add-api-action-dialog
-      .boardName=${this._config?.title ?? ""}
+      .boardName=${this.boardName}
       .configuration=${this.configuration}
       .board=${this.board}
       .yaml=${this.yaml}

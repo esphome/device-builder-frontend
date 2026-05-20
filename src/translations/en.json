@@ -646,7 +646,6 @@
     "add_api_action": "Add API action",
     "add_api_action_dialog_title": "New API action for {name}",
     "api_actions_list_title": "API actions",
-    "api_actions_list_empty": "No API actions yet.",
     "api_actions_list_edit": "Edit",
     "api_actions_list_delete": "Delete",
     "api_action_header_title_static": "API action",

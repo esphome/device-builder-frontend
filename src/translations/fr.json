@@ -510,7 +510,6 @@
     "add_api_action": "Ajouter une action API",
     "add_api_action_dialog_title": "Nouvelle action API pour {name}",
     "api_actions_list_title": "Actions API",
-    "api_actions_list_empty": "Aucune action API pour l'instant.",
     "api_actions_list_edit": "Modifier",
     "api_actions_list_delete": "Supprimer",
     "api_action_header_title_static": "Action API",
