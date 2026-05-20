@@ -42,8 +42,6 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/command-dialog.js";
 import "../components/device/device-editor.js";
 import "../components/device/device-navigator.js";
-import type { ESPHomeDeviceNavigator } from "../components/device/device-navigator.js";
-import type { AddAutomationKind } from "../components/device/add-automation-dialog.js";
 import "../components/firmware-install-dialog.js";
 import "../components/install-method-dialog.js";
 import "../components/logs-dialog.js";
@@ -762,7 +760,6 @@ export class ESPHomePageDevice extends LitElement {
         @yaml-highlight=${this._onYamlHighlight}
         @yaml-updated=${this._onYamlUpdated}
         @yaml-draft=${this._onYamlDraft}
-        @add-automation-request=${this._onAddAutomationRequest}
       >
         ${this._renderNavigator("drawer-nav")}
       </div>
@@ -786,7 +783,6 @@ export class ESPHomePageDevice extends LitElement {
           @validate-device=${this._onValidateClick}
           @install-device=${this._installCtrl.onInstall}
           @update-device=${this._installCtrl.onUpdate}
-          @add-automation-request=${this._onAddAutomationRequest}
         >
           ${this._renderNavigator("desktop-nav")}
           <esphome-device-editor
@@ -917,28 +913,6 @@ export class ESPHomePageDevice extends LitElement {
     this._layout = e.detail;
     localStorage.setItem("esphome-editor-layout", e.detail);
   }
-
-  /**
-   * "+ Add automation" entry point from inside a component's section
-   * editor (currently only the api section). The dialog lives on the
-   * navigator, so route the request through the desktop nav element
-   * — both nav instances share the same dialog and only the desktop
-   * one is guaranteed to be in the DOM at this point. Falls back to
-   * the drawer nav for mobile where the drawer is the only nav.
-   */
-  private _onAddAutomationRequest = (
-    e: CustomEvent<{ kind?: AddAutomationKind }>,
-  ) => {
-    e.stopPropagation();
-    const nav =
-      (this.renderRoot.querySelector(
-        "esphome-device-navigator.desktop-nav",
-      ) as ESPHomeDeviceNavigator | null) ??
-      (this.renderRoot.querySelector(
-        "esphome-device-navigator.drawer-nav",
-      ) as ESPHomeDeviceNavigator | null);
-    nav?.openAddAutomationDialog(e.detail.kind);
-  };
 
   /**
    * Both nav instances (drawer + desktop) share the same prop set

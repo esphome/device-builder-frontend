@@ -1,7 +1,7 @@
 /**
  * Step 1 of the automation editor: pick the automation's target.
  *
- * Six target kinds, matching the ``AutomationLocation`` discriminator
+ * Five target kinds, matching the ``AutomationLocation`` discriminator
  * the backend writer consumes:
  *
  * - ``device_on`` — the device itself (``on_boot`` / ``on_loop`` /
@@ -10,10 +10,16 @@
  *   component instance (a specific binary_sensor, switch, …).
  * - ``interval`` — a top-level ``interval:`` block.
  * - ``script`` — a top-level ``script:`` block.
- * - ``api_action`` — a Home Assistant-callable action inside
- *   ``api: actions:``.
  * - ``light_effect`` — a user-defined effect inside a light's
  *   ``effects:`` list.
+ *
+ * ``api_action`` is intentionally absent from this picker. Those
+ * entries live nested under the api component (``api: actions:``)
+ * and are managed inline from the api section editor — the
+ * "create a thing that reacts to a trigger" framing doesn't apply.
+ * The structured editor still HANDLES a pre-existing
+ * ``ApiActionLocation`` (so a navigator click on a parsed api
+ * action still routes correctly).
  *
  * The picker is presentational: parent owns the selected
  * ``AutomationLocation`` and the list of available component
@@ -54,7 +60,6 @@ const ORDER: readonly TargetKind[] = [
   "component_on",
   "interval",
   "script",
-  "api_action",
 ] as const;
 
 @customElement("esphome-automation-target-picker")
@@ -124,6 +129,9 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
       case "script":
         return this._localize("device.automation_target_script");
       case "api_action":
+        // Not in ORDER (api_actions are managed from the api
+        // section editor) but still labellable if a pre-existing
+        // location lands here through the legacy add-mode path.
         return this._localize("device.automation_target_api_action");
       case "light_effect":
         return this._localize("device.automation_light_effect");
@@ -200,36 +208,18 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
       `;
     }
     if (kind === "api_action") {
+      // The picker doesn't let the user create api_actions through
+      // this surface (api_actions are managed inline from the api
+      // section editor). We still need to render *something* in
+      // edit-mode when a pre-existing api-action location lands
+      // here — a single read-only line is enough.
       const selectedName =
         this.value?.kind === "api_action" ? this.value.action_name : "";
-      // Symmetric with the ``script`` branch: edit-mode locks the
-      // name (the YAML splice destination is keyed by it), add-mode
-      // shows a text input so the user can type the new name.
-      if (this.locked) {
-        return html`
-          <label class="ae-section-label">
-            ${this._localize("device.automation_target_api_action_label")}
-          </label>
-          <p class="ae-section-desc">${selectedName}</p>
-        `;
-      }
       return html`
-        <label class="ae-section-label" for="api-action-id-input">
-          ${this._localize(
-            "device.automation_target_api_action_new_id_label",
-          )}
+        <label class="ae-section-label">
+          ${this._localize("device.automation_target_api_action_label")}
         </label>
-        <input
-          id="api-action-id-input"
-          type="text"
-          .value=${selectedName}
-          placeholder=${this._localize(
-            "device.automation_target_api_action_id_placeholder",
-          )}
-          ?disabled=${this.disabled}
-          @input=${(e: Event) =>
-            this._onApiActionChange((e.target as HTMLInputElement).value)}
-        />
+        <p class="ae-section-desc">${selectedName}</p>
       `;
     }
     if (kind === "light_effect") {
@@ -292,18 +282,17 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             kind,
             id: this.scripts.length ? this.scripts[0].id : "",
           };
-        case "api_action":
-          // Same shape as ``script``: emit an empty-name location
-          // in add-mode so the kind picker doesn't snap back. The
-          // backend creates the ``api:`` block (and the
-          // ``actions:`` key) on first save if neither exists yet.
-          return { kind, action_name: "" };
         case "light_effect": {
           const light = this.devices.find((d) =>
             d.component_id.startsWith("light."),
           );
           return light ? { kind, component_id: light.id, index: 0 } : null;
         }
+        case "api_action":
+          // Unreachable through the dropdown (api_action isn't in
+          // ORDER) but kept for the exhaustive switch — the user
+          // can't pick it here.
+          return null;
       }
     })();
     this._emit(next);
@@ -316,10 +305,6 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
 
   private _onScriptChange(id: string) {
     this._emit({ kind: "script", id });
-  }
-
-  private _onApiActionChange(actionName: string) {
-    this._emit({ kind: "api_action", action_name: actionName });
   }
 
   private _onLightChange(componentId: string) {

@@ -1,8 +1,10 @@
 import { consume } from "@lit/context";
+import toast from "sonner-js";
 import {
   mdiDelete,
   mdiInformationOutline,
   mdiOpenInNew,
+  mdiPencil,
   mdiPlusCircleOutline,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
@@ -19,6 +21,8 @@ import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { parseYamlAutomations } from "../../util/yaml-sections.js";
+import { applyYamlDiff } from "./automation-editor/serialise.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -26,6 +30,8 @@ import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
+import "./add-api-action-dialog.js";
+import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
@@ -43,6 +49,7 @@ registerMdiIcons({
   delete: mdiDelete,
   "information-outline": mdiInformationOutline,
   "open-in-new": mdiOpenInNew,
+  pencil: mdiPencil,
   "plus-circle-outline": mdiPlusCircleOutline,
 });
 
@@ -82,6 +89,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state() _dirty = false;
   @state() _error = "";
 
+  /** Inline delete in flight against the api-actions list. Disables
+   *  the table while we wait so the user can't fire a second delete
+   *  before the first applies. */
+  @state() _deletingApiAction = "";
+
   // Custom / external component the backend catalog doesn't describe —
   // synthetic empty-entries _config triggers the YAML-only notice; subtitle
   // shows the domain.platform so the user can see which key it applies to.
@@ -99,6 +111,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @state() _resolvedFromLine?: number;
 
   @query("esphome-confirm-dialog") _confirmDialog?: ESPHomeConfirmDialog;
+  @query("esphome-add-api-action-dialog")
+  _addApiActionDialog?: ESPHomeAddApiActionDialog;
 
   @state() _deleting = false;
 
@@ -305,7 +319,6 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               />
             </div>`}
       </div>
-      ${this._renderSectionExtras()}
       ${yamlOnly
         ? html`<div class="yaml-only-notice" role="note">
               <wa-icon library="mdi" name="information-outline"></wa-icon>
@@ -322,9 +335,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                     </button>`}
               </div>
             </div>
-            ${canDelete
-              ? html`<div class="actions">${this._renderDeleteButton()}</div>`
-              : nothing}`
+            ${this._renderApiActionsTable()}
+            ${this._renderActionsRow(canDelete)}`
         : html`
             <esphome-config-entry-form
               .entries=${renderEntries}
@@ -353,10 +365,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             ${this._error
               ? html`<p class="error">${this._error}</p>`
               : nothing}
-            ${canDelete
-              ? html`<div class="actions">${this._renderDeleteButton()}</div>`
-              : nothing}
+            ${this._renderApiActionsTable()}
+            ${this._renderActionsRow(canDelete)}
           `}
+      ${this._renderApiActionDialog()}
       ${canDelete
         ? html`<esphome-confirm-dialog
             heading=${this._localize("device.delete_section")}
@@ -383,37 +395,155 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   /**
-   * Per-section affordances rendered between the header and the
-   * form. Currently only the api section: `api.actions:` are
-   * Home Assistant-callable actions that live nested under
-   * ``api:`` in YAML, so the user discovers them from here as
-   * well as from the Automations navigator. The "+ Add" button
-   * bubbles ``add-automation-request`` so the page can route to
-   * the navigator's wizard (the wizard owns the YAML write).
+   * Inline manage-list of api_action entries. Rendered only for the
+   * api section; surfaces existing actions as a flat table with
+   * edit (route to the inline editor) and delete (splice via the
+   * backend) per row. Hidden entirely when no actions are
+   * declared — the `+ Add API action` button next to Delete is
+   * the entry point in that case.
    */
-  private _renderSectionExtras() {
+  private _renderApiActionsTable() {
     if (this.sectionKey !== "api") return nothing;
-    return html`<div class="section-extras">
-      <button
-        type="button"
-        class="section-extra-add"
-        @click=${this._onAddApiAction}
-      >
-        <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-        ${this._localize("device.add_api_action")}
-      </button>
+    const items = parseYamlAutomations(this.yaml).filter((s) =>
+      s.key.startsWith("automation:api_action:"),
+    );
+    if (items.length === 0) return nothing;
+    return html`<div class="api-actions-table">
+      <h4 class="api-actions-title">
+        ${this._localize("device.api_actions_list_title")}
+      </h4>
+      <ul class="api-actions-rows">
+        ${items.map(
+          (item) => html`<li class="api-actions-row">
+            <span class="api-actions-name">${item.id}</span>
+            <div class="api-actions-row-buttons">
+              <button
+                type="button"
+                class="api-actions-row-edit"
+                aria-label=${this._localize("device.api_actions_list_edit")}
+                title=${this._localize("device.api_actions_list_edit")}
+                @click=${() => this._onEditApiAction(item.key)}
+              >
+                <wa-icon library="mdi" name="pencil"></wa-icon>
+              </button>
+              <button
+                type="button"
+                class="api-actions-row-delete"
+                aria-label=${this._localize("device.api_actions_list_delete")}
+                title=${this._localize("device.api_actions_list_delete")}
+                ?disabled=${this._deletingApiAction === item.id}
+                @click=${() => this._onDeleteApiAction(item.id ?? "")}
+              >
+                <wa-icon library="mdi" name="delete"></wa-icon>
+              </button>
+            </div>
+          </li>`,
+        )}
+      </ul>
     </div>`;
   }
 
-  private _onAddApiAction = () => {
+  /**
+   * Bottom actions row. Combines the section's Delete button with
+   * the api-only "+ Add API action" CTA so both live in the same
+   * footer line — same placement convention as the rest of the
+   * section editor.
+   */
+  private _renderActionsRow(canDelete: boolean) {
+    const showAddApi = this.sectionKey === "api";
+    if (!canDelete && !showAddApi) return nothing;
+    return html`<div class="actions">
+      ${showAddApi
+        ? html`<button
+            type="button"
+            class="section-extra-add"
+            @click=${this._onOpenAddApiAction}
+          >
+            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+            ${this._localize("device.add_api_action")}
+          </button>`
+        : nothing}
+      ${canDelete ? this._renderDeleteButton() : nothing}
+    </div>`;
+  }
+
+  private _renderApiActionDialog() {
+    if (this.sectionKey !== "api") return nothing;
+    return html`<esphome-add-api-action-dialog
+      .boardName=${this._config?.title ?? ""}
+      .configuration=${this.configuration}
+      .board=${this.board}
+      .yaml=${this.yaml}
+      @automation-added=${this._onApiActionAdded}
+    ></esphome-add-api-action-dialog>`;
+  }
+
+  private _onOpenAddApiAction = () => {
+    this._addApiActionDialog?.open();
+  };
+
+  /** Backend confirmed the new api_action landed. Route the
+   *  navigator (and the right pane) to its editor so the user can
+   *  fill in variables + actions immediately. */
+  private _onApiActionAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+    e.stopPropagation();
     this.dispatchEvent(
-      new CustomEvent<{ kind: "api_action" }>("add-automation-request", {
-        detail: { kind: "api_action" },
+      new CustomEvent<{ sectionKey: string }>("section-select", {
+        detail: { sectionKey: e.detail.sectionKey },
         bubbles: true,
         composed: true,
       }),
     );
   };
+
+  private _onEditApiAction(sectionKey: string) {
+    this.dispatchEvent(
+      new CustomEvent<{ sectionKey: string }>("section-select", {
+        detail: { sectionKey },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /**
+   * Delete an api_action inline. Uses the same backend path as the
+   * api-action-editor's delete (`deleteAutomation` → apply the
+   * returned diff → ``updateConfig``). Surfaces failures as a
+   * toast; on success the YAML rolls forward via ``yaml-updated``
+   * and the table re-renders against the new draft.
+   */
+  private async _onDeleteApiAction(actionName: string) {
+    if (!this._api || !actionName || this._deletingApiAction) return;
+    this._deletingApiAction = actionName;
+    try {
+      const { yaml_diff } = await this._api.deleteAutomation(
+        this.configuration,
+        { kind: "api_action", action_name: actionName },
+        this.yaml,
+      );
+      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+      await this._api.updateConfig(this.configuration, newYaml);
+      this.dispatchEvent(
+        new CustomEvent<{ yaml: string }>("yaml-updated", {
+          detail: { yaml: newYaml },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : this._localize("device.automation_save_error");
+      toast.error(this._localize("device.automation_save_error"), {
+        description: msg,
+        richColors: true,
+      });
+    } finally {
+      this._deletingApiAction = "";
+    }
+  }
 }
 
 declare global {

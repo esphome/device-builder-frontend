@@ -46,14 +46,14 @@ import {
 } from "./automation-editor/serialise.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of
- *  ``AutomationLocation``'s discriminator. ``script:`` keeps its own
- *  dedicated dialog (the script editor is a richer surface) — the
- *  wizard handles the remaining kinds. */
+ *  ``AutomationLocation``'s discriminator. The callable shapes
+ *  (``script:``, ``api.actions:``) live behind their own
+ *  dedicated dialogs, since the wizard's "what should this react
+ *  to?" framing doesn't apply to them. */
 export type AddAutomationKind =
   | "device_on"
   | "component_on"
-  | "interval"
-  | "api_action";
+  | "interval";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -95,8 +95,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
    *  renderer's storage shape). */
   @state() private _intervalValue = "";
   @state() private _intervalUnit: "us" | "ms" | "s" | "min" | "h" | "d" = "s";
-  /** api_action-only: action name the user typed. */
-  @state() private _apiActionName = "";
   @state() private _available: AvailableAutomations | null = null;
   @state() private _loading = true;
   @state() private _saving = false;
@@ -186,20 +184,12 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     `,
   ];
 
-  /**
-   * Open the wizard. ``preselectKind`` lets callers route directly
-   * to a specific target kind — used by per-component "+ Add
-   * automation" affordances (e.g. the api section's "+ Add API
-   * action" button). Without it, the wizard opens on the default
-   * ``device_on`` flow.
-   */
-  public open(opts?: { preselectKind?: AddAutomationKind }) {
-    this._kind = opts?.preselectKind ?? "device_on";
+  public open() {
+    this._kind = "device_on";
     this._componentId = "";
     this._triggerId = null;
     this._intervalValue = "";
     this._intervalUnit = "s";
-    this._apiActionName = "";
     this._error = "";
     this._dialog.open = true;
     void this._loadAvailable();
@@ -237,11 +227,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private _renderForm() {
     const filteredTriggers = this._filteredTriggers();
     const componentLocked = this._kind !== "component_on";
-    // The trigger row is only meaningful for kinds that carry a
-    // trigger key in YAML (device_on, component_on). interval and
-    // api_action are callable shapes whose body lives elsewhere.
-    const showTrigger =
-      this._kind === "device_on" || this._kind === "component_on";
+    const triggerLocked = this._kind === "interval";
     return html`
       <p class="intro">
         ${renderMarkdown(this._localize("device.automation_header_description"))}
@@ -266,17 +252,13 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           <wa-option value="interval" ?selected=${this._kind === "interval"}>
             ${this._localize("device.automation_target_interval")}
           </wa-option>
-          <wa-option value="api_action" ?selected=${this._kind === "api_action"}>
-            ${this._localize("device.automation_target_api_action")}
-          </wa-option>
         </wa-select>
       </div>
       ${this._kind === "component_on"
         ? this._renderComponentRow(componentLocked)
         : nothing}
       ${this._kind === "interval" ? this._renderIntervalRow() : nothing}
-      ${this._kind === "api_action" ? this._renderApiActionRow() : nothing}
-      ${showTrigger ? this._renderTriggerRow(filteredTriggers) : nothing}
+      ${!triggerLocked ? this._renderTriggerRow(filteredTriggers) : nothing}
       ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
       <div class="actions">
         <button
@@ -360,33 +342,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           )}
         </wa-select>
       </div>
-    </div>`;
-  }
-
-  /**
-   * api_action row: a single text input for the action name. The
-   * backend writer creates the ``api:`` block (and the ``actions:``
-   * key) on first save if neither exists yet, so we don't gate on
-   * pre-existing api config.
-   */
-  private _renderApiActionRow() {
-    return html`<div class="field">
-      <label class="field-label" for="api-action-name-input">
-        ${this._localize("device.automation_target_api_action_new_id_label")}
-      </label>
-      <input
-        id="api-action-name-input"
-        type="text"
-        .value=${this._apiActionName}
-        placeholder=${this._localize(
-          "device.automation_target_api_action_id_placeholder",
-        )}
-        ?disabled=${this._saving}
-        @input=${(e: Event) => {
-          this._apiActionName = (e.target as HTMLInputElement).value.trim();
-          this._error = "";
-        }}
-      />
     </div>`;
   }
 
@@ -496,7 +451,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     const k = kind as TargetKind;
     this._kind = k;
     this._triggerId = null;
-    this._error = "";
     if (k === "component_on") {
       const devices = this._available?.devices ?? [];
       this._componentId = devices[0]?.id ?? "";
@@ -512,17 +466,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   private _canContinue(): boolean {
     if (this._kind === "interval") return this._intervalValue.trim() !== "";
-    if (this._kind === "api_action") {
-      if (!this._apiActionName) return false;
-      // Reject names that collide with an existing api_action in
-      // the current draft YAML; the backend would reject the upsert
-      // anyway, but catching it here keeps the button disabled and
-      // saves a round-trip.
-      const taken = parseYamlAutomations(this.yaml).some(
-        (s) => s.key === `automation:api_action:${this._apiActionName}`,
-      );
-      return !taken;
-    }
     if (!this._triggerId) return false;
     if (this._kind === "component_on" && !this._componentId) return false;
     return true;
@@ -539,8 +482,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         // Interval picks up the value+unit pair the user typed; for
         // device_on / component_on the trigger's own config_entries
         // are still empty at this point (filled in the inline editor
-        // after the wizard closes). api_action starts with an empty
-        // body — variables and actions land in the inline editor.
+        // after the wizard closes).
         trigger_params:
           this._kind === "interval"
             ? { interval: `${this._intervalValue.trim()}${this._intervalUnit}` }
@@ -591,9 +533,6 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         trigger: bare,
       };
     }
-    if (this._kind === "api_action") {
-      return { kind: "api_action", action_name: this._apiActionName };
-    }
     // interval — new blocks land at the end of the interval: list.
     // The backend treats an out-of-range index as "append" (in-range
     // as "replace"), so we have to pass the count of existing
@@ -609,14 +548,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
 
   /**
    * The catalog-qualified trigger id for the AutomationTree.
-   * Callable shapes (``interval``, ``api_action``) carry no trigger;
-   * ``component_on`` stores the un-prefixed catalog id since we
-   * only stripped the prefix for the ``location.trigger`` field.
+   * For ``device_on`` and ``interval`` this coincides with
+   * ``location.trigger`` (or is ``null`` for interval); for
+   * ``component_on`` it's the unprefixed ``this._triggerId``
+   * (which IS the catalog id) since we only stripped the prefix
+   * for the location field.
    */
   private _catalogTriggerId(location: AutomationLocation): string | null {
-    if (location.kind === "interval" || location.kind === "api_action") {
-      return null;
-    }
+    if (location.kind === "interval") return null;
     return this._triggerId;
   }
 

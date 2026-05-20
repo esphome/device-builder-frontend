@@ -38,10 +38,7 @@ import type { HighlightRange } from "../yaml-editor.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./add-automation-dialog.js";
-import type {
-  AddAutomationKind,
-  ESPHomeAddAutomationDialog,
-} from "./add-automation-dialog.js";
+import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import "./add-component-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import "./add-config-dialog.js";
@@ -854,18 +851,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
     e.stopPropagation();
     this._emitSectionSelect(e.detail.sectionKey, undefined);
   };
-
-  /**
-   * Open the wizard programmatically, optionally pre-selecting a
-   * target kind. Used by per-component "+ Add automation" entry
-   * points (e.g. the api section's "+ Add API action" button) so
-   * they can route through the same wizard the navigator owns
-   * without each component instantiating its own dialog.
-   */
-  public openAddAutomationDialog(preselectKind?: AddAutomationKind) {
-    if (!AUTOMATIONS_ENABLED) return;
-    this._addAutomationDialog.open({ preselectKind });
-  }
 }
 
 declare global {
