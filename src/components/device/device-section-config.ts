@@ -18,7 +18,6 @@ import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import { withBase } from "../../util/base-path.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
@@ -490,15 +489,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * device-level ``esphome:`` section get a "+ Add automation"
    * button that opens the same wizard the navigator uses, pre-filled
    * with the current context.
-   *
-   * The Add CTAs are gated on ``AUTOMATIONS_ENABLED`` so they match
-   * the navigator's "+ Add automation" / "+ Add script" buttons —
-   * an always-enabled CTA whose click does nothing reads as a bug.
    */
   private _renderActionsRow(canDelete: boolean) {
-    const showAddApi = this.sectionKey === "api" && AUTOMATIONS_ENABLED;
-    const showAddAutomation =
-      this._shortcutTarget() !== null && AUTOMATIONS_ENABLED;
+    const showAddApi = this.sectionKey === "api";
+    const showAddAutomation = this._shortcutTarget() !== null;
     if (!canDelete && !showAddApi && !showAddAutomation) return nothing;
     return html`<div class="actions">
       ${showAddApi
@@ -526,7 +520,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   private _renderApiActionDialog() {
-    if (this.sectionKey !== "api" || !AUTOMATIONS_ENABLED) return nothing;
+    if (this.sectionKey !== "api") return nothing;
     return html`<esphome-add-api-action-dialog
       .boardName=${this.boardName}
       .configuration=${this.configuration}
@@ -693,7 +687,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   private _renderAddAutomationDialog() {
-    if (this._shortcutTarget() === null || !AUTOMATIONS_ENABLED) {
+    if (this._shortcutTarget() === null) {
       return nothing;
     }
     return html`<esphome-add-automation-dialog

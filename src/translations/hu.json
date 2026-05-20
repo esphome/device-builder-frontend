@@ -670,7 +670,6 @@
     "return_to_after_dep_prefix": "Függőség hozzáadása. Visszahozunk ide:",
     "return_to_after_dep_suffix": "utána.",
     "add_automation_error": "Nem sikerült hozzáadni az automatizmust",
-    "add_automation_unavailable": "Az automatizmustámogatás még nem érhető el",
     "add_config_error": "Nem sikerült hozzáadni a konfigurációs szakaszt",
     "editor_layout_label": "Szerkesztő elrendezése",
     "editor_expand": "Szerkesztő kibontása",

@@ -744,7 +744,6 @@
     "return_to_after_dep_prefix": "Adding a dependency. We'll bring you back to",
     "return_to_after_dep_suffix": "after.",
     "add_automation_error": "Failed to add automation",
-    "add_automation_unavailable": "Automation support is not yet available",
     "add_config_error": "Failed to add config section",
     "editor_layout_label": "Editor layout",
     "editor_expand": "Expand editor",

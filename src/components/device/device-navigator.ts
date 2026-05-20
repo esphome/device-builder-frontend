@@ -15,7 +15,6 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
   fetchAutomationTriggers,
@@ -283,21 +282,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
         opacity: 0.9;
       }
 
-      /* Disabled action: greyed out, no hover, no pointer. The wrapper
-         drops its click handler so the underlying dialog is never
-         opened — this is purely visual confirmation. */
-      .action-item--disabled,
-      .action-item--disabled:hover {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-quiet);
-        cursor: not-allowed;
-        opacity: 0.65;
-      }
-
-      .action-item--disabled wa-icon {
-        color: var(--wa-color-text-quiet);
-      }
-
       .action-item p {
         margin: var(--wa-space-xs) 0;
         font-size: var(--wa-font-size-s);
@@ -423,8 +407,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
       label: string;
       icon: string;
       onClick: () => void;
-      disabled?: boolean;
-      disabledReason?: string;
     }
     interface NavSection {
       label: string;
@@ -473,15 +455,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
             label: this._localize("device.add_automation"),
             icon: "arrow-decision-outline",
             onClick: () => this._addAutomationDialog.open(),
-            disabled: !AUTOMATIONS_ENABLED,
-            disabledReason: this._localize("device.add_automation_unavailable"),
           },
           {
             label: this._localize("device.add_script"),
             icon: "script-text-outline",
             onClick: () => this._addScriptDialog.open(),
-            disabled: !AUTOMATIONS_ENABLED,
-            disabledReason: this._localize("device.add_automation_unavailable"),
           },
         ],
       },
@@ -503,22 +481,20 @@ export class ESPHomeDeviceNavigator extends LitElement {
           .board=${this.board}
           .yaml=${this.yaml}
         ></esphome-add-component-dialog>
-        ${AUTOMATIONS_ENABLED
-          ? html`<esphome-add-automation-dialog
-                .boardName=${this.boardName}
-                .configuration=${this.configuration}
-                .board=${this.board}
-                .yaml=${this.yaml}
-                @automation-added=${this._onAutomationAdded}
-              ></esphome-add-automation-dialog>
-              <esphome-add-script-dialog
-                .boardName=${this.boardName}
-                .configuration=${this.configuration}
-                .board=${this.board}
-                .yaml=${this.yaml}
-                @automation-added=${this._onAutomationAdded}
-              ></esphome-add-script-dialog>`
-          : nothing}
+        <esphome-add-automation-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          @automation-added=${this._onAutomationAdded}
+        ></esphome-add-automation-dialog>
+        <esphome-add-script-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          @automation-added=${this._onAutomationAdded}
+        ></esphome-add-script-dialog>
         <header class="card-header">
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
         </header>
@@ -575,16 +551,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
                     <div class="nav-items">
                       ${actions.map(
                         (action) => html`<div
-                          class="action-item ${action.disabled
-                            ? "action-item--disabled"
-                            : ""}"
-                          title=${action.disabled
-                            ? action.disabledReason ?? ""
-                            : ""}
-                          aria-disabled=${action.disabled ? "true" : "false"}
-                          @click=${action.disabled
-                            ? undefined
-                            : () => action.onClick()}
+                          class="action-item"
+                          @click=${() => action.onClick()}
                         >
                           <div>
                             <wa-icon library="mdi" name=${action.icon}></wa-icon>
@@ -641,10 +609,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // instead of "warmtepomp → on_turn_on" (raw YAML key). The cache
     // is process-wide and the subscription path re-renders when an
     // entry lands.
-    if (
-      AUTOMATIONS_ENABLED &&
-      getCachedAutomationTriggers(platform, boardId) === undefined
-    ) {
+    if (getCachedAutomationTriggers(platform, boardId) === undefined) {
       void fetchAutomationTriggers(this._api, platform, boardId).then(
         () => {
           // Manual nudge — the subscription handler only fires for

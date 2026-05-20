@@ -15,12 +15,7 @@ import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
-import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
-
-// Automation add-flow is gated on a backend that doesn't yet exist;
-// the navigator still shows the section but disables its action
-// button. See `feature-flags.ts` and the README "Status" section.
 import { withBase } from "../../util/base-path.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -441,14 +436,12 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         .board=${board}
         .yaml=${this.yaml}
       ></esphome-add-component-dialog>
-      ${AUTOMATIONS_ENABLED
-        ? html`<esphome-add-automation-dialog
-            .boardName=${board?.name ?? ""}
-            .configuration=${this.configuration}
-            .board=${board}
-            .yaml=${this.yaml}
-          ></esphome-add-automation-dialog>`
-        : nothing}
+      <esphome-add-automation-dialog
+        .boardName=${board?.name ?? ""}
+        .configuration=${this.configuration}
+        .board=${board}
+        .yaml=${this.yaml}
+      ></esphome-add-automation-dialog>
     `;
   }
 
