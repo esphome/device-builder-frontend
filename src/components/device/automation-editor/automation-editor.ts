@@ -32,7 +32,6 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
   mdiArrowDecisionOutline,
-  mdiContentSave,
   mdiDelete,
   mdiOpenInNew,
 } from "@mdi/js";
@@ -78,7 +77,6 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   "arrow-decision-outline": mdiArrowDecisionOutline,
-  "content-save": mdiContentSave,
   delete: mdiDelete,
   "open-in-new": mdiOpenInNew,
 });

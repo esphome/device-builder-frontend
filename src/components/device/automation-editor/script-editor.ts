@@ -26,7 +26,6 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import {
   mdiClose,
-  mdiContentSave,
   mdiDelete,
   mdiOpenInNew,
   mdiPlus,
@@ -76,7 +75,6 @@ import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   close: mdiClose,
-  "content-save": mdiContentSave,
   delete: mdiDelete,
   "open-in-new": mdiOpenInNew,
   plus: mdiPlus,
