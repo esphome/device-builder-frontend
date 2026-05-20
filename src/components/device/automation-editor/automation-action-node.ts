@@ -321,8 +321,20 @@ export class ESPHomeAutomationActionNode extends LitElement {
           .board=${this.board}
           .yaml=${this.yaml}
           ?disabled=${this.disabled}
-          @actions-change=${(e: CustomEvent<{ actions: ActionNode[] }>) =>
-            this._onChildrenChange(key, e.detail.actions)}
+          @actions-change=${(e: CustomEvent<{ actions: ActionNode[] }>) => {
+            // The nested list dispatches ``actions-change`` to mean
+            // "my list of actions changed". This action-node folds
+            // that into its own ``children[key]`` slot and re-emits
+            // as ``action-change`` (the event our PARENT list
+            // listens to). Without ``stopPropagation`` here the
+            // bubbling ``actions-change`` would ALSO be caught by
+            // the outer action-list — which would replace the
+            // entire ``if`` node's slot with the nested list. Net
+            // effect: adding a delay inside an if's then-branch
+            // wipes the if and leaves just the delay.
+            e.stopPropagation();
+            this._onChildrenChange(key, e.detail.actions);
+          }}
         ></esphome-automation-action-list>
       </div>`,
     );
