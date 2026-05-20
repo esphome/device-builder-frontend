@@ -175,9 +175,24 @@ export function renderTimePeriodField(
   if (!parsed.parseable) {
     return renderStringField(entry, "text", path, ctx);
   }
-  const placeholderText = entry.default_value
-    ? String(entry.default_value)
-    : "";
+  // Split the catalog's default ("5s") into its numeric prefix
+  // for the placeholder — the magnitude input shows only the
+  // number, the unit lives in the dropdown beside it.
+  const defaultParsed =
+    entry.default_value !== undefined && entry.default_value !== null
+      ? parseTimePeriod(entry.default_value)
+      : null;
+  const placeholderText =
+    defaultParsed && defaultParsed.parseable ? defaultParsed.value : "";
+  // When the user hasn't touched the field yet, seed the unit
+  // picker with the default's unit so the round-tripped widget
+  // matches what they'd see if they typed the catalog default.
+  const displayUnit =
+    raw !== undefined && raw !== null && raw !== ""
+      ? parsed.unit
+      : defaultParsed?.parseable
+        ? defaultParsed.unit
+        : parsed.unit;
   return html`
     <div class="field time-period" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
@@ -191,7 +206,7 @@ export function renderTimePeriodField(
           placeholder=${placeholderText}
           @input=${(e: Event) => {
             const next = (e.target as HTMLInputElement).value;
-            ctx.emitChange(path, serializeTimePeriod(next, parsed.unit));
+            ctx.emitChange(path, serializeTimePeriod(next, displayUnit));
           }}
         />
         <wa-select
@@ -206,7 +221,7 @@ export function renderTimePeriodField(
           ${TIME_PERIOD_UNITS.map(
             (u) => html`<wa-option
               value=${u}
-              ?selected=${u === parsed.unit}
+              ?selected=${u === displayUnit}
               >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option
             >`,
           )}

@@ -31,7 +31,11 @@ export class ESPHomeLambdaEditor extends LitElement {
 
   @property() value = "";
 
-  @property({ type: Boolean }) disabled = false;
+  // ``reflect: true`` so the ``:host([disabled]) .cm-wrap`` CSS
+  // selector below actually matches — without reflection the
+  // attribute isn't written to the host and the dimmed-state
+  // styling never fires.
+  @property({ type: Boolean, reflect: true }) disabled = false;
 
   @property({ type: Boolean }) invalid = false;
 

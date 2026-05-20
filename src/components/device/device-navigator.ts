@@ -404,8 +404,19 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // mode. Effects are managed through the light's own section
     // editor; drop them here so they don't appear orphaned in the
     // automations group.
+    //
+    // ``automation:unscoped:*`` entries are inline ``on_*:`` handlers
+    // on components that have no ``id:`` set. The structured editor
+    // can't address them (locationFromSectionKey returns null), so
+    // routing one through the navigator would surface as a failing
+    // ``fetchComponent`` and a blank section editor. Drop them too;
+    // the user fixes by adding an ``id:`` to the host component.
     const automations = [...filteredTopLevel, ...detailed]
-      .filter((s) => !s.key.startsWith("automation:light_effect:"))
+      .filter(
+        (s) =>
+          !s.key.startsWith("automation:light_effect:") &&
+          !s.key.startsWith("automation:unscoped:"),
+      )
       .sort((a, b) => a.fromLine - b.fromLine);
 
     interface NavAction {
