@@ -407,8 +407,15 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected willUpdate(changed: PropertyValues) {
     if (changed.has("_view")) this.setAttribute("view", this._view);
-    if (changed.has("_importableDevices")) {
-      this.toggleAttribute("has-discovered", this._importableDevices.length > 0);
+    // ``has-discovered`` is the hook that adds top padding for the
+    // discovery banner. Track the same condition the banner renders
+    // under so an all-ignored / hide-ignored state doesn't leave
+    // empty space at the top of the view.
+    if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
+      this.toggleAttribute(
+        "has-discovered",
+        this._visibleImportableDevices.length > 0,
+      );
     }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
