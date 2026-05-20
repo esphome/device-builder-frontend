@@ -89,6 +89,15 @@ export interface RenderCtx {
   getEditingMagnitude: (path: string[]) => string | undefined;
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
+  /**
+   * Stable per-form object identity used by renderers that keep
+   * cross-render scratch state via a WeakMap (e.g. templatable
+   * literal/lambda stashing — see ``templatable.ts``). The form
+   * rebuilds the rest of the ctx every render so renderEntry /
+   * emitChange / etc. are fresh closures and can't be used as
+   * stable keys. ``stashOwner`` IS the host element itself.
+   */
+  stashOwner: object;
 }
 
 /**

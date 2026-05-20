@@ -33,20 +33,21 @@ interface StashEntry {
 }
 
 /**
- * Module-level stash keyed by the renderEntry function — each host
- * carries its own renderEntry, so this naturally scopes to the form
- * instance without exposing host internals here.
+ * Module-level stash keyed by the form's ``stashOwner`` (the host
+ * element instance) so the stash survives re-renders. We used to
+ * key by ``ctx.renderEntry`` but the form rebuilds the ctx — and
+ * thus a fresh ``renderEntry`` closure — on every paint, so the
+ * WeakMap key changed after every ``emitChange`` and the literal/
+ * lambda toggle would lose the user's stashed-other-side value
+ * after a single round-trip through Lit's update cycle.
  */
 const _stashes = new WeakMap<object, Map<string, StashEntry>>();
 
 function stashFor(ctx: RenderCtx, path: string[]): StashEntry {
-  // Key by ctx.renderEntry (per-host closure) so two forms on the
-  // same page have independent stashes.
-  const owner = ctx.renderEntry as unknown as object;
-  let m = _stashes.get(owner);
+  let m = _stashes.get(ctx.stashOwner);
   if (!m) {
     m = new Map();
-    _stashes.set(owner, m);
+    _stashes.set(ctx.stashOwner, m);
   }
   const key = path.join(".");
   let s = m.get(key);

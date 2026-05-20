@@ -686,7 +686,16 @@ export function sectionAtLine(
   // enclosing automation. Top-level fallback covers cases the
   // automation parser doesn't touch (regular components, ``wifi:``,
   // ``esphome:``, etc.).
-  const autos = parseYamlAutomations(yaml);
+  // Skip ``automation:unscoped:*`` entries: those mark inline
+  // ``on_*:`` handlers whose host component has no ``id:`` and so
+  // can't be addressed by the structured editor (location decoder
+  // returns null for them). Routing a click there would hand the
+  // section editor an unknown key and surface as an error; better
+  // to fall through to the enclosing top-level section so the user
+  // lands somewhere useful.
+  const autos = parseYamlAutomations(yaml).filter(
+    (s) => !s.key.startsWith("automation:unscoped:"),
+  );
   const autoHit = _smallestContaining(autos, line);
   if (autoHit) return autoHit;
   const tops = parseYamlTopLevelSections(yaml);

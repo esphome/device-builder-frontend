@@ -244,9 +244,16 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
               }
             : null;
         case "script":
-          return this.scripts.length
-            ? { kind, id: this.scripts[0].id }
-            : null;
+          // Even when no scripts are declared yet, the picker still
+          // supports a freshly-typed id in add-mode — so emit a
+          // script location with an empty id rather than ``null``,
+          // which would snap the kind picker back to the previous
+          // selection and block creating the first script via
+          // this UI.
+          return {
+            kind,
+            id: this.scripts.length ? this.scripts[0].id : "",
+          };
         case "light_effect": {
           const light = this.devices.find((d) =>
             d.component_id.startsWith("light."),

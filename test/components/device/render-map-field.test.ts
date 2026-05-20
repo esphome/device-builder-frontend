@@ -94,6 +94,7 @@ function makeCtx(values: Record<string, unknown>): CtxStub {
     getEditingMagnitude: () => undefined,
     setEditingMagnitude: () => {},
     clearEditingMagnitude: () => {},
+    stashOwner: {},
   };
   return { ctx, renderEntry, emitChange };
 }

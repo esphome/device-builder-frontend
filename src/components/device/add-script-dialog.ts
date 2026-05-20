@@ -26,7 +26,6 @@ import type {
   AutomationTree,
   AvailableAutomations,
   BoardCatalogEntry,
-  YamlDiff,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";

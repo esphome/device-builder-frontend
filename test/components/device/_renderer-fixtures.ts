@@ -113,6 +113,12 @@ export function makeRenderCtx(
     setPendingUnit: vi.fn(),
     getPendingNumeric: () => undefined,
     setPendingNumeric: vi.fn(),
+    // Stable per-fixture stash owner — tests that exercise the
+    // templatable stash WeakMap (literal/lambda recovery) need a
+    // single object identity across calls into the renderer. A
+    // fresh ``{}`` per ``makeRenderCtx`` invocation matches the
+    // production form's "one stashOwner per host element" contract.
+    stashOwner: {},
     ...(options.overrides ?? {}),
   } as never;
 }

@@ -535,6 +535,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
       },
+      // Stable object identity for renderer-local WeakMap stashes
+      // (templatable literal/lambda recovery, currently). The host
+      // element survives the per-render ctx rebuild so it's the
+      // right key to hang cross-render scratch state on.
+      stashOwner: this,
       // Self-reference: assigned after object creation so the inner
       // renderer can recurse through the dispatch.
       renderEntry: () => nothing,
