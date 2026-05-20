@@ -3,6 +3,7 @@ import {
   mdiDelete,
   mdiInformationOutline,
   mdiOpenInNew,
+  mdiPlusCircleOutline,
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -42,6 +43,7 @@ registerMdiIcons({
   delete: mdiDelete,
   "information-outline": mdiInformationOutline,
   "open-in-new": mdiOpenInNew,
+  "plus-circle-outline": mdiPlusCircleOutline,
 });
 
 // esphome: is the device identity block — required to compile. Hide delete
@@ -303,6 +305,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               />
             </div>`}
       </div>
+      ${this._renderSectionExtras()}
       ${yamlOnly
         ? html`<div class="yaml-only-notice" role="note">
               <wa-icon library="mdi" name="information-outline"></wa-icon>
@@ -378,6 +381,39 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       ${this._localize("device.delete_section")}
     </button>`;
   }
+
+  /**
+   * Per-section affordances rendered between the header and the
+   * form. Currently only the api section: `api.actions:` are
+   * Home Assistant-callable actions that live nested under
+   * ``api:`` in YAML, so the user discovers them from here as
+   * well as from the Automations navigator. The "+ Add" button
+   * bubbles ``add-automation-request`` so the page can route to
+   * the navigator's wizard (the wizard owns the YAML write).
+   */
+  private _renderSectionExtras() {
+    if (this.sectionKey !== "api") return nothing;
+    return html`<div class="section-extras">
+      <button
+        type="button"
+        class="section-extra-add"
+        @click=${this._onAddApiAction}
+      >
+        <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+        ${this._localize("device.add_api_action")}
+      </button>
+    </div>`;
+  }
+
+  private _onAddApiAction = () => {
+    this.dispatchEvent(
+      new CustomEvent<{ kind: "api_action" }>("add-automation-request", {
+        detail: { kind: "api_action" },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
 }
 
 declare global {

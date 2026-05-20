@@ -124,6 +124,39 @@ export const deviceSectionConfigStyles = css`
     padding-top: var(--wa-space-s);
   }
 
+  /* Per-section "+ Add ..." affordances surfaced between the
+     header and the form. Today only the api section uses it
+     ("+ Add API action"); designed to scale to other components
+     once the cross-component add-automation pattern lands. */
+  .section-extras {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-s) 0;
+  }
+
+  .section-extra-add {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--wa-space-2xs);
+    appearance: none;
+    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    padding: var(--wa-space-2xs) var(--wa-space-s);
+    border-radius: var(--wa-border-radius-s);
+    cursor: pointer;
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold);
+    font-family: inherit;
+    transition: border-color 0.12s, color 0.12s;
+  }
+
+  .section-extra-add:hover {
+    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
+    color: var(--wa-color-brand-fill-loud, #0b5cad);
+  }
+
   .delete-button {
     display: inline-flex;
     align-items: center;

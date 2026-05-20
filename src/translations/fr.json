@@ -508,7 +508,6 @@
     "add_script": "Ajouter un script",
     "add_script_dialog_title": "Nouveau script pour {name}",
     "add_api_action": "Ajouter une action API",
-    "add_api_action_dialog_title": "Nouvelle action API pour {name}",
     "api_action_header_title_static": "Action API",
     "api_action_header_description": "Une action nommée que Home Assistant peut invoquer. Déclarez des `variables:` typées pour accepter des arguments de l'appelant, puis listez les actions à exécuter lors de l'appel.",
     "api_action_id_label": "Nom de l'action",

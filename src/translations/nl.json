@@ -508,7 +508,6 @@
     "add_script": "Script toevoegen",
     "add_script_dialog_title": "Nieuw script voor {name}",
     "add_api_action": "API-actie toevoegen",
-    "add_api_action_dialog_title": "Nieuwe API-actie voor {name}",
     "api_action_header_title_static": "API-actie",
     "api_action_header_description": "Een benoemde actie die Home Assistant kan aanroepen. Declareer getypeerde `variables:` om argumenten van de aanroeper te accepteren en geef daarna de acties op die worden uitgevoerd bij aanroepen.",
     "api_action_id_label": "Naam van de actie",
