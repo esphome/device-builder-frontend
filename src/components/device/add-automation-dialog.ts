@@ -89,6 +89,12 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   @state() private _kind: TargetKind = "device_on";
   @state() private _componentId = "";
   @state() private _triggerId: string | null = null;
+  /** True when ``open()`` was called with a prefill — the dialog
+   *  was launched from the per-section "+ Add automation" shortcut
+   *  rather than the navigator's generic CTA. Hides the kind +
+   *  component pickers so the user is only asked the one question
+   *  the shortcut didn't already answer: which trigger? */
+  @state() private _prefilled = false;
   /** Interval-only: numeric value the user typed. Paired with
    *  ``_intervalUnit`` to compose ``trigger_params.interval`` as
    *  "<value><unit>" on submit (mirrors the inline TIME_PERIOD
@@ -184,9 +190,21 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     `,
   ];
 
-  public open() {
-    this._kind = "device_on";
-    this._componentId = "";
+  /**
+   * Open the dialog. With no argument, behaves as the navigator's
+   * "+ Add automation" CTA: kind defaults to ``device_on`` and the
+   * user picks everything from scratch.
+   *
+   * With a ``prefill``, the dialog is launched from a per-section
+   * shortcut (e.g. the "+ Add automation" button on a binary_sensor
+   * instance or the esphome: section). The kind + component
+   * pickers are hidden — the shortcut already answered those — and
+   * only the trigger picker is shown.
+   */
+  public open(prefill?: { kind: AddAutomationKind; componentId?: string }) {
+    this._prefilled = prefill !== undefined;
+    this._kind = prefill?.kind ?? "device_on";
+    this._componentId = prefill?.componentId ?? "";
     this._triggerId = null;
     this._intervalValue = "";
     this._intervalUnit = "s";
@@ -228,33 +246,42 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     const filteredTriggers = this._filteredTriggers();
     const componentLocked = this._kind !== "component_on";
     const triggerLocked = this._kind === "interval";
+    // When prefilled, the shortcut already chose the kind (and, for
+    // component_on, the component instance) — hide those rows so the
+    // dialog reads as "pick a trigger" only. The remaining trigger
+    // picker already filters by kind + componentId.
+    const showKindRow = !this._prefilled;
+    const showComponentRow =
+      this._kind === "component_on" && !this._prefilled;
     return html`
       <p class="intro">
         ${renderMarkdown(this._localize("device.automation_header_description"))}
       </p>
-      <div class="field">
-        <label class="field-label" id="kind-label">
-          ${this._localize("device.automation_wizard_pick_target")}
-        </label>
-        <wa-select
-          aria-labelledby="kind-label"
-          value=${this._kind}
-          ?disabled=${this._saving}
-          @change=${(e: Event) =>
-            this._onKindChange((e.target as HTMLSelectElement).value)}
-        >
-          <wa-option value="device_on" ?selected=${this._kind === "device_on"}>
-            ${this._localize("device.automation_target_device")}
-          </wa-option>
-          <wa-option value="component_on" ?selected=${this._kind === "component_on"}>
-            ${this._localize("device.automation_target_component")}
-          </wa-option>
-          <wa-option value="interval" ?selected=${this._kind === "interval"}>
-            ${this._localize("device.automation_target_interval")}
-          </wa-option>
-        </wa-select>
-      </div>
-      ${this._kind === "component_on"
+      ${showKindRow
+        ? html`<div class="field">
+            <label class="field-label" id="kind-label">
+              ${this._localize("device.automation_wizard_pick_target")}
+            </label>
+            <wa-select
+              aria-labelledby="kind-label"
+              value=${this._kind}
+              ?disabled=${this._saving}
+              @change=${(e: Event) =>
+                this._onKindChange((e.target as HTMLSelectElement).value)}
+            >
+              <wa-option value="device_on" ?selected=${this._kind === "device_on"}>
+                ${this._localize("device.automation_target_device")}
+              </wa-option>
+              <wa-option value="component_on" ?selected=${this._kind === "component_on"}>
+                ${this._localize("device.automation_target_component")}
+              </wa-option>
+              <wa-option value="interval" ?selected=${this._kind === "interval"}>
+                ${this._localize("device.automation_target_interval")}
+              </wa-option>
+            </wa-select>
+          </div>`
+        : nothing}
+      ${showComponentRow
         ? this._renderComponentRow(componentLocked)
         : nothing}
       ${this._kind === "interval" ? this._renderIntervalRow() : nothing}

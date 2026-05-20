@@ -10,7 +10,10 @@ import {
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
+import type {
+  AutomationLocation,
+  BoardCatalogEntry,
+} from "../../api/types.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import { withBase } from "../../util/base-path.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -22,7 +25,11 @@ import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { parseYamlAutomations } from "../../util/yaml-sections.js";
+import {
+  parseYamlAutomations,
+  parseYamlTopLevelSections,
+  sectionKeyOf,
+} from "../../util/yaml-sections.js";
 import { applyYamlDiff } from "./automation-editor/serialise.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
@@ -33,6 +40,8 @@ import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import "./add-api-action-dialog.js";
 import type { ESPHomeAddApiActionDialog } from "./add-api-action-dialog.js";
+import "./add-automation-dialog.js";
+import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
@@ -101,6 +110,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    *  before the first applies. */
   @state() _deletingApiAction = "";
 
+  /** Inline delete in flight against the per-component triggers
+   *  list. Same role as ``_deletingApiAction`` but for the
+   *  ``component_on`` / ``device_on`` shortcut surface. Held as the
+   *  trigger's stable section key (``automation:component_on:<id>:on_press``
+   *  or ``automation:device_on:on_boot``) so the table can disable
+   *  the in-flight row specifically. */
+  @state() _deletingTrigger = "";
+
   // Custom / external component the backend catalog doesn't describe —
   // synthetic empty-entries _config triggers the YAML-only notice; subtitle
   // shows the domain.platform so the user can see which key it applies to.
@@ -120,6 +137,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   @query("esphome-confirm-dialog") _confirmDialog?: ESPHomeConfirmDialog;
   @query("esphome-add-api-action-dialog")
   _addApiActionDialog?: ESPHomeAddApiActionDialog;
+  @query("esphome-add-automation-dialog")
+  _addAutomationDialog?: ESPHomeAddAutomationDialog;
 
   @state() _deleting = false;
 
@@ -343,6 +362,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               </div>
             </div>
             ${this._renderApiActionsTable()}
+            ${this._renderTriggersTable()}
             ${this._renderActionsRow(canDelete)}`
         : html`
             <esphome-config-entry-form
@@ -373,9 +393,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               ? html`<p class="error">${this._error}</p>`
               : nothing}
             ${this._renderApiActionsTable()}
+            ${this._renderTriggersTable()}
             ${this._renderActionsRow(canDelete)}
           `}
       ${this._renderApiActionDialog()}
+      ${this._renderAddAutomationDialog()}
       ${canDelete
         ? html`<esphome-confirm-dialog
             heading=${this._localize("device.delete_section")}
@@ -457,17 +479,24 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   /**
    * Bottom actions row. Combines the section's Delete button with
-   * the api-only "+ Add API action" CTA so both live in the same
-   * footer line — same placement convention as the rest of the
-   * section editor.
+   * any inline "+ Add ..." CTAs so they live in the same footer line
+   * — same placement convention as the rest of the section editor.
    *
-   * The Add CTA is gated on ``AUTOMATIONS_ENABLED`` so it matches
+   * The api section gets a dedicated "+ Add API action" button (PR
+   * #360). Regular component instances with an ``id:`` and the
+   * device-level ``esphome:`` section get a "+ Add automation"
+   * button that opens the same wizard the navigator uses, pre-filled
+   * with the current context.
+   *
+   * The Add CTAs are gated on ``AUTOMATIONS_ENABLED`` so they match
    * the navigator's "+ Add automation" / "+ Add script" buttons —
    * an always-enabled CTA whose click does nothing reads as a bug.
    */
   private _renderActionsRow(canDelete: boolean) {
     const showAddApi = this.sectionKey === "api" && AUTOMATIONS_ENABLED;
-    if (!canDelete && !showAddApi) return nothing;
+    const showAddAutomation =
+      this._shortcutTarget() !== null && AUTOMATIONS_ENABLED;
+    if (!canDelete && !showAddApi && !showAddAutomation) return nothing;
     return html`<div class="actions">
       ${showAddApi
         ? html`<button
@@ -477,6 +506,16 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           >
             <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
             ${this._localize("device.add_api_action")}
+          </button>`
+        : nothing}
+      ${showAddAutomation
+        ? html`<button
+            type="button"
+            class="section-extra-add"
+            @click=${this._onOpenAddAutomation}
+          >
+            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+            ${this._localize("device.add_automation")}
           </button>`
         : nothing}
       ${canDelete ? this._renderDeleteButton() : nothing}
@@ -560,7 +599,212 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this._deletingApiAction = "";
     }
   }
+
+  /**
+   * Classify the current section for the per-section "+ Add
+   * automation" / triggers-list shortcut. Returns ``null`` when the
+   * section can't host inline ``on_*:`` automations (api has its own
+   * shortcut; script/interval have their own navigator CTAs; data-
+   * only blocks like substitutions never carry triggers; component
+   * list items without an ``id:`` can't be addressed by the
+   * structured editor).
+   */
+  private _shortcutTarget():
+    | null
+    | { kind: "device_on" }
+    | { kind: "component_on"; componentId: string } {
+    if (SHORTCUT_HIDE_KEYS.has(this.sectionKey)) return null;
+    if (this.sectionKey === "esphome") return { kind: "device_on" };
+    // Otherwise this should be a regular component instance — a list
+    // item under a top-level platform block. Look it up by matching
+    // section key, biased toward the section's currently-resolved
+    // fromLine so multi-instance components route to the right entry.
+    const sections = parseYamlTopLevelSections(this.yaml);
+    const candidates = sections.filter(
+      (s) => sectionKeyOf(s) === this.sectionKey,
+    );
+    if (candidates.length === 0) return null;
+    const match =
+      this._resolvedFromLine !== undefined
+        ? candidates.find((s) => s.fromLine === this._resolvedFromLine) ??
+          candidates[0]
+        : candidates[0];
+    if (!match.id) return null;
+    return { kind: "component_on", componentId: match.id };
+  }
+
+  /**
+   * Inline manage-list of inline trigger automations for the current
+   * section. Parallels ``_renderApiActionsTable`` — same row UI,
+   * same edit/delete affordances — but scoped to ``component_on``
+   * triggers on a component instance (filtered by ``id``) or
+   * ``device_on`` triggers under the ``esphome:`` block.
+   */
+  private _renderTriggersTable() {
+    const target = this._shortcutTarget();
+    if (target === null) return nothing;
+    const items = parseYamlAutomations(this.yaml).filter((s) => {
+      if (!s.eventKey) return false;
+      if (target.kind === "device_on") return s.parentKey === "esphome";
+      return s.id === target.componentId;
+    });
+    if (items.length === 0) return nothing;
+    const locked = this._deletingTrigger !== "";
+    const title =
+      target.kind === "device_on"
+        ? this._localize("device.automations_list_title_device")
+        : this._localize("device.automations_list_title");
+    return html`<div class="api-actions-table">
+      <h4 class="api-actions-title">${title}</h4>
+      <ul class="api-actions-rows">
+        ${items.map(
+          (item) => html`<li class="api-actions-row">
+            <span class="api-actions-name">${item.eventKey}</span>
+            <div class="api-actions-row-buttons">
+              <button
+                type="button"
+                class="api-actions-row-edit"
+                aria-label=${this._localize("device.automations_list_edit")}
+                title=${this._localize("device.automations_list_edit")}
+                ?disabled=${locked}
+                @click=${() => this._onEditTrigger(item.key)}
+              >
+                <wa-icon library="mdi" name="pencil"></wa-icon>
+              </button>
+              <button
+                type="button"
+                class="api-actions-row-delete"
+                aria-label=${this._localize("device.automations_list_delete")}
+                title=${this._localize("device.automations_list_delete")}
+                ?disabled=${locked}
+                @click=${() =>
+                  this._onDeleteTrigger(target, item.eventKey ?? "", item.key)}
+              >
+                <wa-icon library="mdi" name="delete"></wa-icon>
+              </button>
+            </div>
+          </li>`,
+        )}
+      </ul>
+    </div>`;
+  }
+
+  private _renderAddAutomationDialog() {
+    if (this._shortcutTarget() === null || !AUTOMATIONS_ENABLED) {
+      return nothing;
+    }
+    return html`<esphome-add-automation-dialog
+      .boardName=${this.boardName}
+      .configuration=${this.configuration}
+      .board=${this.board}
+      .yaml=${this.yaml}
+      @automation-added=${this._onAutomationAdded}
+    ></esphome-add-automation-dialog>`;
+  }
+
+  private _onOpenAddAutomation = () => {
+    const target = this._shortcutTarget();
+    if (target === null) return;
+    if (target.kind === "device_on") {
+      this._addAutomationDialog?.open({ kind: "device_on" });
+    } else {
+      this._addAutomationDialog?.open({
+        kind: "component_on",
+        componentId: target.componentId,
+      });
+    }
+  };
+
+  private _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+    e.stopPropagation();
+    this.dispatchEvent(
+      new CustomEvent<{ sectionKey: string }>("section-select", {
+        detail: { sectionKey: e.detail.sectionKey },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
+
+  private _onEditTrigger(sectionKey: string) {
+    this.dispatchEvent(
+      new CustomEvent<{ sectionKey: string }>("section-select", {
+        detail: { sectionKey },
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  }
+
+  /**
+   * Delete a ``component_on`` / ``device_on`` trigger inline. Same
+   * backend path as the automation editor's delete: ``deleteAutomation``
+   * → apply the returned diff → ``updateConfig``. Toasts on failure;
+   * on success the YAML rolls forward via ``yaml-updated`` and the
+   * table re-renders against the new draft.
+   */
+  private async _onDeleteTrigger(
+    target: { kind: "device_on" } | { kind: "component_on"; componentId: string },
+    trigger: string,
+    rowKey: string,
+  ) {
+    if (!this._api || !trigger || this._deletingTrigger) return;
+    this._deletingTrigger = rowKey;
+    try {
+      const location: AutomationLocation =
+        target.kind === "device_on"
+          ? { kind: "device_on", trigger }
+          : {
+              kind: "component_on",
+              component_id: target.componentId,
+              trigger,
+            };
+      const { yaml_diff } = await this._api.deleteAutomation(
+        this.configuration,
+        location,
+        this.yaml,
+      );
+      const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+      await this._api.updateConfig(this.configuration, newYaml);
+      this.dispatchEvent(
+        new CustomEvent<{ yaml: string }>("yaml-updated", {
+          detail: { yaml: newYaml },
+          bubbles: true,
+          composed: true,
+        }),
+      );
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : this._localize("device.automation_save_error");
+      toast.error(this._localize("device.automation_save_error"), {
+        description: msg,
+        richColors: true,
+      });
+    } finally {
+      this._deletingTrigger = "";
+    }
+  }
 }
+
+/**
+ * Sections that don't host inline ``on_*:`` automations. The
+ * shortcut is hidden on these. ``api`` has its own ``+ Add API
+ * action`` flow (PR #360); ``script`` / ``interval`` get their
+ * dedicated navigator CTAs; the rest are data-only blocks where a
+ * trigger handler doesn't make sense.
+ */
+const SHORTCUT_HIDE_KEYS = new Set([
+  "api",
+  "script",
+  "interval",
+  "external_components",
+  "packages",
+  "substitutions",
+  "globals",
+  "dashboard_import",
+]);
 
 declare global {
   interface HTMLElementTagNameMap {
