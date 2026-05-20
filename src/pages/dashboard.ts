@@ -273,6 +273,14 @@ export class ESPHomePageDashboard extends LitElement {
       })
     );
   };
+  // Kebab path: the banner is hidden when every importable is
+  // ignored, so users seeking those cards reach the toggle here.
+  // Pop the section open on the way in so they don't land on a
+  // collapsed banner and have to click "Show" a second time.
+  private _onShowIgnoredFromMenu = () => {
+    if (!this._showIgnored) this._showDiscovered = true;
+    this._toggleShowIgnored();
+  };
   private _onShowArchivedDialog = () => this._archivedDialog?.open();
 
   _onEnterSelectMode = (configuration?: string) => {
@@ -291,6 +299,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
+    window.addEventListener("esphome-show-ignored-from-menu", this._onShowIgnoredFromMenu);
     window.addEventListener("esphome-show-archived-dialog", this._onShowArchivedDialog);
     const pending = consumePendingHighlight();
     if (pending !== null) {
@@ -381,6 +390,10 @@ export class ESPHomePageDashboard extends LitElement {
     window.removeEventListener(
       "esphome-show-ignored-changed",
       this._onShowIgnoredChanged
+    );
+    window.removeEventListener(
+      "esphome-show-ignored-from-menu",
+      this._onShowIgnoredFromMenu
     );
     window.removeEventListener(
       "esphome-show-archived-dialog",

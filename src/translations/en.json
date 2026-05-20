@@ -807,6 +807,8 @@
     "theme_system": "System",
     "settings": "Settings",
     "archived_devices": "Archived devices",
+    "show_ignored_discoveries": "Show ignored discoveries ({count})",
+    "hide_ignored_discoveries": "Hide ignored discoveries",
     "reset_build_env": "Reset build environment",
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",

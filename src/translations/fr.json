@@ -685,6 +685,8 @@
     "theme_system": "Système",
     "settings": "Paramètres",
     "archived_devices": "Appareils archivés",
+    "show_ignored_discoveries": "Afficher les découvertes ignorées ({count})",
+    "hide_ignored_discoveries": "Masquer les découvertes ignorées",
     "reset_build_env": "Réinitialiser l'environnement de compilation",
     "feedback_menu": "Un bug ? Une idée ?",
     "back": "Retour",

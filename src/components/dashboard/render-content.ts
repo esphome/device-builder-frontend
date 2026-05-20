@@ -21,9 +21,6 @@ const discoveryCollator = new Intl.Collator(undefined, {
 export function renderDiscoveredSection(
   host: ESPHomePageDashboard,
 ): TemplateResult | string {
-  // Render when there are any importable devices, even if all are
-  // currently filtered out by the show-ignored flag — the banner is
-  // the only way to flip that flag now.
   if (host._importableDevices.length === 0) return "";
   // Non-ignored discoveries first, then ignored ones — both
   // alphabetical by friendly name (fallback hostname) within each
@@ -36,8 +33,13 @@ export function renderDiscoveredSection(
       b.friendly_name || b.name,
     );
   });
+  // Nothing to announce when every importable is ignored and the
+  // user has opted to hide them — the header kebab's "Show ignored
+  // discoveries" entry is the path back, not a "Discovered 0
+  // devices" stub.
+  if (visible.length === 0) return "";
   const ignoredCount = host._importableDevices.filter((d) => d.ignored).length;
-  const expanded = host._showDiscovered && visible.length > 0;
+  const expanded = host._showDiscovered;
   return html`
     <section class="discovered-section">
       <header class="discovered-section-header">
@@ -50,19 +52,17 @@ export function renderDiscoveredSection(
             { count: visible.length },
           )}</span
         >
-        ${visible.length > 0
-          ? html`<button
-              class="discovered-section-toggle"
-              type="button"
-              aria-expanded=${expanded}
-              aria-controls="discovered-grid"
-              @click=${() => {
-                host._showDiscovered = !host._showDiscovered;
-              }}
-            >
-              ${host._localize(expanded ? "dashboard.hide" : "dashboard.show")}
-            </button>`
-          : ""}
+        <button
+          class="discovered-section-toggle"
+          type="button"
+          aria-expanded=${expanded}
+          aria-controls="discovered-grid"
+          @click=${() => {
+            host._showDiscovered = !host._showDiscovered;
+          }}
+        >
+          ${host._localize(expanded ? "dashboard.hide" : "dashboard.show")}
+        </button>
         ${ignoredCount > 0
           ? html`<button
               class="discovered-section-toggle discovered-section-toggle--ignored"

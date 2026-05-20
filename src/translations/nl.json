@@ -685,6 +685,8 @@
     "theme_system": "Systeem",
     "settings": "Instellingen",
     "archived_devices": "Gearchiveerde apparaten",
+    "show_ignored_discoveries": "Toon genegeerde ontdekkingen ({count})",
+    "hide_ignored_discoveries": "Verberg genegeerde ontdekkingen",
     "reset_build_env": "Bouw-omgeving resetten",
     "feedback_menu": "Probleem of idee?",
     "back": "Terug",
