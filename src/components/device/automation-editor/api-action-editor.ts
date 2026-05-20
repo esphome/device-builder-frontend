@@ -306,7 +306,10 @@ export class ESPHomeApiActionEditor extends LitElement {
   /** Action-name input. Locked in edit mode so the YAML splice
    *  destination stays pinned (renaming would move the entry to a
    *  different slot and require a delete + insert; we don't support
-   *  that inline). */
+   *  that inline). ``readonly`` rather than ``disabled`` for the
+   *  lock so the value stays focusable / selectable for copy and
+   *  screen readers; ``disabled`` is reserved for the during-delete
+   *  state where the whole editor is inert. */
   private _renderActionNameField(disabled: boolean) {
     const name = this.location?.action_name ?? "";
     return html`<div class="field">
@@ -320,7 +323,8 @@ export class ESPHomeApiActionEditor extends LitElement {
         id="api-action-name"
         type="text"
         .value=${name}
-        ?disabled=${disabled || !this.addMode}
+        ?disabled=${disabled}
+        ?readonly=${!this.addMode}
         @input=${(e: Event) =>
           this._onActionNameChange((e.target as HTMLInputElement).value)}
       />
