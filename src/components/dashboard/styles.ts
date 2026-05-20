@@ -239,6 +239,14 @@ export const dashboardStyles = css`
     min-width: 0;
   }
 
+  /* The <form role="search"> wrapper is what suppresses Chrome's
+     credential autofill on the search input; display: contents keeps
+     it out of the layout so the absolute-positioned leading icon
+     still aligns. */
+  .search-form {
+    display: contents;
+  }
+
   .search-wrap {
     position: relative;
     max-width: 380px;

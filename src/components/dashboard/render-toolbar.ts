@@ -174,24 +174,30 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
       name=${host._yamlMode ? "code-braces" : "magnify"}
       aria-hidden="true"
     ></wa-icon>
-    <input
-      class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
-      type="search"
-      name="dashboard-search"
-      with-clear
+    <form
+      role="search"
       autocomplete="off"
-      data-form-type="other"
-      data-lpignore="true"
-      data-1p-ignore="true"
-      aria-autocomplete="none"
-      placeholder=${placeholder}
-      .value=${host._search}
-      @input=${(e: Event) => {
-        host._search = (e.currentTarget as HTMLInputElement).value;
-        host._syncYamlSearch();
-      }}
-      @keydown=${host._onSearchKeyDown}
-    />
+      class="search-form"
+      @submit=${(e: SubmitEvent) => e.preventDefault()}
+    >
+      <input
+        class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
+        type="search"
+        name="q"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-label=${placeholder}
+        placeholder=${placeholder}
+        .value=${host._search}
+        @input=${(e: Event) => {
+          host._search = (e.currentTarget as HTMLInputElement).value;
+          host._syncYamlSearch();
+        }}
+        @keydown=${host._onSearchKeyDown}
+      />
+    </form>
   </div>`;
 }
 
