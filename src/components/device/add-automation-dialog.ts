@@ -39,6 +39,7 @@ import { espHomeStyles } from "../../styles/shared.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import {
   applyYamlDiff,
   sectionKeyFromLocation,
@@ -472,13 +473,17 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         trigger: bare,
       };
     }
-    // interval — newly added blocks always land at the end of the
-    // interval: list, so the backend's writer appends and we pin
-    // index to the length of any existing intervals (the writer
-    // is responsible for the actual index — we just need to pass
-    // a valid number; using 0 makes the writer "first item" if
-    // the list is empty, otherwise the writer appends).
-    return { kind: "interval", index: 0 };
+    // interval — new blocks land at the end of the interval: list.
+    // The backend treats an out-of-range index as "append" (in-range
+    // as "replace"), so we have to pass the count of existing
+    // intervals as the new entry's index. Hardcoding 0 here used to
+    // overwrite the first interval whenever the device already had
+    // one. Parse the current draft yaml (which carries any pending
+    // edits the user hasn't saved yet) to count what's there.
+    const nextIndex = parseYamlAutomations(this.yaml).filter(
+      (s) => s.parentKey === "interval",
+    ).length;
+    return { kind: "interval", index: nextIndex };
   }
 
   /**
