@@ -368,7 +368,15 @@ export class ESPHomeAddAutomationDialog extends LitElement {
   private _filteredTriggers(): AutomationTrigger[] {
     const all = this._available?.triggers ?? [];
     if (this._kind === "device_on") {
-      return all.filter((t) => t.is_device_level);
+      // ESPHome's device-level lifecycle handlers (on_boot, on_loop,
+      // on_shutdown, ...) can only appear once under ``esphome:``,
+      // so once a handler exists the user adds more *actions* inside
+      // it from the inline editor — they don't add another
+      // automation. Hide those triggers from the picker.
+      const takenDeviceTriggers = this._existingDeviceTriggers();
+      return all.filter(
+        (t) => t.is_device_level && !takenDeviceTriggers.has(t.id),
+      );
     }
     if (this._kind === "component_on") {
       if (!this._componentId) return [];
@@ -377,14 +385,56 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       );
       if (!device) return [];
       const [domain] = device.component_id.split(".");
+      // Same rule for component-bound triggers: an inline ``on_*:``
+      // block under a component only fires once, so don't offer
+      // triggers that already have a handler on this instance.
+      const takenComponentTriggers = this._existingComponentTriggers(
+        this._componentId,
+      );
       return all.filter(
         (t) =>
           !t.is_device_level &&
           (t.applies_to.includes(device.component_id) ||
-            t.applies_to.includes(domain)),
+            t.applies_to.includes(domain)) &&
+          !takenComponentTriggers.has(this._bareTrigger(t.id)),
       );
     }
     return [];
+  }
+
+  /** Set of catalog trigger ids ("on_boot", "on_loop", …) that
+   *  already have a handler under ``esphome:`` in the current
+   *  draft YAML. Source: parseYamlAutomations — eventKey is the
+   *  bare YAML key, which for device-level catalog entries is also
+   *  the catalog id (no domain prefix). */
+  private _existingDeviceTriggers(): Set<string> {
+    const set = new Set<string>();
+    for (const s of parseYamlAutomations(this.yaml)) {
+      if (s.parentKey === "esphome" && s.eventKey) set.add(s.eventKey);
+    }
+    return set;
+  }
+
+  /** Bare YAML keys (``on_press`` / ``on_turn_on`` / …) that
+   *  already have a handler on the given component instance. */
+  private _existingComponentTriggers(componentId: string): Set<string> {
+    const set = new Set<string>();
+    for (const s of parseYamlAutomations(this.yaml)) {
+      // ``id`` is the component instance id for inline component_on
+      // entries (set in parseYamlAutomations); ``eventKey`` is the
+      // bare ``on_*`` key. parentKey is the YAML domain ("switch")
+      // — irrelevant here, the id+event pair is unique on its own.
+      if (s.id === componentId && s.eventKey) set.add(s.eventKey);
+    }
+    return set;
+  }
+
+  /** Strip the ``<domain>.`` prefix off a component-level catalog
+   *  trigger id (``switch.on_turn_on`` → ``on_turn_on``). The bare
+   *  key is what shows up under the component instance in YAML. */
+  private _bareTrigger(catalogId: string): string {
+    const dot = catalogId.indexOf(".");
+    return dot >= 0 ? catalogId.slice(dot + 1) : catalogId;
   }
 
   private _onKindChange(kind: string) {
