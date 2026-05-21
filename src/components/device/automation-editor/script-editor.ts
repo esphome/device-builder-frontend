@@ -21,14 +21,10 @@
  *   write.
  */
 import { consume } from "@lit/context";
-import toast from "sonner-js";
+import { mdiDelete, mdiOpenInNew, mdiScriptTextOutline } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import {
-  mdiDelete,
-  mdiOpenInNew,
-  mdiScriptTextOutline,
-} from "@mdi/js";
+import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -38,35 +34,34 @@ import type {
   BoardCatalogEntry,
   ComponentCatalogEntry,
   ConfigEntry,
-  YamlDiff,
 } from "../../../api/types.js";
-
-/** ``AutomationLocation`` variant for top-level ``script:`` blocks
- *  — pulled out as a separate type because the script editor only
- *  ever holds this kind. */
-type ScriptLocation = Extract<AutomationLocation, { kind: "script" }>;
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
-import { normalizeEspHomeId } from "../../../util/esphome-id.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
-import { renderMarkdown } from "../../../util/markdown.js";
-import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
+import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import { normalizeEspHomeId } from "../../../util/esphome-id.js";
+import { renderMarkdown } from "../../../util/markdown.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
+import "../config-entry-form.js";
+import "./automation-action-list.js";
+import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import "./callable-params-editor.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
-import "../config-entry-form.js";
-import "./automation-action-list.js";
-import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
-import "./callable-params-editor.js";
+
+/** ``AutomationLocation`` variant for top-level ``script:`` blocks
+ *  — pulled out as a separate type because the script editor only
+ *  ever holds this kind. */
+type ScriptLocation = Extract<AutomationLocation, { kind: "script" }>;
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -140,6 +135,7 @@ export class ESPHomeScriptEditor extends LitElement {
   private _applyTimer: ReturnType<typeof setTimeout> | null = null;
   private _applyInFlight = false;
   private _applyDirty = false;
+  private _lastSelfWrittenYaml: string | null = null;
 
   /** Brief-window dirty flag mirroring the automation editor —
    *  covers the 200ms debounce gap so the page's unsaved-changes
@@ -158,7 +154,7 @@ export class ESPHomeScriptEditor extends LitElement {
         detail: { dirty: value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -178,7 +174,7 @@ export class ESPHomeScriptEditor extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -193,7 +189,7 @@ export class ESPHomeScriptEditor extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -240,9 +236,7 @@ export class ESPHomeScriptEditor extends LitElement {
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     try {
-      this._available = await this._api.getAvailableAutomations(
-        this.configuration,
-      );
+      this._available = await this._api.getAvailableAutomations(this.configuration);
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     }
@@ -279,12 +273,10 @@ export class ESPHomeScriptEditor extends LitElement {
       // form lands empty.
       const parsed = await this._api.parseDeviceAutomations(
         this.configuration,
-        this.yaml,
+        this.yaml
       );
       const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find(
-        (p) => sectionKeyFromLocation(p.location) === wantKey,
-      );
+      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
       if (match && match.location.kind === "script") {
         this.value = match.automation;
         this.location = match.location;
@@ -295,6 +287,20 @@ export class ESPHomeScriptEditor extends LitElement {
           ? err.message
           : this._localize("device.automation_parse_error");
     }
+  }
+
+  /**
+   * Re-hydrate from the live YAML. Called by the parent
+   * (``device-board-info``) when the YAML pane changes the document
+   * out from under us — mirrors device-section-config.reload() and
+   * automation-editor.reload() so editing YAML in the pane updates
+   * the visual editor.
+   */
+  public reload(): void {
+    if (this.addMode || !this.location) return;
+    if (this._applyInFlight) return;
+    if (this.yaml === this._lastSelfWrittenYaml) return;
+    void this._hydrateFromBackend();
   }
 
   protected render() {
@@ -311,11 +317,8 @@ export class ESPHomeScriptEditor extends LitElement {
     const conditions = this._available?.conditions ?? [];
     const disabled = this._deleting;
     return html`
-      ${this._renderHeader()}
-      ${this._renderConfigForm(automation, disabled)}
-      ${this._showAdvanced
-        ? this._renderParametersField(automation, disabled)
-        : nothing}
+      ${this._renderHeader()} ${this._renderConfigForm(automation, disabled)}
+      ${this._showAdvanced ? this._renderParametersField(automation, disabled) : nothing}
       <div class="field">
         <div class="ae-actions-header">
           <label class="field-label">
@@ -332,9 +335,7 @@ export class ESPHomeScriptEditor extends LitElement {
           </button>
         </div>
         <p class="field-description">
-          ${renderMarkdown(
-            this._localize("device.script_actions_description"),
-          )}
+          ${renderMarkdown(this._localize("device.script_actions_description"))}
         </p>
         <esphome-automation-action-list
           no-header
@@ -350,9 +351,7 @@ export class ESPHomeScriptEditor extends LitElement {
           @actions-change=${this._onActionsChange}
         ></esphome-automation-action-list>
       </div>
-      ${this._error
-        ? html`<p class="ae-error" role="alert">${this._error}</p>`
-        : nothing}
+      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${this.location && this.value && !this.addMode
         ? html`<div class="ae-actions">
             <button
@@ -378,8 +377,7 @@ export class ESPHomeScriptEditor extends LitElement {
    */
   private _renderHeader() {
     const comp = this._scriptComponent;
-    const title =
-      comp?.name ?? this._localize("device.script_header_title_static");
+    const title = comp?.name ?? this._localize("device.script_header_title_static");
     const descText =
       comp?.description ?? this._localize("device.script_header_description");
     const docsUrl = comp?.docs_url ?? "https://esphome.io/components/script.html";
@@ -387,12 +385,7 @@ export class ESPHomeScriptEditor extends LitElement {
     return html`<div class="ae-header">
       <div class="ae-header-text">
         <h2 class="ae-header-title">${title}</h2>
-        <a
-          class="ae-header-docs"
-          href=${docsUrl}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a class="ae-header-docs" href=${docsUrl} target="_blank" rel="noreferrer">
           ${this._localize("device.docs")}
           <wa-icon library="mdi" name="open-in-new"></wa-icon>
         </a>
@@ -401,10 +394,7 @@ export class ESPHomeScriptEditor extends LitElement {
       <div class="ae-header-icon">
         ${imageUrl
           ? html`<img alt="" src=${imageUrl} />`
-          : html`<wa-icon
-              library="mdi"
-              name="script-text-outline"
-            ></wa-icon>`}
+          : html`<wa-icon library="mdi" name="script-text-outline"></wa-icon>`}
       </div>
     </div>`;
   }
@@ -422,14 +412,11 @@ export class ESPHomeScriptEditor extends LitElement {
    * and ``then`` is the actions block, rendered by the action-list
    * below the form.
    */
-  private _renderConfigForm(
-    automation: AutomationTree,
-    disabled: boolean,
-  ) {
+  private _renderConfigForm(automation: AutomationTree, disabled: boolean) {
     const comp = this._scriptComponent;
     if (!comp) return nothing;
     const entries = comp.config_entries.filter(
-      (e) => e.key !== "parameters" && e.key !== "then",
+      (e) => e.key !== "parameters" && e.key !== "then"
     );
     if (entries.length === 0) return nothing;
     // The form is its own flex-column with gap, and the toggle and
@@ -462,8 +449,7 @@ export class ESPHomeScriptEditor extends LitElement {
     // component schema (it does), even if the entries we're handing
     // the form have no non-required fields — the toggle is now also
     // gating the Parameters editor.
-    const hasAdvanced =
-      anyAdvancedEntry(entries) || this._hasParametersEntry();
+    const hasAdvanced = anyAdvancedEntry(entries) || this._hasParametersEntry();
     if (!hasAdvanced) return nothing;
     return html`<div class="advanced-toggle-row">
       <wa-switch
@@ -485,9 +471,7 @@ export class ESPHomeScriptEditor extends LitElement {
    *  same switch. */
   private _hasParametersEntry(): boolean {
     return (
-      this._scriptComponent?.config_entries.some(
-        (e) => e.key === "parameters",
-      ) ?? false
+      this._scriptComponent?.config_entries.some((e) => e.key === "parameters") ?? false
     );
   }
 
@@ -497,7 +481,7 @@ export class ESPHomeScriptEditor extends LitElement {
    *  destination is keyed by location.id — without the mirror the
    *  next upsert would target the OLD slot. */
   private _onConfigFormValueChange = (
-    e: CustomEvent<{ path: string[]; value: unknown }>,
+    e: CustomEvent<{ path: string[]; value: unknown }>
   ) => {
     e.stopPropagation();
     const { path, value } = e.detail;
@@ -510,11 +494,7 @@ export class ESPHomeScriptEditor extends LitElement {
       path.length === 1 && path[0] === "id"
         ? normalizeEspHomeId(String(value ?? ""))
         : value;
-    const next = this._patchParams(
-      automation.trigger_params,
-      path,
-      normalizedValue,
-    );
+    const next = this._patchParams(automation.trigger_params, path, normalizedValue);
     if (path.length === 1 && path[0] === "id") {
       // Match wire shape: ``trigger_params.id`` round-trips with
       // ``location.id``, so keep both pinned to the normalized id.
@@ -535,7 +515,7 @@ export class ESPHomeScriptEditor extends LitElement {
   private _patchParams(
     params: Record<string, unknown>,
     path: string[],
-    value: unknown,
+    value: unknown
   ): Record<string, unknown> {
     if (path.length === 0) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -558,30 +538,20 @@ export class ESPHomeScriptEditor extends LitElement {
    * lives in the shared ``<esphome-callable-params-editor>``; we
    * just wire the wire-shape in and out of it here.
    */
-  private _renderParametersField(
-    automation: AutomationTree,
-    disabled: boolean,
-  ) {
-    const value = (automation.trigger_params.parameters ?? {}) as Record<
-      string,
-      string
-    >;
+  private _renderParametersField(automation: AutomationTree, disabled: boolean) {
+    const value = (automation.trigger_params.parameters ?? {}) as Record<string, string>;
     return html`<esphome-callable-params-editor
       .value=${value}
       ?disabled=${disabled}
       .fieldLabel=${this._localize("device.automation_script_parameters")}
       .description=${this._localize("device.script_parameters_description")}
       .addLabel=${this._localize("device.script_add_parameter")}
-      .namePlaceholder=${this._localize(
-        "device.script_parameter_name_placeholder",
-      )}
+      .namePlaceholder=${this._localize("device.script_parameter_name_placeholder")}
       @value-change=${this._onParametersChange}
     ></esphome-callable-params-editor>`;
   }
 
-  private _onParametersChange = (
-    e: CustomEvent<{ value: Record<string, string> }>,
-  ) => {
+  private _onParametersChange = (e: CustomEvent<{ value: Record<string, string> }>) => {
     e.stopPropagation();
     const automation = this.value ?? emptyAutomationTree();
     this._withValue({
@@ -592,9 +562,7 @@ export class ESPHomeScriptEditor extends LitElement {
     });
   };
 
-  private _onActionsChange = (
-    e: CustomEvent<{ actions: AutomationTree["actions"] }>,
-  ) => {
+  private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
     this._withValue({ actions: e.detail.actions });
   };
@@ -610,7 +578,7 @@ export class ESPHomeScriptEditor extends LitElement {
         detail: { value, location: this.location },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._scheduleAutoApply();
   }
@@ -646,15 +614,17 @@ export class ESPHomeScriptEditor extends LitElement {
         this.configuration,
         this.value,
         this.location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+
+      this._lastSelfWrittenYaml = newYaml;
       this.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-draft", {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =
@@ -709,7 +679,7 @@ export class ESPHomeScriptEditor extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         this.location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
@@ -718,14 +688,14 @@ export class ESPHomeScriptEditor extends LitElement {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
       this.dispatchEvent(
         new CustomEvent<{ sectionKey: string | null }>("section-select", {
           detail: { sectionKey: null },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =

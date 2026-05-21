@@ -27,14 +27,10 @@
  * is outstanding.
  */
 import { consume } from "@lit/context";
-import toast from "sonner-js";
+import { mdiArrowDecisionOutline, mdiDelete, mdiOpenInNew } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import {
-  mdiArrowDecisionOutline,
-  mdiDelete,
-  mdiOpenInNew,
-} from "@mdi/js";
+import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -47,30 +43,29 @@ import type {
   BoardCatalogEntry,
   ComponentCatalogEntry,
   ConfigEntry,
-  YamlDiff,
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
-import { renderMarkdown } from "../../../util/markdown.js";
-import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
+import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
+import { renderMarkdown } from "../../../util/markdown.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
+import "../config-entry-form.js";
+import "./automation-action-list.js";
+import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import "./automation-target-picker.js";
+import "./automation-trigger-picker.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
-import "../config-entry-form.js";
-import "./automation-target-picker.js";
-import "./automation-trigger-picker.js";
-import "./automation-action-list.js";
-import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -164,6 +159,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    */
   private _applyInFlight = false;
   private _applyDirty = false;
+  private _lastSelfWrittenYaml: string | null = null;
 
   /**
    * Brief-window dirty flag covering the 200ms debounce gap
@@ -188,7 +184,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         detail: { dirty: value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -222,7 +218,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -237,7 +233,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -253,15 +249,11 @@ export class ESPHomeAutomationEditor extends LitElement {
     // trigger / actions panels keep showing the old automation's
     // content while the location-derived metadata fields update.
     if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as
-        | AutomationLocation
-        | null
-        | undefined;
+      const prev = changed.get("location") as AutomationLocation | null | undefined;
       if (
         prev &&
         this.location &&
-        sectionKeyFromLocation(prev) !==
-          sectionKeyFromLocation(this.location)
+        sectionKeyFromLocation(prev) !== sectionKeyFromLocation(this.location)
       ) {
         this.value = null;
       }
@@ -311,12 +303,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       return;
     }
     try {
-      const entry = await fetchComponent(
-        this._api,
-        `interval`,
-        platform,
-        boardId,
-      );
+      const entry = await fetchComponent(this._api, `interval`, platform, boardId);
       if (entry) this._intervalComponent = entry;
     } catch {
       /* swallow — the editor falls back to the static label when no
@@ -342,12 +329,10 @@ export class ESPHomeAutomationEditor extends LitElement {
       // user's input.
       const parsed = await this._api.parseDeviceAutomations(
         this.configuration,
-        this.yaml,
+        this.yaml
       );
       const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find(
-        (p) => sectionKeyFromLocation(p.location) === wantKey,
-      );
+      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
       if (match) {
         this.value = match.automation;
         // Re-pin location so the writer round-trips with the parser's
@@ -374,6 +359,26 @@ export class ESPHomeAutomationEditor extends LitElement {
     } finally {
       this._loading = false;
     }
+  }
+
+  /**
+   * Re-hydrate from the live YAML. Called by the parent
+   * (``device-board-info``) when the YAML pane changes the document
+   * out from under us — mirrors the device-section-config reload
+   * pattern so editing YAML in the pane updates the visual editor.
+   *
+   * Skip cases:
+   *  - Our own write echoing back via the prop (avoid clobbering the
+   *    user's just-applied edit).
+   *  - An auto-apply currently in flight (we're already writing /
+   *    about to overwrite; let it finish).
+   *  - Add mode (no location to hydrate from yet).
+   */
+  public reload(): void {
+    if (this.addMode || !this.location) return;
+    if (this._applyInFlight) return;
+    if (this.yaml === this._lastSelfWrittenYaml) return;
+    void this._hydrateFromBackend();
   }
 
   private async _loadAvailable() {
@@ -423,7 +428,7 @@ export class ESPHomeAutomationEditor extends LitElement {
           ? this._catalogIdFor(target) || null
           : null);
     const activeTrigger = effectiveTriggerId
-      ? triggers.find((t) => t.id === effectiveTriggerId) ?? null
+      ? (triggers.find((t) => t.id === effectiveTriggerId) ?? null)
       : null;
     return html`
       ${this._renderHeader(activeTrigger)}
@@ -435,13 +440,11 @@ export class ESPHomeAutomationEditor extends LitElement {
             scripts,
             effectiveTriggerId,
             automation,
-            disabled,
+            disabled
           )
-        : html`${this._renderIdentityFields(activeTrigger)}${this._renderTriggerParamsForm(
-            activeTrigger,
-            automation,
-            disabled,
-          )}`}
+        : html`${this._renderIdentityFields(
+            activeTrigger
+          )}${this._renderTriggerParamsForm(activeTrigger, automation, disabled)}`}
       <div class="field">
         <div class="ae-actions-header">
           <label class="field-label">
@@ -458,9 +461,7 @@ export class ESPHomeAutomationEditor extends LitElement {
           </button>
         </div>
         <p class="field-description">
-          ${renderMarkdown(
-            this._localize("device.automation_actions_description"),
-          )}
+          ${renderMarkdown(this._localize("device.automation_actions_description"))}
         </p>
         <esphome-automation-action-list
           no-header
@@ -476,9 +477,7 @@ export class ESPHomeAutomationEditor extends LitElement {
           @actions-change=${this._onActionsChange}
         ></esphome-automation-action-list>
       </div>
-      ${this._error
-        ? html`<p class="ae-error" role="alert">${this._error}</p>`
-        : nothing}
+      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${this.location && this.value && !this.addMode
         ? html`<div class="ae-actions">
             <button
@@ -513,7 +512,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   private _renderTriggerParamsForm(
     activeTrigger: AutomationTrigger | null,
     automation: AutomationTree,
-    disabled: boolean,
+    disabled: boolean
   ) {
     const entries = this._paramFormEntries(activeTrigger);
     if (entries.length === 0) return nothing;
@@ -555,9 +554,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  form. Interval pulls from the component schema (since
    *  ``interval.then``'s own config_entries is empty); everything
    *  else stays on the trigger's own config_entries. */
-  private _paramFormEntries(
-    activeTrigger: AutomationTrigger | null,
-  ): ConfigEntry[] {
+  private _paramFormEntries(activeTrigger: AutomationTrigger | null): ConfigEntry[] {
     if (this.location?.kind === "interval") {
       const comp = this._intervalComponent;
       if (!comp) return [];
@@ -582,7 +579,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     scripts: AvailableScript[],
     effectiveTriggerId: string | null,
     automation: AutomationTree,
-    disabled: boolean,
+    disabled: boolean
   ) {
     return html`
       <esphome-automation-target-picker
@@ -608,7 +605,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   private _onTriggerParamsValueChange = (
-    e: CustomEvent<{ path: string[]; value: unknown }>,
+    e: CustomEvent<{ path: string[]; value: unknown }>
   ) => {
     e.stopPropagation();
     // Form's value-change events carry path-based updates; merge
@@ -623,7 +620,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   private _applyParamPatch(
     params: Record<string, unknown>,
     path: string[],
-    value: unknown,
+    value: unknown
   ): Record<string, unknown> {
     if (path.length === 0) {
       if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -641,9 +638,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       return { ...params, [head]: value };
     }
     const child =
-      params[head] &&
-      typeof params[head] === "object" &&
-      !Array.isArray(params[head])
+      params[head] && typeof params[head] === "object" && !Array.isArray(params[head])
         ? (params[head] as Record<string, unknown>)
         : {};
     return {
@@ -669,8 +664,7 @@ export class ESPHomeAutomationEditor extends LitElement {
    */
   private _renderHeader(activeTrigger: AutomationTrigger | null) {
     const loc = this.location;
-    const intervalComp =
-      loc?.kind === "interval" ? this._intervalComponent : null;
+    const intervalComp = loc?.kind === "interval" ? this._intervalComponent : null;
     const title = intervalComp?.name ?? this._headerTitle(activeTrigger);
     const docsUrl = intervalComp?.docs_url ?? activeTrigger?.docs_url ?? "";
     const descText =
@@ -697,10 +691,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       <div class="ae-header-icon">
         ${imageUrl
           ? html`<img alt="" src=${imageUrl} />`
-          : html`<wa-icon
-              library="mdi"
-              name="arrow-decision-outline"
-            ></wa-icon>`}
+          : html`<wa-icon library="mdi" name="arrow-decision-outline"></wa-icon>`}
       </div>
     </div>`;
   }
@@ -744,9 +735,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (loc.kind !== "component_on") return nothing;
     const targetValue = this._targetMetadataValue(loc);
     return html`<div class="field">
-      <label class="field-label">
-        ${this._localize("device.automation_target")}
-      </label>
+      <label class="field-label"> ${this._localize("device.automation_target")} </label>
       <input type="text" readonly .value=${targetValue} />
     </div>`;
   }
@@ -764,9 +753,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       case "device_on":
         return this._localize("device.automation_target_device");
       case "component_on": {
-        const device = this._available?.devices.find(
-          (d) => d.id === loc.component_id,
-        );
+        const device = this._available?.devices.find((d) => d.id === loc.component_id);
         if (!device) return loc.component_id;
         const label = device.name ?? device.id;
         return `${label} (${device.component_id})`;
@@ -794,7 +781,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         detail: { value, location: this.location },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._scheduleAutoApply();
   }
@@ -846,15 +833,20 @@ export class ESPHomeAutomationEditor extends LitElement {
         this.configuration,
         this.value,
         this.location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+      // Track our own write so the parent's YAML-driven reload skips
+      // the prop echo. Set before dispatch — the event handler is
+      // synchronous and may already trigger ``updated()`` on the way
+      // back, which is where the skip check runs.
+      this._lastSelfWrittenYaml = newYaml;
       this.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-draft", {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =
@@ -903,9 +895,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     }
   }
 
-  private _onTargetChange = (
-    e: CustomEvent<{ target: AutomationLocation | null }>,
-  ) => {
+  private _onTargetChange = (e: CustomEvent<{ target: AutomationLocation | null }>) => {
     e.stopPropagation();
     this.location = e.detail.target;
     // Reset trigger when switching target kinds — the previous
@@ -914,7 +904,7 @@ export class ESPHomeAutomationEditor extends LitElement {
   };
 
   private _onTriggerChange = (
-    e: CustomEvent<{ triggerId: string; params: Record<string, unknown> }>,
+    e: CustomEvent<{ triggerId: string; params: Record<string, unknown> }>
   ) => {
     e.stopPropagation();
     this._withValue({
@@ -969,15 +959,13 @@ export class ESPHomeAutomationEditor extends LitElement {
   }
 
   private _onTriggerParamsChange = (
-    e: CustomEvent<{ params: Record<string, unknown> }>,
+    e: CustomEvent<{ params: Record<string, unknown> }>
   ) => {
     e.stopPropagation();
     this._withValue({ trigger_params: e.detail.params });
   };
 
-  private _onActionsChange = (
-    e: CustomEvent<{ actions: AutomationTree["actions"] }>,
-  ) => {
+  private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
     this._withValue({ actions: e.detail.actions });
   };
@@ -1006,7 +994,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         this.location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
@@ -1015,14 +1003,14 @@ export class ESPHomeAutomationEditor extends LitElement {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
       this.dispatchEvent(
         new CustomEvent<{ sectionKey: string | null }>("section-select", {
           detail: { sectionKey: null },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =
