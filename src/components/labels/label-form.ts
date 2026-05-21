@@ -32,12 +32,12 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
-import { isLabelNameDuplicate } from "../../util/label-usage.js";
 import {
   LABEL_COLOR_SWATCHES,
   labelChipStyle,
   labelChipStyleString,
 } from "../../util/label-style.js";
+import { isLabelNameDuplicate } from "../../util/label-usage.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -163,12 +163,7 @@ export class ESPHomeLabelForm extends LitElement {
         this._open = false;
       }
     }
-    if (
-      changed.has("defaultOpen") &&
-      this.defaultOpen &&
-      !this._open &&
-      !this.editing
-    ) {
+    if (changed.has("defaultOpen") && this.defaultOpen && !this._open && !this.editing) {
       this.expand();
     }
   }
@@ -223,9 +218,7 @@ export class ESPHomeLabelForm extends LitElement {
     // Move focus to the name input so the user can immediately
     // refine the suggestion (add a room number, etc.).
     requestAnimationFrame(() => {
-      const input = this.renderRoot.querySelector<HTMLInputElement>(
-        'input[type="text"]',
-      );
+      const input = this.renderRoot.querySelector<HTMLInputElement>('input[type="text"]');
       input?.focus();
       input?.setSelectionRange(name.length, name.length);
     });
@@ -264,8 +257,7 @@ export class ESPHomeLabelForm extends LitElement {
         padding: var(--wa-space-m) var(--wa-space-s);
         background: var(--wa-color-surface-lowered);
         border-radius: var(--wa-border-radius-l);
-        border: var(--wa-border-width-s) dashed
-          var(--wa-color-surface-border);
+        border: var(--wa-border-width-s) dashed var(--wa-color-surface-border);
         min-height: 56px;
       }
 
@@ -288,6 +280,18 @@ export class ESPHomeLabelForm extends LitElement {
       }
 
       .suggestions {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: -10px;
+      }
+
+      .suggestions-label {
+        font-size: var(--wa-font-size-2xs);
+        color: var(--wa-color-text-quiet);
+      }
+
+      .suggestions-chips {
         display: flex;
         flex-wrap: wrap;
         gap: 6px;
@@ -322,8 +326,7 @@ export class ESPHomeLabelForm extends LitElement {
 
       .suggestion-chip:focus-visible {
         outline: none;
-        box-shadow: 0 0 0 2px
-          color-mix(in srgb, var(--esphome-primary), transparent 70%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
       }
 
       .suggestion-chip wa-icon {
@@ -399,7 +402,9 @@ export class ESPHomeLabelForm extends LitElement {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: transform 0.12s ease, box-shadow 0.12s ease;
+        transition:
+          transform 0.12s ease,
+          box-shadow 0.12s ease;
         box-shadow: inset 0 0 0 1px color-mix(in srgb, #000, transparent 88%);
       }
 
@@ -441,8 +446,7 @@ export class ESPHomeLabelForm extends LitElement {
         border-style: solid;
         border-color: var(--esphome-primary);
         color: var(--esphome-primary);
-        box-shadow: 0 0 0 2px
-          color-mix(in srgb, var(--esphome-primary), transparent 75%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 75%);
       }
 
       .create-actions {
@@ -549,7 +553,7 @@ export class ESPHomeLabelForm extends LitElement {
     const duplicate = isLabelNameDuplicate(
       trimmed,
       this.existingNames,
-      this.editing?.name ?? null,
+      this.editing?.name ?? null
     );
     // ``_api`` is consumed from context; it's typically present once
     // the dashboard has finished its connect dance, but during the
@@ -563,18 +567,14 @@ export class ESPHomeLabelForm extends LitElement {
       !this._saving &&
       !!this._api;
     const values: (string | null)[] = [null, ...LABEL_COLOR_SWATCHES];
-    const headerKey = isEdit
-      ? "dashboard.labels_edit_label"
-      : "dashboard.labels_create";
+    const headerKey = isEdit ? "dashboard.labels_edit_label" : "dashboard.labels_create";
     const submitKey = isEdit
       ? "dashboard.labels_save_submit"
       : "dashboard.labels_create_submit";
     const inputAriaLabel = this._localize(
-      isEdit ? "dashboard.labels_edit_label" : "dashboard.labels_create",
+      isEdit ? "dashboard.labels_edit_label" : "dashboard.labels_create"
     );
-    const previewName =
-      trimmed ||
-      this._localize("dashboard.labels_create_placeholder");
+    const previewName = trimmed || this._localize("dashboard.labels_create_placeholder");
     const previewIsPlaceholder = trimmed.length === 0;
     return html`
       <form
@@ -587,19 +587,13 @@ export class ESPHomeLabelForm extends LitElement {
       >
         ${this.compact
           ? nothing
-          : html`<span class="form-header"
-              >${this._localize(headerKey)}</span
-            >`}
+          : html`<span class="form-header">${this._localize(headerKey)}</span>`}
         <div class="preview-stage" aria-hidden="true">
           ${previewIsPlaceholder
-            ? html`<span
-                class="label-chip"
-                style=${labelChipStyleString(this._color)}
+            ? html`<span class="label-chip" style=${labelChipStyleString(this._color)}
                 ><span class="preview-placeholder">${previewName}</span></span
               >`
-            : html`<span
-                class="label-chip"
-                style=${labelChipStyleString(this._color)}
+            : html`<span class="label-chip" style=${labelChipStyleString(this._color)}
                 >${previewName}</span
               >`}
         </div>
@@ -629,9 +623,7 @@ export class ESPHomeLabelForm extends LitElement {
                 role="radio"
                 aria-checked=${selected ? "true" : "false"}
                 tabindex=${selected ? "0" : "-1"}
-                class="swatch swatch--clear ${selected
-                  ? "swatch--selected"
-                  : ""}"
+                class="swatch swatch--clear ${selected ? "swatch--selected" : ""}"
                 aria-label=${this._localize("dashboard.labels_color_none")}
                 title=${this._localize("dashboard.labels_color_none")}
                 @click=${() => this._onSwatchClick(null)}
@@ -657,25 +649,15 @@ export class ESPHomeLabelForm extends LitElement {
               title=${c}
               @click=${() => this._onSwatchClick(c)}
             >
-              ${selected
-                ? html`<wa-icon library="mdi" name="check"></wa-icon>`
-                : nothing}
+              ${selected ? html`<wa-icon library="mdi" name="check"></wa-icon>` : nothing}
             </button>`;
           })}
         </div>
         <div class="create-actions">
-          <button
-            type="button"
-            class="btn"
-            @click=${() => this._cancel()}
-          >
+          <button type="button" class="btn" @click=${() => this._cancel()}>
             ${this._localize("dashboard.labels_create_cancel")}
           </button>
-          <button
-            type="submit"
-            class="btn btn--primary"
-            ?disabled=${!canSubmit}
-          >
+          <button type="submit" class="btn btn--primary" ?disabled=${!canSubmit}>
             ${this._localize(submitKey)}
           </button>
         </div>
@@ -694,21 +676,24 @@ export class ESPHomeLabelForm extends LitElement {
     const names = this._suggestionNames();
     if (names.length === 0) return nothing;
     return html`<div class="suggestions">
-      ${names.map((n) => {
-        // Tint each chip with the colour the form would auto-pick
-        // if the user typed this name — gives the suggestions row
-        // visual variety and previews the chip-to-be.
-        const c = this._autoColorFor(n);
-        const fg = labelChipStyle(c).color;
-        return html`<button
-          type="button"
-          class="suggestion-chip"
-          style=${`--suggestion-color:${c};--suggestion-fg:${fg}`}
-          @click=${() => this._onSuggestionClick(n)}
-        >
-          ${n}
-        </button>`;
-      })}
+      <span class="suggestions-label">
+        ${this._localize("dashboard.labels_suggestions_hint")}
+      </span>
+      <div class="suggestions-chips">
+        ${names.map((n) => {
+          const c = this._autoColorFor(n);
+          const fg = labelChipStyle(c).color;
+
+          return html`<button
+            type="button"
+            class="suggestion-chip"
+            style=${`--suggestion-color:${c};--suggestion-fg:${fg}`}
+            @click=${() => this._onSuggestionClick(n)}
+          >
+            ${n}
+          </button>`;
+        })}
+      </div>
     </div>`;
   }
 
@@ -719,7 +704,7 @@ export class ESPHomeLabelForm extends LitElement {
       // local state here; the willUpdate hook will reset on the
       // next prop change.
       this.dispatchEvent(
-        new CustomEvent("editing-cancel", { bubbles: true, composed: true }),
+        new CustomEvent("editing-cancel", { bubbles: true, composed: true })
       );
       return;
     }
@@ -755,9 +740,7 @@ export class ESPHomeLabelForm extends LitElement {
     // user still on the same device?" check) can snapshot before
     // the await. The event has no detail; the host already knows
     // its own context.
-    this.dispatchEvent(
-      new CustomEvent("submitting", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("submitting", { bubbles: true, composed: true }));
     this._saving = true;
     const editing = this.editing;
     try {
@@ -772,7 +755,7 @@ export class ESPHomeLabelForm extends LitElement {
             detail: updated,
             bubbles: true,
             composed: true,
-          }),
+          })
         );
       } else {
         const created = await this._api.createLabel({
@@ -784,7 +767,7 @@ export class ESPHomeLabelForm extends LitElement {
             detail: created,
             bubbles: true,
             composed: true,
-          }),
+          })
         );
         this._name = "";
         this._color = null;
@@ -795,11 +778,9 @@ export class ESPHomeLabelForm extends LitElement {
       console.warn(editing ? "label update failed" : "label create failed", err);
       toast.error(
         this._localize(
-          editing
-            ? "dashboard.labels_update_failed"
-            : "dashboard.labels_create_failed",
+          editing ? "dashboard.labels_update_failed" : "dashboard.labels_create_failed"
         ),
-        { richColors: true },
+        { richColors: true }
       );
     } finally {
       this._saving = false;
@@ -835,9 +816,7 @@ export class ESPHomeLabelForm extends LitElement {
     e.preventDefault();
     this._onSwatchClick(values[next]);
     requestAnimationFrame(() => {
-      const swatch = this.renderRoot.querySelectorAll<HTMLButtonElement>(
-        ".swatch",
-      )[next];
+      const swatch = this.renderRoot.querySelectorAll<HTMLButtonElement>(".swatch")[next];
       swatch?.focus();
     });
   }

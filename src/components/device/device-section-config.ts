@@ -1,5 +1,4 @@
 import { consume } from "@lit/context";
-import toast from "sonner-js";
 import {
   mdiDelete,
   mdiInformationOutline,
@@ -9,21 +8,19 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type {
-  AutomationLocation,
-  BoardCatalogEntry,
-} from "../../api/types.js";
-import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
-import { withBase } from "../../util/base-path.js";
+import type { AutomationLocation, BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { withBase } from "../../util/base-path.js";
 import { anyAdvancedEntry } from "../../util/config-entry-tree.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import {
   parseYamlAutomations,
   parseYamlTopLevelSections,
@@ -45,14 +42,14 @@ import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
 import { deviceSectionConfigStyles } from "./device-section-config.styles.js";
 import {
-  loadConfig,
-  type SectionConfigResponse,
-} from "./device-section-config/loading.js";
-import {
   flushDraft,
   onDeleteConfirmed,
   onValueChange,
 } from "./device-section-config/draft-and-delete.js";
+import {
+  loadConfig,
+  type SectionConfigResponse,
+} from "./device-section-config/loading.js";
 
 registerMdiIcons({
   delete: mdiDelete,
@@ -68,7 +65,9 @@ const UNDELETABLE_SECTIONS = new Set(["esphome"]);
 
 @customElement("esphome-device-section-config")
 export class ESPHomeDeviceSectionConfig extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
   @property() configuration = "";
@@ -190,7 +189,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -205,7 +204,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -245,7 +244,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { dirty: value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -253,24 +252,21 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     if (this._draftTimer) clearTimeout(this._draftTimer);
     this._draftTimer = setTimeout(
       () => flushDraft(this),
-      ESPHomeDeviceSectionConfig.DRAFT_DEBOUNCE_MS,
+      ESPHomeDeviceSectionConfig.DRAFT_DEBOUNCE_MS
     );
   }
 
   private _onImageError(e: Event) {
     const img = e.target as HTMLImageElement;
     const fallback = withBase("/assets/board/default.svg");
-    if (
-      img.src !== window.location.origin + fallback &&
-      !img.src.endsWith(fallback)
-    ) {
+    if (img.src !== window.location.origin + fallback && !img.src.endsWith(fallback)) {
       img.src = fallback;
     }
   }
 
   private _onShowYamlEditor() {
     this.dispatchEvent(
-      new CustomEvent("show-yaml-editor", { bubbles: true, composed: true }),
+      new CustomEvent("show-yaml-editor", { bubbles: true, composed: true })
     );
   }
 
@@ -293,10 +289,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const showAdvanced = this._showAdvanced;
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
-    const renderEntries = resolveSectionEntries(
-      this.sectionKey,
-      this._config.entries,
-    );
+    const renderEntries = resolveSectionEntries(this.sectionKey, this._config.entries);
     const hasAdvanced = anyAdvancedEntry(renderEntries);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated
@@ -363,8 +356,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                     </button>`}
               </div>
             </div>
-            ${this._renderApiActionsTable()}
-            ${this._renderTriggersTable()}
+            ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
             ${this._renderActionsRow(canDelete)}`
         : html`
             <esphome-config-entry-form
@@ -384,22 +376,18 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
                     .checked=${showAdvanced}
                     @change=${(e: Event) =>
                       this._setShowAdvanced(
-                        (e.target as HTMLInputElement & { checked: boolean }).checked,
+                        (e.target as HTMLInputElement & { checked: boolean }).checked
                       )}
                   >
                     ${this._localize("device.show_advanced")}
                   </wa-switch>
                 </div>`
               : nothing}
-            ${this._error
-              ? html`<p class="error">${this._error}</p>`
-              : nothing}
-            ${this._renderApiActionsTable()}
-            ${this._renderTriggersTable()}
+            ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
+            ${this._renderApiActionsTable()} ${this._renderTriggersTable()}
             ${this._renderActionsRow(canDelete)}
           `}
-      ${this._renderApiActionDialog()}
-      ${this._renderAddAutomationDialog()}
+      ${this._renderApiActionDialog()} ${this._renderAddAutomationDialog()}
       ${canDelete
         ? html`<esphome-confirm-dialog
             heading=${this._localize("device.delete_section")}
@@ -436,87 +424,62 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private _renderApiActionsTable() {
     if (this.sectionKey !== "api") return nothing;
     const items = parseYamlAutomations(this.yaml).filter((s) =>
-      s.key.startsWith("automation:api_action:"),
+      s.key.startsWith("automation:api_action:")
     );
-    if (items.length === 0) return nothing;
     // One delete is in flight at a time; lock the whole table so
     // the user can't fire a second delete (or jump into the editor
     // on a sibling row) before the first round-trip settles.
     const locked = this._deletingApiAction !== "";
     return html`<div class="api-actions-table">
-      <h4 class="api-actions-title">
-        ${this._localize("device.api_actions_list_title")}
-      </h4>
-      <ul class="api-actions-rows">
-        ${items.map(
-          (item) => html`<li class="api-actions-row">
-            <span class="api-actions-name">${item.id}</span>
-            <div class="api-actions-row-buttons">
-              <button
-                type="button"
-                class="api-actions-row-edit"
-                aria-label=${this._localize("device.api_actions_list_edit")}
-                title=${this._localize("device.api_actions_list_edit")}
-                ?disabled=${locked}
-                @click=${() => this._onEditApiAction(item.key)}
-              >
-                <wa-icon library="mdi" name="pencil"></wa-icon>
-              </button>
-              <button
-                type="button"
-                class="api-actions-row-delete"
-                aria-label=${this._localize("device.api_actions_list_delete")}
-                title=${this._localize("device.api_actions_list_delete")}
-                ?disabled=${locked}
-                @click=${() => this._onDeleteApiAction(item.id ?? "")}
-              >
-                <wa-icon library="mdi" name="delete"></wa-icon>
-              </button>
-            </div>
-          </li>`,
-        )}
-      </ul>
+      <div class="api-actions-header">
+        <h4 class="api-actions-title">
+          ${this._localize("device.api_actions_list_title")}
+        </h4>
+        <button type="button" class="api-actions-add" @click=${this._onOpenAddApiAction}>
+          <wa-icon library="mdi" name="plus"></wa-icon>
+          ${this._localize("device.add_api_action")}
+        </button>
+      </div>
+      ${items.length === 0
+        ? html`<p class="api-actions-empty" role="status">
+            ${this._localize("device.api_actions_list_empty")}
+          </p>`
+        : html`<ul class="api-actions-rows">
+            ${items.map(
+              (item) =>
+                html`<li class="api-actions-row">
+                  <span class="api-actions-name">${item.id}</span>
+                  <div class="api-actions-row-buttons">
+                    <button
+                      type="button"
+                      class="api-actions-row-edit"
+                      aria-label=${this._localize("device.api_actions_list_edit")}
+                      title=${this._localize("device.api_actions_list_edit")}
+                      ?disabled=${locked}
+                      @click=${() => this._onEditApiAction(item.key)}
+                    >
+                      <wa-icon library="mdi" name="pencil"></wa-icon>
+                    </button>
+                    <button
+                      type="button"
+                      class="api-actions-row-delete"
+                      aria-label=${this._localize("device.api_actions_list_delete")}
+                      title=${this._localize("device.api_actions_list_delete")}
+                      ?disabled=${locked}
+                      @click=${() => this._onDeleteApiAction(item.id ?? "")}
+                    >
+                      <wa-icon library="mdi" name="delete"></wa-icon>
+                    </button>
+                  </div>
+                </li>`
+            )}
+          </ul>`}
     </div>`;
   }
 
-  /**
-   * Bottom actions row. Combines the section's Delete button with
-   * any inline "+ Add ..." CTAs so they live in the same footer line
-   * — same placement convention as the rest of the section editor.
-   *
-   * The api section gets a dedicated "+ Add API action" button (PR
-   * #360). Regular component instances with an ``id:`` and the
-   * device-level ``esphome:`` section get a "+ Add automation"
-   * button that opens the same wizard the navigator uses, pre-filled
-   * with the current context.
-   */
   private _renderActionsRow(canDelete: boolean) {
-    const showAddApi = this.sectionKey === "api";
-    const showAddAutomation = this._shortcutTarget() !== null;
-    if (!canDelete && !showAddApi && !showAddAutomation) return nothing;
-    return html`<div class="actions">
-      ${showAddApi
-        ? html`<button
-            type="button"
-            class="section-extra-add"
-            @click=${this._onOpenAddApiAction}
-          >
-            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-            ${this._localize("device.add_api_action")}
-          </button>`
-        : nothing}
-      ${showAddAutomation
-        ? html`<button
-            type="button"
-            class="section-extra-add"
-            @click=${this._onOpenAddAutomation}
-          >
-            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-            ${this._localize("device.add_automation")}
-          </button>`
-        : nothing}
-      ${canDelete ? this._renderDeleteButton() : nothing}
-    </div>`;
+    if (!canDelete) return nothing;
+    return html`<div class="actions">${this._renderDeleteButton()}</div>`;
   }
 
   private _renderApiActionDialog() {
@@ -544,7 +507,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { sectionKey: e.detail.sectionKey },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -554,7 +517,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { sectionKey },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -572,7 +535,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         { kind: "api_action", action_name: actionName },
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
@@ -581,7 +544,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =
@@ -617,14 +580,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     // section key, biased toward the section's currently-resolved
     // fromLine so multi-instance components route to the right entry.
     const sections = parseYamlTopLevelSections(this.yaml);
-    const candidates = sections.filter(
-      (s) => sectionKeyOf(s) === this.sectionKey,
-    );
+    const candidates = sections.filter((s) => sectionKeyOf(s) === this.sectionKey);
     if (candidates.length === 0) return null;
     const match =
       this._resolvedFromLine !== undefined
-        ? candidates.find((s) => s.fromLine === this._resolvedFromLine) ??
-          candidates[0]
+        ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
         : candidates[0];
     if (!match.id) return null;
     return { kind: "component_on", componentId: match.id };
@@ -645,44 +605,54 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       if (target.kind === "device_on") return s.parentKey === "esphome";
       return s.id === target.componentId;
     });
-    if (items.length === 0) return nothing;
     const locked = this._deletingTrigger !== "";
     const title =
       target.kind === "device_on"
         ? this._localize("device.automations_list_title_device")
         : this._localize("device.automations_list_title");
     return html`<div class="api-actions-table">
-      <h4 class="api-actions-title">${title}</h4>
-      <ul class="api-actions-rows">
-        ${items.map(
-          (item) => html`<li class="api-actions-row">
-            <span class="api-actions-name">${item.eventKey}</span>
-            <div class="api-actions-row-buttons">
-              <button
-                type="button"
-                class="api-actions-row-edit"
-                aria-label=${this._localize("device.automations_list_edit")}
-                title=${this._localize("device.automations_list_edit")}
-                ?disabled=${locked}
-                @click=${() => this._onEditTrigger(item.key)}
-              >
-                <wa-icon library="mdi" name="pencil"></wa-icon>
-              </button>
-              <button
-                type="button"
-                class="api-actions-row-delete"
-                aria-label=${this._localize("device.automations_list_delete")}
-                title=${this._localize("device.automations_list_delete")}
-                ?disabled=${locked}
-                @click=${() =>
-                  this._onDeleteTrigger(target, item.eventKey ?? "", item.key)}
-              >
-                <wa-icon library="mdi" name="delete"></wa-icon>
-              </button>
-            </div>
-          </li>`,
-        )}
-      </ul>
+      <div class="api-actions-header">
+        <h4 class="api-actions-title">${title}</h4>
+        <button type="button" class="api-actions-add" @click=${this._onOpenAddAutomation}>
+          <wa-icon library="mdi" name="plus"></wa-icon>
+          ${this._localize("device.add_automation")}
+        </button>
+      </div>
+      ${items.length === 0
+        ? html`<p class="api-actions-empty" role="status">
+            ${this._localize("device.automations_list_empty")}
+          </p>`
+        : html`<ul class="api-actions-rows">
+            ${items.map(
+              (item) =>
+                html`<li class="api-actions-row">
+                  <span class="api-actions-name">${item.eventKey}</span>
+                  <div class="api-actions-row-buttons">
+                    <button
+                      type="button"
+                      class="api-actions-row-edit"
+                      aria-label=${this._localize("device.automations_list_edit")}
+                      title=${this._localize("device.automations_list_edit")}
+                      ?disabled=${locked}
+                      @click=${() => this._onEditTrigger(item.key)}
+                    >
+                      <wa-icon library="mdi" name="pencil"></wa-icon>
+                    </button>
+                    <button
+                      type="button"
+                      class="api-actions-row-delete"
+                      aria-label=${this._localize("device.automations_list_delete")}
+                      title=${this._localize("device.automations_list_delete")}
+                      ?disabled=${locked}
+                      @click=${() =>
+                        this._onDeleteTrigger(target, item.eventKey ?? "", item.key)}
+                    >
+                      <wa-icon library="mdi" name="delete"></wa-icon>
+                    </button>
+                  </div>
+                </li>`
+            )}
+          </ul>`}
     </div>`;
   }
 
@@ -719,7 +689,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { sectionKey: e.detail.sectionKey },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -729,7 +699,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
         detail: { sectionKey },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -743,7 +713,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   private async _onDeleteTrigger(
     target: { kind: "device_on" } | { kind: "component_on"; componentId: string },
     trigger: string,
-    rowKey: string,
+    rowKey: string
   ) {
     if (!this._api || !trigger || this._deletingTrigger) return;
     this._deletingTrigger = rowKey;
@@ -759,7 +729,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
@@ -768,7 +738,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =

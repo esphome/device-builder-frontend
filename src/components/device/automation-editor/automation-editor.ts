@@ -29,7 +29,7 @@
 import { consume } from "@lit/context";
 import toast from "sonner-js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import {
   mdiArrowDecisionOutline,
   mdiDelete,
@@ -70,6 +70,7 @@ import "../config-entry-form.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import "./automation-action-list.js";
+import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -118,6 +119,12 @@ export class ESPHomeAutomationEditor extends LitElement {
   addMode = false;
 
   @property() yaml = "";
+
+  /** Action-list reference — used by the header-positioned Add
+   *  button to open the catalog picker dialog that lives inside
+   *  the action-list component. */
+  @query("esphome-automation-action-list")
+  private _actionList?: ESPHomeAutomationActionList;
 
   /** Scoped catalog response. Trigger / action / condition lists
    *  come from here (the backend filters to what's actually in the
@@ -436,9 +443,20 @@ export class ESPHomeAutomationEditor extends LitElement {
             disabled,
           )}`}
       <div class="field">
-        <label class="field-label">
-          ${this._localize("device.automation_action")}
-        </label>
+        <div class="ae-actions-header">
+          <label class="field-label">
+            ${this._localize("device.automation_action")}
+          </label>
+          <button
+            type="button"
+            class="ae-section-add"
+            ?disabled=${disabled || actions.length === 0}
+            @click=${() => this._actionList?.openPicker()}
+          >
+            <wa-icon library="mdi" name="plus"></wa-icon>
+            ${this._localize("device.add_action")}
+          </button>
+        </div>
         <p class="field-description">
           ${renderMarkdown(
             this._localize("device.automation_actions_description"),
@@ -446,6 +464,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         </p>
         <esphome-automation-action-list
           no-header
+          hide-add
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}
@@ -469,7 +488,7 @@ export class ESPHomeAutomationEditor extends LitElement {
               @click=${this._onDelete}
             >
               <wa-icon library="mdi" name="delete"></wa-icon>
-              ${this._localize("dashboard.delete")}
+              ${this._localize("device.delete_automation")}
             </button>
           </div>`
         : nothing}

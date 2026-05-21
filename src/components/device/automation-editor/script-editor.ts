@@ -23,7 +23,7 @@
 import { consume } from "@lit/context";
 import toast from "sonner-js";
 import { html, LitElement, nothing } from "lit";
-import { customElement, property, state } from "lit/decorators.js";
+import { customElement, property, query, state } from "lit/decorators.js";
 import {
   mdiDelete,
   mdiOpenInNew,
@@ -65,6 +65,7 @@ import {
 } from "./serialise.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
+import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import "./callable-params-editor.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -107,6 +108,12 @@ export class ESPHomeScriptEditor extends LitElement {
   addMode = false;
 
   @property() yaml = "";
+
+  /** Action-list reference — used by the header-positioned Add
+   *  button to open the catalog picker dialog that lives inside
+   *  the action-list component. */
+  @query("esphome-automation-action-list")
+  private _actionList?: ESPHomeAutomationActionList;
 
   @state() private _available: AvailableAutomations | null = null;
   @state() private _loading = true;
@@ -310,9 +317,20 @@ export class ESPHomeScriptEditor extends LitElement {
         ? this._renderParametersField(automation, disabled)
         : nothing}
       <div class="field">
-        <label class="field-label">
-          ${this._localize("device.automation_action")}
-        </label>
+        <div class="ae-actions-header">
+          <label class="field-label">
+            ${this._localize("device.automation_action")}
+          </label>
+          <button
+            type="button"
+            class="ae-section-add"
+            ?disabled=${disabled || actions.length === 0}
+            @click=${() => this._actionList?.openPicker()}
+          >
+            <wa-icon library="mdi" name="plus"></wa-icon>
+            ${this._localize("device.add_action")}
+          </button>
+        </div>
         <p class="field-description">
           ${renderMarkdown(
             this._localize("device.script_actions_description"),
@@ -320,6 +338,7 @@ export class ESPHomeScriptEditor extends LitElement {
         </p>
         <esphome-automation-action-list
           no-header
+          hide-add
           .actions=${automation.actions}
           .catalog=${actions}
           .conditionCatalog=${conditions}
@@ -343,7 +362,7 @@ export class ESPHomeScriptEditor extends LitElement {
               @click=${this._onDelete}
             >
               <wa-icon library="mdi" name="delete"></wa-icon>
-              ${this._localize("dashboard.delete")}
+              ${this._localize("device.delete_script")}
             </button>
           </div>`
         : nothing}

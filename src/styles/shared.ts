@@ -12,23 +12,13 @@ import { css } from "lit";
 export const espHomeStyles = css`
   :host {
     /* ─── Brand colors ─── */
-    /* Resolve to Home Assistant's primary palette when embedded in HA;
-       fall back to HA's current --ha-color-primary-40 (#009ac7), which
-       is what HA's default theme resolves --primary-color to today
-       (the legacy Material Light Blue 500 value #03a9f4 was retired
-       upstream). Standalone deployments stay visually consistent with
-       HA's default theme rather than reverting to WebAwesome cyan. */
-    --esphome-primary: var(--primary-color, #009ac7);
+    --esphome-primary: var(--primary-color, #009fee);
     --esphome-primary-light: color-mix(
       in srgb,
-      var(--primary-color, #009ac7) 12%,
+      var(--primary-color, #009fee) 12%,
       transparent
     );
-    --esphome-secondary: color-mix(
-      in srgb,
-      var(--primary-color, #009ac7),
-      black 8%
-    );
+    --esphome-secondary: color-mix(in srgb, var(--primary-color, #009fee), black 8%);
     --esphome-success: #2ecc71;
     --esphome-warning: #f39c12;
     --esphome-error: #e74c3c;

@@ -11,9 +11,9 @@
  * ``actions-change`` to update its own state.
  */
 import { consume } from "@lit/context";
+import { mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import { mdiPlus } from "@mdi/js";
 
 import type {
   ActionNode,
@@ -25,17 +25,17 @@ import type {
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
-import { emptyActionNode, removeAt, replaceAt, swap } from "./serialise.js";
 import "./automation-action-node.js";
+import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
   ESPHomeCatalogPickerDialog,
 } from "./catalog-picker-dialog.js";
+import { emptyActionNode, removeAt, replaceAt, swap } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -78,6 +78,9 @@ export class ESPHomeAutomationActionList extends LitElement {
   @property({ type: Boolean, attribute: "no-header" })
   noHeader = false;
 
+  @property({ type: Boolean, attribute: "hide-add" })
+  hideAdd = false;
+
   @query("esphome-catalog-picker-dialog")
   private _picker!: ESPHomeCatalogPickerDialog;
 
@@ -92,19 +95,23 @@ export class ESPHomeAutomationActionList extends LitElement {
               >${this._localize("device.automation_action")}</label
             >`}
         ${this.actions.length === 0
-          ? html`<p class="ae-empty">${this._localize("device.add_action")}</p>`
+          ? html`<p class="ae-empty-block" role="status">
+              ${this._localize("device.automation_actions_empty")}
+            </p>`
           : this.actions.map((node, idx) =>
-              this._renderRow(node, idx, idx === this.actions.length - 1),
+              this._renderRow(node, idx, idx === this.actions.length - 1)
             )}
-        <button
-          type="button"
-          class="ae-add"
-          ?disabled=${this.disabled || this.catalog.length === 0}
-          @click=${this._openPicker}
-        >
-          <wa-icon library="mdi" name="plus"></wa-icon>
-          ${this._localize("device.add_action")}
-        </button>
+        ${this.hideAdd
+          ? nothing
+          : html`<button
+              type="button"
+              class="ae-add"
+              ?disabled=${this.disabled || this.catalog.length === 0}
+              @click=${this.openPicker}
+            >
+              <wa-icon library="mdi" name="plus"></wa-icon>
+              ${this._localize("device.add_action")}
+            </button>`}
         <esphome-catalog-picker-dialog
           kind="action"
           .items=${this.catalog}
@@ -114,6 +121,11 @@ export class ESPHomeAutomationActionList extends LitElement {
       </div>
     `;
   }
+
+  public openPicker = () => {
+    if (this.catalog.length === 0) return;
+    this._picker.open();
+  };
 
   private _renderRow(node: ActionNode, idx: number, isLast: boolean) {
     return html`<esphome-automation-action-node
@@ -129,16 +141,10 @@ export class ESPHomeAutomationActionList extends LitElement {
       ?last=${isLast}
       @action-change=${(e: CustomEvent<{ value: ActionNode }>) =>
         this._onActionChange(idx, e)}
-      @action-reorder=${(e: CustomEvent<{ delta: number }>) =>
-        this._onReorder(idx, e)}
+      @action-reorder=${(e: CustomEvent<{ delta: number }>) => this._onReorder(idx, e)}
       @action-delete=${(e: Event) => this._onDelete(idx, e)}
     ></esphome-automation-action-node>`;
   }
-
-  private _openPicker = () => {
-    if (this.catalog.length === 0) return;
-    this._picker.open();
-  };
 
   private _onActionPicked = (e: CustomEvent<CatalogPickedDetail>) => {
     e.stopPropagation();
@@ -170,7 +176,7 @@ export class ESPHomeAutomationActionList extends LitElement {
         detail: { actions },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

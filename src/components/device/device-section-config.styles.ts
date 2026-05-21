@@ -123,46 +123,19 @@ export const deviceSectionConfigStyles = css`
     gap: var(--wa-space-s);
     padding-top: var(--wa-space-s);
   }
-
-  /* Per-section inline "+ Add ..." button. Currently only used by
-     the api section ("+ Add API action") and sits in the same
-     .actions footer row as the section's Delete button. Sized
-     to match the delete button so the pair reads as one footer. */
-  .section-extra-add {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    background: transparent;
-    color: var(--wa-color-brand-fill-loud, #0b5cad);
-    border: var(--wa-border-width-s) solid
-      color-mix(in srgb, var(--wa-color-brand-fill-loud, #0b5cad), transparent 70%);
-    padding: var(--wa-space-xs) var(--wa-space-m);
-    border-radius: var(--wa-border-radius-m);
-    cursor: pointer;
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-    font-family: inherit;
-    transition: background 0.12s, border-color 0.12s;
-  }
-
-  .section-extra-add:hover {
-    background: color-mix(in srgb, var(--wa-color-brand-fill-loud, #0b5cad), transparent 90%);
-    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
-  }
-
-  .section-extra-add wa-icon {
-    font-size: 16px;
-  }
-
-  /* api.actions: manage-list. Each row carries the action's name
-     plus edit + delete affordances; the "+ Add" button lives in
-     the actions footer (alongside the section Delete) rather than
-     here so the table stays as a tight read-only summary. */
-  .api-actions-table {
+  the empty state replaces the rows with a centred placeholder. */ .api-actions-table {
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-2xs);
+    gap: var(--wa-space-xs);
     padding-top: var(--wa-space-s);
+    border-top: 1px solid var(--wa-color-surface-border);
+  }
+
+  .api-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wa-space-s);
   }
 
   .api-actions-title {
@@ -172,13 +145,55 @@ export const deviceSectionConfigStyles = css`
     color: var(--wa-color-text-normal);
   }
 
+  .api-actions-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--wa-color-brand-fill-loud, #009fee);
+    color: var(--wa-color-brand-on-loud, #ffffff);
+    border: var(--wa-border-width-s) solid var(--wa-color-brand-fill-loud, #009fee);
+    padding: 2px var(--wa-space-s);
+    border-radius: var(--wa-border-radius-m);
+    cursor: pointer;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    font-family: inherit;
+    transition:
+      background 0.12s,
+      border-color 0.12s;
+  }
+
+  .api-actions-add:hover {
+    background: color-mix(in srgb, var(--wa-color-brand-fill-loud, #009fee), black 10%);
+    border-color: color-mix(in srgb, var(--wa-color-brand-fill-loud, #009fee), black 10%);
+  }
+
+  .api-actions-add wa-icon {
+    font-size: 14px;
+  }
+
+  .api-actions-empty {
+    margin: 0;
+    padding: var(--wa-space-m) var(--wa-space-s);
+    text-align: center;
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    font-style: italic;
+    border: 1px dashed var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-lowered, transparent);
+  }
+
   .api-actions-rows {
     list-style: none;
     margin: 0;
     padding: 0;
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-2xs);
+    border: 1px solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    overflow: hidden;
+    background: var(--wa-color-surface-raised, transparent);
   }
 
   .api-actions-row {
@@ -186,10 +201,18 @@ export const deviceSectionConfigStyles = css`
     align-items: center;
     justify-content: space-between;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-2xs) var(--wa-space-s);
-    border: 1px solid var(--wa-color-neutral-border-quiet, #e1e4e8);
-    border-radius: var(--wa-border-radius-s);
-    background: var(--wa-color-surface-lowered, transparent);
+    padding: var(--wa-space-xs) var(--wa-space-s);
+    border-top: 1px solid var(--wa-color-surface-border);
+    background: transparent;
+    transition: background 0.12s;
+  }
+
+  .api-actions-row:first-child {
+    border-top: none;
+  }
+
+  .api-actions-row:hover {
+    background: var(--wa-color-surface-lowered);
   }
 
   .api-actions-name {
@@ -213,9 +236,9 @@ export const deviceSectionConfigStyles = css`
     border: 1px solid transparent;
     background: transparent;
     color: var(--wa-color-text-quiet);
-    width: 32px;
-    height: 32px;
-    border-radius: var(--wa-border-radius-s);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
@@ -242,22 +265,24 @@ export const deviceSectionConfigStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    background: transparent;
-    color: var(--esphome-error);
-    border: var(--wa-border-width-s) solid
-      color-mix(in srgb, var(--esphome-error), transparent 70%);
+    margin-left: auto;
+    background: #e54d2e;
+    color: #ffffff;
+    border: var(--wa-border-width-s) solid #e54d2e;
     padding: var(--wa-space-xs) var(--wa-space-m);
     border-radius: var(--wa-border-radius-m);
     cursor: pointer;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
     font-family: inherit;
-    transition: background 0.12s, border-color 0.12s;
+    transition:
+      background 0.12s,
+      border-color 0.12s;
   }
 
   .delete-button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-error), transparent 90%);
-    border-color: var(--esphome-error);
+    background: color-mix(in srgb, #e54d2e, black 10%);
+    border-color: color-mix(in srgb, #e54d2e, black 10%);
   }
 
   .delete-button:disabled {
@@ -328,7 +353,9 @@ export const deviceSectionConfigStyles = css`
     font-size: inherit;
     font-weight: var(--wa-font-weight-bold);
     cursor: pointer;
-    transition: background 0.12s, color 0.12s;
+    transition:
+      background 0.12s,
+      color 0.12s;
   }
 
   .yaml-only-notice-cta:hover {

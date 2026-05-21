@@ -20,6 +20,7 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
+  mdiDelete,
   mdiPencilOutline,
 } from "@mdi/js";
 
@@ -59,6 +60,7 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
+  delete: mdiDelete,
   "pencil-outline": mdiPencilOutline,
 });
 
@@ -143,11 +145,12 @@ export class ESPHomeAutomationActionNode extends LitElement {
     const collapsed = this._collapsed;
     return html`
       <div class="ae-row ${collapsed ? "ae-row--collapsed" : ""}">
-        <div class="ae-row-body">
+        <div class="ae-row-header">
           <button
             type="button"
             class="ae-row-picker"
             ?disabled=${this.disabled}
+            title=${this._localize("device.automation_action_pick")}
             @click=${this._openPicker}
           >
             <span class="ae-row-picker-name">
@@ -155,67 +158,68 @@ export class ESPHomeAutomationActionNode extends LitElement {
             </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
-          <esphome-catalog-picker-dialog
-            kind="action"
-            .items=${this.catalog}
-            .devices=${this.devices}
-            @catalog-picked=${this._onActionPicked}
-          ></esphome-catalog-picker-dialog>
-          ${collapsed
-            ? nothing
-            : html`
-                ${def?.description
-                  ? html`<p class="ae-section-desc">
-                      ${renderMarkdown(def.description)}
-                    </p>`
-                  : nothing}
-                ${this._renderActionParams(def)}
-                ${this._renderScriptParams(def)}
-                ${this._renderConditionGate(def)}
-                ${this._renderNestedLists(def)}
-              `}
+          <div class="ae-row-controls">
+            <button
+              type="button"
+              aria-label=${collapsed
+                ? this._localize("device.automation_action_expand")
+                : this._localize("device.automation_action_collapse")}
+              aria-expanded=${collapsed ? "false" : "true"}
+              @click=${() => {
+                this._collapsed = !this._collapsed;
+              }}
+            >
+              <wa-icon
+                library="mdi"
+                name=${collapsed ? "chevron-down" : "chevron-up"}
+              ></wa-icon>
+            </button>
+            <button
+              type="button"
+              ?disabled=${this.disabled || this.first}
+              aria-label=${this._localize("device.automation_move_up")}
+              @click=${() => this._reorder(-1)}
+            >
+              <wa-icon library="mdi" name="arrow-up"></wa-icon>
+            </button>
+            <button
+              type="button"
+              ?disabled=${this.disabled || this.last}
+              aria-label=${this._localize("device.automation_move_down")}
+              @click=${() => this._reorder(+1)}
+            >
+              <wa-icon library="mdi" name="arrow-down"></wa-icon>
+            </button>
+            <button
+              type="button"
+              class="ae-row-delete"
+              ?disabled=${this.disabled}
+              aria-label=${this._localize("device.automation_remove")}
+              @click=${this._onDelete}
+            >
+              <wa-icon library="mdi" name="delete"></wa-icon>
+            </button>
+          </div>
         </div>
-        <div class="ae-row-controls">
-          <button
-            type="button"
-            aria-label=${collapsed
-              ? this._localize("device.automation_action_expand")
-              : this._localize("device.automation_action_collapse")}
-            aria-expanded=${collapsed ? "false" : "true"}
-            @click=${() => {
-              this._collapsed = !this._collapsed;
-            }}
-          >
-            <wa-icon
-              library="mdi"
-              name=${collapsed ? "chevron-down" : "chevron-up"}
-            ></wa-icon>
-          </button>
-          <button
-            type="button"
-            ?disabled=${this.disabled || this.first}
-            aria-label=${this._localize("device.automation_move_up")}
-            @click=${() => this._reorder(-1)}
-          >
-            <wa-icon library="mdi" name="arrow-up"></wa-icon>
-          </button>
-          <button
-            type="button"
-            ?disabled=${this.disabled || this.last}
-            aria-label=${this._localize("device.automation_move_down")}
-            @click=${() => this._reorder(+1)}
-          >
-            <wa-icon library="mdi" name="arrow-down"></wa-icon>
-          </button>
-          <button
-            type="button"
-            ?disabled=${this.disabled}
-            aria-label=${this._localize("device.automation_remove")}
-            @click=${this._onDelete}
-          >
-            <wa-icon library="mdi" name="close"></wa-icon>
-          </button>
-        </div>
+        <esphome-catalog-picker-dialog
+          kind="action"
+          .items=${this.catalog}
+          .devices=${this.devices}
+          @catalog-picked=${this._onActionPicked}
+        ></esphome-catalog-picker-dialog>
+        ${collapsed
+          ? nothing
+          : html`<div class="ae-row-body">
+              ${def?.description
+                ? html`<p class="ae-row-desc">
+                    ${renderMarkdown(def.description)}
+                  </p>`
+                : nothing}
+              ${this._renderActionParams(def)}
+              ${this._renderScriptParams(def)}
+              ${this._renderConditionGate(def)}
+              ${this._renderNestedLists(def)}
+            </div>`}
       </div>
     `;
   }

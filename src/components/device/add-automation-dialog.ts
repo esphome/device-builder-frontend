@@ -18,42 +18,35 @@
  * new section.
  */
 import { consume } from "@lit/context";
-import toast from "sonner-js";
 import { mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/index.js";
 import type {
   AutomationLocation,
   AutomationTree,
-  AvailableAutomations,
-  AvailableComponentInstance,
   AutomationTrigger,
+  AvailableAutomations,
   BoardCatalogEntry,
   YamlDiff,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { espHomeStyles } from "../../styles/shared.js";
 import { inputStyles } from "../../styles/inputs.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
+import { espHomeStyles } from "../../styles/shared.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
-import {
-  applyYamlDiff,
-  sectionKeyFromLocation,
-} from "./automation-editor/serialise.js";
+import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of
  *  ``AutomationLocation``'s discriminator. The callable shapes
  *  (``script:``, ``api.actions:``) live behind their own
  *  dedicated dialogs, since the wizard's "what should this react
  *  to?" framing doesn't apply to them. */
-export type AddAutomationKind =
-  | "device_on"
-  | "component_on"
-  | "interval";
+export type AddAutomationKind = "device_on" | "component_on" | "interval";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -142,22 +135,49 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         gap: var(--wa-space-s);
         margin-top: var(--wa-space-l);
       }
+
       .actions button {
-        appearance: none;
-        border: 1px solid transparent;
-        padding: var(--wa-space-2xs) var(--wa-space-m);
-        border-radius: var(--wa-border-radius-s);
+        display: inline-flex;
+        align-items: center;
+        box-sizing: border-box;
+        gap: 3px;
+        padding: 7px 14px;
+        border: var(--wa-border-width-s) solid transparent;
+        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
+        line-height: 1;
+        transition:
+          background 0.12s,
+          border-color 0.12s,
+          box-shadow 0.12s,
+          transform 0.12s;
       }
       .actions .primary {
-        background: var(--wa-color-brand-fill-loud, #0b5cad);
-        color: white;
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+      }
+      .actions .primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        transform: translateY(-1px);
+      }
+      .actions .primary:active:not(:disabled) {
+        transform: translateY(0);
       }
       .actions .primary:disabled {
-        opacity: 0.6;
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary) 35%,
+          var(--wa-color-surface-default)
+        );
+        color: color-mix(in srgb, var(--esphome-on-primary), transparent 30%);
         cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
       }
       .error {
         color: var(--esphome-error, #d92d20);
@@ -208,14 +228,11 @@ export class ESPHomeAddAutomationDialog extends LitElement {
    * scope the trigger to), making the dialog non-recoverable.
    */
   public open(
-    prefill?:
-      | { kind: "device_on" }
-      | { kind: "component_on"; componentId: string },
+    prefill?: { kind: "device_on" } | { kind: "component_on"; componentId: string }
   ) {
     this._prefilled = prefill !== undefined;
     this._kind = prefill?.kind ?? "device_on";
-    this._componentId =
-      prefill?.kind === "component_on" ? prefill.componentId : "";
+    this._componentId = prefill?.kind === "component_on" ? prefill.componentId : "";
     this._triggerId = null;
     this._intervalValue = "";
     this._intervalUnit = "s";
@@ -228,9 +245,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     if (!this._api || !this.configuration) return;
     this._loading = true;
     try {
-      this._available = await this._api.getAvailableAutomations(
-        this.configuration,
-      );
+      this._available = await this._api.getAvailableAutomations(this.configuration);
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     } finally {
@@ -262,8 +277,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     // dialog reads as "pick a trigger" only. The remaining trigger
     // picker already filters by kind + componentId.
     const showKindRow = !this._prefilled;
-    const showComponentRow =
-      this._kind === "component_on" && !this._prefilled;
+    const showComponentRow = this._kind === "component_on" && !this._prefilled;
     return html`
       <p class="intro">
         ${renderMarkdown(this._localize("device.automation_header_description"))}
@@ -292,9 +306,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
             </wa-select>
           </div>`
         : nothing}
-      ${showComponentRow
-        ? this._renderComponentRow(componentLocked)
-        : nothing}
+      ${showComponentRow ? this._renderComponentRow(componentLocked) : nothing}
       ${this._kind === "interval" ? this._renderIntervalRow() : nothing}
       ${!triggerLocked ? this._renderTriggerRow(filteredTriggers) : nothing}
       ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
@@ -332,9 +344,10 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           this._onComponentChange((e.target as HTMLSelectElement).value)}
       >
         ${devices.map(
-          (d) => html`<wa-option value=${d.id} ?selected=${d.id === this._componentId}>
-            ${d.name ?? d.id} (${d.component_id})
-          </wa-option>`,
+          (d) =>
+            html`<wa-option value=${d.id} ?selected=${d.id === this._componentId}>
+              ${d.name ?? d.id} (${d.component_id})
+            </wa-option>`
         )}
       </wa-select>
     </div>`;
@@ -372,11 +385,10 @@ export class ESPHomeAddAutomationDialog extends LitElement {
           }}
         >
           ${units.map(
-            (u) => html`<wa-option
-              value=${u}
-              ?selected=${u === this._intervalUnit}
-              >${this._localize(`device.automation_action_delay_unit_${u}`)}</wa-option
-            >`,
+            (u) =>
+              html`<wa-option value=${u} ?selected=${u === this._intervalUnit}
+                >${this._localize(`device.automation_action_delay_unit_${u}`)}</wa-option
+              >`
           )}
         </wa-select>
       </div>
@@ -398,13 +410,13 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         aria-labelledby="trigger-label"
         value=${this._triggerId ?? ""}
         ?disabled=${this._saving}
-        @change=${(e: Event) =>
-          (this._triggerId = (e.target as HTMLSelectElement).value)}
+        @change=${(e: Event) => (this._triggerId = (e.target as HTMLSelectElement).value)}
       >
         ${triggers.map(
-          (t) => html`<wa-option value=${t.id} ?selected=${t.id === this._triggerId}>
-            ${t.name}
-          </wa-option>`,
+          (t) =>
+            html`<wa-option value=${t.id} ?selected=${t.id === this._triggerId}>
+              ${t.name}
+            </wa-option>`
         )}
       </wa-select>
       ${active?.description
@@ -422,29 +434,22 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       // it from the inline editor — they don't add another
       // automation. Hide those triggers from the picker.
       const takenDeviceTriggers = this._existingDeviceTriggers();
-      return all.filter(
-        (t) => t.is_device_level && !takenDeviceTriggers.has(t.id),
-      );
+      return all.filter((t) => t.is_device_level && !takenDeviceTriggers.has(t.id));
     }
     if (this._kind === "component_on") {
       if (!this._componentId) return [];
-      const device = this._available?.devices.find(
-        (d) => d.id === this._componentId,
-      );
+      const device = this._available?.devices.find((d) => d.id === this._componentId);
       if (!device) return [];
       const [domain] = device.component_id.split(".");
       // Same rule for component-bound triggers: an inline ``on_*:``
       // block under a component only fires once, so don't offer
       // triggers that already have a handler on this instance.
-      const takenComponentTriggers = this._existingComponentTriggers(
-        this._componentId,
-      );
+      const takenComponentTriggers = this._existingComponentTriggers(this._componentId);
       return all.filter(
         (t) =>
           !t.is_device_level &&
-          (t.applies_to.includes(device.component_id) ||
-            t.applies_to.includes(domain)) &&
-          !takenComponentTriggers.has(this._bareTrigger(t.id)),
+          (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain)) &&
+          !takenComponentTriggers.has(this._bareTrigger(t.id))
       );
     }
     return [];
@@ -534,7 +539,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         this.configuration,
         tree,
         location,
-        this.yaml,
+        this.yaml
       );
       this._dispatchAdded(location, yaml_diff);
       this._dialog.open = false;
@@ -563,8 +568,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       // catalog ids are always ``<domain>.<key>`` for non-device
       // triggers.
       const dotIdx = this._triggerId!.indexOf(".");
-      const bare =
-        dotIdx >= 0 ? this._triggerId!.slice(dotIdx + 1) : this._triggerId!;
+      const bare = dotIdx >= 0 ? this._triggerId!.slice(dotIdx + 1) : this._triggerId!;
       return {
         kind: "component_on",
         component_id: this._componentId,
@@ -579,7 +583,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
     // one. Parse the current draft yaml (which carries any pending
     // edits the user hasn't saved yet) to count what's there.
     const nextIndex = parseYamlAutomations(this.yaml).filter(
-      (s) => s.parentKey === "interval",
+      (s) => s.parentKey === "interval"
     ).length;
     return { kind: "interval", index: nextIndex };
   }
@@ -610,14 +614,14 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         detail: { yaml: newYaml },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this.dispatchEvent(
       new CustomEvent<{ sectionKey: string }>("automation-added", {
         detail: { sectionKey: sectionKeyFromLocation(location) },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }
