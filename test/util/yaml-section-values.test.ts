@@ -1410,4 +1410,20 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     expect(values.name).toBe("enabled-device");
     expect(values.comment).toBe("yesterday");
   });
+
+  it("leaves quoted boolean-looking words as strings", () => {
+    // YAML quoting is the explicit "force string" signal — a user
+    // who wrote ``mode: "on"`` or ``state: 'yes'`` wants the literal
+    // string. Without the quoted-scalar guard, the truthy-spelling
+    // table would corrupt those fields into boolean ``true`` and
+    // the round-trip would emit ``true:`` instead.
+    const values = parseYamlSectionValues(
+      `mqtt:\n  mode: "on"\n  state: 'yes'\n  fallback: "True"\n  hint: 'enable'\n`,
+      "mqtt",
+    );
+    expect(values.mode).toBe("on");
+    expect(values.state).toBe("yes");
+    expect(values.fallback).toBe("True");
+    expect(values.hint).toBe("enable");
+  });
 });

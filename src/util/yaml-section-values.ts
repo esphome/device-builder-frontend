@@ -305,10 +305,21 @@ const stripQuotes = (s: string): string => {
   return s;
 };
 
+// Quoting in YAML is the explicit "treat me as a string" signal —
+// ``key: "on"`` must stay the literal ``"on"`` even though ``on`` is
+// a truthy spelling. Detect the quotes BEFORE stripping so we only
+// run the boolean coercion on plain scalars; otherwise a string
+// field that happens to hold ``"on"`` / ``"yes"`` would silently
+// flip to boolean ``true`` on round-trip.
 const parseScalar = (raw: string): unknown => {
+  const wasQuoted =
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"));
   const v = stripQuotes(raw);
-  const bool = parseYamlBoolean(v);
-  if (bool !== null) return bool;
+  if (!wasQuoted) {
+    const bool = parseYamlBoolean(v);
+    if (bool !== null) return bool;
+  }
   return v;
 };
 
