@@ -123,10 +123,15 @@ export const deviceSectionConfigStyles = css`
     gap: var(--wa-space-s);
     padding-top: var(--wa-space-s);
   }
-  the empty state replaces the rows with a centred placeholder. */ .api-actions-table {
+  /* Manage-list block (Automations / API actions). Inline title +
+     "Add X" button on row 1, then either the rows or an empty
+     placeholder below — the breathing room between those two
+     reads as the visual divider, so the gap is deliberately
+     bigger than the row-to-row spacing inside the list. */
+  .api-actions-table {
     display: flex;
     flex-direction: column;
-    gap: var(--wa-space-xs);
+    gap: var(--wa-space-m);
     padding-top: var(--wa-space-s);
     border-top: 1px solid var(--wa-color-surface-border);
   }
