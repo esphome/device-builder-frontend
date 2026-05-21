@@ -11,6 +11,7 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   YamlRawValue,
   formatYamlScalar,
+  parseYamlBoolean,
   serializeYamlValues,
   type SerializeYamlOptions,
 } from "./yaml-serialize.js";
@@ -306,8 +307,8 @@ const stripQuotes = (s: string): string => {
 
 const parseScalar = (raw: string): unknown => {
   const v = stripQuotes(raw);
-  if (v === "true") return true;
-  if (v === "false") return false;
+  const bool = parseYamlBoolean(v);
+  if (bool !== null) return bool;
   return v;
 };
 

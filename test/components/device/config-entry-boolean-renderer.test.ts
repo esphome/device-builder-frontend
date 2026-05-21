@@ -78,19 +78,27 @@ describe("renderBooleanField default-value fallback", () => {
     ).toBe(true);
 
     // The ``checked`` computation must depend on whichever value
-    // wins the fallback (not just the raw). Pin both halves of the
-    // strict-equality compare so a stray truthy coercion (or
-    // dropping the string-form) fails loudly.
-    expect(/===\s*true\b/.test(fnSrc)).toBe(true);
-    expect(/===\s*"true"/.test(fnSrc)).toBe(true);
+    // wins the fallback (not just the raw). The renderer routes the
+    // value through ``parseYamlBoolean`` so every ESPHome YAML
+    // truthy spelling (``True`` / ``yes`` / ``on`` / ``enable``)
+    // collapses to the boolean primitive before the strict-equality
+    // compare — pin that shape so a stray refactor that drops the
+    // lenient parser silently regresses the case where the form
+    // value (or backend-supplied default) arrived as the uppercase
+    // string ``"True"``.
+    expect(
+      /parseYamlBoolean\(.*\)\s*===\s*true\b/.test(fnSrc),
+      "checked must route the fallback value through parseYamlBoolean " +
+        "so all ESPHome YAML boolean spellings (True / yes / on / enable) " +
+        "collapse to the boolean primitive — issue device-builder#923",
+    ).toBe(true);
 
     // ``checked`` must be derived from the same value that consulted
     // ``entry.default_value`` — pin that the strict-equality check
     // doesn't operate on a bare ``raw``. Use a non-greedy span to
     // confirm there's at least one ``=== true`` after the
     // fallback intermediate's assignment, and confirm none of the
-    // ``=== true`` / ``=== "true"`` lines compare against ``raw``
-    // directly.
+    // ``=== true`` lines compare against ``raw`` directly.
     expect(
       /raw\s*===\s*true\b/.test(fnSrc),
       "checked must be computed from the fallback intermediate, not raw directly",

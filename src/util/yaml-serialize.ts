@@ -348,3 +348,29 @@ export function formatYamlScalar(v: unknown): string {
   }
   return s;
 }
+
+// ESPHome's YAML loader accepts the YAML 1.1 truthy/falsy spellings
+// plus ``enable`` / ``disable``, all case-insensitive
+// (https://esphome.io/guides/yaml#scalars). The minimal scalar parser
+// in this repo only recognised lowercase ``true`` / ``false``, so a
+// user-typed ``True`` or ``enable`` round-tripped as a string and the
+// boolean toggle in the form view stuck OFF (issue device-builder#923).
+const YAML_TRUE_VALUES = new Set(["true", "yes", "on", "enable"]);
+const YAML_FALSE_VALUES = new Set(["false", "no", "off", "disable"]);
+
+/**
+ * Coerce *v* to boolean using ESPHome YAML's truthy/falsy spellings.
+ * Returns ``null`` when the input is neither a boolean nor one of the
+ * recognised string spellings — callers treat ``null`` as "not a
+ * boolean, leave the value as-is" (scalar parser) or "fall through to
+ * the default" (form renderer).
+ */
+export function parseYamlBoolean(v: unknown): boolean | null {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "string") {
+    const lower = v.toLowerCase();
+    if (YAML_TRUE_VALUES.has(lower)) return true;
+    if (YAML_FALSE_VALUES.has(lower)) return false;
+  }
+  return null;
+}

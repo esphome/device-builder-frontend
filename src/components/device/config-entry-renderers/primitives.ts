@@ -9,7 +9,7 @@ import {
   serializeFloatWithUnit,
 } from "../../../util/float-with-unit.js";
 import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
-import { YamlRawValue } from "../../../util/yaml-serialize.js";
+import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   renderFieldError,
@@ -327,6 +327,10 @@ export function renderFloatWithUnitField(
 // fields (esp32_ble_tracker.software_coexistence) reflect what ESPHome will
 // actually apply at compile time — otherwise the user sees OFF on a field
 // that's actually ON and saves a redundant explicit true:.
+//
+// Accept the full set of ESPHome YAML boolean spellings (true/yes/on/enable
+// and their case variants) so a user-typed ``True`` or ``enable`` in the
+// YAML editor reflects ON in the form view (issue device-builder#923).
 export function renderBooleanField(
   entry: ConfigEntry,
   path: string[],
@@ -334,7 +338,7 @@ export function renderBooleanField(
 ) {
   const raw = ctx.getAt(path);
   const effective = raw === undefined || raw === null ? entry.default_value : raw;
-  const checked = effective === true || effective === "true";
+  const checked = parseYamlBoolean(effective) === true;
   return html`
     <div class="switch-field" data-field-key=${path.join(".")}>
       <div class="field-info">
