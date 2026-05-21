@@ -69,7 +69,7 @@
     "action_show_api_key": "API-sleutel tonen",
     "action_download_yaml": "YAML downloaden",
     "action_rename": "Hostnaam hernoemen",
-    "action_edit_friendly_name": "Vriendelijke naam bewerken…",
+    "action_edit_friendly_name": "Vriendelijke naam bewerken",
     "action_clean_build": "Bouwbestanden opschonen",
     "action_download_elf": "ELF-bestand downloaden",
     "action_visit_web_ui": "Webinterface openen",
@@ -658,7 +658,7 @@
     "save_and_leave": "Opslaan"
   },
   "onboarding": {
-    "menu_item_setup_wifi": "Wi-Fi instellen…",
+    "menu_item_setup_wifi": "Wi-Fi instellen",
     "wifi": {
       "title": "Wi-Fi-inloggegevens instellen",
       "intro": "Uw apparaten gebruiken deze om verbinding te maken met uw netwerk. Ze worden één keer opgeslagen in secrets.yaml en gedeeld door elke configuratie die u maakt.",

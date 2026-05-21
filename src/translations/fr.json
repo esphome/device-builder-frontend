@@ -69,7 +69,7 @@
     "action_show_api_key": "Afficher la clé API",
     "action_download_yaml": "Télécharger le YAML",
     "action_rename": "Renommer l'hôte",
-    "action_edit_friendly_name": "Modifier le nom convivial…",
+    "action_edit_friendly_name": "Modifier le nom convivial",
     "action_clean_build": "Nettoyer les fichiers de compilation",
     "action_download_elf": "Télécharger le fichier ELF",
     "action_visit_web_ui": "Ouvrir l'interface web",
@@ -658,7 +658,7 @@
     "save_and_leave": "Enregistrer"
   },
   "onboarding": {
-    "menu_item_setup_wifi": "Configurer le Wi-Fi…",
+    "menu_item_setup_wifi": "Configurer le Wi-Fi",
     "wifi": {
       "title": "Configurer les identifiants Wi-Fi",
       "intro": "Vos appareils s'en servent pour rejoindre le réseau. Ils sont enregistrés une seule fois dans secrets.yaml et partagés entre toutes vos configurations.",

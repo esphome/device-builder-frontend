@@ -102,8 +102,8 @@
     "action_show_api_key": "API-kulcs megjelenítése",
     "action_download_yaml": "YAML letöltése",
     "action_rename": "Hosztnév átnevezése",
-    "action_clone": "Duplikálás…",
-    "action_edit_friendly_name": "Megjelenítési név szerkesztése…",
+    "action_clone": "Duplikálás",
+    "action_edit_friendly_name": "Megjelenítési név szerkesztése",
     "action_clean_build": "Összeállító fájlok törlése",
     "action_clean_build_busy": "Várd meg az aktuális összeállítás befejezését a törlés előtt",
     "action_download_elf": "ELF fájl letöltése",
@@ -699,7 +699,7 @@
     "device_name_edge_hyphen": "A kötőjellel kezdődő vagy végződő nevek nem érvényes mDNS-hosztnévként – az eszköz esetleg nem oldható fel RFC-szigorú hálózatokon"
   },
   "onboarding": {
-    "menu_item_setup_wifi": "Wi-Fi beállítása…",
+    "menu_item_setup_wifi": "Wi-Fi beállítása",
     "wifi": {
       "title": "Wi-Fi hitelesítő adatok beállítása",
       "intro": "Az eszközei ezeket használják a hálózathoz való csatlakozáshoz. Egyszer tárolódnak a secrets.yaml fájlban, és minden létrehozott konfiguráció megosztja őket.",
