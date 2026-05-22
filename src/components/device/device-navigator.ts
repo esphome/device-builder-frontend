@@ -2,6 +2,7 @@ import { consume } from "@lit/context";
 import {
   mdiArrowDecisionOutline,
   mdiChevronDown,
+  mdiChevronLeft,
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
@@ -47,6 +48,7 @@ import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
+  "chevron-left": mdiChevronLeft,
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
@@ -144,6 +146,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
       .card-header {
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: var(--wa-space-s);
         padding: var(--wa-space-s) var(--wa-space-m);
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
@@ -154,6 +158,26 @@ export class ESPHomeDeviceNavigator extends LitElement {
         margin: 0;
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
+      }
+
+      .collapse-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        color: var(--esphome-on-primary);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: var(--wa-border-radius-s);
+      }
+
+      .collapse-btn:hover {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+      }
+
+      .collapse-btn wa-icon {
+        font-size: 18px;
       }
 
       .card-body {
@@ -497,6 +521,15 @@ export class ESPHomeDeviceNavigator extends LitElement {
         ></esphome-add-script-dialog>
         <header class="card-header">
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
+          <button
+            type="button"
+            class="collapse-btn"
+            @click=${this._onCollapseClick}
+            title=${this._localize("device.hide_navigator")}
+            aria-label=${this._localize("device.hide_navigator")}
+          >
+            <wa-icon library="mdi" name="chevron-left"></wa-icon>
+          </button>
         </header>
         <div class="card-body">
           <p class="italic">${this._localize("device.navigator_desc")}</p>
@@ -581,6 +614,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
       })
     );
   }
+
+  /** Ask the page to hide the navigator. The page decides between
+   *  desktop (set ``_navCollapsed`` + persist) and mobile (close the
+   *  drawer) — we just say "I'd like to disappear". */
+  private _onCollapseClick = () => {
+    this.dispatchEvent(
+      new CustomEvent("nav-collapse", {
+        bubbles: true,
+        composed: true,
+      }),
+    );
+  };
 
   /**
    * Fire-and-forget catalog lookups for any sections whose name we

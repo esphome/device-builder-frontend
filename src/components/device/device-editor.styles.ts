@@ -5,20 +5,6 @@ export const deviceEditorStyles = css`
     display: contents;
   }
 
-  /* Fullscreen mode covers the surrounding app shell (top bar,
-     navigator, page padding). The card-header stays visible so the
-     user keeps Save / layout / Collapse within reach — same shape as
-     the logs dialog's expand mode. z-index sits above app chrome
-     (which uses values up to ~50) but below modal dialogs (>=1000). */
-  :host([fullscreen]) .card {
-    position: fixed;
-    inset: 0;
-    z-index: 100;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-  }
-
   .card {
     background: var(--wa-color-surface-default);
     border-radius: var(--wa-border-radius-l);
@@ -53,6 +39,10 @@ export const deviceEditorStyles = css`
   .card-header--compact .layout-toggle wa-icon,
   .card-header--compact .diff-toggle wa-icon {
     font-size: 16px;
+  }
+
+  ::slotted([slot="header-start"]) {
+    margin-right: var(--wa-space-xs);
   }
 
   .editor-header-main {
@@ -222,30 +212,6 @@ export const deviceEditorStyles = css`
 
   .diff-toggle wa-icon {
     font-size: 18px;
-  }
-
-  .fullscreen-toggle {
-    border: none;
-    background: transparent;
-    color: var(--esphome-on-primary);
-    padding: 2px 4px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .fullscreen-toggle wa-icon {
-    font-size: 18px;
-  }
-
-  .fullscreen-toggle:hover {
-    background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
-  }
-
-  .card-header--compact .fullscreen-toggle wa-icon {
-    font-size: 16px;
   }
 
   .layout-toggle {

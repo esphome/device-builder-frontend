@@ -11,10 +11,10 @@
  * navigator to the new ``automation:api_action:<name>`` section.
  */
 import { consume } from "@lit/context";
-import toast from "sonner-js";
 import { mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/index.js";
 import type {
@@ -24,16 +24,13 @@ import type {
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { espHomeStyles } from "../../styles/shared.js";
 import { inputStyles } from "../../styles/inputs.js";
+import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeEspHomeId } from "../../util/esphome-id.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
-import {
-  applyYamlDiff,
-  sectionKeyFromLocation,
-} from "./automation-editor/serialise.js";
+import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -107,22 +104,49 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         gap: var(--wa-space-s);
         margin-top: var(--wa-space-l);
       }
+
       .actions button {
-        appearance: none;
-        border: 1px solid transparent;
-        padding: var(--wa-space-2xs) var(--wa-space-m);
-        border-radius: var(--wa-border-radius-s);
+        display: inline-flex;
+        align-items: center;
+        box-sizing: border-box;
+        gap: 3px;
+        padding: 7px 14px;
+        border: var(--wa-border-width-s) solid transparent;
+        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-semibold);
+        font-size: var(--wa-font-size-xs);
+        font-weight: var(--wa-font-weight-bold);
+        font-family: inherit;
+        line-height: 1;
+        transition:
+          background 0.12s,
+          border-color 0.12s,
+          box-shadow 0.12s,
+          transform 0.12s;
       }
       .actions .primary {
-        background: var(--wa-color-brand-fill-loud, #0b5cad);
-        color: white;
+        background: var(--esphome-primary);
+        color: var(--esphome-on-primary);
+        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+      }
+      .actions .primary:hover:not(:disabled) {
+        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        transform: translateY(-1px);
+      }
+      .actions .primary:active:not(:disabled) {
+        transform: translateY(0);
       }
       .actions .primary:disabled {
-        opacity: 0.6;
+        background: color-mix(
+          in srgb,
+          var(--esphome-primary) 35%,
+          var(--wa-color-surface-default)
+        );
+        color: color-mix(in srgb, var(--esphome-on-primary), transparent 30%);
         cursor: not-allowed;
+        box-shadow: none;
+        transform: none;
       }
       .error {
         color: var(--esphome-error, #d92d20);
@@ -146,9 +170,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
       : this._localize("device.add_api_action");
     return html`<wa-dialog light-dismiss label=${title}>
       <p class="intro">
-        ${renderMarkdown(
-          this._localize("device.api_action_header_description"),
-        )}
+        ${renderMarkdown(this._localize("device.api_action_header_description"))}
       </p>
       <div class="field">
         <label class="field-label" for="api-action-id-input">
@@ -160,13 +182,11 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           type="text"
           .value=${this._name}
           placeholder=${this._localize(
-            "device.automation_target_api_action_id_placeholder",
+            "device.automation_target_api_action_id_placeholder"
           )}
           ?disabled=${this._saving}
           @input=${(e: Event) => {
-            this._name = normalizeEspHomeId(
-              (e.target as HTMLInputElement).value,
-            );
+            this._name = normalizeEspHomeId((e.target as HTMLInputElement).value);
             this._error = "";
           }}
         />
@@ -193,7 +213,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
     // the current draft YAML. Backend would reject the upsert, but
     // catching it here gives instant feedback without a round-trip.
     const taken = parseYamlAutomations(this.yaml).some(
-      (s) => s.key === `automation:api_action:${this._name}`,
+      (s) => s.key === `automation:api_action:${this._name}`
     );
     return !taken;
   }
@@ -216,7 +236,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
         this.configuration,
         tree,
         location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       this.dispatchEvent(
@@ -224,14 +244,14 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
       this.dispatchEvent(
         new CustomEvent<{ sectionKey: string }>("automation-added", {
           detail: { sectionKey: sectionKeyFromLocation(location) },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
       this._dialog.open = false;
     } catch (err) {

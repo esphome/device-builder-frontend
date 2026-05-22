@@ -17,6 +17,7 @@ import {
   mdiArrowDown,
   mdiArrowUp,
   mdiClose,
+  mdiDelete,
   mdiPencilOutline,
   mdiPlus,
 } from "@mdi/js";
@@ -55,6 +56,7 @@ registerMdiIcons({
   "arrow-down": mdiArrowDown,
   "arrow-up": mdiArrowUp,
   close: mdiClose,
+  delete: mdiDelete,
   "pencil-outline": mdiPencilOutline,
   plus: mdiPlus,
 });
@@ -143,7 +145,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
     const lastIdx = this.conditions.length - 1;
     return html`
       <div class="ae-row">
-        <div class="ae-row-body">
+        <div class="ae-row-header">
           <button
             type="button"
             class="ae-row-picker"
@@ -155,8 +157,37 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
+          <div class="ae-row-controls">
+            <button
+              type="button"
+              ?disabled=${this.disabled || idx === 0}
+              aria-label=${this._localize("device.automation_move_up")}
+              @click=${() => this._move(idx, idx - 1)}
+            >
+              <wa-icon library="mdi" name="arrow-up"></wa-icon>
+            </button>
+            <button
+              type="button"
+              ?disabled=${this.disabled || idx === lastIdx}
+              aria-label=${this._localize("device.automation_move_down")}
+              @click=${() => this._move(idx, idx + 1)}
+            >
+              <wa-icon library="mdi" name="arrow-down"></wa-icon>
+            </button>
+            <button
+              type="button"
+              class="ae-row-delete"
+              ?disabled=${this.disabled}
+              aria-label=${this._localize("device.automation_remove")}
+              @click=${() => this._remove(idx)}
+            >
+              <wa-icon library="mdi" name="delete"></wa-icon>
+            </button>
+          </div>
+        </div>
+        <div class="ae-row-body">
           ${def?.description
-            ? html`<p class="ae-section-desc">
+            ? html`<p class="ae-row-desc">
                 ${renderMarkdown(def.description)}
               </p>`
             : nothing}
@@ -190,32 +221,6 @@ export class ESPHomeAutomationConditionTree extends LitElement {
                 ></esphome-automation-condition-tree>
               </div>`
             : nothing}
-        </div>
-        <div class="ae-row-controls">
-          <button
-            type="button"
-            ?disabled=${this.disabled || idx === 0}
-            aria-label=${this._localize("device.automation_move_up")}
-            @click=${() => this._move(idx, idx - 1)}
-          >
-            <wa-icon library="mdi" name="arrow-up"></wa-icon>
-          </button>
-          <button
-            type="button"
-            ?disabled=${this.disabled || idx === lastIdx}
-            aria-label=${this._localize("device.automation_move_down")}
-            @click=${() => this._move(idx, idx + 1)}
-          >
-            <wa-icon library="mdi" name="arrow-down"></wa-icon>
-          </button>
-          <button
-            type="button"
-            ?disabled=${this.disabled}
-            aria-label=${this._localize("device.automation_remove")}
-            @click=${() => this._remove(idx)}
-          >
-            <wa-icon library="mdi" name="close"></wa-icon>
-          </button>
         </div>
       </div>
     `;

@@ -1345,3 +1345,85 @@ _internal:
     expect(after).not.toContain("empty_field:");
   });
 });
+
+describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
+  // ESPHome's YAML accepts ``true|yes|on|enable`` / ``false|no|off|disable``
+  // case-insensitively (https://esphome.io/guides/yaml#scalars). The
+  // section parser feeds the form view, so every accepted spelling has
+  // to surface as the boolean primitive — otherwise the form's
+  // boolean toggle stays OFF on a user-typed ``True`` (issue
+  // device-builder#923).
+  const TRUTHY = [
+    "true",
+    "True",
+    "TRUE",
+    "yes",
+    "Yes",
+    "YES",
+    "on",
+    "On",
+    "ON",
+    "enable",
+    "Enable",
+    "ENABLE",
+  ];
+  const FALSY = [
+    "false",
+    "False",
+    "FALSE",
+    "no",
+    "No",
+    "NO",
+    "off",
+    "Off",
+    "OFF",
+    "disable",
+    "Disable",
+    "DISABLE",
+  ];
+
+  for (const spelling of TRUTHY) {
+    it(`parses ${spelling} as boolean true`, () => {
+      const values = parseYamlSectionValues(
+        `wifi:\n  fast_connect: ${spelling}\n`,
+        "wifi",
+      );
+      expect(values.fast_connect).toBe(true);
+    });
+  }
+
+  for (const spelling of FALSY) {
+    it(`parses ${spelling} as boolean false`, () => {
+      const values = parseYamlSectionValues(
+        `wifi:\n  fast_connect: ${spelling}\n`,
+        "wifi",
+      );
+      expect(values.fast_connect).toBe(false);
+    });
+  }
+
+  it("leaves non-boolean strings that resemble words alone", () => {
+    const values = parseYamlSectionValues(
+      "esphome:\n  name: enabled-device\n  comment: yesterday\n",
+      "esphome",
+    );
+    expect(values.name).toBe("enabled-device");
+    expect(values.comment).toBe("yesterday");
+  });
+
+  it("leaves quoted boolean-looking words as strings", () => {
+    // YAML quoting is the explicit "force string" signal — a user
+    // who wrote ``mode: "on"`` or ``state: 'yes'`` wants the literal
+    // string. Without the quoted-scalar guard, the truthy-spelling
+    // table would corrupt those fields into boolean ``true`` and
+    // the round-trip would emit ``true:`` instead.
+    const values = parseYamlSectionValues(
+      `mqtt:\n  mode: "on"\n  state: 'yes'\n  fallback: "True"\n  hint: 'enable'\n`,
+      "mqtt",
+    );
+    expect(values.mode).toBe("on");
+    expect(values.state).toBe("yes");
+    expect(values.fallback).toBe("True");
+    expect(values.hint).toBe("enable");
+  });
+});

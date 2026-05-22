@@ -28,6 +28,7 @@ import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   parseTopLevelComponents,
+  parseYamlBoolean,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
@@ -683,7 +684,7 @@ export class ESPHomeAddComponentForm extends LitElement {
           typeof raw === "number" ? raw : Number.parseFloat(String(raw));
         if (!Number.isNaN(n)) out[entry.key] = n;
       } else if (entry.type === ConfigEntryType.BOOLEAN) {
-        out[entry.key] = raw === true || raw === "true";
+        out[entry.key] = parseYamlBoolean(raw) === true;
       } else {
         out[entry.key] = raw;
       }

@@ -14,7 +14,6 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { renderMarkdown } from "../../util/markdown.js";
@@ -22,6 +21,10 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeAddAutomationDialog } from "./add-automation-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
+import type { ESPHomeApiActionEditor } from "./automation-editor/api-action-editor.js";
+import type { ESPHomeAutomationEditor } from "./automation-editor/automation-editor.js";
+import type { ESPHomeScriptEditor } from "./automation-editor/script-editor.js";
+import { isEmptyToPopulatedYamlChange } from "./device-board-info-helpers.js";
 import type { ESPHomeDeviceSectionConfig } from "./device-section-config.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
@@ -30,11 +33,11 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./add-automation-dialog.js";
 import "./add-component-dialog.js";
 import "./add-config-dialog.js";
-import "./automation-editor/automation-editor.js";
 import "./automation-editor/api-action-editor.js";
+import "./automation-editor/automation-editor.js";
 import "./automation-editor/script-editor.js";
-import "./device-section-config.js";
 import { locationFromSectionKey } from "./automation-editor/serialise.js";
+import "./device-section-config.js";
 
 registerMdiIcons({
   "open-in-new": mdiOpenInNew,
@@ -86,6 +89,20 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
   @query("esphome-device-section-config")
   private _sectionConfig!: ESPHomeDeviceSectionConfig;
 
+  /** Refs to the three automation-family editors — one of these is
+   *  mounted in the right pane when the navigator's selection lives
+   *  under ``automation:`` (script / api_action / device-on /
+   *  component-on / interval). YAML-driven reloads target whichever
+   *  one is live. */
+  @query("esphome-automation-editor")
+  private _automationEditor!: ESPHomeAutomationEditor;
+
+  @query("esphome-script-editor")
+  private _scriptEditor!: ESPHomeScriptEditor;
+
+  @query("esphome-api-action-editor")
+  private _apiActionEditor!: ESPHomeApiActionEditor;
+
   @query("esphome-add-component-dialog")
   private _addComponentDialog!: ESPHomeAddComponentDialog;
 
@@ -110,7 +127,13 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
     // which Lit batches into the same render pass that's about
     // to run anyway — no extra paint, no recursion. A separate
     // `requestAnimationFrame` would just delay the effect.
-    if (changedProperties.has("yaml") && this.selectedSection && this._sectionConfig) {
+    if (changedProperties.has("yaml") && this.selectedSection) {
+      const reload = () => {
+        this._sectionConfig?.reload();
+        this._automationEditor?.reload();
+        this._scriptEditor?.reload();
+        this._apiActionEditor?.reload();
+      };
       if (this._reloadTimer) {
         clearTimeout(this._reloadTimer);
         this._reloadTimer = null;
@@ -120,9 +143,9 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
         // Synchronous bypass: no timer to track, leave
         // `_reloadTimer` at its just-cleared `null` so the
         // "null means no timer" invariant holds.
-        this._sectionConfig.reload();
+        reload();
       } else {
-        this._reloadTimer = setTimeout(() => this._sectionConfig?.reload(), 1000);
+        this._reloadTimer = setTimeout(reload, 1000);
       }
     }
   }
@@ -379,9 +402,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
                     <wa-icon library="mdi" name="open-in-new"></wa-icon>
                   </a>
                 </div>
-                <p class="board-description">
-                  ${renderMarkdown(board.description)}
-                </p>
+                <p class="board-description">${renderMarkdown(board.description)}</p>
               </div>
               <div class="board-image">
                 <img
@@ -477,9 +498,7 @@ export class ESPHomeDeviceBoardInfo extends LitElement {
    */
   private _renderSelectedSection() {
     const key = this.selectedSection!;
-    const location = key.startsWith("automation:")
-      ? locationFromSectionKey(key)
-      : null;
+    const location = key.startsWith("automation:") ? locationFromSectionKey(key) : null;
     if (location?.kind === "script") {
       return html`<esphome-script-editor
         .configuration=${this.configuration}

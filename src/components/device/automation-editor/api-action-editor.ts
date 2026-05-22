@@ -22,10 +22,10 @@
  * skip clobbering an in-flight write.
  */
 import { consume } from "@lit/context";
-import toast from "sonner-js";
+import { mdiDelete, mdiOpenInNew, mdiWebhook } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { mdiDelete, mdiOpenInNew, mdiWebhook } from "@mdi/js";
+import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
@@ -36,19 +36,19 @@ import type {
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
+import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import "./callable-params-editor.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
   sectionKeyFromLocation,
 } from "./serialise.js";
-import "./automation-action-list.js";
-import "./callable-params-editor.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -112,6 +112,7 @@ export class ESPHomeApiActionEditor extends LitElement {
   private _applyTimer: ReturnType<typeof setTimeout> | null = null;
   private _applyInFlight = false;
   private _applyDirty = false;
+  private _lastSelfWrittenYaml: string | null = null;
 
   /** Brief-window dirty flag covering the 200ms debounce gap so the
    *  global save button activates as soon as the user types. */
@@ -135,7 +136,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -150,7 +151,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         detail: { node: this },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -162,15 +163,8 @@ export class ESPHomeApiActionEditor extends LitElement {
     // api_action in the navigator) — invalidate the stale value so
     // the hydrate path below re-fetches.
     if (changed.has("location") && !this.addMode) {
-      const prev = changed.get("location") as
-        | ApiActionLocation
-        | null
-        | undefined;
-      if (
-        prev &&
-        this.location &&
-        prev.action_name !== this.location.action_name
-      ) {
+      const prev = changed.get("location") as ApiActionLocation | null | undefined;
+      if (prev && this.location && prev.action_name !== this.location.action_name) {
         this.value = null;
       }
     }
@@ -218,32 +212,20 @@ export class ESPHomeApiActionEditor extends LitElement {
     const conditions = this._available?.conditions ?? [];
     const disabled = this._deleting;
     return html`
-      ${this._renderHeader()}
-      ${this._renderActionNameField(disabled)}
+      ${this._renderHeader()} ${this._renderActionNameField(disabled)}
       <esphome-callable-params-editor
-        .value=${(automation.trigger_params.variables ?? {}) as Record<
-          string,
-          string
-        >}
+        .value=${(automation.trigger_params.variables ?? {}) as Record<string, string>}
         ?disabled=${disabled}
         .fieldLabel=${this._localize("device.api_action_variables")}
-        .description=${this._localize(
-          "device.api_action_variables_description",
-        )}
+        .description=${this._localize("device.api_action_variables_description")}
         .addLabel=${this._localize("device.api_action_add_variable")}
-        .namePlaceholder=${this._localize(
-          "device.api_action_variable_name_placeholder",
-        )}
+        .namePlaceholder=${this._localize("device.api_action_variable_name_placeholder")}
         @value-change=${this._onVariablesChange}
       ></esphome-callable-params-editor>
       <div class="field">
-        <label class="field-label">
-          ${this._localize("device.automation_action")}
-        </label>
+        <label class="field-label"> ${this._localize("device.automation_action")} </label>
         <p class="field-description">
-          ${renderMarkdown(
-            this._localize("device.api_action_actions_description"),
-          )}
+          ${renderMarkdown(this._localize("device.api_action_actions_description"))}
         </p>
         <esphome-automation-action-list
           no-header
@@ -258,9 +240,7 @@ export class ESPHomeApiActionEditor extends LitElement {
           @actions-change=${this._onActionsChange}
         ></esphome-automation-action-list>
       </div>
-      ${this._error
-        ? html`<p class="ae-error" role="alert">${this._error}</p>`
-        : nothing}
+      ${this._error ? html`<p class="ae-error" role="alert">${this._error}</p>` : nothing}
       ${this.location && this.value && !this.addMode
         ? html`<div class="ae-actions">
             <button
@@ -283,19 +263,12 @@ export class ESPHomeApiActionEditor extends LitElement {
         <h2 class="ae-header-title">
           ${this._localize("device.api_action_header_title_static")}
         </h2>
-        <a
-          class="ae-header-docs"
-          href=${API_DOCS_URL}
-          target="_blank"
-          rel="noreferrer"
-        >
+        <a class="ae-header-docs" href=${API_DOCS_URL} target="_blank" rel="noreferrer">
           ${this._localize("device.docs")}
           <wa-icon library="mdi" name="open-in-new"></wa-icon>
         </a>
         <p class="ae-header-desc">
-          ${renderMarkdown(
-            this._localize("device.api_action_header_description"),
-          )}
+          ${renderMarkdown(this._localize("device.api_action_header_description"))}
         </p>
       </div>
       <div class="ae-header-icon">
@@ -348,9 +321,7 @@ export class ESPHomeApiActionEditor extends LitElement {
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     try {
-      this._available = await this._api.getAvailableAutomations(
-        this.configuration,
-      );
+      this._available = await this._api.getAvailableAutomations(this.configuration);
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     }
@@ -364,12 +335,10 @@ export class ESPHomeApiActionEditor extends LitElement {
       // and miss the just-inserted entry.
       const parsed = await this._api.parseDeviceAutomations(
         this.configuration,
-        this.yaml,
+        this.yaml
       );
       const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find(
-        (p) => sectionKeyFromLocation(p.location) === wantKey,
-      );
+      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
       if (match && match.location.kind === "api_action") {
         this.value = match.automation;
         this.location = match.location;
@@ -382,6 +351,20 @@ export class ESPHomeApiActionEditor extends LitElement {
     }
   }
 
+  /**
+   * Re-hydrate from the live YAML. Called by the parent
+   * (``device-board-info``) when the YAML pane changes the document
+   * out from under us — mirrors device-section-config.reload() and
+   * automation/script reload() so editing YAML in the pane updates
+   * the visual editor.
+   */
+  public reload(): void {
+    if (this.addMode || !this.location) return;
+    if (this._applyInFlight) return;
+    if (this.yaml === this._lastSelfWrittenYaml) return;
+    void this._hydrateFromBackend();
+  }
+
   private _setDirty(value: boolean): void {
     if (this._dirty === value) return;
     this._dirty = value;
@@ -390,7 +373,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         detail: { dirty: value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -404,9 +387,7 @@ export class ESPHomeApiActionEditor extends LitElement {
     this._scheduleAutoApply();
   }
 
-  private _onVariablesChange = (
-    e: CustomEvent<{ value: Record<string, string> }>,
-  ) => {
+  private _onVariablesChange = (e: CustomEvent<{ value: Record<string, string> }>) => {
     e.stopPropagation();
     const automation = this.value ?? emptyAutomationTree();
     this._withValue({
@@ -417,9 +398,7 @@ export class ESPHomeApiActionEditor extends LitElement {
     });
   };
 
-  private _onActionsChange = (
-    e: CustomEvent<{ actions: AutomationTree["actions"] }>,
-  ) => {
+  private _onActionsChange = (e: CustomEvent<{ actions: AutomationTree["actions"] }>) => {
     e.stopPropagation();
     this._withValue({ actions: e.detail.actions });
   };
@@ -435,7 +414,7 @@ export class ESPHomeApiActionEditor extends LitElement {
         detail: { value, location: this.location },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._scheduleAutoApply();
   }
@@ -464,15 +443,17 @@ export class ESPHomeApiActionEditor extends LitElement {
         this.configuration,
         this.value,
         this.location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
+
+      this._lastSelfWrittenYaml = newYaml;
       this.dispatchEvent(
         new CustomEvent<{ yaml: string }>("yaml-draft", {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =
@@ -507,7 +488,7 @@ export class ESPHomeApiActionEditor extends LitElement {
       const { yaml_diff } = await this._api.deleteAutomation(
         this.configuration,
         this.location,
-        this.yaml,
+        this.yaml
       );
       const newYaml = applyYamlDiff(this.yaml, yaml_diff);
       await this._api.updateConfig(this.configuration, newYaml);
@@ -516,14 +497,14 @@ export class ESPHomeApiActionEditor extends LitElement {
           detail: { yaml: newYaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
       this.dispatchEvent(
         new CustomEvent<{ sectionKey: string | null }>("section-select", {
           detail: { sectionKey: null },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
     } catch (err) {
       const msg =

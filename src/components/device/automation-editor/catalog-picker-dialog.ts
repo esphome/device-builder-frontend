@@ -34,7 +34,7 @@
  * whole device state).
  */
 import { consume } from "@lit/context";
-import { mdiClose, mdiMagnify } from "@mdi/js";
+import { mdiClose, mdiMagnify, mdiPlus } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 
@@ -45,15 +45,15 @@ import type {
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-registerMdiIcons({ close: mdiClose, magnify: mdiMagnify });
+registerMdiIcons({ close: mdiClose, magnify: mdiMagnify, plus: mdiPlus });
 
 /** Catalog kind the dialog is rendering. Drives the "By target"
  *  tab visibility and the result-shape of picks. */
@@ -122,60 +122,77 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         padding: 0;
       }
 
+      /* Search field — mirrors the dashboard's .search-wrap +
+         .search-input pattern (absolute-positioned leading icon over
+         a fully-chromed native <input> that inherits styling from
+         inputStyles). Padding lives on the outer container so the
+         input has breathing room from the dialog edges. */
       .picker-search {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-2xs);
-        padding: var(--wa-space-s) var(--wa-space-l);
-        border-bottom: 1px solid
-          var(--wa-color-neutral-border-quiet, #e1e4e8);
+        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      .picker-search wa-icon {
+      .picker-search-wrap {
+        position: relative;
+      }
+
+      .picker-search-icon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        font-size: 18px;
         color: var(--wa-color-text-quiet);
-        flex: 0 0 auto;
+        pointer-events: none;
+        z-index: 1;
       }
 
-      .picker-search input {
-        flex: 1 1 auto;
-        border: none;
-        background: transparent;
-        outline: none;
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-normal);
+      .picker-search-wrap .picker-search-input {
+        padding-left: 36px;
       }
 
       .picker-tabs {
-        display: flex;
-        gap: var(--wa-space-2xs);
-        padding: var(--wa-space-s) var(--wa-space-l) 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        padding: 4px;
+        margin: 0 var(--wa-space-l) var(--wa-space-s);
         background: var(--wa-color-surface-lowered);
-        border-bottom: 1px solid
-          var(--wa-color-neutral-border-quiet, #e1e4e8);
+        border-radius: var(--wa-border-radius-m);
+        color: var(--wa-color-text-quiet);
       }
 
       .picker-tab {
         appearance: none;
         border: none;
         background: transparent;
-        color: var(--wa-color-text-quiet);
-        padding: var(--wa-space-2xs) var(--wa-space-m);
+        color: inherit;
+        padding: 4px var(--wa-space-m);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-semibold);
+        font-family: inherit;
         cursor: pointer;
-        border-bottom: 2px solid transparent;
-        margin-bottom: -1px;
+        border-radius: calc(var(--wa-border-radius-m) - 2px);
+        transition:
+          background 0.12s,
+          color 0.12s,
+          box-shadow 0.12s;
+      }
+
+      .picker-tab:hover:not(.active) {
+        color: var(--wa-color-text-normal);
       }
 
       .picker-tab.active {
-        color: var(--wa-color-brand-fill-loud, #0b5cad);
-        border-bottom-color: var(--wa-color-brand-fill-loud, #0b5cad);
+        background: var(--wa-color-surface-raised);
+        color: var(--wa-color-text-normal);
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
       }
 
       .picker-body {
-        max-height: 60vh;
+        height: min(60vh, 500px);
+        min-height: 320px;
         overflow-y: auto;
-        padding: var(--wa-space-s) var(--wa-space-l) var(--wa-space-l);
+        padding: 0 var(--wa-space-l) var(--wa-space-l);
       }
 
       .picker-group-label {
@@ -184,27 +201,28 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         color: var(--wa-color-text-quiet);
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        margin: var(--wa-space-m) 0 var(--wa-space-2xs);
+        margin: var(--wa-space-m) var(--wa-space-2xs) var(--wa-space-2xs);
       }
 
       .picker-group-label:first-child {
-        margin-top: 0;
+        margin-top: var(--wa-space-2xs);
       }
 
       .picker-row {
         display: grid;
         grid-template-columns: 1fr auto;
         align-items: center;
-        gap: var(--wa-space-s);
-        padding: var(--wa-space-s);
-        border-radius: var(--wa-border-radius-s);
+        gap: var(--wa-space-m);
+        padding: var(--wa-space-s) var(--wa-space-m);
+        border-radius: var(--wa-border-radius-m);
         cursor: pointer;
-        border: 1px solid transparent;
+        transition: background 0.12s;
       }
 
-      .picker-row:hover {
+      .picker-row:hover,
+      .picker-row:focus-visible {
         background: var(--wa-color-surface-lowered);
-        border-color: var(--wa-color-neutral-border-quiet, #e1e4e8);
+        outline: none;
       }
 
       .picker-row-body {
@@ -233,22 +251,38 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       }
 
       .picker-row-add {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 24px;
-        height: 24px;
+        display: grid;
+        place-items: center;
+        width: 28px;
+        height: 28px;
         border-radius: 50%;
-        background: var(--wa-color-brand-fill-loud, #0b5cad);
-        color: white;
-        font-size: 14px;
+        background: transparent;
+        color: var(--wa-color-text-quiet);
         flex: 0 0 auto;
+        line-height: 0;
+        transition:
+          background 0.12s,
+          color 0.12s;
+      }
+
+      .picker-row-add wa-icon {
+        display: block;
+        width: 18px;
+        height: 18px;
+        font-size: 18px;
+        line-height: 0;
+      }
+
+      .picker-row:hover .picker-row-add,
+      .picker-row:focus-visible .picker-row-add {
+        background: var(--wa-color-brand-fill-loud, #009fee);
+        color: var(--wa-color-brand-on-loud, #ffffff);
       }
 
       .picker-empty {
         text-align: center;
         color: var(--wa-color-text-quiet);
-        font-size: var(--wa-font-size-2xs);
+        font-size: var(--wa-font-size-s);
         padding: var(--wa-space-xl) var(--wa-space-l);
         font-style: italic;
       }
@@ -272,31 +306,42 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
 
     return html`<wa-dialog light-dismiss label=${title}>
       <div class="picker-search">
-        <wa-icon library="mdi" name="magnify"></wa-icon>
-        <input
-          type="text"
-          .value=${this._query}
-          placeholder=${placeholder}
-          @input=${(e: Event) =>
-            (this._query = (e.target as HTMLInputElement).value)}
-        />
+        <div class="picker-search-wrap">
+          <wa-icon
+            class="picker-search-icon"
+            library="mdi"
+            name="magnify"
+            aria-hidden="true"
+          ></wa-icon>
+          <input
+            class="picker-search-input"
+            type="search"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-label=${placeholder}
+            .value=${this._query}
+            placeholder=${placeholder}
+            @input=${(e: Event) => (this._query = (e.target as HTMLInputElement).value)}
+          />
+        </div>
       </div>
       <div class="picker-tabs" role="tablist">
         ${tabs.map(
-          (tab) => html`<button
-            type="button"
-            role="tab"
-            class="picker-tab ${this._activeTab === tab ? "active" : ""}"
-            aria-selected=${this._activeTab === tab}
-            @click=${() => (this._activeTab = tab)}
-          >
-            ${this._tabLabel(tab)}
-          </button>`,
+          (tab) =>
+            html`<button
+              type="button"
+              role="tab"
+              class="picker-tab ${this._activeTab === tab ? "active" : ""}"
+              aria-selected=${this._activeTab === tab}
+              @click=${() => (this._activeTab = tab)}
+            >
+              ${this._tabLabel(tab)}
+            </button>`
         )}
       </div>
-      <div class="picker-body" role="tabpanel">
-        ${this._renderActiveTab()}
-      </div>
+      <div class="picker-body" role="tabpanel">${this._renderActiveTab()}</div>
     </wa-dialog>`;
   }
 
@@ -376,11 +421,9 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
           <span class="ae-muted">(${device.component_id})</span>
         </p>
         ${matching.map((item) =>
-          this._renderRow(item, () =>
-            this._pick(item.id, this._preFillFor(item, device)),
-          ),
+          this._renderRow(item, () => this._pick(item.id, this._preFillFor(item, device)))
         )}
-      `,
+      `
     )}`;
   }
 
@@ -411,9 +454,9 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
       (domain) => html`
         <p class="picker-group-label">${domain}</p>
         ${(byDomain.get(domain) ?? []).map((item) =>
-          this._renderRow(item, () => this._pick(item.id)),
+          this._renderRow(item, () => this._pick(item.id))
         )}
-      `,
+      `
     )}`;
   }
 
@@ -425,17 +468,13 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    * for the condition picker.
    */
   private _renderBuildingBlocks(items: CatalogItem[]) {
-    const core = items.filter(
-      (i) => "domain" in i && i.domain === "core",
-    );
+    const core = items.filter((i) => "domain" in i && i.domain === "core");
     if (core.length === 0) {
       return html`<p class="picker-empty">
         ${this._localize("device.automation_pick_no_results")}
       </p>`;
     }
-    return html`${core.map((item) =>
-      this._renderRow(item, () => this._pick(item.id)),
-    )}`;
+    return html`${core.map((item) => this._renderRow(item, () => this._pick(item.id)))}`;
   }
 
   private _renderRow(item: CatalogItem, onClick: () => void) {
@@ -459,7 +498,9 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
             </span>`
           : nothing}
       </div>
-      <span class="picker-row-add" aria-hidden="true">+</span>
+      <span class="picker-row-add" aria-hidden="true">
+        <wa-icon library="mdi" name="plus"></wa-icon>
+      </span>
     </div>`;
   }
 
@@ -471,12 +512,10 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
    */
   private _preFillFor(
     item: CatalogItem,
-    device: AvailableComponentInstance,
+    device: AvailableComponentInstance
   ): Record<string, unknown> | undefined {
     const [domain] = device.component_id.split(".");
-    const idEntry = item.config_entries.find(
-      (e) => e.references_component === domain,
-    );
+    const idEntry = item.config_entries.find((e) => e.references_component === domain);
     if (!idEntry) return undefined;
     return { [idEntry.key]: device.id };
   }
@@ -487,7 +526,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
         detail: { id, preFilledParams },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._dialog.open = false;
   }

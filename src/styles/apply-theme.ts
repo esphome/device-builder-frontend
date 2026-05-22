@@ -58,13 +58,10 @@ function applyEspHomeTokens(): void {
   style.textContent = `
     :root {
       --esphome-svg-filter: none;
-
-      /* Brand / primary — inherits HA's --primary-color when embedded,
-         falls back to HA's #009ac7 (ha-color-primary-40) standalone. */
-      --wa-color-brand-fill-loud: var(--primary-color, #009ac7);
+      --wa-color-brand-fill-loud: var(--primary-color, #009fee);
       --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
-      --wa-color-brand-fill-quiet: var(--state-active-color, rgba(0, 154, 199, 0.12));
-      --wa-color-brand-on-quiet: var(--primary-color, #009ac7);
+      --wa-color-brand-fill-quiet: var(--state-active-color, rgba(0, 159, 238, 0.12));
+      --wa-color-brand-on-quiet: var(--primary-color, #009fee);
     }
 
     /* Surfaces and text — remap WebAwesome's surface/text tokens to

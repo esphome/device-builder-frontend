@@ -289,22 +289,51 @@ export const automationEditorStyles = css`
     margin-left: var(--wa-space-2xs);
   }
 
-  /* One row in an action or condition list. */
   .ae-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
+    display: flex;
+    flex-direction: column;
     gap: var(--wa-space-s);
     padding: var(--wa-space-m);
-    border: 1px solid var(--wa-color-neutral-border-quiet, #e1e4e8);
+    border: 1px solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-m);
-    background: var(--wa-color-surface-lowered);
+    background: var(--wa-color-surface-raised);
+    transition:
+      border-color 0.15s,
+      box-shadow 0.15s;
   }
 
-  /* Collapsed variant — tighter padding so the compact one-line
-     view doesn't visually look the same height as an expanded row.
-     The controls stay full-size; only the body gets squeezed. */
+  .ae-row:hover {
+    border-color: color-mix(in srgb, var(--wa-color-text-normal), transparent 80%);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.03),
+      0 2px 8px rgba(0, 0, 0, 0.04);
+  }
+
   .ae-row.ae-row--collapsed {
-    padding: var(--wa-space-2xs) var(--wa-space-m);
+    gap: 0;
+    padding: var(--wa-space-xs) var(--wa-space-m);
+  }
+
+  .ae-row-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wa-space-m);
+    min-width: 0;
+  }
+
+  .ae-row-body {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+    min-width: 0;
+  }
+
+  .ae-row-desc {
+    margin: 0;
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+    line-height: 1.5;
   }
 
   /* Each action / condition row lives inside its own custom
@@ -320,28 +349,25 @@ export const automationEditorStyles = css`
     display: block;
   }
 
-  /* The big "select action / condition" button inside a row that
-     opens the catalog picker. Reads as the primary control of the
-     row — clicking it is how the user changes what the row IS. */
   .ae-row-picker {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    justify-content: space-between;
-    gap: var(--wa-space-s);
+    gap: var(--wa-space-2xs);
     appearance: none;
-    width: 100%;
-    background: var(--wa-color-surface-default);
-    border: 1px solid var(--wa-color-neutral-border-quiet, #d1d5db);
-    border-radius: var(--wa-border-radius-s);
-    padding: var(--wa-space-xs) var(--wa-space-s);
+    background: transparent;
+    border: none;
+    padding: 0;
+    margin: 0;
     cursor: pointer;
-    font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);
     text-align: left;
+    min-width: 0;
+    font-family: inherit;
+    transition: color 0.12s;
   }
 
   .ae-row-picker:hover:not(:disabled) {
-    border-color: var(--wa-color-brand-fill-loud, #0b5cad);
+    color: var(--wa-color-brand-fill-loud, #009fee);
   }
 
   .ae-row-picker:disabled {
@@ -350,37 +376,53 @@ export const automationEditorStyles = css`
   }
 
   .ae-row-picker-name {
-    font-weight: var(--wa-font-weight-semibold);
+    font-size: var(--wa-font-size-m);
+    font-weight: var(--wa-font-weight-bold);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .ae-row-picker wa-icon {
     color: var(--wa-color-text-quiet);
     font-size: 14px;
     flex: 0 0 auto;
+    opacity: 0.7;
+    transition:
+      opacity 0.12s,
+      color 0.12s;
   }
 
-  .ae-row-body {
-    display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-2xs);
-    min-width: 0;
+  .ae-row-picker:hover:not(:disabled) wa-icon {
+    color: var(--wa-color-brand-fill-loud, #009fee);
+    opacity: 1;
   }
 
+  /* Horizontal toolbar living in the row header, opposite the
+     title cluster. Was vertical when the layout was a 2-column
+     grid; now the header is a single flex row, so a horizontal
+     toolbar reads more naturally next to the title. */
   .ae-row-controls {
     display: flex;
-    flex-direction: column;
-    gap: var(--wa-space-3xs);
-    align-self: flex-start;
+    flex-direction: row;
+    gap: 2px;
+    align-items: center;
+    flex: 0 0 auto;
   }
 
+  /* Compact circular icon buttons matching the per-row edit/delete
+     pattern used by the api-actions / automations tables in the
+     section editor. The wa-icon child's font-size is left at its
+     default so the glyph keeps the same size — only the hit-target
+     shrinks and rounds around it. */
   .ae-row-controls button {
     appearance: none;
     border: 1px solid transparent;
     background: transparent;
     color: var(--wa-color-text-quiet);
-    width: 28px;
-    height: 28px;
-    border-radius: var(--wa-border-radius-s);
+    width: 26px;
+    height: 26px;
+    border-radius: 6px;
     cursor: pointer;
     padding: 0;
     display: inline-flex;
@@ -391,6 +433,15 @@ export const automationEditorStyles = css`
   .ae-row-controls button:hover:not(:disabled) {
     background: var(--wa-color-surface-default);
     color: var(--wa-color-text-normal);
+  }
+
+  /* Destructive variant — same shape as siblings but a red-tinted
+     hover wash + red glyph colour, mirroring the api-actions-row-
+     delete treatment so destructive intent reads consistently
+     across the app. */
+  .ae-row-controls .ae-row-delete:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--esphome-error), transparent 90%);
+    color: var(--esphome-error);
   }
 
   .ae-row-controls button:disabled {
@@ -449,13 +500,6 @@ export const automationEditorStyles = css`
     box-sizing: border-box;
   }
 
-  /* "Add action" / "Add condition" button. Full-width, solid
-     brand-colored border so it reads as the obvious next step
-     from the user — easy to spot on a long list of actions or
-     a fresh empty automation. Nested action lists (then / else
-     branches inside an "if") use the slightly toned-down
-     variant under .ae-nested below to keep the inner tree from
-     reading as a series of equally-loud primary CTAs. */
   .ae-add {
     display: flex;
     justify-content: center;
@@ -463,21 +507,25 @@ export const automationEditorStyles = css`
     gap: var(--wa-space-2xs);
     width: 100%;
     appearance: none;
-    border: 1px solid var(--wa-color-brand-fill-loud, #0b5cad);
-    background: transparent;
-    color: var(--wa-color-brand-fill-loud, #0b5cad);
-    padding: var(--wa-space-xs) var(--wa-space-m);
-    border-radius: var(--wa-border-radius-s);
+    border: 1px solid var(--wa-color-brand-fill-loud, #009fee);
+    background: var(--esphome-primary-light);
+    color: var(--wa-color-brand-fill-loud, #009fee);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border-radius: var(--wa-border-radius-m);
     cursor: pointer;
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-semibold);
     margin-top: var(--wa-space-s);
+    transition:
+      background 0.12s,
+      border-color 0.12s,
+      color 0.12s;
   }
 
   .ae-add:hover:not(:disabled) {
     background: color-mix(
       in srgb,
-      var(--wa-color-brand-fill-loud, #0b5cad) 10%,
+      var(--wa-color-brand-fill-loud, #009fee) 18%,
       transparent
     );
   }
@@ -520,6 +568,57 @@ export const automationEditorStyles = css`
     font-style: italic;
   }
 
+  .ae-actions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wa-space-s);
+  }
+
+  .ae-section-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    background: var(--wa-color-brand-fill-loud, #009fee);
+    color: var(--wa-color-brand-on-loud, #ffffff);
+    border: var(--wa-border-width-s) solid var(--wa-color-brand-fill-loud, #009fee);
+    padding: 2px var(--wa-space-s);
+    border-radius: var(--wa-border-radius-m);
+    cursor: pointer;
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    font-family: inherit;
+    transition:
+      background 0.12s,
+      border-color 0.12s;
+  }
+
+  .ae-section-add:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--wa-color-brand-fill-loud, #009fee), black 10%);
+    border-color: color-mix(in srgb, var(--wa-color-brand-fill-loud, #009fee), black 10%);
+  }
+
+  .ae-section-add:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .ae-section-add wa-icon {
+    font-size: 14px;
+  }
+
+  .ae-empty-block {
+    margin: 0;
+    padding: var(--wa-space-m) var(--wa-space-s);
+    text-align: center;
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-s);
+    font-style: italic;
+    border: 1px dashed var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-surface-lowered, transparent);
+  }
+
   /* Bottom-of-editor save / delete buttons. */
   .ae-actions {
     display: flex;
@@ -551,13 +650,30 @@ export const automationEditorStyles = css`
   }
 
   .ae-actions .ae-danger {
-    background: transparent;
-    color: var(--esphome-error, #d92d20);
-    border-color: var(--esphome-error, #d92d20);
+    gap: 4px;
+    background: #e54d2e;
+    color: #ffffff;
+    border: var(--wa-border-width-s) solid #e54d2e;
+    padding: var(--wa-space-xs) var(--wa-space-m);
+    border-radius: var(--wa-border-radius-m);
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
+    transition:
+      background 0.12s,
+      border-color 0.12s;
+  }
+
+  .ae-actions .ae-danger:hover:not(:disabled) {
+    background: color-mix(in srgb, #e54d2e, black 10%);
+    border-color: color-mix(in srgb, #e54d2e, black 10%);
+  }
+
+  .ae-actions .ae-danger wa-icon {
+    font-size: 16px;
   }
 
   .ae-actions button:disabled {
-    opacity: 0.6;
+    opacity: 0.5;
     cursor: not-allowed;
   }
 `;

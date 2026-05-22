@@ -1,7 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiArrowCollapse,
-  mdiArrowExpand,
   mdiCheckCircleOutline,
   mdiContentSave,
   mdiDockLeft,
@@ -18,7 +16,6 @@ import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { EscapeController } from "../../util/escape-controller.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceEditorStyles } from "./device-editor.styles.js";
 import type { HighlightRange } from "../yaml-editor.js";
@@ -30,8 +27,6 @@ import "../yaml-diff.js";
 import "./device-board-info.js";
 
 registerMdiIcons({
-  "arrow-collapse": mdiArrowCollapse,
-  "arrow-expand": mdiArrowExpand,
   "check-circle-outline": mdiCheckCircleOutline,
   "content-save": mdiContentSave,
   eye: mdiEye,
@@ -78,9 +73,6 @@ export class ESPHomeDeviceEditor extends LitElement {
   @state()
   private _isMobile = false;
 
-  @state()
-  private _fullscreen = false;
-
   private _mql = window.matchMedia("(max-width: 900px)");
 
   private _onMqlChange = (e: MediaQueryListEvent) => {
@@ -89,9 +81,7 @@ export class ESPHomeDeviceEditor extends LitElement {
 
   /** Cmd/Ctrl+S → save the YAML if there are unsaved changes.
    *  Listens at the window level so the shortcut works regardless of
-   *  which child (CodeMirror, navigator, etc.) currently has focus.
-   *  Esc-to-exit-fullscreen is wired through EscapeController below
-   *  so the listener is only attached while fullscreen is active. */
+   *  which child (CodeMirror, navigator, etc.) currently has focus. */
   private _onGlobalKeyDown = (e: KeyboardEvent) => {
     if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "s") {
       e.preventDefault();
@@ -100,11 +90,6 @@ export class ESPHomeDeviceEditor extends LitElement {
       }
     }
   };
-
-  private _escape = new EscapeController(this, (e) => {
-    e.preventDefault();
-    this._fullscreen = false;
-  });
 
   connectedCallback() {
     super.connectedCallback();
@@ -209,7 +194,7 @@ export class ESPHomeDeviceEditor extends LitElement {
     return html`
       <section class="card">
         <header class="card-header ${compactHeader ? "card-header--compact" : ""}">
-          <slot name="mobile-menu"></slot>
+          <slot name="header-start"></slot>
           <div class="editor-header-main">
             <h2 class="editor-header-title">${title}</h2>
           </div>
@@ -280,24 +265,6 @@ export class ESPHomeDeviceEditor extends LitElement {
                 <wa-icon library="mdi" name="layout-right"></wa-icon>
               </button>
             </div>
-            ${this._isMobile
-              ? nothing
-              : html`<button
-                  type="button"
-                  class="fullscreen-toggle"
-                  aria-pressed=${this._fullscreen}
-                  @click=${this._toggleFullscreen}
-                  title=${this._localize(
-                    this._fullscreen
-                      ? "device.editor_collapse"
-                      : "device.editor_expand",
-                  )}
-                >
-                  <wa-icon
-                    library="mdi"
-                    name=${this._fullscreen ? "arrow-collapse" : "arrow-expand"}
-                  ></wa-icon>
-                </button>`}
           </div>
         </header>
         <div class="card-body">
@@ -463,17 +430,6 @@ export class ESPHomeDeviceEditor extends LitElement {
         composed: true,
       })
     );
-  }
-
-  private _toggleFullscreen() {
-    this._fullscreen = !this._fullscreen;
-  }
-
-  protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("_fullscreen")) {
-      this.toggleAttribute("fullscreen", this._fullscreen);
-      this._escape.set(this._fullscreen);
-    }
   }
 
   /**
