@@ -16,7 +16,7 @@ export type LocalizeFunc = (
   values?: Record<string, string | number>
 ) => string;
 
-export const SUPPORTED_LOCALES = ["en", "fr", "nl", "hu"] as const;
+export const SUPPORTED_LOCALES = ["en", "fr", "nl", "hu", "zh"] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Language picker choice — every supported locale plus the
@@ -42,6 +42,7 @@ export const LANGUAGES: {
   { value: "fr", labelKey: "settings.language_fr", flag: "🇫🇷" },
   { value: "nl", labelKey: "settings.language_nl", flag: "🇳🇱" },
   { value: "hu", labelKey: "settings.language_hu", flag: "🇭🇺" },
+  { value: "zh", labelKey: "settings.language_zh", flag: "🇨🇳" },
 ];
 
 const LOCALE_STORAGE_KEY = "esphome-locale";
@@ -86,6 +87,8 @@ async function loadLocaleMessages(
       return (await import("../translations/nl.json")).default as Record<string, unknown>;
     case "hu":
       return (await import("../translations/hu.json")).default as Record<string, unknown>;
+    case "zh":
+      return (await import("../translations/cn.json")).default as Record<string, unknown>;
   }
 }
 
