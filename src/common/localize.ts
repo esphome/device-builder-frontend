@@ -16,7 +16,7 @@ export type LocalizeFunc = (
   values?: Record<string, string | number>
 ) => string;
 
-export const SUPPORTED_LOCALES = ["en", "fr", "nl", "hu"] as const;
+export const SUPPORTED_LOCALES = ["en", "fr", "nl", "hu", "zh-CN"] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Language picker choice — every supported locale plus the
@@ -42,15 +42,18 @@ export const LANGUAGES: {
   { value: "fr", labelKey: "settings.language_fr", flag: "🇫🇷" },
   { value: "nl", labelKey: "settings.language_nl", flag: "🇳🇱" },
   { value: "hu", labelKey: "settings.language_hu", flag: "🇭🇺" },
+  { value: "zh-CN", labelKey: "settings.language_zh_cn", flag: "🇨🇳" },
 ];
 
 const LOCALE_STORAGE_KEY = "esphome-locale";
 
 function detectLocale(): SupportedLocale {
-  const lang = navigator.language.split("-")[0];
-  return (SUPPORTED_LOCALES as readonly string[]).includes(lang)
-    ? (lang as SupportedLocale)
-    : "en";
+  const lang = navigator.language;
+  if ((SUPPORTED_LOCALES as readonly string[]).includes(lang)) {
+    return lang as SupportedLocale;
+  }
+
+  return "en";
 }
 
 /** Read the user's explicit locale choice from localStorage, if any. */
@@ -86,6 +89,8 @@ async function loadLocaleMessages(
       return (await import("../translations/nl.json")).default as Record<string, unknown>;
     case "hu":
       return (await import("../translations/hu.json")).default as Record<string, unknown>;
+    case "zh-CN":
+      return (await import("../translations/zh-CN.json")).default as Record<string, unknown>;
   }
 }
 
