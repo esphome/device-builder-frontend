@@ -29,8 +29,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { labelChipStyleString } from "../../util/label-style.js";
-import { labelChipStyles } from "../../util/label-chip-template.js";
+import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { labelsListStyles } from "./labels-list-styles.js";
 
@@ -285,9 +284,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
             ? html`<wa-icon library="mdi" name="minus"></wa-icon>`
             : nothing}
       </span>
-      <span class="label-chip" style=${labelChipStyleString(label.color)}
-        >${label.name}</span
-      >
+      ${renderLabelChip(label)}
     </button>`;
   }
 
