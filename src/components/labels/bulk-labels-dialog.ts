@@ -200,9 +200,10 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       <wa-dialog
         label=${this._localize(titleKey, { count: this.devices.length })}
         ?light-dismiss=${!this._saving}
+        @wa-request-close=${this._onRequestClose}
       >
         ${this._catalog.length === 0
-          ? html`<div class="option-empty">
+          ? html`<div class="option-empty" role="status">
               ${this._localize("dashboard.labels_bulk_dialog_empty")}
             </div>`
           : html`<div
@@ -287,6 +288,17 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     this._pendingChanges = map;
   }
 
+  /** Block Esc / X / backdrop while a save is in flight so an
+   *  in-flight set_labels_bulk write can't be orphaned by a stray
+   *  dismissal. Mirrors the pattern used by onboarding-wifi-dialog
+   *  and adopt-dialog. The footer's disabled Cancel button covers
+   *  the explicit dismiss path; this covers the implicit ones. */
+  private _onRequestClose = (e: Event) => {
+    if (this._saving) {
+      e.preventDefault();
+    }
+  };
+
   private _apply = async () => {
     if (!this._api) return;
     const updates = this.computeUpdates();
@@ -301,6 +313,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
             ? "dashboard.labels_bulk_saved_one"
             : "dashboard.labels_bulk_saved_other";
         toast.success(this._localize(key, { count }), { richColors: true });
+        // Only close on full success; partial-failure keeps the
+        // dialog open so the user can see which devices were
+        // staged and re-Apply without re-staging their tri-state
+        // edits. Matches the transport-failure branch below.
+        this.close();
       } else {
         const key =
           failures.length === 1
@@ -310,7 +327,6 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
           richColors: true,
         });
       }
-      this.close();
     } catch (err) {
       console.warn("set_labels_bulk failed", err);
       const key =

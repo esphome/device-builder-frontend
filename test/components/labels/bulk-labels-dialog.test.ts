@@ -183,7 +183,7 @@ describe("esphome-bulk-labels-dialog Apply gating", () => {
 });
 
 describe("esphome-bulk-labels-dialog cycle-back drops stale pending changes", () => {
-  test("indeterminate -> checked -> unchecked -> derived removes the override", () => {
+  test("checked -> unchecked -> checked returns to derived, drops override", () => {
     // Start: lbl-a checked on every selected device → derived is
     // "checked". A click cycles to unchecked; a second click
     // brings it back to the derived "checked" state, which must
@@ -238,7 +238,10 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(dialog._saving).toBe(false);
   });
 
-  test("partial-failure: error toast carries the failure count, dialog still closes", async () => {
+  test("partial-failure: error toast carries the failure count, dialog stays open", async () => {
+    // Partial-failure leaves the dialog open so the user can see
+    // their staged tri-state edits and re-Apply without re-staging
+    // every transition. Matches the transport-failure branch.
     const dialog = makeMockedDialog(
       async (updates) =>
         updates.map((u, i) =>
@@ -261,8 +264,31 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
 
     expect(successSpy).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(dialog.close).toHaveBeenCalledTimes(1);
+    expect(dialog.close).not.toHaveBeenCalled();
     expect(dialog._saving).toBe(false);
+  });
+
+  test("_onRequestClose vetoes dismissal while _saving is true", () => {
+    // Esc / X / backdrop-click all surface through ``wa-request-close``;
+    // the handler must call preventDefault() to block them mid-save
+    // so the in-flight set_labels_bulk write isn't orphaned.
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u) => ({ configuration: u.configuration, success: true })),
+      [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]
+    );
+
+    const event = new Event("wa-request-close", { cancelable: true });
+    dialog._saving = true;
+    (dialog as unknown as { _onRequestClose: (e: Event) => void })._onRequestClose(event);
+    expect(event.defaultPrevented).toBe(true);
+
+    const idleEvent = new Event("wa-request-close", { cancelable: true });
+    dialog._saving = false;
+    (dialog as unknown as { _onRequestClose: (e: Event) => void })._onRequestClose(
+      idleEvent
+    );
+    expect(idleEvent.defaultPrevented).toBe(false);
   });
 
   test("transport-failure: bulk-failure i18n key fires, dialog stays open", async () => {
