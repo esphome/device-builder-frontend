@@ -17,10 +17,12 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
-import type { ConfigEntry, LightEffect } from "../../../api/types.js";
+import type { ConfigEntry, Filter, LightEffect } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
 import {
+  fetchFilters,
   fetchLightEffects,
+  getCachedFilters,
   getCachedLightEffects,
   subscribeAutomationCatalogCache,
 } from "../../../util/automation-catalog-cache.js";
@@ -70,28 +72,41 @@ export class ESPHomeRegistryList extends LitElement {
   @property({ attribute: false })
   ctx!: RenderCtx;
 
-  @state() private _catalog: LightEffect[] | null = null;
+  // Catalog entries share a structural shape (``id``, ``name``,
+  // ``config_entries``, ``applies_to``) across LightEffect and
+  // Filter; the renderer only reads those fields so a single
+  // ``RegistryCatalogEntry`` covers both.
+  @state() private _catalog: (LightEffect | Filter)[] | null = null;
 
   private _unsubscribe?: () => void;
 
   connectedCallback(): void {
     super.connectedCallback();
-    // Only ``light_effects`` is wired today; future registries plug
-    // into the cache the same way.
-    const cached = getCachedLightEffects();
+    const registry = this.entry?.registry ?? null;
+    const cached = this._readCache(registry);
     if (cached !== undefined) {
       this._catalog = cached;
     } else if (this._api) {
-      fetchLightEffects(this._api).catch(() => {
+      this._kickFetch(registry).catch(() => {
         // Cache layer suppresses the rejection broadcast; render a
         // placeholder via ``_catalog === null`` until either the
         // user retries or a successful fetch refreshes the cache.
       });
     }
     this._unsubscribe = subscribeAutomationCatalogCache(() => {
-      const next = getCachedLightEffects();
+      const next = this._readCache(this.entry?.registry ?? null);
       if (next !== undefined) this._catalog = next;
     });
+  }
+
+  private _readCache(registry: string | null): (LightEffect | Filter)[] | undefined {
+    if (registry === "filter") return getCachedFilters();
+    return getCachedLightEffects();
+  }
+
+  private _kickFetch(registry: string | null): Promise<unknown> {
+    if (registry === "filter") return fetchFilters(this._api);
+    return fetchLightEffects(this._api);
   }
 
   disconnectedCallback(): void {
@@ -141,7 +156,7 @@ export class ESPHomeRegistryList extends LitElement {
   private _renderRow(
     item: Record<string, unknown>,
     index: number,
-    catalog: LightEffect[],
+    catalog: (LightEffect | Filter)[],
     disabled: boolean
   ) {
     const currentId = itemId(item);
@@ -175,7 +190,7 @@ export class ESPHomeRegistryList extends LitElement {
     `;
   }
 
-  private _addItem(catalog: LightEffect[]) {
+  private _addItem(catalog: (LightEffect | Filter)[]) {
     const items = asPolymorphicList(this.ctx.getAt(this.path));
     const seedId = catalog[0]?.id ?? "";
     const next = [...items, seedId ? { [seedId]: null } : {}];

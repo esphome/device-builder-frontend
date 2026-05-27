@@ -899,6 +899,19 @@ export interface LightEffect {
   applies_to: string[];
 }
 
+/** A sensor / binary_sensor / text_sensor filter (``delta``,
+ *  ``lambda``, ``calibrate_linear``…). Same shape as
+ *  :class:`LightEffect`. ``applies_to`` lists component domains
+ *  the filter is valid on. Filters with the same id across domains
+ *  (``lambda`` appears in all three) merge into one catalog entry
+ *  with applies_to spanning every domain it lives in. */
+export interface Filter {
+  id: string;
+  name: string;
+  config_entries: ConfigEntry[];
+  applies_to: string[]; // ``["sensor"]`` / ``["binary_sensor"]`` / etc.
+}
+
 /** Tagged-union locator for an automation inside a device YAML.
  *  Mirrors the backend's ``AutomationLocation`` Python dataclass.
  *  ``parse`` returns these and ``upsert`` / ``delete`` consume them
