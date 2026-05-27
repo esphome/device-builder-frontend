@@ -186,6 +186,7 @@
     "labels_bulk_saved_one": "Étiquettes mises à jour sur 1 appareil",
     "labels_bulk_saved_other": "Étiquettes mises à jour sur {count} appareils",
     "labels_bulk_mixed_hint": "Certains appareils sélectionnés possèdent déjà cette étiquette",
+    "labels_bulk_no_changes": "Aucune modification à appliquer",
     "labels_bulk_dialog_empty": "Aucune étiquette pour l'instant. Créez-en une depuis le tiroir d'un appareil pour l'attribuer en lot.",
     "labels_edit_label": "Modifier l'étiquette",
     "labels_rename": "Renommer l'étiquette",

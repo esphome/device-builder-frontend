@@ -284,6 +284,7 @@
     "labels_bulk_saved_one": "Címkék frissítve 1 eszközön",
     "labels_bulk_saved_other": "Címkék frissítve {count} eszközön",
     "labels_bulk_mixed_hint": "Néhány kiválasztott eszközön már szerepel ez a címke",
+    "labels_bulk_no_changes": "Nincs alkalmazandó módosítás",
     "labels_bulk_dialog_empty": "Még nincsenek címkék. Hozz létre egyet egy eszköz fiókjából, hogy tömegesen hozzárendelhesd.",
     "labels_edit_label": "Címke szerkesztése",
     "labels_rename": "Címke átnevezése",

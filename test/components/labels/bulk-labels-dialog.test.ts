@@ -328,15 +328,18 @@ describe("esphome-bulk-labels-dialog cycle-back drops stale pending changes", ()
 describe("esphome-bulk-labels-dialog _apply branches", () => {
   let successSpy: ReturnType<typeof vi.spyOn>;
   let errorSpy: ReturnType<typeof vi.spyOn>;
+  let infoSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
     successSpy = vi.spyOn(toast, "success").mockImplementation(() => "");
     errorSpy = vi.spyOn(toast, "error").mockImplementation(() => "");
+    infoSpy = vi.spyOn(toast, "info").mockImplementation(() => "");
   });
 
   afterEach(() => {
     successSpy.mockRestore();
     errorSpy.mockRestore();
+    infoSpy.mockRestore();
   });
 
   test("all-success: count-aware success toast, dialog closes, _saving resets", async () => {
@@ -510,12 +513,13 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(dialog._failedConfigurations).toBeNull();
   });
 
-  test("_apply bails when computeUpdates resolves to an empty payload", async () => {
+  test("_apply on empty-payload no-op fires info toast then closes", async () => {
     // After a DEVICE_UPDATED in another tab makes the user's
     // staged transition a no-op for every selected device, the
     // diff filter returns [] even though _hasPendingChanges is
-    // still true. Avoid firing a "0 devices updated" toast or
-    // sending an empty WS request — silently clear and close.
+    // still true. Don't send an empty WS request, but DO fire an
+    // info toast so the dialog vanishing doesn't read as a failed
+    // click.
     const setDeviceLabelsBulk = vi.fn();
     const dialog = makeMockedDialog(
       async () => [], // shouldn't be called
@@ -530,6 +534,7 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     await dialog._apply();
 
     expect(setDeviceLabelsBulk).not.toHaveBeenCalled();
+    expect(infoSpy).toHaveBeenCalledTimes(1);
     expect(successSpy).not.toHaveBeenCalled();
     expect(errorSpy).not.toHaveBeenCalled();
     expect(dialog._open).toBe(false);

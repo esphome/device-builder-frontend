@@ -62,7 +62,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @consume({ context: apiContext })
+  @consume({ context: apiContext, subscribe: true })
   @state()
   private _api?: ESPHomeAPI;
 
@@ -461,9 +461,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       // ``_hasPendingChanges`` is true but every transition is a
       // no-op against the current device labels (e.g. another tab
       // applied the same change in the interim, or the catalog
-      // reconcile dropped the last remaining entry). Don't fire
-      // a "0 devices updated" toast or an empty WS request —
-      // silently clear the pending state and close.
+      // reconcile dropped the last remaining entry). Acknowledge
+      // the click with an info toast so the dialog vanishing
+      // doesn't read as a failed action, then clear pending state.
+      toast.info(this._localize("dashboard.labels_bulk_no_changes"), {
+        richColors: true,
+      });
       this._pendingChanges = new Map();
       this._failedConfigurations = null;
       this.close();
