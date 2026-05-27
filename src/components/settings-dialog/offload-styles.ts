@@ -109,14 +109,14 @@ export const pairingRowStyles = css`
 
   .btn-unpair {
     height: 32px;
-    padding: 0 var(--wa-space-m);
+    width: 32px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-s);
     background: var(--wa-color-surface-default);
     color: var(--wa-color-text-quiet);
-    font: inherit;
-    font-size: var(--wa-font-size-xs);
-    font-weight: var(--wa-font-weight-semibold);
     cursor: pointer;
     flex-shrink: 0;
   }
@@ -125,6 +125,10 @@ export const pairingRowStyles = css`
     background: color-mix(in srgb, var(--esphome-error), white 90%);
     color: var(--esphome-error);
     border-color: var(--esphome-error);
+  }
+
+  .btn-unpair wa-icon {
+    font-size: 16px;
   }
 
   .btn-edit-endpoint {
@@ -151,8 +155,23 @@ export const pairingRowStyles = css`
     font-size: 16px;
   }
 
-  .pairing-row {
+  /* The per-pairing enable toggle stays on the title line beside
+     the status pill so it reads as part of the server identity,
+     not as an action; margin-left: auto pushes it to the right
+     edge of the title flex. */
+  .pairing-toggle {
+    margin-left: auto;
+  }
+
+  /* Lives at the bottom of a .row--stacked pairing row. Wraps so a
+     narrow dialog (HA-addon sidebar, mobile) doesn't clip the
+     rightmost button when Build + View + edit + Unpair are all
+     present. */
+  .pairing-actions {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--wa-space-s);
   }
 
