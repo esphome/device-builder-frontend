@@ -46,6 +46,26 @@ function itemId(item: Record<string, unknown>): string {
   return keys.length > 0 ? keys[0] : "";
 }
 
+/** Cache + fetch pair for one named registry. New registries plug
+ *  into this table; the renderer reads through ``entry.registry``
+ *  with a fallback to ``light_effects`` for legacy configs missing
+ *  the field. */
+interface RegistryOps {
+  cache: () => (LightEffect | Filter)[] | undefined;
+  fetch: (api: ESPHomeAPI) => Promise<unknown>;
+}
+
+const REGISTRY_OPS: Record<string, RegistryOps> = {
+  light_effects: {
+    cache: () => getCachedLightEffects(),
+    fetch: (api) => fetchLightEffects(api),
+  },
+  filter: {
+    cache: () => getCachedFilters(),
+    fetch: (api) => fetchFilters(api),
+  },
+};
+
 /** Coerce ``ctx.getAt`` output to a mutable list of polymorphic items.
  *  Anything that isn't already an array (a freshly-mounted form with
  *  no value, a parser fallback to YamlRawValue) renders as an empty
@@ -74,39 +94,34 @@ export class ESPHomeRegistryList extends LitElement {
 
   // Catalog entries share a structural shape (``id``, ``name``,
   // ``config_entries``, ``applies_to``) across LightEffect and
-  // Filter; the renderer only reads those fields so a single
-  // ``RegistryCatalogEntry`` covers both.
+  // Filter; the renderer only reads those fields so the union
+  // covers both. New registries plug in by adding a row to
+  // ``REGISTRY_OPS`` below — no per-call dispatch logic.
   @state() private _catalog: (LightEffect | Filter)[] | null = null;
 
   private _unsubscribe?: () => void;
 
   connectedCallback(): void {
     super.connectedCallback();
-    const registry = this.entry?.registry ?? null;
-    const cached = this._readCache(registry);
+    const ops = this._ops();
+    const cached = ops.cache();
     if (cached !== undefined) {
       this._catalog = cached;
     } else if (this._api) {
-      this._kickFetch(registry).catch(() => {
+      ops.fetch(this._api).catch(() => {
         // Cache layer suppresses the rejection broadcast; render a
         // placeholder via ``_catalog === null`` until either the
         // user retries or a successful fetch refreshes the cache.
       });
     }
     this._unsubscribe = subscribeAutomationCatalogCache(() => {
-      const next = this._readCache(this.entry?.registry ?? null);
+      const next = this._ops().cache();
       if (next !== undefined) this._catalog = next;
     });
   }
 
-  private _readCache(registry: string | null): (LightEffect | Filter)[] | undefined {
-    if (registry === "filter") return getCachedFilters();
-    return getCachedLightEffects();
-  }
-
-  private _kickFetch(registry: string | null): Promise<unknown> {
-    if (registry === "filter") return fetchFilters(this._api);
-    return fetchLightEffects(this._api);
+  private _ops(): RegistryOps {
+    return REGISTRY_OPS[this.entry?.registry ?? ""] ?? REGISTRY_OPS.light_effects;
   }
 
   disconnectedCallback(): void {
