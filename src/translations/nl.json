@@ -176,7 +176,7 @@
     "labels_create_failed": "Kan label niet maken",
     "labels_save_failed": "Kan labels niet opslaan",
     "labels_save_submit": "Opslaan",
-    "labels_bulk_button": "Labels",
+    "labels_bulk_button": "Labels op {count} apparaat/apparaten",
     "labels_bulk_dialog_title_one": "Labels voor 1 apparaat",
     "labels_bulk_dialog_title_other": "Labels voor {count} apparaten",
     "labels_bulk_apply": "Toepassen",

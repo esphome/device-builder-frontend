@@ -274,7 +274,7 @@
     "labels_create_failed": "无法创建标签",
     "labels_save_failed": "无法保存标签",
     "labels_save_submit": "保存",
-    "labels_bulk_button": "标签",
+    "labels_bulk_button": "{count} 个设备的标签",
     "labels_bulk_dialog_title_one": "1 个设备的标签",
     "labels_bulk_dialog_title_other": "{count} 个设备的标签",
     "labels_bulk_apply": "应用",

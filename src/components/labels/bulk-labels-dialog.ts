@@ -367,14 +367,15 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // sets its own ``title=${label.name}`` on the chip span, so
     // a row-level title in the non-mixed case is duplicate.
     // ``undefined`` removes the attribute entirely (Lit semantics).
+    const title = mixed
+      ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
+      : undefined;
     return html`<button
       class="option"
       type="button"
       role="checkbox"
       aria-checked=${ariaChecked}
-      title=${mixed
-        ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
-        : (undefined as unknown as string)}
+      title=${title}
       @click=${() => this._onToggle(label.id)}
     >
       <span
@@ -429,6 +430,18 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     if (!this._api) return;
     const updates = this.computeUpdates();
     const count = updates.length;
+    if (count === 0) {
+      // ``_hasPendingChanges`` is true but every transition is a
+      // no-op against the current device labels (e.g. another tab
+      // applied the same change in the interim, or the catalog
+      // reconcile dropped the last remaining entry). Don't fire
+      // a "0 devices updated" toast or an empty WS request —
+      // silently clear the pending state and close.
+      this._pendingChanges = new Map();
+      this._failedConfigurations = null;
+      this.close();
+      return;
+    }
     this._saving = true;
     try {
       const results = await this._api.setDeviceLabelsBulk(updates);
@@ -462,6 +475,21 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         // succeeded (idempotent backend-side but wastes round
         // trips + audit-log entries).
         this._failedConfigurations = new Set(failures.map((f) => f.configuration));
+        // Acknowledge the successes too — a 8/10-succeeded outcome
+        // reads as "nothing worked" if only the failure toast
+        // fires. The dashboard's rows visibly flip for the
+        // succeeded devices so the two toasts together match what
+        // the user is seeing.
+        const succeeded = count - failures.length;
+        if (succeeded > 0) {
+          const successKey =
+            succeeded === 1
+              ? "dashboard.labels_bulk_saved_one"
+              : "dashboard.labels_bulk_saved_other";
+          toast.success(this._localize(successKey, { count: succeeded }), {
+            richColors: true,
+          });
+        }
         const key =
           failures.length === 1
             ? "dashboard.labels_bulk_save_failed_one"

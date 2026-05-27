@@ -322,10 +322,11 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(dialog._saving).toBe(false);
   });
 
-  test("partial-failure: error toast carries the failure count, dialog stays open", async () => {
-    // Partial-failure leaves the dialog open so the user can see
-    // their staged tri-state edits and re-Apply without re-staging
-    // every transition. Matches the transport-failure branch.
+  test("partial-failure: fires BOTH success and error toasts, dialog stays open", async () => {
+    // 1 succeeded + 1 failed → both toasts. The dialog stays open
+    // so the user can see their staged tri-state edits and re-Apply.
+    // Acknowledging the successes avoids the "nothing worked" UX
+    // when most of a bulk Apply lands correctly.
     const dialog = makeMockedDialog(
       async (updates) =>
         updates.map((u, i) =>
@@ -346,10 +347,34 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
 
     await dialog._apply();
 
-    expect(successSpy).not.toHaveBeenCalled();
+    expect(successSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(dialog._open).toBe(true);
     expect(dialog._saving).toBe(false);
+  });
+
+  test("partial-failure with no successes skips the success toast", async () => {
+    // When zero devices succeeded (every entry failed), the
+    // success toast is pointless and would say "0 devices updated".
+    // Only the error toast fires.
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u) => ({
+          configuration: u.configuration,
+          success: false,
+          error: "boom",
+        })),
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
   });
 
   test("partial-failure records the failed configurations for retry-narrowing", async () => {
@@ -447,6 +472,32 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     (dialog as unknown as { open: () => void }).open();
 
     expect(dialog._failedConfigurations).toBeNull();
+  });
+
+  test("_apply bails when computeUpdates resolves to an empty payload", async () => {
+    // After a DEVICE_UPDATED in another tab makes the user's
+    // staged transition a no-op for every selected device, the
+    // diff filter returns [] even though _hasPendingChanges is
+    // still true. Avoid firing a "0 devices updated" toast or
+    // sending an empty WS request — silently clear and close.
+    const setDeviceLabelsBulk = vi.fn();
+    const dialog = makeMockedDialog(
+      async () => [], // shouldn't be called
+      [makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] })]
+    );
+    dialog._api = { setDeviceLabelsBulk } as unknown as ESPHomeAPI;
+    // User toggled lbl-a "checked" but the device already has it →
+    // diff filter resolves to no-op.
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+    expect(dialog.computeUpdates()).toEqual([]);
+
+    await dialog._apply();
+
+    expect(setDeviceLabelsBulk).not.toHaveBeenCalled();
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(dialog._open).toBe(false);
+    expect(dialog._pendingChanges.size).toBe(0);
   });
 
   test("_apply re-entrancy guard drops a second concurrent call", async () => {

@@ -274,7 +274,7 @@
     "labels_create_failed": "Nem sikerült létrehozni a címkét",
     "labels_save_failed": "Nem sikerült menteni a címkéket",
     "labels_save_submit": "Mentés",
-    "labels_bulk_button": "Címkék",
+    "labels_bulk_button": "Címkék {count} eszközön",
     "labels_bulk_dialog_title_one": "Címkék 1 eszközhöz",
     "labels_bulk_dialog_title_other": "Címkék {count} eszközhöz",
     "labels_bulk_apply": "Alkalmaz",

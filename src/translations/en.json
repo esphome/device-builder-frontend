@@ -274,7 +274,7 @@
     "labels_create_failed": "Could not create label",
     "labels_save_failed": "Could not save labels",
     "labels_save_submit": "Save",
-    "labels_bulk_button": "Labels",
+    "labels_bulk_button": "Labels on {count} device(s)",
     "labels_bulk_dialog_title_one": "Labels for 1 device",
     "labels_bulk_dialog_title_other": "Labels for {count} devices",
     "labels_bulk_apply": "Apply",

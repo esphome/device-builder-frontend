@@ -176,7 +176,7 @@
     "labels_create_failed": "Impossible de créer l'étiquette",
     "labels_save_failed": "Impossible d'enregistrer les étiquettes",
     "labels_save_submit": "Enregistrer",
-    "labels_bulk_button": "Étiquettes",
+    "labels_bulk_button": "Étiquettes sur {count} appareil(s)",
     "labels_bulk_dialog_title_one": "Étiquettes pour 1 appareil",
     "labels_bulk_dialog_title_other": "Étiquettes pour {count} appareils",
     "labels_bulk_apply": "Appliquer",

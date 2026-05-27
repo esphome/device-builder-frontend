@@ -229,7 +229,9 @@ export class ESPHomeSelectBar extends LitElement {
   protected render() {
     const allSelected = this.allVisibleSelected;
     const cancelLabel = this._localize("layout.cancel");
-    const labelsLabel = this._localize("dashboard.labels_bulk_button");
+    const labelsLabel = this._localize("dashboard.labels_bulk_button", {
+      count: this.selectedCount,
+    });
     const archiveLabel = this._localize("dashboard.archive_selected", {
       count: this.selectedCount,
     });
