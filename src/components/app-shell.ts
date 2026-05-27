@@ -317,11 +317,11 @@ export class ESPHomeApp extends LitElement {
   private async _init() {
     toast.config({
       toastOptions: {
-        position: "bottom-right",
+        // bottom-left keeps toasts clear of the editor's bottom-right
+        // Install/Validate/Save FAB cluster (#921, prior fix #171).
+        position: "bottom-left",
         richColors: true,
         duration: 4000,
-        // bottom-right can land on top of editor Save/Install (#171); X gives a
-        // guaranteed dismissal beyond swipe and beyond the 4s auto-close timer.
         closeButton: true,
       },
     });
