@@ -62,16 +62,13 @@ export const deviceCardStyles = [
     }
     @keyframes card-highlight-glow {
       0% {
-        box-shadow: 0 0 0 0
-          color-mix(in srgb, var(--esphome-primary), transparent 40%);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--esphome-primary), transparent 40%);
       }
       50% {
-        box-shadow: 0 0 0 8px
-          color-mix(in srgb, var(--esphome-primary), transparent 65%);
+        box-shadow: 0 0 0 8px color-mix(in srgb, var(--esphome-primary), transparent 65%);
       }
       100% {
-        box-shadow: 0 0 0 0
-          color-mix(in srgb, var(--esphome-primary), transparent 100%);
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--esphome-primary), transparent 100%);
       }
     }
     @media (prefers-reduced-motion: reduce) {
@@ -214,7 +211,8 @@ export const deviceCardStyles = [
 
     /* RECENT_JOB_TTL_MS_COMPLETED is short; throb signals "transient". */
     @keyframes completed-pulse {
-      0%, 100% {
+      0%,
+      100% {
         opacity: 1;
       }
       50% {

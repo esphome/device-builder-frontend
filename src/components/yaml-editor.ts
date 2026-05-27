@@ -138,8 +138,8 @@ export class ESPHomeYamlEditor extends LitElement {
         // ─── Diagnostics: red wavy underline only (no gutter pill) ──
         ".cm-lintRange-error": {
           backgroundImage: this._darkMode
-            ? "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 6 3\"><path d=\"M0 3 L1.5 0 L3 3 L4.5 0 L6 3\" fill=\"none\" stroke=\"%23ff6b6b\" stroke-width=\"0.9\" stroke-linecap=\"round\"/></svg>')"
-            : "url('data:image/svg+xml;utf8,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 6 3\"><path d=\"M0 3 L1.5 0 L3 3 L4.5 0 L6 3\" fill=\"none\" stroke=\"%23d92d20\" stroke-width=\"0.9\" stroke-linecap=\"round\"/></svg>')",
+            ? 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 3"><path d="M0 3 L1.5 0 L3 3 L4.5 0 L6 3" fill="none" stroke="%23ff6b6b" stroke-width="0.9" stroke-linecap="round"/></svg>\')'
+            : 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 3"><path d="M0 3 L1.5 0 L3 3 L4.5 0 L6 3" fill="none" stroke="%23d92d20" stroke-width="0.9" stroke-linecap="round"/></svg>\')',
           backgroundRepeat: "repeat-x",
           backgroundPosition: "left bottom",
           backgroundSize: "6px 3px",
@@ -158,9 +158,7 @@ export class ESPHomeYamlEditor extends LitElement {
         },
         ".cm-diagnostic": {
           padding: "10px 14px 10px 12px",
-          borderLeft: this._darkMode
-            ? "3px solid #ff6b6b"
-            : "3px solid #d92d20",
+          borderLeft: this._darkMode ? "3px solid #ff6b6b" : "3px solid #d92d20",
           background: "transparent",
           color: this._darkMode ? "#f0f0f5" : "#1a1a1a",
           fontFamily: "inherit",
@@ -207,10 +205,9 @@ export class ESPHomeYamlEditor extends LitElement {
           background: this._darkMode ? "#2c5fb3" : "#0b5cad",
           color: "#ffffff",
         },
-        ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail":
-          {
-            color: "rgba(255,255,255,0.78)",
-          },
+        ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionDetail": {
+          color: "rgba(255,255,255,0.78)",
+        },
         ".cm-completionLabel": {
           fontFamily: '"JetBrains Mono", "Fira Code", monospace',
           fontSize: "12.5px",
@@ -221,11 +218,10 @@ export class ESPHomeYamlEditor extends LitElement {
           fontWeight: "700",
           color: this._darkMode ? "#7fc4ff" : "#0b5cad",
         },
-        ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText":
-          {
-            color: "#ffffff",
-            textShadow: "0 0 0.5px currentColor",
-          },
+        ".cm-tooltip-autocomplete > ul > li[aria-selected] .cm-completionMatchedText": {
+          color: "#ffffff",
+          textShadow: "0 0 0.5px currentColor",
+        },
         ".cm-completionDetail": {
           fontStyle: "normal",
           fontSize: "11px",
@@ -294,7 +290,7 @@ export class ESPHomeYamlEditor extends LitElement {
               detail: { value: update.state.doc.toString() },
               bubbles: true,
               composed: true,
-            }),
+            })
           );
         }
         // Cursor moved (click, arrow keys, find-jump). Emit the
@@ -313,7 +309,7 @@ export class ESPHomeYamlEditor extends LitElement {
                 detail: { line },
                 bubbles: true,
                 composed: true,
-              }),
+              })
             );
           }
         }
@@ -327,7 +323,7 @@ export class ESPHomeYamlEditor extends LitElement {
         createBackendYamlLinter({
           api: this._api,
           getConfiguration: () => this.configuration,
-        }),
+        })
       );
       // Schema-driven completion off the components catalog.
       extensions.push(
@@ -337,7 +333,7 @@ export class ESPHomeYamlEditor extends LitElement {
           icons: true,
           closeOnBlur: true,
           maxRenderedOptions: 60,
-        }),
+        })
       );
     }
 
@@ -397,9 +393,7 @@ export class ESPHomeYamlEditor extends LitElement {
     // across the rebuild by writing it back into `this.value`
     // before remounting.
     if (
-      (changed.has("_darkMode") ||
-        changed.has("_api") ||
-        changed.has("maskAllValues")) &&
+      (changed.has("_darkMode") || changed.has("_api") || changed.has("maskAllValues")) &&
       this._view
     ) {
       this.value = this._view.state.doc.toString();
@@ -492,8 +486,12 @@ export class ESPHomeYamlEditor extends LitElement {
       this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
       if (this.highlightRange && this.scrollToHighlight) {
         const line = Math.max(1, this.highlightRange.fromLine);
-        const pos = this._view.state.doc.line(Math.min(line, this._view.state.doc.lines)).from;
-        this._view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }) });
+        const pos = this._view.state.doc.line(
+          Math.min(line, this._view.state.doc.lines)
+        ).from;
+        this._view.dispatch({
+          effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+        });
       }
     }
 

@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { APIError } from "../../src/api/api-error.js";
-import {
-  ErrorCode,
-  type OffloaderPinMismatchAlert,
-} from "../../src/api/types.js";
+import { ErrorCode, type OffloaderPinMismatchAlert } from "../../src/api/types.js";
 import {
   buildReauthPairRequest,
   classifyReauthError,
@@ -28,7 +25,7 @@ import {
  */
 
 function fixtureAlert(
-  overrides: Partial<OffloaderPinMismatchAlert> = {},
+  overrides: Partial<OffloaderPinMismatchAlert> = {}
 ): OffloaderPinMismatchAlert {
   return {
     kind: "pin_mismatch",

@@ -12,7 +12,7 @@ describe("friendlyNameSlugify", () => {
     // entirely instead of mapping it to ``-`` like upstream's
     // ``friendly_name_slugify`` does. Pin the legacy parity.
     expect(friendlyNameSlugify("test_web_server_ota_esp32")).toBe(
-      "test-web-server-ota-esp32",
+      "test-web-server-ota-esp32"
     );
   });
 
@@ -31,9 +31,7 @@ describe("friendlyNameSlugify", () => {
     // ``.replace("__", "_")`` (which would leave ``my-cool--device``
     // for the same input). See the implementation comment for the
     // why.
-    expect(friendlyNameSlugify("  My  Cool - Device  ")).toBe(
-      "my-cool-device",
-    );
+    expect(friendlyNameSlugify("  My  Cool - Device  ")).toBe("my-cool-device");
   });
 
   it("drops characters outside [a-z0-9_-] before the underscore→hyphen pass", () => {

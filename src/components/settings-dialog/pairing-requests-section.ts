@@ -5,11 +5,7 @@ import toast from "sonner-js";
 
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
-import {
-  ErrorCode,
-  type PairingWindowState,
-  type PeerSummary,
-} from "../../api/types.js";
+import { ErrorCode, type PairingWindowState, type PeerSummary } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
@@ -74,10 +70,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
     // Refcounted server-side; closes on disconnect or 5min idle.
     if (this._api !== undefined) {
       void this._api.setRemoteBuildPairingWindow({ open: true }).catch(() => {
-        this._toast(
-          "warning",
-          "settings.build_server_pairing_window_open_failed",
-        );
+        this._toast("warning", "settings.build_server_pairing_window_open_failed");
       });
     }
   }
@@ -161,18 +154,14 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
               class="pairing-window-countdown"
               aria-label=${this._localize(
                 "settings.build_server_pairing_window_remaining_aria",
-                { duration: this._formatDuration(remaining) },
+                { duration: this._formatDuration(remaining) }
               )}
             >
               ${this._formatDuration(remaining)}
             </span>
           `
         : nothing}
-      <button
-        type="button"
-        class="pairing-window-extend"
-        @click=${this._onExtend}
-      >
+      <button type="button" class="pairing-window-extend" @click=${this._onExtend}>
         ${this._localize("settings.build_server_pairing_window_extend")}
       </button>
     `;
@@ -195,10 +184,9 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
         <div class="peer-actions">
           <button
             type="button"
-            aria-label=${this._localize(
-              "settings.build_server_peer_review_aria",
-              { label: peer.label },
-            )}
+            aria-label=${this._localize("settings.build_server_peer_review_aria", {
+              label: peer.label,
+            })}
             @click=${() => this._onReviewRequest(peer)}
           >
             ${this._localize("settings.build_server_peer_review")}
@@ -259,10 +247,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
   private _onExtend = () => {
     if (this._api === undefined) return;
     void this._api.setRemoteBuildPairingWindow({ open: true }).catch(() => {
-      this._toast(
-        "warning",
-        "settings.build_server_pairing_window_extend_failed",
-      );
+      this._toast("warning", "settings.build_server_pairing_window_extend_failed");
     });
   };
 
@@ -295,7 +280,7 @@ export class ESPHomeSettingsPairingRequests extends LitElement {
   private _toast(
     level: "success" | "warning" | "error",
     key: string,
-    values?: Record<string, string | number>,
+    values?: Record<string, string | number>
   ) {
     toast[level](this._localize(key, values), { richColors: true });
   }

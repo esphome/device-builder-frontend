@@ -91,7 +91,7 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
     const componentId =
       this.target.kind === "component_on" ? this.target.component_id : null;
     const boundDevice = componentId
-      ? this.devices.find((d) => d.id === componentId) ?? null
+      ? (this.devices.find((d) => d.id === componentId) ?? null)
       : null;
     return html`
       <div class="ae-section">
@@ -117,17 +117,14 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
               @change=${this._onTriggerChange}
             >
               ${filtered.map(
-                (t) => html`<wa-option
-                  value=${t.id}
-                  ?selected=${t.id === this.triggerId}
-                  >${t.name}</wa-option
-                >`,
+                (t) =>
+                  html`<wa-option value=${t.id} ?selected=${t.id === this.triggerId}
+                    >${t.name}</wa-option
+                  >`
               )}
             </wa-select>`}
         ${active?.description
-          ? html`<p class="ae-section-desc">
-              ${renderMarkdown(active.description)}
-            </p>`
+          ? html`<p class="ae-section-desc">${renderMarkdown(active.description)}</p>`
           : nothing}
         ${active && active.config_entries.length > 0
           ? html`<esphome-config-entry-form
@@ -160,8 +157,7 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
       return this.triggers.filter(
         (t) =>
           !t.is_device_level &&
-          (t.applies_to.includes(device.component_id) ||
-            t.applies_to.includes(domain)),
+          (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain))
       );
     }
     return [];
@@ -174,23 +170,19 @@ export class ESPHomeAutomationTriggerPicker extends LitElement {
         detail: { triggerId: id, params: {} },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
   private _onParamChange = (e: CustomEvent<ConfigEntryValueChange>) => {
     e.stopPropagation();
-    const next = applyParamChange(
-      this.triggerParams,
-      e.detail.path,
-      e.detail.value,
-    );
+    const next = applyParamChange(this.triggerParams, e.detail.path, e.detail.value);
     this.dispatchEvent(
       new CustomEvent("trigger-params-change", {
         detail: { params: next },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 }

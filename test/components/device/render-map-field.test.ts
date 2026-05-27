@@ -28,9 +28,7 @@ import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 function makeMapEntry(): ConfigEntry {
   return makeConfigEntry({
     type: ConfigEntryType.MAP,
-    config_entries: [
-      makeConfigEntry({ key: "value", required: true }),
-    ],
+    config_entries: [makeConfigEntry({ key: "value", required: true })],
   });
 }
 
@@ -44,9 +42,7 @@ interface CtxStub {
  *  collect every function (event handlers Lit binds to ``@click``
  *  / ``@change`` attributes). Used by the null-prototype test to
  *  invoke add / rename / delete handlers without a DOM. */
-function collectHandlers(
-  values: unknown[],
-): Array<(...args: unknown[]) => unknown> {
+function collectHandlers(values: unknown[]): Array<(...args: unknown[]) => unknown> {
   const out: Array<(...args: unknown[]) => unknown> = [];
   const walk = (v: unknown): void => {
     if (typeof v === "function") {
@@ -114,9 +110,7 @@ describe("renderMapField (substitutions / logger.logs / etc.)", () => {
     // value template at the per-row path.
     const calls = stub.renderEntry.mock.calls;
     const paths = calls.map((c) => c[1]);
-    expect(paths).toEqual(
-      expect.arrayContaining([["id_prefix"], ["timeout"]]),
-    );
+    expect(paths).toEqual(expect.arrayContaining([["id_prefix"], ["timeout"]]));
     expect(calls).toHaveLength(2);
   });
 
@@ -226,9 +220,10 @@ describe("renderMapField (substitutions / logger.logs / etc.)", () => {
     // Every dict ``ctx.emitChange`` received must be null-proto.
     const emittedDicts = stub.emitChange.mock.calls
       .map((c) => c[1])
-      .filter(
-        (v) => v !== null && typeof v === "object" && !Array.isArray(v),
-      ) as Record<string, unknown>[];
+      .filter((v) => v !== null && typeof v === "object" && !Array.isArray(v)) as Record<
+      string,
+      unknown
+    >[];
     expect(emittedDicts.length).toBeGreaterThanOrEqual(2);
     for (const d of emittedDicts) {
       expect(Object.getPrototypeOf(d)).toBeNull();

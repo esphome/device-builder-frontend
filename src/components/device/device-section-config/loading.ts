@@ -1,9 +1,7 @@
 import type { ConfigEntry } from "../../../api/types.js";
 import { fetchComponent } from "../../../util/component-name-cache.js";
 import { normalizeHexValues } from "../../../util/hex-int.js";
-import {
-  parseYamlSectionValues,
-} from "../../../util/yaml-section-values.js";
+import { parseYamlSectionValues } from "../../../util/yaml-section-values.js";
 import { resolveCurrentFromLine } from "../../../util/yaml-sections.js";
 import { parseTopLevelComponents } from "../../../util/yaml-serialize.js";
 import type { ESPHomeDeviceSectionConfig } from "../device-section-config.js";
@@ -78,16 +76,8 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
     // Asymmetric with save/delete paths: undefined here means "section
     // not in live yaml" — surface an empty form (silent), since this load
     // is reactive to external mutations, not explicit user intent.
-    const resolvedFromLine = resolveCurrentFromLine(
-      yaml,
-      host.sectionKey,
-      host.fromLine,
-    );
-    const parsedValues = parseYamlSectionValues(
-      yaml,
-      host.sectionKey,
-      resolvedFromLine,
-    );
+    const resolvedFromLine = resolveCurrentFromLine(yaml, host.sectionKey, host.fromLine);
+    const parsedValues = parseYamlSectionValues(yaml, host.sectionKey, resolvedFromLine);
     // Pre-format hex values to canonical "0x…" string form (#410) so a
     // save preserves the user's hex notation even when they only edited
     // an unrelated field. Without this, i2c addresses round-trip from

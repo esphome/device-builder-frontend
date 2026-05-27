@@ -117,9 +117,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
               >${this._localize("device.automation_only_when")}</label
             >`}
         ${this.conditions.length === 0
-          ? html`<p class="ae-empty">
-              ${this._localize("device.add_condition")}
-            </p>`
+          ? html`<p class="ae-empty">${this._localize("device.add_condition")}</p>`
           : this.conditions.map((node, idx) => this._renderNode(node, idx))}
         <button
           type="button"
@@ -152,9 +150,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
             ?disabled=${this.disabled}
             @click=${() => this._openPickerForChange(idx)}
           >
-            <span class="ae-row-picker-name">
-              ${def?.name ?? node.condition_id}
-            </span>
+            <span class="ae-row-picker-name"> ${def?.name ?? node.condition_id} </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
           <div class="ae-row-controls">
@@ -187,9 +183,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
         </div>
         <div class="ae-row-body">
           ${def?.description
-            ? html`<p class="ae-row-desc">
-                ${renderMarkdown(def.description)}
-              </p>`
+            ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
             : nothing}
           ${def && def.config_entries.length > 0
             ? html`<esphome-config-entry-form
@@ -216,7 +210,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
                   .yaml=${this.yaml}
                   ?disabled=${this.disabled}
                   @conditions-change=${(
-                    e: CustomEvent<{ conditions: ConditionNode[] }>,
+                    e: CustomEvent<{ conditions: ConditionNode[] }>
                   ) => this._onChildrenChange(idx, e)}
                 ></esphome-automation-condition-tree>
               </div>`
@@ -265,12 +259,12 @@ export class ESPHomeAutomationConditionTree extends LitElement {
 
   private _onChildrenChange(
     idx: number,
-    e: CustomEvent<{ conditions: ConditionNode[] }>,
+    e: CustomEvent<{ conditions: ConditionNode[] }>
   ) {
     e.stopPropagation();
     const old = this.conditions[idx];
     this._emit(
-      replaceAt(this.conditions, idx, { ...old, children: e.detail.conditions }),
+      replaceAt(this.conditions, idx, { ...old, children: e.detail.conditions })
     );
   }
 
@@ -288,7 +282,7 @@ export class ESPHomeAutomationConditionTree extends LitElement {
         detail: { conditions },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

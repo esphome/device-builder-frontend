@@ -36,9 +36,7 @@ import { makeConfigEntry } from "./config-entry-defaults.js";
  *  YAML with ``{}`` on save (#361), so packages now goes through
  *  ``YAML_ONLY_SECTIONS`` instead — both shapes round-trip via
  *  the YAML pane. */
-export const MAP_SECTIONS: ReadonlySet<string> = new Set([
-  "substitutions",
-]);
+export const MAP_SECTIONS: ReadonlySet<string> = new Set(["substitutions"]);
 
 /** Sections that must persist explicit ``""`` values in YAML — i.e.
  *  the user typed a key + cleared the value, treat that as
@@ -46,9 +44,7 @@ export const MAP_SECTIONS: ReadonlySet<string> = new Set([
  *  ``substitutions`` is currently the only one: its values are
  *  user-supplied strings, and a cleared value means "this
  *  substitution is intentionally empty". */
-export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set([
-  "substitutions",
-]);
+export const KEEP_EMPTY_STRING_SECTIONS: ReadonlySet<string> = new Set(["substitutions"]);
 
 /** Synthesised entries shared by every section in :data:`MAP_SECTIONS`
  *  — a single MAP whose value template is a string. The user names
@@ -95,7 +91,7 @@ const MAP_SECTION_ENTRIES: ConfigEntry[] = [
  */
 export function resolveSectionEntries(
   sectionKey: string,
-  catalogEntries: ConfigEntry[],
+  catalogEntries: ConfigEntry[]
 ): ConfigEntry[] {
   if (MAP_SECTIONS.has(sectionKey)) return MAP_SECTION_ENTRIES;
   return catalogEntries;

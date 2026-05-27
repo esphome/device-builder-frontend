@@ -103,8 +103,12 @@ registerMdiIcons({
 
 @customElement("esphome-device-drawer-content")
 export class ESPHomeDeviceDrawerContent extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
-  @consume({ context: integrationDocsContext, subscribe: true }) @state() _integrationDocs: Record<string, string> = {};
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
+  @consume({ context: integrationDocsContext, subscribe: true })
+  @state()
+  _integrationDocs: Record<string, string> = {};
   @consume({ context: apiContext }) @state() _api?: ESPHomeAPI;
 
   @property({ attribute: false }) device!: ConfiguredDevice;
@@ -180,24 +184,46 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
         : nothing}
       <div class="section">
         <h4 class="section-title">${this._localize("dashboard.drawer_device_info")}</h4>
-        ${renderRow("information-outline", this._localize("dashboard.drawer_name"), d.friendly_name || d.name)}
-        ${renderRow("network-outline", this._localize("dashboard.drawer_address"), d.address, true)}
-        ${renderIpAddressRow(this, d)}
-        ${renderMacAddressRow(d, this._localize)}
+        ${renderRow(
+          "information-outline",
+          this._localize("dashboard.drawer_name"),
+          d.friendly_name || d.name
+        )}
+        ${renderRow(
+          "network-outline",
+          this._localize("dashboard.drawer_address"),
+          d.address,
+          true
+        )}
+        ${renderIpAddressRow(this, d)} ${renderMacAddressRow(d, this._localize)}
         ${renderEthernetMacRow(d, this._localize)}
         ${renderBluetoothMacRow(d, this._localize)}
-        ${renderRow("memory", this._localize("dashboard.drawer_platform"), d.target_platform)}
+        ${renderRow(
+          "memory",
+          this._localize("dashboard.drawer_platform"),
+          d.target_platform
+        )}
         ${renderBuildSizeRow(this, d)}
-        ${d.area ? renderRow("map-marker-outline", this._localize("dashboard.drawer_area"), d.area) : nothing}
+        ${d.area
+          ? renderRow(
+              "map-marker-outline",
+              this._localize("dashboard.drawer_area"),
+              d.area
+            )
+          : nothing}
       </div>
 
-      ${renderLabelsSection(d, this._localize)}
-      ${renderReachabilitySection(this)}
+      ${renderLabelsSection(d, this._localize)} ${renderReachabilitySection(this)}
       ${renderVersionSection(d, this._localize)}
 
       <div class="section">
         <h4 class="section-title">${this._localize("dashboard.drawer_configuration")}</h4>
-        ${renderRow("file-document-outline", this._localize("dashboard.drawer_config_file"), d.configuration, true)}
+        ${renderRow(
+          "file-document-outline",
+          this._localize("dashboard.drawer_config_file"),
+          d.configuration,
+          true
+        )}
         ${renderRow("text-short", this._localize("dashboard.drawer_comment"), d.comment)}
       </div>
 
@@ -215,8 +241,7 @@ export class ESPHomeDeviceDrawerContent extends LitElement {
     const previousDevice = changed.get("device") as ConfiguredDevice | null | undefined;
     const deviceTargetMoved =
       changed.has("device") &&
-      (previousDevice?.configuration ?? null) !==
-        (this.device?.configuration ?? null);
+      (previousDevice?.configuration ?? null) !== (this.device?.configuration ?? null);
     if (deviceTargetMoved) {
       this._ipExpanded = false;
     }

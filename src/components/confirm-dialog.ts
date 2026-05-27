@@ -122,11 +122,7 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog
-        label=${this.heading}
-        light-dismiss
-        @wa-after-hide=${this._onAfterHide}
-      >
+      <wa-dialog label=${this.heading} light-dismiss @wa-after-hide=${this._onAfterHide}>
         <div class="body">
           ${this.destructive
             ? html`<div class="icon-wrap destructive">

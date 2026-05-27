@@ -28,7 +28,7 @@ export class ComponentNameResolverController implements ReactiveController {
   constructor(
     private readonly _host: ReactiveControllerHost,
     private readonly _getApi: () => ESPHomeAPI | undefined,
-    private readonly _getPlatform: () => string | undefined,
+    private readonly _getPlatform: () => string | undefined
   ) {
     _host.addController(this);
   }

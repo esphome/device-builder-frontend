@@ -131,22 +131,34 @@ export class ESPHomeLogsMethodDialog extends LitElement {
           <div class="option option--disabled">
             <wa-icon library="mdi" name="wifi"></wa-icon>
             <div class="info">
-              <span class="title">${this._localize("dashboard.logs_method_wireless")}</span>
-              <span class="desc">${this._localize("dashboard.logs_method_wireless_desc")}</span>
+              <span class="title"
+                >${this._localize("dashboard.logs_method_wireless")}</span
+              >
+              <span class="desc"
+                >${this._localize("dashboard.logs_method_wireless_desc")}</span
+              >
             </div>
           </div>
           <div class="option" @click=${this._onWebSerial}>
             <wa-icon library="mdi" name="usb"></wa-icon>
             <div class="info">
-              <span class="title">${this._localize("dashboard.logs_method_usb_local")}</span>
-              <span class="desc">${this._localize("dashboard.logs_method_usb_local_desc")}</span>
+              <span class="title"
+                >${this._localize("dashboard.logs_method_usb_local")}</span
+              >
+              <span class="desc"
+                >${this._localize("dashboard.logs_method_usb_local_desc")}</span
+              >
             </div>
           </div>
           <div class="option option--disabled">
             <wa-icon library="mdi" name="serial-port"></wa-icon>
             <div class="info">
-              <span class="title">${this._localize("dashboard.logs_method_usb_server")}</span>
-              <span class="desc">${this._localize("dashboard.logs_method_usb_server_desc")}</span>
+              <span class="title"
+                >${this._localize("dashboard.logs_method_usb_server")}</span
+              >
+              <span class="desc"
+                >${this._localize("dashboard.logs_method_usb_server_desc")}</span
+              >
             </div>
           </div>
         </div>
@@ -155,15 +167,11 @@ export class ESPHomeLogsMethodDialog extends LitElement {
   }
 
   private _onClose() {
-    this.dispatchEvent(
-      new CustomEvent("close", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   }
 
   private _onWebSerial() {
-    this.dispatchEvent(
-      new CustomEvent("web-serial", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("web-serial", { bubbles: true, composed: true }));
   }
 }
 

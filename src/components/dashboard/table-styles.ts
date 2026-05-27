@@ -74,9 +74,12 @@ export const tableLayoutStyles = css`
     min-height: 0;
     /* Horizontal scroll shadows — appear only when content overflows */
     background:
-      linear-gradient(to right, var(--wa-color-surface-raised) 30%, transparent) left center,
-      linear-gradient(to left, var(--wa-color-surface-raised) 30%, transparent) right center,
-      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.12), transparent) left center,
+      linear-gradient(to right, var(--wa-color-surface-raised) 30%, transparent) left
+        center,
+      linear-gradient(to left, var(--wa-color-surface-raised) 30%, transparent) right
+        center,
+      radial-gradient(farthest-side at 0 50%, rgba(0, 0, 0, 0.12), transparent) left
+        center,
       radial-gradient(farthest-side at 100% 50%, rgba(0, 0, 0, 0.12), transparent) right
         center;
     background-repeat: no-repeat;

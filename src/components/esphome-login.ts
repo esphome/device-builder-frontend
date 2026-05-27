@@ -174,7 +174,7 @@ export class ESPHomeLogin extends LitElement {
   protected render() {
     const secondsLeft = Math.max(
       0,
-      Math.ceil((this.rateLimitedUntil - this._now) / 1000),
+      Math.ceil((this.rateLimitedUntil - this._now) / 1000)
     );
     const rateLimited = secondsLeft > 0;
     const submitDisabled = this.submitting || rateLimited || this.disconnected;
@@ -197,9 +197,7 @@ export class ESPHomeLogin extends LitElement {
         </div>
         <form @submit=${this._onSubmit}>
           <div class="field">
-            <label for="login-username">
-              ${this._localize("auth.username")}
-            </label>
+            <label for="login-username"> ${this._localize("auth.username")} </label>
             <input
               id="login-username"
               name="username"
@@ -211,9 +209,7 @@ export class ESPHomeLogin extends LitElement {
             />
           </div>
           <div class="field">
-            <label for="login-password">
-              ${this._localize("auth.password")}
-            </label>
+            <label for="login-password"> ${this._localize("auth.password")} </label>
             <input
               id="login-password"
               name="password"
@@ -227,9 +223,7 @@ export class ESPHomeLogin extends LitElement {
           ${this.error
             ? html`<div class="error" role="alert">${this.error}</div>`
             : nothing}
-          <button type="submit" ?disabled=${submitDisabled}>
-            ${submitLabel}
-          </button>
+          <button type="submit" ?disabled=${submitDisabled}>${submitLabel}</button>
         </form>
       </div>
     `;
@@ -253,7 +247,7 @@ export class ESPHomeLogin extends LitElement {
         detail: { username: this._username, password: this._password },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 }

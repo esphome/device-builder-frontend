@@ -210,7 +210,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
-    () => this._localize,
+    () => this._localize
   );
 
   private _installCtrl = this._createInstallController();
@@ -679,9 +679,7 @@ export class ESPHomePageDevice extends LitElement {
    *  navigator's selection to the containing section so the user
    *  isn't left looking at a different section's form panel after
    *  the scroll lands. */
-  private _onValidationGoTo = (
-    e: CustomEvent<{ line: number; col: number }>,
-  ) => {
+  private _onValidationGoTo = (e: CustomEvent<{ line: number; col: number }>) => {
     const line = e.detail.line;
     if (line && line >= 1) {
       // Sections-only layout would scroll a hidden editor — flip
@@ -721,8 +719,7 @@ export class ESPHomePageDevice extends LitElement {
   private _onValidateClick = () => {
     if (!this._device) return;
     this._commandDialog.configuration = this._device.configuration;
-    this._commandDialog.name =
-      this._device.friendly_name || this._device.name;
+    this._commandDialog.name = this._device.friendly_name || this._device.name;
     this._commandDialog.open("validate");
   };
 
@@ -748,9 +745,7 @@ export class ESPHomePageDevice extends LitElement {
    *    dialogs only ever surface for the current page's device),
    *    but defensively navigate to the requested device so the
    *    hint can never become a silent no-op. */
-  private _onRequestOpenEditor = (
-    e: CustomEvent<{ configuration: string }>
-  ) => {
+  private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     e.stopPropagation();
     if (e.detail.configuration === this._device?.configuration) return;
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
@@ -765,9 +760,7 @@ export class ESPHomePageDevice extends LitElement {
       this.id ||
       this._localize("dashboard.create_device");
 
-    const showEdgeTab = this._isMobile
-      ? !this._drawerOpen
-      : this._navCollapsed;
+    const showEdgeTab = this._isMobile ? !this._drawerOpen : this._navCollapsed;
     const backLabel = this._localize("device.back");
 
     return html`
@@ -924,9 +917,7 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     this._navCollapsed = false;
-    this._api
-      .updatePreferences({ navigator_visible: true })
-      .catch(() => {});
+    this._api.updatePreferences({ navigator_visible: true }).catch(() => {});
   };
 
   /** Collapse request bubbling up from the navigator's own chevron.
@@ -938,9 +929,7 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     this._navCollapsed = true;
-    this._api
-      .updatePreferences({ navigator_visible: false })
-      .catch(() => {});
+    this._api.updatePreferences({ navigator_visible: false }).catch(() => {});
   };
 
   /**

@@ -27,21 +27,17 @@ describe("resolveSectionForUrlLine", () => {
     expect(resolveSectionForUrlLine(SAMPLE_YAML, undefined, null)).toBeNull();
   });
 
-  it.each([
-    NaN,
-    0,
-    -1,
-    -100,
-    1.5,
-    7.5,
-  ])("returns null for invalid line value %s (URL param can be junk)", (badLine) => {
-    // ``line`` arrives via ``Number(raw)`` from ``URLSearchParams``,
-    // so a hand-crafted URL like ``?line=foo`` (NaN), ``?line=7.5``
-    // (fractional), or ``?line=-1`` would otherwise feed bad input
-    // to ``sectionAtLine`` / CodeMirror's ``doc.line(n)`` which
-    // throws. Validate at the boundary.
-    expect(resolveSectionForUrlLine(SAMPLE_YAML, badLine, null)).toBeNull();
-  });
+  it.each([NaN, 0, -1, -100, 1.5, 7.5])(
+    "returns null for invalid line value %s (URL param can be junk)",
+    (badLine) => {
+      // ``line`` arrives via ``Number(raw)`` from ``URLSearchParams``,
+      // so a hand-crafted URL like ``?line=foo`` (NaN), ``?line=7.5``
+      // (fractional), or ``?line=-1`` would otherwise feed bad input
+      // to ``sectionAtLine`` / CodeMirror's ``doc.line(n)`` which
+      // throws. Validate at the boundary.
+      expect(resolveSectionForUrlLine(SAMPLE_YAML, badLine, null)).toBeNull();
+    }
+  );
 
   it("returns null when YAML is empty (still loading)", () => {
     expect(resolveSectionForUrlLine("", 5, null)).toBeNull();

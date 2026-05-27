@@ -92,7 +92,9 @@ const JOB_TYPE_TO_COMMAND: Record<string, CommandType> = {
 
 @customElement("esphome-command-dialog")
 export class ESPHomeCommandDialog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
   @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode = true;
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
@@ -192,10 +194,7 @@ export class ESPHomeCommandDialog extends LitElement {
     // running → terminal transition.
     if (changedProperties.has("_state")) {
       const prev = changedProperties.get("_state") as CommandState | null;
-      if (
-        prev === "running" &&
-        (this._state === "success" || this._state === "error")
-      ) {
+      if (prev === "running" && (this._state === "success" || this._state === "error")) {
         this._resetAnsiLogScroll();
       }
     }
@@ -311,7 +310,7 @@ export class ESPHomeCommandDialog extends LitElement {
     // follow_job will reattach if they click back into this device's job.
     this.close();
     this.dispatchEvent(
-      new CustomEvent("open-firmware-jobs", { bubbles: true, composed: true }),
+      new CustomEvent("open-firmware-jobs", { bubbles: true, composed: true })
     );
   };
 
@@ -326,7 +325,7 @@ export class ESPHomeCommandDialog extends LitElement {
         detail: { configuration },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -337,7 +336,7 @@ export class ESPHomeCommandDialog extends LitElement {
   _tryResetBuildEnv = () => {
     this.close();
     this.dispatchEvent(
-      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true }),
+      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
     );
   };
 
@@ -407,8 +406,7 @@ export class ESPHomeCommandDialog extends LitElement {
             ></esphome-ansi-log>
             ${renderQueuedOverlay(this)}
           </div>
-          ${renderBanner(this)} ${renderResetSuggestion(this)}
-          ${renderToolbar(this)}
+          ${renderBanner(this)} ${renderResetSuggestion(this)} ${renderToolbar(this)}
         </div>
       </wa-dialog>
     `;

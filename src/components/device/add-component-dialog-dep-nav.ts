@@ -23,10 +23,7 @@ export interface DepNavHost {
  * Domain-level deps (``output``, ``sensor``) fall back to the
  * category-filtered catalog where the user picks a variant.
  */
-export async function navigateToDep(
-  host: DepNavHost,
-  domain: string,
-): Promise<void> {
+export async function navigateToDep(host: DepNavHost, domain: string): Promise<void> {
   if (host._submitting) return;
   // Snapshot, don't commit, until the lookup resolves: the original
   // form is still rendered + submit-enabled (request-add-component
@@ -39,7 +36,7 @@ export async function navigateToDep(
     direct = await host._api.getComponent(
       domain,
       host.platform || undefined,
-      host.board?.id ?? undefined,
+      host.board?.id ?? undefined
     );
   } catch {
     direct = null;
@@ -66,7 +63,7 @@ export async function navigateToDep(
  */
 export function matchesDepDomain(
   added: ComponentCatalogEntry,
-  depDomain: string,
+  depDomain: string
 ): boolean {
   return added.id === depDomain || added.category === depDomain;
 }

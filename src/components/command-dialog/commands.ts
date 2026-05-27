@@ -1,9 +1,5 @@
 import { APIError } from "../../api/api-error.js";
-import {
-  ErrorCode,
-  JobStatus,
-  type FirmwareJob,
-} from "../../api/types.js";
+import { ErrorCode, JobStatus, type FirmwareJob } from "../../api/types.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
@@ -75,7 +71,7 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
         host._flushPendingLines();
         host._state = data.success ? "success" : "error";
         host._statusMessage = host._localize(
-          data.success ? "command.validate_success" : "command.validate_failed",
+          data.success ? "command.validate_success" : "command.validate_failed"
         );
       },
       onError: (error) => {
@@ -85,7 +81,7 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
         host._statusMessage = error;
       },
     },
-    { showSecrets: host._showSecrets },
+    { showSecrets: host._showSecrets }
   );
 }
 
@@ -168,7 +164,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._statusMessage = host._localize(
         success
           ? `command.${host._commandType}_success`
-          : `command.${host._commandType}_failed`,
+          : `command.${host._commandType}_failed`
       );
       host._jobId = "";
       if (
@@ -206,8 +202,7 @@ export function stopCommand(host: ESPHomeCommandDialog): void {
 function isCancelAlreadyTerminal(err: unknown): boolean {
   if (!(err instanceof APIError)) return false;
   return (
-    err.errorCode === ErrorCode.NOT_FOUND ||
-    err.errorCode === ErrorCode.INVALID_ARGS
+    err.errorCode === ErrorCode.NOT_FOUND || err.errorCode === ErrorCode.INVALID_ARGS
   );
 }
 

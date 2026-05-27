@@ -42,7 +42,7 @@ const stubHost = () => {
 };
 
 const mockApi = (
-  impl: (id: string) => ComponentCatalogEntry | null,
+  impl: (id: string) => ComponentCatalogEntry | null
 ): { api: ESPHomeAPI; getComponent: ReturnType<typeof vi.fn> } => {
   const getComponent = vi.fn((id: string) => Promise.resolve(impl(id)));
   return { api: { getComponent } as unknown as ESPHomeAPI, getComponent };
@@ -58,7 +58,7 @@ describe("ComponentNameResolverController", () => {
     const ctl = new ComponentNameResolverController(
       host,
       () => api,
-      () => "esp32",
+      () => "esp32"
     );
 
     expect(ctl.resolve("i2c")).toBe("i2c"); // not yet fetched
@@ -71,7 +71,11 @@ describe("ComponentNameResolverController", () => {
   it("falls back to the raw id when the cache has no entry", () => {
     const { host } = stubHost();
     const { api } = mockApi(() => null);
-    const ctl = new ComponentNameResolverController(host, () => api, () => undefined);
+    const ctl = new ComponentNameResolverController(
+      host,
+      () => api,
+      () => undefined
+    );
 
     expect(ctl.resolve("uart")).toBe("uart");
   });
@@ -82,7 +86,7 @@ describe("ComponentNameResolverController", () => {
     const ctl = new ComponentNameResolverController(
       host,
       () => api,
-      () => undefined,
+      () => undefined
     );
 
     // No subscription before hostConnected — kickoff still fetches, but
@@ -106,7 +110,7 @@ describe("ComponentNameResolverController", () => {
     const ctl = new ComponentNameResolverController(
       host,
       () => undefined,
-      () => undefined,
+      () => undefined
     );
     // Should be a no-op rather than throwing.
     expect(() => ctl.kickoff(["i2c", "uart"])).not.toThrow();
@@ -118,7 +122,7 @@ describe("ComponentNameResolverController", () => {
     const ctl = new ComponentNameResolverController(
       host,
       () => api,
-      () => undefined,
+      () => undefined
     );
     connect();
 

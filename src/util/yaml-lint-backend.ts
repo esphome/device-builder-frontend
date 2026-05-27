@@ -40,7 +40,7 @@ const _lastValidated = new Map<
 /** Return the linter's last result if it matches the current buffer and is fresh. */
 export function getLastValidatedResult(
   configuration: string,
-  content: string,
+  content: string
 ): EditorValidateResponse | null {
   const entry = _lastValidated.get(configuration);
   if (entry === undefined || entry.content !== content) return null;
@@ -52,7 +52,7 @@ export function getLastValidatedResult(
 export function __setLastValidatedForTesting(
   configuration: string,
   content: string,
-  result: EditorValidateResponse,
+  result: EditorValidateResponse
 ): void {
   _lastValidated.set(configuration, { content, result, at: performance.now() });
 }
@@ -68,7 +68,7 @@ const YAML_LINE_RE = /line\s+(\d+)/i;
  */
 function rangeToOffsets(
   view: EditorView,
-  range: { start_line: number; start_col: number; end_line: number; end_col: number },
+  range: { start_line: number; start_col: number; end_line: number; end_col: number }
 ): { from: number; to: number } {
   const doc = view.state.doc;
   const totalLines = doc.lines;
@@ -104,7 +104,7 @@ function rangeToOffsets(
 function lineToOffsets(
   view: EditorView,
   line1: number,
-  col1: number | null,
+  col1: number | null
 ): { from: number; to: number } {
   const doc = view.state.doc;
   const lineNum = Math.min(Math.max(line1, 1), doc.lines);
@@ -193,6 +193,6 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
       // Don't auto-open the panel — we only want the inline wavy underlines
       // and hover tooltip.
       autoPanel: false,
-    },
+    }
   );
 }

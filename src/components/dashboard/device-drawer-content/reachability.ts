@@ -1,9 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
-import type {
-  ReachabilitySource,
-  ReachabilityStateEvent,
-} from "../../../api/types.js";
+import type { ReachabilitySource, ReachabilityStateEvent } from "../../../api/types.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
 import {
   ageOf,
@@ -23,7 +20,7 @@ interface ReachabilityRowSpec {
 }
 
 export function renderReachabilitySection(
-  host: ESPHomeDeviceDrawerContent,
+  host: ESPHomeDeviceDrawerContent
 ): TemplateResult | typeof nothing {
   const r = host._reachability;
   if (r === null) return nothing;
@@ -61,15 +58,13 @@ export function renderReachabilitySection(
 
   return html`
     <div class="section">
-      <h4 class="section-title">
-        ${host._localize("dashboard.drawer_reachability")}
-      </h4>
+      <h4 class="section-title">${host._localize("dashboard.drawer_reachability")}</h4>
       ${!anySignal
         ? html`<div class="value muted">
             ${host._localize("dashboard.drawer_waiting_for_signal")}
           </div>`
         : rows.map((row) =>
-            renderReachabilityRow(row, r.active_source, lang, host._localize),
+            renderReachabilityRow(row, r.active_source, lang, host._localize)
           )}
     </div>
   `;
@@ -79,7 +74,7 @@ function renderReachabilityRow(
   row: ReachabilityRowSpec,
   activeSource: ReachabilitySource,
   lang: string | undefined,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   if (row.age === null) return nothing;
   const ageText = formatSecondsAgo(row.age, lang);
@@ -122,12 +117,10 @@ function renderReachabilityRow(
 // (which catches WS reconnects — the API clears event listeners on close so
 // the stale _subscribedDevice would otherwise block resubscribe).
 export function reconcileSubscription(host: ESPHomeDeviceDrawerContent): void {
-  const wantName =
-    host.drawerOpen && host.device && host._api ? host.device.name : null;
+  const wantName = host.drawerOpen && host.device && host._api ? host.device.name : null;
   const currentGeneration = host._api?.connectionGeneration ?? 0;
   const generationChanged =
-    host._subscribedDevice !== null &&
-    currentGeneration !== host._subscribedGeneration;
+    host._subscribedDevice !== null && currentGeneration !== host._subscribedGeneration;
   if (wantName === host._subscribedDevice && !generationChanged) return;
 
   teardownSubscription(host);
@@ -149,7 +142,7 @@ async function openSubscription(
   deviceName: string,
   attemptGeneration: number,
   attemptKey: string,
-  api: ESPHomeAPI,
+  api: ESPHomeAPI
 ): Promise<void> {
   // A WS reconnect (gen bump) or different-device selection between
   // subscribe-start and resolve/reject makes this attempt stale; catch
@@ -166,7 +159,7 @@ async function openSubscription(
         if (!isCurrent()) return;
         host._reachability = state;
         host._reachabilityAnchorMs = Date.now();
-      },
+      }
     );
     if (!isCurrent()) {
       void subscription.unsubscribe();

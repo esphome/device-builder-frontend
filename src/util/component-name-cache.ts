@@ -38,7 +38,7 @@ function _key(componentId: string, platform?: string, boardId?: string): string 
 export function getCachedComponent(
   componentId: string,
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): CacheValue | undefined {
   return _cache.get(_key(componentId, platform, boardId));
 }
@@ -53,7 +53,7 @@ export function fetchComponent(
   api: ESPHomeAPI,
   componentId: string,
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): Promise<CacheValue> {
   const key = _key(componentId, platform, boardId);
   if (_cache.has(key)) return Promise.resolve(_cache.get(key) ?? null);

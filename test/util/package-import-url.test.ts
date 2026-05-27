@@ -17,14 +17,14 @@ import { previewPackageImportUrl } from "../../src/util/package-import-url.js";
 describe("previewPackageImportUrl — github://", () => {
   it("resolves a basic shorthand with @ref", () => {
     const out = previewPackageImportUrl(
-      "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0",
+      "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0"
     );
     expect(out.browseUrl).toBe(
-      "https://github.com/athom-tech/athom-configs/blob/v1.0.0/athom-rgbct-light.yaml",
+      "https://github.com/athom-tech/athom-configs/blob/v1.0.0/athom-rgbct-light.yaml"
     );
     expect(out.service).toBe("github");
     expect(out.raw).toBe(
-      "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0",
+      "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0"
     );
   });
 
@@ -34,10 +34,10 @@ describe("previewPackageImportUrl — github://", () => {
     // somewhere — ``HEAD`` is what GitHub's blob view falls back to
     // for the default branch.
     const out = previewPackageImportUrl(
-      "github://athom-tech/athom-configs/athom-rgbct-light.yaml",
+      "github://athom-tech/athom-configs/athom-rgbct-light.yaml"
     );
     expect(out.browseUrl).toBe(
-      "https://github.com/athom-tech/athom-configs/blob/HEAD/athom-rgbct-light.yaml",
+      "https://github.com/athom-tech/athom-configs/blob/HEAD/athom-rgbct-light.yaml"
     );
     expect(out.service).toBe("github");
   });
@@ -47,10 +47,10 @@ describe("previewPackageImportUrl — github://", () => {
     // monorepo. Pinning this case so a regex-tightening that broke
     // ``/`` in the filename wouldn't slip through CI.
     const out = previewPackageImportUrl(
-      "github://ApolloAutomation/PUMP-1/Integrations/ESPHome/PUMP-1_Minimal.yaml@main",
+      "github://ApolloAutomation/PUMP-1/Integrations/ESPHome/PUMP-1_Minimal.yaml@main"
     );
     expect(out.browseUrl).toBe(
-      "https://github.com/ApolloAutomation/PUMP-1/blob/main/Integrations/ESPHome/PUMP-1_Minimal.yaml",
+      "https://github.com/ApolloAutomation/PUMP-1/blob/main/Integrations/ESPHome/PUMP-1_Minimal.yaml"
     );
     expect(out.service).toBe("github");
   });
@@ -62,10 +62,10 @@ describe("previewPackageImportUrl — github://", () => {
     // semantic to ESPHome only — for the browse URL we drop it,
     // since GitHub doesn't know what ``?full_config`` means.
     const out = previewPackageImportUrl(
-      "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0?full_config",
+      "github://athom-tech/athom-configs/athom-rgbct-light.yaml@v1.0.0?full_config"
     );
     expect(out.browseUrl).toBe(
-      "https://github.com/athom-tech/athom-configs/blob/v1.0.0/athom-rgbct-light.yaml",
+      "https://github.com/athom-tech/athom-configs/blob/v1.0.0/athom-rgbct-light.yaml"
     );
   });
 });
@@ -75,20 +75,20 @@ describe("previewPackageImportUrl — gitlab://", () => {
     // GitLab's blob route is ``-/blob/<ref>/<path>`` — note the
     // ``-/`` segment that GitHub doesn't have.
     const out = previewPackageImportUrl(
-      "gitlab://example-group/example-repo/configs/device.yaml@v1.0.0",
+      "gitlab://example-group/example-repo/configs/device.yaml@v1.0.0"
     );
     expect(out.browseUrl).toBe(
-      "https://gitlab.com/example-group/example-repo/-/blob/v1.0.0/configs/device.yaml",
+      "https://gitlab.com/example-group/example-repo/-/blob/v1.0.0/configs/device.yaml"
     );
     expect(out.service).toBe("gitlab");
   });
 
   it("falls back to HEAD when @ref is omitted", () => {
     const out = previewPackageImportUrl(
-      "gitlab://example-group/example-repo/configs/device.yaml",
+      "gitlab://example-group/example-repo/configs/device.yaml"
     );
     expect(out.browseUrl).toBe(
-      "https://gitlab.com/example-group/example-repo/-/blob/HEAD/configs/device.yaml",
+      "https://gitlab.com/example-group/example-repo/-/blob/HEAD/configs/device.yaml"
     );
   });
 });
@@ -106,9 +106,7 @@ describe("previewPackageImportUrl — fall-through to plain text", () => {
     // a vendor starts shipping ``bitbucket://…`` URLs before we
     // update this util, we render them as plain text rather than
     // fabricating a wrong click target.
-    const out = previewPackageImportUrl(
-      "bitbucket://owner/repo/file.yaml@main",
-    );
+    const out = previewPackageImportUrl("bitbucket://owner/repo/file.yaml@main");
     expect(out.browseUrl).toBe(null);
     expect(out.service).toBe(null);
     expect(out.raw).toBe("bitbucket://owner/repo/file.yaml@main");
@@ -120,9 +118,9 @@ describe("previewPackageImportUrl — fall-through to plain text", () => {
     // render them as a clickable preview either; the user
     // sees the raw value and the missing link is the
     // signal that it won't import.
-    expect(previewPackageImportUrl("https://github.com/o/r/blob/main/x.yaml").browseUrl).toBe(
-      null,
-    );
+    expect(
+      previewPackageImportUrl("https://github.com/o/r/blob/main/x.yaml").browseUrl
+    ).toBe(null);
     expect(previewPackageImportUrl("http://example.com/foo.yaml").browseUrl).toBe(null);
   });
 
@@ -134,7 +132,7 @@ describe("previewPackageImportUrl — fall-through to plain text", () => {
     expect(previewPackageImportUrl("javascript:alert(1)").browseUrl).toBe(null);
     expect(previewPackageImportUrl("not a url at all").browseUrl).toBe(null);
     expect(
-      previewPackageImportUrl("github://owner/repo/file.yaml javascript:").browseUrl,
+      previewPackageImportUrl("github://owner/repo/file.yaml javascript:").browseUrl
     ).toBe(null);
   });
 

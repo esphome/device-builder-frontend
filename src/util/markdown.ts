@@ -125,7 +125,7 @@ function renderSegment(seg: Segment): TemplateResult | string {
  * conditional. Output is a Lit template; safe to interpolate.
  */
 export function renderMarkdown(
-  input: string | null | undefined,
+  input: string | null | undefined
 ): TemplateResult | typeof nothing {
   if (!input) return nothing;
   const segments = parseMarkdown(input);

@@ -173,7 +173,8 @@ export const componentCatalogStyles = css`
     flex-direction: column;
     gap: 6px;
     cursor: pointer;
-    transition: border-color var(--wa-transition-normal) var(--wa-transition-easing),
+    transition:
+      border-color var(--wa-transition-normal) var(--wa-transition-easing),
       background var(--wa-transition-normal) var(--wa-transition-easing);
   }
 

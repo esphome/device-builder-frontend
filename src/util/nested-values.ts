@@ -19,7 +19,7 @@
 export function setIn(
   obj: Record<string, unknown>,
   path: string[],
-  value: unknown,
+  value: unknown
 ): Record<string, unknown> {
   // Empty path → caller is replacing the whole object with *value*
   // (used by top-level map sections like ``substitutions:``, where
@@ -56,11 +56,7 @@ function _parseArrayIndex(segment: string): number | null {
  * existing child's shape (Array → ``_setInArray``; anything else
  * is coerced to ``{}`` and handed to ``setIn``).
  */
-function _newChild(
-  currentChild: unknown,
-  rest: string[],
-  value: unknown,
-): unknown {
+function _newChild(currentChild: unknown, rest: string[], value: unknown): unknown {
   if (rest.length === 0) return value;
   if (Array.isArray(currentChild)) {
     return _setInArray(currentChild, rest, value);
@@ -82,7 +78,7 @@ function _newChild(
 function _setInArray(
   arr: readonly unknown[],
   path: string[],
-  value: unknown,
+  value: unknown
 ): readonly unknown[] {
   const [head, ...rest] = path;
   const idx = _parseArrayIndex(head);
@@ -98,10 +94,7 @@ function _setInArray(
  * intermediate. Numeric path segments index into arrays (mirrors
  * the array-aware writes in :func:`setIn`).
  */
-export function getIn(
-  obj: Record<string, unknown>,
-  path: string[],
-): unknown {
+export function getIn(obj: Record<string, unknown>, path: string[]): unknown {
   let cur: unknown = obj;
   for (const k of path) {
     if (cur === null || cur === undefined || typeof cur !== "object") {
@@ -143,7 +136,7 @@ export function getIn(
  * object.
  */
 export function isPrimitiveOrNullish(
-  value: unknown,
+  value: unknown
 ): value is string | number | boolean | null | undefined {
   if (value === null || value === undefined) return true;
   const t = typeof value;
@@ -161,9 +154,7 @@ export function isPrimitiveOrNullish(
  * fresh ``{}``. Centralised so both call sites can share one
  * definition of "object I can deep-merge into".
  */
-export function isPlainObject(
-  value: unknown,
-): value is Record<string, unknown> {
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
@@ -189,8 +180,6 @@ export function asRecord(value: unknown): Record<string, unknown> {
  * ``Record<string, unknown>[]`` regardless of mid-edit YAML
  * weirdness.
  */
-export function asMappingList(
-  value: unknown,
-): Record<string, unknown>[] {
+export function asMappingList(value: unknown): Record<string, unknown>[] {
   return Array.isArray(value) ? value.map(asRecord) : [];
 }

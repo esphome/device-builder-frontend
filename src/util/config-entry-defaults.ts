@@ -20,9 +20,7 @@
  */
 import { ConfigEntryType, type ConfigEntry } from "../api/types.js";
 
-export function makeConfigEntry(
-  overrides: Partial<ConfigEntry> = {},
-): ConfigEntry {
+export function makeConfigEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
   return {
     key: "",
     type: ConfigEntryType.STRING,

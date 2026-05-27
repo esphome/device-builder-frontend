@@ -204,7 +204,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                   const sensitiveLabel = this._localize(
                     this._revealSensitive
                       ? "device.yaml_mask_sensitive"
-                      : "device.yaml_reveal_sensitive",
+                      : "device.yaml_reveal_sensitive"
                   );
                   return html`<button
                     type="button"
@@ -413,11 +413,7 @@ export class ESPHomeDeviceEditor extends LitElement {
       this._showDiff = false;
       return;
     }
-    if (
-      this._showDiff &&
-      changed.has("savedYaml") &&
-      this.yaml === this.savedYaml
-    ) {
+    if (this._showDiff && changed.has("savedYaml") && this.yaml === this.savedYaml) {
       this._showDiff = false;
     }
   }

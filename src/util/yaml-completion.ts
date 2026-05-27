@@ -260,8 +260,7 @@ function entryToCompletion(entry: ConfigEntry): Completion {
   detailParts.push(entry.required ? "required" : entry.type);
   return {
     label: entry.key,
-    apply: (view, _completion, from, to) =>
-      applyKeyInsertion(view, from, to, entry.key),
+    apply: (view, _completion, from, to) => applyKeyInsertion(view, from, to, entry.key),
     type: iconType(entry.type),
     detail: detailParts.join(" · "),
     info: buildEntryInfo(entry),
@@ -344,9 +343,7 @@ export function buildTopLevelCompletions(catalog: CatalogIndex): Completion[] {
   return out;
 }
 
-export function platformValueCompletion(
-  c: ComponentCatalogEntry,
-): Completion {
+export function platformValueCompletion(c: ComponentCatalogEntry): Completion {
   // ``c.id`` is the dotted catalog id (``binary_sensor.gpio``);
   // YAML's ``platform:`` value is just the stem (``gpio``).
   // Strip the domain prefix so the inserted text is valid YAML —
@@ -379,7 +376,7 @@ function applyInsertion(
   view: EditorView,
   from: number,
   to: number,
-  insert: string,
+  insert: string
 ): void {
   view.dispatch({
     changes: { from, to, insert },
@@ -397,7 +394,7 @@ function applyKeyInsertion(
   view: EditorView,
   from: number,
   to: number,
-  key: string,
+  key: string
 ): void {
   applyInsertion(view, from, to, `${key}: `);
   startCompletion(view);
@@ -412,15 +409,10 @@ function applyListBlockInsertion(
   view: EditorView,
   from: number,
   to: number,
-  key: string,
+  key: string
 ): void {
   const lead = readLineLead(view, from);
-  applyInsertion(
-    view,
-    from,
-    to,
-    `${key}:\n${lead}${ESPHOME_YAML_INDENT}- `,
-  );
+  applyInsertion(view, from, to, `${key}:\n${lead}${ESPHOME_YAML_INDENT}- `);
   startCompletion(view);
 }
 
@@ -433,7 +425,7 @@ function applyListItemEntry(
   view: EditorView,
   from: number,
   to: number,
-  key: string,
+  key: string
 ): void {
   const line = view.state.doc.lineAt(from);
   const before = line.text.slice(0, from - line.from);
@@ -484,7 +476,7 @@ function triggerToCompletion(t: { key: string; docs?: string }): Completion {
         view,
         from,
         to,
-        `${t.key}:\n${inner}then:\n${inner}${ESPHOME_YAML_INDENT}- `,
+        `${t.key}:\n${inner}then:\n${inner}${ESPHOME_YAML_INDENT}- `
       );
     },
     type: "namespace",
@@ -505,8 +497,7 @@ function triggerToCompletion(t: { key: string; docs?: string }): Completion {
 function actionToCompletion(a: SchemaAction): Completion {
   return {
     label: a.key,
-    apply: (view, _completion, from, to) =>
-      applyListItemEntry(view, from, to, a.key),
+    apply: (view, _completion, from, to) => applyListItemEntry(view, from, to, a.key),
     type: "function",
     detail: "action",
     info: a.docs ?? undefined,
@@ -518,14 +509,10 @@ function actionToCompletion(a: SchemaAction): Completion {
  *  registry-key name itself (``filter`` / ``effects``) so the
  *  popup distinguishes filters from actions when both could
  *  apply. */
-function registryToCompletion(
-  e: SchemaRegistryEntry,
-  registryKey: string,
-): Completion {
+function registryToCompletion(e: SchemaRegistryEntry, registryKey: string): Completion {
   return {
     label: e.key,
-    apply: (view, _completion, from, to) =>
-      applyListItemEntry(view, from, to, e.key),
+    apply: (view, _completion, from, to) => applyListItemEntry(view, from, to, e.key),
     type: "function",
     detail: registryKey,
     info: e.docs ?? undefined,
@@ -553,7 +540,7 @@ function registryToCompletion(
  */
 function bundleFor(
   topLevelKey: string,
-  platformValue: string | null,
+  platformValue: string | null
 ): { bundle: string; componentKey: string } {
   return platformValue
     ? {
@@ -586,7 +573,7 @@ export async function resolveAvailableEntries(
   catalog: CatalogIndex,
   parentKey: string,
   platformValue: string | null,
-  topLevelKey: string | null,
+  topLevelKey: string | null
 ): Promise<ConfigEntry[]> {
   // Special case: cursor is nested under a list-item header
   // (``- platform: template`` → parentKey="platform"). The form
@@ -655,7 +642,7 @@ function resolveCompletionContext(
   pos: number,
   allLines: string[],
   lineIdx: number,
-  indent: number,
+  indent: number
 ): {
   platformValue: string | null;
   topLevelKey: string | null;
@@ -781,14 +768,14 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         pos,
         allLines,
         lineInfo.number - 1,
-        indent,
+        indent
       );
       const entries = await resolveAvailableEntries(
         api,
         catalog,
         parent.key,
         completionCtx.platformValue,
-        completionCtx.topLevelKey,
+        completionCtx.topLevelKey
       );
       const entry = entries.find((e) => e.key === key);
 
@@ -827,15 +814,12 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // (``device_class:``), since Lezer hasn't seen the value
       // yet.
       if (completionCtx.topLevelKey) {
-        const target = bundleFor(
-          completionCtx.topLevelKey,
-          completionCtx.platformValue,
-        );
+        const target = bundleFor(completionCtx.topLevelKey, completionCtx.platformValue);
         const enumValues = await getConfigVarValueOptions(
           api,
           target.bundle,
           target.componentKey,
-          key,
+          key
         );
         if (enumValues.length > 0) {
           return {
@@ -888,7 +872,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       pos,
       allLines,
       lineInfo.number - 1,
-      indent,
+      indent
     );
     const keyCtx: KeyPositionCtx = {
       api,
@@ -914,9 +898,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
         ctx.explicit || partial === "" || RE_TRIGGER_PREFIX.test(partial),
     };
 
-    const buckets = await Promise.all(
-      KEY_POSITION_PROVIDERS.map((p) => p.fetch(keyCtx)),
-    );
+    const buckets = await Promise.all(KEY_POSITION_PROVIDERS.map((p) => p.fetch(keyCtx)));
     const options = buckets.flat();
     if (options.length === 0) return null;
 
@@ -1009,7 +991,7 @@ async function resolveCatalogEntries(k: KeyPositionCtx): Promise<ConfigEntry[]> 
       k.catalog,
       k.parent.key,
       k.platformValue,
-      k.topLevelKey,
+      k.topLevelKey
     );
   }
   return k._cachedCatalogEntries;
@@ -1054,11 +1036,7 @@ const triggerKeysProvider: KeyPositionProvider = {
     if (!k.partialCouldBeTrigger) return [];
     if (!k.bundleCtx) return [];
     const target = bundleFor(k.bundleCtx.topLevelKey, k.bundleCtx.platformValue);
-    const triggers = await getTriggerKeys(
-      k.api,
-      target.bundle,
-      target.componentKey,
-    );
+    const triggers = await getTriggerKeys(k.api, target.bundle, target.componentKey);
     return triggers.map(triggerToCompletion);
   },
 };
@@ -1094,7 +1072,7 @@ const filterRegistryProvider: KeyPositionProvider = {
       k.api,
       target.bundle,
       target.componentKey,
-      k.parent.key,
+      k.parent.key
     );
     if (!ref) return [];
     const entries = await getRegistryEntries(k.api, ref);
@@ -1154,7 +1132,7 @@ const registryEntryArgsProvider: KeyPositionProvider = {
       k.api,
       ref.bundleName,
       ref.componentName,
-      ref.entryName,
+      ref.entryName
     );
     return keys.map(schemaKeyToCompletion);
   },
@@ -1192,4 +1170,3 @@ const KEY_POSITION_PROVIDERS: KeyPositionProvider[] = [
   platformKeyProvider,
   triggerBodyProvider,
 ];
-

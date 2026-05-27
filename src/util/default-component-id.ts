@@ -25,7 +25,7 @@
 export function generateDefaultComponentId(
   componentId: string,
   multiConf: boolean,
-  existing: ReadonlySet<string>,
+  existing: ReadonlySet<string>
 ): string | null {
   const isSingleton = !multiConf && !componentId.includes(".");
   if (isSingleton) return null;

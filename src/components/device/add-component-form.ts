@@ -14,10 +14,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
-import {
-  validateEntries,
-  type ValidationError,
-} from "../../util/config-validation.js";
+import { validateEntries, type ValidationError } from "../../util/config-validation.js";
 import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import {
   collectExistingIds,
@@ -28,9 +25,9 @@ import { setIn } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
   parseTopLevelComponents,
-  parseYamlBoolean,
   serializeYamlValues,
 } from "../../util/yaml-serialize.js";
+import { coerceFields } from "./add-component-form-coerce.js";
 import { addComponentFormStyles } from "./add-component-form.styles.js";
 import "./config-entry-form.js";
 import type { ConfigEntryValueChange } from "./config-entry-form.js";
@@ -101,7 +98,7 @@ export class ESPHomeAddComponentForm extends LitElement {
   private readonly _depResolver = new ComponentNameResolverController(
     this,
     () => this._api,
-    () => this.board?.esphome.platform || undefined,
+    () => this.board?.esphome.platform || undefined
   );
 
   static styles = [
@@ -115,13 +112,8 @@ export class ESPHomeAddComponentForm extends LitElement {
         display: flex;
         gap: var(--wa-space-s);
         padding: var(--wa-space-s) var(--wa-space-m);
-        background: color-mix(
-          in srgb,
-          var(--esphome-warning, #d97706),
-          transparent 88%
-        );
-        border: var(--wa-border-width-s) solid
-          var(--esphome-warning, #d97706);
+        background: color-mix(in srgb, var(--esphome-warning, #d97706), transparent 88%);
+        border: var(--wa-border-width-s) solid var(--esphome-warning, #d97706);
         border-radius: var(--wa-border-radius-m);
         color: var(--wa-color-text-normal);
         font-size: var(--wa-font-size-s);
@@ -219,7 +211,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     let next = this._seedDefaults(this.component.config_entries, seedAll);
 
     const idEntry = this.component.config_entries.find(
-      (e) => e.key === "id" && e.type === ConfigEntryType.ID,
+      (e) => e.key === "id" && e.type === ConfigEntryType.ID
     );
     if (idEntry && next["id"] === undefined) {
       const seeded = this._generateDefaultId();
@@ -237,14 +229,14 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.component.id,
       this.component.config_entries,
       this.board,
-      next,
+      next
     );
 
     if (this.prefillReference) {
       const targetPath = this._findReferencePath(
         this.component.config_entries,
         this.prefillReference.domain,
-        [],
+        []
       );
       if (targetPath) {
         next = setIn(next, targetPath, this.prefillReference.id);
@@ -263,15 +255,14 @@ export class ESPHomeAddComponentForm extends LitElement {
   private _findReferencePath(
     entries: ConfigEntry[],
     domain: string,
-    prefix: string[],
+    prefix: string[]
   ): string[] | null {
     for (const entry of entries) {
       if (entry.type === ConfigEntryType.NESTED) {
-        const found = this._findReferencePath(
-          entry.config_entries ?? [],
-          domain,
-          [...prefix, entry.key],
-        );
+        const found = this._findReferencePath(entry.config_entries ?? [], domain, [
+          ...prefix,
+          entry.key,
+        ]);
         if (found) return found;
         continue;
       }
@@ -296,7 +287,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    */
   private _seedDefaults(
     entries: ConfigEntry[],
-    seedAll: boolean = false,
+    seedAll: boolean = false
   ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
     for (const entry of entries) {
@@ -321,7 +312,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     return generateDefaultComponentId(
       this.component.id,
       this.component.multi_conf,
-      collectExistingIds(this.yaml),
+      collectExistingIds(this.yaml)
     );
   }
 
@@ -333,7 +324,7 @@ export class ESPHomeAddComponentForm extends LitElement {
     // configured first. Surface these to the user instead of letting
     // them submit a config that won't validate.
     const missingDeps = (this.component.dependencies ?? []).filter(
-      (d) => !presentComponents.has(d),
+      (d) => !presentComponents.has(d)
     );
 
     // The shared form filters its own visibility — but we still need
@@ -344,16 +335,14 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.component.config_entries,
       this._values,
       presentComponents,
-      this.board?.esphome.platform ?? null,
+      this.board?.esphome.platform ?? null
     );
     const isComplete = !this._hasRequiredErrors(validation);
 
     return html`
       <div class="form">
         <p class="form-desc">${renderMarkdown(this.component.description)}</p>
-        ${missingDeps.length > 0
-          ? this._renderMissingDeps(missingDeps)
-          : nothing}
+        ${missingDeps.length > 0 ? this._renderMissingDeps(missingDeps) : nothing}
         <esphome-config-entry-form
           .entries=${this.component.config_entries}
           .values=${this._values}
@@ -379,9 +368,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         ${this._showYaml
           ? html`<pre class="yaml-preview">${this._generateYamlPreview()}</pre>`
           : nothing}
-        ${this.submitError
-          ? html`<p class="error">${this.submitError}</p>`
-          : nothing}
+        ${this.submitError ? html`<p class="error">${this.submitError}</p>` : nothing}
         ${this._localBlockMessage
           ? html`<p class="error">${this._localBlockMessage}</p>`
           : nothing}
@@ -432,15 +419,16 @@ export class ESPHomeAddComponentForm extends LitElement {
           <div>${this._localize("device.missing_dependencies_body")}</div>
           <div class="deps-warning-actions">
             ${missing.map(
-              (d) => html`<button
-                type="button"
-                class="dep-button"
-                @click=${() => this._onAddDep(d)}
-              >
-                ${this._localize("device.missing_dependencies_add", {
-                  domain: this._depResolver.resolve(d),
-                })}
-              </button>`,
+              (d) =>
+                html`<button
+                  type="button"
+                  class="dep-button"
+                  @click=${() => this._onAddDep(d)}
+                >
+                  ${this._localize("device.missing_dependencies_add", {
+                    domain: this._depResolver.resolve(d),
+                  })}
+                </button>`
             )}
           </div>
         </div>
@@ -458,7 +446,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         detail: { domain },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -491,9 +479,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       entry = entries.find((e) => e.key === seg);
       if (!entry) break;
       entries =
-        entry.type === ConfigEntryType.NESTED
-          ? entry.config_entries ?? []
-          : null;
+        entry.type === ConfigEntryType.NESTED ? (entry.config_entries ?? []) : null;
     }
     return entry ? resolveEntryLabel(entry, this._localize) : errKey;
   }
@@ -511,7 +497,7 @@ export class ESPHomeAddComponentForm extends LitElement {
    */
   private _anyErrorIsVisible(
     errors: Map<string, ValidationError>,
-    presentComponents: Set<string>,
+    presentComponents: Set<string>
   ): boolean {
     // The caller (``_onSubmit``) only enters this branch when
     // ``errors.size > 0``, but we keep the guard so the helper is
@@ -525,7 +511,7 @@ export class ESPHomeAddComponentForm extends LitElement {
         showAdvanced: false,
         presentComponents,
         targetPlatform: this.board?.esphome.platform ?? null,
-      },
+      }
     );
     for (const key of errors.keys()) {
       if (renderedPaths.has(key)) return true;
@@ -557,9 +543,7 @@ export class ESPHomeAddComponentForm extends LitElement {
   }
 
   private _onCancel() {
-    this.dispatchEvent(
-      new CustomEvent("form-cancel", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("form-cancel", { bubbles: true, composed: true }));
   }
 
   private _onSubmit() {
@@ -573,17 +557,16 @@ export class ESPHomeAddComponentForm extends LitElement {
     // The button should already be disabled in that case, but defend
     // here too in case the YAML changed under us between renders.
     const missingDeps = (this.component.dependencies ?? []).filter(
-      (d) => !presentComponents.has(d),
+      (d) => !presentComponents.has(d)
     );
     if (missingDeps.length > 0) {
       // Should be unreachable — the button-disabled predicate uses the
       // same check. If we get here, the YAML changed under us between
       // renders. Surface a visible message that names the missing
       // domain(s) so the user can act, instead of returning silently.
-      this._localBlockMessage = `${this._localize(
-        "device.missing_dependencies_title",
-        { name: this.component.name },
-      )} (${missingDeps.join(", ")})`;
+      this._localBlockMessage = `${this._localize("device.missing_dependencies_title", {
+        name: this.component.name,
+      })} (${missingDeps.join(", ")})`;
       return;
     }
 
@@ -593,7 +576,7 @@ export class ESPHomeAddComponentForm extends LitElement {
       this.component.config_entries,
       this._values,
       presentComponents,
-      this.board?.esphome.platform ?? null,
+      this.board?.esphome.platform ?? null
     );
     if (errors.size > 0) {
       this._errors = errors;
@@ -610,12 +593,13 @@ export class ESPHomeAddComponentForm extends LitElement {
         // ``key: code`` when the schema lookup misses (defensive
         // against nested paths the heuristic can't follow).
         const summary = [...errors.entries()]
-          .map(([key, err]) =>
-            `${this._labelForErrorKey(key)}: ${this._localize(err.code, err.params)}`,
+          .map(
+            ([key, err]) =>
+              `${this._labelForErrorKey(key)}: ${this._localize(err.code, err.params)}`
           )
           .join("; ");
         this._localBlockMessage = `${this._localize(
-          "device.add_component_hidden_validation_error",
+          "device.add_component_hidden_validation_error"
         )} (${summary})`;
       }
       return;
@@ -623,73 +607,15 @@ export class ESPHomeAddComponentForm extends LitElement {
     this._errors = new Map();
     this._localBlockMessage = "";
 
-    const fields = this._coerceFields(
-      this.component.config_entries,
-      this._values,
-    );
+    const fields = coerceFields(this.component.config_entries, this._values);
 
     this.dispatchEvent(
       new CustomEvent("form-submit", {
         detail: { fields },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
-  }
-
-  /**
-   * Convert raw form values into the API payload. Drops empty strings
-   * (unless the entry is required), keeps arrays as-is, and recurses
-   * through NESTED groups. Numeric / boolean entries are coerced to
-   * their proper types so the backend sees `5` not `"5"`.
-   */
-  private _coerceFields(
-    entries: ConfigEntry[],
-    values: Record<string, unknown>,
-  ): Record<string, unknown> {
-    const out: Record<string, unknown> = {};
-    for (const entry of entries) {
-      if (entry.hidden) continue;
-      const raw = values[entry.key];
-
-      if (entry.type === ConfigEntryType.NESTED) {
-        const childValues =
-          raw !== null && typeof raw === "object" && !Array.isArray(raw)
-            ? (raw as Record<string, unknown>)
-            : {};
-        const sub = this._coerceFields(
-          entry.config_entries ?? [],
-          childValues,
-        );
-        if (Object.keys(sub).length > 0) out[entry.key] = sub;
-        continue;
-      }
-
-      if (raw === undefined) continue;
-      if (Array.isArray(raw)) {
-        if (raw.length === 0) continue;
-        out[entry.key] = raw;
-        continue;
-      }
-      if (raw === "") {
-        if (entry.required) out[entry.key] = raw;
-        continue;
-      }
-
-      if (entry.type === ConfigEntryType.INTEGER) {
-        const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
-        if (!Number.isNaN(n)) out[entry.key] = n;
-      } else if (entry.type === ConfigEntryType.FLOAT) {
-        const n =
-          typeof raw === "number" ? raw : Number.parseFloat(String(raw));
-        if (!Number.isNaN(n)) out[entry.key] = n;
-      } else if (entry.type === ConfigEntryType.BOOLEAN) {
-        out[entry.key] = parseYamlBoolean(raw) === true;
-      } else {
-        out[entry.key] = raw;
-      }
-    }
-    return out;
   }
 }
 

@@ -94,7 +94,9 @@ export class ESPHomeApiKeyDialog extends LitElement {
         cursor: pointer;
         padding: 0;
         flex-shrink: 0;
-        transition: background 0.12s, color 0.12s;
+        transition:
+          background 0.12s,
+          color 0.12s;
       }
 
       .key-btn:hover {
@@ -156,8 +158,14 @@ export class ESPHomeApiKeyDialog extends LitElement {
         <span class="key-value">${masked}</span>
         <button
           class="key-btn"
-          title=${this._localize(this._visible ? "dashboard.action_api_key_hide" : "dashboard.action_api_key_show")}
-          @click=${() => { this._visible = !this._visible; }}
+          title=${this._localize(
+            this._visible
+              ? "dashboard.action_api_key_hide"
+              : "dashboard.action_api_key_show"
+          )}
+          @click=${() => {
+            this._visible = !this._visible;
+          }}
         >
           <wa-icon library="mdi" name=${this._visible ? "eye-off" : "eye"}></wa-icon>
         </button>

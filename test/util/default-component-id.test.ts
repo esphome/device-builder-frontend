@@ -11,13 +11,9 @@ describe("generateDefaultComponentId", () => {
     // namespace in ESPHome codegen. These components aren't referenced
     // by id from elsewhere, so we just don't seed one — power users
     // can type a value if they need it for `!extend` overrides.
-    expect(generateDefaultComponentId("web_server", false, new Set())).toBe(
-      null,
-    );
+    expect(generateDefaultComponentId("web_server", false, new Set())).toBe(null);
     expect(generateDefaultComponentId("mdns", false, new Set())).toBe(null);
-    expect(generateDefaultComponentId("captive_portal", false, new Set())).toBe(
-      null,
-    );
+    expect(generateDefaultComponentId("captive_portal", false, new Set())).toBe(null);
     expect(generateDefaultComponentId("logger", false, new Set())).toBe(null);
     expect(generateDefaultComponentId("api", false, new Set())).toBe(null);
     expect(generateDefaultComponentId("ota", false, new Set())).toBe(null);
@@ -28,18 +24,14 @@ describe("generateDefaultComponentId", () => {
     // Even an unrelated id collision shouldn't flip them back into
     // suffix-generation mode.
     const existing = new Set(["web_server", "web_server_1", "web_server_2"]);
-    expect(generateDefaultComponentId("web_server", false, existing)).toBe(
-      null,
-    );
+    expect(generateDefaultComponentId("web_server", false, existing)).toBe(null);
   });
 
   it("suffixes top-level multi_conf components", () => {
     // `script`, `i2c`, `spi`, etc. — users add several and reference
     // them by id from automations / bus consumers, so a prefilled
     // unique id earns its keep.
-    expect(generateDefaultComponentId("script", true, new Set())).toBe(
-      "script_1",
-    );
+    expect(generateDefaultComponentId("script", true, new Set())).toBe("script_1");
   });
 
   it("suffixes platform entries even when multi_conf is false", () => {
@@ -47,17 +39,17 @@ describe("generateDefaultComponentId", () => {
     // routinely add multiple entries of the same platform and reference
     // them by id (`id(my_switch).turn_on()`), so the suffix is useful.
     expect(generateDefaultComponentId("switch.gpio", false, new Set())).toBe(
-      "switch_gpio_1",
+      "switch_gpio_1"
     );
     expect(generateDefaultComponentId("sensor.dht", true, new Set())).toBe(
-      "sensor_dht_1",
+      "sensor_dht_1"
     );
   });
 
   it("walks the suffix counter on collision", () => {
     const existing = new Set(["switch_gpio_1", "switch_gpio_2"]);
     expect(generateDefaultComponentId("switch.gpio", true, existing)).toBe(
-      "switch_gpio_3",
+      "switch_gpio_3"
     );
   });
 
@@ -65,14 +57,12 @@ describe("generateDefaultComponentId", () => {
     // Counter-walk for a top-level (no `.`) multi_conf entry is a
     // distinct code path from the platform case above — pin it.
     const existing = new Set(["script_1"]);
-    expect(generateDefaultComponentId("script", true, existing)).toBe(
-      "script_2",
-    );
+    expect(generateDefaultComponentId("script", true, existing)).toBe("script_2");
   });
 
   it("lowercases mixed-case platform ids", () => {
     expect(generateDefaultComponentId("Switch.GPIO", true, new Set())).toBe(
-      "switch_gpio_1",
+      "switch_gpio_1"
     );
   });
 });
@@ -92,7 +82,7 @@ sensor:
     platform: dht
 `;
     expect(collectExistingIds(yaml)).toEqual(
-      new Set(["web_server", "temp_1", "humid_1"]),
+      new Set(["web_server", "temp_1", "humid_1"])
     );
   });
 

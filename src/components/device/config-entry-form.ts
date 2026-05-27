@@ -30,13 +30,8 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  type ValidationError,
-} from "../../util/config-validation.js";
-import {
-  _isStructuralType,
-  filterRenderable,
-} from "./config-entry-render-filter.js";
+import { type ValidationError } from "../../util/config-validation.js";
+import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -179,7 +174,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _filterRenderable = (
     entries: ConfigEntry[],
-    values: Record<string, unknown>,
+    values: Record<string, unknown>
   ): ConfigEntry[] =>
     filterRenderable(entries, values, {
       requiredOnly: this.requiredOnly,
@@ -196,7 +191,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
     return html`${visible.map((entry) =>
-      this._renderEntry(entry, entry.key ? [entry.key] : [], ctx),
+      this._renderEntry(entry, entry.key ? [entry.key] : [], ctx)
     )}`;
   }
 
@@ -234,9 +229,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   private async _syncSelectValues() {
     if (!this.shadowRoot) return;
-    const fields = this.shadowRoot.querySelectorAll<HTMLElement>(
-      "[data-field-key]",
-    );
+    const fields = this.shadowRoot.querySelectorAll<HTMLElement>("[data-field-key]");
     for (const field of fields) {
       const select = field.querySelector("wa-select") as
         | (HTMLElement & {
@@ -285,8 +278,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // binding instead.
       if (!isPrimitiveOrNullish(value)) {
         const current = Array.isArray(select.value)
-          ? select.value[0] ?? ""
-          : select.value ?? "";
+          ? (select.value[0] ?? "")
+          : (select.value ?? "");
         if (current !== "") select.value = "";
         continue;
       }
@@ -305,19 +298,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // i2c bus on ESP32-C3 lands on the right option instead of
       // showing an empty select.
       const options = Array.from(
-        select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
+        select.querySelectorAll<HTMLElement & { value: string }>("wa-option")
       );
       const rawGpio = raw.match(/^\s*(?:GPIO)?(\d+)\s*$/i)?.[1];
       const findByValue = (v: string) =>
         options.find((o) => o.value?.toLowerCase() === v.toLowerCase());
       const matched = raw
-        ? (findByValue(raw) ??
-            (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
+        ? (findByValue(raw) ?? (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
         : null;
       const desired = matched?.value ?? raw;
       const current = Array.isArray(select.value)
-        ? select.value[0] ?? ""
-        : select.value ?? "";
+        ? (select.value[0] ?? "")
+        : (select.value ?? "");
       if (current !== desired) {
         select.value = desired;
       }
@@ -335,7 +327,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     select: HTMLElement & {
       value: string | string[] | null;
       updateComplete?: Promise<unknown>;
-    },
+    }
   ) {
     if (select.updateComplete) {
       try {
@@ -344,14 +336,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
         // ignore
       }
     }
-    const selectedOption = select.querySelector<
-      HTMLElement & { value: string }
-    >("wa-option[selected]");
+    const selectedOption = select.querySelector<HTMLElement & { value: string }>(
+      "wa-option[selected]"
+    );
     const desired = selectedOption?.value ?? "";
     if (!desired) return;
     const current = Array.isArray(select.value)
-      ? select.value[0] ?? ""
-      : select.value ?? "";
+      ? (select.value[0] ?? "")
+      : (select.value ?? "");
     if (current !== desired) {
       select.value = desired;
     }
@@ -373,15 +365,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
       console.error(
         "esphome-config-entry-form: render failed for entry",
         { key: entry.key, type: entry.type, path },
-        err,
+        err
       );
       const message = err instanceof Error ? err.message : String(err);
       return html`<div class="render-error" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div>
-          <strong>
-            ${this._localize("device.entry_render_error_title")}
-          </strong>
+          <strong> ${this._localize("device.entry_render_error_title")} </strong>
           <code class="render-error-key"
             >${entry.key || "(empty key)"} · ${entry.type}</code
           >
@@ -394,7 +384,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _renderEntryUnsafe(
     entry: ConfigEntry,
     path: string[],
-    ctx: RenderCtx,
+    ctx: RenderCtx
   ): unknown {
     // Templatable wrapper pre-empts the type switch for any leaf
     // entry that accepts a literal-or-lambda value. Structural
@@ -404,17 +394,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // a thunk so we don't need to duplicate the type switch here.
     if (entry.templatable && !_isStructuralType(entry.type)) {
       return renderTemplatableField(entry, path, ctx, () =>
-        this._renderEntryLeaf(entry, path, ctx),
+        this._renderEntryLeaf(entry, path, ctx)
       );
     }
     return this._renderEntryLeaf(entry, path, ctx);
   }
 
-  private _renderEntryLeaf(
-    entry: ConfigEntry,
-    path: string[],
-    ctx: RenderCtx,
-  ): unknown {
+  private _renderEntryLeaf(entry: ConfigEntry, path: string[], ctx: RenderCtx): unknown {
     if (entry.type === ConfigEntryType.DIVIDER) {
       return html`<wa-divider></wa-divider>`;
     }
@@ -563,7 +549,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         detail: { path, value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -606,7 +592,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         detail: { domain },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

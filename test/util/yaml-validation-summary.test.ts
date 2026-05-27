@@ -23,7 +23,7 @@ import { summarizeValidation } from "../../src/util/yaml-validation-summary.js";
 
 function res(
   yaml_errors: EditorValidateResponse["yaml_errors"] = [],
-  validation_errors: EditorValidateResponse["validation_errors"] = [],
+  validation_errors: EditorValidateResponse["validation_errors"] = []
 ): EditorValidateResponse {
   return { yaml_errors, validation_errors };
 }
@@ -35,19 +35,19 @@ describe("summarizeValidation", () => {
 
   it("extracts line + column from a yaml-error message", () => {
     const summary = summarizeValidation(
-      res([{ message: "mapping values not allowed at line 7, column 12" }]),
+      res([{ message: "mapping values not allowed at line 7, column 12" }])
     );
     expect(summary.count).toBe(1);
     expect(summary.first?.line).toBe(7);
     expect(summary.first?.col).toBe(12);
     expect(summary.first?.message).toBe(
-      "mapping values not allowed at line 7, column 12",
+      "mapping values not allowed at line 7, column 12"
     );
   });
 
   it("falls back to bare 'line N' when the column is absent", () => {
     const summary = summarizeValidation(
-      res([{ message: "while parsing block mapping at line 4" }]),
+      res([{ message: "while parsing block mapping at line 4" }])
     );
     expect(summary.first?.line).toBe(4);
     expect(summary.first?.col).toBe(0);
@@ -58,9 +58,7 @@ describe("summarizeValidation", () => {
     // info; "Go to error" should disable rather than jump to a
     // bogus line. Dialog reads ``firstErrorLine === 0`` as
     // "no jump target".
-    const summary = summarizeValidation(
-      res([{ message: "Unknown YAML failure" }]),
-    );
+    const summary = summarizeValidation(res([{ message: "Unknown YAML failure" }]));
     expect(summary.first?.line).toBe(0);
     expect(summary.first?.col).toBe(0);
     expect(summary.first?.message).toBe("Unknown YAML failure");
@@ -75,15 +73,13 @@ describe("summarizeValidation", () => {
             message: "Invalid value for sensor.0.platform",
             range: { start_line: 9, start_col: 4, end_line: 9, end_col: 12 },
           },
-        ],
-      ),
+        ]
+      )
     );
     expect(summary.count).toBe(1);
     expect(summary.first?.line).toBe(10);
     expect(summary.first?.col).toBe(5);
-    expect(summary.first?.message).toBe(
-      "Invalid value for sensor.0.platform",
-    );
+    expect(summary.first?.message).toBe("Invalid value for sensor.0.platform");
   });
 
   it("yaml errors win precedence over validation errors", () => {
@@ -101,14 +97,14 @@ describe("summarizeValidation", () => {
             message: "Stale validation error",
             range: { start_line: 20, start_col: 0, end_line: 20, end_col: 1 },
           },
-        ],
-      ),
+        ]
+      )
     );
     expect(summary.count).toBe(2);
     expect(summary.first?.line).toBe(3);
     expect(summary.first?.col).toBe(5);
     expect(summary.first?.message).toBe(
-      "block sequence entries are not allowed at line 3, column 5",
+      "block sequence entries are not allowed at line 3, column 5"
     );
   });
 
@@ -125,8 +121,8 @@ describe("summarizeValidation", () => {
             message: "v2",
             range: { start_line: 1, start_col: 0, end_line: 1, end_col: 1 },
           },
-        ],
-      ),
+        ]
+      )
     );
     expect(summary.count).toBe(3);
   });

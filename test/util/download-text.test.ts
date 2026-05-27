@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  downloadAnsiText,
-  downloadBase64Binary,
-} from "../../src/util/download-text.js";
+import { downloadAnsiText, downloadBase64Binary } from "../../src/util/download-text.js";
 
 /* The runtime test environment is Node, so we stub the bits of the
    browser API the helper touches. The download mechanics (anchor +
@@ -15,7 +12,7 @@ class FakeBlob {
   static instances: FakeBlob[] = [];
   constructor(
     public parts: BlobPart[],
-    public options?: BlobPropertyBag,
+    public options?: BlobPropertyBag
   ) {
     FakeBlob.instances.push(this);
   }
@@ -58,10 +55,7 @@ function withBrowserStubs<T>(fn: () => T): { result: T; anchor: FakeAnchor } {
 describe("downloadAnsiText", () => {
   it("strips ANSI escape sequences before saving", () => {
     const { result, anchor } = withBrowserStubs(() =>
-      downloadAnsiText(
-        ["plain", "[31mred[0m", "[1;33mwarn[0m"],
-        "out.txt",
-      ),
+      downloadAnsiText(["plain", "[31mred[0m", "[1;33mwarn[0m"], "out.txt")
     );
     expect(result).toBe("plain\nred\nwarn");
     expect(anchor.download).toBe("out.txt");
@@ -69,9 +63,7 @@ describe("downloadAnsiText", () => {
   });
 
   it("joins lines with a single \\n (no trailing newline)", () => {
-    const { result } = withBrowserStubs(() =>
-      downloadAnsiText(["a", "b", "c"], "x.txt"),
-    );
+    const { result } = withBrowserStubs(() => downloadAnsiText(["a", "b", "c"], "x.txt"));
     expect(result).toBe("a\nb\nc");
   });
 
@@ -88,17 +80,14 @@ describe("downloadAnsiText", () => {
        that shape). All three terminators must collapse so the saved
        file reads cleanly. */
     const { result } = withBrowserStubs(() =>
-      downloadAnsiText(
-        ["one\n", "two\r\n", "three", "four\r", "five\r\r\n"],
-        "log.txt",
-      ),
+      downloadAnsiText(["one\n", "two\r\n", "three", "four\r", "five\r\r\n"], "log.txt")
     );
     expect(result).toBe("one\ntwo\nthree\nfour\nfive");
   });
 
   it("preserves bracketed text that isn't an ANSI escape (no ESC byte)", () => {
     const { result } = withBrowserStubs(() =>
-      downloadAnsiText(["[INFO] startup", "[1;31m not-an-escape"], "log.txt"),
+      downloadAnsiText(["[INFO] startup", "[1;31m not-an-escape"], "log.txt")
     );
     /* stripAnsi only matches when ESC () is present, so plain
        bracketed text — which shows up in real ESPHome logs as level
@@ -107,9 +96,7 @@ describe("downloadAnsiText", () => {
   });
 
   it("creates a text/plain Blob with the joined content", () => {
-    withBrowserStubs(() =>
-      downloadAnsiText(["hello", "[32mworld[0m"], "greeting.txt"),
-    );
+    withBrowserStubs(() => downloadAnsiText(["hello", "[32mworld[0m"], "greeting.txt"));
     expect(FakeBlob.instances).toHaveLength(1);
     const blob = FakeBlob.instances[0];
     expect(blob.options?.type).toBe("text/plain");
@@ -121,7 +108,7 @@ describe("downloadBase64Binary", () => {
   it("decodes the base64 payload and saves as application/octet-stream", () => {
     /* ``AAECAw==`` decodes to the four-byte sequence 0x00 0x01 0x02 0x03. */
     const { anchor } = withBrowserStubs(() =>
-      downloadBase64Binary("AAECAw==", "firmware.bin"),
+      downloadBase64Binary("AAECAw==", "firmware.bin")
     );
     expect(anchor.download).toBe("firmware.bin");
     expect(anchor.click).toHaveBeenCalledTimes(1);
@@ -162,9 +149,7 @@ describe("downloadBase64Binary", () => {
     /* An empty base64 string decodes to zero bytes. Helpful for
        defensive call sites that pass through whatever the backend
        returned without their own length gate. */
-    const { anchor } = withBrowserStubs(() =>
-      downloadBase64Binary("", "empty.bin"),
-    );
+    const { anchor } = withBrowserStubs(() => downloadBase64Binary("", "empty.bin"));
     expect(anchor.download).toBe("empty.bin");
     const blob = FakeBlob.instances[0];
     const part = blob.parts[0];

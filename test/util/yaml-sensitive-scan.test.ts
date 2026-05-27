@@ -33,11 +33,7 @@ mqtt:
   password: 'mq-secret'
 `;
     const ranges = findSensitiveValueRanges(yaml);
-    expect(valuesAt(yaml, ranges)).toEqual([
-      "hunter2",
-      `"ota-secret"`,
-      `'mq-secret'`,
-    ]);
+    expect(valuesAt(yaml, ranges)).toEqual(["hunter2", `"ota-secret"`, `'mq-secret'`]);
   });
 
   it("masks ap_password and ota_password", () => {
@@ -259,7 +255,7 @@ ota:
     expect(ranges.every((r) => r.line !== 6)).toBe(true);
   });
 
-  it("recognises closing `\"` after an even number of backslashes", () => {
+  it('recognises closing `"` after an even number of backslashes', () => {
     // `\\` is an escaped backslash; the `"` that follows is the real
     // close of the scalar. A naive "preceded by `\\`?" check would
     // run past it and lose the trailing comment-strip step.
@@ -269,16 +265,14 @@ ota:
     expect(valuesAt(yaml, ranges)).toEqual([`"ends with \\\\"`]);
   });
 
-  it("treats `\"` after an odd number of backslashes as escaped", () => {
+  it('treats `"` after an odd number of backslashes as escaped', () => {
     // `\"` is an escaped quote inside the scalar; the next real `"`
     // closes it.
     const yaml = `api:
   password: "with \\"escaped\\" inside" # comment
 `;
     const ranges = findSensitiveValueRanges(yaml);
-    expect(valuesAt(yaml, ranges)).toEqual([
-      `"with \\"escaped\\" inside"`,
-    ]);
+    expect(valuesAt(yaml, ranges)).toEqual([`"with \\"escaped\\" inside"`]);
   });
 
   describe("maskAllValues mode (secrets.yaml)", () => {
@@ -334,18 +328,14 @@ wifi_ssid: real-value
       // secrets.yaml itself, but if they do we still skip it.
       const yaml = `wifi_password: !secret real_password
 `;
-      expect(
-        findSensitiveValueRanges(yaml, { maskAllValues: true }),
-      ).toEqual([]);
+      expect(findSensitiveValueRanges(yaml, { maskAllValues: true })).toEqual([]);
     });
 
     it("ignores key-only lines with no inline value", () => {
       const yaml = `wifi_ssid:
 api_key:
 `;
-      expect(
-        findSensitiveValueRanges(yaml, { maskAllValues: true }),
-      ).toEqual([]);
+      expect(findSensitiveValueRanges(yaml, { maskAllValues: true })).toEqual([]);
     });
 
     it("default mode is unaffected (no maskAllValues option)", () => {

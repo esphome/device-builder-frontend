@@ -28,7 +28,12 @@ type WizardStep = "method" | "board" | "setup" | "empty-config";
 type CreationMethod = "basic" | "empty" | "import";
 type WizardStepDetail =
   | WizardStep
-  | { step: WizardStep; board?: BoardCatalogEntry | null; method?: CreationMethod; file?: File };
+  | {
+      step: WizardStep;
+      board?: BoardCatalogEntry | null;
+      method?: CreationMethod;
+      file?: File;
+    };
 
 @customElement("esphome-create-config-dialog")
 export class ESPHomeCreateConfigDialog extends LitElement {
@@ -254,12 +259,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
           ${this._title}
         </span>
         ${this._renderStep()}
-        ${this._importError
-          ? html`<p class="error">${this._importError}</p>`
-          : nothing}
-        ${this._createError
-          ? html`<p class="error">${this._createError}</p>`
-          : nothing}
+        ${this._importError ? html`<p class="error">${this._importError}</p>` : nothing}
+        ${this._createError ? html`<p class="error">${this._createError}</p>` : nothing}
       </wa-dialog>
     `;
   }
@@ -267,7 +268,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   private _renderStep() {
     // Show loading message while import creation is in progress
     if (this._submitting && this._creationMethod === "import") {
-      return html`<p style="text-align:center;color:var(--wa-color-text-quiet);padding:var(--wa-space-xl) 0">
+      return html`<p
+        style="text-align:center;color:var(--wa-color-text-quiet);padding:var(--wa-space-xl) 0"
+      >
         ${this._localize("wizard.importing_device")}
       </p>`;
     }
@@ -280,7 +283,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
           .presetFilterLabel=${this._initialBoardFilter}
         ></esphome-wizard-step-board>`;
       case "setup":
-        return html`<esphome-wizard-step-setup .board=${this._selectedBoard}></esphome-wizard-step-setup>`;
+        return html`<esphome-wizard-step-setup
+          .board=${this._selectedBoard}
+        ></esphome-wizard-step-setup>`;
       case "empty-config":
         return html`<esphome-wizard-step-empty-config></esphome-wizard-step-empty-config>`;
     }
@@ -349,7 +354,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     window.history.pushState(
       {},
       "",
-      withBase(`/device/${encodeURIComponent(configuration)}`),
+      withBase(`/device/${encodeURIComponent(configuration)}`)
     );
     window.dispatchEvent(new PopStateEvent("popstate"));
   }
@@ -362,7 +367,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       },
-      { board: this._selectedBoard ?? null },
+      { board: this._selectedBoard ?? null }
     );
   }
 
@@ -438,7 +443,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         ssid: wifiSsid,
         psk: wifiPassword,
       },
-      { board },
+      { board }
     );
   }
 
@@ -464,7 +469,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       psk?: string;
       file_content?: string;
     },
-    options: { board?: BoardCatalogEntry | null } = {},
+    options: { board?: BoardCatalogEntry | null } = {}
   ): Promise<void> {
     if (this._submitting) return;
     this._resetCreateErrors();
@@ -474,10 +479,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       this._navigateToCreated(configuration);
     } catch (err) {
       console.error("Failed to create device:", err);
-      this._createError = this._extractCreateErrorMessage(
-        err,
-        options.board ?? null,
-      );
+      this._createError = this._extractCreateErrorMessage(err, options.board ?? null);
     } finally {
       this._submitting = false;
     }
@@ -503,7 +505,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
    */
   private _extractCreateErrorMessage(
     err: unknown,
-    board: BoardCatalogEntry | null,
+    board: BoardCatalogEntry | null
   ): string {
     let message: string;
     if (err instanceof APIError && err.details.trim()) {

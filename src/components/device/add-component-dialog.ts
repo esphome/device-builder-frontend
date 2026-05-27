@@ -222,11 +222,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         gap: var(--wa-space-2xs);
         margin-bottom: var(--wa-space-m);
         padding: var(--wa-space-2xs) var(--wa-space-s);
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 92%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
         border-left: 3px solid var(--esphome-primary);
         border-radius: var(--wa-border-radius-s);
         font-size: var(--wa-font-size-xs);
@@ -244,11 +240,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         gap: var(--wa-space-xs);
         margin-bottom: var(--wa-space-m);
         padding: var(--wa-space-xs) var(--wa-space-s);
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 92%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
         border-left: 3px solid var(--esphome-primary);
         border-radius: var(--wa-border-radius-s);
         font-size: var(--wa-font-size-xs);
@@ -399,14 +391,14 @@ export class ESPHomeAddComponentDialog extends LitElement {
    * with the regular flow.
    */
   private async _onBundleSelected(
-    e: CustomEvent<{ bundle: FeaturedBundle; boardId: string }>,
+    e: CustomEvent<{ bundle: FeaturedBundle; boardId: string }>
   ) {
     e.stopPropagation();
     if (this._submitting) return;
     const { bundle, boardId } = e.detail;
     if (!boardId || bundle.component_ids.length === 0) return;
     const fullIds = bundle.component_ids.map(
-      (localId) => `featured.${boardId}.${localId}`,
+      (localId) => `featured.${boardId}.${localId}`
     );
     const [first, ...rest] = fullIds;
     // The WS layer can throw on a transient disconnect / timeout; an
@@ -419,13 +411,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
       component = await this._api.getComponent(
         first,
         this.platform || undefined,
-        boardId,
+        boardId
       );
     } catch (err) {
       this._submitError =
-        err instanceof Error
-          ? err.message
-          : this._localize("device.add_component_error");
+        err instanceof Error ? err.message : this._localize("device.add_component_error");
       return;
     }
     if (!component) {
@@ -504,7 +494,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
           detail: { yaml },
           bubbles: true,
           composed: true,
-        }),
+        })
       );
 
       if (this._returnTo) {
@@ -551,7 +541,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         const nextComponent = await this._api.getComponent(
           nextId,
           this.platform || undefined,
-          this.board?.id ?? undefined,
+          this.board?.id ?? undefined
         );
         if (!nextComponent) {
           this._submitError = this._localize("device.add_component_error");
@@ -590,7 +580,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
         const target = findAddedSection(
           yaml,
           componentId,
-          typeof newId === "string" ? newId : undefined,
+          typeof newId === "string" ? newId : undefined
         );
         if (target) {
           this.dispatchEvent(
@@ -598,7 +588,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
               detail: target,
               bubbles: true,
               composed: true,
-            }),
+            })
           );
         }
         this._dialog.open = false;
@@ -606,9 +596,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         this._resetDetourState();
       }
     } catch (err) {
-      this._submitError = err instanceof Error
-        ? err.message
-        : this._localize("device.add_component_error");
+      this._submitError =
+        err instanceof Error ? err.message : this._localize("device.add_component_error");
     } finally {
       this._submitting = false;
     }

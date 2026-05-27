@@ -52,7 +52,7 @@ export function emptyConditionNode(conditionId: string): ConditionNode {
 export function applyParamChange(
   params: Record<string, unknown>,
   path: string[],
-  value: unknown,
+  value: unknown
 ): Record<string, unknown> {
   if (path.length === 0) {
     if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -169,9 +169,7 @@ export function applyYamlDiff(yaml: string, diff: YamlDiff): string {
  * parser emits ``automation:unscoped:…`` for unscoped handlers; those
  * have no canonical location).
  */
-export function locationFromSectionKey(
-  key: string,
-): AutomationLocation | null {
+export function locationFromSectionKey(key: string): AutomationLocation | null {
   if (!key.startsWith("automation:")) return null;
   const parts = key.split(":");
   // parts[0] = "automation"

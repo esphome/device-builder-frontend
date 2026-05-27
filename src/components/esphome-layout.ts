@@ -3,7 +3,12 @@ import { mdiArrowCollapseRight } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import { isHaIngressContext, localizeContext, serverVersionContext, versionContext } from "../context/index.js";
+import {
+  isHaIngressContext,
+  localizeContext,
+  serverVersionContext,
+  versionContext,
+} from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { withBase } from "../util/base-path.js";
 import { navigate } from "../util/navigation.js";
@@ -177,10 +182,7 @@ export class ESPHomeLayout extends LitElement {
     // page load (deep link / refresh) so there's nothing useful to
     // pop and we fall back to ``navigate("/")`` to stay inside the
     // SPA instead of exiting to the previous site.
-    if (
-      window.history.state !== null &&
-      typeof window.history.state === "object"
-    ) {
+    if (window.history.state !== null && typeof window.history.state === "object") {
       window.history.back();
       return;
     }
@@ -221,8 +223,12 @@ export class ESPHomeLayout extends LitElement {
       </div>
       <slot></slot>
       <div class="app-footer">
-        ${this._serverVersion ? html`<span>ESPHome Device Builder v${this._serverVersion}</span>` : nothing}
-        ${this._esphomeVersion ? html`<span>ESPHome ${this._esphomeVersion}</span>` : nothing}
+        ${this._serverVersion
+          ? html`<span>ESPHome Device Builder v${this._serverVersion}</span>`
+          : nothing}
+        ${this._esphomeVersion
+          ? html`<span>ESPHome ${this._esphomeVersion}</span>`
+          : nothing}
       </div>
     `;
   }

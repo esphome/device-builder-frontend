@@ -39,7 +39,7 @@ import type { ESPHomeApp } from "../app-shell.js";
 export function patchOffloadPairing(
   host: ESPHomeApp,
   pin: string,
-  diff: Partial<PairingSummary>,
+  diff: Partial<PairingSummary>
 ): void {
   if (host._buildOffloadPairings === null) return;
   const existing = host._buildOffloadPairings.get(pin);
@@ -102,23 +102,21 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.DEVICE_UPDATED: {
       const { device } = data as DeviceEventData;
       host._devices = host._devices.map((d) =>
-        d.configuration === device.configuration ? device : d,
+        d.configuration === device.configuration ? device : d
       );
       break;
     }
     case DeviceEventType.DEVICE_REMOVED: {
       const { device } = data as DeviceEventData;
       host._devices = host._devices.filter(
-        (d) => d.configuration !== device.configuration,
+        (d) => d.configuration !== device.configuration
       );
       break;
     }
     case DeviceEventType.DEVICE_STATE_CHANGED: {
       const { configuration, state } = data as DeviceStateChangedEventData;
       host._devices = host._devices.map((d) =>
-        d.configuration === configuration
-          ? { ...d, state: state as DeviceState }
-          : d,
+        d.configuration === configuration ? { ...d, state: state as DeviceState } : d
       );
       break;
     }
@@ -179,9 +177,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         connected: false,
       };
       const current = host._buildServerPeers ?? [];
-      const idx = current.findIndex(
-        (p) => p.dashboard_id === incoming.dashboard_id,
-      );
+      const idx = current.findIndex((p) => p.dashboard_id === incoming.dashboard_id);
       host._buildServerPeers =
         idx === -1
           ? [...current, incoming]
@@ -193,13 +189,11 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       const current = host._buildServerPeers ?? [];
       if (evt.status === "removed") {
         host._buildServerPeers = current.filter(
-          (p) => p.dashboard_id !== evt.dashboard_id,
+          (p) => p.dashboard_id !== evt.dashboard_id
         );
       } else {
         host._buildServerPeers = current.map((p) =>
-          p.dashboard_id === evt.dashboard_id
-            ? { ...p, status: "approved" as const }
-            : p,
+          p.dashboard_id === evt.dashboard_id ? { ...p, status: "approved" as const } : p
         );
       }
       break;
@@ -210,7 +204,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       const evt = data as ReceiverPeerLinkSessionEventData;
       const connected = event === DeviceEventType.RECEIVER_PEER_LINK_SESSION_OPENED;
       host._buildServerPeers = host._buildServerPeers.map((p) =>
-        p.dashboard_id === evt.dashboard_id ? { ...p, connected } : p,
+        p.dashboard_id === evt.dashboard_id ? { ...p, connected } : p
       );
       break;
     }
@@ -353,4 +347,3 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     }
   }
 }
-

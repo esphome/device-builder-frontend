@@ -25,11 +25,7 @@ import { stripAnsi } from "./strip-ansi.js";
  * (:func:`downloadAnsiText`, :func:`downloadBase64Binary`)
  * rather than touching this directly.
  */
-function _downloadBlob(
-  bytes: BlobPart,
-  filename: string,
-  mimeType: string,
-): void {
+function _downloadBlob(bytes: BlobPart, filename: string, mimeType: string): void {
   const blob = new Blob([bytes], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -89,9 +85,7 @@ export function downloadAnsiText(lines: string[], filename: string): string {
      per entry before the join so the output reads as one real log
      line per file row regardless of which terminator the upstream
      used. */
-  const text = lines
-    .map((line) => stripAnsi(line).replace(/[\r\n]+$/, ""))
-    .join("\n");
+  const text = lines.map((line) => stripAnsi(line).replace(/[\r\n]+$/, "")).join("\n");
   _downloadBlob(text, filename, "text/plain");
   return text;
 }

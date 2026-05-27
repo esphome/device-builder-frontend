@@ -20,11 +20,7 @@ import {
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
-export function renderNumberField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderNumberField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   // A featured-entry preset can pin the choice to a short list — defer to
   // the suggestion-aware string renderer which converts back to number on change.
   if (entry.suggestions && entry.suggestions.length > 0) {
@@ -55,7 +51,7 @@ export function renderNumberField(
         const raw = (e.target as HTMLInputElement).value;
         ctx.emitChange(path, raw === "" ? "" : Number(raw));
       }}
-    />`,
+    />`
   );
 }
 
@@ -63,11 +59,7 @@ export function renderNumberField(
 // (display_format=hex from cv.hex_uint*_t — every i2c address) need a text
 // input with explicit hex parsing + display formatting. Round-trips to
 // "0x" + lower-hex; accepts 0x76 / 0X76 (hex) and 118 (decimal).
-function renderHexIntField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+function renderHexIntField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const rawValue = ctx.getAt(path);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
@@ -103,7 +95,7 @@ function renderHexIntField(
         ctx.emitChange(path, formatHexInt(parseHexInt(raw)) || raw);
       }}
       @blur=${() => ctx.clearEditingMagnitude(path)}
-    />`,
+    />`
   );
 }
 
@@ -146,7 +138,7 @@ function parseTimePeriod(raw: unknown): {
     const [, num, suf] = m;
     return {
       value: num,
-      unit: ((suf as TimePeriodUnit) ?? "s"),
+      unit: (suf as TimePeriodUnit) ?? "s",
       parseable: true,
     };
   }
@@ -164,7 +156,7 @@ function serializeTimePeriod(value: string, unit: TimePeriodUnit): string {
 export function renderTimePeriodField(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ) {
   const raw = ctx.getAt(path);
   const parsed = parseTimePeriod(raw);
@@ -213,17 +205,15 @@ export function renderTimePeriodField(
           data-no-value-sync
           ?disabled=${disabled}
           @change=${(e: Event) => {
-            const nextUnit = (e.target as HTMLSelectElement)
-              .value as TimePeriodUnit;
+            const nextUnit = (e.target as HTMLSelectElement).value as TimePeriodUnit;
             ctx.emitChange(path, serializeTimePeriod(parsed.value, nextUnit));
           }}
         >
           ${TIME_PERIOD_UNITS.map(
-            (u) => html`<wa-option
-              value=${u}
-              ?selected=${u === displayUnit}
-              >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option
-            >`,
+            (u) =>
+              html`<wa-option value=${u} ?selected=${u === displayUnit}
+                >${ctx.localize(`device.automation_action_delay_unit_${u}`)}</wa-option
+              >`
           )}
         </wa-select>
       </div>
@@ -239,7 +229,7 @@ export function renderTimePeriodField(
 export function renderFloatWithUnitField(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ) {
   const unitOptions = entry.unit_options ?? [];
   const canonicalUnit = unitOptions[0] ?? "";
@@ -248,18 +238,14 @@ export function renderFloatWithUnitField(
   // Edit buffer survives intermediate typing states ("-", "1e", "1.") that
   // the parser turns into null/"". Cleared on blur and on entries change.
   const editingText = ctx.getEditingMagnitude(path);
-  const numberValue =
-    editingText ?? (parsed.value === null ? "" : String(parsed.value));
+  const numberValue = editingText ?? (parsed.value === null ? "" : String(parsed.value));
   const unit = chooseDisplayUnit(
     rawValue,
     entry.default_value,
     ctx.getPendingUnit(path),
-    unitOptions,
+    unitOptions
   );
-  const placeholder = placeholderForFloatWithUnit(
-    entry.default_value,
-    unitOptions,
-  );
+  const placeholder = placeholderForFloatWithUnit(entry.default_value, unitOptions);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   const isCanonical = unit === canonicalUnit;
@@ -308,11 +294,10 @@ export function renderFloatWithUnitField(
                 }}
               >
                 ${unitOptions.map(
-                  (option) => html`<wa-option
-                    value=${option}
-                    ?selected=${option === unit}
-                    >${option}</wa-option
-                  >`,
+                  (option) =>
+                    html`<wa-option value=${option} ?selected=${option === unit}
+                      >${option}</wa-option
+                    >`
                 )}
               </wa-select>
             `
@@ -331,19 +316,13 @@ export function renderFloatWithUnitField(
 // Accept the full set of ESPHome YAML boolean spellings (true/yes/on/enable
 // and their case variants) so a user-typed ``True`` or ``enable`` in the
 // YAML editor reflects ON in the form view (issue device-builder#923).
-export function renderBooleanField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
   const effective = raw === undefined || raw === null ? entry.default_value : raw;
   const checked = parseYamlBoolean(effective) === true;
   return html`
     <div class="switch-field" data-field-key=${path.join(".")}>
-      <div class="field-info">
-        ${renderLabel(entry, ctx, { includeHelpLink: false })}
-      </div>
+      <div class="field-info">${renderLabel(entry, ctx, { includeHelpLink: false })}</div>
       ${renderHelpLink(entry, ctx)}
       <wa-switch
         ?checked=${checked}
@@ -351,18 +330,14 @@ export function renderBooleanField(
         @change=${(e: Event) =>
           ctx.emitChange(
             path,
-            (e.target as HTMLInputElement & { checked: boolean }).checked,
+            (e.target as HTMLInputElement & { checked: boolean }).checked
           )}
       ></wa-switch>
     </div>
   `;
 }
 
-export function renderSelectField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderSelectField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
@@ -382,9 +357,7 @@ export function renderSelectField(
         >
           ${entry.suggestions.map((s) => {
             const v = String(s);
-            return html`<wa-option
-              value=${v}
-              ?selected=${v.toLowerCase() === valueLower}
+            return html`<wa-option value=${v} ?selected=${v.toLowerCase() === valueLower}
               >${v}</wa-option
             >`;
           })}
@@ -410,7 +383,7 @@ export function renderSelectField(
         />
         <datalist id=${listId}>
           ${entry.options.map(
-            (opt) => html`<option value=${opt.value}>${opt.label}</option>`,
+            (opt) => html`<option value=${opt.value}>${opt.label}</option>`
           )}
         </datalist>
         ${renderFieldError(path, ctx)}
@@ -421,10 +394,9 @@ export function renderSelectField(
   // (ESP32C6 vs esp32c6) — case-insensitive compare so the matching option
   // still flags as selected.
   const valueLower = value.toLowerCase();
-  const defaultStr =
-    entry.default_value != null ? String(entry.default_value) : "";
+  const defaultStr = entry.default_value != null ? String(entry.default_value) : "";
   const defaultOption = entry.options?.find(
-    (o) => o.value.toLowerCase() === defaultStr.toLowerCase(),
+    (o) => o.value.toLowerCase() === defaultStr.toLowerCase()
   );
   const placeholder = defaultOption?.label ?? defaultStr;
   return html`
@@ -443,7 +415,7 @@ export function renderSelectField(
               value=${opt.value}
               ?selected=${opt.value.toLowerCase() === valueLower}
               >${opt.label}</wa-option
-            >`,
+            >`
         )}
       </wa-select>
       ${renderFieldError(path, ctx)}
@@ -454,11 +426,7 @@ export function renderSelectField(
 // YAML block-scalar values (lambda: |-) come through as YamlRawValue so the
 // on-disk style round-trips. Re-wrap edited text as YamlRawValue so the |-
 // marker survives the next save (#428).
-export function renderTextareaField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
   const isRaw = raw instanceof YamlRawValue;
   const value = isRaw ? raw.body : String(raw ?? "");
@@ -474,10 +442,7 @@ export function renderTextareaField(
         placeholder=${String(entry.default_value ?? "")}
         @input=${(e: Event) => {
           const text = (e.target as HTMLTextAreaElement).value;
-          ctx.emitChange(
-            path,
-            isRaw ? YamlRawValue.fromBodyText(text, raw) : text,
-          );
+          ctx.emitChange(path, isRaw ? YamlRawValue.fromBodyText(text, raw) : text);
         }}
       ></textarea>
       ${renderFieldError(path, ctx)}
@@ -485,11 +450,7 @@ export function renderTextareaField(
   `;
 }
 
-export function renderIconField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderIconField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const value = String(ctx.getAt(path) ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`

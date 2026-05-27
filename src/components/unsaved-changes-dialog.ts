@@ -110,7 +110,9 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
         font-family: inherit;
         cursor: pointer;
         border: none;
-        transition: background 0.12s, color 0.12s;
+        transition:
+          background 0.12s,
+          color 0.12s;
       }
 
       .btn--ghost {
@@ -179,24 +181,18 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   private _onDiscard() {
     this._resolved = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("discard", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("discard", { bubbles: true, composed: true }));
   }
 
   private _onSave() {
     this._resolved = true;
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("save", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("save", { bubbles: true, composed: true }));
   }
 
   private _onAfterHide() {
     if (!this._resolved) {
-      this.dispatchEvent(
-        new CustomEvent("cancel", { bubbles: true, composed: true }),
-      );
+      this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
     }
   }
 }

@@ -152,7 +152,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
             hostname,
             port,
           },
-        }),
+        })
       );
       this._open = false;
     } catch (err) {
@@ -171,10 +171,10 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     if (err instanceof APIError) {
       switch (err.errorCode) {
         case ErrorCode.UNAVAILABLE:
-          return this._localize(
-            "settings.edit_pairing_endpoint_unavailable",
-            { host, port: String(port) },
-          );
+          return this._localize("settings.edit_pairing_endpoint_unavailable", {
+            host,
+            port: String(port),
+          });
         case ErrorCode.PRECONDITION_FAILED:
           // Backend folds four distinct preconditions onto this
           // code: not-APPROVED, identity-not-loaded, no-op
@@ -186,17 +186,15 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
           // Detail string carries the diagnostic verbatim from
           // the backend; the dialog surfaces it inline so the
           // user sees which precondition tripped.
-          return this._localize(
-            "settings.edit_pairing_endpoint_precondition_failed",
-            { detail: err.details },
-          );
+          return this._localize("settings.edit_pairing_endpoint_precondition_failed", {
+            detail: err.details,
+          });
         case ErrorCode.NOT_FOUND:
           return this._localize("settings.edit_pairing_endpoint_not_found");
         case ErrorCode.INVALID_ARGS:
-          return this._localize(
-            "settings.edit_pairing_endpoint_invalid_args",
-            { detail: err.details },
-          );
+          return this._localize("settings.edit_pairing_endpoint_invalid_args", {
+            detail: err.details,
+          });
         default:
           return this._localize("settings.edit_pairing_endpoint_generic_error");
       }
@@ -230,8 +228,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
     const initialPort = parsePortInput(this._initialPort);
     return (
       normalizeHostnameForCompare(this._hostname) ===
-        normalizeHostnameForCompare(this._initialHostname) &&
-      port === initialPort
+        normalizeHostnameForCompare(this._initialHostname) && port === initialPort
     );
   }
 
@@ -256,9 +253,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
         @request-close=${this._onRequestClose}
         @after-hide=${this._close}
       >
-        <p class="desc">
-          ${this._localize("settings.edit_pairing_endpoint_desc")}
-        </p>
+        <p class="desc">${this._localize("settings.edit_pairing_endpoint_desc")}</p>
         <div class="field">
           <label for="ep-hostname">
             ${this._localize("settings.edit_pairing_endpoint_hostname_label")}
@@ -308,7 +303,7 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
             ${this._localize(
               this._submitting
                 ? "settings.edit_pairing_endpoint_saving"
-                : "settings.edit_pairing_endpoint_save",
+                : "settings.edit_pairing_endpoint_save"
             )}
           </button>
         </div>

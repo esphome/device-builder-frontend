@@ -182,7 +182,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
               bubbles: true,
               composed: true,
               detail: { job_id: job.job_id },
-            }),
+            })
           );
         }
       }
@@ -218,7 +218,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         // mismatch, hash mismatch). reason carries the code.
         this._submitErrorMessage = this._localize(
           "settings.remote_build_submit_rejected",
-          { reason: result.reason ?? "" },
+          { reason: result.reason ?? "" }
         );
         this._step = "input";
         return;
@@ -238,7 +238,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
             configuration: this._configuration,
             target: this._target,
           },
-        }),
+        })
       );
       this._expandedJobId = result.job_id;
       this._step = "list";
@@ -280,9 +280,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         // settles.
         this._patchRowState(job.job_id, {
           cancelInFlight: false,
-          errorMessage: this._localize(
-            "settings.remote_build_cancel_generic_error",
-          ),
+          errorMessage: this._localize("settings.remote_build_cancel_generic_error"),
         });
       }
     } catch (err) {
@@ -317,7 +315,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         bubbles: true,
         composed: true,
         detail: { job_id },
-      }),
+      })
     );
     if (this._expandedJobId === job_id) this._expandedJobId = "";
   };
@@ -326,9 +324,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     if (err instanceof APIError) {
       switch (err.errorCode) {
         case ErrorCode.PRECONDITION_FAILED:
-          return this._localize(
-            "settings.remote_build_cancel_precondition_failed",
-          );
+          return this._localize("settings.remote_build_cancel_precondition_failed");
         case ErrorCode.NOT_FOUND:
           return this._localize("settings.remote_build_cancel_not_found");
         default:
@@ -342,9 +338,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     if (err instanceof APIError) {
       switch (err.errorCode) {
         case ErrorCode.PRECONDITION_FAILED:
-          return this._localize(
-            "settings.remote_build_submit_precondition_failed",
-          );
+          return this._localize("settings.remote_build_submit_precondition_failed");
         case ErrorCode.UNAVAILABLE:
           return this._localize("settings.remote_build_submit_unavailable");
         case ErrorCode.NOT_FOUND:
@@ -363,9 +357,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
   private _renderInput() {
     if (this._devices.length === 0) {
       return html`
-        <p class="empty">
-          ${this._localize("settings.remote_build_submit_no_devices")}
-        </p>
+        <p class="empty">${this._localize("settings.remote_build_submit_no_devices")}</p>
         <div class="actions">
           <button class="btn-secondary" type="button" @click=${this._close}>
             ${this._localize("layout.close")}
@@ -384,7 +376,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
           @change=${this._onConfigurationChange}
         >
           ${this._devices.map(
-            (d) => html`<option value=${d.configuration}>${d.name}</option>`,
+            (d) => html`<option value=${d.configuration}>${d.name}</option>`
           )}
         </select>
       </div>
@@ -392,11 +384,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
         <label for="rb-target">
           ${this._localize("settings.remote_build_submit_target_label")}
         </label>
-        <select
-          id="rb-target"
-          .value=${this._target}
-          @change=${this._onTargetChange}
-        >
+        <select id="rb-target" .value=${this._target} @change=${this._onTargetChange}>
           <option value=${JobType.COMPILE}>
             ${this._localize("settings.remote_build_submit_target_compile")}
           </option>
@@ -439,18 +427,14 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
    *  ordering. */
   private _sortedJobs(): RemoteBuildJobState[] {
     if (!this._jobs) return [];
-    return [...this._jobs.values()].sort(
-      (a, b) => b.started_at - a.started_at,
-    );
+    return [...this._jobs.values()].sort((a, b) => b.started_at - a.started_at);
   }
 
   private _renderList() {
     const jobs = this._sortedJobs();
     if (jobs.length === 0) {
       return html`
-        <p class="empty">
-          ${this._localize("settings.remote_build_list_empty")}
-        </p>
+        <p class="empty">${this._localize("settings.remote_build_list_empty")}</p>
         <div class="actions">
           <button class="btn-secondary" type="button" @click=${this._close}>
             ${this._localize("layout.close")}
@@ -474,10 +458,10 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     const terminal = isTerminalJobStatus(job.status);
     const expanded = this._expandedJobId === job.job_id;
     const row = this._rowState.get(job.job_id) ?? FRESH_ROW_STATE;
-    const headerLabel = job.receiver_label ||
-      this._localize("settings.remote_build_unknown_receiver");
-    const headerConfig = job.configuration ||
-      this._localize("settings.remote_build_unknown_configuration");
+    const headerLabel =
+      job.receiver_label || this._localize("settings.remote_build_unknown_receiver");
+    const headerConfig =
+      job.configuration || this._localize("settings.remote_build_unknown_configuration");
     return html`
       <li class="job-row">
         <button
@@ -493,14 +477,10 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
             <span class="job-receiver">${headerLabel}</span>
             <span class="job-meta-line">
               ${headerConfig} &middot;
-              ${this._localize(
-                `settings.remote_build_submit_target_${job.target}`,
-              )}
+              ${this._localize(`settings.remote_build_submit_target_${job.target}`)}
             </span>
           </span>
-          <span class="chevron" aria-hidden="true">
-            ${expanded ? "▾" : "▸"}
-          </span>
+          <span class="chevron" aria-hidden="true"> ${expanded ? "▾" : "▸"} </span>
         </button>
         ${expanded
           ? html`
@@ -533,7 +513,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
                             ? "settings.remote_build_cancel_pending"
                             : row.cancelInFlight
                               ? "settings.remote_build_cancel_in_flight"
-                              : "settings.remote_build_cancel_action",
+                              : "settings.remote_build_cancel_action"
                         )}
                       </button>`}
                 </div>
@@ -719,8 +699,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
 
       .job-body {
         padding: 0 var(--wa-space-m) var(--wa-space-m);
-        border-top: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
 
       .logs-container {

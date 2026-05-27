@@ -45,9 +45,7 @@ export interface ValidationSummary {
  * case anyway. When parse errors are absent, take the first
  * validation error's range.
  */
-export function summarizeValidation(
-  res: EditorValidateResponse,
-): ValidationSummary {
+export function summarizeValidation(res: EditorValidateResponse): ValidationSummary {
   const yamlErrors = res.yaml_errors ?? [];
   const validationErrors = res.validation_errors ?? [];
   const count = yamlErrors.length + validationErrors.length;

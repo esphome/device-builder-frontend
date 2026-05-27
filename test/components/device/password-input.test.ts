@@ -49,7 +49,7 @@ describe("password-input event contract", () => {
     const target = new EventTarget();
     const seen: Array<CustomEvent<PasswordInputValueChange>> = [];
     target.addEventListener(PASSWORD_INPUT_VALUE_CHANGE_EVENT, (e) =>
-      seen.push(e as CustomEvent<PasswordInputValueChange>),
+      seen.push(e as CustomEvent<PasswordInputValueChange>)
     );
     target.dispatchEvent(buildPasswordValueChangeEvent("secret"));
     expect(seen).toHaveLength(1);

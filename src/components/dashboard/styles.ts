@@ -365,11 +365,7 @@ export const dashboardStyles = css`
       border-color 0.12s;
   }
   .yaml-hits:not(:has(.yaml-snippet)) .yaml-hit-group:hover {
-    border-color: color-mix(
-      in srgb,
-      var(--esphome-primary),
-      transparent 50%
-    );
+    border-color: color-mix(in srgb, var(--esphome-primary), transparent 50%);
     background: var(--wa-color-surface-lowered);
   }
   .yaml-hit-group-header {
@@ -541,19 +537,14 @@ export const dashboardStyles = css`
   }
 
   .select-toggle-btn:hover {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-text-normal),
-      transparent 94%
-    );
+    background: color-mix(in srgb, var(--wa-color-text-normal), transparent 94%);
     color: var(--wa-color-text-normal);
   }
 
   .select-toggle-btn:focus-visible {
     outline: none;
     color: var(--wa-color-text-normal);
-    box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
 
   .select-toggle-btn.active {

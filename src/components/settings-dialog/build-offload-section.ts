@@ -23,10 +23,7 @@ import {
 } from "../../context/index.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  normalizeHostnameForCompare,
-  trimTrailingDot,
-} from "../../util/hostname.js";
+import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import type { ESPHomeEditPairingEndpointDialog } from "../edit-pairing-endpoint-dialog.js";
@@ -34,10 +31,7 @@ import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.j
 import type { ESPHomeReauthWizardDialog } from "../reauth-wizard-dialog.js";
 import type { ESPHomeRemoteBuildJobDialog } from "../remote-build-job-dialog.js";
 import { renderOffloaderAlert } from "./build-offload-alert.js";
-import {
-  latestJobForPin,
-  renderPairingRow,
-} from "./build-offload-pairing-row.js";
+import { latestJobForPin, renderPairingRow } from "./build-offload-pairing-row.js";
 import { offloaderAlertStyles, pairingRowStyles } from "./offload-styles.js";
 import {
   peerRowStyles,
@@ -121,8 +115,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
 
   protected render() {
     return html`
-      ${this._renderAlerts()}
-      ${this._renderRemoteBuildsToggle()}
+      ${this._renderAlerts()} ${this._renderRemoteBuildsToggle()}
 
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
@@ -149,11 +142,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
             ${this._localize("settings.pair_build_server_row_helper")}
           </span>
         </div>
-        <button
-          class="btn-pair-build-server"
-          type="button"
-          @click=${this._onPairClick}
-        >
+        <button class="btn-pair-build-server" type="button" @click=${this._onPairClick}>
           <wa-icon library="mdi" name="lan-connect"></wa-icon>
           ${this._localize("settings.pair_build_server_open_action")}
         </button>
@@ -189,9 +178,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
               ${this._localize("settings.offloader_remote_builds_enabled")}
             </span>
             <span class="row-desc">
-              ${this._localize(
-                "settings.offloader_remote_builds_enabled_loading",
-              )}
+              ${this._localize("settings.offloader_remote_builds_enabled_loading")}
             </span>
           </div>
         </div>
@@ -225,7 +212,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         localize: this._localize,
         onRepair: this._onAlertRepair,
         onUnpair: this._onAlertUnpair,
-      }),
+      })
     );
   }
 
@@ -246,7 +233,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         onViewBuild: (jobId) => this._jobDialog?.openForJob(jobId),
         onEditEndpoint: this._onEditEndpointClick,
         onUnpair: this._onUnpairRequest,
-      }),
+      })
     );
   }
 
@@ -265,7 +252,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       return this._statusRow("settings.remote_build_peers_loading");
     }
     const peers = Array.from(this._discoveredHosts.values()).filter(
-      (peer) => !this._hasPairingFor(peer.hostname),
+      (peer) => !this._hasPairingFor(peer.hostname)
     );
     if (peers.length === 0) {
       return this._statusRow("settings.remote_build_peers_empty");
@@ -332,7 +319,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         detail: !this._remoteBuildsEnabled,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -342,7 +329,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         detail: { pin_sha256: pairing.pin_sha256, enabled: !pairing.enabled },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -378,7 +365,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     e: CustomEvent<{
       outcome: "success" | "pin_changed";
       receiver_label: string;
-    }>,
+    }>
   ): void => {
     // The wizard now owns the request_pair call and the
     // retry-on-NO_PAIRING_WINDOW / UNAVAILABLE UX (operator's
@@ -397,7 +384,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         this._localize("settings.reauth_repair_success", {
           label: e.detail.receiver_label,
         }),
-        { richColors: true },
+        { richColors: true }
       );
       return;
     }
@@ -405,7 +392,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       this._localize("settings.reauth_repair_pin_changed", {
         label: e.detail.receiver_label,
       }),
-      { richColors: true },
+      { richColors: true }
     );
   };
 
@@ -455,7 +442,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   };
 
   private _onPairApproved = (
-    e: CustomEvent<{ hostname: string; port: number }>,
+    e: CustomEvent<{ hostname: string; port: number }>
   ): void => {
     this._toast("success", "settings.pair_build_server_approved_toast", {
       hostname: e.detail.hostname,
@@ -464,7 +451,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   };
 
   private _onPairRejected = (
-    e: CustomEvent<{ hostname: string; port: number }>,
+    e: CustomEvent<{ hostname: string; port: number }>
   ): void => {
     this._toast("warning", "settings.pair_build_server_rejected_toast", {
       hostname: e.detail.hostname,
@@ -472,9 +459,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     });
   };
 
-  private _onPairRequestSent = (
-    e: CustomEvent<{ summary: PairingSummary }>,
-  ): void => {
+  private _onPairRequestSent = (e: CustomEvent<{ summary: PairingSummary }>): void => {
     // Bubbles past us to app-shell, which seeds the new pending
     // row into the pairings map. We just surface the toast.
     this._toast("success", "settings.pair_build_server_sent_toast", {
@@ -486,7 +471,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   private _toast(
     level: "success" | "warning" | "error",
     key: string,
-    values?: Record<string, string | number>,
+    values?: Record<string, string | number>
   ) {
     toast[level](this._localize(key, values), { richColors: true });
   }
