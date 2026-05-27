@@ -8,7 +8,8 @@
     "dev": "node build-scripts/dev-server.cjs",
     "build": "node build-scripts/build.cjs",
     "lint": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
+    "format:check": "prettier --check \"src/**/*.ts\" \"test/**/*.ts\"",
     "test": "vitest run",
     "test:watch": "vitest",
     "prepare": "husky"
