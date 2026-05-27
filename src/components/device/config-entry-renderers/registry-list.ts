@@ -194,6 +194,9 @@ export class ESPHomeRegistryList extends LitElement {
   @state() private _fetchError = false;
 
   private _unsubscribe?: () => void;
+  // Set once when a fetch has been kicked off so updated() doesn't
+  // re-evaluate fetch conditions on every reactive update.
+  private _kickedFetch = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -227,7 +230,9 @@ export class ESPHomeRegistryList extends LitElement {
   updated(): void {
     // Catch up if _api landed after connectedCallback; otherwise the
     // element would be stuck on "Loading catalog…" with no retry.
-    if (this._catalog !== null || this._fetchError || !this._api) return;
+    if (this._kickedFetch || this._catalog !== null || this._fetchError || !this._api) {
+      return;
+    }
     const ops = this._ops();
     if (ops === null || ops.cache() !== undefined) return;
     this._kickFetch(ops);
@@ -235,6 +240,7 @@ export class ESPHomeRegistryList extends LitElement {
 
   private _kickFetch(ops: RegistryOps): void {
     if (!this._api) return;
+    this._kickedFetch = true;
     ops.fetch(this._api).catch((err) => {
       // Log so a real WS / schema / parse error is diagnosable beyond
       // the generic UI message; flip _fetchError to surface retry.
@@ -271,6 +277,8 @@ export class ESPHomeRegistryList extends LitElement {
     // Drop the reference too so the cache-module closure isn't pinned.
     this._unsubscribe?.();
     this._unsubscribe = undefined;
+    // Allow a fresh fetch on reconnect.
+    this._kickedFetch = false;
   }
 
   static styles = css`
@@ -424,6 +432,8 @@ export class ESPHomeRegistryList extends LitElement {
     // value round-trips on the next save instead of silently
     // disappearing from the picker.
     const knownInCatalog = catalog.some((e) => e.id === currentId);
+    // Sort by id so 39 sensor filters in the picker stay scannable.
+    const sortedCatalog = [...catalog].sort((a, b) => a.id.localeCompare(b.id));
     return html`
       <div class="registry-list-row" data-row-index=${index}>
         <wa-select
@@ -444,7 +454,7 @@ export class ESPHomeRegistryList extends LitElement {
                 >${formatRegistryId(currentId)}</wa-option
               >`
             : nothing}
-          ${catalog
+          ${sortedCatalog
             .filter((effect) => effect.id === currentId || !takenIds.has(effect.id))
             .map(
               (effect) =>
@@ -496,12 +506,12 @@ export class ESPHomeRegistryList extends LitElement {
       if (!target) return items;
       const oldId = itemId(target);
       if (oldId === nextId) return items;
-      // Preserve the old key's params (the user's existing config)
-      // when the picker swaps types — the params shape may not be
-      // valid for the new type but a lossless rename keeps the YAML
-      // pane in sync with the visual editor.
-      const params = oldId ? target[oldId] : null;
-      return items.map((it, i) => (i === index ? { [nextId]: params ?? null } : it));
+      // Discard non-null params on type change: each entry type has
+      // its own schema and carrying ``{delta: 0.5}`` over to ``throttle``
+      // would silently produce a scalar where the new type expects a
+      // time string. V1 has no sub-form to surface the mismatch, so
+      // emit ``{nextId: null}`` and let the user reconfigure.
+      return items.map((it, i) => (i === index ? { [nextId]: null } : it));
     });
   }
 }

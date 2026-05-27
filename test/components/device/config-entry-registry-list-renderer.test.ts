@@ -102,6 +102,26 @@ describe("renderRegistryListField — row rendering", () => {
     expect(values).toContain("pulse");
   });
 
+  it("sorts picker options alphabetically by id", async () => {
+    // Backend-emitted order isn't predictable; 39 filter entries need
+    // a stable scan order. Current-row id is kept regardless of sort.
+    const { el } = mount(
+      { effects: [{}] },
+      {
+        catalog: [
+          { id: "zebra", name: "Zebra", config_entries: [], applies_to: [] },
+          { id: "alpha", name: "Alpha", config_entries: [], applies_to: [] },
+          { id: "mango", name: "Mango", config_entries: [], applies_to: [] },
+        ],
+      }
+    );
+    await el.updateComplete;
+    const optionValues = Array.from(el.shadowRoot!.querySelectorAll("wa-option")).map(
+      (o) => (o as HTMLElement).getAttribute("value")
+    );
+    expect(optionValues).toEqual(["alpha", "mango", "zebra"]);
+  });
+
   it("formats option labels from the id, not the catalog's prefixed name", async () => {
     // The catalog stores ``name: 'Light → Addressable Rainbow'``
     // because ``_automation_label`` always emits ``Domain → Name``
@@ -193,11 +213,12 @@ describe("renderRegistryListField — emitChange contract", () => {
     expect(pickers[1].getAttribute("aria-label")).toContain('"2"');
   });
 
-  it("Picker change renames the row, preserving its params", async () => {
-    // Pre-#941, rename was destructive — params for the old effect
-    // would have to be re-entered. The renderer carries them across
-    // so a user who's experimenting with effect types doesn't lose
-    // their tuning on every picker change.
+  it("Picker change discards params on type change", async () => {
+    // Each entry type has its own params schema; carrying ``{speed: 50}``
+    // from addressable_rainbow over to pulse would silently produce
+    // wrong-shape YAML and the user only learns about the mismatch when
+    // compilation fails. V1 has no sub-form to surface the mismatch, so
+    // emit ``{nextId: null}`` and let the user reconfigure.
     const { el, emit } = mount({
       effects: [{ addressable_rainbow: { speed: 50 } }],
     });
@@ -207,7 +228,7 @@ describe("renderRegistryListField — emitChange contract", () => {
     ) as HTMLSelectElement & { value: string };
     picker.value = "pulse";
     picker.dispatchEvent(new Event("change"));
-    expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: { speed: 50 } }]);
+    expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }]);
   });
 
   it("Picker change with empty nextId never produces an empty-key item", async () => {
