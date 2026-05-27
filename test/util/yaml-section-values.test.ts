@@ -988,6 +988,68 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(values.triggers).toBeInstanceOf(YamlRawValue);
   });
 
+  it("parses effects from the #941 reporter's exact YAML shape", () => {
+    // The reporter's fixture: real config preamble (esphome / esp32 /
+    // logger / sensor) sits ahead of the light section. The parser
+    // has to resolve the dash line by name + 1-indexed line number,
+    // not by counting from zero. Without this regression test, a
+    // future shift in the fromLine semantics could land effects in
+    // an empty array again and the rendered list would show "No
+    // items yet" — the visible bug the user screenshot caught.
+    const yaml = `esphome:
+  name: test-light
+
+esp32:
+  board: esp32dev
+
+logger:
+
+light:
+  - platform: esp32_rmt_led_strip
+    name: RGB LEDs
+    id: rgb_leds
+    pin: GPIO14
+    num_leds: 10
+    rgb_order: GRB
+    chipset: WS2812
+    rmt_symbols: 48
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+
+sensor:
+  - platform: template
+    name: Probe
+    id: probe_sensor
+    filters:
+      - delta: 0.1
+      - multiply: 2.0
+`;
+    const lightLine =
+      yaml
+        .split("\n")
+        .findIndex((l) => l.startsWith("  - platform: esp32_rmt_led_strip")) + 1;
+    const lightValues = parseYamlSectionValues(
+      yaml,
+      "light.esp32_rmt_led_strip",
+      lightLine
+    );
+    expect(lightValues.effects).toEqual([
+      { addressable_rainbow: null },
+      { addressable_color_wipe: null },
+    ]);
+    // Filters with simple scalar args also round-trip as an array
+    // of single-key mappings. A lambda filter would force a
+    // YamlRawValue fallback because the parser can't model block
+    // scalars inside list items; that's a pre-existing path,
+    // covered by the existing "falls back to YamlRawValue when
+    // items contain block scalars" test.
+    const sensorLine =
+      yaml.split("\n").findIndex((l) => l.startsWith("  - platform: template")) + 1;
+    const sensorValues = parseYamlSectionValues(yaml, "sensor.template", sensorLine);
+    expect(sensorValues.filters).toEqual([{ delta: "0.1" }, { multiply: "2.0" }]);
+  });
+
   it("parses light effects (single-key empty mappings) as an array (#941)", () => {
     // Each ``- effect_id:`` is a polymorphic registry-list item: a
     // single-key mapping whose value is either null (default params)
