@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiLanConnect, mdiPencil } from "@mdi/js";
+import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -46,7 +46,11 @@ import "../reauth-wizard-dialog.js";
 import "../remote-build-job-dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-registerMdiIcons({ "lan-connect": mdiLanConnect, pencil: mdiPencil });
+registerMdiIcons({
+  delete: mdiDelete,
+  "lan-connect": mdiLanConnect,
+  pencil: mdiPencil,
+});
 
 @customElement("esphome-settings-build-offload")
 export class ESPHomeSettingsBuildOffload extends LitElement {
