@@ -874,6 +874,7 @@
     "language_fr": "Français",
     "language_nl": "Nederlands",
     "language_hu": "Magyar",
+    "language_zh_cn": "简体中文",
     "theme_desc": "选择浅色、深色，或跟随系统偏好。",
     "yaml_diff_desc": "在 YAML 编辑器中显示差异按钮，以比较未保存的更改与上次保存的版本。",
     "show_yaml_diff_button": "显示 YAML 差异按钮",

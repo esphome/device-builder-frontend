@@ -65,6 +65,13 @@ describe("activeLocale (browser detection fallback)", () => {
     clearStoredLocale();
     if (originalLanguage !== undefined) {
       Object.defineProperty(navigator, "language", originalLanguage);
+    } else {
+      // ``navigator.language`` lives on the prototype by default,
+      // so the previous descriptor was ``undefined``. Drop the
+      // own-property override we installed via ``setLanguage`` so
+      // the next test reads through to the prototype again and
+      // doesn't observe the previous stub.
+      delete (navigator as { language?: string }).language;
     }
   });
 
@@ -77,6 +84,13 @@ describe("activeLocale (browser detection fallback)", () => {
 
   it("matches exact supported locale codes (zh-CN)", () => {
     setLanguage("zh-CN");
+    expect(activeLocale()).toBe("zh-CN");
+  });
+
+  it("matches case-insensitive variants of the locale tag", () => {
+    // BCP 47 tags are case-insensitive; a browser may report any
+    // casing. The canonical ``zh-CN`` is still what we return.
+    setLanguage("zh-cn");
     expect(activeLocale()).toBe("zh-CN");
   });
 

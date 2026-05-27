@@ -47,20 +47,28 @@ export const LANGUAGES: {
 
 const LOCALE_STORAGE_KEY = "esphome-locale";
 
+// BCP 47 tags are case-insensitive so a browser may report
+// ``zh-CN``, ``zh-cn``, or ``ZH-CN`` interchangeably. Index the
+// supported locales by their lowercased form and map back to
+// the canonical casing on lookup.
+const SUPPORTED_LOCALE_BY_LOWERCASE = new Map<string, SupportedLocale>(
+  SUPPORTED_LOCALES.map((l) => [l.toLowerCase(), l])
+);
+
 function detectLocale(): SupportedLocale {
-  const lang = navigator.language;
+  const lang = navigator.language.toLowerCase();
   // Try the full code first so regional variants we ship as
   // distinct locales (zh-CN vs zh-TW / zh-HK / zh-MO / zh-SG)
   // stay disambiguated, then fall back to the language prefix
   // so fr-CA / fr-BE / fr-CH still resolve to fr, nl-BE to nl,
   // etc.
-  const supported = SUPPORTED_LOCALES as readonly string[];
-  if (supported.includes(lang)) {
-    return lang as SupportedLocale;
+  const exact = SUPPORTED_LOCALE_BY_LOWERCASE.get(lang);
+  if (exact !== undefined) {
+    return exact;
   }
-  const prefix = lang.split("-", 1)[0];
-  if (supported.includes(prefix)) {
-    return prefix as SupportedLocale;
+  const prefix = SUPPORTED_LOCALE_BY_LOWERCASE.get(lang.split("-", 1)[0]);
+  if (prefix !== undefined) {
+    return prefix;
   }
   return "en";
 }
