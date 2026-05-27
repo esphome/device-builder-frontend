@@ -205,10 +205,7 @@ export class ESPHomeRegistryList extends LitElement {
       this._kickFetch(ops);
     }
     this._unsubscribe = subscribeAutomationCatalogCache(() => {
-      // The cache module retains subscribers across the element's
-      // lifetime; guard against firing on a disconnected instance so
-      // a slow fetch resolving after navigation doesn't trigger a
-      // re-render on a dead element.
+      // Cache subscribers outlive the element; bail if we're already gone.
       if (!this.isConnected) return;
       const live = this._ops();
       if (live === null) return;
@@ -221,11 +218,8 @@ export class ESPHomeRegistryList extends LitElement {
   }
 
   updated(): void {
-    // The API context can resolve after connectedCallback (Lit guarantees
-    // a microtask between mount and first paint but not before the
-    // provider's value lands). Without this catch-up, a registry-list
-    // mounted before its provider would stay stuck on "Loading catalog…"
-    // forever with no retry affordance.
+    // Catch up if _api landed after connectedCallback; otherwise the
+    // element would be stuck on "Loading catalog…" with no retry.
     if (this._catalog !== null || this._fetchError || !this._api) return;
     const ops = this._ops();
     if (ops === null || ops.cache() !== undefined) return;
@@ -235,13 +229,9 @@ export class ESPHomeRegistryList extends LitElement {
   private _kickFetch(ops: RegistryOps): void {
     if (!this._api) return;
     ops.fetch(this._api).catch((err) => {
-      // Distinct from "still loading": flag the failure so render
-      // surfaces an error + retry affordance instead of a permanent
-      // loading message. Log so a real WS / schema / parse error is
-      // diagnosable in devtools beyond the generic UI message.
+      // Log so a real WS / schema / parse error is diagnosable beyond
+      // the generic UI message; flip _fetchError to surface retry.
       console.error("Failed to fetch registry catalog", err);
-      // Async resolution may race past disconnect; skip the state
-      // assignment so Lit doesn't warn about updating a dead element.
       if (!this.isConnected) return;
       this._fetchError = true;
     });
@@ -271,9 +261,7 @@ export class ESPHomeRegistryList extends LitElement {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    // Drop the reference along with the subscription so the dead
-    // element doesn't keep the cache-module closure (and anything it
-    // captures) reachable until GC.
+    // Drop the reference too so the cache-module closure isn't pinned.
     this._unsubscribe?.();
     this._unsubscribe = undefined;
   }
@@ -417,8 +405,7 @@ export class ESPHomeRegistryList extends LitElement {
           ?disabled=${disabled}
           placeholder=${this.ctx.localize("device.registry_list_select")}
           @change=${(e: Event) => {
-            // wa-select exposes a structural ``value`` but isn't an
-            // ``HTMLSelectElement``; cast to the only field we read.
+            // wa-select isn't an HTMLSelectElement; cast to the read field.
             const next = (e.target as unknown as { value: string }).value;
             this._renameRow(index, next);
           }}
@@ -473,6 +460,9 @@ export class ESPHomeRegistryList extends LitElement {
 
   private _renameRow(index: number, nextId: string) {
     this._mutateEditable((items) => {
+      // Reject empty: an empty id would synthesize ``{ "": null }``
+      // and collide with itemId()'s unselected-placeholder sentinel.
+      if (!nextId) return items;
       const target = items[index];
       if (!target) return items;
       const oldId = itemId(target);

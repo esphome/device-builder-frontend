@@ -168,6 +168,26 @@ describe("renderRegistryListField — emitChange contract", () => {
     picker.dispatchEvent(new Event("change"));
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: { speed: 50 } }]);
   });
+
+  it("Picker change with empty nextId never produces an empty-key item", async () => {
+    // Defensive: an empty value from the picker would synthesize
+    // ``{ "": null }`` and collide with itemId()'s unselected sentinel.
+    const { el, emit } = mount({ effects: [{ pulse: null }] });
+    await el.updateComplete;
+    const picker = el.shadowRoot!.querySelector(
+      ".registry-list-row wa-select"
+    ) as HTMLSelectElement & { value: string };
+    picker.value = "";
+    picker.dispatchEvent(new Event("change"));
+    for (const call of emit.mock.calls) {
+      const list = call[1] as Array<Record<string, unknown>>;
+      for (const item of list) {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          expect(Object.keys(item)).not.toContain("");
+        }
+      }
+    }
+  });
 });
 
 describe("renderRegistryListField — applies_to filtering", () => {
