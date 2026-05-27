@@ -264,9 +264,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         localize: this._localize,
         appVersion: this._appVersion,
         latestJob: latestJobForPin(this._jobs, p.pin_sha256),
-        masterAllowMajorVersionMismatch: this._allowMajorVersionMismatch,
         onToggleEnabled: this._onTogglePairingEnabled,
-        onToggleAllowMajorVersionMismatch: this._onTogglePairingAllowMajorVersionMismatch,
         onBuildRemote: this._onBuildRemoteClick,
         onViewBuild: (jobId) => this._jobDialog?.openForJob(jobId),
         onEditEndpoint: this._onEditEndpointClick,
@@ -376,19 +374,6 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     this.dispatchEvent(
       new CustomEvent("set-offloader-pairing-enabled", {
         detail: { pin_sha256: pairing.pin_sha256, enabled: !pairing.enabled },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  };
-
-  private _onTogglePairingAllowMajorVersionMismatch = (pairing: PairingSummary) => {
-    this.dispatchEvent(
-      new CustomEvent("set-offloader-pairing-allow-major-version-mismatch", {
-        detail: {
-          pin_sha256: pairing.pin_sha256,
-          allow_major_version_mismatch: !pairing.allow_major_version_mismatch,
-        },
         bubbles: true,
         composed: true,
       })

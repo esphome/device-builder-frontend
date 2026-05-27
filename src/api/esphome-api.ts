@@ -1609,17 +1609,6 @@ export class ESPHomeAPI {
     return this.sendCommand<PairingSummary>("remote_build/set_pairing_enabled", args);
   }
 
-  /** Flip the per-pairing override of the major-version-match gate. */
-  async setOffloaderPairingAllowMajorVersionMismatch(args: {
-    pin_sha256: string;
-    allow_major_version_mismatch: boolean;
-  }): Promise<PairingSummary> {
-    return this.sendCommand<PairingSummary>(
-      "remote_build/set_pairing_allow_major_version_mismatch",
-      args
-    );
-  }
-
   /**
   // Note: there's no ``listRemoteBuildHosts`` /
   // ``addRemoteBuildManualHost`` / ``removeRemoteBuildManualHost``

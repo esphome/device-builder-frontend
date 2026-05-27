@@ -208,23 +208,4 @@ export const pairingRowStyles = css`
   .pairing-version-mismatch--release {
     color: var(--esphome-warning, #f59e0b);
   }
-
-  /* Inline "Use this server anyway" toggle that appears under
-     the release-level version-skew warning. The wrapper carries
-     the click handler so clicking the visible text also flips
-     the switch (the inner button stops propagation to avoid
-     double-firing on its own clicks). */
-  .pairing-allow-mismatch {
-    display: inline-flex;
-    align-items: center;
-    gap: var(--wa-space-xs);
-    margin-top: var(--wa-space-xs);
-    cursor: pointer;
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
-  }
-
-  .pairing-allow-mismatch-label {
-    user-select: none;
-  }
 `;

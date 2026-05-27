@@ -40,13 +40,7 @@ interface PairingRowContext {
   localize: LocalizeFunc;
   appVersion: string;
   latestJob: RemoteBuildJobState | undefined;
-  /** Master "Allow major-version mismatch" state. The per-pairing
-   *  override is only meaningful when this is `false` (strict
-   *  mode); when `true` or `null` (loading) the override is
-   *  hidden because it would have no effect. */
-  masterAllowMajorVersionMismatch: boolean | null;
   onToggleEnabled: (pairing: PairingSummary) => void;
-  onToggleAllowMajorVersionMismatch: (pairing: PairingSummary) => void;
   onBuildRemote: (pairing: PairingSummary) => void;
   onViewBuild: (jobId: string) => void;
   onEditEndpoint: (pairing: PairingSummary) => void;
@@ -61,9 +55,7 @@ export function renderPairingRow(
     localize,
     appVersion,
     latestJob,
-    masterAllowMajorVersionMismatch,
     onToggleEnabled,
-    onToggleAllowMajorVersionMismatch,
     onBuildRemote,
     onViewBuild,
     onEditEndpoint,
@@ -105,13 +97,7 @@ export function renderPairingRow(
               </span>
             `
           : nothing}
-        ${renderVersionMismatch(
-          pairing,
-          localize,
-          appVersion,
-          masterAllowMajorVersionMismatch,
-          onToggleAllowMajorVersionMismatch
-        )}
+        ${renderVersionMismatch(pairing, localize, appVersion)}
       </div>
       <div class="pairing-actions">
         ${pairing.status === "approved" && pairing.connected
@@ -176,9 +162,7 @@ export function renderPairingRow(
 function renderVersionMismatch(
   pairing: PairingSummary,
   localize: LocalizeFunc,
-  appVersion: string,
-  masterAllowMajorVersionMismatch: boolean | null,
-  onToggleAllowMajorVersionMismatch: (pairing: PairingSummary) => void
+  appVersion: string
 ): TemplateResult | typeof nothing {
   if (pairing.status !== "approved") return nothing;
   const kind = classifyVersionMismatch(appVersion, pairing.esphome_version);
@@ -187,11 +171,6 @@ function renderVersionMismatch(
     kind === "release"
       ? "settings.build_offload_pairing_version_mismatch_release"
       : "settings.build_offload_pairing_version_mismatch_patch";
-  // The per-pairing override is only consulted when the master
-  // gate is active (strict mode). Hiding it when the master
-  // allows mismatches keeps the row from showing a toggle that
-  // has no observable effect.
-  const showOverride = kind === "release" && masterAllowMajorVersionMismatch === false;
   return html`
     <span
       class=${`row-desc pairing-version-mismatch pairing-version-mismatch--${kind}`}
@@ -199,36 +178,6 @@ function renderVersionMismatch(
     >
       ${localize(key, { peer: pairing.esphome_version, local: appVersion })}
     </span>
-    ${showOverride
-      ? html`
-          <div
-            class="pairing-allow-mismatch"
-            @click=${() => onToggleAllowMajorVersionMismatch(pairing)}
-          >
-            <button
-              class="toggle pairing-allow-mismatch-toggle"
-              role="switch"
-              aria-labelledby=${`pairing-allow-mismatch-label-${pairing.pin_sha256}`}
-              aria-checked=${pairing.allow_major_version_mismatch}
-              title=${localize(
-                "settings.build_offload_pairing_allow_major_version_mismatch_title"
-              )}
-              @click=${(e: Event) => {
-                e.stopPropagation();
-                onToggleAllowMajorVersionMismatch(pairing);
-              }}
-            ></button>
-            <span
-              id=${`pairing-allow-mismatch-label-${pairing.pin_sha256}`}
-              class="pairing-allow-mismatch-label"
-            >
-              ${localize(
-                "settings.build_offload_pairing_allow_major_version_mismatch_inline_label"
-              )}
-            </span>
-          </div>
-        `
-      : nothing}
   `;
 }
 

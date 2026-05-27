@@ -145,33 +145,6 @@ export async function onSetOffloaderAllowMajorVersionMismatch(
   }
 }
 
-export async function onSetOffloaderPairingAllowMajorVersionMismatch(
-  host: ESPHomeApp,
-  e: CustomEvent<{ pin_sha256: string; allow_major_version_mismatch: boolean }>
-): Promise<void> {
-  const { pin_sha256, allow_major_version_mismatch } = e.detail;
-  const previous =
-    host._buildOffloadPairings?.get(pin_sha256)?.allow_major_version_mismatch;
-  patchOffloadPairing(host, pin_sha256, {
-    allow_major_version_mismatch,
-  });
-  try {
-    await host._api.setOffloaderPairingAllowMajorVersionMismatch({
-      pin_sha256,
-      allow_major_version_mismatch,
-    });
-  } catch {
-    if (previous !== undefined) {
-      patchOffloadPairing(host, pin_sha256, {
-        allow_major_version_mismatch: previous,
-      });
-    }
-    toast.error(host._localize("settings.remote_build_save_failed"), {
-      richColors: true,
-    });
-  }
-}
-
 export function onPairRequestSent(
   host: ESPHomeApp,
   e: CustomEvent<{ summary: PairingSummary }>

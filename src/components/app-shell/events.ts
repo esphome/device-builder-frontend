@@ -11,7 +11,6 @@ import type {
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
-  OffloaderPairingAllowMajorVersionMismatchChangedEventData,
   OffloaderPairingEnabledChangedEventData,
   OffloaderPairPeerRevokedEventData,
   OffloaderPairPinMismatchEventData,
@@ -331,13 +330,6 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.OFFLOADER_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED: {
       const evt = data as OffloaderAllowMajorVersionMismatchChangedEventData;
       host._offloaderAllowMajorVersionMismatch = evt.allow_major_version_mismatch;
-      break;
-    }
-    case DeviceEventType.OFFLOADER_PAIRING_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED: {
-      const evt = data as OffloaderPairingAllowMajorVersionMismatchChangedEventData;
-      patchOffloadPairing(host, evt.pin_sha256, {
-        allow_major_version_mismatch: evt.allow_major_version_mismatch,
-      });
       break;
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {

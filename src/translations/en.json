@@ -947,8 +947,6 @@
     "offloader_remote_builds_enabled_loading": "Loading…",
     "offloader_allow_major_version_mismatch": "Allow major-version mismatch",
     "offloader_allow_major_version_mismatch_desc": "Off, recommended: only route remote builds to servers running the same ESPHome major version. On (default): allow routing to mismatched servers; firmware may not compile correctly across release lines.",
-    "build_offload_pairing_allow_major_version_mismatch_title": "Allow this server even on a major-version mismatch",
-    "build_offload_pairing_allow_major_version_mismatch_inline_label": "Use this server anyway",
     "build_offload_pairing_connected": "Connected",
     "build_offload_pairing_connecting": "Connecting…",
     "build_offload_pairing_disconnected": "Disconnected",

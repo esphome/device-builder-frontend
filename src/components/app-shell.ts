@@ -72,7 +72,6 @@ import {
   onRemoteBuildJobSubmitted,
   onSetLanguage,
   onSetOffloaderAllowMajorVersionMismatch,
-  onSetOffloaderPairingAllowMajorVersionMismatch,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
   onSetRemoteBuildCleanupTtl,
@@ -524,12 +523,6 @@ export class ESPHomeApp extends LitElement {
         ) => onSetOffloaderPairingEnabled(this, e)}
         @set-offloader-allow-major-version-mismatch=${(e: CustomEvent<boolean>) =>
           onSetOffloaderAllowMajorVersionMismatch(this, e)}
-        @set-offloader-pairing-allow-major-version-mismatch=${(
-          e: CustomEvent<{
-            pin_sha256: string;
-            allow_major_version_mismatch: boolean;
-          }>
-        ) => onSetOffloaderPairingAllowMajorVersionMismatch(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>

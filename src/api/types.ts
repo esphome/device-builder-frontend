@@ -1407,9 +1407,8 @@ export enum DeviceEventType {
   // sync their switch state without polling.
   OFFLOADER_REMOTE_BUILDS_TOGGLED = "offloader_remote_builds_toggled",
   OFFLOADER_PAIRING_ENABLED_CHANGED = "offloader_pairing_enabled_changed",
-  // Master + per-pairing major-version-match gate flips.
+  // Master major-version-match gate flip.
   OFFLOADER_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED = "offloader_allow_major_version_mismatch_changed",
-  OFFLOADER_PAIRING_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED = "offloader_pairing_allow_major_version_mismatch_changed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -1847,12 +1846,6 @@ export interface PairingSummary {
    * eligible).
    */
   enabled: boolean;
-  /**
-   * Per-pairing override of the offloader's master
-   * `allow_major_version_mismatch` gate; only consulted
-   * when the master is off.
-   */
-  allow_major_version_mismatch: boolean;
 }
 
 /**
@@ -2087,12 +2080,6 @@ export interface OffloaderPairingEnabledChangedEventData {
 
 /** Data payload for ``offloader_allow_major_version_mismatch_changed``. */
 export interface OffloaderAllowMajorVersionMismatchChangedEventData {
-  allow_major_version_mismatch: boolean;
-}
-
-/** Data payload for ``offloader_pairing_allow_major_version_mismatch_changed``. */
-export interface OffloaderPairingAllowMajorVersionMismatchChangedEventData {
-  pin_sha256: string;
   allow_major_version_mismatch: boolean;
 }
 
