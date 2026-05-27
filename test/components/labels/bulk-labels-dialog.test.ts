@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
-import { describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import toast from "sonner-js";
 
-import type { Label } from "../../../src/api/types.js";
+import type { ESPHomeAPI } from "../../../src/api/index.js";
+import type { BulkActionResult, ConfiguredDevice } from "../../../src/api/types.js";
 import { ESPHomeBulkLabelsDialog } from "../../../src/components/labels/bulk-labels-dialog.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
@@ -13,20 +15,40 @@ import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
 interface DialogView {
   devices: ESPHomeBulkLabelsDialog["devices"];
-  _catalog: Label[];
   _pendingChanges: Map<string, "checked" | "unchecked">;
+  _saving: boolean;
+  _api: ESPHomeAPI | undefined;
   effectiveState: ESPHomeBulkLabelsDialog["effectiveState"];
   computeUpdates: ESPHomeBulkLabelsDialog["computeUpdates"];
   _hasPendingChanges: boolean;
+  _apply: () => Promise<void>;
+  close: () => void;
 }
 
 function makeDialog(): DialogView {
   return new ESPHomeBulkLabelsDialog() as unknown as DialogView;
 }
 
-const LBL_A: Label = { id: "lbl-a", name: "Alpha", color: null };
-const LBL_B: Label = { id: "lbl-b", name: "Bravo", color: null };
-const LBL_C: Label = { id: "lbl-c", name: "Charlie", color: null };
+/** Build a dialog with a stubbed ``_api`` whose ``setDeviceLabelsBulk``
+ *  returns whatever the test passes in (a result list or a thrown
+ *  error). Centralises the boilerplate so the three ``_apply`` branch
+ *  tests below stay focused on their toast / state assertions. */
+function makeMockedDialog(
+  setDeviceLabelsBulkImpl: (
+    updates: Array<{ configuration: string; labelIds: string[] }>
+  ) => Promise<BulkActionResult[]>,
+  devices: ConfiguredDevice[]
+): DialogView {
+  const dialog = makeDialog();
+  dialog.devices = devices;
+  dialog._api = {
+    setDeviceLabelsBulk: vi.fn(setDeviceLabelsBulkImpl),
+  } as unknown as ESPHomeAPI;
+  // Stub close() so the @query("wa-dialog") miss doesn't crash on
+  // the bare instance (we're not mounted).
+  dialog.close = vi.fn();
+  return dialog;
+}
 
 describe("esphome-bulk-labels-dialog tri-state derivation", () => {
   test("label on every selected device renders checked", () => {
@@ -160,8 +182,110 @@ describe("esphome-bulk-labels-dialog Apply gating", () => {
   });
 });
 
-// Silence "unused" warnings on the symbols we expose for documentation
-// of the test fixture even when a specific assertion doesn't reach for
-// them — keeps the suite robust against tighter linting later.
-void LBL_B;
-void LBL_C;
+describe("esphome-bulk-labels-dialog cycle-back drops stale pending changes", () => {
+  test("indeterminate -> checked -> unchecked -> derived removes the override", () => {
+    // Start: lbl-a checked on every selected device → derived is
+    // "checked". A click cycles to unchecked; a second click
+    // brings it back to the derived "checked" state, which must
+    // drop the pending entry so Apply doesn't fire a no-op write.
+    const dialog = makeDialog();
+    dialog.devices = [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-a"] }),
+    ];
+    // First click: derived "checked" → next is "unchecked", store it.
+    (dialog as unknown as { _onToggle: (id: string) => void })._onToggle("lbl-a");
+    expect(dialog._pendingChanges.get("lbl-a")).toBe("unchecked");
+    expect(dialog._hasPendingChanges).toBe(true);
+    // Second click: effective is "unchecked", next is "checked",
+    // which matches the derived state → entry dropped.
+    (dialog as unknown as { _onToggle: (id: string) => void })._onToggle("lbl-a");
+    expect(dialog._pendingChanges.has("lbl-a")).toBe(false);
+    expect(dialog._hasPendingChanges).toBe(false);
+  });
+});
+
+describe("esphome-bulk-labels-dialog _apply branches", () => {
+  let successSpy: ReturnType<typeof vi.spyOn>;
+  let errorSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    successSpy = vi.spyOn(toast, "success").mockImplementation(() => "");
+    errorSpy = vi.spyOn(toast, "error").mockImplementation(() => "");
+  });
+
+  afterEach(() => {
+    successSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  test("all-success: count-aware success toast, dialog closes, _saving resets", async () => {
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u) => ({ configuration: u.configuration, success: true })),
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+
+    expect(successSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy).not.toHaveBeenCalled();
+    expect(dialog.close).toHaveBeenCalledTimes(1);
+    expect(dialog._saving).toBe(false);
+  });
+
+  test("partial-failure: error toast carries the failure count, dialog still closes", async () => {
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u, i) =>
+          i === 0
+            ? {
+                configuration: u.configuration,
+                success: false,
+                error: "unknown label id",
+              }
+            : { configuration: u.configuration, success: true }
+        ),
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(dialog.close).toHaveBeenCalledTimes(1);
+    expect(dialog._saving).toBe(false);
+  });
+
+  test("transport-failure: bulk-failure i18n key fires, dialog stays open", async () => {
+    // Pin the fix that swapped ``labels_save_failed`` (single-
+    // device wording) for the bulk-specific key on the catch path.
+    // Asserting on the localize key name via the toast call is
+    // load-bearing — the bug was that the wrong key surfaced
+    // single-device copy on a multi-device failure.
+    const dialog = makeMockedDialog(async () => {
+      throw new Error("ws closed");
+    }, [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+    ]);
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    // The dialog does NOT close on transport failure (so the user
+    // can retry without losing their tri-state edits).
+    expect(dialog.close).not.toHaveBeenCalled();
+    expect(dialog._saving).toBe(false);
+  });
+});

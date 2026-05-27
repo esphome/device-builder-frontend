@@ -199,11 +199,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     return html`
       <wa-dialog
         label=${this._localize(titleKey, { count: this.devices.length })}
-        light-dismiss
+        ?light-dismiss=${!this._saving}
       >
         ${this._catalog.length === 0
           ? html`<div class="option-empty">
-              ${this._localize("dashboard.labels_dialog_empty")}
+              ${this._localize("dashboard.labels_bulk_dialog_empty")}
             </div>`
           : html`<div
               class="options"
@@ -275,7 +275,15 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // for every device; a second removes it from every device).
     const next: "checked" | "unchecked" = current === "checked" ? "unchecked" : "checked";
     const map = new Map(this._pendingChanges);
-    map.set(labelId, next);
+    // If the user cycled back to the derived baseline (checked ↔
+    // unchecked ↔ checked over a label that was already checked
+    // across the selection), drop the override so Apply doesn't
+    // stay enabled for a no-op write.
+    if (next === this._derivedState(labelId)) {
+      map.delete(labelId);
+    } else {
+      map.set(labelId, next);
+    }
     this._pendingChanges = map;
   }
 
@@ -305,9 +313,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       this.close();
     } catch (err) {
       console.warn("set_labels_bulk failed", err);
-      toast.error(this._localize("dashboard.labels_save_failed"), {
-        richColors: true,
-      });
+      const key =
+        count === 1
+          ? "dashboard.labels_bulk_save_failed_one"
+          : "dashboard.labels_bulk_save_failed_other";
+      toast.error(this._localize(key, { count }), { richColors: true });
     } finally {
       this._saving = false;
     }

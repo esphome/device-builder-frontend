@@ -186,6 +186,7 @@
     "labels_bulk_saved_one": "Labels bijgewerkt op 1 apparaat",
     "labels_bulk_saved_other": "Labels bijgewerkt op {count} apparaten",
     "labels_bulk_mixed_hint": "Sommige geselecteerde apparaten hebben dit label al",
+    "labels_bulk_dialog_empty": "Nog geen labels. Maak er een aan vanuit de drawer van een apparaat om hem in bulk toe te wijzen.",
     "labels_edit_label": "Label bewerken",
     "labels_rename": "Label hernoemen",
     "labels_update_failed": "Kan labelwijzigingen niet opslaan",
