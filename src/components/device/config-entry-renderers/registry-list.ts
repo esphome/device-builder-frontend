@@ -212,10 +212,13 @@ export class ESPHomeRegistryList extends LitElement {
       }
     });
     const cached = ops.cache();
+    // Clear any stale error from a prior session before either taking
+    // the cached value or kicking a fresh fetch — otherwise the error
+    // block would render alongside an in-flight refetch and the Retry
+    // button would no-op (the cache layer dedupes via _inflight).
+    this._fetchError = false;
     if (cached !== undefined) {
       this._catalog = cached;
-      // Reconnect with cached data: clear any stale error from a prior session.
-      this._fetchError = false;
     } else {
       this._kickFetch(ops);
     }
@@ -427,6 +430,9 @@ export class ESPHomeRegistryList extends LitElement {
           .value=${currentId}
           ?disabled=${disabled}
           placeholder=${this.ctx.localize("device.registry_list_select")}
+          aria-label=${this.ctx.localize("device.registry_list_row_label", {
+            index: String(index + 1),
+          })}
           @change=${(e: Event) => {
             // wa-select isn't an HTMLSelectElement; cast to the read field.
             const next = (e.target as unknown as { value: string }).value;

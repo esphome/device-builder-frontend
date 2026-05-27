@@ -606,6 +606,7 @@
     "registry_list_select": "Válasszon egy lehetőséget…",
     "registry_list_empty_catalog": "Nincsenek elérhető lehetőségek ehhez a regiszterhez.",
     "registry_list_no_applicable_options": "Nincsenek ide illeszkedő lehetőségek.",
+    "registry_list_row_label": "{index}. sor",
     "registry_list_error": "A katalógus betöltése sikertelen.",
     "registry_list_retry": "Újra",
     "registry_list_unsupported": "Ez a mező olyan regiszterre hivatkozik, amelyet a vizuális szerkesztő nem ismer; szerkessze közvetlenül a YAML-panelben.",

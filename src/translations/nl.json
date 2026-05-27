@@ -632,6 +632,7 @@
     "registry_list_select": "Selecteer een optie…",
     "registry_list_empty_catalog": "Geen opties beschikbaar voor dit register.",
     "registry_list_no_applicable_options": "Geen opties zijn van toepassing op deze sectie.",
+    "registry_list_row_label": "Rij {index}",
     "registry_list_error": "Kan de catalogus niet laden.",
     "registry_list_retry": "Opnieuw proberen",
     "registry_list_unsupported": "Dit veld verwijst naar een register dat de visuele editor niet herkent; bewerk het rechtstreeks in het YAML-paneel.",

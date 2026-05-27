@@ -632,6 +632,7 @@
     "registry_list_select": "Sélectionnez une option…",
     "registry_list_empty_catalog": "Aucune option disponible pour ce registre.",
     "registry_list_no_applicable_options": "Aucune option ne s'applique à cette section.",
+    "registry_list_row_label": "Ligne {index}",
     "registry_list_error": "Impossible de charger le catalogue.",
     "registry_list_retry": "Réessayer",
     "registry_list_unsupported": "Ce champ référence un registre que l'éditeur visuel ne reconnaît pas ; modifiez-le directement dans le volet YAML.",

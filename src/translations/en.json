@@ -607,6 +607,7 @@
     "registry_list_select": "Select an option…",
     "registry_list_empty_catalog": "No options available for this registry.",
     "registry_list_no_applicable_options": "No options apply to this section.",
+    "registry_list_row_label": "Row {index}",
     "registry_list_error": "Couldn't load the catalog.",
     "registry_list_retry": "Retry",
     "registry_list_unsupported": "This field references a registry the visual editor doesn't recognise — edit it directly in the YAML pane.",

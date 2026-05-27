@@ -153,6 +153,46 @@ describe("renderRegistryListField — emitChange contract", () => {
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }]);
   });
 
+  it("Each row's wa-select has a per-row aria-label", async () => {
+    // Field-level renderLabel only names the group; each picker
+    // needs its own accessible name so screen readers don't
+    // announce three bare "comboboxes" for three filter rows.
+    const calls: Array<{
+      key: string;
+      values: Record<string, string | number> | undefined;
+    }> = [];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "effects",
+      label: "Effects",
+      registry: "light_effects",
+      multi_value: true,
+    });
+    el.path = ["effects"];
+    el.ctx = makeRenderCtx(
+      { effects: [{ pulse: null }, { addressable_rainbow: null }] },
+      {
+        overrides: {
+          localize: ((k: string, v?: Record<string, string | number>) => {
+            calls.push({ key: k, values: v });
+            return v ? `${k}:${JSON.stringify(v)}` : k;
+          }) as never,
+        },
+      }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: LightEffect[] })._catalog = STUB_CATALOG;
+    el.requestUpdate();
+    await el.updateComplete;
+    const labelCalls = calls.filter((c) => c.key === "device.registry_list_row_label");
+    expect(labelCalls.length).toBe(2);
+    expect(labelCalls[0].values).toEqual({ index: "1" });
+    expect(labelCalls[1].values).toEqual({ index: "2" });
+    const pickers = el.shadowRoot!.querySelectorAll(".registry-list-row wa-select");
+    expect(pickers[0].getAttribute("aria-label")).toContain('"1"');
+    expect(pickers[1].getAttribute("aria-label")).toContain('"2"');
+  });
+
   it("Picker change renames the row, preserving its params", async () => {
     // Pre-#941, rename was destructive — params for the old effect
     // would have to be re-entered. The renderer carries them across
