@@ -54,6 +54,7 @@ import {
   renderNestedField,
   renderNestedListField,
   renderNumberField,
+  renderRegistryListField,
   renderPinField,
   renderSelectField,
   renderStringField,
@@ -421,6 +422,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     }
     if (entry.type === ConfigEntryType.MAP) {
       return renderMapField(entry, path, ctx);
+    }
+    if (entry.type === ConfigEntryType.REGISTRY_LIST) {
+      return renderRegistryListField(entry, path, ctx);
     }
     if (entry.multi_value) {
       return renderMultiValueField(entry, path, ctx);

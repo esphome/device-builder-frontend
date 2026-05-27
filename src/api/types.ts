@@ -621,6 +621,13 @@ export interface ConfigEntry {
    */
   display_format: "hex" | null;
   /**
+   * Catalog name for `REGISTRY_LIST` entries — currently only
+   * `"light_effects"` is wired. The renderer fetches the named
+   * catalog via the automation-catalog cache and uses its entries
+   * for the per-row type picker. Null on every other entry type.
+   */
+  registry: string | null;
+  /**
    * Unit choices for `FLOAT_WITH_UNIT` entries. The frontend renders
    * a unit picker populated from this list; each option's string is
    * what the YAML serialization appends after the numeric value
@@ -798,6 +805,13 @@ export enum ConfigEntryType {
   // `substitutions:`, `globals:`, `api.actions:`, etc. — places where
   // the schema would otherwise need to enumerate every possible key.
   MAP = "map",
+  // Polymorphic list of single-key items drawn from a named registry.
+  // Each item is `{ <registry_id>: <params> | null }`. Frontend
+  // renders a list of rows with a per-row type picker pulled from the
+  // catalog named by ``entry.registry`` (currently only
+  // ``"light_effects"`` is wired). Used for fields like
+  // ``light.effects`` and ``sensor.filters``. #941.
+  REGISTRY_LIST = "registry_list",
   // Fallback for fields whose type couldn't be determined
   UNKNOWN = "unknown",
   /** @deprecated Backend signals dropdown via populated `options` instead. Kept for legacy callers. */

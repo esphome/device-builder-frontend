@@ -602,6 +602,7 @@
     "multi_value_add": "Hozzáadás",
     "multi_value_remove": "Eltávolítás",
     "multi_value_yaml_only": "Ez a lista olyan YAML-t tartalmaz, amelyet a vizuális szerkesztő nem tud kezelni – szerkessze közvetlenül a jobb oldali YAML-panelben.",
+    "registry_list_loading": "Katalógus betöltése…",
     "map_empty": "Még nincsenek bejegyzések – Kattintson a + gombra egy hozzáadásához.",
     "map_add": "Bejegyzés hozzáadása",
     "map_remove": "Bejegyzés eltávolítása",

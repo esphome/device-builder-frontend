@@ -34,13 +34,17 @@ function arrayItemHandlers(
   return { addItem, removeAt };
 }
 
-function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
+export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
   return items.length === 0
     ? html`<p class="field-description">${ctx.localize("device.multi_value_empty")}</p>`
     : nothing;
 }
 
-function renderListRemoveButton(ctx: RenderCtx, disabled: boolean, onClick: () => void) {
+export function renderListRemoveButton(
+  ctx: RenderCtx,
+  disabled: boolean,
+  onClick: () => void
+) {
   return html`
     <button
       type="button"
@@ -54,7 +58,11 @@ function renderListRemoveButton(ctx: RenderCtx, disabled: boolean, onClick: () =
   `;
 }
 
-function renderListAddButton(ctx: RenderCtx, disabled: boolean, onClick: () => void) {
+export function renderListAddButton(
+  ctx: RenderCtx,
+  disabled: boolean,
+  onClick: () => void
+) {
   return html`
     <button
       type="button"
