@@ -17,7 +17,7 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
-import type { ConfigEntry, Filter, LightEffect } from "../../../api/types.js";
+import type { ConfigEntry, RegistryCatalogEntry } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
 import {
   fetchFilters,
@@ -80,7 +80,7 @@ function formatRegistryId(id: string): string {
  *  (``"light.esp32_rmt_led_strip"``), so we match on the whole
  *  section key. */
 interface RegistryOps {
-  cache: () => (LightEffect | Filter)[] | undefined;
+  cache: () => RegistryCatalogEntry[] | undefined;
   fetch: (api: ESPHomeAPI) => Promise<unknown>;
   /** Project a section key (``light.esp32_rmt_led_strip``) into the
    *  shape ``applies_to`` lists use for this registry. */
@@ -187,12 +187,9 @@ export class ESPHomeRegistryList extends LitElement {
   @property({ attribute: false })
   ctx!: RenderCtx;
 
-  // Catalog entries share a structural shape (``id``, ``name``,
-  // ``config_entries``, ``applies_to``) across LightEffect and
-  // Filter; the renderer only reads those fields so the union
-  // covers both. New registries plug in by adding a row to
-  // ``REGISTRY_OPS``.
-  @state() private _catalog: (LightEffect | Filter)[] | null = null;
+  // New registries plug in by adding a row to ``REGISTRY_OPS``
+  // and a fetch / cache pair in the catalog cache module.
+  @state() private _catalog: RegistryCatalogEntry[] | null = null;
   @state() private _fetchError = false;
 
   private _unsubscribe?: () => void;
@@ -386,7 +383,7 @@ export class ESPHomeRegistryList extends LitElement {
   private _renderRow(
     item: Record<string, unknown>,
     index: number,
-    catalog: (LightEffect | Filter)[],
+    catalog: RegistryCatalogEntry[],
     allItems: Record<string, unknown>[],
     disabled: boolean,
     dedupByTypeId: boolean

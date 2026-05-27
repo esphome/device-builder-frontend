@@ -886,32 +886,32 @@ export interface AutomationCondition {
   accepts_condition_list: boolean;
 }
 
-/** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).
- *  Each effect is itself a registry entry with its own parameter
- *  schema. Surfaced through a separate editor surface because the
- *  list ergonomics differ from actions (effects compose into a list
- *  on a single ``light`` block; actions form a tree). */
-export interface LightEffect {
-  id: string; // "pulse", "flicker", "addressable_lambda"
-  name: string;
-  config_entries: ConfigEntry[];
-  /** Light platform types this effect is valid on
-   *  (``["light.binary"]``, ``["light.addressable_rgb"]``…). */
-  applies_to: string[];
-}
-
-/** A sensor / binary_sensor / text_sensor filter (``delta``,
- *  ``lambda``, ``calibrate_linear``…). Same shape as
- *  :class:`LightEffect`. ``applies_to`` lists component domains
- *  the filter is valid on. Filters with the same id across domains
- *  (``lambda`` appears in all three) merge into one catalog entry
- *  with applies_to spanning every domain it lives in. */
-export interface Filter {
+/** Common shape for the polymorphic-list registry catalogs
+ *  (`light_effects`, `filter`, future additions). One entry per
+ *  registered id; `config_entries` is the per-id parameter schema;
+ *  `applies_to` scopes the entry to the parent sections it's valid
+ *  on. The token shape in `applies_to` is per-registry: qualified
+ *  component ids (`"light.addressable_rgb"`) for `light_effects`,
+ *  bare component domains (`"sensor"`) for `filter`. */
+export interface RegistryCatalogEntry {
   id: string;
   name: string;
   config_entries: ConfigEntry[];
-  applies_to: string[]; // ``["sensor"]`` / ``["binary_sensor"]`` / etc.
+  applies_to: string[];
 }
+
+/** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).
+ *  Each effect is itself a registry entry with its own parameter
+ *  schema. `applies_to` carries qualified component ids
+ *  (``["light.addressable_rgb"]``). */
+export type LightEffect = RegistryCatalogEntry;
+
+/** A sensor / binary_sensor / text_sensor filter (``delta``,
+ *  ``lambda``, ``calibrate_linear``…). `applies_to` carries bare
+ *  component domains (``["sensor"]`` / ``["binary_sensor"]``).
+ *  Filters with the same id across domains merge into one catalog
+ *  entry whose `applies_to` spans every domain it lives in. */
+export type Filter = RegistryCatalogEntry;
 
 /** Tagged-union locator for an automation inside a device YAML.
  *  Mirrors the backend's ``AutomationLocation`` Python dataclass.
