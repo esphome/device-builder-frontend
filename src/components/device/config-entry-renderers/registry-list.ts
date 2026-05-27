@@ -85,6 +85,18 @@ interface RegistryOps {
   /** Project a section key (``light.esp32_rmt_led_strip``) into the
    *  shape ``applies_to`` lists use for this registry. */
   parentToken: (sectionKey: string) => string;
+  /** True when the picker should hide ids already chosen by other
+   *  rows. Set for registries where the row's *type id* doubles as
+   *  the entry's identifier on the compile side and a per-row
+   *  ``name:`` override isn't available in the visual editor yet —
+   *  ``light_effects`` is the only such case today (each effect's
+   *  default ``name:`` is derived from the effect id, so two rows
+   *  with the same id collide as ``Found the effect name 'X' twice``).
+   *  For registries like ``filter`` where chained same-type entries
+   *  with different params is a normal pattern (``- delta: 0.5`` +
+   *  ``- delta: 1.0``), leave false so the visual editor matches
+   *  YAML expressiveness. */
+  dedupByTypeId: boolean;
 }
 
 const REGISTRY_OPS: Record<string, RegistryOps> = {
@@ -92,11 +104,13 @@ const REGISTRY_OPS: Record<string, RegistryOps> = {
     cache: () => getCachedLightEffects(),
     fetch: (api) => fetchLightEffects(api),
     parentToken: (sectionKey) => sectionKey,
+    dedupByTypeId: true,
   },
   filter: {
     cache: () => getCachedFilters(),
     fetch: (api) => fetchFilters(api),
     parentToken: (sectionKey) => sectionKey.split(".", 1)[0],
+    dedupByTypeId: false,
   },
 };
 
@@ -191,10 +205,12 @@ export class ESPHomeRegistryList extends LitElement {
     if (cached !== undefined) {
       this._catalog = cached;
     } else if (this._api) {
-      ops.fetch(this._api).catch(() => {
+      ops.fetch(this._api).catch((err) => {
         // Distinct from "still loading": flag the failure so render
         // surfaces an error + retry affordance instead of a permanent
-        // loading message.
+        // loading message. Log so a real WS / schema / parse error is
+        // diagnosable in devtools beyond the generic UI message.
+        console.error("Failed to fetch registry catalog", err);
         this._fetchError = true;
       });
     }
@@ -224,7 +240,8 @@ export class ESPHomeRegistryList extends LitElement {
     const ops = this._ops();
     if (ops === null) return;
     this._fetchError = false;
-    ops.fetch(this._api).catch(() => {
+    ops.fetch(this._api).catch((err) => {
+      console.error("Failed to retry registry catalog fetch", err);
       this._fetchError = true;
     });
   };
@@ -287,13 +304,18 @@ export class ESPHomeRegistryList extends LitElement {
         entry.applies_to.length === 0 ||
         entry.applies_to.includes(parentToken)
     );
-    // Three discriminated states for the picker affordance:
+    // Four discriminated states for the picker affordance:
     //   - error: fetch rejected, retry button.
     //   - loading: catalog is null and no error → fetch in flight.
-    //   - empty: catalog is [] → registry has no entries (most
-    //     likely a backend-side misconfig). Distinct from loading
-    //     so the user isn't told something's happening when it
-    //     isn't.
+    //   - empty-catalog: backend registry is genuinely empty (most
+    //     likely a misconfig). Distinct from loading so the user
+    //     isn't told something's happening when it isn't.
+    //   - no-applicable: registry has entries but ``applies_to``
+    //     filtered them all out for this section. The common case
+    //     (e.g. monochromatic light with only addressable effects
+    //     in the registry); "no options for this registry" would
+    //     be actively misleading here.
+    const catalogIsEmpty = this._catalog !== null && this._catalog.length === 0;
     const statusHint: unknown = this._fetchError
       ? html`<p class="registry-list-fallback">
           ${this.ctx.localize("device.registry_list_error")}
@@ -305,11 +327,15 @@ export class ESPHomeRegistryList extends LitElement {
         ? html`<p class="registry-list-fallback">
             ${this.ctx.localize("device.registry_list_loading")}
           </p>`
-        : catalog.length === 0
+        : catalogIsEmpty
           ? html`<p class="registry-list-fallback">
               ${this.ctx.localize("device.registry_list_empty_catalog")}
             </p>`
-          : nothing;
+          : catalog.length === 0
+            ? html`<p class="registry-list-fallback">
+                ${this.ctx.localize("device.registry_list_no_applicable_options")}
+              </p>`
+            : nothing;
     // Add is gated on a populated catalog: clicking with no catalog
     // would push ``{}`` and the picker would render with no options,
     // leaving the row stuck.
@@ -318,7 +344,9 @@ export class ESPHomeRegistryList extends LitElement {
       <div class="field" data-field-key=${this.path.join(".")}>
         ${renderLabel(this.entry, this.ctx)} ${renderListEmptyHint(items, this.ctx)}
         ${statusHint}
-        ${items.map((item, i) => this._renderRow(item, i, catalog, items, disabled))}
+        ${items.map((item, i) =>
+          this._renderRow(item, i, catalog, items, disabled, ops.dedupByTypeId)
+        )}
         ${renderListAddButton(this.ctx, addDisabled, () => this._addItem())}
         ${renderFieldError(this.path, this.ctx)}
       </div>
@@ -330,20 +358,26 @@ export class ESPHomeRegistryList extends LitElement {
     index: number,
     catalog: (LightEffect | Filter)[],
     allItems: Record<string, unknown>[],
-    disabled: boolean
+    disabled: boolean,
+    dedupByTypeId: boolean
   ) {
     const currentId = itemId(item);
-    // Effects already chosen on OTHER rows: filtered from this row's
-    // dropdown so the user can't pick a duplicate (ESPHome rejects
-    // ``Found the effect name 'X' twice``). The current row's id is
-    // intentionally kept so the picker still renders the value and
-    // the user can rename to anything that isn't a sibling.
+    // Ids chosen on OTHER rows, only collected when the registry
+    // opts into ``dedupByTypeId``. For ``light_effects`` two rows
+    // sharing an id collide on ESPHome's default ``name:`` derivation
+    // and the compile fails with ``Found the effect name 'X' twice``;
+    // for chained filters (``- delta: 0.5`` + ``- delta: 1.0``)
+    // same-type duplicates are a normal pattern and we want the
+    // picker to keep offering them. The current row's id is kept
+    // unconditionally so the picker still renders the value.
     const takenIds = new Set<string>();
-    allItems.forEach((it, i) => {
-      if (i === index) return;
-      const id = itemId(it);
-      if (id) takenIds.add(id);
-    });
+    if (dedupByTypeId) {
+      allItems.forEach((it, i) => {
+        if (i === index) return;
+        const id = itemId(it);
+        if (id) takenIds.add(id);
+      });
+    }
     // Always include the current id even when the catalog doesn't
     // (older configs may carry an effect the schema dropped) so the
     // value round-trips on the next save instead of silently

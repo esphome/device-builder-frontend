@@ -295,12 +295,13 @@ describe("renderRegistryListField — applies_to filtering", () => {
   });
 });
 
-describe("renderRegistryListField — duplicate guard", () => {
+describe("renderRegistryListField — light_effects duplicate guard", () => {
   it("hides options already chosen in other rows", async () => {
-    // ESPHome rejects ``Found the effect name 'X' twice``; the
-    // picker filters options already taken by sibling rows so the
-    // user can't accidentally produce that shape via the visual
-    // editor.
+    // ESPHome derives each effect's default ``name:`` from the
+    // effect id, so two ``- pulse:`` rows collide on compile with
+    // ``Found the effect name 'Pulse' twice``. Per-row ``name:``
+    // overrides aren't editable in V1 so the visual editor scopes
+    // the picker to ids not already taken by siblings.
     const { el } = mount({
       effects: [{ pulse: null }, { addressable_rainbow: null }],
     });
@@ -311,9 +312,7 @@ describe("renderRegistryListField — duplicate guard", () => {
     const values = Array.from(secondRowOptions).map((o) =>
       (o as HTMLElement).getAttribute("value")
     );
-    // Second row's picker still shows its own current id.
     expect(values).toContain("addressable_rainbow");
-    // But ``pulse`` (chosen by the first row) is filtered out.
     expect(values).not.toContain("pulse");
   });
 
@@ -333,6 +332,42 @@ describe("renderRegistryListField — duplicate guard", () => {
       );
       expect(values).toContain("pulse");
     }
+  });
+});
+
+describe("renderRegistryListField — filter registry allows duplicates", () => {
+  it("keeps same-type options visible on sibling rows for filters", async () => {
+    // Chained filters with the same type and different params is a
+    // normal ESPHome pattern: ``- delta: 0.5`` followed by
+    // ``- delta: 1.0``. The dedup behaviour the light_effects
+    // registry needs would block this; the per-registry
+    // ``dedupByTypeId`` flag is false for filters so the picker
+    // keeps offering already-taken ids.
+    const { el } = mount(
+      { filters: [{ delta: null }, { lambda: null }] },
+      {
+        registry: "filter",
+        key: "filters",
+        catalog: [
+          { id: "delta", name: "Delta", config_entries: [], applies_to: [] },
+          { id: "lambda", name: "Lambda", config_entries: [], applies_to: [] },
+          { id: "offset", name: "Offset", config_entries: [], applies_to: [] },
+        ],
+      }
+    );
+    await el.updateComplete;
+    const secondRowOptions = el
+      .shadowRoot!.querySelectorAll(".registry-list-row")[1]
+      .querySelectorAll("wa-option");
+    const values = Array.from(secondRowOptions).map((o) =>
+      (o as HTMLElement).getAttribute("value")
+    );
+    // ``delta`` chosen by row 0 must still appear on row 1's picker
+    // so the user can add a second ``- delta:`` with a different
+    // threshold.
+    expect(values).toContain("delta");
+    expect(values).toContain("lambda");
+    expect(values).toContain("offset");
   });
 });
 
@@ -410,6 +445,34 @@ describe("renderRegistryListField — status states", () => {
       "device.registry_list_empty_catalog"
     );
     expect(emptyEl.shadowRoot!.textContent).not.toContain("device.registry_list_loading");
+  });
+
+  it("distinguishes empty-catalog from no-applicable-options state", async () => {
+    // Catalog populated but every entry's applies_to rules it out
+    // for this section: the common case (e.g., a monochromatic
+    // light with only addressable effects in the catalog). The
+    // "empty registry" copy would be actively misleading here.
+    const { el } = mount(
+      { effects: [] },
+      {
+        sectionKey: "light.monochromatic",
+        catalog: [
+          {
+            id: "addressable_rainbow",
+            name: "Rainbow",
+            config_entries: [],
+            applies_to: ["light.esp32_rmt_led_strip"],
+          },
+        ],
+      }
+    );
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain(
+      "device.registry_list_no_applicable_options"
+    );
+    expect(el.shadowRoot!.textContent).not.toContain(
+      "device.registry_list_empty_catalog"
+    );
   });
 
   it("disables the Add button while the catalog is loading or empty", async () => {
