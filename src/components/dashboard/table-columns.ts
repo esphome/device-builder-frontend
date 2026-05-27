@@ -37,10 +37,10 @@ export interface DeviceRow {
   _device: ConfiguredDevice;
 }
 
-/** Locale-aware, case-insensitive, numeric-aware collator shared
- *  with the card grid (``_cardCollator`` in ``pages/dashboard.ts``)
- *  and the discovery list (``discoveryCollator`` in
- *  ``render-content.ts``). #946. */
+/** Locale-aware, case-insensitive, numeric-aware collator;
+ *  mirrors the options used by ``_cardCollator`` in
+ *  ``pages/dashboard.ts`` and ``discoveryCollator`` in
+ *  ``render-content.ts``. Keep the three in sync. #946. */
 export const NAME_COLLATOR = new Intl.Collator(undefined, {
   sensitivity: "base",
   numeric: true,
