@@ -210,9 +210,10 @@ export const pairingRowStyles = css`
   }
 
   /* Inline "Use this server anyway" toggle that appears under
-     the release-level version-skew warning. The wrapping label
-     element ties the visible text to the toggle for click
-     forwarding. */
+     the release-level version-skew warning. The wrapper carries
+     the click handler so clicking the visible text also flips
+     the switch (the inner button stops propagation to avoid
+     double-firing on its own clicks). */
   .pairing-allow-mismatch {
     display: inline-flex;
     align-items: center;

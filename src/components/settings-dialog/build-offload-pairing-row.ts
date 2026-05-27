@@ -201,23 +201,32 @@ function renderVersionMismatch(
     </span>
     ${showOverride
       ? html`
-          <label class="pairing-allow-mismatch">
+          <div
+            class="pairing-allow-mismatch"
+            @click=${() => onToggleAllowMajorVersionMismatch(pairing)}
+          >
             <button
               class="toggle pairing-allow-mismatch-toggle"
               role="switch"
-              aria-label=${localize(
-                "settings.build_offload_pairing_allow_major_version_mismatch_aria",
-                { label: pairing.label }
-              )}
+              aria-labelledby=${`pairing-allow-mismatch-label-${pairing.pin_sha256}`}
               aria-checked=${pairing.allow_major_version_mismatch}
-              @click=${() => onToggleAllowMajorVersionMismatch(pairing)}
+              title=${localize(
+                "settings.build_offload_pairing_allow_major_version_mismatch_title"
+              )}
+              @click=${(e: Event) => {
+                e.stopPropagation();
+                onToggleAllowMajorVersionMismatch(pairing);
+              }}
             ></button>
-            <span class="pairing-allow-mismatch-label">
+            <span
+              id=${`pairing-allow-mismatch-label-${pairing.pin_sha256}`}
+              class="pairing-allow-mismatch-label"
+            >
               ${localize(
                 "settings.build_offload_pairing_allow_major_version_mismatch_inline_label"
               )}
             </span>
-          </label>
+          </div>
         `
       : nothing}
   `;
