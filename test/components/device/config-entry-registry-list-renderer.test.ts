@@ -167,6 +167,47 @@ describe("renderRegistryListField — emitChange contract", () => {
   });
 });
 
+describe("renderRegistryListField — duplicate guard", () => {
+  it("hides options already chosen in other rows", async () => {
+    // ESPHome rejects ``Found the effect name 'X' twice``; the
+    // picker filters options already taken by sibling rows so the
+    // user can't accidentally produce that shape via the visual
+    // editor.
+    const { el } = mount({
+      effects: [{ pulse: null }, { addressable_rainbow: null }],
+    });
+    await el.updateComplete;
+    const secondRowOptions = el
+      .shadowRoot!.querySelectorAll(".registry-list-row")[1]
+      .querySelectorAll("wa-option");
+    const values = Array.from(secondRowOptions).map((o) =>
+      (o as HTMLElement).getAttribute("value")
+    );
+    // Second row's picker still shows its own current id.
+    expect(values).toContain("addressable_rainbow");
+    // But ``pulse`` (chosen by the first row) is filtered out.
+    expect(values).not.toContain("pulse");
+  });
+
+  it("keeps the current row's id available even when it overlaps a sibling", async () => {
+    // The filter is "exclude siblings' ids, NOT the current row's
+    // id" so the picker can still render the value the row is
+    // already showing. Edge case: malformed configs with literal
+    // duplicates still render rather than dropping options entirely.
+    const { el } = mount({
+      effects: [{ pulse: null }, { pulse: null }],
+    });
+    await el.updateComplete;
+    const rows = el.shadowRoot!.querySelectorAll(".registry-list-row");
+    for (const row of Array.from(rows)) {
+      const values = Array.from(row.querySelectorAll("wa-option")).map((o) =>
+        (o as HTMLElement).getAttribute("value")
+      );
+      expect(values).toContain("pulse");
+    }
+  });
+});
+
 describe("renderRegistryListField — foreign-entry preservation", () => {
   it("Remove keeps non-editable entries verbatim (silent-data-loss fix)", async () => {
     // The values dict can carry foreign entries — strings, scalars,

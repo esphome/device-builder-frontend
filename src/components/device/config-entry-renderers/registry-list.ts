@@ -294,7 +294,7 @@ export class ESPHomeRegistryList extends LitElement {
       <div class="field" data-field-key=${this.path.join(".")}>
         ${renderLabel(this.entry, this.ctx)} ${renderListEmptyHint(items, this.ctx)}
         ${statusHint}
-        ${items.map((item, i) => this._renderRow(item, i, catalog, disabled))}
+        ${items.map((item, i) => this._renderRow(item, i, catalog, items, disabled))}
         ${renderListAddButton(this.ctx, addDisabled, () => this._addItem())}
         ${renderFieldError(this.path, this.ctx)}
       </div>
@@ -305,9 +305,21 @@ export class ESPHomeRegistryList extends LitElement {
     item: Record<string, unknown>,
     index: number,
     catalog: (LightEffect | Filter)[],
+    allItems: Record<string, unknown>[],
     disabled: boolean
   ) {
     const currentId = itemId(item);
+    // Effects already chosen on OTHER rows: filtered from this row's
+    // dropdown so the user can't pick a duplicate (ESPHome rejects
+    // ``Found the effect name 'X' twice``). The current row's id is
+    // intentionally kept so the picker still renders the value and
+    // the user can rename to anything that isn't a sibling.
+    const takenIds = new Set<string>();
+    allItems.forEach((it, i) => {
+      if (i === index) return;
+      const id = itemId(it);
+      if (id) takenIds.add(id);
+    });
     // Always include the current id even when the catalog doesn't
     // (older configs may carry an effect the schema dropped) so the
     // value round-trips on the next save instead of silently
@@ -329,12 +341,14 @@ export class ESPHomeRegistryList extends LitElement {
                 >${formatRegistryId(currentId)}</wa-option
               >`
             : nothing}
-          ${catalog.map(
-            (effect) =>
-              html`<wa-option value=${effect.id} ?selected=${effect.id === currentId}
-                >${formatRegistryId(effect.id)}</wa-option
-              >`
-          )}
+          ${catalog
+            .filter((effect) => effect.id === currentId || !takenIds.has(effect.id))
+            .map(
+              (effect) =>
+                html`<wa-option value=${effect.id} ?selected=${effect.id === currentId}
+                  >${formatRegistryId(effect.id)}</wa-option
+                >`
+            )}
         </wa-select>
         ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
       </div>
