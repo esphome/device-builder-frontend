@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { describe, expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
 
+import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
 import {
   extractAttributeBindings,
@@ -18,6 +19,8 @@ interface PageView {
   _yaml: string;
   _savedYaml: string;
   _saving: boolean;
+  _api: ESPHomeAPI;
+  _save(): Promise<void>;
   render(): unknown;
 }
 
@@ -104,16 +107,31 @@ describe("esphome-page-secrets save-button disabled state", () => {
     ).toBe(true);
   });
 
-  test("disabled while saving is in flight", () => {
-    expect(
-      saveDisabled(
-        makePage({
-          _loaded: true,
-          _yaml: "wifi_password: new\n",
-          _savedYaml: "wifi_password: old\n",
-          _saving: true,
-        })
-      )
-    ).toBe(true);
+  test("_save() flips _saving true during the in-flight call and false after", async () => {
+    let resolveUpdate!: () => void;
+    const updateConfigPromise = new Promise<void>((r) => {
+      resolveUpdate = r;
+    });
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    page._api = {
+      updateConfig: vi.fn().mockReturnValue(updateConfigPromise),
+    } as unknown as ESPHomeAPI;
+
+    expect(page._saving).toBe(false);
+    const savePromise = page._save();
+    // In-flight: _saving is true and the rendered button reflects that.
+    expect(page._saving).toBe(true);
+    expect(saveDisabled(page)).toBe(true);
+
+    resolveUpdate();
+    await savePromise;
+
+    expect(page._saving).toBe(false);
+    // Post-success: dirty-check disables (yaml === savedYaml now).
+    expect(saveDisabled(page)).toBe(true);
   });
 });

@@ -290,40 +290,46 @@ export class ESPHomePageSecrets extends LitElement {
     this._revealSensitive = !this._revealSensitive;
   }
 
-  private _save() {
+  private async _save() {
     // Optimistic update: dirty-state UI flips back to "saved"
     // immediately so the Save button disables. Snapshot the
     // previous saved buffer first so a real (non-timeout)
     // failure can revert and let the user retry.
     const previousSaved = this._savedYaml;
     this._savedYaml = this._yaml;
+    // ``_saving`` covers the in-flight window so a rapid second
+    // click can't queue a duplicate write; the dirty-check would
+    // also disable on the success path (savedYaml === yaml), but
+    // _saving stays true through both branches so the "Saving…"
+    // label and disabled state hold until the API call returns.
+    this._saving = true;
     toast.success(this._localize("secrets.saved"), { richColors: true });
-    this._api
-      .updateConfig(SECRETS_FILE, this._yaml)
-      .then(() => {
-        // Window-level so other mounted components (app-shell's
-        // onboarding-state refresh, peer secrets-page instances)
-        // can react regardless of where they live in the tree.
-        // ``detail.source`` lets self-listeners short-circuit.
-        window.dispatchEvent(
-          new CustomEvent("secrets-saved", { detail: { source: this } })
-        );
-      })
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : "";
-        // WS commands may time out client-side while the server
-        // still completes the write — keep the optimistic buffer
-        // so the user isn't told their save failed when it
-        // probably succeeded. Any other error is a real failure:
-        // restore the previous saved buffer so the dirty state
-        // returns and the user can retry.
-        if (!msg.includes("timed out")) {
-          this._savedYaml = previousSaved;
-          toast.error(this._localize("secrets.save_error"), {
-            richColors: true,
-          });
-        }
-      });
+    try {
+      await this._api.updateConfig(SECRETS_FILE, this._yaml);
+      // Window-level so other mounted components (app-shell's
+      // onboarding-state refresh, peer secrets-page instances)
+      // can react regardless of where they live in the tree.
+      // ``detail.source`` lets self-listeners short-circuit.
+      window.dispatchEvent(
+        new CustomEvent("secrets-saved", { detail: { source: this } })
+      );
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "";
+      // WS commands may time out client-side while the server
+      // still completes the write — keep the optimistic buffer
+      // so the user isn't told their save failed when it
+      // probably succeeded. Any other error is a real failure:
+      // restore the previous saved buffer so the dirty state
+      // returns and the user can retry.
+      if (!msg.includes("timed out")) {
+        this._savedYaml = previousSaved;
+        toast.error(this._localize("secrets.save_error"), {
+          richColors: true,
+        });
+      }
+    } finally {
+      this._saving = false;
+    }
   }
 }
 
