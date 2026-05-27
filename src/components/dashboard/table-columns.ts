@@ -37,6 +37,21 @@ export interface DeviceRow {
   _device: ConfiguredDevice;
 }
 
+/** Locale-aware, case-insensitive, numeric-aware collator shared
+ *  with the card grid (``_cardCollator`` in ``pages/dashboard.ts``)
+ *  and the discovery list (``discoveryCollator`` in
+ *  ``render-content.ts``). #946. */
+export const NAME_COLLATOR = new Intl.Collator(undefined, {
+  sensitivity: "base",
+  numeric: true,
+});
+
+/** Pick the string the Name column should sort by — the friendly
+ *  name when set, the YAML hostname otherwise. Mirrors what the
+ *  cell renderer displays. */
+export const nameSortKey = (row: DeviceRow): string =>
+  row.friendly_name || row.name;
+
 const RECENT_ICON: Record<JobStatus, string | null> = {
   [JobStatus.QUEUED]: null,
   [JobStatus.RUNNING]: null,
@@ -151,6 +166,11 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             : nothing}
         </span>`;
       },
+      sortingFn: (rowA, rowB) =>
+        NAME_COLLATOR.compare(
+          nameSortKey(rowA.original),
+          nameSortKey(rowB.original),
+        ),
       size: 200,
       enableHiding: true,
     },
