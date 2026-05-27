@@ -17,6 +17,7 @@ interface DialogView {
   devices: ESPHomeBulkLabelsDialog["devices"];
   _pendingChanges: Map<string, "checked" | "unchecked">;
   _saving: boolean;
+  _failedConfigurations: Set<string> | null;
   _api: ESPHomeAPI | undefined;
   effectiveState: ESPHomeBulkLabelsDialog["effectiveState"];
   computeUpdates: ESPHomeBulkLabelsDialog["computeUpdates"];
@@ -266,6 +267,76 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
     expect(dialog.close).not.toHaveBeenCalled();
     expect(dialog._saving).toBe(false);
+  });
+
+  test("partial-failure records the failed configurations for retry-narrowing", async () => {
+    // Apply with two devices; the first fails. _failedConfigurations
+    // must capture the failed config so a retry computeUpdates() only
+    // emits that one.
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u, i) =>
+          i === 0
+            ? { configuration: u.configuration, success: false, error: "boom" }
+            : { configuration: u.configuration, success: true }
+        ),
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+
+    expect(dialog._failedConfigurations).not.toBeNull();
+    expect([...dialog._failedConfigurations!]).toEqual(["a.yaml"]);
+
+    // Retry computeUpdates: now emits only the failed config.
+    expect(dialog.computeUpdates()).toEqual([
+      { configuration: "a.yaml", labelIds: ["lbl-a"] },
+    ]);
+  });
+
+  test("full success after partial-failure clears the retry-narrow filter", async () => {
+    // Once a failure heals (or the user closes + re-opens), the
+    // narrow shouldn't stick around to bite a future Apply that
+    // expected to write all selected devices.
+    let firstCall = true;
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u, i) =>
+          firstCall && i === 0
+            ? { configuration: u.configuration, success: false, error: "boom" }
+            : { configuration: u.configuration, success: true }
+        ),
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+    expect(dialog._failedConfigurations).not.toBeNull();
+
+    firstCall = false;
+    await dialog._apply(); // retry — succeeds
+    expect(dialog._failedConfigurations).toBeNull();
+  });
+
+  test("open() resets the retry-narrow filter from a previous session", () => {
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u) => ({ configuration: u.configuration, success: true })),
+      [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]
+    );
+    dialog._failedConfigurations = new Set(["stale.yaml"]);
+
+    // open() lives on the production class; call it through the cast.
+    (dialog as unknown as { open: () => void }).open();
+
+    expect(dialog._failedConfigurations).toBeNull();
   });
 
   test("_onRequestClose vetoes dismissal while _saving is true", () => {

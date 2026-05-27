@@ -70,6 +70,15 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   @state()
   private _saving = false;
 
+  /** Set of configurations the previous Apply failed on. Null
+   *  means "no prior failure; target the full selection."
+   *  Non-null means the dialog stays open after a partial failure
+   *  and the next Apply targets only this subset, avoiding a
+   *  redundant write to devices that already succeeded. Reset
+   *  on ``open()`` and on a fully-successful Apply. */
+  @state()
+  private _failedConfigurations: Set<string> | null = null;
+
   @query("wa-dialog")
   private _dialog?: HTMLElement & { open: boolean };
 
@@ -77,6 +86,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
    *  previous session's state doesn't leak. */
   open() {
     this._pendingChanges = new Map();
+    this._failedConfigurations = null;
     if (this._dialog) this._dialog.open = true;
   }
 
@@ -111,11 +121,21 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
 
   /** Compute the per-device updates payload the Apply button would send.
    *
+   *  After a partial failure the dialog stays open and the next
+   *  Apply targets only the configurations that failed last time
+   *  (``_failedConfigurations``) — succeeded devices already
+   *  carry the desired labels, so re-sending them would just
+   *  cost an extra round trip + audit-log entry per device.
+   *
    *  Exposed (not just inlined into ``_apply``) so the test suite
    *  can drive selection state and assert the resulting payload
    *  without mounting the API client. */
   computeUpdates(): Array<{ configuration: string; labelIds: string[] }> {
-    return this.devices.map((device) => {
+    const failed = this._failedConfigurations;
+    const targets = failed
+      ? this.devices.filter((d) => failed.has(d.configuration))
+      : this.devices;
+    return targets.map((device) => {
       const next = new Set(device.labels ?? []);
       for (const [labelId, change] of this._pendingChanges) {
         if (change === "checked") next.add(labelId);
@@ -316,6 +336,10 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
             ? "dashboard.labels_bulk_saved_one"
             : "dashboard.labels_bulk_saved_other";
         toast.success(this._localize(key, { count }), { richColors: true });
+        // Full success clears the retry-narrow filter so a future
+        // re-open via the bulk button would target the whole new
+        // selection rather than the previous failure subset.
+        this._failedConfigurations = null;
         // Only close on full success; partial-failure keeps the
         // dialog open so the user can see which devices were
         // staged and re-Apply without re-staging their tri-state
@@ -330,6 +354,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
           "set_labels_bulk partial failure:",
           failures.map((f) => ({ configuration: f.configuration, error: f.error }))
         );
+        // Narrow the next Apply to only the failed configurations
+        // so a retry doesn't re-write the devices that already
+        // succeeded (idempotent backend-side but wastes round
+        // trips + audit-log entries).
+        this._failedConfigurations = new Set(failures.map((f) => f.configuration));
         const key =
           failures.length === 1
             ? "dashboard.labels_bulk_save_failed_one"
