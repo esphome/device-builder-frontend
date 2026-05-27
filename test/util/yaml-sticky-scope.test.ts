@@ -61,7 +61,7 @@ describe("computeStickyScope", () => {
         "  name: x", //        2
         "wifi:", //            3   ← top visible, leaf at indent 0
         "logger:", //          4
-      ].join("\n"),
+      ].join("\n")
     );
     expect(computeStickyScope(lines, 3)).toEqual([]);
   });
@@ -78,7 +78,7 @@ describe("computeStickyScope", () => {
         "  name: x", //        2
         "wifi:", //            3   ← top visible, opens block
         "  ssid: foo", //      4
-      ].join("\n"),
+      ].join("\n")
     );
     expect(computeStickyScope(lines, 3)).toEqual([]);
   });
@@ -88,7 +88,7 @@ describe("computeStickyScope", () => {
       [
         "esphome:", //         1
         "  name: x", //        2   ← top visible, leaf at indent 2
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 2);
     expect(scope.map((s) => s.lineNumber)).toEqual([1]);
@@ -110,7 +110,7 @@ describe("computeStickyScope", () => {
         "        battery_level:", //                    5   indent 8
         "          id: battery_level_lightning", //     6   indent 10  ← top visible (leaf)
         "      - device: 0x1755", //                    7
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 6);
     // ``id:`` is a leaf (next line at lower indent) — not a
@@ -134,7 +134,7 @@ describe("computeStickyScope", () => {
         "binary_sensor:", //              1   indent 0
         "  - platform: acurite", //       2   indent 2 ← top visible, opens block
         "    devices:", //                3   indent 4
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 2);
     expect(scope.map((s) => s.lineNumber)).toEqual([1]);
@@ -153,7 +153,7 @@ describe("computeStickyScope", () => {
         "  - platform: dht", //        2   indent 2
         "    name: kitchen", //        3   indent 4
         "  - platform: bme280", //     4   indent 2  ← top visible (leaf — no body)
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 4);
     expect(scope.map((s) => s.lineNumber)).toEqual([1]);
@@ -170,7 +170,7 @@ describe("computeStickyScope", () => {
         "  - platform: dht", //        2
         "", //                         3   blank
         "    name: kitchen", //        4   ← top visible, indent 4
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 4);
     expect(scope.map((s) => s.lineNumber)).toEqual([1, 2]);
@@ -189,7 +189,7 @@ describe("computeStickyScope", () => {
         "## Components ##", //          4   column-0 banner
         "sensor:", //                   5   indent 0
         "  - platform: dht", //         6   ← top visible, indent 2
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 6);
     expect(scope.map((s) => s.lineNumber)).toEqual([5]);
@@ -210,7 +210,7 @@ describe("computeStickyScope", () => {
         "    name: kitchen", //        3
         "", //                         4   ← top visible (blank)
         "  - platform: bme280", //     5
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 4);
     // Previous non-blank is line 3 (indent 4) — that's the bound.
@@ -240,7 +240,7 @@ describe("computeStickyScope", () => {
         "  - platform: dht", //        2
         "    name: kitchen", //        3   ← top visible at EOF
         "",
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 3);
     expect(scope.map((s) => s.lineNumber)).toEqual([1, 2]);
@@ -256,7 +256,7 @@ describe("computeStickyScope", () => {
       [
         "esphome:  # device-wide", //   1   trailing comment
         "  name: x", //                 2   ← top visible
-      ].join("\n"),
+      ].join("\n")
     );
     const scope = computeStickyScope(lines, 2);
     expect(scope[0].text).toBe("esphome:  # device-wide");
@@ -285,7 +285,7 @@ describe("findScopeExitLine", () => {
         "    name: a", //              3   indent 4
         "  - platform: gpio", //       4   indent 2  ← exit
         "    name: b", //              5
-      ].join("\n"),
+      ].join("\n")
     );
     expect(findScopeExitLine(lines, 2, 2)).toBe(4);
   });
@@ -303,7 +303,7 @@ describe("findScopeExitLine", () => {
         "      then:", //                          4   indent 6
         "        - logger.log: hi", //             5   indent 8
         "    on_release:", //                      6   indent 4  ← exit
-      ].join("\n"),
+      ].join("\n")
     );
     expect(findScopeExitLine(lines, 3, 4)).toBe(6);
   });
@@ -319,7 +319,7 @@ describe("findScopeExitLine", () => {
         "sensor:", //                  1
         "  - platform: dht", //        2
         "    name: kitchen", //        3
-      ].join("\n"),
+      ].join("\n")
     );
     expect(findScopeExitLine(lines, 1, 0)).toBe(lines.length + 1);
   });
@@ -339,7 +339,7 @@ describe("findScopeExitLine", () => {
         "  - platform: bme280", //     5   indent 2 — still inside scope
         "    name: living", //         6
         "switch:", //                  7   indent 0  ← exit
-      ].join("\n"),
+      ].join("\n")
     );
     expect(findScopeExitLine(lines, 1, 0)).toBe(7);
   });
@@ -358,7 +358,7 @@ describe("findScopeExitLine", () => {
         "## ---------- ##", //          3   column-0 banner — NOT the exit
         "## Components ##", //          4   column-0 banner — NOT the exit
         "sensor:", //                   5   indent 0  ← exit
-      ].join("\n"),
+      ].join("\n")
     );
     expect(findScopeExitLine(lines, 1, 0)).toBe(5);
   });
@@ -373,7 +373,7 @@ describe("findScopeExitLine", () => {
         "  - platform: dht", //        1   indent 2  ← opener
         "    name: a", //              2
         "  - platform: gpio", //       3   indent 2  ← same indent = exit
-      ].join("\n"),
+      ].join("\n")
     );
     expect(findScopeExitLine(lines, 1, 2)).toBe(3);
   });
@@ -396,7 +396,7 @@ describe("isScopeOpener", () => {
       [
         "sensor:", //                  1   indent 0
         "  - platform: dht", //        2   indent 2
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 1)).toBe(true);
   });
@@ -409,7 +409,7 @@ describe("isScopeOpener", () => {
         "esphome:", //                 1
         "  name: x", //                2   indent 2  ← leaf
         "  build_path: ./build", //    3   indent 2 (sibling, same indent)
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 2)).toBe(false);
   });
@@ -423,7 +423,7 @@ describe("isScopeOpener", () => {
         "  name: x", //                2
         "wifi:", //                    3   indent 0  ← leaf
         "logger:", //                  4   indent 0
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 3)).toBe(false);
   });
@@ -437,7 +437,7 @@ describe("isScopeOpener", () => {
         "sensor:", //                  1   indent 0
         "", //                         2   blank
         "  - platform: dht", //        3   indent 2
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 1)).toBe(true);
   });
@@ -451,7 +451,7 @@ describe("isScopeOpener", () => {
         "esphome:", //                 1   indent 0
         "## ----------- ##", //        2   column-0 banner
         "  name: x", //                3   indent 2  ← real next
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 1)).toBe(true);
   });
@@ -464,7 +464,7 @@ describe("isScopeOpener", () => {
       [
         "esphome:", //                 1
         "  name: x", //                2   ← last meaningful line
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 2)).toBe(false);
   });
@@ -479,7 +479,7 @@ describe("isScopeOpener", () => {
         "", //                         2   blank
         "## comment ##", //            3   banner
         "  name: x", //                4
-      ].join("\n"),
+      ].join("\n")
     );
     expect(isScopeOpener(lines, 2)).toBe(false);
     expect(isScopeOpener(lines, 3)).toBe(false);
