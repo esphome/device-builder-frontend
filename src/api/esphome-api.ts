@@ -601,7 +601,7 @@ export class ESPHomeAPI {
    */
   async subscribeDeviceReachability(
     deviceName: string,
-    callback: (state: ReachabilityStateEvent) => void,
+    callback: (state: ReachabilityStateEvent) => void
   ): Promise<ReachabilitySubscription> {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
@@ -649,9 +649,7 @@ export class ESPHomeAPI {
         const timer = setTimeout(() => {
           this._pendingRequests.delete(messageId);
           reject(
-            new Error(
-              `subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`,
-            ),
+            new Error(`subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`)
           );
         }, SUBSCRIBE_TIMEOUT_MS);
         this._pendingRequests.set(messageId, {
@@ -792,9 +790,7 @@ export class ESPHomeAPI {
     return this.sendCommand<{ configuration: string }>("devices/clone", {
       configuration,
       new_name: newName,
-      ...(newFriendlyName !== undefined
-        ? { new_friendly_name: newFriendlyName }
-        : {}),
+      ...(newFriendlyName !== undefined ? { new_friendly_name: newFriendlyName } : {}),
     });
   }
 
@@ -963,7 +959,7 @@ export class ESPHomeAPI {
    *  state without waiting for the ``device_updated`` event. */
   async setDeviceLabels(
     configuration: string,
-    labelIds: string[],
+    labelIds: string[]
   ): Promise<ConfiguredDevice> {
     return this.sendCommand<ConfiguredDevice>("devices/set_labels", {
       configuration,
@@ -981,10 +977,7 @@ export class ESPHomeAPI {
   /** Create a new label. ``name`` 1-50 chars, unique
    *  case-insensitively. ``color`` is ``#rrggbb`` (lowercased on
    *  save) or ``null`` / omitted for "no explicit color". */
-  async createLabel(args: {
-    name: string;
-    color?: string | null;
-  }): Promise<Label> {
+  async createLabel(args: { name: string; color?: string | null }): Promise<Label> {
     return this.sendCommand<Label>("labels/create", args);
   }
 
@@ -1119,7 +1112,7 @@ export class ESPHomeAPI {
   async firmwareInstall(
     configuration: string,
     port = "OTA",
-    forceLocal = false,
+    forceLocal = false
   ): Promise<FirmwareJob> {
     return this.sendCommand<FirmwareJob>("firmware/install", {
       configuration,
@@ -1303,7 +1296,7 @@ export class ESPHomeAPI {
    */
   async getAutomationTriggers(
     platform?: string,
-    boardId?: string,
+    boardId?: string
   ): Promise<AutomationTrigger[]> {
     return this.sendCommand<AutomationTrigger[]>("automations/get_triggers", {
       ...(platform ? { platform } : {}),
@@ -1315,7 +1308,7 @@ export class ESPHomeAPI {
    *  ``getAutomationTriggers``. */
   async getAutomationActions(
     platform?: string,
-    boardId?: string,
+    boardId?: string
   ): Promise<AutomationAction[]> {
     return this.sendCommand<AutomationAction[]>("automations/get_actions", {
       ...(platform ? { platform } : {}),
@@ -1327,25 +1320,19 @@ export class ESPHomeAPI {
    *  ``getAutomationTriggers``. */
   async getAutomationConditions(
     platform?: string,
-    boardId?: string,
+    boardId?: string
   ): Promise<AutomationCondition[]> {
-    return this.sendCommand<AutomationCondition[]>(
-      "automations/get_conditions",
-      {
-        ...(platform ? { platform } : {}),
-        ...(boardId ? { board_id: boardId } : {}),
-      },
-    );
+    return this.sendCommand<AutomationCondition[]>("automations/get_conditions", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
   }
 
   /** Catalog of every light effect registered with ESPHome.
    *  Surfaced as a separate command because effects sit on a
    *  different editor surface (per-light list ergonomics) than the
    *  trigger/action/condition tree. */
-  async getLightEffects(
-    platform?: string,
-    boardId?: string,
-  ): Promise<LightEffect[]> {
+  async getLightEffects(platform?: string, boardId?: string): Promise<LightEffect[]> {
     return this.sendCommand<LightEffect[]>("automations/get_light_effects", {
       ...(platform ? { platform } : {}),
       ...(boardId ? { board_id: boardId } : {}),
@@ -1365,13 +1352,10 @@ export class ESPHomeAPI {
    * contents — callers should re-fetch on each YAML change rather
    * than caching across edits.
    */
-  async getAvailableAutomations(
-    configuration: string,
-  ): Promise<AvailableAutomations> {
-    return this.sendCommand<AvailableAutomations>(
-      "automations/get_available",
-      { configuration },
-    );
+  async getAvailableAutomations(configuration: string): Promise<AvailableAutomations> {
+    return this.sendCommand<AvailableAutomations>("automations/get_available", {
+      configuration,
+    });
   }
 
   /**
@@ -1397,7 +1381,7 @@ export class ESPHomeAPI {
      * saved yet (e.g. the editor's post-add hydrate that runs
      * before global save).
      */
-    yaml?: string,
+    yaml?: string
   ): Promise<ParsedAutomation[]> {
     return this.sendCommand<ParsedAutomation[]>("automations/parse", {
       configuration,
@@ -1430,7 +1414,7 @@ export class ESPHomeAPI {
      * ``_yaml`` here so the backend works with the same text the
      * frontend is about to splice into.
      */
-    yaml?: string,
+    yaml?: string
   ): Promise<{ yaml_diff: YamlDiff }> {
     return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/upsert", {
       configuration,
@@ -1450,7 +1434,7 @@ export class ESPHomeAPI {
     location: AutomationLocation,
     /** Optional in-memory YAML override — same purpose as for
      *  ``upsertAutomation``. */
-    yaml?: string,
+    yaml?: string
   ): Promise<{ yaml_diff: YamlDiff }> {
     return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/delete", {
       configuration,
@@ -1515,14 +1499,11 @@ export class ESPHomeAPI {
    * (32 char SSID, 64 char password) and surfaces violations as
    * ``CommandError(INVALID_ARGS)`` for the UI to render.
    */
-  async setOnboardingWifi(
-    ssid: string,
-    password: string,
-  ): Promise<OnboardingState> {
-    return this.sendCommand<OnboardingState>(
-      "onboarding/set_wifi_credentials",
-      { ssid, password },
-    );
+  async setOnboardingWifi(ssid: string, password: string): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/set_wifi_credentials", {
+      ssid,
+      password,
+    });
   }
 
   /**
@@ -1564,10 +1545,7 @@ export class ESPHomeAPI {
     enabled: boolean;
     cleanup_ttl_seconds?: number;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/set_settings",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/set_settings", args);
   }
 
   /**
@@ -1627,10 +1605,7 @@ export class ESPHomeAPI {
     pin_sha256: string;
     enabled: boolean;
   }): Promise<PairingSummary> {
-    return this.sendCommand<PairingSummary>(
-      "remote_build/set_pairing_enabled",
-      args
-    );
+    return this.sendCommand<PairingSummary>("remote_build/set_pairing_enabled", args);
   }
 
   /**
@@ -1672,10 +1647,7 @@ export class ESPHomeAPI {
   async approveRemoteBuildPeer(args: {
     dashboard_id: string;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/approve_peer",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/approve_peer", args);
   }
 
   /**
@@ -1690,10 +1662,7 @@ export class ESPHomeAPI {
   async removeRemoteBuildPeer(args: {
     dashboard_id: string;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/remove_peer",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/remove_peer", args);
   }
 
   /**
@@ -1716,10 +1685,7 @@ export class ESPHomeAPI {
   async setRemoteBuildPairingWindow(args: {
     open: boolean;
   }): Promise<PairingWindowState> {
-    return this.sendCommand<PairingWindowState>(
-      "remote_build/set_pairing_window",
-      args
-    );
+    return this.sendCommand<PairingWindowState>("remote_build/set_pairing_window", args);
   }
 
   // ─── Remote build: offloader-side pair flow (phase 4a-o) ──
@@ -1742,10 +1708,7 @@ export class ESPHomeAPI {
     hostname: string;
     port: number;
   }): Promise<{ pin_sha256: string }> {
-    return this.sendCommand<{ pin_sha256: string }>(
-      "remote_build/preview_pair",
-      args
-    );
+    return this.sendCommand<{ pin_sha256: string }>("remote_build/preview_pair", args);
   }
 
   /**
@@ -1816,9 +1779,7 @@ export class ESPHomeAPI {
    * "stale on receiver, removed locally" case as a UI
    * affordance for the receiver-side admin.
    */
-  async unpairRemoteBuild(args: {
-    pin_sha256: string;
-  }): Promise<{ removed: boolean }> {
+  async unpairRemoteBuild(args: { pin_sha256: string }): Promise<{ removed: boolean }> {
     return this.sendCommand<{ removed: boolean }>("remote_build/unpair", args);
   }
 
@@ -1860,10 +1821,7 @@ export class ESPHomeAPI {
     hostname: string;
     port: number;
   }): Promise<PairingSummary> {
-    return this.sendCommand<PairingSummary>(
-      "remote_build/edit_pairing_endpoint",
-      args,
-    );
+    return this.sendCommand<PairingSummary>("remote_build/edit_pairing_endpoint", args);
   }
 
   /**
@@ -1944,10 +1902,7 @@ export class ESPHomeAPI {
     pin_sha256: string;
     job_id: string;
   }): Promise<{ sent: boolean }> {
-    return this.sendCommand<{ sent: boolean }>(
-      "remote_build/cancel_job",
-      args,
-    );
+    return this.sendCommand<{ sent: boolean }>("remote_build/cancel_job", args);
   }
 
   // ─── Remote build: receiver identity ──────────

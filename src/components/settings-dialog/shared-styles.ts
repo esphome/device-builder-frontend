@@ -293,29 +293,17 @@ export const peerRowStyles = css`
   }
 
   .peer-connection-connected {
-    background: color-mix(
-      in srgb,
-      var(--esphome-success, #16a34a),
-      transparent 80%
-    );
+    background: color-mix(in srgb, var(--esphome-success, #16a34a), transparent 80%);
     color: var(--esphome-success, #16a34a);
   }
 
   .peer-connection-disconnected {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-neutral-500, #6b7280),
-      transparent 80%
-    );
+    background: color-mix(in srgb, var(--wa-color-neutral-500, #6b7280), transparent 80%);
     color: var(--wa-color-neutral-500, #6b7280);
   }
 
   .peer-connection-connecting {
-    background: color-mix(
-      in srgb,
-      var(--esphome-warning, #f59e0b),
-      transparent 80%
-    );
+    background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 80%);
     color: var(--esphome-warning, #f59e0b);
   }
 

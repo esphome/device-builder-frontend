@@ -49,14 +49,11 @@ export const PASSWORD_INPUT_VALUE_CHANGE_EVENT = "password-input-change";
  * listeners fire regardless of `bubbles`.
  */
 export function buildPasswordValueChangeEvent(
-  value: string,
+  value: string
 ): CustomEvent<PasswordInputValueChange> {
-  return new CustomEvent<PasswordInputValueChange>(
-    PASSWORD_INPUT_VALUE_CHANGE_EVENT,
-    {
-      detail: { value },
-      bubbles: false,
-      composed: false,
-    },
-  );
+  return new CustomEvent<PasswordInputValueChange>(PASSWORD_INPUT_VALUE_CHANGE_EVENT, {
+    detail: { value },
+    bubbles: false,
+    composed: false,
+  });
 }

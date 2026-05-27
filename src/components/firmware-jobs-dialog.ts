@@ -62,10 +62,17 @@ registerMdiIcons({
 
 @customElement("esphome-firmware-jobs-dialog")
 export class ESPHomeFirmwareJobsDialog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
-  @consume({ context: firmwareJobsContext, subscribe: true }) @state() _jobs: Map<string, FirmwareJob> = new Map();
-  @consume({ context: devicesContext, subscribe: true }) @state() _devices: ConfiguredDevice[] = [];
+  @consume({ context: firmwareJobsContext, subscribe: true }) @state() _jobs: Map<
+    string,
+    FirmwareJob
+  > = new Map();
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  _devices: ConfiguredDevice[] = [];
 
   @query("wa-dialog") private _dialog!: HTMLElement & { open: boolean };
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
@@ -76,7 +83,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
-    () => this._localize,
+    () => this._localize
   );
 
   // Ticker for live relative-time strings ("started 2m ago"). Open-only.
@@ -153,9 +160,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
               `
             : nothing}
         </div>
-        ${hasJobs
-          ? renderGroups(this, active, terminal)
-          : renderEmpty(this._localize)}
+        ${hasJobs ? renderGroups(this, active, terminal) : renderEmpty(this._localize)}
       </wa-dialog>
       <esphome-command-dialog
         @open-reset-build-env=${this._onLocalResetEvent}
@@ -234,7 +239,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       new CustomEvent("firmware-history-cleared", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 }

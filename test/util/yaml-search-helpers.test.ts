@@ -53,25 +53,25 @@ describe("yamlHitLabel", () => {
 
   it("falls back to device_name when friendly_name is empty", () => {
     expect(yamlHitLabel(mkHit({ friendly_name: "" }), MATCH)).toBe(
-      "kitchen — ssid: home",
+      "kitchen — ssid: home"
     );
   });
 
   it("falls back to configuration when neither name is set", () => {
-    expect(
-      yamlHitLabel(mkHit({ friendly_name: "", device_name: "" }), MATCH),
-    ).toBe("kitchen.yaml — ssid: home");
+    expect(yamlHitLabel(mkHit({ friendly_name: "", device_name: "" }), MATCH)).toBe(
+      "kitchen.yaml — ssid: home"
+    );
   });
 
   it("uses 'line N' fallback when the matched line is whitespace-only", () => {
-    expect(
-      yamlHitLabel(HIT, mkMatch({ line_number: 12, line_text: "    " })),
-    ).toBe("Kitchen Lamp — line 12");
+    expect(yamlHitLabel(HIT, mkMatch({ line_number: 12, line_text: "    " }))).toBe(
+      "Kitchen Lamp — line 12"
+    );
   });
 
   it("trims surrounding whitespace from the line text", () => {
     expect(
-      yamlHitLabel(HIT, mkMatch({ line_number: 3, line_text: "    wifi:    " })),
+      yamlHitLabel(HIT, mkMatch({ line_number: 3, line_text: "    wifi:    " }))
     ).toBe("Kitchen Lamp — wifi:");
   });
 
@@ -82,16 +82,13 @@ describe("yamlHitLabel", () => {
     ["psk: 0123456789abcdef", "psk: ••••••••"],
   ])("masks inline credential value in %s", (raw, expectedTrimmed) => {
     expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
-      `Kitchen Lamp — ${expectedTrimmed}`,
+      `Kitchen Lamp — ${expectedTrimmed}`
     );
   });
 
   it("does not mask !secret references — those are indirections, not credentials", () => {
     expect(
-      yamlHitLabel(
-        HIT,
-        mkMatch({ line_text: "  password: !secret wifi_password" }),
-      ),
+      yamlHitLabel(HIT, mkMatch({ line_text: "  password: !secret wifi_password" }))
     ).toBe("Kitchen Lamp — password: !secret wifi_password");
   });
 
@@ -103,13 +100,13 @@ describe("yamlHitLabel", () => {
     // the credential lives in the substitutions block (which
     // *is* masked, see the ``*_password`` suffix tests below).
     expect(
-      yamlHitLabel(HIT, mkMatch({ line_text: "  password: ${wifi_password}" })),
+      yamlHitLabel(HIT, mkMatch({ line_text: "  password: ${wifi_password}" }))
     ).toBe("Kitchen Lamp — password: ${wifi_password}");
   });
 
   it("does not mask non-sensitive keys", () => {
     expect(yamlHitLabel(HIT, mkMatch({ line_text: "  ssid: home_network" }))).toBe(
-      "Kitchen Lamp — ssid: home_network",
+      "Kitchen Lamp — ssid: home_network"
     );
   });
 
@@ -120,7 +117,7 @@ describe("yamlHitLabel", () => {
     // over-masks button codes (remote_receiver / remote_transmitter
     // commonly use ``key: <number>``) surfaces as a test failure.
     expect(yamlHitLabel(HIT, mkMatch({ line_text: "    key: 0xABCDEF12" }))).toBe(
-      "Kitchen Lamp — key: 0xABCDEF12",
+      "Kitchen Lamp — key: 0xABCDEF12"
     );
   });
 
@@ -136,7 +133,7 @@ describe("yamlHitLabel", () => {
     ["# - ap_password: 42dfadc0c2", "# - ap_password: ••••••••"],
   ])("masks credential value inside a YAML comment (%s)", (raw, expectedTrimmed) => {
     expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
-      `Kitchen Lamp — ${expectedTrimmed}`,
+      `Kitchen Lamp — ${expectedTrimmed}`
     );
   });
 
@@ -152,9 +149,9 @@ describe("yamlHitLabel", () => {
     "masks credential value for user-defined *_password / *_psk keys (%s)",
     (raw, expectedTrimmed) => {
       expect(yamlHitLabel(HIT, mkMatch({ line_text: raw }))).toBe(
-        `Kitchen Lamp — ${expectedTrimmed}`,
+        `Kitchen Lamp — ${expectedTrimmed}`
       );
-    },
+    }
   );
 
   it.each([
@@ -176,9 +173,9 @@ describe("yamlHitLabel", () => {
     // ``findSensitiveValueRanges`` — verify by checking that
     // the editor's scan-only path (``key`` under encryption) is
     // *not* masked here.
-    expect(
-      yamlHitLabel(HIT, mkMatch({ line_text: "    key: random-noise-here" })),
-    ).toBe("Kitchen Lamp — key: random-noise-here");
+    expect(yamlHitLabel(HIT, mkMatch({ line_text: "    key: random-noise-here" }))).toBe(
+      "Kitchen Lamp — key: random-noise-here"
+    );
   });
 });
 
@@ -188,9 +185,9 @@ describe("yamlHitHref", () => {
   });
 
   it("URL-encodes the configuration filename", () => {
-    expect(
-      yamlHitHref(mkHit({ configuration: "guest room (1).yaml" }), MATCH),
-    ).toBe("/device/guest%20room%20(1).yaml?line=7");
+    expect(yamlHitHref(mkHit({ configuration: "guest room (1).yaml" }), MATCH)).toBe(
+      "/device/guest%20room%20(1).yaml?line=7"
+    );
   });
 });
 
@@ -204,9 +201,9 @@ describe("yamlHitDeviceLabel", () => {
   });
 
   it("falls back to configuration when neither name is set", () => {
-    expect(
-      yamlHitDeviceLabel(mkHit({ friendly_name: "", device_name: "" })),
-    ).toBe("kitchen.yaml");
+    expect(yamlHitDeviceLabel(mkHit({ friendly_name: "", device_name: "" }))).toBe(
+      "kitchen.yaml"
+    );
   });
 });
 
@@ -422,11 +419,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual([
-      "wifi:",
-      "  ssid: home",
-      "  password: ••••••••",
-    ]);
+    expect(block.lines).toEqual(["wifi:", "  ssid: home", "  password: ••••••••"]);
   });
 
   it("masks the API encryption key when its parent is in the snippet window", () => {
@@ -495,10 +488,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual([
-      "wifi:",
-      "  password: ••••••••  # admin pwd",
-    ]);
+    expect(block.lines).toEqual(["wifi:", "  password: ••••••••  # admin pwd"]);
   });
 
   it("falls back to the single-line heuristic for commented credentials", () => {
@@ -563,10 +553,7 @@ describe("buildYamlSnippetBlocks", () => {
 
     const [block] = buildYamlSnippetBlocks([m]);
 
-    expect(block.lines).toEqual([
-      "substitutions:",
-      "  wifi_password: ••••••••",
-    ]);
+    expect(block.lines).toEqual(["substitutions:", "  wifi_password: ••••••••"]);
   });
 });
 
@@ -592,7 +579,7 @@ describe("yamlSnippetBlockHref", () => {
     const [block] = buildYamlSnippetBlocks([m]);
 
     expect(
-      yamlSnippetBlockHref(mkHit({ configuration: "guest room (1).yaml" }), block),
+      yamlSnippetBlockHref(mkHit({ configuration: "guest room (1).yaml" }), block)
     ).toBe("/device/guest%20room%20(1).yaml?line=5");
   });
 });

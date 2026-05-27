@@ -17,10 +17,7 @@ import { customElement, state } from "lit/decorators.js";
 
 import type { OffloaderAlertSnapshotEntry } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import {
-  buildOffloadAlertsContext,
-  localizeContext,
-} from "../context/index.js";
+import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -147,8 +144,7 @@ export class ESPHomeSettingsDialog extends LitElement {
       // Icons without an outline/filled pair (e.g. translate)
       // fall back to the same name.
       const isActive = s.id === this._section;
-      const iconName =
-        isActive && s.iconActive !== undefined ? s.iconActive : s.icon;
+      const iconName = isActive && s.iconActive !== undefined ? s.iconActive : s.icon;
       return html`
         <button
           class="nav-item ${isActive ? "nav-item--active" : ""}"

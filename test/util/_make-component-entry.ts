@@ -7,14 +7,11 @@
  * under ``test/util/`` so the file isn't picked up by the
  * ``test/**\/*.test.ts`` vitest glob.
  */
-import {
-  ComponentCategory,
-  type ComponentCatalogEntry,
-} from "../../src/api/types.js";
+import { ComponentCategory, type ComponentCatalogEntry } from "../../src/api/types.js";
 
 export function makeComponentEntry(
   id: string,
-  overrides: Partial<ComponentCatalogEntry> = {},
+  overrides: Partial<ComponentCatalogEntry> = {}
 ): ComponentCatalogEntry {
   return {
     id,

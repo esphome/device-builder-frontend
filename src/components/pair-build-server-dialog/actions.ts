@@ -5,7 +5,7 @@ import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.j
 
 export function previewErrorMessage(
   host: ESPHomePairBuildServerDialog,
-  err: unknown,
+  err: unknown
 ): string {
   if (err instanceof APIError) {
     if (err.errorCode === ErrorCode.UNAVAILABLE) {
@@ -25,7 +25,7 @@ export function previewErrorMessage(
 
 export function requestErrorMessage(
   host: ESPHomePairBuildServerDialog,
-  err: unknown,
+  err: unknown
 ): string {
   if (err instanceof APIError) {
     if (err.errorCode === ErrorCode.PRECONDITION_FAILED) {
@@ -49,9 +49,7 @@ export function requestErrorMessage(
   return host._localize("settings.pair_build_server_request_failed");
 }
 
-export async function onPreviewSubmit(
-  host: ESPHomePairBuildServerDialog,
-): Promise<void> {
+export async function onPreviewSubmit(host: ESPHomePairBuildServerDialog): Promise<void> {
   if (host._api === undefined || host._busy) return;
   const hostname = host._hostname.trim();
   const port = parsePortInput(host._port);
@@ -72,9 +70,7 @@ export async function onPreviewSubmit(
   }
 }
 
-export async function onConfirmSubmit(
-  host: ESPHomePairBuildServerDialog,
-): Promise<void> {
+export async function onConfirmSubmit(host: ESPHomePairBuildServerDialog): Promise<void> {
   if (host._api === undefined || host._busy) return;
   const hostname = host._hostname.trim();
   const port = parsePortInput(host._port);
@@ -110,7 +106,7 @@ export async function onConfirmSubmit(
         detail: { summary },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   } catch (err) {
     host._error = requestErrorMessage(host, err);
@@ -125,7 +121,7 @@ export async function onConfirmSubmit(
 // watching" signal — fire a toast event and close.
 export function watchPairingApproval(
   host: ESPHomePairBuildServerDialog,
-  changed: Map<string, unknown>,
+  changed: Map<string, unknown>
 ): void {
   if (
     host._sentKey === null ||
@@ -147,7 +143,7 @@ export function watchPairingApproval(
         },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     host._sentKey = null;
     host.close();
@@ -167,7 +163,7 @@ export function watchPairingApproval(
         },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     host._sentKey = null;
     host.close();

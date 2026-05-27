@@ -52,7 +52,7 @@ describe("auth-token", () => {
   it("treats an empty token string as no token", () => {
     localStorage.setItem(
       "esphome.auth-token",
-      JSON.stringify({ token: "", expires_at: 0 }),
+      JSON.stringify({ token: "", expires_at: 0 })
     );
     expect(getStoredToken()).toBeNull();
   });

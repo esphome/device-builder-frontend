@@ -1,16 +1,8 @@
 import { html, type TemplateResult } from "lit";
-import type {
-  ArchivedDevice,
-  ConfiguredDevice,
-  Label,
-} from "../../api/types.js";
+import type { ArchivedDevice, ConfiguredDevice, Label } from "../../api/types.js";
 import { DeviceState } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  archiveBulkDevices,
-  deleteBulkDevices,
-  deleteDevice,
-} from "./actions.js";
+import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
 import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
@@ -33,7 +25,7 @@ export function confirmDialogCopy(
   pending: PendingConfirm | null,
   localize: LocalizeFunc,
   selectedDevicesSize: number,
-  labelUsage: () => Record<string, number>,
+  labelUsage: () => Record<string, number>
 ): ConfirmCopy {
   const t = localize;
   if (!pending) {
@@ -106,8 +98,11 @@ export function confirmDialogCopy(
 
 export function computeLabelUsageCached(
   source: ConfiguredDevice[],
-  cache: { source: ConfiguredDevice[]; map: Record<string, number> } | null,
-): { map: Record<string, number>; cache: { source: ConfiguredDevice[]; map: Record<string, number> } } {
+  cache: { source: ConfiguredDevice[]; map: Record<string, number> } | null
+): {
+  map: Record<string, number>;
+  cache: { source: ConfiguredDevice[]; map: Record<string, number> };
+} {
   if (cache?.source === source) return { map: cache.map, cache };
   const map = computeLabelUsage(source);
   return { map, cache: { source, map } };
@@ -115,7 +110,7 @@ export function computeLabelUsageCached(
 
 export function executeConfirm(
   host: ESPHomePageDashboard,
-  pending: PendingConfirm,
+  pending: PendingConfirm
 ): void {
   switch (pending.kind) {
     case "delete-bulk": {
@@ -152,7 +147,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     host._pendingConfirm,
     host._localize,
     host._selectedDevices.size,
-    () => host._computeLabelUsage(),
+    () => host._computeLabelUsage()
   );
   return html`
     <esphome-confirm-dialog
@@ -200,8 +195,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
       @select-method=${host._onInstallMethodSelect}
     ></esphome-install-method-dialog>
     <esphome-archived-devices-dialog
-      @unarchive=${(e: CustomEvent<ArchivedDevice>) =>
-        host._unarchiveDevice(e.detail)}
+      @unarchive=${(e: CustomEvent<ArchivedDevice>) => host._unarchiveDevice(e.detail)}
       @delete-archived=${(e: CustomEvent<ArchivedDevice>) =>
         host._confirmDeleteArchived(e.detail)}
     ></esphome-archived-devices-dialog>

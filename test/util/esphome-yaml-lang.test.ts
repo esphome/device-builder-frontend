@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
 import { getIndentation, indentUnit } from "@codemirror/language";
-import {
-  ESPHOME_YAML_INDENT,
-  esphomeYaml,
-} from "../../src/util/esphome-yaml-lang.js";
+import { ESPHOME_YAML_INDENT, esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 
 /**
  * The indent service mirrors the legacy esphome dashboard's Monaco
@@ -111,4 +108,3 @@ describe("esphome-yaml language extension shape", () => {
     expect(flat.length).toBeGreaterThan(0);
   });
 });
-

@@ -5,11 +5,7 @@
  * `now` is passed in so callers can drive re-renders from a ticker
  * and tests are deterministic.
  */
-export function formatRelativeTime(
-  iso: string,
-  now: number,
-  locale?: string,
-): string {
+export function formatRelativeTime(iso: string, now: number, locale?: string): string {
   const past = new Date(iso).getTime();
   const diffSec = Math.round((past - now) / 1000);
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
@@ -28,11 +24,7 @@ export function formatRelativeTime(
  * drop the date so they stay short; older stamps prefix a short
  * month/day.
  */
-export function formatAbsoluteTime(
-  iso: string,
-  now: number,
-  locale?: string,
-): string {
+export function formatAbsoluteTime(iso: string, now: number, locale?: string): string {
   const date = new Date(iso);
   const today = new Date(now);
   const isSameDay =

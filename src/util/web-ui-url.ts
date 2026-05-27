@@ -54,6 +54,6 @@ export function buildWebUiUrl(device: ConfiguredDevice): string {
   const host = device.address || device.ip;
   if (!host) return "";
   return safeWebUiUrl(
-    `http://${_bracketIpv6(host)}${device.web_port === 80 ? "" : `:${device.web_port}`}`,
+    `http://${_bracketIpv6(host)}${device.web_port === 80 ? "" : `:${device.web_port}`}`
   );
 }

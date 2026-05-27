@@ -126,9 +126,7 @@ const VISUALS: Record<Exclude<EncryptionState, "none">, EncryptionVisual> = {
 };
 
 /** Returns ``null`` for the ``"none"`` state so callers can skip rendering. */
-export function getEncryptionVisual(
-  state: EncryptionState,
-): EncryptionVisual | null {
+export function getEncryptionVisual(state: EncryptionState): EncryptionVisual | null {
   return state === "none" ? null : VISUALS[state];
 }
 
@@ -145,9 +143,7 @@ export function getEncryptionVisual(
  * single-device contexts (drawer / details pane) where confirmation
  * is useful. (issue #141)
  */
-export function getCompactEncryptionVisual(
-  d: EncryptionInputs,
-): EncryptionVisual | null {
+export function getCompactEncryptionVisual(d: EncryptionInputs): EncryptionVisual | null {
   const state = getEncryptionState(d);
   if (state === "active" && d.api_encryption_active) return null;
   return getEncryptionVisual(state);

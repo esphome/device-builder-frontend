@@ -16,9 +16,7 @@ describe("normalizeEspHomeId", () => {
   it("collapses runs of invalid characters to a single underscore", () => {
     // The screenshot's regression case: spaces and slashes all
     // collapse into one underscore each, including the "is / a" run.
-    expect(normalizeEspHomeId("this is / a invalid id")).toBe(
-      "this_is_a_invalid_id",
-    );
+    expect(normalizeEspHomeId("this is / a invalid id")).toBe("this_is_a_invalid_id");
     expect(normalizeEspHomeId("my-script-name")).toBe("my_script_name");
     expect(normalizeEspHomeId("kitchen.sensor")).toBe("kitchen_sensor");
   });

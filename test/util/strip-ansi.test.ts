@@ -30,7 +30,7 @@ describe("stripAnsi", () => {
        was keeping those visible until the regex grew this branch. */
     expect(stripAnsi("\\033[32mINFO\\033[0m hello")).toBe("INFO hello");
     expect(stripAnsi("\\033[0;35m[C][i2c.idf:092]: I2C\\033[0m")).toBe(
-      "[C][i2c.idf:092]: I2C",
+      "[C][i2c.idf:092]: I2C"
     );
   });
 });

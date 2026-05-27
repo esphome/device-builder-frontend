@@ -141,11 +141,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
           <button class="btn btn--cancel" @click=${this.close}>
             ${this._localize("layout.cancel")}
           </button>
-          <button
-            class="btn btn--goto"
-            ?disabled=${!canGoToError}
-            @click=${this._goto}
-          >
+          <button class="btn btn--goto" ?disabled=${!canGoToError} @click=${this._goto}>
             ${this._localize("device.yaml_invalid_go_to_error")}
           </button>
           <button class="btn btn--save-anyway" @click=${this._saveAnyway}>
@@ -164,23 +160,19 @@ export class ESPHomeYamlValidationDialog extends LitElement {
         detail: { line: this.firstErrorLine, col: this.firstErrorCol },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
   private _saveAnyway() {
     this._resolvedExit = "save-anyway";
     this.close();
-    this.dispatchEvent(
-      new CustomEvent("save-anyway", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("save-anyway", { bubbles: true, composed: true }));
   }
 
   private _onAfterHide() {
     if (this._resolvedExit === null) {
-      this.dispatchEvent(
-        new CustomEvent("cancel", { bubbles: true, composed: true }),
-      );
+      this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
     }
   }
 }

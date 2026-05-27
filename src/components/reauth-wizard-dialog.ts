@@ -3,10 +3,7 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type {
-  OffloaderPinMismatchAlert,
-  PairingSummary,
-} from "../api/types.js";
+import type { OffloaderPinMismatchAlert, PairingSummary } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
@@ -198,7 +195,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
     // stored pairing.
     const args = buildReauthPairRequest(
       alert,
-      friendlyHostname(window.location.hostname),
+      friendlyHostname(window.location.hostname)
     );
     this._busy = true;
     this._errorKey = null;
@@ -255,7 +252,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
         detail: { summary },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._dispatchResult("success", alert.receiver_label);
     this._open = false;
@@ -263,14 +260,14 @@ export class ESPHomeReauthWizardDialog extends LitElement {
 
   private _dispatchResult(
     outcome: "success" | "pin_changed",
-    receiverLabel: string,
+    receiverLabel: string
   ): void {
     this.dispatchEvent(
       new CustomEvent("reauth-result", {
         bubbles: true,
         composed: true,
         detail: { outcome, receiver_label: receiverLabel },
-      }),
+      })
     );
   }
 
@@ -288,13 +285,9 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           <div class="pin-block-label">
             ${this._localize("settings.reauth_wizard_expected_label")}
           </div>
-          <esphome-pin-emoji-grid
-            .pin=${alert.expected_pin}
-          ></esphome-pin-emoji-grid>
+          <esphome-pin-emoji-grid .pin=${alert.expected_pin}></esphome-pin-emoji-grid>
           <details class="pin-hex">
-            <summary>
-              ${this._localize("settings.remote_build_pin_hex_summary")}
-            </summary>
+            <summary>${this._localize("settings.remote_build_pin_hex_summary")}</summary>
             <code>${formatPinSha256(alert.expected_pin)}</code>
           </details>
         </div>
@@ -302,13 +295,9 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           <div class="pin-block-label pin-block-label-observed">
             ${this._localize("settings.reauth_wizard_observed_label")}
           </div>
-          <esphome-pin-emoji-grid
-            .pin=${alert.observed_pin}
-          ></esphome-pin-emoji-grid>
+          <esphome-pin-emoji-grid .pin=${alert.observed_pin}></esphome-pin-emoji-grid>
           <details class="pin-hex">
-            <summary>
-              ${this._localize("settings.remote_build_pin_hex_summary")}
-            </summary>
+            <summary>${this._localize("settings.remote_build_pin_hex_summary")}</summary>
             <code>${formatPinSha256(alert.observed_pin)}</code>
           </details>
         </div>
@@ -318,9 +307,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
 
   private _renderStep2() {
     return html`
-      <p class="lede">
-        ${this._localize("settings.reauth_wizard_step2_lede")}
-      </p>
+      <p class="lede">${this._localize("settings.reauth_wizard_step2_lede")}</p>
       <div class="possibilities">
         <div class="possibility possibility-benign">
           <div class="possibility-title">
@@ -353,13 +340,9 @@ export class ESPHomeReauthWizardDialog extends LitElement {
         <div class="pin-block-label pin-block-label-observed">
           ${this._localize("settings.reauth_wizard_observed_label")}
         </div>
-        <esphome-pin-emoji-grid
-          .pin=${alert.observed_pin}
-        ></esphome-pin-emoji-grid>
+        <esphome-pin-emoji-grid .pin=${alert.observed_pin}></esphome-pin-emoji-grid>
         <details class="pin-hex">
-          <summary>
-            ${this._localize("settings.remote_build_pin_hex_summary")}
-          </summary>
+          <summary>${this._localize("settings.remote_build_pin_hex_summary")}</summary>
           <code>${formatPinSha256(alert.observed_pin)}</code>
         </details>
       </div>
@@ -370,9 +353,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
           @change=${this._onVerifiedChange}
           ?disabled=${this._busy}
         />
-        <span>
-          ${this._localize("settings.reauth_wizard_verified_checkbox")}
-        </span>
+        <span> ${this._localize("settings.reauth_wizard_verified_checkbox")} </span>
       </label>
       ${this._errorKey !== null
         ? html`
@@ -405,10 +386,10 @@ export class ESPHomeReauthWizardDialog extends LitElement {
       >
         <div
           class="step-indicator"
-          aria-label=${this._localize(
-            "settings.reauth_wizard_step_progress",
-            { step: this._step, total: 3 },
-          )}
+          aria-label=${this._localize("settings.reauth_wizard_step_progress", {
+            step: this._step,
+            total: 3,
+          })}
         >
           ${[1, 2, 3].map(
             (n) => html`
@@ -416,7 +397,7 @@ export class ESPHomeReauthWizardDialog extends LitElement {
                 class=${`dot ${this._step === n ? "dot-active" : ""}`}
                 aria-hidden="true"
               ></span>
-            `,
+            `
           )}
         </div>
         <div class="step-body">${stepBody}</div>
@@ -440,7 +421,11 @@ export class ESPHomeReauthWizardDialog extends LitElement {
               </button>`
             : nothing}
           ${this._step < 3
-            ? html`<button class="btn btn--primary" type="button" @click=${this._onContinue}>
+            ? html`<button
+                class="btn btn--primary"
+                type="button"
+                @click=${this._onContinue}
+              >
                 ${this._localize("settings.reauth_wizard_continue")}
               </button>`
             : html`<button

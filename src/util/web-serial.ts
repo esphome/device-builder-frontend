@@ -5,12 +5,7 @@
  * Web Serial API. No backend involvement — talks directly to the
  * USB-connected ESP device.
  */
-import {
-  ClassicReset,
-  ESPLoader,
-  Transport,
-  UsbJtagSerialReset,
-} from "esptool-js";
+import { ClassicReset, ESPLoader, Transport, UsbJtagSerialReset } from "esptool-js";
 
 /** Espressif's USB Vendor ID — chips with native USB-Serial/JTAG. */
 const ESPRESSIF_USB_VID = 0x303a;
@@ -64,7 +59,7 @@ export function markSerialActivity(): void {
 }
 
 export function isRecentSerialActivity(
-  windowMs: number = SERIAL_ACTIVITY_WINDOW_MS,
+  windowMs: number = SERIAL_ACTIVITY_WINDOW_MS
 ): boolean {
   return Date.now() - _lastSerialActivityMs < windowMs;
 }
@@ -80,7 +75,10 @@ export function isRecentSerialActivity(
  * and falls back to ``port.close()`` so we never leak an open port —
  * a still-open port silently breaks the next ``port.open()`` call.
  */
-export async function connectToPort(port: SerialPort, onLog?: LogCallback): Promise<DetectedChip> {
+export async function connectToPort(
+  port: SerialPort,
+  onLog?: LogCallback
+): Promise<DetectedChip> {
   markSerialActivity();
   const transport = new Transport(port, false);
 
@@ -168,7 +166,9 @@ const APP_DESC_MAGIC = 0xabcd5432;
  * empty, or when the flash read fails — callers fall through to
  * chip-name-based board detection in that case.
  */
-export async function readDeviceManifest(loader: ESPLoader): Promise<DeviceManifest | null> {
+export async function readDeviceManifest(
+  loader: ESPLoader
+): Promise<DeviceManifest | null> {
   markSerialActivity();
   try {
     const bytes = await loader.readFlash(APP_DESC_OFFSET, APP_DESC_SIZE);
@@ -284,10 +284,7 @@ const RTC_CNTL_WDT_WKEY = 0x50d83aa1;
  * Returns ``false`` for chip types where this isn't safe (ESP32-C6
  * freezes; classic ESP32 / ESP8266 don't have the WDT at all).
  */
-async function watchdogReset(
-  loader: ESPLoader,
-  transport: Transport,
-): Promise<boolean> {
+async function watchdogReset(loader: ESPLoader, transport: Transport): Promise<boolean> {
   const regs = loader.chip?.CHIP_NAME
     ? WDT_RESET_CHIPS[loader.chip.CHIP_NAME]
     : undefined;
@@ -312,10 +309,7 @@ async function watchdogReset(
   try {
     await loader.writeReg(regs.wdtWProtect, RTC_CNTL_WDT_WKEY);
     await loader.writeReg(regs.wdtConfig1, 2000);
-    await loader.writeReg(
-      regs.wdtConfig0,
-      (1 << 31) | (5 << 28) | (1 << 8) | 2,
-    );
+    await loader.writeReg(regs.wdtConfig0, (1 << 31) | (5 << 28) | (1 << 8) | 2);
     await loader.writeReg(regs.wdtWProtect, 0);
   } catch {
     /* A writeReg may race the actual reset firing — the chip is
@@ -356,7 +350,7 @@ async function watchdogReset(
 async function hardResetChip(
   loader: ESPLoader,
   transport: Transport,
-  port: SerialPort,
+  port: SerialPort
 ): Promise<void> {
   if (await watchdogReset(loader, transport)) return;
   const vendorId = port.getInfo().usbVendorId;
@@ -371,7 +365,7 @@ async function hardResetChip(
 export async function resetAndDisconnect(
   loader: ESPLoader,
   transport: Transport,
-  port: SerialPort,
+  port: SerialPort
 ): Promise<void> {
   markSerialActivity();
   try {

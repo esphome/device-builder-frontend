@@ -1,8 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
-import type {
-  ComponentCatalogEntry,
-  FeaturedBundle,
-} from "../../../api/types.js";
+import type { ComponentCatalogEntry, FeaturedBundle } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import {
@@ -20,7 +17,7 @@ export function shouldHandleCardClick(ev: MouseEvent): boolean {
 
 export function renderBundleCard(
   host: ESPHomeComponentCatalog,
-  bundle: FeaturedBundle,
+  bundle: FeaturedBundle
 ): TemplateResult {
   return html`
     <article
@@ -66,7 +63,7 @@ export function renderCard(
   component: ComponentCatalogEntry,
   expanded: boolean,
   featured: boolean,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult {
   const hasImage = !!component.image_url && !host._imageFailed.has(component.id);
   // Skip the chip entirely when the label is empty (defensive against an

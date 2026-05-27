@@ -151,8 +151,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
       .trigger:focus,
       :host([open]) .trigger {
         border-color: var(--esphome-primary);
-        box-shadow: 0 0 0 3px
-          color-mix(in srgb, var(--esphome-primary), transparent 80%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
       }
 
       .trigger.invalid {
@@ -160,8 +159,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
       }
 
       .trigger.invalid:focus {
-        box-shadow: 0 0 0 3px
-          color-mix(in srgb, var(--esphome-error), transparent 80%);
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-error), transparent 80%);
       }
 
       .trigger:disabled {
@@ -405,7 +403,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
       e.stopPropagation();
       this._close();
     },
-    { target: document },
+    { target: document }
   );
 
   private _onDocumentClick = (e: Event) => {
@@ -453,7 +451,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
         detail: { value: next },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._close();
   }
@@ -466,7 +464,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
         detail: { value: "" },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -549,7 +547,7 @@ export class ESPHomeMdiIconPicker extends LitElement {
                         <path fill="currentColor" d=${entry.path}></path>
                       </svg>
                     </button>
-                  `,
+                  `
                 )}
               </div>`}
         </div>

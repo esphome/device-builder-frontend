@@ -78,14 +78,12 @@ export function renderLabelChip(label: Label): TemplateResult {
  *  doesn't have to gate. */
 export function renderLabelChips(
   labels: Label[],
-  options: { max?: number | null } = {},
+  options: { max?: number | null } = {}
 ): TemplateResult | typeof nothing {
   if (labels.length === 0) return nothing;
   const max = options.max ?? null;
   if (max === null || labels.length <= max) {
-    return html`<span class="label-chips">
-      ${labels.map(renderLabelChip)}
-    </span>`;
+    return html`<span class="label-chips"> ${labels.map(renderLabelChip)} </span>`;
   }
   const visible = labels.slice(0, max);
   const hidden = labels.slice(max);
@@ -108,7 +106,7 @@ export function renderLabelChips(
  *  rendering a placeholder chip alongside the resolved set. */
 export function resolveLabelIds(
   ids: readonly string[] | null | undefined,
-  catalog: readonly Label[],
+  catalog: readonly Label[]
 ): Label[] {
   if (!ids || ids.length === 0) return [];
   const byId = new Map(catalog.map((l) => [l.id, l]));

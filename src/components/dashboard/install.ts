@@ -6,7 +6,7 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export function openInstallMethod(
   host: ESPHomePageDashboard,
-  device: ConfiguredDevice,
+  device: ConfiguredDevice
 ): void {
   host._installMethodDevice = device;
   host._installMethodMode = "install";
@@ -15,7 +15,7 @@ export function openInstallMethod(
 
 export function onInstallMethodSelect(
   host: ESPHomePageDashboard,
-  e: CustomEvent<{ method: string; port?: string }>,
+  e: CustomEvent<{ method: string; port?: string }>
 ): void {
   const device = host._installMethodDevice;
   host._installMethodOpen = false;
@@ -42,7 +42,7 @@ export function openCommand(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice,
   type: CommandType,
-  port?: string,
+  port?: string
 ): void {
   host._commandDialog.configuration = device.configuration;
   host._commandDialog.name = device.friendly_name || device.name;
@@ -51,20 +51,17 @@ export function openCommand(
 
 export function showJobProgress(
   host: ESPHomePageDashboard,
-  device: ConfiguredDevice,
+  device: ConfiguredDevice
 ): void {
   const job = host._activeJobs.get(device.configuration);
   if (!job) return;
   host._commandDialog.followJob(
     job,
-    firmwareJobDisplayName(job, host._devices, host._localize),
+    firmwareJobDisplayName(job, host._devices, host._localize)
   );
 }
 
-export function openLogs(
-  host: ESPHomePageDashboard,
-  device: ConfiguredDevice,
-): void {
+export function openLogs(host: ESPHomePageDashboard, device: ConfiguredDevice): void {
   if (device.state === DeviceState.ONLINE) {
     host._logsDialog.configuration = device.configuration;
     host._logsDialog.name = device.friendly_name || device.name;

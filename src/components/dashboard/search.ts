@@ -44,7 +44,7 @@ export function syncYamlSearch(host: ESPHomePageDashboard): void {
 export function setSearchMode(
   host: ESPHomePageDashboard,
   yamlMode: boolean,
-  search?: string,
+  search?: string
 ): void {
   host._yamlMode = yamlMode;
   if (search !== undefined) host._search = search;
@@ -56,7 +56,7 @@ export function setSearchMode(
 // the empty state can show "Try YAML — N matches" with a real count.
 export function maybeFireEmptyStatePreview(
   host: ESPHomePageDashboard,
-  changed: PropertyValues,
+  changed: PropertyValues
 ): void {
   if (!changed.has("_search") && !changed.has("_yamlMode")) return;
   if (!host._isDeviceSearchActive) return;
@@ -66,9 +66,7 @@ export function maybeFireEmptyStatePreview(
     return;
   }
   const lowered = trimmed.toLowerCase();
-  const anyDeviceMatches = host._sortedDevices.some((d) =>
-    matchesDeviceName(d, lowered),
-  );
+  const anyDeviceMatches = host._sortedDevices.some((d) => matchesDeviceName(d, lowered));
   if (anyDeviceMatches) {
     host._yamlSearch.clear();
     return;

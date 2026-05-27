@@ -28,10 +28,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { deviceCardStyles } from "./device-card/styles.js";
-import {
-  navigateCards,
-  onHostContextMenu,
-} from "./device-card/keyboard-nav.js";
+import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
   renderEncryptionIcon,
   renderLabels,
@@ -63,8 +60,11 @@ registerMdiIcons({
 
 @customElement("esphome-device-card")
 export class ESPHomeDeviceCard extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
-  @consume({ context: labelsContext, subscribe: true }) @state() _labelCatalog: Label[] = [];
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
+  @consume({ context: labelsContext, subscribe: true }) @state() _labelCatalog: Label[] =
+    [];
 
   // Resolved against the catalog at render time so a recolor / rename in
   // another client repaints every card without per-card state.
@@ -73,8 +73,10 @@ export class ESPHomeDeviceCard extends LitElement {
   @property({ attribute: false }) name = "";
   @property() configuration = "";
   @property() state: DeviceState = DeviceState.UNKNOWN;
-  @property({ type: Boolean, attribute: "has-pending-changes" }) hasPendingChanges = false;
-  @property({ type: Boolean, attribute: "has-update-available" }) hasUpdateAvailable = false;
+  @property({ type: Boolean, attribute: "has-pending-changes" }) hasPendingChanges =
+    false;
+  @property({ type: Boolean, attribute: "has-update-available" }) hasUpdateAvailable =
+    false;
   @property({ type: Boolean, attribute: "api-enabled" }) apiEnabled = false;
   @property({ type: Boolean, attribute: "api-encrypted" }) apiEncrypted = false;
 
@@ -322,7 +324,7 @@ export class ESPHomeDeviceCard extends LitElement {
         detail: { x: rect.right, y: rect.bottom },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 

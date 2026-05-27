@@ -39,13 +39,11 @@ export const tableCellStyles = css`
   }
   .status-dot.online {
     background: var(--esphome-success);
-    box-shadow: 0 0 6px
-      color-mix(in srgb, var(--esphome-success), transparent 50%);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--esphome-success), transparent 50%);
   }
   .status-dot.offline {
     background: var(--esphome-error);
-    box-shadow: 0 0 6px
-      color-mix(in srgb, var(--esphome-error), transparent 60%);
+    box-shadow: 0 0 6px color-mix(in srgb, var(--esphome-error), transparent 60%);
   }
   .status-dot.unknown {
     background: var(--wa-color-text-quiet);
@@ -100,7 +98,8 @@ export const tableCellStyles = css`
     color: var(--wa-color-text-quiet);
   }
   @keyframes cell-status-completed-pulse {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 1;
     }
     50% {
@@ -135,7 +134,8 @@ export const tableCellStyles = css`
 
   .cell-indicator--modified {
     background: var(--esphome-warning, #f59e0b);
-    box-shadow: 0 0 5px color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 50%);
+    box-shadow: 0 0 5px
+      color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 50%);
   }
 
   .cell-indicator--update {
@@ -144,8 +144,7 @@ export const tableCellStyles = css`
   }
 
   .cell-mono {
-    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-      monospace;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
     font-size: var(--wa-font-size-2xs);
     color: var(--wa-color-text-quiet);
   }
@@ -156,11 +155,7 @@ export const tableCellStyles = css`
     border-radius: 999px;
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
-    background: color-mix(
-      in srgb,
-      var(--esphome-primary),
-      transparent 88%
-    );
+    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
     color: var(--esphome-primary);
     letter-spacing: 0.02em;
   }

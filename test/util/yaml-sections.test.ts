@@ -95,12 +95,7 @@ wifi:
     // The same trim has to fire for the file's last section, not
     // just the inter-section seams — a banner at EOF would otherwise
     // extend the last section's highlight range past its content.
-    const yaml = [
-      "esphome:",
-      "  name: x",
-      "## --- end of file --- ##",
-      "",
-    ].join("\n");
+    const yaml = ["esphome:", "  name: x", "## --- end of file --- ##", ""].join("\n");
     const sections = parseYamlTopLevelSections(yaml);
     expect(sections).toHaveLength(1);
     expect(sections[0].toLine).toBe(2);
@@ -126,12 +121,7 @@ wifi:
   });
 
   it("keeps indented trailing comments as part of the final section", () => {
-    const yaml = [
-      "wifi:",
-      "  ssid: x",
-      "  # last note",
-      "",
-    ].join("\n");
+    const yaml = ["wifi:", "  ssid: x", "  # last note", ""].join("\n");
     const sections = parseYamlTopLevelSections(yaml);
     expect(sections).toHaveLength(1);
     expect(sections[0].toLine).toBe(3);
@@ -292,9 +282,7 @@ sensor:
 `;
     // ``on_press:`` itself is line 6; its body is lines 7-8.
     const m = sectionAtLine(yaml, 7);
-    expect(m?.key).toBe(
-      "automation:component_on:door_sensor:on_press",
-    );
+    expect(m?.key).toBe("automation:component_on:door_sensor:on_press");
   });
 
   // Click inside a top-level ``script:`` entry resolves to that
@@ -409,7 +397,7 @@ describe("parseYamlAutomations", () => {
       - logger.log: "cleanup"
 `;
     const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:script:"),
+      s.key.startsWith("automation:script:")
     );
     expect(items.map((s) => s.key)).toEqual([
       "automation:script:my_alarm",
@@ -428,7 +416,7 @@ describe("parseYamlAutomations", () => {
       - logger.log: "fast"
 `;
     const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:interval:"),
+      s.key.startsWith("automation:interval:")
     );
     expect(items.map((s) => s.key)).toEqual([
       "automation:interval:0",
@@ -448,7 +436,7 @@ describe("parseYamlAutomations", () => {
         - logger.log: "stopping"
 `;
     const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:api_action:"),
+      s.key.startsWith("automation:api_action:")
     );
     expect(items.map((s) => s.key)).toEqual([
       "automation:api_action:start_laundry",
@@ -466,11 +454,9 @@ describe("parseYamlAutomations", () => {
         - logger.log: "old"
 `;
     const items = parseYamlAutomations(yaml).filter((s) =>
-      s.key.startsWith("automation:api_action:"),
+      s.key.startsWith("automation:api_action:")
     );
-    expect(items.map((s) => s.key)).toEqual([
-      "automation:api_action:legacy_name",
-    ]);
+    expect(items.map((s) => s.key)).toEqual(["automation:api_action:legacy_name"]);
   });
 });
 
@@ -514,7 +500,7 @@ describe("resolveCurrentFromLine", () => {
       "logger:",
       "api:",
       "  encryption:",
-      "    key: \"...\"",
+      '    key: "..."',
       "wifi:",
       "  ssid: y",
       "",
@@ -551,12 +537,7 @@ describe("resolveCurrentFromLine", () => {
   });
 
   it("returns the first match when no stale line is provided", () => {
-    const dup = [
-      "ota:",
-      "  - platform: esphome",
-      "  - platform: esphome",
-      "",
-    ].join("\n");
+    const dup = ["ota:", "  - platform: esphome", "  - platform: esphome", ""].join("\n");
     expect(resolveCurrentFromLine(dup, "ota.esphome")).toBe(2);
   });
 
@@ -585,17 +566,9 @@ describe("resolveCurrentFromLine", () => {
     ].join("\n");
     // Cached fromLine from before the paste — the stale hint.
     const staleFromLine = 2;
-    const resolved = resolveCurrentFromLine(
-      yamlAfterPaste,
-      "ota.esphome",
-      staleFromLine,
-    );
+    const resolved = resolveCurrentFromLine(yamlAfterPaste, "ota.esphome", staleFromLine);
     expect(resolved).toBe(6);
-    const values = parseYamlSectionValues(
-      yamlAfterPaste,
-      "ota.esphome",
-      resolved!,
-    );
+    const values = parseYamlSectionValues(yamlAfterPaste, "ota.esphome", resolved!);
     expect(values).toEqual({ platform: "esphome", password: "secret" });
   });
 
@@ -610,11 +583,7 @@ describe("resolveCurrentFromLine", () => {
     const yaml = "esphome:\n  name: x\n";
     const resolved = resolveCurrentFromLine(yaml, "ota.esphome", 5);
     expect(resolved).toBeUndefined();
-    const values = parseYamlSectionValues(
-      yaml,
-      "ota.esphome",
-      resolved,
-    );
+    const values = parseYamlSectionValues(yaml, "ota.esphome", resolved);
     expect(values).toEqual({});
   });
 });

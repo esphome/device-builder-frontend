@@ -21,8 +21,12 @@ describe("getEncryptionState", () => {
     expect(getEncryptionState(inputs({ api_enabled: false }))).toBe("none");
     expect(
       getEncryptionState(
-        inputs({ api_enabled: false, api_encrypted: true, api_encryption_active: "Noise_..." }),
-      ),
+        inputs({
+          api_enabled: false,
+          api_encrypted: true,
+          api_encryption_active: "Noise_...",
+        })
+      )
     ).toBe("none");
   });
 
@@ -38,15 +42,18 @@ describe("getEncryptionState", () => {
     /* Cast through ``as unknown`` so we can simulate an older WS
        payload that omits the field entirely; ``EncryptionInputs``
        declares it required to keep call-site coverage tight. */
-    const stale = { ...inputs(), api_encryption_active: undefined } as unknown as EncryptionInputs;
+    const stale = {
+      ...inputs(),
+      api_encryption_active: undefined,
+    } as unknown as EncryptionInputs;
     expect(getEncryptionState(stale)).toBe("active");
   });
 
   it("returns 'active' when YAML encrypted and mDNS confirms encryption", () => {
     expect(
       getEncryptionState(
-        inputs({ api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256" }),
-      ),
+        inputs({ api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256" })
+      )
     ).toBe("active");
   });
 
@@ -62,8 +69,8 @@ describe("getEncryptionState", () => {
     for (const observed of [null, ""]) {
       expect(
         getEncryptionState(
-          inputs({ api_encryption_active: observed, has_pending_changes: true }),
-        ),
+          inputs({ api_encryption_active: observed, has_pending_changes: true })
+        )
       ).toBe("pending");
     }
   });
@@ -80,16 +87,16 @@ describe("getEncryptionState", () => {
         inputs({
           api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256",
           has_pending_changes: true,
-        }),
-      ),
+        })
+      )
     ).toBe("active");
   });
 
   it("returns 'mismatch' when YAML encrypted, mDNS reports plaintext, no pending changes", () => {
     expect(
       getEncryptionState(
-        inputs({ api_encryption_active: "", has_pending_changes: false }),
-      ),
+        inputs({ api_encryption_active: "", has_pending_changes: false })
+      )
     ).toBe("mismatch");
   });
 
@@ -124,8 +131,8 @@ describe("getEncryptionState", () => {
         inputs({
           api_encrypted: false,
           api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256",
-        }),
-      ),
+        })
+      )
     ).toBe("active");
   });
 
@@ -137,9 +144,7 @@ describe("getEncryptionState", () => {
        just because ``api_encryption_active`` is non-null —
        only truthy strings (the live cipher) flip the state. */
     expect(
-      getEncryptionState(
-        inputs({ api_encrypted: false, api_encryption_active: "" }),
-      ),
+      getEncryptionState(inputs({ api_encrypted: false, api_encryption_active: "" }))
     ).toBe("plaintext");
   });
 });
@@ -169,41 +174,35 @@ describe("getCompactEncryptionVisual", () => {
     // state, hidden in compact views.
     expect(
       getCompactEncryptionVisual(
-        inputs({ api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256" }),
-      ),
+        inputs({ api_encryption_active: "Noise_NNpsk0_25519_ChaChaPoly_SHA256" })
+      )
     ).toBeNull();
   });
 
   it("keeps the lock when YAML enables encryption but mDNS hasn't broadcast", () => {
     // active state with null api_encryption_active is the
     // "waiting / unknown" case the issue explicitly wants visible.
-    const v = getCompactEncryptionVisual(
-      inputs({ api_encryption_active: null }),
-    );
+    const v = getCompactEncryptionVisual(inputs({ api_encryption_active: null }));
     expect(v).not.toBeNull();
     expect(v!.cssClass).toBe("secure");
   });
 
   it("keeps showing the icon for plaintext / pending / mismatch states", () => {
     const plaintext = getCompactEncryptionVisual(
-      inputs({ api_encrypted: false, api_encryption_active: null }),
+      inputs({ api_encrypted: false, api_encryption_active: null })
     );
     expect(plaintext?.cssClass).toBe("insecure");
 
     const pending = getCompactEncryptionVisual(
-      inputs({ api_encryption_active: "", has_pending_changes: true }),
+      inputs({ api_encryption_active: "", has_pending_changes: true })
     );
     expect(pending?.cssClass).toBe("pending");
 
-    const mismatch = getCompactEncryptionVisual(
-      inputs({ api_encryption_active: "" }),
-    );
+    const mismatch = getCompactEncryptionVisual(inputs({ api_encryption_active: "" }));
     expect(mismatch?.cssClass).toBe("mismatch");
   });
 
   it("returns null when the API is disabled (no indicator at all)", () => {
-    expect(
-      getCompactEncryptionVisual(inputs({ api_enabled: false })),
-    ).toBeNull();
+    expect(getCompactEncryptionVisual(inputs({ api_enabled: false }))).toBeNull();
   });
 });

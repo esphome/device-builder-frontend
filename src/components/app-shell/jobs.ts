@@ -45,11 +45,7 @@ export function subscribeToFollowJobs(host: ESPHomeApp): void {
   }
 }
 
-export function handleJobEvent(
-  host: ESPHomeApp,
-  event: string,
-  data: unknown,
-): void {
+export function handleJobEvent(host: ESPHomeApp, event: string, data: unknown): void {
   switch (event) {
     case "snapshot":
     case "job_queued":
@@ -102,7 +98,7 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
       (j) =>
         j.job_id !== job.job_id &&
         j.configuration === job.configuration &&
-        !isTerminalJobStatus(j.status),
+        !isTerminalJobStatus(j.status)
     );
     if (supersededByActive) {
       const next = new Map(host._firmwareJobs);

@@ -44,13 +44,20 @@ const darkHighlight = HighlightStyle.define([
   { tag: t.bool, color: "#569cd6" },
   { tag: t.null, color: "#569cd6" },
   { tag: t.atom, color: "#569cd6" },
-  { tag: [t.lineComment, t.blockComment, t.comment], color: "#6a9955", fontStyle: "italic" },
+  {
+    tag: [t.lineComment, t.blockComment, t.comment],
+    color: "#6a9955",
+    fontStyle: "italic",
+  },
   { tag: t.definition(t.propertyName), color: "#9cdcfe" },
   { tag: t.propertyName, color: "#9cdcfe" },
   { tag: t.labelName, color: "#dcdcaa" },
   { tag: t.typeName, color: "#4ec9b0" },
   { tag: t.meta, color: "#c586c0" },
-  { tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace], color: DARK_FG },
+  {
+    tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace],
+    color: DARK_FG,
+  },
   { tag: t.content, color: DARK_FG },
 ]);
 
@@ -63,13 +70,20 @@ const lightHighlight = HighlightStyle.define([
   { tag: t.bool, color: "#0550ae" },
   { tag: t.null, color: "#0550ae" },
   { tag: t.atom, color: "#0550ae" },
-  { tag: [t.lineComment, t.blockComment, t.comment], color: "#6e7781", fontStyle: "italic" },
+  {
+    tag: [t.lineComment, t.blockComment, t.comment],
+    color: "#6e7781",
+    fontStyle: "italic",
+  },
   { tag: t.definition(t.propertyName), color: "#0550ae" },
   { tag: t.propertyName, color: "#0550ae" },
   { tag: t.labelName, color: "#6f42c1" },
   { tag: t.typeName, color: "#953800" },
   { tag: t.meta, color: "#8250df" },
-  { tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace], color: LIGHT_FG },
+  {
+    tag: [t.separator, t.punctuation, t.bracket, t.squareBracket, t.brace],
+    color: LIGHT_FG,
+  },
   { tag: t.content, color: LIGHT_FG },
 ]);
 
@@ -107,7 +121,7 @@ const darkBase = EditorView.theme(
       backgroundColor: "#9d550f",
     },
   },
-  { dark: true },
+  { dark: true }
 );
 
 const lightBase = EditorView.theme(
@@ -144,7 +158,7 @@ const lightBase = EditorView.theme(
       backgroundColor: "#ffd33d",
     },
   },
-  { dark: false },
+  { dark: false }
 );
 
 export const vscodeDark: Extension = [darkBase, syntaxHighlighting(darkHighlight)];

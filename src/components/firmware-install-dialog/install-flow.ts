@@ -29,7 +29,7 @@ export function compileFailureDetail(err: unknown): string {
 }
 
 export async function startWebSerialInstall(
-  host: ESPHomeFirmwareInstallDialog,
+  host: ESPHomeFirmwareInstallDialog
 ): Promise<void> {
   const device = host._device;
   if (!device) return;
@@ -82,7 +82,7 @@ export async function startWebSerialInstall(
       host._localize("firmware.chip_mismatch", {
         detected: detected.chipName,
         expected,
-      }),
+      })
     );
     return;
   }
@@ -153,7 +153,7 @@ export async function startWebSerialInstall(
         /* ignore */
       }
       host._fail(
-        err instanceof Error ? err.message : host._localize("firmware.flash_failed"),
+        err instanceof Error ? err.message : host._localize("firmware.flash_failed")
       );
       return;
     }
@@ -165,7 +165,7 @@ export async function startWebSerialInstall(
     await resetAndDisconnect(
       flashDetected.loader,
       flashDetected.transport,
-      flashDetected.port,
+      flashDetected.port
     );
   } catch {
     /* ignore reset errors */
@@ -183,7 +183,7 @@ export async function startWebSerialInstall(
 
 export function flipToLogs(
   host: ESPHomeFirmwareInstallDialog,
-  webSerialPort: SerialPort,
+  webSerialPort: SerialPort
 ): void {
   const device = host._device;
   if (!device) return;
@@ -200,9 +200,7 @@ export function flipToLogs(
 // in which binaries are eligible — web.esphome.io needs a self-contained image
 // (factory.bin / firmware.bin); manual gives whatever artefact was produced
 // (including .uf2 for RP2040 / nrf52 / libretiny).
-export async function startDownload(
-  host: ESPHomeFirmwareInstallDialog,
-): Promise<void> {
+export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
   const isWebFlasher = host._installer === "web-download";
@@ -229,15 +227,12 @@ export async function startDownload(
       // Web-flasher path with no match almost always = UF2 platform.
       host._fail(
         host._localize(
-          isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries",
-        ),
+          isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries"
+        )
       );
       return;
     }
-    const result = await host._api.firmwareDownload(
-      device.configuration,
-      flashable.file,
-    );
+    const result = await host._api.firmwareDownload(device.configuration, flashable.file);
     downloadBase64Binary(result.data, result.filename);
     host._downloadedFilename = result.filename;
   } catch {
@@ -251,7 +246,7 @@ export async function startDownload(
 
 export function compileAndWait(
   host: ESPHomeFirmwareInstallDialog,
-  configuration: string,
+  configuration: string
 ): Promise<void> {
   return new Promise(async (resolve, reject) => {
     // Capture reject on the dialog so a mid-flight detach (header-X / Escape /

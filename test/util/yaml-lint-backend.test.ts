@@ -21,42 +21,36 @@ afterEach(() => {
 
 describe("getLastValidatedResult", () => {
   it("returns null when nothing has been validated for the configuration", async () => {
-    const { getLastValidatedResult } = await import(
-      "../../src/util/yaml-lint-backend.js"
-    );
+    const { getLastValidatedResult } =
+      await import("../../src/util/yaml-lint-backend.js");
     expect(getLastValidatedResult("kitchen.yaml", "esphome:\n")).toBeNull();
   });
 
   it("returns null for a configuration that has no entry yet", async () => {
-    const { getLastValidatedResult, __setLastValidatedForTesting } = await import(
-      "../../src/util/yaml-lint-backend.js"
-    );
+    const { getLastValidatedResult, __setLastValidatedForTesting } =
+      await import("../../src/util/yaml-lint-backend.js");
     const result = { yaml_errors: [], validation_errors: [] };
     __setLastValidatedForTesting("kitchen.yaml", "esphome:\n  name: a\n", result);
-    expect(
-      getLastValidatedResult("bedroom.yaml", "esphome:\n  name: a\n"),
-    ).toBeNull();
+    expect(getLastValidatedResult("bedroom.yaml", "esphome:\n  name: a\n")).toBeNull();
   });
 
   it("returns the cached result when content matches exactly", async () => {
-    const { getLastValidatedResult, __setLastValidatedForTesting } = await import(
-      "../../src/util/yaml-lint-backend.js"
-    );
+    const { getLastValidatedResult, __setLastValidatedForTesting } =
+      await import("../../src/util/yaml-lint-backend.js");
     const result = { yaml_errors: [], validation_errors: [] };
     __setLastValidatedForTesting("kitchen.yaml", "esphome:\n  name: kitchen\n", result);
-    expect(
-      getLastValidatedResult("kitchen.yaml", "esphome:\n  name: kitchen\n"),
-    ).toBe(result);
+    expect(getLastValidatedResult("kitchen.yaml", "esphome:\n  name: kitchen\n")).toBe(
+      result
+    );
   });
 
   it("returns null when content differs by even one byte", async () => {
-    const { getLastValidatedResult, __setLastValidatedForTesting } = await import(
-      "../../src/util/yaml-lint-backend.js"
-    );
+    const { getLastValidatedResult, __setLastValidatedForTesting } =
+      await import("../../src/util/yaml-lint-backend.js");
     const result = { yaml_errors: [], validation_errors: [] };
     __setLastValidatedForTesting("kitchen.yaml", "esphome:\n  name: kitchen\n", result);
     expect(
-      getLastValidatedResult("kitchen.yaml", "esphome:\n  name: kitchen \n"),
+      getLastValidatedResult("kitchen.yaml", "esphome:\n  name: kitchen \n")
     ).toBeNull();
   });
 
@@ -66,9 +60,8 @@ describe("getLastValidatedResult", () => {
     let fakeNow = 1_000_000;
     vi.spyOn(performance, "now").mockImplementation(() => fakeNow);
     try {
-      const { getLastValidatedResult, __setLastValidatedForTesting } = await import(
-        "../../src/util/yaml-lint-backend.js"
-      );
+      const { getLastValidatedResult, __setLastValidatedForTesting } =
+        await import("../../src/util/yaml-lint-backend.js");
       const result = { yaml_errors: [], validation_errors: [] };
       __setLastValidatedForTesting("kitchen.yaml", "esphome:\n", result);
       fakeNow += 60_001;

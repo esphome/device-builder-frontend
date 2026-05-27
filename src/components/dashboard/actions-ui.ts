@@ -1,10 +1,6 @@
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type {
-  AdoptableDevice,
-  ConfiguredDevice,
-  Label,
-} from "../../api/types.js";
+import type { AdoptableDevice, ConfiguredDevice, Label } from "../../api/types.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
 import { streamSerialToDialog } from "./actions.js";
@@ -12,7 +8,7 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,
-  e: CustomEvent<{ newFriendlyName: string; install: boolean }>,
+  e: CustomEvent<{ newFriendlyName: string; install: boolean }>
 ): Promise<void> {
   const device = host._actionDevice;
   if (!device) return;
@@ -27,7 +23,7 @@ export async function executeFriendlyName(
         name: device.name,
         reason,
       }),
-      { richColors: true },
+      { richColors: true }
     );
     return;
   }
@@ -42,7 +38,7 @@ export async function executeFriendlyName(
       host._localize("dashboard.action_friendly_name_success", {
         name: newFriendlyName,
       }),
-      { richColors: true },
+      { richColors: true }
     );
     return;
   }
@@ -50,14 +46,14 @@ export async function executeFriendlyName(
     host._localize("dashboard.action_friendly_name_success", {
       name: newFriendlyName,
     }),
-    { richColors: true },
+    { richColors: true }
   );
   host._openInstallMethod(device);
 }
 
 export async function executeClone(
   host: ESPHomePageDashboard,
-  e: CustomEvent<{ newName: string; newFriendlyName: string }>,
+  e: CustomEvent<{ newName: string; newFriendlyName: string }>
 ): Promise<void> {
   const device = host._actionDevice;
   if (!device) return;
@@ -72,7 +68,7 @@ export async function executeClone(
         name: device.name,
         reason,
       }),
-      { richColors: true },
+      { richColors: true }
     );
     return;
   }
@@ -83,7 +79,7 @@ export async function executeClone(
 
 export async function executeRename(
   host: ESPHomePageDashboard,
-  e: CustomEvent<string>,
+  e: CustomEvent<string>
 ): Promise<void> {
   const device = host._actionDevice;
   if (!device) return;
@@ -93,17 +89,16 @@ export async function executeRename(
   try {
     response = await host._api.renameDevice(device.configuration, newName);
   } catch {
-    toast.error(
-      host._localize("dashboard.action_rename_failed", { name: device.name }),
-      { richColors: true },
-    );
+    toast.error(host._localize("dashboard.action_rename_failed", { name: device.name }), {
+      richColors: true,
+    });
     return;
   }
   clearJustCreated();
   if (response.job) {
     host._commandDialog.followJob(
       response.job,
-      firmwareJobDisplayName(response.job, host._devices, host._localize),
+      firmwareJobDisplayName(response.job, host._devices, host._localize)
     );
     return;
   }
@@ -114,7 +109,7 @@ export async function executeRename(
 
 export async function toggleIgnore(
   host: ESPHomePageDashboard,
-  device: AdoptableDevice,
+  device: AdoptableDevice
 ): Promise<void> {
   try {
     await host._api.ignoreDevice(device.name, !device.ignored);
@@ -125,16 +120,16 @@ export async function toggleIgnore(
         device.ignored
           ? "dashboard.action_unignore_failed"
           : "dashboard.action_ignore_failed",
-        { name },
+        { name }
       ),
-      { richColors: true },
+      { richColors: true }
     );
   }
 }
 
 export async function deleteLabel(
   host: ESPHomePageDashboard,
-  label: Label,
+  label: Label
 ): Promise<void> {
   if (!host._api) return;
   try {
@@ -154,7 +149,7 @@ export async function openLogsWithMethod(
   host: ESPHomePageDashboard,
   device: ConfiguredDevice,
   method: string,
-  port?: string,
+  port?: string
 ): Promise<void> {
   if (method === "ota") {
     host._logsDialog.configuration = device.configuration;
@@ -172,9 +167,11 @@ export async function openLogsWithMethod(
       return;
     }
     try {
-      const serialPort = await (navigator as unknown as {
-        serial: { requestPort: () => Promise<SerialPortLike> };
-      }).serial.requestPort();
+      const serialPort = await (
+        navigator as unknown as {
+          serial: { requestPort: () => Promise<SerialPortLike> };
+        }
+      ).serial.requestPort();
       await serialPort.open({ baudRate: 115200 });
       host._logsDialog.configuration = device.configuration;
       host._logsDialog.name = device.friendly_name || device.name;
@@ -193,22 +190,19 @@ interface SerialPortLike {
 
 export function scheduleScrollIntoView(
   host: ESPHomePageDashboard,
-  configuration: string,
+  configuration: string
 ): void {
   requestAnimationFrame(() =>
-    requestAnimationFrame(() => scrollAdoptedIntoView(host, configuration)),
+    requestAnimationFrame(() => scrollAdoptedIntoView(host, configuration))
   );
 }
 
-function scrollAdoptedIntoView(
-  host: ESPHomePageDashboard,
-  configuration: string,
-): void {
+function scrollAdoptedIntoView(host: ESPHomePageDashboard, configuration: string): void {
   const root = host.shadowRoot;
   if (!root) return;
   const escaped = CSS.escape(configuration);
   const card = root.querySelector<HTMLElement>(
-    `esphome-device-card[data-configuration="${escaped}"]`,
+    `esphome-device-card[data-configuration="${escaped}"]`
   );
   if (card) {
     card.scrollIntoView({ behavior: "instant", block: "center" });

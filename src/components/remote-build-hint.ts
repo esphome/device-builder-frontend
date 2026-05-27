@@ -43,14 +43,10 @@ export interface RemoteBuildHintHost {
 // is a presentational guard, not an XSS defense.
 export function renderRemoteBuildFailureSuggestion(
   host: RemoteBuildHintHost,
-  receiver: string,
+  receiver: string
 ): TemplateResult {
   const template = host._localize("command.try_reset_suggestion_remote");
-  const [before, middle, after] = splitTemplate(
-    template,
-    "{clean_action}",
-    "{receiver}",
-  );
+  const [before, middle, after] = splitTemplate(template, "{clean_action}", "{receiver}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>

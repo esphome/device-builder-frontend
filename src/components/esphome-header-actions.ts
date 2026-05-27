@@ -120,7 +120,9 @@ export class ESPHomeHeaderActions extends LitElement {
         padding: 6px;
         border-radius: var(--wa-border-radius-m);
         opacity: 0.85;
-        transition: opacity 0.12s, background 0.12s;
+        transition:
+          opacity 0.12s,
+          background 0.12s;
       }
 
       .menu-btn:hover {
@@ -168,8 +170,14 @@ export class ESPHomeHeaderActions extends LitElement {
       }
 
       @keyframes menu-in {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
       }
 
       .menu-item {
@@ -242,17 +250,14 @@ export class ESPHomeHeaderActions extends LitElement {
   connectedCallback(): void {
     super.connectedCallback();
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
-    window.addEventListener(
-      "esphome-show-ignored-changed",
-      this._onShowIgnoredChanged,
-    );
+    window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     window.removeEventListener(
       "esphome-show-ignored-changed",
-      this._onShowIgnoredChanged,
+      this._onShowIgnoredChanged
     );
   }
 
@@ -302,7 +307,9 @@ export class ESPHomeHeaderActions extends LitElement {
                 @keydown=${this._onMenuItemKeydown}
               >
                 <wa-icon library="mdi" name="playlist-check"></wa-icon>
-                <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
+                <span class="menu-item-label"
+                  >${this._localize("firmware_jobs.menu_item")}</span
+                >
                 ${activeCount > 0
                   ? html`<span class="menu-item-count">${activeCount}</span>`
                   : nothing}
@@ -384,7 +391,9 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="cog"></wa-icon>
                 <span class="menu-item-label">${this._localize("layout.settings")}</span>
                 ${hasAlerts
-                  ? html`<span class="menu-item-count">${this._offloaderAlertsCount()}</span>`
+                  ? html`<span class="menu-item-count"
+                      >${this._offloaderAlertsCount()}</span
+                    >`
                   : nothing}
               </div>
               <div class="menu-divider" role="separator"></div>
@@ -467,7 +476,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-onboarding-wifi", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -477,7 +486,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-firmware-jobs", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -487,7 +496,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-reset-build-env", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -497,7 +506,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-settings", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -511,7 +520,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-feedback", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

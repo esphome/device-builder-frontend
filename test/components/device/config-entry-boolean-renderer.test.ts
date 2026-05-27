@@ -24,7 +24,7 @@ describe("renderBooleanField default-value fallback", () => {
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
       here,
-      "../../../src/components/device/config-entry-renderers/primitives.ts",
+      "../../../src/components/device/config-entry-renderers/primitives.ts"
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
 
@@ -42,10 +42,7 @@ describe("renderBooleanField default-value fallback", () => {
     // false failure when an assertion's anchor falls past the
     // truncation boundary.
     const nextExportIdx = src.indexOf("export function ", startIdx + 1);
-    const fnSrc = src.slice(
-      startIdx,
-      nextExportIdx > 0 ? nextExportIdx : src.length,
-    );
+    const fnSrc = src.slice(startIdx, nextExportIdx > 0 ? nextExportIdx : src.length);
 
     // The renderer must consult ``entry.default_value`` when
     // computing the value that drives ``checked`` — a bare reference
@@ -67,14 +64,13 @@ describe("renderBooleanField default-value fallback", () => {
     // this test.
     const fallbackShape =
       /=\s*raw\s*===\s*undefined\s*\|\|\s*raw\s*===\s*null\s*\?\s*entry\.default_value\s*:\s*raw/.test(
-        fnSrc,
-      ) ||
-      /=\s*raw\s*\?\?\s*entry\.default_value/.test(fnSrc);
+        fnSrc
+      ) || /=\s*raw\s*\?\?\s*entry\.default_value/.test(fnSrc);
     expect(
       fallbackShape,
       "renderBooleanField must compute an intermediate that falls " +
         "back from raw to entry.default_value — default-true fields " +
-        "otherwise render OFF when the YAML omits them",
+        "otherwise render OFF when the YAML omits them"
     ).toBe(true);
 
     // The ``checked`` computation must depend on whichever value
@@ -90,7 +86,7 @@ describe("renderBooleanField default-value fallback", () => {
       /parseYamlBoolean\(.*\)\s*===\s*true\b/.test(fnSrc),
       "checked must route the fallback value through parseYamlBoolean " +
         "so all ESPHome YAML boolean spellings (True / yes / on / enable) " +
-        "collapse to the boolean primitive — issue device-builder#923",
+        "collapse to the boolean primitive — issue device-builder#923"
     ).toBe(true);
 
     // ``checked`` must be derived from the same value that consulted
@@ -101,7 +97,7 @@ describe("renderBooleanField default-value fallback", () => {
     // ``=== true`` lines compare against ``raw`` directly.
     expect(
       /raw\s*===\s*true\b/.test(fnSrc),
-      "checked must be computed from the fallback intermediate, not raw directly",
+      "checked must be computed from the fallback intermediate, not raw directly"
     ).toBe(false);
   });
 });

@@ -79,7 +79,7 @@ export interface ParentKey {
 export function findParentKey(
   lines: string[],
   lineIdx: number,
-  belowIndent: number,
+  belowIndent: number
 ): ParentKey | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
     const stripped = stripComment(lines[i]);
@@ -93,10 +93,7 @@ export function findParentKey(
 }
 
 /** Walk back from *lineIdx* to the first column-0 ``key:`` line. */
-export function findTopLevelBlock(
-  lines: string[],
-  lineIdx: number,
-): string | null {
+export function findTopLevelBlock(lines: string[], lineIdx: number): string | null {
   for (let i = lineIdx - 1; i >= 0; i--) {
     const stripped = stripComment(lines[i]);
     if (!stripped.trim()) continue;
@@ -123,7 +120,7 @@ export function findTopLevelBlock(
 export function readPlatformSibling(
   lines: string[],
   lineIdx: number,
-  indent: number,
+  indent: number
 ): string | null {
   // First pass: scan back for *any* ``- platform: <value>`` at a
   // shallower indent than the cursor. This catches the

@@ -24,17 +24,11 @@ import type { LocalizeFunc } from "../../common/localize.js";
  * known" branch so the visit affordance isn't gated on the first
  * mDNS A-record.
  */
-export function renderIpValue(
-  ip: string,
-  url: string,
-  localize: LocalizeFunc,
-) {
+export function renderIpValue(ip: string, url: string, localize: LocalizeFunc) {
   const isPlaceholder = !ip;
   const display = ip || "—";
   if (!url) {
-    return html`<div
-      class="value mono ${isPlaceholder ? "muted" : ""}"
-    >${display}</div>`;
+    return html`<div class="value mono ${isPlaceholder ? "muted" : ""}">${display}</div>`;
   }
   const visitLabel = localize("dashboard.action_visit_web_ui");
   return html`
@@ -82,7 +76,7 @@ export function renderIpValue(
  */
 export function renderMdnsTxtRecords(
   records: Record<string, string> | null | undefined,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
   if (records === null || records === undefined) return nothing;
   const entries = Object.entries(records);
@@ -105,15 +99,13 @@ export function renderMdnsTxtRecords(
       : "dashboard.drawer_show_mdns_txt_records_plural";
   return html`
     <details class="mdns-txt-details">
-      <summary>
-        ${localize(summaryKey, { count: entries.length })}
-      </summary>
+      <summary>${localize(summaryKey, { count: entries.length })}</summary>
       <dl class="mdns-txt-list">
         ${entries.map(
           ([key, value]) => html`
             <dt>${key}</dt>
             <dd>${value}</dd>
-          `,
+          `
         )}
       </dl>
     </details>

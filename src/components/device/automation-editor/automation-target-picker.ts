@@ -108,9 +108,10 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
           @change=${this._onKindChange}
         >
           ${ORDER.map(
-            (k) => html`<wa-option value=${k} ?selected=${k === kind}
-              >${this._kindLabel(k)}</wa-option
-            >`,
+            (k) =>
+              html`<wa-option value=${k} ?selected=${k === kind}
+                >${this._kindLabel(k)}</wa-option
+              >`
           )}
         </wa-select>
         ${this._renderKindBody(kind)}
@@ -165,9 +166,11 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             this._onComponentChange((e.target as HTMLSelectElement).value)}
         >
           ${this.devices.map(
-            (d) => html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
-              >${d.name ?? d.id} <span class="ae-muted">(${d.component_id})</span></wa-option
-            >`,
+            (d) =>
+              html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
+                >${d.name ?? d.id}
+                <span class="ae-muted">(${d.component_id})</span></wa-option
+              >`
           )}
         </wa-select>
       `;
@@ -198,9 +201,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
           id="script-id-input"
           type="text"
           .value=${selectedId}
-          placeholder=${this._localize(
-            "device.automation_target_script_id_placeholder",
-          )}
+          placeholder=${this._localize("device.automation_target_script_id_placeholder")}
           ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this._onScriptChange((e.target as HTMLInputElement).value)}
@@ -225,9 +226,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
     if (kind === "light_effect") {
       const selectedId =
         this.value?.kind === "light_effect" ? this.value.component_id : "";
-      const lights = this.devices.filter((d) =>
-        d.component_id.startsWith("light."),
-      );
+      const lights = this.devices.filter((d) => d.component_id.startsWith("light."));
       if (lights.length === 0) {
         return html`<p class="ae-empty" role="status">
           ${this._localize("device.automation_target_no_lights")}
@@ -245,9 +244,10 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             this._onLightChange((e.target as HTMLSelectElement).value)}
         >
           ${lights.map(
-            (d) => html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
-              >${d.name ?? d.id}</wa-option
-            >`,
+            (d) =>
+              html`<wa-option value=${d.id} ?selected=${d.id === selectedId}
+                >${d.name ?? d.id}</wa-option
+              >`
           )}
         </wa-select>
       `;
@@ -283,9 +283,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
             id: this.scripts.length ? this.scripts[0].id : "",
           };
         case "light_effect": {
-          const light = this.devices.find((d) =>
-            d.component_id.startsWith("light."),
-          );
+          const light = this.devices.find((d) => d.component_id.startsWith("light."));
           return light ? { kind, component_id: light.id, index: 0 } : null;
         }
         case "api_action":
@@ -318,7 +316,7 @@ export class ESPHomeAutomationTargetPicker extends LitElement {
         detail: { target },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

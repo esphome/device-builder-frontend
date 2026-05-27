@@ -510,11 +510,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   family: this._selectedFilter,
                 })}
               </span>
-              <button
-                class="helper-link"
-                type="button"
-                @click=${this._exitDetectionMode}
-              >
+              <button class="helper-link" type="button" @click=${this._exitDetectionMode}>
                 ${this._localize("wizard.show_all_boards")}
               </button>
             </div>
@@ -793,7 +789,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       this._serverPorts = [];
       this._detectError = this._extractErrorDetail(
         e,
-        this._localize("wizard.connect_your_board_detect_failed"),
+        this._localize("wizard.connect_your_board_detect_failed")
       );
     } finally {
       this._loadingServerPorts = false;
@@ -832,7 +828,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
     } catch (err) {
       this._detectError = this._extractErrorDetail(
         err,
-        this._localize("wizard.connect_your_board_detect_failed"),
+        this._localize("wizard.connect_your_board_detect_failed")
       );
     } finally {
       this._detectingChip = false;

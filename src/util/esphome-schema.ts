@@ -98,12 +98,7 @@ export interface SchemaSchema {
  *  these names; pinning the union keeps callsites that index by
  *  registry name (``getRegistryEntries``) honest about which
  *  slots are valid. */
-export const SCHEMA_REGISTRY_KEYS = [
-  "action",
-  "condition",
-  "filter",
-  "effects",
-] as const;
+export const SCHEMA_REGISTRY_KEYS = ["action", "condition", "filter", "effects"] as const;
 export type SchemaRegistryKey = (typeof SCHEMA_REGISTRY_KEYS)[number];
 
 const REGISTRY_KEY_SET = new Set<string>(SCHEMA_REGISTRY_KEYS);
@@ -127,10 +122,7 @@ export interface SchemaComponent {
 
 export interface SchemaCore extends SchemaComponent {
   platforms?: Record<string, { docs?: string } | undefined>;
-  components?: Record<
-    string,
-    { docs?: string; dependencies?: string[] } | undefined
-  >;
+  components?: Record<string, { docs?: string; dependencies?: string[] } | undefined>;
 }
 
 export interface SchemaBundle {
@@ -186,10 +178,9 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
   const promise = (async () => {
     const { esphome_version } = await api.getVersion();
     if (esphome_version.endsWith("dev")) return "dev";
-    const probe = await fetch(
-      `${SCHEMA_HOST}/${esphome_version}/esphome.json`,
-      { method: "HEAD" },
-    );
+    const probe = await fetch(`${SCHEMA_HOST}/${esphome_version}/esphome.json`, {
+      method: "HEAD",
+    });
     if (probe.ok) return esphome_version;
     // Only fall back to ``dev`` for a definitive
     // "this version isn't published" answer (404). Transient
@@ -200,9 +191,7 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
     // probe used to silently downgrade to ``dev`` for the page
     // lifetime.)
     if (probe.status === 404) return "dev";
-    throw new Error(
-      `schema-host probe returned ${probe.status} for ${esphome_version}`,
-    );
+    throw new Error(`schema-host probe returned ${probe.status} for ${esphome_version}`);
   })();
   versionPromise = promise;
   // Evict on failure so subsequent calls retry. A successful
@@ -220,10 +209,7 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
  * ``null`` on any failure — callers gracefully skip the
  * schema-driven extras when ``null``.
  */
-export function fetchBundle(
-  api: ESPHomeAPI,
-  name: string,
-): Promise<SchemaBundle | null> {
+export function fetchBundle(api: ESPHomeAPI, name: string): Promise<SchemaBundle | null> {
   // First-line dedupe: concurrent callers asking for the same
   // bundle name (before we know the version) share one promise.
   // Once the version resolves, the entry gets re-keyed under
@@ -292,7 +278,7 @@ export function fetchBundle(
 export async function getTriggerKeys(
   api: ESPHomeAPI,
   bundleName: string,
-  componentKey: string,
+  componentKey: string
 ): Promise<{ key: string; docs?: string }[]> {
   const out: { key: string; docs?: string }[] = [];
   const seen = new Set<string>();
@@ -303,7 +289,7 @@ export async function getTriggerKeys(
     "CONFIG_SCHEMA",
     out,
     seen,
-    new Set(),
+    new Set()
   );
   return out;
 }
@@ -322,15 +308,9 @@ async function collectTriggers(
   schemaName: string,
   out: { key: string; docs?: string }[],
   seenKeys: Set<string>,
-  visited: Set<string>,
+  visited: Set<string>
 ): Promise<void> {
-  const cv = await loadSchemaCv(
-    api,
-    bundleName,
-    componentKey,
-    schemaName,
-    visited,
-  );
+  const cv = await loadSchemaCv(api, bundleName, componentKey, schemaName, visited);
   if (!cv) return;
   const schema = "schema" in cv ? cv.schema : undefined;
   if (!schema) return;
@@ -352,7 +332,7 @@ async function collectTriggers(
       ref.schemaName,
       out,
       seenKeys,
-      visited,
+      visited
     );
   }
 }
@@ -401,7 +381,7 @@ const configVarKeysCache = new Map<string, Promise<SchemaConfigVarKey[]>>();
 export async function getConfigVarKeys(
   api: ESPHomeAPI,
   bundleName: string,
-  componentKey: string,
+  componentKey: string
 ): Promise<SchemaConfigVarKey[]> {
   const cacheKey = `${bundleName}|${componentKey}`;
   const cached = configVarKeysCache.get(cacheKey);
@@ -416,7 +396,7 @@ export async function getConfigVarKeys(
       "CONFIG_SCHEMA",
       out,
       seen,
-      new Set(),
+      new Set()
     );
     return out;
   })();
@@ -433,15 +413,9 @@ async function collectConfigVars(
   schemaName: string,
   out: SchemaConfigVarKey[],
   seenKeys: Set<string>,
-  visited: Set<string>,
+  visited: Set<string>
 ): Promise<void> {
-  const cv = await loadSchemaCv(
-    api,
-    bundleName,
-    componentKey,
-    schemaName,
-    visited,
-  );
+  const cv = await loadSchemaCv(api, bundleName, componentKey, schemaName, visited);
   if (!cv) return;
 
   // Discriminated union narrows on ``cv.type``.
@@ -453,13 +427,7 @@ async function collectConfigVars(
     for (const variant of Object.values(cv.types ?? {})) {
       if (!variant) continue;
       pushConfigVars(variant.config_vars, out, seenKeys);
-      await walkConfigVarExtends(
-        api,
-        variant.extends,
-        out,
-        seenKeys,
-        visited,
-      );
+      await walkConfigVarExtends(api, variant.extends, out, seenKeys, visited);
     }
     return;
   }
@@ -480,7 +448,7 @@ async function walkConfigVarExtends(
   extendsList: string[] | undefined,
   out: SchemaConfigVarKey[],
   seenKeys: Set<string>,
-  visited: Set<string>,
+  visited: Set<string>
 ): Promise<void> {
   for (const ext of extendsList ?? []) {
     const ref = parseExtendsRef(ext);
@@ -492,7 +460,7 @@ async function walkConfigVarExtends(
       ref.schemaName,
       out,
       seenKeys,
-      visited,
+      visited
     );
   }
 }
@@ -501,7 +469,7 @@ async function walkConfigVarExtends(
 function pushConfigVars(
   vars: Record<string, SchemaConfigVar | undefined> | undefined,
   out: SchemaConfigVarKey[],
-  seenKeys: Set<string>,
+  seenKeys: Set<string>
 ): void {
   if (!vars) return;
   for (const [key, decl] of Object.entries(vars)) {
@@ -531,7 +499,7 @@ function pushConfigVars(
  *  dispatch.
  */
 function parseExtendsRef(
-  ext: string,
+  ext: string
 ): { bundle: string; componentKey: string; schemaName: string } | null {
   const parts = ext.split(".");
   if (parts.length === 2) {
@@ -557,7 +525,7 @@ async function loadSchemaCv(
   bundleName: string,
   componentKey: string,
   schemaName: string,
-  visited: Set<string>,
+  visited: Set<string>
 ): Promise<SchemaConfigVar | null> {
   const visitKey = `${bundleName}|${componentKey}|${schemaName}`;
   if (visited.has(visitKey)) return null;
@@ -566,8 +534,9 @@ async function loadSchemaCv(
   if (!bundle) return null;
   const component = bundle[componentKey];
   if (!component) return null;
-  const cv: SchemaConfigVar | undefined = (component as SchemaComponent)
-    .schemas?.[schemaName];
+  const cv: SchemaConfigVar | undefined = (component as SchemaComponent).schemas?.[
+    schemaName
+  ];
   if (!cv || typeof cv !== "object") return null;
   return cv;
 }
@@ -592,7 +561,7 @@ export async function getConfigVarValueOptions(
   api: ESPHomeAPI,
   bundleName: string,
   componentKey: string,
-  varKey: string,
+  varKey: string
 ): Promise<SchemaEnumValue[]> {
   const out: SchemaEnumValue[] = [];
   await collectEnumValues(
@@ -602,7 +571,7 @@ export async function getConfigVarValueOptions(
     "CONFIG_SCHEMA",
     varKey,
     out,
-    new Set(),
+    new Set()
   );
   return out;
 }
@@ -614,20 +583,14 @@ async function collectEnumValues(
   schemaName: string,
   varKey: string,
   out: SchemaEnumValue[],
-  visited: Set<string>,
+  visited: Set<string>
 ): Promise<void> {
   if (out.length > 0) return; // first hit wins
-  const cv = await loadSchemaCv(
-    api,
-    bundleName,
-    componentKey,
-    schemaName,
-    visited,
-  );
+  const cv = await loadSchemaCv(api, bundleName, componentKey, schemaName, visited);
   if (!cv) return;
 
   const tryVars = (
-    vars: Record<string, SchemaConfigVar | undefined> | undefined,
+    vars: Record<string, SchemaConfigVar | undefined> | undefined
   ): boolean => {
     const decl = vars?.[varKey];
     // Discriminated union narrows ``decl`` to ``SchemaConfigVarEnum``
@@ -667,7 +630,7 @@ async function walkEnumExtends(
   extendsList: string[] | undefined,
   varKey: string,
   out: SchemaEnumValue[],
-  visited: Set<string>,
+  visited: Set<string>
 ): Promise<void> {
   for (const ext of extendsList ?? []) {
     const ref = parseExtendsRef(ext);
@@ -679,7 +642,7 @@ async function walkEnumExtends(
       ref.schemaName,
       varKey,
       out,
-      visited,
+      visited
     );
     if (out.length > 0) return;
   }
@@ -723,7 +686,7 @@ export async function getRegistryEntryKeys(
   api: ESPHomeAPI,
   bundleName: string,
   componentName: string,
-  entryName: string,
+  entryName: string
 ): Promise<SchemaConfigVarKey[]> {
   const bundle = await fetchBundle(api, bundleName);
   if (!bundle) return [];
@@ -743,7 +706,7 @@ export async function getRegistryEntryKeys(
  *  schemas. Shared between every registry-entry path. */
 async function readRegistryEntrySchema(
   api: ESPHomeAPI,
-  entry: SchemaConfigVar,
+  entry: SchemaConfigVar
 ): Promise<SchemaConfigVarKey[]> {
   const out: SchemaConfigVarKey[] = [];
   const seen = new Set<string>();
@@ -755,13 +718,7 @@ async function readRegistryEntrySchema(
     for (const variant of Object.values(entry.types ?? {})) {
       if (!variant) continue;
       pushConfigVars(variant.config_vars, out, seen);
-      await walkConfigVarExtends(
-        api,
-        variant.extends,
-        out,
-        seen,
-        new Set(),
-      );
+      await walkConfigVarExtends(api, variant.extends, out, seen, new Set());
     }
     return out;
   }
@@ -794,7 +751,7 @@ async function readRegistryEntrySchema(
  *  actions just to translate ``"core" → bundle "esphome"``.)
  */
 export function parseRegistryLabel(
-  label: string,
+  label: string
 ): { bundleName: string; componentName: string; entryName: string } | null {
   const parts = label.split(".");
   if (parts.length === 1) {
@@ -829,7 +786,7 @@ export async function lookupRegistryRef(
   api: ESPHomeAPI,
   bundleName: string,
   componentKey: string,
-  varKey: string,
+  varKey: string
 ): Promise<string | null> {
   // Read off the memoised key list — ``getConfigVarKeys`` walks
   // the typed/extends chain once per ``<bundle>|<componentKey>``
@@ -850,7 +807,7 @@ export async function lookupRegistryRef(
  */
 export async function getRegistryEntries(
   api: ESPHomeAPI,
-  registryRef: string,
+  registryRef: string
 ): Promise<SchemaRegistryEntry[]> {
   const dot = registryRef.indexOf(".");
   if (dot < 0) return [];
@@ -898,11 +855,9 @@ export async function getRegistryEntries(
 export async function getActions(
   api: ESPHomeAPI,
   bundleNames: string[],
-  componentKeys: string[],
+  componentKeys: string[]
 ): Promise<SchemaAction[]> {
-  const bundles = await Promise.all(
-    bundleNames.map((name) => fetchBundle(api, name)),
-  );
+  const bundles = await Promise.all(bundleNames.map((name) => fetchBundle(api, name)));
   const wantedKeys = new Set(componentKeys);
   const out: SchemaAction[] = [];
   const seen = new Set<string>();

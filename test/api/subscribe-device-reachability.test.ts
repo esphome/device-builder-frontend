@@ -243,7 +243,7 @@ describe("ESPHomeAPI.subscribeDeviceReachability", () => {
           return 0 as unknown as ReturnType<typeof setTimeout>;
         }
         return realSetTimeout(fn, delay, ...args);
-      },
+      }
     );
 
     try {
@@ -270,9 +270,9 @@ describe("ESPHomeAPI.subscribeDeviceReachability", () => {
     const api = new ESPHomeAPI();
     // Don't connect — the call should reject immediately rather
     // than queuing forever or sending into a closed transport.
-    await expect(
-      api.subscribeDeviceReachability("kitchen", () => {}),
-    ).rejects.toThrow(/not connected/i);
+    await expect(api.subscribeDeviceReachability("kitchen", () => {})).rejects.toThrow(
+      /not connected/i
+    );
   });
 
   it("bumps connectionGeneration on every WS open", async () => {

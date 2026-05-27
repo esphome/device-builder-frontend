@@ -15,11 +15,7 @@
  * to ``components/device``).
  */
 import { vi } from "vitest";
-import type {
-  BoardCatalogEntry,
-  BoardPin,
-  ConfigEntry,
-} from "../../../src/api/types.js";
+import type { BoardCatalogEntry, BoardPin, ConfigEntry } from "../../../src/api/types.js";
 import { ConfigEntryType } from "../../../src/api/types.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
@@ -31,10 +27,7 @@ import {
  *  input+output GPIO with ``available=true`` so the pin-renderer's
  *  feature filter and disabled-pin filter both see it as eligible.
  */
-export function makeBoardPin(
-  gpio: number,
-  overrides: Partial<BoardPin> = {},
-): BoardPin {
+export function makeBoardPin(gpio: number, overrides: Partial<BoardPin> = {}): BoardPin {
   return {
     gpio,
     label: `GPIO${gpio}`,
@@ -52,7 +45,7 @@ export function makeBoardPin(
  *  override the default 3-pin set, or pass ``overrides`` to swap
  *  any other field. */
 export function makeTestBoard(
-  options: { pins?: BoardPin[]; overrides?: Partial<BoardCatalogEntry> } = {},
+  options: { pins?: BoardPin[]; overrides?: Partial<BoardCatalogEntry> } = {}
 ): BoardCatalogEntry {
   const pins = options.pins ?? [makeBoardPin(0), makeBoardPin(2), makeBoardPin(33)];
   return {
@@ -81,7 +74,7 @@ export function makeRenderCtx(
   options: {
     board?: BoardCatalogEntry | null;
     overrides?: Partial<RenderCtx>;
-  } = {},
+  } = {}
 ): RenderCtx {
   return {
     localize: ((k: string) => k) as never,
@@ -128,7 +121,7 @@ export function makeRenderCtx(
  *  ``required``, ``pin_features``, etc. */
 export function makeEntry(
   type: ConfigEntryType,
-  overrides: Partial<ConfigEntry> = {},
+  overrides: Partial<ConfigEntry> = {}
 ): ConfigEntry {
   return {
     key: "field",
@@ -158,9 +151,7 @@ export function makeEntry(
  */
 export function findElementBindings(
   template: unknown,
-  tag: string,
+  tag: string
 ): Record<string, unknown>[] {
-  return findTemplatesByAnchor(template, `<${tag}`).map(
-    extractAttributeBindings,
-  );
+  return findTemplatesByAnchor(template, `<${tag}`).map(extractAttributeBindings);
 }

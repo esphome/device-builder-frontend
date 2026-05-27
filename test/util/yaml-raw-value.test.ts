@@ -22,10 +22,7 @@ describe("YamlRawValue.toString", () => {
     //       lambda: |-
     //         return foo;
     //         return bar;
-    const raw = new YamlRawValue(
-      ["        return foo;", "        return bar;"],
-      "|-",
-    );
+    const raw = new YamlRawValue(["        return foo;", "        return bar;"], "|-");
     expect(String(raw)).toBe("return foo;\nreturn bar;");
   });
 
@@ -44,7 +41,7 @@ describe("YamlRawValue.indent", () => {
   it("picks the common leading whitespace of every non-blank line", () => {
     const raw = new YamlRawValue(
       ["    return foo;", "    if (bar) {", "      return baz;", "    }"],
-      "|-",
+      "|-"
     );
     expect(raw.indent).toBe("    ");
   });
@@ -52,10 +49,7 @@ describe("YamlRawValue.indent", () => {
   it("ignores blank lines when computing the common indent", () => {
     // A blank middle line shouldn't collapse the common indent
     // to "" — the body's indent comes from the non-blank lines.
-    const raw = new YamlRawValue(
-      ["    return foo;", "", "    return bar;"],
-      "|-",
-    );
+    const raw = new YamlRawValue(["    return foo;", "", "    return bar;"], "|-");
     expect(raw.indent).toBe("    ");
   });
 
@@ -77,10 +71,7 @@ describe("YamlRawValue.indent", () => {
 
 describe("YamlRawValue.body", () => {
   it("strips the common indent across all lines", () => {
-    const raw = new YamlRawValue(
-      ["    return foo;", "    return bar;"],
-      "|-",
-    );
+    const raw = new YamlRawValue(["    return foo;", "    return bar;"], "|-");
     expect(raw.body).toBe("return foo;\nreturn bar;");
   });
 
@@ -89,32 +80,20 @@ describe("YamlRawValue.body", () => {
     // their own indent — the common-prefix stripping must keep
     // those deeper indents intact, otherwise we'd corrupt the
     // user's formatting on display.
-    const raw = new YamlRawValue(
-      ["    if (x) {", "      return foo;", "    }"],
-      "|-",
-    );
+    const raw = new YamlRawValue(["    if (x) {", "      return foo;", "    }"], "|-");
     expect(raw.body).toBe("if (x) {\n  return foo;\n}");
   });
 
   it("preserves blank lines verbatim", () => {
-    const raw = new YamlRawValue(
-      ["    return foo;", "", "    return bar;"],
-      "|-",
-    );
+    const raw = new YamlRawValue(["    return foo;", "", "    return bar;"], "|-");
     expect(raw.body).toBe("return foo;\n\nreturn bar;");
   });
 });
 
 describe("YamlRawValue.fromBodyText", () => {
   it("re-applies the original common indent and preserves the inline header", () => {
-    const original = new YamlRawValue(
-      ["    return foo;", "    return bar;"],
-      "|-",
-    );
-    const edited = YamlRawValue.fromBodyText(
-      "return baz;\nreturn qux;",
-      original,
-    );
+    const original = new YamlRawValue(["    return foo;", "    return bar;"], "|-");
+    const edited = YamlRawValue.fromBodyText("return baz;\nreturn qux;", original);
     expect(edited.lines).toEqual(["    return baz;", "    return qux;"]);
     expect(edited.inlineHeader).toBe("|-");
   });
@@ -123,10 +102,7 @@ describe("YamlRawValue.fromBodyText", () => {
     // ``original.body → fromBodyText → .body`` must be identity for
     // the no-edit case, otherwise opening + saving without typing
     // would mutate the YAML.
-    const original = new YamlRawValue(
-      ["    return foo;", "      return bar;"],
-      "|-",
-    );
+    const original = new YamlRawValue(["    return foo;", "      return bar;"], "|-");
     const roundTripped = YamlRawValue.fromBodyText(original.body, original);
     expect(roundTripped.body).toBe(original.body);
   });
@@ -135,19 +111,9 @@ describe("YamlRawValue.fromBodyText", () => {
     // YAML block-scalar bodies can have blank lines; those should
     // round-trip as TRULY empty lines (no trailing whitespace) so
     // a subsequent re-parse doesn't see "this is a continuation."
-    const original = new YamlRawValue(
-      ["    return foo;", "    return bar;"],
-      "|-",
-    );
-    const edited = YamlRawValue.fromBodyText(
-      "return foo;\n\nreturn bar;",
-      original,
-    );
-    expect(edited.lines).toEqual([
-      "    return foo;",
-      "",
-      "    return bar;",
-    ]);
+    const original = new YamlRawValue(["    return foo;", "    return bar;"], "|-");
+    const edited = YamlRawValue.fromBodyText("return foo;\n\nreturn bar;", original);
+    expect(edited.lines).toEqual(["    return foo;", "", "    return bar;"]);
   });
 
   it("handles bodies with no original indent (zero-prefix lines)", () => {

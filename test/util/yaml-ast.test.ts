@@ -81,9 +81,7 @@ describe("resolveBundleContext", () => {
     // (``readPlatformSibling``) breaks at the dash column and
     // misses the ``platform:`` sibling — the AST is what makes
     // this work. Pin the resolution at exactly that position.
-    const yaml = ["binary_sensor:", "  - platform: gpio", "    pi"].join(
-      "\n",
-    );
+    const yaml = ["binary_sensor:", "  - platform: gpio", "    pi"].join("\n");
     const state = makeState(yaml);
     const ctx = resolveBundleContext(state, yaml.length);
     expect(ctx).toEqual({
@@ -98,11 +96,7 @@ describe("resolveBundleContext", () => {
     // keys at 6 spaces). YAML accepts any consistent indent; the
     // AST should resolve the same context regardless of whether
     // the user picked 2- or 4-space style.
-    const yaml = [
-      "sensor:",
-      "    - platform: uptime",
-      "      nam",
-    ].join("\n");
+    const yaml = ["sensor:", "    - platform: uptime", "      nam"].join("\n");
     const state = makeState(yaml);
     const ctx = resolveBundleContext(state, yaml.length);
     expect(ctx).toEqual({
@@ -134,7 +128,8 @@ describe("resolveBundleContext", () => {
 
 describe("getTopLevelKey", () => {
   it("returns the column-0 ancestor key", () => {
-    const yaml = "esphome:\n  name: test\nbinary_sensor:\n  - platform: gpio\n    pin: 5\n";
+    const yaml =
+      "esphome:\n  name: test\nbinary_sensor:\n  - platform: gpio\n    pin: 5\n";
     const state = makeState(yaml);
     expect(getTopLevelKey(state, posAt(yaml, 2, 5))).toBe("esphome");
     expect(getTopLevelKey(state, posAt(yaml, 5, 5))).toBe("binary_sensor");
@@ -194,8 +189,7 @@ describe("getPlatformValue", () => {
 
 describe("isUnderThenItem", () => {
   it("returns true at the list-item position inside a then: block", () => {
-    const yaml =
-      "esphome:\n  on_boot:\n    then:\n      - logger.log: hi\n";
+    const yaml = "esphome:\n  on_boot:\n    then:\n      - logger.log: hi\n";
     const state = makeState(yaml);
     // Cursor on the ``- logger.log`` line, inside the Item.
     expect(isUnderThenItem(state, posAt(yaml, 4, 9))).toBe(true);
@@ -254,21 +248,13 @@ describe("isUnderThenItem", () => {
 
 describe("collectTopLevelKeys", () => {
   it("returns each top-level key once, in document order", () => {
-    const yaml =
-      "esphome:\n  name: test\nwifi:\n  ssid: x\nlogger:\n  level: INFO\n";
-    expect(collectTopLevelKeys(makeState(yaml))).toEqual([
-      "esphome",
-      "wifi",
-      "logger",
-    ]);
+    const yaml = "esphome:\n  name: test\nwifi:\n  ssid: x\nlogger:\n  level: INFO\n";
+    expect(collectTopLevelKeys(makeState(yaml))).toEqual(["esphome", "wifi", "logger"]);
   });
 
   it("skips nested keys (only column-0 pairs)", () => {
     const yaml = "esphome:\n  name: test\n  on_boot:\nwifi:\n  ssid: x\n";
-    expect(collectTopLevelKeys(makeState(yaml))).toEqual([
-      "esphome",
-      "wifi",
-    ]);
+    expect(collectTopLevelKeys(makeState(yaml))).toEqual(["esphome", "wifi"]);
   });
 
   it("returns [] for empty / unparseable input", () => {

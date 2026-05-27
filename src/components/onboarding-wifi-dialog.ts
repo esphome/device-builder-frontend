@@ -182,7 +182,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             ${this._localize("onboarding.wifi.intro")}
           </p>
           <div class="field">
-            <label for="onboarding-ssid">${this._localize("onboarding.wifi.ssid_label")}</label>
+            <label for="onboarding-ssid"
+              >${this._localize("onboarding.wifi.ssid_label")}</label
+            >
             <input
               id="onboarding-ssid"
               type="text"
@@ -196,7 +198,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             />
           </div>
           <div class="field">
-            <label for="onboarding-password">${this._localize("onboarding.wifi.password_label")}</label>
+            <label for="onboarding-password"
+              >${this._localize("onboarding.wifi.password_label")}</label
+            >
             <esphome-password-input
               id="onboarding-password"
               .value=${this._password}
@@ -204,9 +208,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               .maxlength=${64}
               .label=${this._localize("onboarding.wifi.password_label")}
               ?disabled=${this._saving}
-              @password-input-change=${(
-                e: CustomEvent<PasswordInputValueChange>,
-              ) => {
+              @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) => {
                 this._password = e.detail.value;
               }}
             ></esphome-password-input>
@@ -275,9 +277,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     // circuit. Fired before ``markOnboardingAcknowledged`` so a
     // failure on the second call doesn't suppress the refresh
     // — the wifi write is the user-visible state change.
-    window.dispatchEvent(
-      new CustomEvent("secrets-saved", { detail: { source: this } }),
-    );
+    window.dispatchEvent(new CustomEvent("secrets-saved", { detail: { source: this } }));
     try {
       // Acknowledge so the dialog doesn't re-pop on next load even
       // if the badge logic wants to keep the menu indicator.
@@ -378,7 +378,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       new CustomEvent("onboarding-dismissed-session", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this.close();
   };
@@ -388,7 +388,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       new CustomEvent("onboarding-acknowledged", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

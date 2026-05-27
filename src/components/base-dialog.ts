@@ -156,7 +156,7 @@ export class ESPHomeBaseDialog extends LitElement {
     // descendant ``wa-dialog`` rather than our own.
     if (e.target !== e.currentTarget) return;
     this.dispatchEvent(
-      new CustomEvent("after-hide", { bubbles: false, composed: false }),
+      new CustomEvent("after-hide", { bubbles: false, composed: false })
     );
   };
 

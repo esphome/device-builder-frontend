@@ -48,7 +48,7 @@ export interface IntegrationSplit {
 
 export function splitIntegrations(
   loaded: readonly string[] | null | undefined,
-  directlyReferenced: readonly string[] | null | undefined,
+  directlyReferenced: readonly string[] | null | undefined
 ): IntegrationSplit {
   const loadedList = loaded ?? [];
   const direct = directlyReferenced ?? [];

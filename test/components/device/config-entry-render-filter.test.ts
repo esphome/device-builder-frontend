@@ -29,10 +29,14 @@ describe("filterRenderable", () => {
       makeEntry({ key: "a", hidden: true }),
       makeEntry({ key: "b", required: true }),
     ];
-    const out = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const out = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect(out.map((e) => e.key)).toEqual(["b"]);
   });
 
@@ -41,15 +45,23 @@ describe("filterRenderable", () => {
       makeEntry({ key: "a", advanced: true, required: true }),
       makeEntry({ key: "b", required: true }),
     ];
-    const required = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const required = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect(required.map((e) => e.key)).toEqual(["b"]);
-    const withAdv = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: true,
-    });
+    const withAdv = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: true,
+      }
+    );
     expect(withAdv.map((e) => e.key)).toEqual(["a", "b"]);
   });
 
@@ -59,10 +71,14 @@ describe("filterRenderable", () => {
       makeEntry({ key: "fast_connect", advanced: true }),
       makeEntry({ key: "ssid", required: true }),
     ];
-    const out = filterRenderable(entries, { tx_power: "20dB", ssid: "x" }, {
-      requiredOnly: false,
-      showAdvanced: false,
-    });
+    const out = filterRenderable(
+      entries,
+      { tx_power: "20dB", ssid: "x" },
+      {
+        requiredOnly: false,
+        showAdvanced: false,
+      }
+    );
     // `tx_power` survives because YAML supplied a value;
     // `fast_connect` stays hidden because it isn't filled.
     expect(out.map((e) => e.key)).toEqual(["tx_power", "ssid"]);
@@ -77,13 +93,9 @@ describe("filterRenderable", () => {
     const out = filterRenderable(
       entries,
       { use_address: false, channel: 0, comment: "" },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
-    expect(out.map((e) => e.key)).toEqual([
-      "use_address",
-      "channel",
-      "comment",
-    ]);
+    expect(out.map((e) => e.key)).toEqual(["use_address", "channel", "comment"]);
   });
 
   it("keeps an advanced NESTED group when any descendant has a value", () => {
@@ -92,22 +104,23 @@ describe("filterRenderable", () => {
         key: "manual_ip",
         type: ConfigEntryType.NESTED,
         advanced: true,
-        config_entries: [
-          makeEntry({ key: "static_ip" }),
-          makeEntry({ key: "gateway" }),
-        ],
+        config_entries: [makeEntry({ key: "static_ip" }), makeEntry({ key: "gateway" })],
       }),
     ];
     const filled = filterRenderable(
       entries,
       { manual_ip: { static_ip: "10.0.0.5" } },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(filled.map((e) => e.key)).toEqual(["manual_ip"]);
-    const empty = filterRenderable(entries, {}, {
-      requiredOnly: false,
-      showAdvanced: false,
-    });
+    const empty = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: false,
+        showAdvanced: false,
+      }
+    );
     expect(empty.map((e) => e.key)).toEqual([]);
   });
 
@@ -125,19 +138,19 @@ describe("filterRenderable", () => {
     const filled = filterRenderable(
       entries,
       { ota: { platform: "esphome", password: "secret" } },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(filled.map((e) => e.key)).toEqual(["ota"]);
     const filledChildren = filterRenderable(
       entries[0].config_entries!,
       { platform: "esphome", password: "secret" },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(filledChildren.map((e) => e.key)).toEqual(["platform", "password"]);
     const emptyChildren = filterRenderable(
       entries[0].config_entries!,
       { platform: "esphome" },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(emptyChildren.map((e) => e.key)).toEqual(["platform"]);
   });
@@ -148,10 +161,14 @@ describe("filterRenderable", () => {
       makeEntry({ key: "name" }), // optional but always shown
       makeEntry({ key: "scl", required: true }),
     ];
-    const out = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const out = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect(out.map((e) => e.key)).toEqual(["name", "scl"]);
   });
 
@@ -160,10 +177,14 @@ describe("filterRenderable", () => {
       makeEntry({ key: "freq" }),
       makeEntry({ key: "scl", required: true }),
     ];
-    const out = filterRenderable(entries, {}, {
-      requiredOnly: false,
-      showAdvanced: true,
-    });
+    const out = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: false,
+        showAdvanced: true,
+      }
+    );
     expect(out.map((e) => e.key)).toEqual(["freq", "scl"]);
   });
 
@@ -180,10 +201,14 @@ describe("filterRenderable", () => {
         ],
       }),
     ];
-    const out = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const out = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect(out.map((e) => e.key)).toEqual([]);
   });
 
@@ -198,10 +223,14 @@ describe("filterRenderable", () => {
         ],
       }),
     ];
-    const out = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const out = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect(out.map((e) => e.key)).toEqual(["auth"]);
   });
 
@@ -226,13 +255,13 @@ describe("filterRenderable", () => {
     const empty = filterRenderable(
       entries,
       {},
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(empty.map((e) => e.key)).toEqual(["devices"]);
     const populated = filterRenderable(
       entries,
       { devices: [{ id: "front" }] },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(populated.map((e) => e.key)).toEqual(["devices"]);
   });
@@ -256,8 +285,14 @@ describe("filterRenderable", () => {
     ];
     const out = filterRenderable(
       entries,
-      { devices: new YamlRawValue(["    - id: kitchen", "      filters:", "        delta: 0.5"]) },
-      { requiredOnly: false, showAdvanced: false },
+      {
+        devices: new YamlRawValue([
+          "    - id: kitchen",
+          "      filters:",
+          "        delta: 0.5",
+        ]),
+      },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(out.map((e) => e.key)).toEqual(["devices"]);
   });
@@ -278,13 +313,13 @@ describe("filterRenderable", () => {
     const filled = filterRenderable(
       entries,
       { devices: [{ id: "front" }] },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect(filled.map((e) => e.key)).toEqual(["devices"]);
     const empty = filterRenderable(
       entries,
       { devices: [] },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     // Empty array → not material → advanced gate hides it.
     expect(empty.map((e) => e.key)).toEqual([]);
@@ -302,17 +337,25 @@ describe("filterRenderable", () => {
     ];
     // mode != "expert" → advanced_opt hidden.
     expect(
-      filterRenderable(entries, { mode: "basic" }, {
-        requiredOnly: true,
-        showAdvanced: false,
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        { mode: "basic" },
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+        }
+      ).map((e) => e.key)
     ).toEqual(["mode"]);
     // mode == "expert" → both visible.
     expect(
-      filterRenderable(entries, { mode: "expert" }, {
-        requiredOnly: true,
-        showAdvanced: false,
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        { mode: "expert" },
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+        }
+      ).map((e) => e.key)
     ).toEqual(["mode", "advanced_opt"]);
   });
 
@@ -326,18 +369,26 @@ describe("filterRenderable", () => {
       makeEntry({ key: "name", required: true }),
     ];
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        presentComponents: new Set(["esphome"]),
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          presentComponents: new Set(["esphome"]),
+        }
+      ).map((e) => e.key)
     ).toEqual(["name"]);
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        presentComponents: new Set(["esphome", "mqtt"]),
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          presentComponents: new Set(["esphome", "mqtt"]),
+        }
+      ).map((e) => e.key)
     ).toEqual(["mqtt_topic", "name"]);
   });
 
@@ -356,17 +407,25 @@ describe("filterRenderable", () => {
       }),
       makeEntry({ key: "free", required: true }),
     ];
-    const onEsp8266 = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-      targetPlatform: "esp8266",
-    });
+    const onEsp8266 = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp8266",
+      }
+    );
     expect(onEsp8266.map((e) => e.key)).toEqual(["free"]);
-    const onEsp32 = filterRenderable(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-      targetPlatform: "esp32",
-    });
+    const onEsp32 = filterRenderable(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+        targetPlatform: "esp32",
+      }
+    );
     expect(onEsp32.map((e) => e.key)).toEqual(["psram", "free"]);
   });
 
@@ -383,25 +442,37 @@ describe("filterRenderable", () => {
       }),
     ];
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        targetPlatform: "esp32",
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          targetPlatform: "esp32",
+        }
+      ).map((e) => e.key)
     ).toEqual(["fragmentation"]);
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        targetPlatform: "esp8266",
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          targetPlatform: "esp8266",
+        }
+      ).map((e) => e.key)
     ).toEqual(["fragmentation"]);
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        targetPlatform: "rp2040",
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          targetPlatform: "rp2040",
+        }
+      ).map((e) => e.key)
     ).toEqual([]);
   });
 
@@ -413,11 +484,15 @@ describe("filterRenderable", () => {
       makeEntry({ key: "free", required: true }),
     ];
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        targetPlatform: "esp8266",
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          targetPlatform: "esp8266",
+        }
+      ).map((e) => e.key)
     ).toEqual(["loop_time", "free"]);
   });
 
@@ -435,17 +510,25 @@ describe("filterRenderable", () => {
       }),
     ];
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        targetPlatform: null,
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          targetPlatform: null,
+        }
+      ).map((e) => e.key)
     ).toEqual(["psram"]);
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+        }
+      ).map((e) => e.key)
     ).toEqual(["psram"]);
   });
 
@@ -467,11 +550,15 @@ describe("filterRenderable", () => {
       }),
     ];
     expect(
-      filterRenderable(entries, {}, {
-        requiredOnly: true,
-        showAdvanced: false,
-        targetPlatform: "esp8266",
-      }).map((e) => e.key),
+      filterRenderable(
+        entries,
+        {},
+        {
+          requiredOnly: true,
+          showAdvanced: false,
+          targetPlatform: "esp8266",
+        }
+      ).map((e) => e.key)
     ).toEqual([]);
   });
 });
@@ -483,10 +570,14 @@ describe("collectRenderablePaths", () => {
       makeEntry({ key: "sda", required: true }),
       makeEntry({ key: "freq" }), // dropped in required-only
     ];
-    const paths = collectRenderablePaths(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const paths = collectRenderablePaths(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect([...paths].sort()).toEqual(["scl", "sda"]);
   });
 
@@ -501,15 +592,15 @@ describe("collectRenderablePaths", () => {
         ],
       }),
     ];
-    const paths = collectRenderablePaths(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
-    expect([...paths].sort()).toEqual([
-      "auth",
-      "auth.password",
-      "auth.username",
-    ]);
+    const paths = collectRenderablePaths(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
+    expect([...paths].sort()).toEqual(["auth", "auth.password", "auth.username"]);
   });
 
   it("omits NESTED groups whose children are all filtered out", () => {
@@ -523,10 +614,14 @@ describe("collectRenderablePaths", () => {
       }),
       makeEntry({ key: "name", required: true }),
     ];
-    const paths = collectRenderablePaths(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const paths = collectRenderablePaths(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect([...paths].sort()).toEqual(["name"]);
   });
 
@@ -536,10 +631,14 @@ describe("collectRenderablePaths", () => {
       makeEntry({ key: "adv", required: true, advanced: true }),
       makeEntry({ key: "vis", required: true }),
     ];
-    const paths = collectRenderablePaths(entries, {}, {
-      requiredOnly: true,
-      showAdvanced: false,
-    });
+    const paths = collectRenderablePaths(
+      entries,
+      {},
+      {
+        requiredOnly: true,
+        showAdvanced: false,
+      }
+    );
     expect([...paths]).toEqual(["vis"]);
   });
 
@@ -558,7 +657,7 @@ describe("collectRenderablePaths", () => {
     const paths = collectRenderablePaths(
       entries,
       { devices: [{ id: "front" }, { id: "kitchen", name: "Kitchen" }] },
-      { requiredOnly: false, showAdvanced: false },
+      { requiredOnly: false, showAdvanced: false }
     );
     expect([...paths].sort()).toEqual(
       [
@@ -567,7 +666,7 @@ describe("collectRenderablePaths", () => {
         "devices.0.name",
         "devices.1.id",
         "devices.1.name",
-      ].sort(),
+      ].sort()
     );
   });
 
@@ -583,10 +682,14 @@ describe("collectRenderablePaths", () => {
         config_entries: [makeEntry({ key: "id", required: true })],
       }),
     ];
-    const paths = collectRenderablePaths(entries, {}, {
-      requiredOnly: false,
-      showAdvanced: false,
-    });
+    const paths = collectRenderablePaths(
+      entries,
+      {},
+      {
+        requiredOnly: false,
+        showAdvanced: false,
+      }
+    );
     expect([...paths]).toEqual(["devices"]);
   });
 });

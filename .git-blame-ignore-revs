@@ -1,0 +1,11 @@
+# Revisions listed here are skipped by ``git blame --ignore-revs-file``
+# and by GitHub's blame view (which honours the file automatically).
+# Use sparingly; only for whole-tree reformats whose authorship would
+# otherwise obscure the substantive change a reader is hunting for.
+#
+# To enable locally:
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# Format src and test with prettier (chore: close the CI / pre-commit
+# prettier gap).
+0c6a3911b8854ed4951bf008c2c282a2f621415c

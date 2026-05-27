@@ -67,30 +67,34 @@ type Stubbed = {
 };
 
 const stubApi = (impls?: {
-  triggers?: (platform?: string, boardId?: string) =>
-    | Promise<AutomationTrigger[]>
-    | AutomationTrigger[];
-  actions?: (platform?: string, boardId?: string) =>
-    | Promise<AutomationAction[]>
-    | AutomationAction[];
-  conditions?: (platform?: string, boardId?: string) =>
-    | Promise<AutomationCondition[]>
-    | AutomationCondition[];
-  effects?: (platform?: string, boardId?: string) =>
-    | Promise<LightEffect[]>
-    | LightEffect[];
+  triggers?: (
+    platform?: string,
+    boardId?: string
+  ) => Promise<AutomationTrigger[]> | AutomationTrigger[];
+  actions?: (
+    platform?: string,
+    boardId?: string
+  ) => Promise<AutomationAction[]> | AutomationAction[];
+  conditions?: (
+    platform?: string,
+    boardId?: string
+  ) => Promise<AutomationCondition[]> | AutomationCondition[];
+  effects?: (
+    platform?: string,
+    boardId?: string
+  ) => Promise<LightEffect[]> | LightEffect[];
 }): Stubbed => {
   const getAutomationTriggers = vi.fn((platform?: string, boardId?: string) =>
-    Promise.resolve(impls?.triggers?.(platform, boardId) ?? [trigger("on_boot")]),
+    Promise.resolve(impls?.triggers?.(platform, boardId) ?? [trigger("on_boot")])
   );
   const getAutomationActions = vi.fn((platform?: string, boardId?: string) =>
-    Promise.resolve(impls?.actions?.(platform, boardId) ?? [action("delay")]),
+    Promise.resolve(impls?.actions?.(platform, boardId) ?? [action("delay")])
   );
   const getAutomationConditions = vi.fn((platform?: string, boardId?: string) =>
-    Promise.resolve(impls?.conditions?.(platform, boardId) ?? [condition("and")]),
+    Promise.resolve(impls?.conditions?.(platform, boardId) ?? [condition("and")])
   );
   const getLightEffects = vi.fn((platform?: string, boardId?: string) =>
-    Promise.resolve(impls?.effects?.(platform, boardId) ?? [effect("pulse")]),
+    Promise.resolve(impls?.effects?.(platform, boardId) ?? [effect("pulse")])
   );
   return {
     api: {

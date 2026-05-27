@@ -32,7 +32,7 @@ export function seedBoardPinDefaults(
   componentId: string,
   configEntries: ConfigEntry[],
   board: BoardCatalogEntry | null,
-  values: Record<string, unknown>,
+  values: Record<string, unknown>
 ): Record<string, unknown> {
   if (!board?.pins?.length) return values;
   // Platform-qualified ids (``audio_adc.es7210``) → skip. Bus-like

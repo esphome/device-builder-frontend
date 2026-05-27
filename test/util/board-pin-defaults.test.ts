@@ -72,12 +72,9 @@ describe("seedBoardPinDefaults", () => {
   ];
 
   it("seeds matching pins from board manifest features", () => {
-    const result = seedBoardPinDefaults(
-      "i2c",
-      i2cEntries,
-      makeBoard(c3Pins),
-      { id: "i2c_1" },
-    );
+    const result = seedBoardPinDefaults("i2c", i2cEntries, makeBoard(c3Pins), {
+      id: "i2c_1",
+    });
     // GPIO8 is tagged i2c_sda → sda entry gets 8.
     // GPIO9 is tagged i2c_scl → scl entry gets 9.
     expect(result).toEqual({ id: "i2c_1", scl: 9, sda: 8 });
@@ -89,7 +86,7 @@ describe("seedBoardPinDefaults", () => {
       i2cEntries,
       makeBoard(c3Pins),
       // User typed scl manually before clicking Add.
-      { id: "i2c_1", scl: 5 },
+      { id: "i2c_1", scl: 5 }
     );
     // sda still seeded; scl untouched.
     expect(result).toEqual({ id: "i2c_1", scl: 5, sda: 8 });
@@ -103,12 +100,9 @@ describe("seedBoardPinDefaults", () => {
   });
 
   it("returns input unchanged when board has no pins", () => {
-    const result = seedBoardPinDefaults(
-      "i2c",
-      i2cEntries,
-      makeBoard([]),
-      { id: "i2c_1" },
-    );
+    const result = seedBoardPinDefaults("i2c", i2cEntries, makeBoard([]), {
+      id: "i2c_1",
+    });
     expect(result).toEqual({ id: "i2c_1" });
   });
 
@@ -134,7 +128,7 @@ describe("seedBoardPinDefaults", () => {
       "audio_adc.es7210",
       [makeEntry({ key: "din", default_value: "GPIO4" })],
       makeBoard([makePin({ gpio: 4, features: ["adc"] })]),
-      {},
+      {}
     );
     expect(result).toEqual({});
   });
@@ -151,7 +145,7 @@ describe("seedBoardPinDefaults", () => {
       "featured.athom-smart-plug-v3.relay",
       [makeEntry({ key: "pin", default_value: "GPIO12" })],
       makeBoard([makePin({ gpio: 8, features: ["i2c_sda"] })]),
-      { pin: "GPIO12" }, // catalog preset already in values
+      { pin: "GPIO12" } // catalog preset already in values
     );
     // No change — preset stays put.
     expect(result).toEqual({ pin: "GPIO12" });
@@ -160,9 +154,7 @@ describe("seedBoardPinDefaults", () => {
   it("only seeds PIN-typed entries, not other types", () => {
     // A board pin tagged i2c_frequency wouldn't make sense, but if
     // the manifest had it, the seeder must NOT touch a FLOAT entry.
-    const board = makeBoard([
-      makePin({ gpio: 8, features: ["i2c_frequency"] }),
-    ]);
+    const board = makeBoard([makePin({ gpio: 8, features: ["i2c_frequency"] })]);
     const result = seedBoardPinDefaults(
       "i2c",
       [
@@ -173,7 +165,7 @@ describe("seedBoardPinDefaults", () => {
         }),
       ],
       board,
-      {},
+      {}
     );
     expect(result).toEqual({});
   });
@@ -194,7 +186,7 @@ describe("seedBoardPinDefaults", () => {
         makeEntry({ key: "tx", default_value: "GPIO1" }),
       ],
       board,
-      {},
+      {}
     );
     // Only entries whose key matches the suffix after ``uart_`` get
     // seeded — ``rx`` and ``tx``. Mismatched keys (``rx_pin``,
@@ -215,7 +207,7 @@ describe("seedBoardPinDefaults", () => {
       "i2c",
       [makeEntry({ key: "sda", default_value: "SDA" })],
       board,
-      {},
+      {}
     );
     expect(result).toEqual({ sda: 8 });
   });

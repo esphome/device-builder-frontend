@@ -78,15 +78,9 @@ describe("deleteConfirmKey", () => {
 
 describe("isLabelNameDuplicate", () => {
   it("flags a name already in the catalog (case-insensitive)", () => {
-    expect(isLabelNameDuplicate("Kitchen", ["Bedroom", "Kitchen"], null)).toBe(
-      true,
-    );
-    expect(isLabelNameDuplicate("kitchen", ["Bedroom", "Kitchen"], null)).toBe(
-      true,
-    );
-    expect(isLabelNameDuplicate("KITCHEN", ["Bedroom", "Kitchen"], null)).toBe(
-      true,
-    );
+    expect(isLabelNameDuplicate("Kitchen", ["Bedroom", "Kitchen"], null)).toBe(true);
+    expect(isLabelNameDuplicate("kitchen", ["Bedroom", "Kitchen"], null)).toBe(true);
+    expect(isLabelNameDuplicate("KITCHEN", ["Bedroom", "Kitchen"], null)).toBe(true);
   });
 
   it("ignores leading/trailing whitespace", () => {
@@ -94,9 +88,7 @@ describe("isLabelNameDuplicate", () => {
   });
 
   it("does not flag a fresh name", () => {
-    expect(isLabelNameDuplicate("Garage", ["Bedroom", "Kitchen"], null)).toBe(
-      false,
-    );
+    expect(isLabelNameDuplicate("Garage", ["Bedroom", "Kitchen"], null)).toBe(false);
   });
 
   it("treats an empty / whitespace-only name as non-duplicate", () => {
@@ -110,21 +102,19 @@ describe("isLabelNameDuplicate", () => {
   it("excludes the editing label's own current name", () => {
     // User opened "Kitchen" for edit and types its name again —
     // shouldn't flag as duplicate.
-    expect(
-      isLabelNameDuplicate("Kitchen", ["Bedroom", "Kitchen"], "Kitchen"),
-    ).toBe(false);
+    expect(isLabelNameDuplicate("Kitchen", ["Bedroom", "Kitchen"], "Kitchen")).toBe(
+      false
+    );
     // Case-insensitive exclusion: typed casing differs from the
     // stored casing, but the editing-name match still applies.
-    expect(
-      isLabelNameDuplicate("kitchen", ["Bedroom", "Kitchen"], "Kitchen"),
-    ).toBe(false);
+    expect(isLabelNameDuplicate("kitchen", ["Bedroom", "Kitchen"], "Kitchen")).toBe(
+      false
+    );
   });
 
   it("still flags a name that collides with a different existing label in edit mode", () => {
     // User editing "Kitchen" tries to rename it to "Bedroom" —
     // that's a real collision.
-    expect(
-      isLabelNameDuplicate("Bedroom", ["Bedroom", "Kitchen"], "Kitchen"),
-    ).toBe(true);
+    expect(isLabelNameDuplicate("Bedroom", ["Bedroom", "Kitchen"], "Kitchen")).toBe(true);
   });
 });
