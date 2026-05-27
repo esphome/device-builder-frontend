@@ -26,7 +26,12 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
+import {
+  apiContext,
+  devicesContext,
+  labelsContext,
+  localizeContext,
+} from "../../context/index.js";
 import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
@@ -63,8 +68,26 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   @state()
   private _catalog: Label[] = [];
 
+  /** Live device list from app-shell. Subscribed so a
+   *  ``device_updated`` event mid-dialog rebinds device objects
+   *  and ``_derivedState`` / ``_onToggle`` see fresh labels. */
+  @consume({ context: devicesContext, subscribe: true })
+  @state()
+  private _allDevices: ConfiguredDevice[] = [];
+
+  /** Configuration ids the dashboard selected when opening the
+   *  dialog. The actual ``ConfiguredDevice`` objects are looked
+   *  up from ``_allDevices`` on each access so they stay current
+   *  if a ``device_updated`` event lands while we're open (e.g.
+   *  after a partial-failure Apply where some devices succeed
+   *  and the backend re-emits with new labels). */
   @property({ attribute: false })
-  devices: ConfiguredDevice[] = [];
+  configurations: string[] = [];
+
+  get devices(): ConfiguredDevice[] {
+    const targets = new Set(this.configurations);
+    return this._allDevices.filter((d) => targets.has(d.configuration));
+  }
 
   /** Reactive ``open`` flag bound to ``<esphome-base-dialog>``.
    *  Imperative ``open()`` flips this to true; ``@after-hide``
@@ -113,24 +136,61 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     this._open = false;
   };
 
+  protected updated(changed: Map<string, unknown>) {
+    // Reconcile ``_pendingChanges`` against the live catalog: if
+    // a label was deleted elsewhere (another tab, the single-device
+    // editor's delete flow) while the dialog was open, drop any
+    // pending transition for the now-missing id. Otherwise the
+    // payload would include an id the backend no longer knows
+    // and surface as a per-device failure with no UI affordance
+    // for the user to clear it (the row is already gone from
+    // the catalog list).
+    if (changed.has("_catalog") && this._pendingChanges.size > 0) {
+      const validIds = new Set(this._catalog.map((l) => l.id));
+      let mutated = false;
+      const map = new Map(this._pendingChanges);
+      for (const id of map.keys()) {
+        if (!validIds.has(id)) {
+          map.delete(id);
+          mutated = true;
+        }
+      }
+      if (mutated) this._pendingChanges = map;
+    }
+  }
+
   /** Per-label count of selected devices that carry that label,
-   *  memoised by ``devices`` reference. Lazy so it works whether
-   *  it's hit from the Lit lifecycle or from a bare test instance
-   *  that sets ``devices`` directly. O(devices × avgLabels) once,
-   *  then O(1) per label for the dialog's lifetime. */
+   *  memoised by the upstream inputs (``_allDevices`` array
+   *  reference + ``configurations`` array reference) so each
+   *  ``_derivedState`` call inside a single render is O(1) after
+   *  the first. Rebuilds when either input changes — including
+   *  the ``device_updated`` event that replaces ``_allDevices``. */
   private _labelCounts: Map<string, number> = new Map();
-  private _labelCountsFor: ConfiguredDevice[] | null = null;
+  private _labelCountsFor: {
+    all: ConfiguredDevice[];
+    configs: string[];
+  } | null = null;
 
   private _ensureLabelCounts() {
-    if (this._labelCountsFor === this.devices) return;
+    if (
+      this._labelCountsFor?.all === this._allDevices &&
+      this._labelCountsFor?.configs === this.configurations
+    ) {
+      return;
+    }
     const counts = new Map<string, number>();
-    for (const device of this.devices) {
+    const targets = new Set(this.configurations);
+    for (const device of this._allDevices) {
+      if (!targets.has(device.configuration)) continue;
       for (const id of device.labels ?? []) {
         counts.set(id, (counts.get(id) ?? 0) + 1);
       }
     }
     this._labelCounts = counts;
-    this._labelCountsFor = this.devices;
+    this._labelCountsFor = {
+      all: this._allDevices,
+      configs: this.configurations,
+    };
   }
 
   /** Derived tri-state for a label across the current device set. */
@@ -303,6 +363,10 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     const checked = triState === "checked";
     const mixed = triState === "indeterminate";
     const ariaChecked = checked ? "true" : mixed ? "mixed" : "false";
+    // ``title`` only when ``mixed``: ``renderLabelChip`` below
+    // sets its own ``title=${label.name}`` on the chip span, so
+    // a row-level title in the non-mixed case is duplicate.
+    // ``undefined`` removes the attribute entirely (Lit semantics).
     return html`<button
       class="option"
       type="button"
@@ -310,7 +374,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       aria-checked=${ariaChecked}
       title=${mixed
         ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
-        : label.name}
+        : (undefined as unknown as string)}
       @click=${() => this._onToggle(label.id)}
     >
       <span

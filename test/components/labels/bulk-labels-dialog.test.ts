@@ -3,7 +3,11 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import type { BulkActionResult, ConfiguredDevice } from "../../../src/api/types.js";
+import type {
+  BulkActionResult,
+  ConfiguredDevice,
+  Label,
+} from "../../../src/api/types.js";
 import { ESPHomeBulkLabelsDialog } from "../../../src/components/labels/bulk-labels-dialog.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 
@@ -14,7 +18,10 @@ import { makeConfiguredDevice } from "../../_make-configured-device.js";
  */
 
 interface DialogView {
+  _allDevices: ConfiguredDevice[];
+  configurations: string[];
   devices: ESPHomeBulkLabelsDialog["devices"];
+  _catalog: Label[];
   _pendingChanges: Map<string, "checked" | "unchecked">;
   _saving: boolean;
   _open: boolean;
@@ -31,6 +38,16 @@ function makeDialog(): DialogView {
   return new ESPHomeBulkLabelsDialog() as unknown as DialogView;
 }
 
+/** Seed a bare dialog with ``_allDevices`` (mirrors the
+ *  ``devicesContext`` upstream) and ``configurations`` (what the
+ *  dashboard would set on open). The dialog's ``devices`` getter
+ *  resolves the filtered list from these inputs the same way it
+ *  would in production. */
+function seedDevices(dialog: DialogView, devices: ConfiguredDevice[]): void {
+  dialog._allDevices = devices;
+  dialog.configurations = devices.map((d) => d.configuration);
+}
+
 /** Build a dialog with a stubbed ``_api`` whose ``setDeviceLabelsBulk``
  *  returns whatever the test passes in (a result list or a thrown
  *  error). Centralises the boilerplate so the branch tests stay
@@ -43,7 +60,7 @@ function makeMockedDialog(
   devices: ConfiguredDevice[]
 ): DialogView {
   const dialog = makeDialog();
-  dialog.devices = devices;
+  seedDevices(dialog, devices);
   dialog._api = {
     setDeviceLabelsBulk: vi.fn(setDeviceLabelsBulkImpl),
   } as unknown as ESPHomeAPI;
@@ -54,28 +71,28 @@ function makeMockedDialog(
 describe("esphome-bulk-labels-dialog tri-state derivation", () => {
   test("label on every selected device renders checked", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-a"] }),
-    ];
+    ]);
     expect(dialog.effectiveState("lbl-a")).toBe("checked");
   });
 
   test("label on no selected device renders unchecked", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-a"] }),
-    ];
+    ]);
     expect(dialog.effectiveState("lbl-b")).toBe("unchecked");
   });
 
   test("label on some-but-not-all selected devices renders indeterminate", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
-    ];
+    ]);
     expect(dialog.effectiveState("lbl-a")).toBe("indeterminate");
   });
 });
@@ -83,9 +100,9 @@ describe("esphome-bulk-labels-dialog tri-state derivation", () => {
 describe("esphome-bulk-labels-dialog tri-state cycle", () => {
   test("checked -> click -> unchecked -> click -> checked", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
-    ];
+    ]);
     expect(dialog.effectiveState("lbl-a")).toBe("checked");
     dialog._pendingChanges = new Map([["lbl-a", "unchecked"]]);
     expect(dialog.effectiveState("lbl-a")).toBe("unchecked");
@@ -99,10 +116,10 @@ describe("esphome-bulk-labels-dialog tri-state cycle", () => {
     // already "checked" (in which case it goes to "unchecked").
     // Pinning the destination so the renderer can't drift.
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
-    ];
+    ]);
     expect(dialog.effectiveState("lbl-a")).toBe("indeterminate");
     // First click from indeterminate -> checked
     dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
@@ -113,10 +130,10 @@ describe("esphome-bulk-labels-dialog tri-state cycle", () => {
 describe("esphome-bulk-labels-dialog computeUpdates", () => {
   test("no pending changes -> no payload (every device is a no-op)", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-b"] }),
-    ];
+    ]);
     // Diff filter: with no transitions, every device's after-set
     // equals its before-set, so the payload is empty. The Apply
     // button is disabled in this state anyway (``_hasPendingChanges``),
@@ -127,10 +144,10 @@ describe("esphome-bulk-labels-dialog computeUpdates", () => {
 
   test("checked transition only emits entries for devices that actually change", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
-    ];
+    ]);
     dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
     // a.yaml already has lbl-a → no diff → skipped.
     // b.yaml gains lbl-a → diff → included.
@@ -141,10 +158,10 @@ describe("esphome-bulk-labels-dialog computeUpdates", () => {
 
   test("unchecked transition removes from every device that had it", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a", "lbl-b"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-a"] }),
-    ];
+    ]);
     dialog._pendingChanges = new Map([["lbl-a", "unchecked"]]);
     const updates = dialog.computeUpdates();
     const aLabels = updates.find((u) => u.configuration === "a.yaml")?.labelIds;
@@ -155,10 +172,10 @@ describe("esphome-bulk-labels-dialog computeUpdates", () => {
 
   test("untouched labels (indeterminate) preserve each device's existing assignment", () => {
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
-    ];
+    ]);
     // User toggled lbl-c on for everyone but didn't touch lbl-a.
     dialog._pendingChanges = new Map([["lbl-c", "checked"]]);
     const updates = dialog.computeUpdates();
@@ -173,15 +190,79 @@ describe("esphome-bulk-labels-dialog computeUpdates", () => {
 describe("esphome-bulk-labels-dialog Apply gating", () => {
   test("Apply is disabled when there are no pending changes", () => {
     const dialog = makeDialog();
-    dialog.devices = [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })];
+    seedDevices(dialog, [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]);
     expect(dialog._hasPendingChanges).toBe(false);
   });
 
   test("Apply enables once any label is touched", () => {
     const dialog = makeDialog();
-    dialog.devices = [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })];
+    seedDevices(dialog, [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]);
     dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
     expect(dialog._hasPendingChanges).toBe(true);
+  });
+});
+
+describe("esphome-bulk-labels-dialog stays bound to live devices", () => {
+  test("a DEVICE_UPDATED that replaces _allDevices refreshes derived state", () => {
+    // Repro for the discussion thread: app-shell replaces device
+    // objects on every DEVICE_UPDATED. The dialog must derive
+    // tri-state from the LIVE list, not a snapshot taken at open
+    // time. Otherwise a partial-failure retry (where succeeded
+    // devices got new labels mid-dialog) would compute against
+    // stale data.
+    const dialog = makeDialog();
+    seedDevices(dialog, [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+    ]);
+    expect(dialog.effectiveState("lbl-x")).toBe("unchecked");
+
+    // Simulate the DEVICE_UPDATED event: app-shell replaces _allDevices
+    // with a fresh array carrying new device objects (a.yaml now has
+    // lbl-x; b.yaml still doesn't).
+    dialog._allDevices = [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-x"] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+    ];
+    // configurations is unchanged but derived state now picks up
+    // the fresh labels from _allDevices.
+    expect(dialog.effectiveState("lbl-x")).toBe("indeterminate");
+  });
+
+  test("_onAfterHide flips _open false so the next render's ?open matches", () => {
+    // The wrapper's wa-after-hide fires after every dismissal
+    // (Esc / X / outside-click / reactive ?open flip). Without
+    // this listener, our local _open would drift out of sync
+    // with the wrapper's state and the next render would try to
+    // re-open the just-closed dialog.
+    const dialog = makeDialog();
+    dialog._open = true;
+    (dialog as unknown as { _onAfterHide: () => void })._onAfterHide();
+    expect(dialog._open).toBe(false);
+  });
+
+  test("catalog deletion drops the corresponding pending entry", () => {
+    // If another tab deletes a label while this dialog is open,
+    // the catalog updates reactively. ``_pendingChanges`` would
+    // otherwise hold a stale entry for the deleted id — Apply
+    // stays enabled and the payload includes the dead id.
+    const dialog = makeDialog();
+    seedDevices(dialog, [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]);
+    dialog._catalog = [{ id: "lbl-a", name: "Alpha", color: null }];
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+    expect(dialog._hasPendingChanges).toBe(true);
+
+    // Simulate the cross-tab delete: catalog now empty.
+    dialog._catalog = [];
+    // Drive the reactive cycle so updated() fires.
+    (
+      dialog as unknown as {
+        updated: (m: Map<string, unknown>) => void;
+      }
+    ).updated(new Map([["_catalog", []]]));
+
+    expect(dialog._pendingChanges.has("lbl-a")).toBe(false);
+    expect(dialog._hasPendingChanges).toBe(false);
   });
 });
 
@@ -192,10 +273,10 @@ describe("esphome-bulk-labels-dialog cycle-back drops stale pending changes", ()
     // brings it back to the derived "checked" state, which must
     // drop the pending entry so Apply doesn't fire a no-op write.
     const dialog = makeDialog();
-    dialog.devices = [
+    seedDevices(dialog, [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-a"] }),
-    ];
+    ]);
     // First click: derived "checked" → next is "unchecked", store it.
     (dialog as unknown as { _onToggle: (id: string) => void })._onToggle("lbl-a");
     expect(dialog._pendingChanges.get("lbl-a")).toBe("unchecked");

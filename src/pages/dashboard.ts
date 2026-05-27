@@ -781,10 +781,11 @@ export class ESPHomePageDashboard extends LitElement {
 
   _labelsSelected = () => {
     if (this._selectedDevices.size === 0) return;
-    const selectedSet = this._selectedDevices;
-    const devices = this._devices.filter((d) => selectedSet.has(d.configuration));
-    if (devices.length === 0) return;
-    this._bulkLabelsDialog.devices = devices;
+    // Pass configurations (ids) rather than ``Device`` objects; the
+    // dialog consumes ``devicesContext`` to resolve them on each
+    // render so they stay fresh through any DEVICE_UPDATED events
+    // that arrive while the dialog is open.
+    this._bulkLabelsDialog.configurations = [...this._selectedDevices];
     this._bulkLabelsDialog.open();
   };
 
