@@ -386,11 +386,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     const checked = triState === "checked";
     const mixed = triState === "indeterminate";
     const ariaChecked = checked ? "true" : mixed ? "mixed" : "false";
-    // ``title`` only when ``mixed``: ``renderLabelChip`` below
-    // sets its own ``title=${label.name}`` on the chip span, so a
-    // row-level title in the non-mixed case is duplicate. Lit's
-    // ``nothing`` sentinel removes the attribute cleanly without
-    // the TypeScript cast a plain ``undefined`` would need.
+    // Row-level title owns the tooltip for the whole row: the chip
+    // below opts out via ``suppressTitle`` so hovering chip vs.
+    // button background doesn't show two different tooltips on the
+    // same row. Mixed rows extend the title with the supplementary
+    // hint; non-mixed rows still get the label name.
     return html`<button
       class="option"
       type="button"
@@ -398,7 +398,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       aria-checked=${ariaChecked}
       title=${mixed
         ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
-        : nothing}
+        : label.name}
       @click=${() => this._onToggle(label.id)}
     >
       <span
@@ -414,7 +414,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
             ? html`<wa-icon library="mdi" name="minus"></wa-icon>`
             : nothing}
       </span>
-      ${renderLabelChip(label)}
+      ${renderLabelChip(label, { suppressTitle: true })}
     </button>`;
   }
 

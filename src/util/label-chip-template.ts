@@ -60,11 +60,21 @@ export const labelChipStyles: CSSResult = css`
   }
 `;
 
-export function renderLabelChip(label: Label): TemplateResult {
+/** Render a label chip.
+ *
+ *  ``options.suppressTitle`` lets a parent that owns its own
+ *  row-level ``title`` attribute opt out of the chip's native
+ *  tooltip; otherwise two tooltips fight for the same row (one
+ *  on the chip, one on the parent). The bulk-labels dialog is
+ *  the canonical caller. */
+export function renderLabelChip(
+  label: Label,
+  options: { suppressTitle?: boolean } = {}
+): TemplateResult {
   return html`<span
     class="label-chip"
     style=${labelChipStyleString(label.color)}
-    title=${label.name}
+    title=${options.suppressTitle ? nothing : label.name}
     >${label.name}</span
   >`;
 }
@@ -83,13 +93,15 @@ export function renderLabelChips(
   if (labels.length === 0) return nothing;
   const max = options.max ?? null;
   if (max === null || labels.length <= max) {
-    return html`<span class="label-chips"> ${labels.map(renderLabelChip)} </span>`;
+    return html`<span class="label-chips">
+      ${labels.map((l) => renderLabelChip(l))}
+    </span>`;
   }
   const visible = labels.slice(0, max);
   const hidden = labels.slice(max);
   const overflowTitle = hidden.map((l) => l.name).join(", ");
   return html`<span class="label-chips">
-    ${visible.map(renderLabelChip)}
+    ${visible.map((l) => renderLabelChip(l))}
     <span class="label-chip label-chip--overflow" title=${overflowTitle}
       >+${hidden.length}</span
     >
