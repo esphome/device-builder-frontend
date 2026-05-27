@@ -120,11 +120,7 @@ export const reauthWizardDialogStyles = css`
     gap: var(--wa-space-s);
     margin-top: var(--wa-space-m);
     padding: var(--wa-space-s) var(--wa-space-m);
-    background: color-mix(
-      in srgb,
-      var(--esphome-warning, #f59e0b),
-      transparent 92%
-    );
+    background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 92%);
     border-radius: var(--wa-border-radius-m);
     font-size: var(--wa-font-size-s);
     cursor: pointer;
@@ -145,11 +141,7 @@ export const reauthWizardDialogStyles = css`
     margin-top: var(--wa-space-m);
     padding: var(--wa-space-s) var(--wa-space-m);
     border-left: 3px solid var(--wa-color-warning-fill-loud);
-    background: color-mix(
-      in srgb,
-      var(--wa-color-warning-fill-loud),
-      transparent 88%
-    );
+    background: color-mix(in srgb, var(--wa-color-warning-fill-loud), transparent 88%);
     border-radius: var(--wa-border-radius-s);
     font-size: var(--wa-font-size-s);
     color: var(--wa-color-text-normal);

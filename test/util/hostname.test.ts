@@ -34,20 +34,16 @@ describe("trimTrailingDot", () => {
 
 describe("normalizeHostnameForCompare", () => {
   it("lowercases per RFC 4343", () => {
-    expect(normalizeHostnameForCompare("MyDashboard.LOCAL")).toBe(
-      "mydashboard.local",
-    );
+    expect(normalizeHostnameForCompare("MyDashboard.LOCAL")).toBe("mydashboard.local");
   });
 
   it("strips trailing dot", () => {
-    expect(normalizeHostnameForCompare("mydashboard.local.")).toBe(
-      "mydashboard.local",
-    );
+    expect(normalizeHostnameForCompare("mydashboard.local.")).toBe("mydashboard.local");
   });
 
   it("trims surrounding whitespace", () => {
     expect(normalizeHostnameForCompare("  mydashboard.local  ")).toBe(
-      "mydashboard.local",
+      "mydashboard.local"
     );
   });
 
@@ -56,7 +52,7 @@ describe("normalizeHostnameForCompare", () => {
     // Freshly-discovered mDNS row: "MyDashboard.local."
     // The "already paired" check must consider these equal.
     expect(normalizeHostnameForCompare("mydashboard.local")).toBe(
-      normalizeHostnameForCompare("MyDashboard.local."),
+      normalizeHostnameForCompare("MyDashboard.local.")
     );
   });
 
@@ -88,9 +84,7 @@ describe("friendlyHostname", () => {
   });
 
   it("returns the input shape for non-mDNS FQDNs", () => {
-    expect(friendlyHostname("buildhost.example.com")).toBe(
-      "buildhost.example.com",
-    );
+    expect(friendlyHostname("buildhost.example.com")).toBe("buildhost.example.com");
   });
 
   it("returns the input shape for plain short names", () => {

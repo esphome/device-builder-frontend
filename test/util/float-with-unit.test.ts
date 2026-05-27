@@ -111,8 +111,7 @@ describe("parseFloatWithUnit", () => {
 
   it("round-trips through serialize for typical inputs", () => {
     for (const raw of ["50kHz", "0.5mHz", "1000Hz", "-2GHz"]) {
-      expect(serializeFloatWithUnit(parseFloatWithUnit(raw, FREQUENCY_UNITS)))
-        .toBe(raw);
+      expect(serializeFloatWithUnit(parseFloatWithUnit(raw, FREQUENCY_UNITS))).toBe(raw);
     }
   });
 
@@ -291,18 +290,14 @@ describe("defaultUnitForFloatWithUnit", () => {
 
 describe("chooseDisplayUnit", () => {
   it("uses the parsed unit when the value is non-empty", () => {
-    expect(
-      chooseDisplayUnit("50kHz", "10MHz", undefined, FREQUENCY_UNITS),
-    ).toBe("kHz");
+    expect(chooseDisplayUnit("50kHz", "10MHz", undefined, FREQUENCY_UNITS)).toBe("kHz");
   });
 
   it("ignores the pending unit when the value is non-empty", () => {
     // Once the user has typed a number, the picker reflects the
     // value's unit — pending state from before they typed is
     // superseded.
-    expect(
-      chooseDisplayUnit("50kHz", "10MHz", "GHz", FREQUENCY_UNITS),
-    ).toBe("kHz");
+    expect(chooseDisplayUnit("50kHz", "10MHz", "GHz", FREQUENCY_UNITS)).toBe("kHz");
   });
 
   it("uses the pending unit when the value is empty", () => {
@@ -315,15 +310,11 @@ describe("chooseDisplayUnit", () => {
   });
 
   it("falls back to the catalog default's unit when no pending pick", () => {
-    expect(
-      chooseDisplayUnit("", "50kHz", undefined, FREQUENCY_UNITS),
-    ).toBe("kHz");
+    expect(chooseDisplayUnit("", "50kHz", undefined, FREQUENCY_UNITS)).toBe("kHz");
   });
 
   it("falls back to the canonical option when nothing else is set", () => {
-    expect(
-      chooseDisplayUnit("", null, undefined, FREQUENCY_UNITS),
-    ).toBe("Hz");
+    expect(chooseDisplayUnit("", null, undefined, FREQUENCY_UNITS)).toBe("Hz");
   });
 
   it("returns empty when unit_options is empty", () => {
@@ -333,9 +324,7 @@ describe("chooseDisplayUnit", () => {
 
 describe("serializeFloatWithUnit", () => {
   it("concatenates value and unit without separator", () => {
-    expect(
-      serializeFloatWithUnit({ value: 50, unit: "kHz" }),
-    ).toBe("50kHz");
+    expect(serializeFloatWithUnit({ value: 50, unit: "kHz" })).toBe("50kHz");
   });
 
   it("returns empty string for null value", () => {

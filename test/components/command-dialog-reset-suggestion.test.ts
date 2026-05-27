@@ -11,12 +11,7 @@
  */
 import { describe, it } from "vitest";
 import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
-import {
-  JobSource,
-  JobStatus,
-  JobType,
-  type FirmwareJob,
-} from "../../src/api/types.js";
+import { JobSource, JobStatus, JobType, type FirmwareJob } from "../../src/api/types.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import {
   expectFallbackToLocal,
@@ -61,13 +56,11 @@ interface Host {
   _failedDuringValidate: boolean;
   _jobId: string;
   _jobs: Map<string, FirmwareJob>;
-  _primedSource:
-    | {
-        source: JobSource;
-        source_label: string;
-        source_esphome_version: string;
-      }
-    | null;
+  _primedSource: {
+    source: JobSource;
+    source_label: string;
+    source_esphome_version: string;
+  } | null;
   _tryCleanBuild: () => void;
   _tryResetBuildEnv: () => void;
   _tryOpenInEditor: () => void;
@@ -97,9 +90,7 @@ const render = (host: Host) =>
 describe("renderResetSuggestion — local build", () => {
   it("emits both clean and reset links when the live job is LOCAL", () => {
     const host = baseHost({
-      _jobs: new Map([
-        ["job-1", fakeJob({ source: JobSource.LOCAL, source_label: "" })],
-      ]),
+      _jobs: new Map([["job-1", fakeJob({ source: JobSource.LOCAL, source_label: "" })]]),
     });
     expectLocalSuggestion(render(host), host);
   });
@@ -148,10 +139,7 @@ describe("renderResetSuggestion — remote build", () => {
     // "ask the operator of  to ...".
     const host = baseHost({
       _jobs: new Map([
-        [
-          "job-1",
-          fakeJob({ source: JobSource.REMOTE, source_label: "" }),
-        ],
+        ["job-1", fakeJob({ source: JobSource.REMOTE, source_label: "" })],
       ]),
     });
     expectFallbackToLocal(render(host), host);

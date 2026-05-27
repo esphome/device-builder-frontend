@@ -54,7 +54,7 @@ export class ESPHomePageSecrets extends LitElement {
     super.connectedCallback();
     window.addEventListener(
       "secrets-saved",
-      this._onExternalSecretsSaved as EventListener,
+      this._onExternalSecretsSaved as EventListener
     );
     await this._loadFromServer();
   }
@@ -62,7 +62,7 @@ export class ESPHomePageSecrets extends LitElement {
   disconnectedCallback() {
     window.removeEventListener(
       "secrets-saved",
-      this._onExternalSecretsSaved as EventListener,
+      this._onExternalSecretsSaved as EventListener
     );
     super.disconnectedCallback();
   }
@@ -169,7 +169,10 @@ export class ESPHomePageSecrets extends LitElement {
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
         box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
-        transition: background 0.12s, box-shadow 0.12s, transform 0.12s;
+        transition:
+          background 0.12s,
+          box-shadow 0.12s,
+          transform 0.12s;
       }
 
       .save-button:hover:not(:disabled) {
@@ -194,11 +197,7 @@ export class ESPHomePageSecrets extends LitElement {
 
       .reveal-toggle {
         border: var(--wa-border-width-s) solid var(--esphome-primary);
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 90%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
         color: var(--esphome-primary);
         padding: 6px 12px;
         border-radius: var(--wa-border-radius-m);
@@ -213,11 +212,7 @@ export class ESPHomePageSecrets extends LitElement {
       }
 
       .reveal-toggle:hover {
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 80%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
       }
 
       .reveal-toggle wa-icon {
@@ -228,7 +223,7 @@ export class ESPHomePageSecrets extends LitElement {
 
   protected render() {
     const revealLabel = this._localize(
-      this._revealSensitive ? "secrets.hide_values" : "secrets.reveal_values",
+      this._revealSensitive ? "secrets.hide_values" : "secrets.reveal_values"
     );
     return html`
       <div class="page">
@@ -296,7 +291,7 @@ export class ESPHomePageSecrets extends LitElement {
         // can react regardless of where they live in the tree.
         // ``detail.source`` lets self-listeners short-circuit.
         window.dispatchEvent(
-          new CustomEvent("secrets-saved", { detail: { source: this } }),
+          new CustomEvent("secrets-saved", { detail: { source: this } })
         );
       })
       .catch((e) => {

@@ -153,9 +153,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
             title=${this._localize("device.automation_action_pick")}
             @click=${this._openPicker}
           >
-            <span class="ae-row-picker-name">
-              ${def?.name ?? this.value.action_id}
-            </span>
+            <span class="ae-row-picker-name"> ${def?.name ?? this.value.action_id} </span>
             <wa-icon library="mdi" name="pencil-outline"></wa-icon>
           </button>
           <div class="ae-row-controls">
@@ -211,14 +209,10 @@ export class ESPHomeAutomationActionNode extends LitElement {
           ? nothing
           : html`<div class="ae-row-body">
               ${def?.description
-                ? html`<p class="ae-row-desc">
-                    ${renderMarkdown(def.description)}
-                  </p>`
+                ? html`<p class="ae-row-desc">${renderMarkdown(def.description)}</p>`
                 : nothing}
-              ${this._renderActionParams(def)}
-              ${this._renderScriptParams(def)}
-              ${this._renderConditionGate(def)}
-              ${this._renderNestedLists(def)}
+              ${this._renderActionParams(def)} ${this._renderScriptParams(def)}
+              ${this._renderConditionGate(def)} ${this._renderNestedLists(def)}
             </div>`}
       </div>
     `;
@@ -239,29 +233,30 @@ export class ESPHomeAutomationActionNode extends LitElement {
         ${this._localize("device.automation_script_parameters")}
       </p>
       ${script.parameters.map(
-        (p) => html`<label class="ae-section-label" for="script-${p.name}"
-            >${p.name} <span class="ae-muted">${p.type}</span></label
-          >
-          <input
-            id="script-${p.name}"
-            type=${p.type === "int" || p.type === "float" ? "number" : "text"}
-            ?disabled=${this.disabled}
-            .value=${String(this.value.params[p.name] ?? "")}
-            @input=${(e: Event) => {
-              const raw = (e.target as HTMLInputElement).value;
-              const next =
-                p.type === "int"
-                  ? raw === ""
-                    ? ""
-                    : parseInt(raw, 10)
-                  : p.type === "float"
+        (p) =>
+          html`<label class="ae-section-label" for="script-${p.name}"
+              >${p.name} <span class="ae-muted">${p.type}</span></label
+            >
+            <input
+              id="script-${p.name}"
+              type=${p.type === "int" || p.type === "float" ? "number" : "text"}
+              ?disabled=${this.disabled}
+              .value=${String(this.value.params[p.name] ?? "")}
+              @input=${(e: Event) => {
+                const raw = (e.target as HTMLInputElement).value;
+                const next =
+                  p.type === "int"
                     ? raw === ""
                       ? ""
-                      : Number(raw)
-                    : raw;
-              this._patchParams({ [p.name]: next });
-            }}
-          />`,
+                      : parseInt(raw, 10)
+                    : p.type === "float"
+                      ? raw === ""
+                        ? ""
+                        : Number(raw)
+                      : raw;
+                this._patchParams({ [p.name]: next });
+              }}
+            />`
       )}
     </div>`;
   }
@@ -279,9 +274,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     if (!def) return nothing;
     if (def.id !== "if" && def.id !== "wait_until") return nothing;
     return html`<div class="ae-nested">
-      <p class="ae-nested-label">
-        ${this._localize("device.automation_only_when")}
-      </p>
+      <p class="ae-nested-label">${this._localize("device.automation_only_when")}</p>
       <esphome-automation-condition-tree
         no-header
         .conditions=${this.value.conditions ?? []}
@@ -309,38 +302,39 @@ export class ESPHomeAutomationActionNode extends LitElement {
       return nothing;
     }
     return def.accepts_action_list.map(
-      (key) => html`<div class="ae-nested">
-        <p class="ae-nested-label">
-          ${key === "else"
-            ? this._localize("device.automation_else")
-            : this._localize("device.automation_action")}
-        </p>
-        <esphome-automation-action-list
-          no-header
-          .actions=${this.value.children?.[key] ?? []}
-          .catalog=${this.catalog}
-          .conditionCatalog=${this.conditionCatalog}
-          .scripts=${this.scripts}
-          .devices=${this.devices}
-          .board=${this.board}
-          .yaml=${this.yaml}
-          ?disabled=${this.disabled}
-          @actions-change=${(e: CustomEvent<{ actions: ActionNode[] }>) => {
-            // The nested list dispatches ``actions-change`` to mean
-            // "my list of actions changed". This action-node folds
-            // that into its own ``children[key]`` slot and re-emits
-            // as ``action-change`` (the event our PARENT list
-            // listens to). Without ``stopPropagation`` here the
-            // bubbling ``actions-change`` would ALSO be caught by
-            // the outer action-list — which would replace the
-            // entire ``if`` node's slot with the nested list. Net
-            // effect: adding a delay inside an if's then-branch
-            // wipes the if and leaves just the delay.
-            e.stopPropagation();
-            this._onChildrenChange(key, e.detail.actions);
-          }}
-        ></esphome-automation-action-list>
-      </div>`,
+      (key) =>
+        html`<div class="ae-nested">
+          <p class="ae-nested-label">
+            ${key === "else"
+              ? this._localize("device.automation_else")
+              : this._localize("device.automation_action")}
+          </p>
+          <esphome-automation-action-list
+            no-header
+            .actions=${this.value.children?.[key] ?? []}
+            .catalog=${this.catalog}
+            .conditionCatalog=${this.conditionCatalog}
+            .scripts=${this.scripts}
+            .devices=${this.devices}
+            .board=${this.board}
+            .yaml=${this.yaml}
+            ?disabled=${this.disabled}
+            @actions-change=${(e: CustomEvent<{ actions: ActionNode[] }>) => {
+              // The nested list dispatches ``actions-change`` to mean
+              // "my list of actions changed". This action-node folds
+              // that into its own ``children[key]`` slot and re-emits
+              // as ``action-change`` (the event our PARENT list
+              // listens to). Without ``stopPropagation`` here the
+              // bubbling ``actions-change`` would ALSO be caught by
+              // the outer action-list — which would replace the
+              // entire ``if`` node's slot with the nested list. Net
+              // effect: adding a delay inside an if's then-branch
+              // wipes the if and leaves just the delay.
+              e.stopPropagation();
+              this._onChildrenChange(key, e.detail.actions);
+            }}
+          ></esphome-automation-action-list>
+        </div>`
     );
   }
 
@@ -402,10 +396,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
           placeholder="0"
           ?disabled=${this.disabled}
           @input=${(e: Event) =>
-            this._writeDelay(
-              (e.target as HTMLInputElement).value,
-              unit,
-            )}
+            this._writeDelay((e.target as HTMLInputElement).value, unit)}
         />
       </div>
       <div class="ae-delay-unit">
@@ -418,13 +409,14 @@ export class ESPHomeAutomationActionNode extends LitElement {
           @change=${(e: Event) =>
             this._writeDelay(
               numericValue,
-              (e.target as HTMLSelectElement).value as DelayUnit,
+              (e.target as HTMLSelectElement).value as DelayUnit
             )}
         >
           ${DELAY_UNITS.map(
-            (u) => html`<option value=${u} ?selected=${u === unit}>
-              ${this._localize(`device.automation_action_delay_unit_${u}`)}
-            </option>`,
+            (u) =>
+              html`<option value=${u} ?selected=${u === unit}>
+                ${this._localize(`device.automation_action_delay_unit_${u}`)}
+              </option>`
           )}
         </select>
       </div>
@@ -511,11 +503,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
 
   private _onParamChange = (e: CustomEvent<ConfigEntryValueChange>) => {
     e.stopPropagation();
-    const params = applyParamChange(
-      this.value.params,
-      e.detail.path,
-      e.detail.value,
-    );
+    const params = applyParamChange(this.value.params, e.detail.path, e.detail.value);
     this._emit({ ...this.value, params });
   };
 
@@ -523,9 +511,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
     this._emit({ ...this.value, params: { ...this.value.params, ...patch } });
   }
 
-  private _onConditionsChange = (
-    e: CustomEvent<{ conditions: ConditionNode[] }>,
-  ) => {
+  private _onConditionsChange = (e: CustomEvent<{ conditions: ConditionNode[] }>) => {
     e.stopPropagation();
     this._emit({ ...this.value, conditions: e.detail.conditions });
   };
@@ -541,7 +527,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
         detail: { delta },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -550,7 +536,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
       new CustomEvent("action-delete", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -560,7 +546,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
         detail: { value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

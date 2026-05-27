@@ -35,9 +35,7 @@ export function createRouter(host: ReactiveControllerHost & HTMLElement): Router
         return true;
       },
       render: ({ id }) =>
-        html`<esphome-page-device
-          .id=${decodeIdParam(id)}
-        ></esphome-page-device>`,
+        html`<esphome-page-device .id=${decodeIdParam(id)}></esphome-page-device>`,
     },
   ]);
 }

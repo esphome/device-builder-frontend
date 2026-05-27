@@ -60,10 +60,7 @@ describe("renderMdnsTxtRecords", () => {
     // device serialised its TXT entries.
     const rowTemplates = findTemplatesByAnchor(result, "<dt>");
     expect(rowTemplates.length).toBe(4);
-    const pairs = rowTemplates.map((t) => [
-      t.values[0] as string,
-      t.values[1] as string,
-    ]);
+    const pairs = rowTemplates.map((t) => [t.values[0] as string, t.values[1] as string]);
     expect(pairs).toEqual([
       ["api_encryption", "Noise_NNpsk0_25519_ChaChaPoly_SHA256"],
       ["config_hash", "5a94a12d"],
@@ -87,10 +84,7 @@ describe("renderMdnsTxtRecords", () => {
     const result = renderMdnsTxtRecords(records, _identityLocalize);
     const rowTemplates = findTemplatesByAnchor(result, "<dt>");
     expect(rowTemplates.length).toBe(2);
-    const pairs = rowTemplates.map((t) => [
-      t.values[0] as string,
-      t.values[1] as string,
-    ]);
+    const pairs = rowTemplates.map((t) => [t.values[0] as string, t.values[1] as string]);
     expect(pairs).toEqual([
       ["api_encryption", ""],
       ["version", "2025.4.0"],
@@ -178,7 +172,7 @@ describe("renderMdnsTxtRecords", () => {
     // user-supplied content).
     const dangerous = {
       version: "<script>alert('xss')</script>",
-      config_hash: "\" onclick=\"alert(1)",
+      config_hash: '" onclick="alert(1)',
       "<key>": "innocent",
     };
     const result = renderMdnsTxtRecords(dangerous, _identityLocalize);
@@ -204,7 +198,7 @@ describe("renderMdnsTxtRecords", () => {
     // Values reach the rendered output as plain strings — Lit
     // turns them into text nodes at render time.
     expect(allValues).toContain("<script>alert('xss')</script>");
-    expect(allValues).toContain("\" onclick=\"alert(1)");
+    expect(allValues).toContain('" onclick="alert(1)');
     expect(allValues).toContain("<key>");
   });
 

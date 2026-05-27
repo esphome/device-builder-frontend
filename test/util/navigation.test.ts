@@ -77,7 +77,7 @@ describe("navigate", () => {
     expect(pushStateSpy).toHaveBeenCalledTimes(1);
     expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/dashboard");
     const popstateCalls = dispatchSpy.mock.calls.filter(
-      (call) => (call[0] as Event).type === "popstate",
+      (call) => (call[0] as Event).type === "popstate"
     );
     expect(popstateCalls).toHaveLength(1);
   });
@@ -93,7 +93,7 @@ describe("navigate", () => {
     // refactor that fired pushState eagerly (and only consulted
     // the guard for cancellation) can't slip through.
     expect(guard.mock.invocationCallOrder[0]).toBeLessThan(
-      pushStateSpy.mock.invocationCallOrder[0],
+      pushStateSpy.mock.invocationCallOrder[0]
     );
   });
 
@@ -106,7 +106,7 @@ describe("navigate", () => {
     expect(guard).toHaveBeenCalledTimes(1);
     expect(pushStateSpy).not.toHaveBeenCalled();
     const popstateCalls = dispatchSpy.mock.calls.filter(
-      (call) => (call[0] as Event).type === "popstate",
+      (call) => (call[0] as Event).type === "popstate"
     );
     expect(popstateCalls).toHaveLength(0);
   });
@@ -126,7 +126,7 @@ describe("navigate", () => {
 
     expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/");
     const popstateCalls = dispatchSpy.mock.calls.filter(
-      (call) => (call[0] as Event).type === "popstate",
+      (call) => (call[0] as Event).type === "popstate"
     );
     expect(popstateCalls).toHaveLength(1);
   });
@@ -170,7 +170,7 @@ describe("navigate", () => {
       () =>
         new Promise<boolean>((resolve) => {
           resolveGuard = resolve;
-        }),
+        })
     );
     setLeaveGuard(guard);
 

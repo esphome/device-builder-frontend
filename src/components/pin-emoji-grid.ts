@@ -81,19 +81,14 @@ export class ESPHomePinEmojiGrid extends LitElement {
     // fingerprint once via the grid's aria-label rather than
     // repeating each name twice (container label + cell text).
     return html`
-      <div
-        class="grid"
-        role="img"
-        lang="en"
-        aria-label=${this._ariaLabel(slots)}
-      >
+      <div class="grid" role="img" lang="en" aria-label=${this._ariaLabel(slots)}>
         ${slots.map(
           (slot) => html`
             <div class="cell">
               <span class="emoji" aria-hidden="true">${slot.emoji}</span>
               <span class="name" aria-hidden="true">${slot.name}</span>
             </div>
-          `,
+          `
         )}
       </div>
     `;

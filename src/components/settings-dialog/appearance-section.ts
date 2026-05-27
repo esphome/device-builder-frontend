@@ -20,12 +20,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
   @state()
   private _theme: string = localStorage.getItem("esphome-theme") ?? "system";
 
-  static styles = [
-    espHomeStyles,
-    inputStyles,
-    settingsSharedStyles,
-    settingsRowStyles,
-  ];
+  static styles = [espHomeStyles, inputStyles, settingsSharedStyles, settingsRowStyles];
 
   protected render() {
     return html`
@@ -51,7 +46,7 @@ export class ESPHomeSettingsAppearance extends LitElement {
         detail: theme,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

@@ -34,7 +34,7 @@ export function editDevice(device: ConfiguredDevice) {
 export async function archiveDevice(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<boolean> {
   const name = device.friendly_name || device.name;
   try {
@@ -76,23 +76,21 @@ export async function archiveDevice(
 export async function unarchiveDevice(
   device: ArchivedDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<boolean> {
   const name = device.friendly_name || device.name || device.configuration;
   try {
     await api.unarchiveDevice(device.configuration);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    toast.error(
-      localize("dashboard.action_unarchive_failed", { name, error }),
-      { richColors: true },
-    );
+    toast.error(localize("dashboard.action_unarchive_failed", { name, error }), {
+      richColors: true,
+    });
     return false;
   }
-  toast.success(
-    localize("dashboard.action_unarchive_success", { name }),
-    { richColors: true },
-  );
+  toast.success(localize("dashboard.action_unarchive_success", { name }), {
+    richColors: true,
+  });
   return true;
 }
 
@@ -105,23 +103,21 @@ export async function unarchiveDevice(
 export async function deleteArchivedDevice(
   device: ArchivedDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<boolean> {
   const name = device.friendly_name || device.name || device.configuration;
   try {
     await api.deleteArchivedDevice(device.configuration);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    toast.error(
-      localize("dashboard.action_delete_archived_failed", { name, error }),
-      { richColors: true },
-    );
+    toast.error(localize("dashboard.action_delete_archived_failed", { name, error }), {
+      richColors: true,
+    });
     return false;
   }
-  toast.success(
-    localize("dashboard.action_delete_archived_success", { name }),
-    { richColors: true },
-  );
+  toast.success(localize("dashboard.action_delete_archived_success", { name }), {
+    richColors: true,
+  });
   return true;
 }
 
@@ -162,7 +158,7 @@ async function runBulkAction(
     successKey: string;
     failureKey: string;
     successOptions?: Parameters<typeof toast.success>[1];
-  },
+  }
 ) {
   let results: BulkActionResult[];
   try {
@@ -176,15 +172,15 @@ async function runBulkAction(
   const failed = results.filter((r) => !r.success);
 
   if (succeeded > 0) {
-    toast.success(
-      localize(copy.successKey, { count: succeeded }),
-      { richColors: true, ...copy.successOptions },
-    );
+    toast.success(localize(copy.successKey, { count: succeeded }), {
+      richColors: true,
+      ...copy.successOptions,
+    });
   }
   // Index by configuration up front so failure-toast naming is
   // O(failures) instead of O(failures × devices) on big selections.
   const devicesByConfiguration = new Map(
-    devices.map((d) => [d.configuration, d] as const),
+    devices.map((d) => [d.configuration, d] as const)
   );
   const fallbackError = localize("dashboard.bulk_failure_unknown_error");
   for (const result of failed) {
@@ -197,7 +193,7 @@ async function runBulkAction(
     // ``action_unarchive_failed`` interpolate ``{error}`` directly.
     toast.error(
       localize(copy.failureKey, { name, error: result.error || fallbackError }),
-      { richColors: true },
+      { richColors: true }
     );
   }
 }
@@ -211,30 +207,42 @@ export async function archiveBulkDevices(
   configurations: string[],
   devices: ConfiguredDevice[],
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
-  await runBulkAction(configurations, devices, localize, (c) => api.archiveBulkDevices(c), {
-    catchAllKey: "dashboard.archive_bulk_failed",
-    successKey: "dashboard.archive_bulk_success",
-    failureKey: "dashboard.action_archive_failed",
-    successOptions: {
-      description: localize("dashboard.action_archive_success_hint"),
-      duration: 8000,
-    },
-  });
+  await runBulkAction(
+    configurations,
+    devices,
+    localize,
+    (c) => api.archiveBulkDevices(c),
+    {
+      catchAllKey: "dashboard.archive_bulk_failed",
+      successKey: "dashboard.archive_bulk_success",
+      failureKey: "dashboard.action_archive_failed",
+      successOptions: {
+        description: localize("dashboard.action_archive_success_hint"),
+        duration: 8000,
+      },
+    }
+  );
 }
 
 export async function deleteBulkDevices(
   configurations: string[],
   devices: ConfiguredDevice[],
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
-  await runBulkAction(configurations, devices, localize, (c) => api.deleteBulkDevices(c), {
-    catchAllKey: "dashboard.delete_bulk_failed",
-    successKey: "dashboard.delete_bulk_success",
-    failureKey: "dashboard.delete_failed",
-  });
+  await runBulkAction(
+    configurations,
+    devices,
+    localize,
+    (c) => api.deleteBulkDevices(c),
+    {
+      catchAllKey: "dashboard.delete_bulk_failed",
+      successKey: "dashboard.delete_bulk_success",
+      failureKey: "dashboard.delete_failed",
+    }
+  );
 }
 
 export async function downloadYaml(
@@ -268,7 +276,7 @@ export async function downloadYaml(
 export async function downloadFirmware(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<void> {
   const name = device.friendly_name || device.name;
   try {
@@ -311,7 +319,7 @@ export async function detectAndOpenWizard(
      *  this function stays UI-agnostic. */
     onRecognized?: (device: ConfiguredDevice) => void;
     localize?: LocalizeFunc;
-  } = {},
+  } = {}
 ): Promise<void> {
   try {
     const detected = options.port
@@ -327,7 +335,7 @@ export async function detectAndOpenWizard(
         const mac = await readMacAddress(detected.loader);
         recognized =
           options.devices.find(
-            (d) => d.mac_address && d.mac_address.toUpperCase() === mac,
+            (d) => d.mac_address && d.mac_address.toUpperCase() === mac
           ) ?? null;
       } catch {
         // MAC read failed (unsupported chip family, transport flap);
@@ -338,9 +346,7 @@ export async function detectAndOpenWizard(
     // Manifest lookup — runs only when MAC didn't match an existing
     // device. ``readDeviceManifest`` already swallows read / parse
     // failures and returns null, so this can't throw.
-    const manifest = recognized
-      ? null
-      : await readDeviceManifest(detected.loader);
+    const manifest = recognized ? null : await readDeviceManifest(detected.loader);
 
     await disconnect(detected.transport);
 
@@ -350,7 +356,7 @@ export async function detectAndOpenWizard(
           options.localize("dashboard.serial_recognized", {
             name: recognized.friendly_name || recognized.name,
           }),
-          { richColors: true },
+          { richColors: true }
         );
       }
       options.onRecognized(recognized);
@@ -365,7 +371,7 @@ export async function detectAndOpenWizard(
             options.localize("dashboard.serial_starterkit_detected", {
               name: board.name,
             }),
-            { richColors: true },
+            { richColors: true }
           );
         }
         createDialog.openWithBoard(board);
@@ -506,4 +512,3 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
       });
   };
 }
-

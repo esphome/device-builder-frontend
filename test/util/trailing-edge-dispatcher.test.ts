@@ -111,7 +111,9 @@ describe("TrailingEdgeDispatcher", () => {
       throw new Error("sync boom");
     });
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const d = new TrailingEdgeDispatcher<string>(fn as unknown as (i: string) => Promise<void>);
+    const d = new TrailingEdgeDispatcher<string>(
+      fn as unknown as (i: string) => Promise<void>
+    );
 
     d.dispatch("a");
     await Promise.resolve();

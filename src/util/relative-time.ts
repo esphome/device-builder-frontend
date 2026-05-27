@@ -40,7 +40,7 @@ function getFormatter(language?: string): Intl.RelativeTimeFormat {
 
 export function formatSecondsAgo(
   secondsAgo: number | null | undefined,
-  language?: string,
+  language?: string
 ): string {
   if (secondsAgo === null || secondsAgo === undefined) return "";
 
@@ -81,7 +81,7 @@ export function formatSecondsAgo(
 export function ageOf(
   baselineSecondsAgo: number | null | undefined,
   anchorMs: number,
-  nowMs: number,
+  nowMs: number
 ): number | null {
   if (baselineSecondsAgo === null || baselineSecondsAgo === undefined) {
     return null;
@@ -116,12 +116,9 @@ export function ageOf(
 export function remainingOf(
   baselineRemainingSeconds: number | null | undefined,
   anchorMs: number,
-  nowMs: number,
+  nowMs: number
 ): number | null {
-  if (
-    baselineRemainingSeconds === null ||
-    baselineRemainingSeconds === undefined
-  ) {
+  if (baselineRemainingSeconds === null || baselineRemainingSeconds === undefined) {
     return null;
   }
   const elapsedSeconds = Math.max(0, (nowMs - anchorMs) / 1000);
@@ -146,7 +143,7 @@ const numberFormatterCache = new Map<string, Intl.NumberFormat>();
 
 export function getNumberFormatter(
   language: string | undefined,
-  maximumFractionDigits: number,
+  maximumFractionDigits: number
 ): Intl.NumberFormat {
   const key = `${language ?? "default"}|${maximumFractionDigits}`;
   let formatter = numberFormatterCache.get(key);

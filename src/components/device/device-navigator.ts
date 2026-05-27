@@ -136,7 +136,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
       .card {
         background: var(--wa-color-surface-default);
         border-radius: var(--navigator-border-radius, var(--wa-border-radius-l));
-        border: var(--navigator-border, var(--wa-border-width-s) solid var(--wa-color-surface-border));
+        border: var(
+          --navigator-border,
+          var(--wa-border-width-s) solid var(--wa-color-surface-border)
+        );
         box-shadow: var(--wa-elevation-02);
         display: flex;
         flex-direction: column;
@@ -378,8 +381,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       const match =
         (this.selectedFromLine !== undefined
           ? allSections.find((s) => s.fromLine === this.selectedFromLine)
-          : undefined) ??
-        allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
+          : undefined) ?? allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
       if (match) {
         this._selectedLine = match.fromLine;
         this._selectedRange = {
@@ -404,7 +406,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // those bare keys here so each automation shows up exactly once.
     const detailed = parseYamlAutomations(this.yaml);
     const filteredTopLevel = topLevelAutomations.filter(
-      (s) => s.key !== "script" && s.key !== "interval",
+      (s) => s.key !== "script" && s.key !== "interval"
     );
     // Light effects belong to their parent light component now, not
     // the automations surface — clicking one in the navigator
@@ -423,7 +425,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       .filter(
         (s) =>
           !s.key.startsWith("automation:light_effect:") &&
-          !s.key.startsWith("automation:unscoped:"),
+          !s.key.startsWith("automation:unscoped:")
       )
       .sort((a, b) => a.fromLine - b.fromLine);
 
@@ -552,8 +554,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
                       ? html`
                           <div class="nav-items">
                             ${items.map((item) => {
-                              const { primary, secondary } =
-                                this._navItemLabels(item, category);
+                              const { primary, secondary } = this._navItemLabels(
+                                item,
+                                category
+                              );
                               return html`
                                 <div
                                   class="nav-item ${this._selectedLine === item.fromLine
@@ -562,7 +566,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
                                     ? "nav-item--hovered"
                                     : ""}"
                                   @mouseenter=${() =>
-                                    this._onItemHover(item.fromLine, item.fromLine, item.toLine)}
+                                    this._onItemHover(
+                                      item.fromLine,
+                                      item.fromLine,
+                                      item.toLine
+                                    )}
                                   @mouseleave=${() => this._onItemLeave()}
                                   @click=${() => this._onItemClick(item)}
                                 >
@@ -583,16 +591,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
                       : nothing}
                     <div class="nav-items">
                       ${actions.map(
-                        (action) => html`<div
-                          class="action-item"
-                          @click=${() => action.onClick()}
-                        >
-                          <div>
-                            <wa-icon library="mdi" name=${action.icon}></wa-icon>
-                            <p>${action.label}</p>
-                          </div>
-                          <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-                        </div>`,
+                        (action) =>
+                          html`<div class="action-item" @click=${() => action.onClick()}>
+                            <div>
+                              <wa-icon library="mdi" name=${action.icon}></wa-icon>
+                              <p>${action.label}</p>
+                            </div>
+                            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+                          </div>`
                       )}
                     </div>
                   `
@@ -623,7 +629,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       new CustomEvent("nav-collapse", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -664,7 +670,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
         },
         () => {
           /* swallow — same rationale as the component fetch above. */
-        },
+        }
       );
     }
   }
@@ -684,7 +690,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
    */
   private _navItemLabels(
     item: YamlSection,
-    category: "core" | "component" | "automation",
+    category: "core" | "component" | "automation"
   ): { primary: string; secondary?: string } {
     const raw = sectionKeyOf(item);
 
@@ -718,7 +724,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
    */
   private _automationLabels(
     item: YamlSection,
-    raw: string,
+    raw: string
   ): { primary: string; secondary?: string } {
     // Script: line 1 = "Script", line 2 = id.
     if (item.parentKey === "script") {
@@ -745,7 +751,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       const primary = this._resolveTriggerName(
         "esphome",
         item.eventKey,
-        `${this._prettyDomain("esphome")} → ${item.eventKey}`,
+        `${this._prettyDomain("esphome")} → ${item.eventKey}`
       );
       return { primary };
     }
@@ -753,11 +759,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     // catalog; "Warmtepomp" on line 2).
     if (item.parentKey && item.eventKey) {
       const fallback = `${this._prettyDomain(item.parentKey)} → ${item.eventKey}`;
-      const primary = this._resolveTriggerName(
-        item.parentKey,
-        item.eventKey,
-        fallback,
-      );
+      const primary = this._resolveTriggerName(item.parentKey, item.eventKey, fallback);
       const named = item.name || item.id;
       const secondary = named && named !== primary ? named : undefined;
       return { primary, secondary };
@@ -775,15 +777,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
   private _resolveTriggerName(
     domain: string,
     eventKey: string,
-    fallback: string,
+    fallback: string
   ): string {
     const triggers = getCachedAutomationTriggers(
       this.platform || undefined,
-      this.board?.id,
+      this.board?.id
     );
     if (!triggers) return fallback;
-    const catalogId =
-      domain === "esphome" ? eventKey : `${domain}.${eventKey}`;
+    const catalogId = domain === "esphome" ? eventKey : `${domain}.${eventKey}`;
     const hit = triggers.find((t) => t.id === catalogId);
     return hit?.name || fallback;
   }
@@ -815,7 +816,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
       this.selectedKey = null;
       this._selectedLine = null;
       this._selectedRange = null;
-      this._emitHighlight(this._hoveredLine === fromLine ? { fromLine, toLine } : null, false);
+      this._emitHighlight(
+        this._hoveredLine === fromLine ? { fromLine, toLine } : null,
+        false
+      );
       this._emitSectionSelect(null, undefined);
     } else {
       this.selectedKey = sectionKey;
@@ -855,9 +859,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
    * the same key parseYamlAutomations will produce on the next
    * navigator render once the YAML refresh propagates.
    */
-  private _onAutomationAdded = (
-    e: CustomEvent<{ sectionKey: string }>,
-  ) => {
+  private _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
     e.stopPropagation();
     this._emitSectionSelect(e.detail.sectionKey, undefined);
   };

@@ -29,7 +29,7 @@
  */
 export function seededMap<T, K>(
   rows: readonly T[] | undefined,
-  keyFn: (row: T) => K,
+  keyFn: (row: T) => K
 ): Map<K, T> | null {
   if (rows === undefined) return null;
   return new Map(rows.map((row) => [keyFn(row), row]));

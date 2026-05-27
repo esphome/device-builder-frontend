@@ -18,9 +18,9 @@ async function readSource(): Promise<string> {
   return fs.readFileSync(
     path.resolve(
       here,
-      "../../../../src/components/device/automation-editor/automation-editor.ts",
+      "../../../../src/components/device/automation-editor/automation-editor.ts"
     ),
-    "utf-8",
+    "utf-8"
   );
 }
 

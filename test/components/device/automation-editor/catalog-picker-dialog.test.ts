@@ -25,9 +25,9 @@ async function readSource(): Promise<string> {
   return fs.readFileSync(
     path.resolve(
       here,
-      "../../../../src/components/device/automation-editor/catalog-picker-dialog.ts",
+      "../../../../src/components/device/automation-editor/catalog-picker-dialog.ts"
     ),
-    "utf-8",
+    "utf-8"
   );
 }
 
@@ -38,7 +38,9 @@ describe("catalog-picker-dialog filtering contract", () => {
    * ``(``) and slurps until the next ``private`` / ``}`` boundary.
    */
   function methodBody(src: string, name: string): string {
-    const re = new RegExp(`private\\s+${name}[\\s\\S]*?(?=\\n {2}(private|static|public|protected|@|\\}))`);
+    const re = new RegExp(
+      `private\\s+${name}[\\s\\S]*?(?=\\n {2}(private|static|public|protected|@|\\}))`
+    );
     const m = src.match(re);
     if (!m) throw new Error(`Method ${name} not found`);
     return m[0];

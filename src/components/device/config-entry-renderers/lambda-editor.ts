@@ -91,14 +91,14 @@ export class ESPHomeLambdaEditor extends LitElement {
     if (changed.has("_darkMode")) {
       this._view.dispatch({
         effects: this._themeCompartment.reconfigure(
-          this._darkMode ? vscodeDark : vscodeLight,
+          this._darkMode ? vscodeDark : vscodeLight
         ),
       });
     }
     if (changed.has("disabled")) {
       this._view.dispatch({
         effects: this._editableCompartment.reconfigure(
-          EditorView.editable.of(!this.disabled),
+          EditorView.editable.of(!this.disabled)
         ),
       });
     }
@@ -128,9 +128,7 @@ export class ESPHomeLambdaEditor extends LitElement {
           indentUnit.of("  "),
           keymap.of([indentWithTab]),
           this._editableCompartment.of(EditorView.editable.of(!this.disabled)),
-          this._themeCompartment.of(
-            this._darkMode ? vscodeDark : vscodeLight,
-          ),
+          this._themeCompartment.of(this._darkMode ? vscodeDark : vscodeLight),
           EditorView.theme({
             "&": { height: "100%" },
           }),
@@ -142,7 +140,7 @@ export class ESPHomeLambdaEditor extends LitElement {
                   detail: { value },
                   bubbles: true,
                   composed: true,
-                }),
+                })
               );
             }
           }),

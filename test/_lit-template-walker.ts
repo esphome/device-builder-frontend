@@ -44,10 +44,7 @@ export function isTemplateResult(value: unknown): value is TemplateResult {
  * non-arrays are skipped. Order matches Lit's render order:
  * parents before their interpolated children.
  */
-export function visitTemplates(
-  root: unknown,
-  visit: (t: TemplateResult) => void,
-): void {
+export function visitTemplates(root: unknown, visit: (t: TemplateResult) => void): void {
   if (!root) return;
   if (Array.isArray(root)) {
     for (const r of root) visitTemplates(r, visit);
@@ -69,10 +66,7 @@ export function visitTemplates(
  *  way to find the templates that emit the tag you care about,
  *  without parsing the lit-html grammar yourself.
  */
-export function findTemplatesByAnchor(
-  root: unknown,
-  anchor: string,
-): TemplateResult[] {
+export function findTemplatesByAnchor(root: unknown, anchor: string): TemplateResult[] {
   const matches: TemplateResult[] = [];
   visitTemplates(root, (t) => {
     if (t.strings.join("§").includes(anchor)) matches.push(t);
@@ -105,9 +99,7 @@ export function findTemplatesByAnchor(
  * ``b[".label"]``) without depending on the order the renderer
  * wrote the attributes in the template literal.
  */
-export function extractAttributeBindings(
-  t: TemplateResult,
-): Record<string, unknown> {
+export function extractAttributeBindings(t: TemplateResult): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (let i = 0; i < t.values.length; i++) {
     // The static string preceding `values[i]`. We only care about

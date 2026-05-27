@@ -72,7 +72,7 @@ describe("setIn", () => {
 
   it("preserves array shape when replacing a slot", () => {
     expect(
-      setIn({ devices: [{ name: "old" }] }, ["devices", "0"], { name: "new" }),
+      setIn({ devices: [{ name: "old" }] }, ["devices", "0"], { name: "new" })
     ).toEqual({ devices: [{ name: "new" }] });
   });
 
@@ -106,8 +106,9 @@ describe("getIn", () => {
   it("descends into arrays via numeric path segments", () => {
     // Arrays are valid containers — the nested-list renderer needs
     // to read child fields out of items at ``devices[0]``.
-    expect(getIn({ devices: [{ name: "front" }] }, ["devices", "0", "name"]))
-      .toBe("front");
+    expect(getIn({ devices: [{ name: "front" }] }, ["devices", "0", "name"])).toBe(
+      "front"
+    );
     expect(getIn({ a: [1, 2, 3] }, ["a", "2"])).toBe(3);
   });
 
@@ -141,9 +142,7 @@ describe("isPrimitiveOrNullish", () => {
     // Pinning this is the whole reason the helper exists.
     const noProto = Object.create(null);
     expect(isPrimitiveOrNullish(noProto)).toBe(false);
-    expect(() => String(noProto)).toThrow(
-      /Cannot convert object to primitive value/,
-    );
+    expect(() => String(noProto)).toThrow(/Cannot convert object to primitive value/);
   });
 
   it("rejects arrays, dates, maps, and other built-ins", () => {

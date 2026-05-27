@@ -21,7 +21,7 @@ const RESET_SUGGESTION_ANCHOR = 'class="reset-suggestion"';
  */
 export const localize = (
   key: string,
-  values?: Record<string, string | number>,
+  values?: Record<string, string | number>
 ): string => {
   const parts = key.split(".");
   let cur: unknown = enMessages as unknown;
@@ -35,10 +35,7 @@ export const localize = (
   }
   const text = typeof cur === "string" ? cur : key;
   if (!values) return text;
-  return text.replace(
-    /\{(\w+)\}/g,
-    (_, k) => String(values[k] ?? `{${k}}`),
-  );
+  return text.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? `{${k}}`));
 };
 
 export type LocalizeFn = typeof localize;
@@ -51,7 +48,7 @@ interface SuggestionHandlers {
 /** Assert the LOCAL two-link variant rendered (clean + reset). */
 export function expectLocalSuggestion(
   tree: TemplateResult | typeof import("lit").nothing,
-  host: SuggestionHandlers,
+  host: SuggestionHandlers
 ): void {
   const matches = findTemplatesByAnchor(tree, RESET_SUGGESTION_ANCHOR);
   expect(matches.length).toBe(1);
@@ -68,7 +65,7 @@ export function expectLocalSuggestion(
 export function expectRemoteSuggestion(
   tree: TemplateResult | typeof import("lit").nothing,
   host: SuggestionHandlers,
-  receiver: string,
+  receiver: string
 ): void {
   const matches = findTemplatesByAnchor(tree, RESET_SUGGESTION_ANCHOR);
   expect(matches.length).toBe(1);
@@ -85,7 +82,7 @@ export function expectRemoteSuggestion(
  */
 export function expectFallbackToLocal(
   tree: TemplateResult | typeof import("lit").nothing,
-  host: SuggestionHandlers,
+  host: SuggestionHandlers
 ): void {
   const matches = findTemplatesByAnchor(tree, RESET_SUGGESTION_ANCHOR);
   expect(matches.length).toBe(1);
@@ -94,7 +91,7 @@ export function expectFallbackToLocal(
 
 /** Assert no build-failure hint rendered (user-stopped, peer-link lost, …). */
 export function expectNoSuggestion(
-  tree: TemplateResult | typeof import("lit").nothing,
+  tree: TemplateResult | typeof import("lit").nothing
 ): void {
   expect(findTemplatesByAnchor(tree, RESET_SUGGESTION_ANCHOR).length).toBe(0);
 }

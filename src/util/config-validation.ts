@@ -1,6 +1,7 @@
 import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
+import { parseHexInt } from "./hex-int.js";
 import { asMappingList, asRecord } from "./nested-values.js";
 import { YamlRawValue } from "./yaml-serialize.js";
 
@@ -29,7 +30,7 @@ export function isEntryVisible(
   entry: ConfigEntry,
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
-  targetPlatform?: string | null,
+  targetPlatform?: string | null
 ): boolean {
   if (entry.hidden) return false;
 
@@ -114,10 +115,7 @@ export function getDeviceNameWarning(name: string): ValidationError | null {
   return null;
 }
 
-export function validateEntry(
-  entry: ConfigEntry,
-  raw: unknown,
-): ValidationError | null {
+export function validateEntry(entry: ConfigEntry, raw: unknown): ValidationError | null {
   if (entry.hidden) return null;
 
   const isEmpty =
@@ -131,7 +129,36 @@ export function validateEntry(
   }
   if (isEmpty) return null;
 
-  if (entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT) {
+  if (entry.type === ConfigEntryType.INTEGER && entry.display_format === "hex") {
+    // BigInt-route the hex-typed integer check so cv.hex_uint64_t
+    // range bounds stay honest (#944 follow-up). ``Number(String(raw))``
+    // would round any value above 2^53 before the comparison, and the
+    // catalog's max for uint64 (2^64 - 1) is already imprecise after
+    // JSON.parse — comparing a precise input against an imprecise
+    // bound is wrong. ``parseHexInt`` accepts the canonical strings
+    // the renderer emits and any non-negative decimal a fixture / test
+    // might pass; numbers / bigints stringify through the same path.
+    const canonical = parseHexInt(String(raw));
+    if (canonical === null) {
+      return { key: entry.key, code: "validation.not_a_number" };
+    }
+    if (entry.range) {
+      const n = BigInt(canonical);
+      const [min, max] = entry.range;
+      // ``Math.floor`` / ``Math.ceil`` widen the bounds at sub-integer
+      // edges in the lenient direction; the backend's cv.hex_int
+      // validator is the source of truth either way.
+      if (n < BigInt(Math.floor(min))) {
+        return { key: entry.key, code: "validation.min", params: { min } };
+      }
+      if (n > BigInt(Math.ceil(max))) {
+        return { key: entry.key, code: "validation.max", params: { max } };
+      }
+    }
+  } else if (
+    entry.type === ConfigEntryType.INTEGER ||
+    entry.type === ConfigEntryType.FLOAT
+  ) {
     const num = typeof raw === "number" ? raw : Number(String(raw));
     if (Number.isNaN(num)) {
       return { key: entry.key, code: "validation.not_a_number" };
@@ -190,7 +217,7 @@ export function validateEntries(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
   presentComponents?: Set<string>,
-  targetPlatform?: string | null,
+  targetPlatform?: string | null
 ): Map<string, ValidationError> {
   const errors = new Map<string, ValidationError>();
   _validateEntriesRecursive(
@@ -199,7 +226,7 @@ export function validateEntries(
     presentComponents,
     targetPlatform,
     [],
-    errors,
+    errors
   );
   return errors;
 }
@@ -216,7 +243,7 @@ function _validateEntriesRecursive(
   presentComponents: Set<string> | undefined,
   targetPlatform: string | null | undefined,
   pathPrefix: string[],
-  errors: Map<string, ValidationError>,
+  errors: Map<string, ValidationError>
 ): void {
   for (const entry of entries) {
     // Skip hidden entries and those whose visibility predicates fail —
@@ -259,7 +286,7 @@ function _validateEntriesRecursive(
             presentComponents,
             targetPlatform,
             [...pathPrefix, entry.key, String(idx)],
-            errors,
+            errors
           );
         });
         continue;
@@ -282,7 +309,7 @@ function _validateEntriesRecursive(
         presentComponents,
         targetPlatform,
         [...pathPrefix, entry.key],
-        errors,
+        errors
       );
       continue;
     }
@@ -317,7 +344,7 @@ function _validateEntriesRecursive(
     // surface as ``validation.required`` even though the catalog
     // pre-supplies a valid value.
     const raw = entry.required
-      ? values[entry.key] ?? entry.default_value
+      ? (values[entry.key] ?? entry.default_value)
       : values[entry.key];
     const err = validateEntry(entry, raw);
     if (err) {

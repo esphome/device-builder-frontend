@@ -13,34 +13,34 @@ import type { AutomationLocation } from "../../../../src/api/types.js";
 
 describe("sectionKeyFromLocation", () => {
   it("emits the same shape parseYamlAutomations uses", () => {
-    expect(
-      sectionKeyFromLocation({ kind: "device_on", trigger: "on_boot" }),
-    ).toBe("automation:device_on:on_boot");
+    expect(sectionKeyFromLocation({ kind: "device_on", trigger: "on_boot" })).toBe(
+      "automation:device_on:on_boot"
+    );
     expect(
       sectionKeyFromLocation({
         kind: "component_on",
         component_id: "my_button",
         trigger: "on_press",
-      }),
+      })
     ).toBe("automation:component_on:my_button:on_press");
     expect(sectionKeyFromLocation({ kind: "script", id: "my_alarm" })).toBe(
-      "automation:script:my_alarm",
+      "automation:script:my_alarm"
     );
     expect(sectionKeyFromLocation({ kind: "interval", index: 2 })).toBe(
-      "automation:interval:2",
+      "automation:interval:2"
     );
     expect(
       sectionKeyFromLocation({
         kind: "light_effect",
         component_id: "strip",
         index: 0,
-      }),
+      })
     ).toBe("automation:light_effect:strip:0");
     expect(
       sectionKeyFromLocation({
         kind: "api_action",
         action_name: "start_laundry",
-      }),
+      })
     ).toBe("automation:api_action:start_laundry");
   });
 });

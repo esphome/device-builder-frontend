@@ -62,7 +62,9 @@ export type Installer = "web-serial" | "web-download" | "binary-download" | null
 
 @customElement("esphome-firmware-install-dialog")
 export class ESPHomeFirmwareInstallDialog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
   @consume({ context: darkModeContext, subscribe: true }) @state() _darkMode = true;
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
@@ -227,7 +229,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         detail: { configuration: device.configuration },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
@@ -241,14 +243,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         detail: device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   };
 
   _tryResetBuildEnv = () => {
     this._close();
     this.dispatchEvent(
-      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true }),
+      new CustomEvent("open-reset-build-env", { bubbles: true, composed: true })
     );
   };
 

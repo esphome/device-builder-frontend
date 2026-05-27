@@ -9,20 +9,12 @@ export const offloaderAlertStyles = css`
     margin: var(--wa-space-s) var(--wa-space-m);
     border-radius: var(--wa-border-radius-m);
     border-left: 4px solid var(--esphome-warning, #f59e0b);
-    background: color-mix(
-      in srgb,
-      var(--esphome-warning, #f59e0b),
-      transparent 92%
-    );
+    background: color-mix(in srgb, var(--esphome-warning, #f59e0b), transparent 92%);
   }
 
   .offloader-alert-peer-revoked {
     border-left-color: var(--esphome-error, #dc2626);
-    background: color-mix(
-      in srgb,
-      var(--esphome-error, #dc2626),
-      transparent 92%
-    );
+    background: color-mix(in srgb, var(--esphome-error, #dc2626), transparent 92%);
   }
 
   .offloader-alert-body {
@@ -91,8 +83,7 @@ export const pairingRowStyles = css`
 
   .btn-pair-build-server:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
 
   .btn-pair-build-server:disabled {

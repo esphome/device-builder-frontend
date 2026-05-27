@@ -23,31 +23,24 @@ function readArrayAt(ctx: RenderCtx, path: string[]): readonly unknown[] {
 function arrayItemHandlers(
   ctx: RenderCtx,
   path: string[],
-  makeNewItem: () => unknown,
+  makeNewItem: () => unknown
 ): { addItem: () => void; removeAt: (idx: number) => void } {
   const removeAt = (idx: number) =>
     ctx.emitChange(
       path,
-      readArrayAt(ctx, path).filter((_, i) => i !== idx),
+      readArrayAt(ctx, path).filter((_, i) => i !== idx)
     );
-  const addItem = () =>
-    ctx.emitChange(path, [...readArrayAt(ctx, path), makeNewItem()]);
+  const addItem = () => ctx.emitChange(path, [...readArrayAt(ctx, path), makeNewItem()]);
   return { addItem, removeAt };
 }
 
 function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
   return items.length === 0
-    ? html`<p class="field-description">
-        ${ctx.localize("device.multi_value_empty")}
-      </p>`
+    ? html`<p class="field-description">${ctx.localize("device.multi_value_empty")}</p>`
     : nothing;
 }
 
-function renderListRemoveButton(
-  ctx: RenderCtx,
-  disabled: boolean,
-  onClick: () => void,
-) {
+function renderListRemoveButton(ctx: RenderCtx, disabled: boolean, onClick: () => void) {
   return html`
     <button
       type="button"
@@ -61,11 +54,7 @@ function renderListRemoveButton(
   `;
 }
 
-function renderListAddButton(
-  ctx: RenderCtx,
-  disabled: boolean,
-  onClick: () => void,
-) {
+function renderListAddButton(ctx: RenderCtx, disabled: boolean, onClick: () => void) {
   return html`
     <button
       type="button"
@@ -82,7 +71,7 @@ function renderListAddButton(
 export function renderMultiValueField(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ) {
   const items: string[] = readArrayAt(ctx, path).map((v) => String(v));
   const invalid = ctx.errorAt(path) !== null;
@@ -105,15 +94,13 @@ export function renderMultiValueField(
               class="multi-input ${invalid ? "invalid" : ""}"
               .value=${item}
               ?disabled=${disabled}
-              @input=${(e: Event) =>
-                updateAt(i, (e.target as HTMLInputElement).value)}
+              @input=${(e: Event) => updateAt(i, (e.target as HTMLInputElement).value)}
             />
             ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
           </div>
-        `,
+        `
       )}
-      ${renderListAddButton(ctx, disabled, addItem)}
-      ${renderFieldError(path, ctx)}
+      ${renderListAddButton(ctx, disabled, addItem)} ${renderFieldError(path, ctx)}
     </div>
   `;
 }
@@ -123,11 +110,7 @@ export function renderMultiValueField(
 // logger.logs:, substitutions:, globals:, api.actions:. Storage:
 // values[key] = { userKey: userValue, ... }. Renames rebuild to preserve
 // order; deletes remove the entry; adds inject new_1, new_2, ….
-export function renderMapField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const valueTemplate = (entry.config_entries ?? [])[0];
   const raw = ctx.getAt(path);
   const map: Record<string, unknown> =
@@ -141,9 +124,8 @@ export function renderMapField(
   // __proto__ / constructor stay as own property data instead of mutating
   // Object.prototype. A naive {...obj} spread would silently swap the
   // protection out on the first mutation. (Copilot-flagged.)
-  const cloneMap = (
-    src: Record<string, unknown>,
-  ): Record<string, unknown> => Object.assign(Object.create(null), src);
+  const cloneMap = (src: Record<string, unknown>): Record<string, unknown> =>
+    Object.assign(Object.create(null), src);
 
   const readMap = (): Record<string, unknown> => {
     const cur = ctx.getAt(path);
@@ -196,8 +178,7 @@ export function renderMapField(
           class="multi-input map-key-input"
           .value=${rowKey}
           ?disabled=${disabled}
-          @change=${(e: Event) =>
-            renameKey(rowKey, (e.target as HTMLInputElement).value)}
+          @change=${(e: Event) => renameKey(rowKey, (e.target as HTMLInputElement).value)}
         />
         <div class="map-value">
           ${complex
@@ -225,9 +206,7 @@ export function renderMapField(
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
       ${keys.length === 0
-        ? html`<p class="field-description">
-            ${ctx.localize("device.map_empty")}
-          </p>`
+        ? html`<p class="field-description">${ctx.localize("device.map_empty")}</p>`
         : nothing}
       ${keys.map((k) => renderRow(k))}
       <button
@@ -252,7 +231,7 @@ export function renderMapField(
 export function renderNestedListField(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ) {
   // YamlRawValue means the parser preserved the block byte-for-byte (the
   // catalog's flat-mapping contract didn't fit). Bail to a YAML-only notice;
@@ -263,9 +242,7 @@ export function renderNestedListField(
     return html`
       <div class="nested-list" data-field-key=${path.join(".")}>
         ${renderLabel(entry, ctx)}
-        <p class="field-description">
-          ${ctx.localize("device.multi_value_yaml_only")}
-        </p>
+        <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
         ${renderFieldError(path, ctx)}
       </div>
     `;
@@ -286,21 +263,18 @@ export function renderNestedListField(
         return html`
           <div class="nested-list-item" data-field-key=${itemPath.join(".")}>
             <div class="nested-list-item-header">
-              <span class="nested-list-item-title">
-                ${itemTitle} ${i + 1}
-              </span>
+              <span class="nested-list-item-title"> ${itemTitle} ${i + 1} </span>
               ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}
             </div>
             <div class="nested-fields">
               ${renderableChildren.map((child) =>
-                ctx.renderEntry(child, [...itemPath, child.key]),
+                ctx.renderEntry(child, [...itemPath, child.key])
               )}
             </div>
           </div>
         `;
       })}
-      ${renderListAddButton(ctx, disabled, addItem)}
-      ${renderFieldError(path, ctx)}
+      ${renderListAddButton(ctx, disabled, addItem)} ${renderFieldError(path, ctx)}
     </div>
   `;
 }

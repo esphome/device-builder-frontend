@@ -130,9 +130,7 @@ function copyViaExecCommand(text: string): boolean {
   // our hijacked range. Cheap to be a good citizen — the user
   // might have text selected before clicking Copy.
   const previousRange =
-    selection && selection.rangeCount > 0
-      ? selection.getRangeAt(0).cloneRange()
-      : null;
+    selection && selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
 
   // ``execCommand("copy")`` won't fire the ``copy`` event
   // without an active non-empty selection. Use a hidden span

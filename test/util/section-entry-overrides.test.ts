@@ -121,7 +121,7 @@ describe("device-section-config wiring", () => {
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
       here,
-      "../../src/components/device/device-section-config.ts",
+      "../../src/components/device/device-section-config.ts"
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
 
@@ -134,14 +134,14 @@ describe("device-section-config wiring", () => {
     const expr = match![1].trim();
     expect(
       expr.includes("renderEntries") || expr.includes("resolveSectionEntries"),
-      `form's .entries binds to '${expr}', not to the resolver's output`,
+      `form's .entries binds to '${expr}', not to the resolver's output`
     ).toBe(true);
 
     // Pin the inverse too: the catalog source ``this._config.entries``
     // must NOT be the value bound to the form's ``.entries`` prop.
     expect(
       expr.includes("this._config.entries"),
-      "form's .entries binds to the raw catalog entries — substitutions override is bypassed",
+      "form's .entries binds to the raw catalog entries — substitutions override is bypassed"
     ).toBe(false);
   });
 
@@ -171,7 +171,7 @@ describe("device-section-config wiring", () => {
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const sourcePath = path.resolve(
       here,
-      "../../src/components/device/device-section-config/draft-and-delete.ts",
+      "../../src/components/device/device-section-config/draft-and-delete.ts"
     );
     const src = fs.readFileSync(sourcePath, "utf-8");
 
@@ -180,13 +180,12 @@ describe("device-section-config wiring", () => {
     expect(match, "validateEntries call not found").not.toBeNull();
     const firstArg = match![1].trim();
     expect(
-      firstArg.includes("renderEntries") ||
-        firstArg.includes("resolveSectionEntries"),
-      `validateEntries' first arg is '${firstArg}', not the resolver's output`,
+      firstArg.includes("renderEntries") || firstArg.includes("resolveSectionEntries"),
+      `validateEntries' first arg is '${firstArg}', not the resolver's output`
     ).toBe(true);
     expect(
       firstArg === "this._config.entries",
-      "validateEntries reads the raw catalog — MAP-section saves silently bail on the catalog's required fields",
+      "validateEntries reads the raw catalog — MAP-section saves silently bail on the catalog's required fields"
     ).toBe(false);
   });
 });
@@ -218,19 +217,13 @@ describe("save validation contract", () => {
 
     // Buggy path (validate against catalog): ``url`` reports
     // required, so ``_fieldErrors`` populates and the save bails.
-    const rawErrors = validateEntries(
-      packagesShapedCatalog,
-      userKeyedValues,
-    );
+    const rawErrors = validateEntries(packagesShapedCatalog, userKeyedValues);
     expect(rawErrors.has("url")).toBe(true);
 
     // Fixed path (validate against resolver output): the single
     // user-keyed MAP entry isn't required, so no errors and the
     // save proceeds.
-    const resolved = resolveSectionEntries(
-      "substitutions",
-      packagesShapedCatalog,
-    );
+    const resolved = resolveSectionEntries("substitutions", packagesShapedCatalog);
     const resolvedErrors = validateEntries(resolved, userKeyedValues);
     expect(resolvedErrors.size).toBe(0);
   });
@@ -247,10 +240,7 @@ describe("save validation contract", () => {
         required: true,
       }),
     ];
-    const errors = validateEntries(
-      resolveSectionEntries("wifi", wifiCatalog),
-      {},
-    );
+    const errors = validateEntries(resolveSectionEntries("wifi", wifiCatalog), {});
     expect(errors.has("ssid")).toBe(true);
   });
 });

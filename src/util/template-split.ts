@@ -8,10 +8,7 @@
 // placeholder absent from the template yields an empty string in its slot
 // and the remainder stays trailing, matching the existing call sites'
 // pair-of-split-with-default-empty pattern.
-export function splitTemplate(
-  template: string,
-  ...placeholders: string[]
-): string[] {
+export function splitTemplate(template: string, ...placeholders: string[]): string[] {
   let rest = template;
   const parts: string[] = [];
   for (const placeholder of placeholders) {

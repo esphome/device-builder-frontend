@@ -12,9 +12,7 @@ const loadPatterns = async (): Promise<CopyPattern[]> => {
     };
   };
   const cfg = mod.createRspackConfig();
-  const copyPlugin = cfg.plugins.find(
-    (p) => p?.constructor?.name === "CopyRspackPlugin",
-  );
+  const copyPlugin = cfg.plugins.find((p) => p?.constructor?.name === "CopyRspackPlugin");
   if (!copyPlugin) {
     throw new Error("CopyRspackPlugin not found in rspack plugins");
   }
@@ -29,23 +27,15 @@ describe("rspack config", () => {
     // index.html and the JS bundles but no logos/board images, so
     // the running dashboard 404s every static asset request.
     const patterns = await loadPatterns();
-    const assetsPattern = patterns.find((p) =>
-      p.from.endsWith("/public/assets"),
-    );
+    const assetsPattern = patterns.find((p) => p.from.endsWith("/public/assets"));
     expect(assetsPattern, "expected a copy pattern for public/assets").toBeDefined();
-    expect(assetsPattern!.to).toMatch(
-      /\/esphome_device_builder_frontend\/assets$/,
-    );
+    expect(assetsPattern!.to).toMatch(/\/esphome_device_builder_frontend\/assets$/);
   });
 
   it("copies the package __init__.py so pip install ships where()", async () => {
     const patterns = await loadPatterns();
-    const initPattern = patterns.find((p) =>
-      p.from.endsWith("/public/__init__.py"),
-    );
+    const initPattern = patterns.find((p) => p.from.endsWith("/public/__init__.py"));
     expect(initPattern, "expected a copy pattern for __init__.py").toBeDefined();
-    expect(initPattern!.to).toMatch(
-      /\/esphome_device_builder_frontend\/__init__\.py$/,
-    );
+    expect(initPattern!.to).toMatch(/\/esphome_device_builder_frontend\/__init__\.py$/);
   });
 });

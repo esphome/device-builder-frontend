@@ -50,10 +50,7 @@ function readLiteralText(state: EditorState, node: SyntaxNode): string {
  *  quotes if it wraps a ``QuotedLiteral``. Returns ``null`` for
  *  non-scalar keys (block-mapping / sequence keys are valid YAML
  *  but never component-name keys we'd want to match here). */
-export function readKeyText(
-  state: EditorState,
-  key: SyntaxNode,
-): string | null {
+export function readKeyText(state: EditorState, key: SyntaxNode): string | null {
   // ``Key`` wraps an ``element`` — the literal we care about is
   // its first leaf-ish child (Literal / QuotedLiteral).
   let inner: SyntaxNode | null = key.firstChild;
@@ -74,19 +71,14 @@ export function readKeyText(
 }
 
 /** Walk up from any node to the nearest enclosing ``Pair``. */
-export function findEnclosingPair(
-  node: SyntaxNode | null,
-): SyntaxNode | null {
+export function findEnclosingPair(node: SyntaxNode | null): SyntaxNode | null {
   let cur = node;
   while (cur && cur.name !== "Pair") cur = cur.parent;
   return cur;
 }
 
 /** Read the ``Key`` text of a ``Pair`` directly. */
-export function getPairKey(
-  state: EditorState,
-  pair: SyntaxNode,
-): string | null {
+export function getPairKey(state: EditorState, pair: SyntaxNode): string | null {
   const key = pair.getChild("Key");
   if (!key) return null;
   return readKeyText(state, key);
@@ -99,9 +91,7 @@ export function getPairKey(
  * isn't nested under a top-level mapping (e.g. unparseable
  * single-line input).
  */
-export function findTopLevelPair(
-  node: SyntaxNode | null,
-): SyntaxNode | null {
+export function findTopLevelPair(node: SyntaxNode | null): SyntaxNode | null {
   let cur = findEnclosingPair(node);
   while (cur) {
     const map = cur.parent;
@@ -149,10 +139,7 @@ const RE_AUTOMATION_KEY = /^(?:then|else|on_[a-z0-9_]*|[a-z0-9_]+_action)$/;
  * list-item position via ``isListItem`` so this only triggers
  * the registry at the dash position.
  */
-export function isUnderAutomationItem(
-  state: EditorState,
-  pos: number,
-): boolean {
+export function isUnderAutomationItem(state: EditorState, pos: number): boolean {
   const node = syntaxTree(state).resolveInner(pos, -1);
   let cur: SyntaxNode | null = node;
   while (cur) {
@@ -177,10 +164,7 @@ export function isUnderAutomationItem(
  * cursor isn't nested under a top-level mapping pair (e.g.
  * cursor at the very top of an empty doc).
  */
-export function getTopLevelKey(
-  state: EditorState,
-  pos: number,
-): string | null {
+export function getTopLevelKey(state: EditorState, pos: number): string | null {
   const node = syntaxTree(state).resolveInner(pos, -1);
   const top = findTopLevelPair(node);
   if (!top) return null;
@@ -193,10 +177,7 @@ export function getTopLevelKey(
  * ``null`` when the cursor isn't inside a list-item that declares
  * a ``platform:`` sibling.
  */
-export function getPlatformValue(
-  state: EditorState,
-  pos: number,
-): string | null {
+export function getPlatformValue(state: EditorState, pos: number): string | null {
   // Walk up through every enclosing ``Item`` until one has a
   // ``platform:`` pair as a direct child of its mapping. Inner
   // list-of-mappings positions (cursor inside a ``filters:`` /
@@ -236,7 +217,7 @@ export function getPlatformValue(
  */
 export function resolveBundleContext(
   state: EditorState,
-  pos: number,
+  pos: number
 ): { topLevelKey: string; platformValue: string | null } | null {
   const topLevelKey = getTopLevelKey(state, pos);
   if (!topLevelKey) return null;

@@ -820,8 +820,8 @@ export enum ConfigEntryType {
 
 /** A trigger that can start an automation. */
 export interface AutomationTrigger {
-  id: string;                  // "on_press", "binary_sensor.on_click", "on_boot"
-  name: string;                // "On Press"
+  id: string; // "on_press", "binary_sensor.on_click", "on_boot"
+  name: string; // "On Press"
   description: string;
   docs_url: string;
   /** Platform types this trigger applies to (``["binary_sensor"]``).
@@ -837,11 +837,11 @@ export interface AutomationTrigger {
 
 /** An action that can run inside an automation. */
 export interface AutomationAction {
-  id: string;                  // "light.turn_on", "delay", "if", "lambda"
+  id: string; // "light.turn_on", "delay", "if", "lambda"
   name: string;
   description: string;
   docs_url: string;
-  domain: string;              // "light", "core" for built-ins
+  domain: string; // "light", "core" for built-ins
   config_entries: ConfigEntry[];
   /** True for ``if`` / ``while`` / ``repeat`` / ``wait_until`` —
    *  the action embeds nested action lists addressed by the keys in
@@ -859,11 +859,11 @@ export interface AutomationAction {
 /** A condition usable inside an automation's ``if`` / ``while`` /
  *  ``wait_until`` action, or as a trigger gate. */
 export interface AutomationCondition {
-  id: string;                  // "binary_sensor.is_on", "and", "lambda"
+  id: string; // "binary_sensor.is_on", "and", "lambda"
   name: string;
   description: string;
   docs_url: string;
-  domain: string;              // "binary_sensor", "core"
+  domain: string; // "binary_sensor", "core"
   config_entries: ConfigEntry[];
   /** True for ``and`` / ``or`` / ``all`` / ``any`` / ``not`` /
    *  ``xor`` — the condition embeds a recursive list of child
@@ -877,7 +877,7 @@ export interface AutomationCondition {
  *  list ergonomics differ from actions (effects compose into a list
  *  on a single ``light`` block; actions form a tree). */
 export interface LightEffect {
-  id: string;                  // "pulse", "flicker", "addressable_lambda"
+  id: string; // "pulse", "flicker", "addressable_lambda"
   name: string;
   config_entries: ConfigEntry[];
   /** Light platform types this effect is valid on
@@ -2150,8 +2150,7 @@ export type PeerLinkCloseReason =
  * (true on non-orphan reasons; false on `pin_mismatch` /
  * `superseded` where the run loop won't retry).
  */
-export interface OffloaderPeerLinkClosedEventData
-  extends OffloaderPeerLinkSessionEventData {
+export interface OffloaderPeerLinkClosedEventData extends OffloaderPeerLinkSessionEventData {
   reason: PeerLinkCloseReason;
   error_detail: string;
 }

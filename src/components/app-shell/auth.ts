@@ -12,7 +12,7 @@ export function parseRateLimitSeconds(details: string): number {
 
 export async function onLoginSubmit(
   host: ESPHomeApp,
-  e: CustomEvent<{ username: string; password: string }>,
+  e: CustomEvent<{ username: string; password: string }>
 ): Promise<void> {
   if (host._authState === "authing") return;
   host._authState = "authing";

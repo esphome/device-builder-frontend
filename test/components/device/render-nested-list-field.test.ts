@@ -46,9 +46,7 @@ interface CtxStub {
   filterRenderable: ReturnType<typeof vi.fn>;
 }
 
-function collectHandlers(
-  values: unknown[],
-): Array<(...args: unknown[]) => unknown> {
+function collectHandlers(values: unknown[]): Array<(...args: unknown[]) => unknown> {
   const out: Array<(...args: unknown[]) => unknown> = [];
   const walk = (v: unknown): void => {
     if (typeof v === "function") {
@@ -137,10 +135,7 @@ describe("renderNestedListField", () => {
     // Last handler in render order is the add button (rendered after
     // the items + their per-item remove buttons).
     handlers[handlers.length - 1]();
-    expect(emitChange).toHaveBeenCalledWith(
-      ["devices"],
-      [{ id: "kitchen" }, {}],
-    );
+    expect(emitChange).toHaveBeenCalledWith(["devices"], [{ id: "kitchen" }, {}]);
   });
 
   it("removeAt drops the item at idx and emits the new array", () => {
@@ -154,10 +149,7 @@ describe("renderNestedListField", () => {
     const handlers = collectHandlers(tpl.values);
     expect(handlers).toHaveLength(4);
     handlers[1]();
-    expect(emitChange).toHaveBeenCalledWith(
-      ["devices"],
-      [{ id: "a" }, { id: "c" }],
-    );
+    expect(emitChange).toHaveBeenCalledWith(["devices"], [{ id: "a" }, { id: "c" }]);
     // Untouched siblings preserve identity.
     const next = emitChange.mock.calls[0][1] as Array<Record<string, unknown>>;
     expect(next[0]).toBe(before.devices[0]);
@@ -201,7 +193,7 @@ describe("renderNestedListField", () => {
     });
     // Pretend the filter drops ``area_id`` for this item.
     filterRenderable.mockImplementation((entries) =>
-      entries.filter((e) => e.key !== "area_id"),
+      entries.filter((e) => e.key !== "area_id")
     );
     renderNestedListField(entry, ["devices"], ctx);
     expect(renderEntry).toHaveBeenCalledTimes(2);

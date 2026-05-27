@@ -33,7 +33,7 @@ export interface LabelUsageDevice {
  * zero.
  */
 export function computeLabelUsage(
-  devices: readonly LabelUsageDevice[],
+  devices: readonly LabelUsageDevice[]
 ): Record<string, number> {
   const usage: Record<string, number> = {};
   for (const d of devices) {
@@ -75,7 +75,7 @@ export function deleteConfirmKey(usage: number): string {
 export function isLabelNameDuplicate(
   name: string,
   existingNames: readonly string[],
-  editingName: string | null,
+  editingName: string | null
 ): boolean {
   const lower = name.trim().toLowerCase();
   if (!lower) return false;

@@ -1,8 +1,5 @@
 import { APIError } from "../api/api-error.js";
-import {
-  ErrorCode,
-  type OffloaderPinMismatchAlert,
-} from "../api/types.js";
+import { ErrorCode, type OffloaderPinMismatchAlert } from "../api/types.js";
 
 /** Args shape of {@link ESPHomeAPI.requestRemoteBuildPair}.
  *  Mirrored locally rather than imported because the API
@@ -54,7 +51,7 @@ export interface ReauthPairRequestArgs {
  */
 export function buildReauthPairRequest(
   alert: OffloaderPinMismatchAlert,
-  offloaderLabel: string,
+  offloaderLabel: string
 ): ReauthPairRequestArgs {
   return {
     hostname: alert.receiver_hostname,

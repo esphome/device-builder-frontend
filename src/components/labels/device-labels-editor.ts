@@ -24,12 +24,7 @@
  * override.
  */
 import { consume } from "@lit/context";
-import {
-  mdiCheck,
-  mdiClose,
-  mdiPencil,
-  mdiTagMultiple,
-} from "@mdi/js";
+import { mdiCheck, mdiClose, mdiPencil, mdiTagMultiple } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
@@ -39,10 +34,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyleString } from "../../util/label-style.js";
-import {
-  labelChipStyles,
-  resolveLabelIds,
-} from "../../util/label-chip-template.js";
+import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
@@ -263,8 +255,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       .option:focus-visible {
         outline: none;
         background: var(--wa-color-surface-lowered);
-        box-shadow: 0 0 0 2px
-          color-mix(in srgb, var(--esphome-primary), transparent 70%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
       }
 
       .option-check {
@@ -299,10 +290,8 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
       .create-section {
         margin-top: var(--wa-space-l);
         padding-top: var(--wa-space-m);
-        border-top: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
-
     `,
   ];
 
@@ -341,25 +330,24 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
           ? html`<span class="empty">${this._localize("dashboard.labels_none")}</span>`
           : nothing}
         ${assigned.map(
-          (label) => html`<span
-            class="label-chip assigned-chip"
-            style=${labelChipStyleString(label.color)}
-            title=${label.name}
-            >${label.name}<button
-              class="remove-btn"
-              type="button"
-              aria-label=${this._localize("dashboard.labels_remove", { name: label.name })}
-              @click=${() => this._unassign(label.id)}
-            >
-              <wa-icon library="mdi" name="close"></wa-icon>
-            </button>
-          </span>`,
+          (label) =>
+            html`<span
+              class="label-chip assigned-chip"
+              style=${labelChipStyleString(label.color)}
+              title=${label.name}
+              >${label.name}<button
+                class="remove-btn"
+                type="button"
+                aria-label=${this._localize("dashboard.labels_remove", {
+                  name: label.name,
+                })}
+                @click=${() => this._unassign(label.id)}
+              >
+                <wa-icon library="mdi" name="close"></wa-icon>
+              </button>
+            </span>`
         )}
-        <button
-          class="edit-btn"
-          type="button"
-          @click=${this._openDialog}
-        >
+        <button class="edit-btn" type="button" @click=${this._openDialog}>
           <wa-icon library="mdi" name="pencil"></wa-icon>
           ${this._localize("dashboard.labels_edit")}
         </button>
@@ -376,7 +364,11 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         light-dismiss
         @wa-after-hide=${this._onDialogClose}
       >
-        <div class="options" role="group" aria-label=${this._localize("dashboard.drawer_labels")}>
+        <div
+          class="options"
+          role="group"
+          aria-label=${this._localize("dashboard.drawer_labels")}
+        >
           ${this._catalog.length === 0
             ? html`<div class="option-empty">
                 ${this._localize("dashboard.labels_dialog_empty")}

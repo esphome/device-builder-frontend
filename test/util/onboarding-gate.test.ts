@@ -27,7 +27,7 @@ const wifi = (status: OnboardingStepStatus) => ({
 const stateWith = (
   steps: ReturnType<typeof wifi>[],
   current_version = 1,
-  completed_version = 0,
+  completed_version = 0
 ): OnboardingState => ({
   current_version,
   completed_version,
@@ -36,15 +36,13 @@ const stateWith = (
 
 describe("isOnboardingPending", () => {
   it("returns true when any step is pending", () => {
-    expect(
-      isOnboardingPending(stateWith([wifi(OnboardingStepStatus.PENDING)])),
-    ).toBe(true);
+    expect(isOnboardingPending(stateWith([wifi(OnboardingStepStatus.PENDING)]))).toBe(
+      true
+    );
   });
 
   it("returns false when every step is done", () => {
-    expect(
-      isOnboardingPending(stateWith([wifi(OnboardingStepStatus.DONE)])),
-    ).toBe(false);
+    expect(isOnboardingPending(stateWith([wifi(OnboardingStepStatus.DONE)]))).toBe(false);
   });
 
   it("returns false on an empty step list", () => {
@@ -55,10 +53,7 @@ describe("isOnboardingPending", () => {
 describe("shouldAutoShowOnboarding", () => {
   it("pops for a fresh-install user behind current with pending step", () => {
     expect(
-      shouldAutoShowOnboarding(
-        stateWith([wifi(OnboardingStepStatus.PENDING)]),
-        false,
-      ),
+      shouldAutoShowOnboarding(stateWith([wifi(OnboardingStepStatus.PENDING)]), false)
     ).toBe(true);
   });
 
@@ -67,20 +62,17 @@ describe("shouldAutoShowOnboarding", () => {
       "(this is the bug fix — completed_version=0 + step DONE must not interrupt)",
     () => {
       expect(
-        shouldAutoShowOnboarding(
-          stateWith([wifi(OnboardingStepStatus.DONE)]),
-          false,
-        ),
+        shouldAutoShowOnboarding(stateWith([wifi(OnboardingStepStatus.DONE)]), false)
       ).toBe(false);
-    },
+    }
   );
 
   it("does NOT pop when user is up to date even with pending step", () => {
     expect(
       shouldAutoShowOnboarding(
         stateWith([wifi(OnboardingStepStatus.PENDING)], 1, 1),
-        false,
-      ),
+        false
+      )
     ).toBe(false);
   });
 
@@ -88,17 +80,14 @@ describe("shouldAutoShowOnboarding", () => {
     expect(
       shouldAutoShowOnboarding(
         stateWith([wifi(OnboardingStepStatus.PENDING)], 1, 2),
-        false,
-      ),
+        false
+      )
     ).toBe(false);
   });
 
   it("respects session-dismissal even with pending work", () => {
     expect(
-      shouldAutoShowOnboarding(
-        stateWith([wifi(OnboardingStepStatus.PENDING)]),
-        true,
-      ),
+      shouldAutoShowOnboarding(stateWith([wifi(OnboardingStepStatus.PENDING)]), true)
     ).toBe(false);
   });
 

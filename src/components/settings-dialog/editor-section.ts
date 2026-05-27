@@ -51,7 +51,7 @@ export class ESPHomeSettingsEditor extends LitElement {
         detail: !this._yamlDiffButton,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

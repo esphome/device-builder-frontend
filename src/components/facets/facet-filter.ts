@@ -177,10 +177,7 @@ export class ESPHomeFacetFilter extends LitElement {
         ${count > 2
           ? html`<span class="facet-trigger-badge">
               <span class="facet-trigger-badge-label"
-                >${this.multiSelectedLabel.replace(
-                  "{count}",
-                  String(count),
-                )}</span
+                >${this.multiSelectedLabel.replace("{count}", String(count))}</span
               >
               <button
                 class="facet-trigger-badge-remove"
@@ -220,9 +217,7 @@ export class ESPHomeFacetFilter extends LitElement {
       : this.options;
     return html`
       <div
-        class="facet-popover ${this.anchorRight
-          ? "facet-popover--anchor-right"
-          : ""}"
+        class="facet-popover ${this.anchorRight ? "facet-popover--anchor-right" : ""}"
         role="group"
         aria-label=${this.name}
       >
@@ -277,11 +272,7 @@ export class ESPHomeFacetFilter extends LitElement {
             </div>`}
         ${this.selected.length > 0
           ? html`<div class="facet-footer">
-              <button
-                class="facet-clear-link"
-                type="button"
-                @click=${this._clear}
-              >
+              <button class="facet-clear-link" type="button" @click=${this._clear}>
                 ${this.clearLabel}
               </button>
             </div>`
@@ -334,7 +325,7 @@ export class ESPHomeFacetFilter extends LitElement {
         detail: next,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

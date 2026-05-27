@@ -1,10 +1,5 @@
 import { consume } from "@lit/context";
-import {
-  mdiDownload,
-  mdiEyeOffOutline,
-  mdiEyeOutline,
-  mdiOpenInNew,
-} from "@mdi/js";
+import { mdiDownload, mdiEyeOffOutline, mdiEyeOutline, mdiOpenInNew } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { AdoptableDevice } from "../api/types.js";
@@ -121,8 +116,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
 
       .hostname {
         font-family:
-          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
-          monospace;
+          "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
         font-size: var(--wa-font-size-2xs);
         background: var(--wa-color-surface-lowered);
         border-radius: var(--wa-border-radius-s);
@@ -286,10 +280,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
           ${this.device.ignored
             ? nothing
             : html`
-                <button
-                  class="btn btn--primary"
-                  @click=${() => this._emit("adopt")}
-                >
+                <button class="btn btn--primary" @click=${() => this._emit("adopt")}>
                   <wa-icon library="mdi" name="download"></wa-icon>
                   ${this._localize("dashboard.action_take_control")}
                 </button>
@@ -312,7 +303,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
             title=${this._localize(
               this.device.ignored
                 ? "dashboard.action_unignore"
-                : "dashboard.action_ignore",
+                : "dashboard.action_ignore"
             )}
             @click=${() => this._emit("toggle-ignore")}
           >
@@ -323,7 +314,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
             ${this._localize(
               this.device.ignored
                 ? "dashboard.action_unignore"
-                : "dashboard.action_ignore",
+                : "dashboard.action_ignore"
             )}
           </button>
         </div>
@@ -337,7 +328,7 @@ export class ESPHomeDiscoveredDeviceCard extends LitElement {
         detail: this.device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

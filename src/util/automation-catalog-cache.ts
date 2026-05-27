@@ -81,7 +81,7 @@ function _fetch<K extends CatalogKind>(
   kind: K,
   fetcher: (platform?: string, boardId?: string) => Promise<CatalogValue[K]>,
   platform: string | undefined,
-  boardId: string | undefined,
+  boardId: string | undefined
 ): Promise<CatalogValue[K]> {
   const key = _key(platform, boardId);
   const cached = _cache[kind].get(key);
@@ -108,7 +108,7 @@ function _fetch<K extends CatalogKind>(
 
 export function getCachedAutomationTriggers(
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): AutomationTrigger[] | undefined {
   return _cache.triggers.get(_key(platform, boardId));
 }
@@ -116,19 +116,14 @@ export function getCachedAutomationTriggers(
 export function fetchAutomationTriggers(
   api: ESPHomeAPI,
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): Promise<AutomationTrigger[]> {
-  return _fetch(
-    "triggers",
-    (p, b) => api.getAutomationTriggers(p, b),
-    platform,
-    boardId,
-  );
+  return _fetch("triggers", (p, b) => api.getAutomationTriggers(p, b), platform, boardId);
 }
 
 export function getCachedAutomationActions(
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): AutomationAction[] | undefined {
   return _cache.actions.get(_key(platform, boardId));
 }
@@ -136,19 +131,14 @@ export function getCachedAutomationActions(
 export function fetchAutomationActions(
   api: ESPHomeAPI,
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): Promise<AutomationAction[]> {
-  return _fetch(
-    "actions",
-    (p, b) => api.getAutomationActions(p, b),
-    platform,
-    boardId,
-  );
+  return _fetch("actions", (p, b) => api.getAutomationActions(p, b), platform, boardId);
 }
 
 export function getCachedAutomationConditions(
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): AutomationCondition[] | undefined {
   return _cache.conditions.get(_key(platform, boardId));
 }
@@ -156,19 +146,19 @@ export function getCachedAutomationConditions(
 export function fetchAutomationConditions(
   api: ESPHomeAPI,
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): Promise<AutomationCondition[]> {
   return _fetch(
     "conditions",
     (p, b) => api.getAutomationConditions(p, b),
     platform,
-    boardId,
+    boardId
   );
 }
 
 export function getCachedLightEffects(
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): LightEffect[] | undefined {
   return _cache.light_effects.get(_key(platform, boardId));
 }
@@ -176,22 +166,15 @@ export function getCachedLightEffects(
 export function fetchLightEffects(
   api: ESPHomeAPI,
   platform?: string,
-  boardId?: string,
+  boardId?: string
 ): Promise<LightEffect[]> {
-  return _fetch(
-    "light_effects",
-    (p, b) => api.getLightEffects(p, b),
-    platform,
-    boardId,
-  );
+  return _fetch("light_effects", (p, b) => api.getLightEffects(p, b), platform, boardId);
 }
 
 /** Subscribe to cache updates. Returns an unsubscribe function.
  *  Listeners fire once per fresh entry (across any of the four
  *  catalogues); failed fetches do not fire. */
-export function subscribeAutomationCatalogCache(
-  listener: () => void,
-): () => void {
+export function subscribeAutomationCatalogCache(listener: () => void): () => void {
   _listeners.add(listener);
   return () => {
     _listeners.delete(listener);

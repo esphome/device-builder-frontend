@@ -33,7 +33,7 @@ export class EscapeController implements ReactiveController {
   constructor(
     host: ReactiveControllerHost,
     private readonly onEscape: (e: KeyboardEvent) => void,
-    options: EscapeControllerOptions = {},
+    options: EscapeControllerOptions = {}
   ) {
     this._target = options.target ?? window;
     host.addController(this);

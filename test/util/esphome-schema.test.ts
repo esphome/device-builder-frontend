@@ -88,7 +88,9 @@ describe("fetchBundle", () => {
     });
     const bundle = await fetchBundle(makeApi() as never, "esphome");
     expect(bundle).not.toBeNull();
-    expect(bundle?.esphome?.schemas?.CONFIG_SCHEMA?.schema.config_vars.on_boot).toBeDefined();
+    expect(
+      bundle?.esphome?.schemas?.CONFIG_SCHEMA?.schema.config_vars.on_boot
+    ).toBeDefined();
   });
 
   it("falls back to /dev/ when the version-specific bundle is missing", async () => {
@@ -132,7 +134,7 @@ describe("fetchBundle", () => {
     await Promise.all([fetchBundle(api, "esphome"), fetchBundle(api, "esphome")]);
     // One HEAD probe + one GET, regardless of how many in-flight callers.
     const gets = fetchSpy.mock.calls.filter(
-      (c) => (c[1] as RequestInit | undefined)?.method !== "HEAD",
+      (c) => (c[1] as RequestInit | undefined)?.method !== "HEAD"
     );
     expect(gets.length).toBe(1);
   });
@@ -151,9 +153,7 @@ describe("getTriggerKeys", () => {
       "on_shutdown",
     ]);
     // Docs flow through when present.
-    expect(triggers.find((t) => t.key === "on_boot")?.docs).toBe(
-      "Run when device boots",
-    );
+    expect(triggers.find((t) => t.key === "on_boot")?.docs).toBe("Run when device boots");
   });
 
   it("returns trigger keys from a platform-style component (binary_sensor.gpio)", async () => {
@@ -164,7 +164,7 @@ describe("getTriggerKeys", () => {
     const triggers = await getTriggerKeys(
       makeApi() as never,
       "binary_sensor",
-      "binary_sensor.gpio",
+      "binary_sensor.gpio"
     );
     expect(triggers.map((t) => t.key).sort()).toEqual(["on_press", "on_release"]);
   });
@@ -200,7 +200,7 @@ describe("getTriggerKeys", () => {
             },
           },
         }),
-        { status: 200 },
+        { status: 200 }
       );
     });
     const triggers = await getTriggerKeys(makeApi() as never, "plain", "plain");
@@ -255,12 +255,9 @@ describe("getTriggerKeys", () => {
     const triggers = await getTriggerKeys(
       makeApi() as never,
       "gpio",
-      "gpio.binary_sensor",
+      "gpio.binary_sensor"
     );
-    expect(triggers.map((t) => t.key).sort()).toEqual([
-      "on_press",
-      "on_release",
-    ]);
+    expect(triggers.map((t) => t.key).sort()).toEqual(["on_press", "on_release"]);
     expect(triggers.find((t) => t.key === "on_press")?.docs).toBe("Pressed");
   });
 
@@ -295,11 +292,7 @@ describe("getTriggerKeys", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
-    const triggers = await getTriggerKeys(
-      makeApi() as never,
-      "child",
-      "child",
-    );
+    const triggers = await getTriggerKeys(makeApi() as never, "child", "child");
     expect(triggers.map((t) => t.key).sort()).toEqual(["on_state", "on_value"]);
     expect(triggers.find((t) => t.key === "on_state")?.docs).toBe("child");
   });
@@ -355,7 +348,7 @@ describe("getActions", () => {
     const actions = await getActions(
       makeApi() as never,
       ["logger", "light"],
-      ["logger", "light"],
+      ["logger", "light"]
     );
     const keys = actions.map((a) => a.key).sort();
     expect(keys).toEqual([
@@ -364,9 +357,7 @@ describe("getActions", () => {
       "logger.log",
       "logger.set_level",
     ]);
-    expect(actions.find((a) => a.key === "logger.log")?.docs).toBe(
-      "Log a message",
-    );
+    expect(actions.find((a) => a.key === "logger.log")?.docs).toBe("Log a message");
   });
 
   it("emits core actions without a domain prefix", async () => {
@@ -384,7 +375,7 @@ describe("getActions", () => {
     const actions = await getActions(
       makeApi() as never,
       ["logger", "light"],
-      ["logger", "light"],
+      ["logger", "light"]
     );
     expect(actions).toEqual([]);
     debugSpy.mockRestore();
@@ -400,7 +391,7 @@ describe("getActions", () => {
     const actions = await getActions(
       makeApi() as never,
       ["logger", "logger"],
-      ["logger"],
+      ["logger"]
     );
     expect(actions.filter((a) => a.key === "logger.log").length).toBe(1);
   });
@@ -420,19 +411,12 @@ describe("getActions", () => {
             action: { foo: { type: "schema" } },
           },
         }),
-        { status: 200 },
+        { status: 200 }
       );
     });
-    const actions = await getActions(
-      makeApi() as never,
-      ["logger"],
-      ["logger"],
-    );
+    const actions = await getActions(makeApi() as never, ["logger"], ["logger"]);
     expect(actions.map((a) => a.key)).not.toContain("ignored.foo");
-    expect(actions.map((a) => a.key).sort()).toEqual([
-      "logger.log",
-      "logger.set_level",
-    ]);
+    expect(actions.map((a) => a.key).sort()).toEqual(["logger.log", "logger.set_level"]);
   });
 });
 
@@ -497,11 +481,7 @@ describe("getConfigVarKeys", () => {
         });
       throw new Error(`unexpected ${url}`);
     });
-    const keys = await getConfigVarKeys(
-      makeApi() as never,
-      "uptime",
-      "uptime.sensor",
-    );
+    const keys = await getConfigVarKeys(makeApi() as never, "uptime", "uptime.sensor");
     const labels = keys.map((k) => k.key);
     // Discriminator surfaces.
     expect(labels).toContain("type");
@@ -540,11 +520,7 @@ describe("getConfigVarKeys", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(CHILD_BUNDLE), { status: 200 });
     });
-    const keys = await getConfigVarKeys(
-      makeApi() as never,
-      "child",
-      "child",
-    );
+    const keys = await getConfigVarKeys(makeApi() as never, "child", "child");
     expect(keys.map((k) => k.key).sort()).toEqual(["inherited", "local"]);
   });
 
@@ -568,22 +544,14 @@ describe("getConfigVarKeys", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
-    const keys = await getConfigVarKeys(
-      makeApi() as never,
-      "thing",
-      "thing",
-    );
+    const keys = await getConfigVarKeys(makeApi() as never, "thing", "thing");
     expect(keys.map((k) => k.key)).toEqual(["name"]);
   });
 
   it("returns [] when the bundle fails to load", async () => {
     fetchSpy.mockRejectedValue(new TypeError("Failed to fetch"));
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const keys = await getConfigVarKeys(
-      makeApi() as never,
-      "uptime",
-      "uptime.sensor",
-    );
+    const keys = await getConfigVarKeys(makeApi() as never, "uptime", "uptime.sensor");
     expect(keys).toEqual([]);
     debugSpy.mockRestore();
   });
@@ -649,16 +617,14 @@ describe("getConfigVarValueOptions", () => {
       makeApi() as never,
       "uptime",
       "uptime.sensor",
-      "device_class",
+      "device_class"
     );
     expect(values.map((v) => v.value).sort()).toEqual([
       "duration",
       "humidity",
       "temperature",
     ]);
-    expect(values.find((v) => v.value === "duration")?.docs).toBe(
-      "Time elapsed",
-    );
+    expect(values.find((v) => v.value === "duration")?.docs).toBe("Time elapsed");
   });
 
   it("returns [] when the named config-var isn't an enum", async () => {
@@ -680,7 +646,7 @@ describe("getConfigVarValueOptions", () => {
       makeApi() as never,
       "thing",
       "thing",
-      "name",
+      "name"
     );
     expect(values).toEqual([]);
   });
@@ -692,7 +658,7 @@ describe("getConfigVarValueOptions", () => {
       makeApi() as never,
       "uptime",
       "uptime.sensor",
-      "device_class",
+      "device_class"
     );
     expect(values).toEqual([]);
     debugSpy.mockRestore();
@@ -759,20 +725,17 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
       makeApi() as never,
       "uptime",
       "uptime.sensor",
-      "filters",
+      "filters"
     );
     expect(ref).toBe("sensor.filter");
-    const entries = await getRegistryEntries(
-      makeApi() as never,
-      ref!,
-    );
+    const entries = await getRegistryEntries(makeApi() as never, ref!);
     expect(entries.map((e) => e.key).sort()).toEqual([
       "calibrate_linear",
       "clamp",
       "multiply",
     ]);
     expect(entries.find((e) => e.key === "calibrate_linear")?.docs).toBe(
-      "Linear calibration",
+      "Linear calibration"
     );
   });
 
@@ -804,11 +767,7 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
-    const keys = await getConfigVarKeys(
-      makeApi() as never,
-      "thing",
-      "thing",
-    );
+    const keys = await getConfigVarKeys(makeApi() as never, "thing", "thing");
     expect(keys.find((k) => k.key === "filters")?.isList).toBe(true);
     expect(keys.find((k) => k.key === "name")?.isList).toBe(false);
   });
@@ -828,27 +787,16 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
-    const ref = await lookupRegistryRef(
-      makeApi() as never,
-      "thing",
-      "thing",
-      "name",
-    );
+    const ref = await lookupRegistryRef(makeApi() as never, "thing", "thing", "name");
     expect(ref).toBeNull();
   });
 
   it("returns [] when the registry ref points at a missing slot", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
       if (init?.method === "HEAD") return new Response(null, { status: 200 });
-      return new Response(
-        JSON.stringify({ thing: { schemas: {} } }),
-        { status: 200 },
-      );
+      return new Response(JSON.stringify({ thing: { schemas: {} } }), { status: 200 });
     });
-    const entries = await getRegistryEntries(
-      makeApi() as never,
-      "thing.filter",
-    );
+    const entries = await getRegistryEntries(makeApi() as never, "thing.filter");
     expect(entries).toEqual([]);
   });
 
@@ -928,7 +876,7 @@ describe("getRegistryEntryKeys", () => {
       makeApi() as never,
       "globals",
       "globals",
-      "set",
+      "set"
     );
     expect(keys.map((k) => k.key).sort()).toEqual(["id", "value"]);
     expect(keys.find((k) => k.key === "id")?.required).toBe(true);
@@ -967,7 +915,7 @@ describe("getRegistryEntryKeys", () => {
       makeApi() as never,
       "light",
       "light",
-      "turn_on",
+      "turn_on"
     );
     expect(keys.map((k) => k.key).sort()).toEqual([
       "brightness",
@@ -986,7 +934,7 @@ describe("getRegistryEntryKeys", () => {
       makeApi() as never,
       "thing",
       "thing",
-      "missing",
+      "missing"
     );
     expect(keys).toEqual([]);
   });
@@ -1013,7 +961,7 @@ describe("getRegistryEntryKeys", () => {
       makeApi() as never,
       "esphome",
       "core",
-      "delay",
+      "delay"
     );
     expect(keys.map((k) => k.key)).toEqual(["time"]);
   });
@@ -1057,7 +1005,7 @@ describe("resolveVersion (probe failure handling)", () => {
     expect(bundle).not.toBeNull();
     await fetchBundle(makeApi() as never, "esphome");
     const heads = fetchSpy.mock.calls.filter(
-      (c) => (c[1] as RequestInit | undefined)?.method === "HEAD",
+      (c) => (c[1] as RequestInit | undefined)?.method === "HEAD"
     );
     expect(heads.length).toBe(1);
   });

@@ -8,10 +8,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { BoardPin, ConfigEntry } from "../../api/types.js";
 import { PinFeature, PinMode } from "../../api/types.js";
-import {
-  findUsedPins,
-  sectionEndLine,
-} from "../../util/config-entry-yaml-scan.js";
+import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
@@ -58,15 +55,14 @@ function buildPinOption(
   pin: BoardPin,
   entry: ConfigEntry,
   usedPins: Map<number, string>,
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ): PinOptionView {
   const optValue = `GPIO${pin.gpio}`;
   const primary = pin.label || optValue;
   const occupiedBy = pin.occupied_by || "";
   const usedBy = usedPins.get(pin.gpio) || "";
   const needsOutput =
-    entry.pin_mode === PinMode.OUTPUT ||
-    entry.pin_mode === PinMode.INPUT_OUTPUT;
+    entry.pin_mode === PinMode.OUTPUT || entry.pin_mode === PinMode.INPUT_OUTPUT;
   const isInputOnly = pin.features.includes(PinFeature.INPUT_ONLY);
   const inputOnlyConflict = needsOutput && isInputOnly;
   const disabled = pin.available === false || inputOnlyConflict;
@@ -100,7 +96,7 @@ function buildPinOption(
 export function renderPinField(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ): TemplateResult {
   if (!ctx.board || ctx.board.pins.length === 0) {
     return renderStringField(entry, "text", path, ctx);
@@ -137,9 +133,7 @@ export function renderPinField(
   // feature-filtered set instead, with a visible error for the field).
   if (entry.suggestions && entry.suggestions.length > 0) {
     const allowed = new Set(
-      entry.suggestions
-        .map(parsePinGpio)
-        .filter((g): g is number => g !== null),
+      entry.suggestions.map(parsePinGpio).filter((g): g is number => g !== null)
     );
     if (allowed.size > 0) {
       const narrowed = visible.filter((p) => allowed.has(p.gpio));
@@ -170,7 +164,7 @@ export function renderPinField(
   const usedPins = findUsedPins(
     ctx.yaml,
     ctx.fromLine,
-    sectionEndLine(ctx.yaml, ctx.fromLine),
+    sectionEndLine(ctx.yaml, ctx.fromLine)
   );
   const fieldDisabled = effectiveDisabled(entry, ctx);
   const isLongForm = isPlainObject(rawValue);
@@ -261,7 +255,7 @@ function renderPinAdvanced(
   ctx: RenderCtx,
   rawValue: unknown,
   isLongForm: boolean,
-  fieldDisabled: boolean,
+  fieldDisabled: boolean
 ): TemplateResult | typeof nothing {
   // Apply the same visibility filter every other nested renderer
   // uses so requiredOnly / showAdvanced / platform-gating rules
@@ -271,7 +265,7 @@ function renderPinAdvanced(
   // sub-fields the rest of the form has hidden.
   const longFormFields = ctx.filterRenderable(
     entry.config_entries ?? [],
-    ctx.scopeValues(path),
+    ctx.scopeValues(path)
   );
   if (longFormFields.length === 0) return nothing;
 
@@ -317,17 +311,12 @@ function renderPinAdvanced(
         ?disabled=${fieldDisabled}
         @click=${onAdvancedToggle}
       >
-        <wa-icon
-          library="mdi"
-          name=${isOpen ? "chevron-up" : "chevron-down"}
-        ></wa-icon>
+        <wa-icon library="mdi" name=${isOpen ? "chevron-up" : "chevron-down"}></wa-icon>
         <span>${ctx.localize("device.pin_advanced")}</span>
       </button>
       ${isOpen
         ? html`<div class="pin-advanced-fields">
-            ${longFormFields.map((child) =>
-              ctx.renderEntry(child, [...path, child.key]),
-            )}
+            ${longFormFields.map((child) => ctx.renderEntry(child, [...path, child.key]))}
           </div>`
         : nothing}
     </div>

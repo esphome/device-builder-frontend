@@ -39,7 +39,7 @@ export type VersionMismatchKind = "patch" | "release" | null;
  */
 export function classifyVersionMismatch(
   local: string,
-  peer: string,
+  peer: string
 ): VersionMismatchKind {
   // Either side unknown — handshake hasn't filled in the peer
   // value yet (PENDING / first-session) or the local probe
@@ -60,12 +60,8 @@ export function classifyVersionMismatch(
   // 2026.5b1 and 2026.5 still classify as the same release.
   const localParts = local.split(".");
   const peerParts = peer.split(".");
-  const localRelease = `${localParts[0] ?? ""}.${stripSuffix(
-    localParts[1] ?? "",
-  )}`;
-  const peerRelease = `${peerParts[0] ?? ""}.${stripSuffix(
-    peerParts[1] ?? "",
-  )}`;
+  const localRelease = `${localParts[0] ?? ""}.${stripSuffix(localParts[1] ?? "")}`;
+  const peerRelease = `${peerParts[0] ?? ""}.${stripSuffix(peerParts[1] ?? "")}`;
   return localRelease === peerRelease ? "patch" : "release";
 }
 

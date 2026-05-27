@@ -11,10 +11,7 @@ interface PillResult {
   pillLabel: string;
 }
 
-export function pillFor(
-  pairing: PairingSummary,
-  localize: LocalizeFunc,
-): PillResult {
+export function pillFor(pairing: PairingSummary, localize: LocalizeFunc): PillResult {
   if (pairing.status !== "approved") {
     return {
       pillClass: "pairing-status-pill pairing-status-pending",
@@ -52,7 +49,7 @@ interface PairingRowContext {
 
 export function renderPairingRow(
   pairing: PairingSummary,
-  ctx: PairingRowContext,
+  ctx: PairingRowContext
 ): TemplateResult {
   const {
     localize,
@@ -93,10 +90,9 @@ export function renderPairingRow(
             <button
               class="toggle"
               role="switch"
-              aria-label=${localize(
-                "settings.build_offload_pairing_enabled_aria",
-                { label: pairing.label },
-              )}
+              aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
+                label: pairing.label,
+              })}
               aria-checked=${pairing.enabled}
               title=${localize("settings.build_offload_pairing_enabled_title")}
               @click=${() => onToggleEnabled(pairing)}
@@ -163,7 +159,7 @@ export function renderPairingRow(
 function renderVersionMismatch(
   pairing: PairingSummary,
   localize: LocalizeFunc,
-  appVersion: string,
+  appVersion: string
 ): TemplateResult | typeof nothing {
   if (pairing.status !== "approved") return nothing;
   const kind = classifyVersionMismatch(appVersion, pairing.esphome_version);
@@ -184,7 +180,7 @@ function renderVersionMismatch(
 
 export function latestJobForPin(
   jobs: Map<string, RemoteBuildJobState> | null,
-  pin_sha256: string,
+  pin_sha256: string
 ): RemoteBuildJobState | undefined {
   if (jobs === null) return undefined;
   let best: RemoteBuildJobState | undefined;

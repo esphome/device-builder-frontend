@@ -59,22 +59,13 @@ export const facetStyles = css`
      darker border reads as "interactive" without competing with the
      active-state badges that already carry the facet's colour. */
   .facet-trigger:hover {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-text-normal),
-      transparent 94%
-    );
-    border-color: color-mix(
-      in srgb,
-      var(--wa-color-text-normal),
-      transparent 70%
-    );
+    background: color-mix(in srgb, var(--wa-color-text-normal), transparent 94%);
+    border-color: color-mix(in srgb, var(--wa-color-text-normal), transparent 70%);
   }
 
   .facet-trigger:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
   }
 
   /* Leading + icon — sits before the facet name in every state. */
@@ -163,8 +154,7 @@ export const facetStyles = css`
   .facet-trigger-badge-remove:focus-visible {
     outline: none;
     opacity: 1;
-    box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 60%);
   }
 
   .facet-trigger-badge-remove wa-icon {
@@ -275,11 +265,7 @@ export const facetStyles = css`
 
   .facet-row:hover,
   .facet-row:focus-visible {
-    background: color-mix(
-      in srgb,
-      var(--wa-color-text-normal),
-      transparent 94%
-    );
+    background: color-mix(in srgb, var(--wa-color-text-normal), transparent 94%);
     outline: none;
   }
 
@@ -373,11 +359,7 @@ export const facetStyles = css`
   .facet-clear-link:hover,
   .facet-clear-link:focus-visible {
     color: var(--wa-color-text-normal);
-    background: color-mix(
-      in srgb,
-      var(--wa-color-text-normal),
-      transparent 94%
-    );
+    background: color-mix(in srgb, var(--wa-color-text-normal), transparent 94%);
     outline: none;
   }
 `;

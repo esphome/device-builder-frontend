@@ -35,11 +35,7 @@ function bodyOf(raw: unknown): string {
   return String(raw);
 }
 
-export function renderLambdaField(
-  entry: ConfigEntry,
-  path: string[],
-  ctx: RenderCtx,
-) {
+export function renderLambdaField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
   const value = bodyOf(raw);
   const invalid = ctx.errorAt(path) !== null;
@@ -55,6 +51,6 @@ export function renderLambdaField(
       placeholder=${String(entry.default_value ?? "")}
       @lambda-change=${(e: CustomEvent<{ value: string }>) =>
         ctx.emitChange(path, { _lambda: e.detail.value })}
-    ></esphome-lambda-editor>`,
+    ></esphome-lambda-editor>`
   );
 }

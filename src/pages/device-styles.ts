@@ -16,8 +16,9 @@ export const devicePageStyles = css`
     grid-template-columns: minmax(230px, 1fr) minmax(0, 5fr);
     gap: var(--wa-space-l);
     height: calc(
-      100vh - var(--esphome-header-height) - var(--esphome-footer-height) -
-        var(--wa-space-l)
+      100vh - var(--esphome-header-height) - var(--esphome-footer-height) - var(
+          --wa-space-l
+        )
     );
     transition: grid-template-columns 0.25s ease;
   }

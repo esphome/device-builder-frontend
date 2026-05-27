@@ -32,7 +32,7 @@ export function findFirstErrorTarget(
   entries: ConfigEntry[],
   errors: Map<string, ValidationError>,
   pathPrefix: string[] = [],
-  ancestorAdvanced = false,
+  ancestorAdvanced = false
 ): { path: string[]; hasAdvancedAncestor: boolean } | null {
   for (const entry of entries) {
     const path = [...pathPrefix, entry.key];
@@ -42,7 +42,7 @@ export function findFirstErrorTarget(
         entry.config_entries ?? [],
         errors,
         path,
-        advancedHere,
+        advancedHere
       );
       if (found) return found;
       continue;

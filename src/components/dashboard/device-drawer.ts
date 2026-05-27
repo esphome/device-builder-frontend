@@ -100,8 +100,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
         align-items: center;
         justify-content: space-between;
         padding: var(--wa-space-l);
-        border-bottom: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         flex-shrink: 0;
       }
 
@@ -127,8 +126,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
         margin: 0;
         font-size: var(--wa-font-size-xs);
         color: var(--wa-color-text-quiet);
-        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-          monospace;
+        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       }
 
       .close-btn {
@@ -142,7 +140,9 @@ export class ESPHomeDeviceDrawer extends LitElement {
         background: transparent;
         color: var(--wa-color-text-quiet);
         cursor: pointer;
-        transition: background 0.12s, color 0.12s;
+        transition:
+          background 0.12s,
+          color 0.12s;
         flex-shrink: 0;
         margin-left: var(--wa-space-s);
       }
@@ -175,11 +175,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
       }
 
       .status-banner.online {
-        background: color-mix(
-          in srgb,
-          var(--esphome-success),
-          transparent 88%
-        );
+        background: color-mix(in srgb, var(--esphome-success), transparent 88%);
         color: var(--esphome-success);
         border: var(--wa-border-width-s) solid
           color-mix(in srgb, var(--esphome-success), transparent 70%);
@@ -211,14 +207,12 @@ export class ESPHomeDeviceDrawer extends LitElement {
 
       .status-dot.online {
         background: var(--esphome-success);
-        box-shadow: 0 0 8px
-          color-mix(in srgb, var(--esphome-success), transparent 40%);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--esphome-success), transparent 40%);
       }
 
       .status-dot.offline {
         background: var(--esphome-error);
-        box-shadow: 0 0 8px
-          color-mix(in srgb, var(--esphome-error), transparent 50%);
+        box-shadow: 0 0 8px color-mix(in srgb, var(--esphome-error), transparent 50%);
       }
 
       .status-dot.unknown {
@@ -240,8 +234,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
         display: flex;
         gap: var(--wa-space-xs);
         padding: var(--wa-space-m) var(--wa-space-l);
-        border-top: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         flex-shrink: 0;
       }
 
@@ -258,7 +251,9 @@ export class ESPHomeDeviceDrawer extends LitElement {
         font-family: inherit;
         cursor: pointer;
         border: var(--wa-border-width-s) solid transparent;
-        transition: background 0.12s, border-color 0.12s;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
         white-space: nowrap;
       }
 
@@ -275,24 +270,12 @@ export class ESPHomeDeviceDrawer extends LitElement {
       }
 
       .action--accent {
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 90%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
         color: var(--esphome-primary);
-        border-color: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 70%
-        );
+        border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
       }
       .action--accent:hover {
-        background: color-mix(
-          in srgb,
-          var(--esphome-primary),
-          transparent 82%
-        );
+        background: color-mix(in srgb, var(--esphome-primary), transparent 82%);
         border-color: var(--esphome-primary);
       }
 
@@ -343,7 +326,11 @@ export class ESPHomeDeviceDrawer extends LitElement {
             <h2 class="title">${device.friendly_name || device.name}</h2>
             <p class="subtitle">${device.configuration}</p>
           </div>
-          <button class="close-btn" @click=${this._close} aria-label=${this._localize("dashboard.drawer_close")}>
+          <button
+            class="close-btn"
+            @click=${this._close}
+            aria-label=${this._localize("dashboard.drawer_close")}
+          >
             <wa-icon library="mdi" name="close"></wa-icon>
           </button>
         </div>
@@ -405,7 +392,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
   private _close() {
     this.open = false;
     this.dispatchEvent(
-      new CustomEvent("drawer-close", { bubbles: true, composed: true }),
+      new CustomEvent("drawer-close", { bubbles: true, composed: true })
     );
   }
 
@@ -424,7 +411,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
         detail: this.device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

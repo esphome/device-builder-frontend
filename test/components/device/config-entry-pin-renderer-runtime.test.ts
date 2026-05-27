@@ -27,11 +27,7 @@
 import { describe, expect, it } from "vitest";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
 import { ConfigEntryType } from "../../../src/api/types.js";
-import {
-  findElementBindings,
-  makeEntry,
-  makeRenderCtx,
-} from "./_renderer-fixtures.js";
+import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const pinEntry = () =>
   makeEntry(ConfigEntryType.PIN, {
@@ -59,7 +55,7 @@ describe("renderPinField — long-form pin block selection", () => {
       selected.length,
       `exactly one option should be selected; got ${selected.length} (${selected
         .map((s) => String(s.value))
-        .join(", ")})`,
+        .join(", ")})`
     ).toBe(1);
     expect(selected[0].value, "selected option value").toBe("GPIO33");
     expect(selected[0][".label"], "selected option label").toBe("GPIO33");
@@ -70,7 +66,7 @@ describe("renderPinField — long-form pin block selection", () => {
     const result = renderPinField(pinEntry(), ["pin"], ctx);
 
     const selected = findElementBindings(result, "wa-option").filter(
-      (o) => o["?selected"] === true,
+      (o) => o["?selected"] === true
     );
     expect(selected.length).toBe(1);
     expect(selected[0].value).toBe("GPIO33");
@@ -84,7 +80,7 @@ describe("renderPinField — long-form pin block selection", () => {
     const result = renderPinField(pinEntry(), ["pin"], ctx);
 
     const selected = findElementBindings(result, "wa-option").filter(
-      (o) => o["?selected"] === true,
+      (o) => o["?selected"] === true
     );
     expect(selected.length).toBe(0);
   });
@@ -103,7 +99,7 @@ describe("renderPinField — long-form pin block selection", () => {
 
     const result = renderPinField(pinEntry(), ["pin"], ctx);
     const selected = findElementBindings(result, "wa-option").filter(
-      (o) => o["?selected"] === true,
+      (o) => o["?selected"] === true
     );
     expect(selected.length).toBe(0);
   });

@@ -11,7 +11,7 @@ interface AlertContext {
 
 export function renderOffloaderAlert(
   alert: OffloaderAlertSnapshotEntry,
-  { localize, onRepair, onUnpair }: AlertContext,
+  { localize, onRepair, onUnpair }: AlertContext
 ): TemplateResult {
   const target = `${alert.receiver_hostname}:${alert.receiver_port}`;
   if (alert.kind === "pin_mismatch") {

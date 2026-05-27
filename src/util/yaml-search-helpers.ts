@@ -73,9 +73,7 @@ function maskSensitiveLine(line: string): string {
   // ``# password: hunter2`` is just as much a leak as the live
   // form. The leading-``#`` group is captured into ``prefix`` so
   // the masked output preserves the comment marker.
-  const m = line.match(
-    /^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/
-  );
+  const m = line.match(/^(\s*(?:#+\s*)?-?\s*)([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.+)$/);
   if (!m) return line;
   const [, prefix, key, valueRaw] = m;
   if (!isSensitiveKey(key)) return line;
@@ -134,9 +132,7 @@ function maskSnippetBlock(lines: readonly string[]): string[] {
     const value = line.slice(range.valueFrom, range.valueTo).trim();
     if (value.startsWith("${")) continue;
     out[idx] =
-      line.slice(0, range.valueFrom) +
-      MASK_PLACEHOLDER +
-      line.slice(range.valueTo);
+      line.slice(0, range.valueFrom) + MASK_PLACEHOLDER + line.slice(range.valueTo);
     scannerMaskedLines.add(idx);
   }
   for (let i = 0; i < out.length; i++) {
@@ -373,8 +369,6 @@ export function yamlSnippetBlockHref(
   // that somehow has no matched lines — defensive only;
   // ``buildYamlSnippetBlocks`` always populates it.
   const firstMatch =
-    block.matchedLines.size > 0
-      ? Math.min(...block.matchedLines)
-      : block.startLine;
+    block.matchedLines.size > 0 ? Math.min(...block.matchedLines) : block.startLine;
   return `/device/${encodeURIComponent(hit.configuration)}?line=${firstMatch}`;
 }

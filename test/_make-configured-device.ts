@@ -52,7 +52,7 @@ const _BASE = {
  *  full ``ConfiguredDevice`` (not ``Partial``) so consumers can
  *  pass the result anywhere a real device object is expected. */
 export function makeConfiguredDevice(
-  overrides: Partial<ConfiguredDevice> = {},
+  overrides: Partial<ConfiguredDevice> = {}
 ): ConfiguredDevice {
   return { ..._BASE, ...overrides };
 }
