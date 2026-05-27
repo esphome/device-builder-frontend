@@ -287,6 +287,42 @@ describe("esphome-bulk-labels-dialog cycle-back drops stale pending changes", ()
     expect(dialog._pendingChanges.has("lbl-a")).toBe(false);
     expect(dialog._hasPendingChanges).toBe(false);
   });
+
+  test("indeterminate -> checked -> unchecked -> indeterminate (third click clears pending)", () => {
+    // Indeterminate-derived rows can't fall out of the
+    // ``next === derived`` shortcut (``next`` is binary), so the
+    // third click on a mixed row gets a dedicated branch in
+    // ``_onToggle`` that clears the pending entry and returns the
+    // row to indeterminate. Without it the user has no in-dialog
+    // path back to "leave each device alone" after a mistaken
+    // click on a mixed row, short of Cancel-which-drops-all-edits.
+    const dialog = makeDialog();
+    seedDevices(dialog, [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+    ]);
+    const toggle = (dialog as unknown as { _onToggle: (id: string) => void })._onToggle;
+    const bound = toggle.bind(dialog);
+    // Derived state is indeterminate (some devices have it, some don't).
+    expect(dialog.effectiveState("lbl-a")).toBe("indeterminate");
+    // Click 1: indeterminate -> checked.
+    bound("lbl-a");
+    expect(dialog._pendingChanges.get("lbl-a")).toBe("checked");
+    expect(dialog.effectiveState("lbl-a")).toBe("checked");
+    // Click 2: checked -> unchecked.
+    bound("lbl-a");
+    expect(dialog._pendingChanges.get("lbl-a")).toBe("unchecked");
+    expect(dialog.effectiveState("lbl-a")).toBe("unchecked");
+    // Click 3: unchecked + derived=indeterminate -> clear pending.
+    bound("lbl-a");
+    expect(dialog._pendingChanges.has("lbl-a")).toBe(false);
+    expect(dialog.effectiveState("lbl-a")).toBe("indeterminate");
+    expect(dialog._hasPendingChanges).toBe(false);
+    // Click 4: same as click 1 (cycle restarts).
+    bound("lbl-a");
+    expect(dialog._pendingChanges.get("lbl-a")).toBe("checked");
+    expect(dialog.effectiveState("lbl-a")).toBe("checked");
+  });
 });
 
 describe("esphome-bulk-labels-dialog _apply branches", () => {

@@ -186,39 +186,29 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     }
   }
 
-  /** Per-label count of selected devices that carry that label,
-   *  plus the valid-device denominator for tri-state derivation.
-   *  Memoised on the upstream array references (``_allDevices``
-   *  and ``configurations``) so each ``_derivedState`` call inside
-   *  one render is O(1) after the first. Rebuilds when either
-   *  input changes — including the ``device_updated`` event that
-   *  replaces ``_allDevices``. Same memo pattern Home Assistant's
-   *  frontend uses throughout. */
-  private _computeLabelCounts = memoizeOne(
-    (allDevices: ConfiguredDevice[], configurations: string[]) => {
-      const counts = new Map<string, number>();
-      const targets = new Set(configurations);
-      let validCount = 0;
-      for (const device of allDevices) {
-        if (!targets.has(device.configuration)) continue;
-        validCount++;
-        for (const id of device.labels ?? []) {
-          counts.set(id, (counts.get(id) ?? 0) + 1);
-        }
+  /** Per-label count of selected devices that carry that label.
+   *  Composes on top of ``_filterDevices`` rather than re-scanning
+   *  ``_allDevices`` itself: ``this.devices`` is already a
+   *  reference-stable filtered list (memoize-one above), so passing
+   *  it in lets this memo cache on that same reference and avoids a
+   *  second full-list scan per render. ``validCount`` falls out
+   *  naturally from ``filteredDevices.length``. */
+  private _computeLabelCounts = memoizeOne((filteredDevices: ConfiguredDevice[]) => {
+    const counts = new Map<string, number>();
+    for (const device of filteredDevices) {
+      for (const id of device.labels ?? []) {
+        counts.set(id, (counts.get(id) ?? 0) + 1);
       }
-      return { counts, validCount };
     }
-  );
+    return counts;
+  });
 
   /** Derived tri-state for a label across the current device set. */
   private _derivedState(labelId: string): TriState {
-    const { counts, validCount } = this._computeLabelCounts(
-      this._allDevices,
-      this.configurations
-    );
-    if (validCount === 0) return "unchecked";
-    const has = counts.get(labelId) ?? 0;
-    if (has === validCount) return "checked";
+    const filtered = this.devices;
+    if (filtered.length === 0) return "unchecked";
+    const has = this._computeLabelCounts(filtered).get(labelId) ?? 0;
+    if (has === filtered.length) return "checked";
     if (has === 0) return "unchecked";
     return "indeterminate";
   }
@@ -420,17 +410,31 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
 
   private _onToggle(labelId: string) {
     const current = this.effectiveState(labelId);
+    const derived = this._derivedState(labelId);
+    const map = new Map(this._pendingChanges);
+    // Indeterminate-derived rows: cycle is indeterminate -> checked
+    // -> unchecked -> indeterminate. The third click clears pending
+    // so the user has a path back to "leave each device alone"
+    // without scrapping their other staged edits via Cancel. The
+    // checked- and unchecked-derived rows already get this via the
+    // ``next === derived`` shortcut below; indeterminate can't fall
+    // out of that path because ``next`` is binary.
+    if (derived === "indeterminate" && current === "unchecked") {
+      map.delete(labelId);
+      this._pendingChanges = map;
+      this._failedConfigurations = null;
+      return;
+    }
     // ``checked`` → ``unchecked``; everything else → ``checked``.
     // The "indeterminate → checked" rule mirrors Gmail / GitHub
     // multi-select label semantics (one click "claims" the label
     // for every device; a second removes it from every device).
     const next: "checked" | "unchecked" = current === "checked" ? "unchecked" : "checked";
-    const map = new Map(this._pendingChanges);
     // If the user cycled back to the derived baseline (checked ↔
     // unchecked ↔ checked over a label that was already checked
     // across the selection), drop the override so Apply doesn't
     // stay enabled for a no-op write.
-    if (next === this._derivedState(labelId)) {
+    if (next === derived) {
       map.delete(labelId);
     } else {
       map.set(labelId, next);
