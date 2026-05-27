@@ -481,6 +481,26 @@ describe("renderRegistryListField — status states", () => {
     const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
     expect(addButton.disabled).toBe(true);
   });
+
+  it("recovers from stuck-loading when the API context resolves after mount", async () => {
+    // Race: ``connectedCallback`` runs before the context provider
+    // sets ``_api``, so the initial fetch branch is skipped and the
+    // element would otherwise stay on "Loading catalog…" forever.
+    // ``updated()`` re-checks and kicks the fetch when ``_api`` is
+    // present.
+    const { el } = mount({}, { catalog: null });
+    (el as unknown as { _api: undefined })._api = undefined;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain("device.registry_list_loading");
+
+    const kick = vi.fn();
+    (el as unknown as { _kickFetch: (...args: unknown[]) => void })._kickFetch = kick;
+    (el as unknown as { _api: object })._api = {};
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(kick).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("renderRegistryListField — registry dispatch", () => {
