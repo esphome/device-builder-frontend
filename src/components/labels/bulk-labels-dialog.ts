@@ -86,9 +86,19 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   @property({ attribute: false })
   configurations: string[] = [];
 
+  /** Memoised filter of ``_allDevices`` down to the selected
+   *  ``configurations``. Reference-stable on the same inputs so
+   *  ``render()`` (which reads ``devices.length`` twice) +
+   *  ``computeUpdates`` don't re-run the filter on every render. */
+  private _filterDevices = memoizeOne(
+    (allDevices: ConfiguredDevice[], configurations: string[]) => {
+      const targets = new Set(configurations);
+      return allDevices.filter((d) => targets.has(d.configuration));
+    }
+  );
+
   get devices(): ConfiguredDevice[] {
-    const targets = new Set(this.configurations);
-    return this._allDevices.filter((d) => targets.has(d.configuration));
+    return this._filterDevices(this._allDevices, this.configurations);
   }
 
   /** Reactive ``open`` flag bound to ``<esphome-base-dialog>``.
