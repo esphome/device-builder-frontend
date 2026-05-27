@@ -28,6 +28,7 @@ import {
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
+  offloaderAllowMajorVersionMismatchContext,
   offloaderRemoteBuildsEnabledContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
@@ -70,6 +71,8 @@ import {
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
   onSetLanguage,
+  onSetOffloaderAllowMajorVersionMismatch,
+  onSetOffloaderPairingAllowMajorVersionMismatch,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
   onSetRemoteBuildCleanupTtl,
@@ -147,6 +150,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: offloaderRemoteBuildsEnabledContext })
   @state()
   _offloaderRemoteBuildsEnabled: boolean | null = null;
+  @provide({ context: offloaderAllowMajorVersionMismatchContext })
+  @state()
+  _offloaderAllowMajorVersionMismatch: boolean | null = null;
   @provide({ context: buildOffloadAlertsContext }) @state() _buildOffloadAlerts: Map<
     string,
     OffloaderAlertSnapshotEntry
@@ -516,6 +522,14 @@ export class ESPHomeApp extends LitElement {
         @set-offloader-pairing-enabled=${(
           e: CustomEvent<{ pin_sha256: string; enabled: boolean }>
         ) => onSetOffloaderPairingEnabled(this, e)}
+        @set-offloader-allow-major-version-mismatch=${(e: CustomEvent<boolean>) =>
+          onSetOffloaderAllowMajorVersionMismatch(this, e)}
+        @set-offloader-pairing-allow-major-version-mismatch=${(
+          e: CustomEvent<{
+            pin_sha256: string;
+            allow_major_version_mismatch: boolean;
+          }>
+        ) => onSetOffloaderPairingAllowMajorVersionMismatch(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>

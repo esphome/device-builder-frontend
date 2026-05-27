@@ -41,6 +41,7 @@ interface PairingRowContext {
   appVersion: string;
   latestJob: RemoteBuildJobState | undefined;
   onToggleEnabled: (pairing: PairingSummary) => void;
+  onToggleAllowMajorVersionMismatch: (pairing: PairingSummary) => void;
   onBuildRemote: (pairing: PairingSummary) => void;
   onViewBuild: (jobId: string) => void;
   onEditEndpoint: (pairing: PairingSummary) => void;
@@ -56,6 +57,7 @@ export function renderPairingRow(
     appVersion,
     latestJob,
     onToggleEnabled,
+    onToggleAllowMajorVersionMismatch,
     onBuildRemote,
     onViewBuild,
     onEditEndpoint,
@@ -97,7 +99,12 @@ export function renderPairingRow(
               </span>
             `
           : nothing}
-        ${renderVersionMismatch(pairing, localize, appVersion)}
+        ${renderVersionMismatch(
+          pairing,
+          localize,
+          appVersion,
+          onToggleAllowMajorVersionMismatch
+        )}
       </div>
       <div class="pairing-actions">
         ${pairing.status === "approved" && pairing.connected
@@ -162,7 +169,8 @@ export function renderPairingRow(
 function renderVersionMismatch(
   pairing: PairingSummary,
   localize: LocalizeFunc,
-  appVersion: string
+  appVersion: string,
+  onToggleAllowMajorVersionMismatch: (pairing: PairingSummary) => void
 ): TemplateResult | typeof nothing {
   if (pairing.status !== "approved") return nothing;
   const kind = classifyVersionMismatch(appVersion, pairing.esphome_version);
@@ -177,6 +185,23 @@ function renderVersionMismatch(
       role="status"
     >
       ${localize(key, { peer: pairing.esphome_version, local: appVersion })}
+      ${kind === "release"
+        ? html`
+            <button
+              class="toggle pairing-allow-mismatch-toggle"
+              role="switch"
+              aria-label=${localize(
+                "settings.build_offload_pairing_allow_major_version_mismatch_aria",
+                { label: pairing.label }
+              )}
+              aria-checked=${pairing.allow_major_version_mismatch}
+              title=${localize(
+                "settings.build_offload_pairing_allow_major_version_mismatch_title"
+              )}
+              @click=${() => onToggleAllowMajorVersionMismatch(pairing)}
+            ></button>
+          `
+        : nothing}
     </span>
   `;
 }

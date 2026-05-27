@@ -1580,7 +1580,8 @@ export class ESPHomeAPI {
    * intent on a security-relevant switch).
    */
   async setOffloaderRemoteBuildSettings(args: {
-    remote_builds_enabled: boolean;
+    remote_builds_enabled?: boolean;
+    allow_major_version_mismatch?: boolean;
   }): Promise<OffloaderRemoteBuildSettings> {
     return this.sendCommand<OffloaderRemoteBuildSettings>(
       "remote_build/set_offloader_settings",
@@ -1606,6 +1607,17 @@ export class ESPHomeAPI {
     enabled: boolean;
   }): Promise<PairingSummary> {
     return this.sendCommand<PairingSummary>("remote_build/set_pairing_enabled", args);
+  }
+
+  /** Flip the per-pairing override of the major-version-match gate. */
+  async setOffloaderPairingAllowMajorVersionMismatch(args: {
+    pin_sha256: string;
+    allow_major_version_mismatch: boolean;
+  }): Promise<PairingSummary> {
+    return this.sendCommand<PairingSummary>(
+      "remote_build/set_pairing_allow_major_version_mismatch",
+      args
+    );
   }
 
   /**
