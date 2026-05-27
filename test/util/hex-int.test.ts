@@ -61,6 +61,17 @@ describe("parseHexInt", () => {
     expect(parseHexInt("0x00be030c9794184728")).toBe("0xbe030c9794184728");
   });
 
+  it("canonicalises zero to 0x0 regardless of input shape", () => {
+    // Pin the zero corner of CANONICAL_HEX_RE so a future tweak to
+    // the regex can't desynchronise the slow path's BigInt(0) output
+    // from the canonical-form gate ``formatHexInt`` /
+    // ``normalizeHexValues`` use to skip rewriting.
+    expect(parseHexInt("0")).toBe("0x0");
+    expect(parseHexInt("0x0")).toBe("0x0");
+    expect(parseHexInt("0x00")).toBe("0x0");
+    expect(parseHexInt("0x000")).toBe("0x0");
+  });
+
   it("trims surrounding whitespace", () => {
     expect(parseHexInt("  0x76 ")).toBe("0x76");
     expect(parseHexInt("\t118\n")).toBe("0x76");
@@ -136,6 +147,27 @@ describe("formatHexInt", () => {
     // must agree on the output for a single value.
     expect(formatHexInt("0x076")).toBe("0x76");
     expect(formatHexInt("0x00be030c9794184728")).toBe("0xbe030c9794184728");
+  });
+
+  it("agrees with parseHexInt at the zero edge", () => {
+    // ``formatHexInt`` must not return ``"0x00"`` for a string that
+    // ``parseHexInt`` canonicalises to ``"0x0"``; otherwise the
+    // ``normalizeHexValues`` fast-path skip would diverge from a
+    // subsequent re-format.
+    expect(formatHexInt("0x0")).toBe("0x0");
+    expect(formatHexInt("0x00")).toBe("0x0");
+    expect(formatHexInt(0)).toBe("0x0");
+  });
+
+  it("rejects numbers above Number.MAX_SAFE_INTEGER (#944 latent footgun)", () => {
+    // ``Number.isInteger`` returns true for any double whose
+    // fractional part is zero, including values past 2^53 where the
+    // double has already been rounded. Stringifying those would
+    // re-introduce the precision loss this PR fixes. Pin the
+    // ``Number.isSafeInteger`` gate so a future relaxation can't
+    // silently regress the bug.
+    expect(formatHexInt(Number.MAX_SAFE_INTEGER + 1)).toBe("");
+    expect(formatHexInt(2 ** 60)).toBe("");
   });
 
   it("formats bigint inputs as 0x-prefixed lowercase hex", () => {

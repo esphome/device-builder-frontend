@@ -231,9 +231,14 @@ export function formatHexInt(value: unknown): string {
     return parseHexInt(value) ?? "";
   }
   if (typeof value === "number") {
-    if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0) {
-      return "";
-    }
+    // ``Number.isSafeInteger`` rejects NaN, +/-Infinity, fractional
+    // values, and anything above 2^53 in one shot. The upper bound
+    // matters: a caller that hands us 0xbe030c9794184728 as a JS
+    // Number has already lost precision before we see it; stringifying
+    // the rounded double would silently reintroduce the #944 bug.
+    // Bigint / canonical-string callers stay on their precision-safe
+    // branches above.
+    if (!Number.isSafeInteger(value) || value < 0) return "";
     return "0x" + value.toString(16);
   }
   if (typeof value === "bigint") {
