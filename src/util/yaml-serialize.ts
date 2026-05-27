@@ -13,8 +13,36 @@
  * dependency checks against the user's current configuration.
  */
 
+import { isLambdaValue } from "../api/types.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
+
+/**
+ * Emit a ``LambdaValue`` sentinel (``{_lambda: "<body>"}``) as a
+ * block-scalar field at the given header / body indent. Mirrors
+ * the backend's ``controllers/automations/emitter.encode_value``
+ * convention of bare ``|-`` (no ``!lambda`` tag) so a freshly-
+ * emitted YAML doesn't gain a tag the user wouldn't have typed;
+ * ESPHome's parser accepts both bare and tagged forms.
+ *
+ * Without this branch the form serializer falls through into the
+ * generic ``typeof val === "object"`` recursion and emits the
+ * sentinel literally as ``key:\n  _lambda: "raw\nbody"``, which
+ * is invalid YAML (``"`` doesn't escape embedded newlines) and
+ * cascades into ``findSectionRange`` failing on the next save —
+ * #940.
+ */
+function lambdaBlockLines(
+  headerLine: string,
+  body: string,
+  bodyIndent: string
+): string[] {
+  const lines = [`${headerLine}: |-`];
+  for (const line of body.split("\n")) {
+    lines.push(line === "" ? "" : `${bodyIndent}${line}`);
+  }
+  return lines;
+}
 
 /**
  * Opaque wrapper for a section-value block the parser couldn't fully
@@ -49,7 +77,7 @@ import { isPlainObject } from "./nested-values.js";
 export class YamlRawValue {
   constructor(
     public readonly lines: readonly string[],
-    public readonly inlineHeader?: string,
+    public readonly inlineHeader?: string
   ) {}
 
   /**
@@ -124,9 +152,7 @@ export class YamlRawValue {
    */
   static fromBodyText(body: string, original: YamlRawValue): YamlRawValue {
     const indent = original.indent;
-    const lines = body
-      .split("\n")
-      .map((line) => (line === "" ? "" : `${indent}${line}`));
+    const lines = body.split("\n").map((line) => (line === "" ? "" : `${indent}${line}`));
     return new YamlRawValue(lines, original.inlineHeader);
   }
 }
@@ -180,14 +206,14 @@ export interface SerializeYamlOptions {
 function serializeListItem(
   item: unknown,
   indent: string,
-  options: SerializeYamlOptions,
+  options: SerializeYamlOptions
 ): string[] {
   const keepEmpty = options.keepEmptyStrings === true;
   const step = options.indentStep ?? ESPHOME_YAML_INDENT;
   const dashIndent = `${indent}${step}`;
   if (isPlainObject(item)) {
     const entries = Object.entries(item).filter(
-      ([, v]) => v !== undefined && v !== null && (v !== "" || keepEmpty),
+      ([, v]) => v !== undefined && v !== null && (v !== "" || keepEmpty)
     );
     if (entries.length === 0) return [`${dashIndent}-`];
     const lines: string[] = [];
@@ -208,6 +234,16 @@ function serializeListItem(
         lines.push(...v.lines);
         return;
       }
+      if (isLambdaValue(v)) {
+        lines.push(
+          ...lambdaBlockLines(
+            `${prefix}${k}`,
+            v._lambda,
+            `${childIndent}${ESPHOME_YAML_INDENT}`
+          )
+        );
+        return;
+      }
       lines.push(`${prefix}${k}: ${formatYamlScalar(v)}`);
     });
     return lines;
@@ -223,7 +259,7 @@ function serializeListItem(
 export function serializeYamlValues(
   values: Record<string, unknown>,
   indent: string,
-  options: SerializeYamlOptions = {},
+  options: SerializeYamlOptions = {}
 ): string[] {
   const lines: string[] = [];
   const keepEmpty = options.keepEmptyStrings === true;
@@ -253,6 +289,10 @@ export function serializeYamlValues(
       }
       continue;
     }
+    if (isLambdaValue(val)) {
+      lines.push(...lambdaBlockLines(`${indent}${key}`, val._lambda, `${indent}${step}`));
+      continue;
+    }
     if (typeof val === "object") {
       // Thread ``options`` through the recursion so
       // ``keepEmptyStrings`` applies at every depth — without
@@ -262,7 +302,7 @@ export function serializeYamlValues(
       const sub = serializeYamlValues(
         val as Record<string, unknown>,
         `${indent}${step}`,
-        options,
+        options
       );
       if (sub.length === 0) continue;
       lines.push(`${indent}${key}:`);
@@ -323,9 +363,7 @@ export function parseConfiguredPlatforms(yaml: string): Set<string> {
     // Only consider lines indented under the current domain. Two
     // spaces is the canonical ESPHome indentation; we accept any
     // leading whitespace to be lenient.
-    const platform = line.match(
-      /^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*(?:#.*)?$/,
-    );
+    const platform = line.match(/^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*(?:#.*)?$/);
     if (platform) {
       out.add(`${currentDomain}.${platform[1]}`);
     }

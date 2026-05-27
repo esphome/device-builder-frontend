@@ -14,11 +14,7 @@ import { YamlRawValue } from "../../src/util/yaml-serialize.js";
  *  edits. Reuses the parser's `LIST_ITEM_START_RE` directly so
  *  a future tightening there can't silently let the test helper
  *  drift to a different definition of "list item". */
-function nthListItemLine(
-  yaml: string,
-  parent: string,
-  n: number,
-): number {
+function nthListItemLine(yaml: string, parent: string, n: number): number {
   const lines = yaml.split("\n");
   const start = findSectionStart(lines, parent);
   if (start === -1) {
@@ -50,15 +46,13 @@ describe("test helper: nthListItemLine", () => {
     // a typo in a test fixture surfaces immediately rather
     // than as a confusing wrong-line assertion downstream.
     const yaml = "esphome:\n  name: x\n";
-    expect(() => nthListItemLine(yaml, "ota", 1)).toThrow(
-      /section ota: not found/,
-    );
+    expect(() => nthListItemLine(yaml, "ota", 1)).toThrow(/section ota: not found/);
   });
 
   it("throws when there are fewer dashes than requested", () => {
     const yaml = "ota:\n  - platform: esphome\n";
     expect(() => nthListItemLine(yaml, "ota", 2)).toThrow(
-      /fewer than 2 list-item dashes/,
+      /fewer than 2 list-item dashes/
     );
   });
 });
@@ -78,7 +72,7 @@ describe("parseYamlSectionValues — permissive key alphabet", () => {
       "  ApolloAutomation.R-PRO-1-ETH: github://ApolloAutomation/R_PRO-1/Integrations/ESPHome/R_PRO-1_ETH.yaml\n";
     const values = parseYamlSectionValues(yaml, "packages");
     expect(values["ApolloAutomation.R-PRO-1-ETH"]).toBe(
-      "github://ApolloAutomation/R_PRO-1/Integrations/ESPHome/R_PRO-1_ETH.yaml",
+      "github://ApolloAutomation/R_PRO-1/Integrations/ESPHome/R_PRO-1_ETH.yaml"
     );
   });
 
@@ -126,9 +120,7 @@ describe("parseYamlSectionValues — prototype pollution defense", () => {
     // …without polluting bystanders or `Object.prototype`.
     const bystander: Record<string, unknown> = {};
     expect(bystander.polluted).toBeUndefined();
-    expect(
-      (Object.prototype as { polluted?: unknown }).polluted,
-    ).toBeUndefined();
+    expect((Object.prototype as { polluted?: unknown }).polluted).toBeUndefined();
   });
 
   it("captures constructor / prototype keys as plain data", () => {
@@ -197,7 +189,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
       before,
       "ota.esphome",
       { platform: "esphome", password: "secret" },
-      2, // 1-indexed line of the `- platform: esphome` row
+      2 // 1-indexed line of the `- platform: esphome` row
     );
     // The `platform` key must appear exactly once.
     expect(after.match(/platform:/g)).toHaveLength(1);
@@ -229,7 +221,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
       before,
       "ota.esphome",
       { platform: "esphome", password: "secret" },
-      2,
+      2
     );
     expect(after.match(/platform:/g)).toHaveLength(1);
     expect(after).toContain("- platform: esphome");
@@ -246,7 +238,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
       before,
       "ota.esphome",
       { platform: "http_request" },
-      2,
+      2
     );
     expect(after.match(/platform:/g)).toHaveLength(1);
     expect(after).toContain("- platform: http_request");
@@ -262,12 +254,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // comment is dropped along with the stale value and the
     // form's pick lands.
     const before = "ota:\n  - platform: # filled later\n";
-    const after = updateSectionInYaml(
-      before,
-      "ota.esphome",
-      { platform: "esphome" },
-      2,
-    );
+    const after = updateSectionInYaml(before, "ota.esphome", { platform: "esphome" }, 2);
     expect(after.match(/platform:/g)).toHaveLength(1);
     expect(after).toContain("- platform: esphome");
     expect(after).not.toContain("filled later");
@@ -285,7 +272,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
       before,
       "wrap.x",
       { platform: { complex: "object" } },
-      fromLine,
+      fromLine
     );
     expect(after.match(/platform:/g)).toHaveLength(1);
     expect(after).not.toContain("- platform: x");
@@ -315,7 +302,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
       before,
       "ota.esphome",
       { platform: null, password: "secret" },
-      fromLine,
+      fromLine
     );
     expect(after).not.toContain("- platform: esphome");
     expect(after).toContain("password: secret");
@@ -325,11 +312,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // values the form holds (minus the null, which the
     // serializer drops).
     const afterFromLine = firstListItemLine(after, "ota");
-    const reparsed = parseYamlSectionValues(
-      after,
-      "ota.esphome",
-      afterFromLine,
-    );
+    const reparsed = parseYamlSectionValues(after, "ota.esphome", afterFromLine);
     expect(reparsed).toEqual({ password: "secret" });
   });
 
@@ -351,7 +334,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
         before,
         `wrap.${key}`,
         { [key]: "b", extra: "y" },
-        2,
+        2
       );
       expect(after.match(new RegExp(`${escape(key)}:`, "g"))).toHaveLength(1);
       expect(after).toContain(`- ${key}: b`);
@@ -371,12 +354,7 @@ describe("updateSectionInYaml — list item with inline key", () => {
     // Plain object with no own `constructor` property — but
     // `"constructor" in values` is still true via the prototype.
     const formValues: Record<string, unknown> = { extra: "y" };
-    const after = updateSectionInYaml(
-      before,
-      "wrap.constructor",
-      formValues,
-      fromLine,
-    );
+    const after = updateSectionInYaml(before, "wrap.constructor", formValues, fromLine);
     expect(after).toContain("- constructor: foo");
     expect(after).toContain("extra: y");
   });
@@ -433,7 +411,7 @@ describe("removeSectionFromYaml — multi-item list", () => {
     const after = removeSectionFromYaml(
       multiItemOta,
       "ota.web_server",
-      nthListItemLine(multiItemOta, "ota", 2),
+      nthListItemLine(multiItemOta, "ota", 2)
     );
     expect(after).not.toContain("- platform: web_server");
     // The first item and its sibling field survive.
@@ -486,21 +464,12 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     // `icon` → save. The lambda body must be intact and the
     // on_press list must NOT have been re-serialized as a
     // quoted string.
-    const values = parseYamlSectionValues(
-      TEMPLATE_BUTTON_YAML,
-      "button.template",
-      2,
-    );
+    const values = parseYamlSectionValues(TEMPLATE_BUTTON_YAML, "button.template", 2);
     expect(values.platform).toBe("template");
     expect(values.name).toBe("My Button");
     // Form-side: user adds an icon
     (values as Record<string, unknown>).icon = "mdi:account";
-    const after = updateSectionInYaml(
-      TEMPLATE_BUTTON_YAML,
-      "button.template",
-      values,
-      2,
-    );
+    const after = updateSectionInYaml(TEMPLATE_BUTTON_YAML, "button.template", values, 2);
 
     // Block scalar lambda is intact
     expect(after).toContain("- lambda: |-");
@@ -520,19 +489,10 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     // Sanity round-trip: parse + write WITHOUT the form changing
     // anything must produce a byte-equivalent (modulo trailing
     // newline handling) result for the section.
-    const values = parseYamlSectionValues(
-      TEMPLATE_BUTTON_YAML,
-      "button.template",
-      2,
-    );
-    const after = updateSectionInYaml(
-      TEMPLATE_BUTTON_YAML,
-      "button.template",
-      values,
-      2,
-    );
+    const values = parseYamlSectionValues(TEMPLATE_BUTTON_YAML, "button.template", 2);
+    const after = updateSectionInYaml(TEMPLATE_BUTTON_YAML, "button.template", values, 2);
     expect(after).toContain(
-      "    on_press:\n      - lambda: |-\n          some_code(1, 2);",
+      "    on_press:\n      - lambda: |-\n          some_code(1, 2);"
     );
     // Tighten the byte-stable contract: no duplicated section
     // headers (regression check — early findSectionRange bug
@@ -575,14 +535,8 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     // captured but `on_press` wouldn't — so the presence of
     // both keys in the parse output proves the walk crossed
     // the nested dash.
-    const values = parseYamlSectionValues(
-      TEMPLATE_BUTTON_YAML,
-      "button.template",
-      2,
-    );
-    expect(Object.keys(values).sort()).toEqual(
-      ["name", "on_press", "platform"].sort(),
-    );
+    const values = parseYamlSectionValues(TEMPLATE_BUTTON_YAML, "button.template", 2);
+    expect(Object.keys(values).sort()).toEqual(["name", "on_press", "platform"].sort());
   });
 
   it("preserves sub-dict list items (`- then:` style automations)", () => {
@@ -656,6 +610,87 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     expect(after).not.toContain('inline_code: "|-"');
   });
 
+  it("emits LambdaValue sentinel as `lambda: |-` block scalar (#940)", () => {
+    // The renderer's @lambda-change handler writes the user's typed
+    // body back into the values dict as a ``LambdaValue`` sentinel
+    // (``{_lambda: "<body>"}``). Pre-#940 the serializer fell through
+    // to the generic object-recursion branch and emitted
+    // ``lambda:\n  _lambda: "raw\nbody"`` — invalid YAML that broke
+    // findSectionRange on the next save, so each subsequent keystroke
+    // APPENDED a fresh section instead of replacing.
+    const yaml = `display:
+  - platform: ssd1306_i2c
+    address: 0x3c
+    lambda: |-
+      it.printf(0, 0, "hello");
+`;
+    const values = parseYamlSectionValues(yaml, "display.ssd1306_i2c", 2);
+    // Form edit: user typed in the lambda editor, which wraps the
+    // body in the sentinel.
+    (values as Record<string, unknown>).lambda = {
+      _lambda: 'it.printf(0, 0, "hello");\nit.printf(0, 8, "world");',
+    };
+    const after = updateSectionInYaml(yaml, "display.ssd1306_i2c", values, 2);
+    expect(after).toContain("lambda: |-");
+    expect(after).toContain('      it.printf(0, 0, "hello");');
+    expect(after).toContain('      it.printf(0, 8, "world");');
+    // No sentinel leak.
+    expect(after).not.toContain("_lambda:");
+    // No nested-mapping leak.
+    expect(after).not.toMatch(/lambda:\s*\n\s+_lambda:/);
+  });
+
+  it("emits LambdaValue inside a list item as `- lambda: |-` (#940)", () => {
+    // The automation editor produces list items like
+    // ``- lambda: { _lambda: "..." }`` for inline lambda actions.
+    // serializeListItem must dispatch on isLambdaValue before the
+    // formatYamlScalar fallback (which would stringify the sentinel
+    // object as ``[object Object]``).
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - logger.log: pressed
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    (values as Record<string, unknown>).on_press = [
+      { lambda: { _lambda: "do_something();\nand_more();" } },
+    ];
+    const after = updateSectionInYaml(yaml, "binary_sensor.gpio", values, 2);
+    expect(after).toContain("- lambda: |-");
+    expect(after).toContain("      do_something();");
+    expect(after).toContain("      and_more();");
+    expect(after).not.toContain("_lambda:");
+    expect(after).not.toContain("[object Object]");
+  });
+
+  it("LambdaValue round-trips through a re-save without appending (#940)", () => {
+    // Bug #2 cascade check: the first save's malformed YAML broke the
+    // next save's section-range detection, so each keystroke produced
+    // ANOTHER copy of the lambda block appended below. With the fix
+    // the YAML stays valid, parseYamlSectionValues finds the same
+    // section on the second pass, and the save replaces in place.
+    const yaml = `display:
+  - platform: ssd1306_i2c
+    address: 0x3c
+    lambda: |-
+      original();
+`;
+    const values1 = parseYamlSectionValues(yaml, "display.ssd1306_i2c", 2);
+    (values1 as Record<string, unknown>).lambda = { _lambda: "edited_v1();" };
+    const after1 = updateSectionInYaml(yaml, "display.ssd1306_i2c", values1, 2);
+    const values2 = parseYamlSectionValues(after1, "display.ssd1306_i2c", 2);
+    (values2 as Record<string, unknown>).lambda = { _lambda: "edited_v2();" };
+    const after2 = updateSectionInYaml(after1, "display.ssd1306_i2c", values2, 2);
+    // Exactly one platform / one lambda after each round.
+    expect(after1.match(/- platform: ssd1306_i2c/g)?.length).toBe(1);
+    expect(after2.match(/- platform: ssd1306_i2c/g)?.length).toBe(1);
+    expect(after2.match(/lambda: \|-/g)?.length).toBe(1);
+    expect(after2).toContain("      edited_v2();");
+    expect(after2).not.toContain("edited_v1();");
+    expect(after2).not.toContain("original();");
+  });
+
   it("preserves dotted-key automation actions (`- logger.log:`, `- switch.turn_on:`)", () => {
     // Pre-fix `LIST_ITEM_DICT_KEY_RE` only matched bare
     // identifiers, so `- logger.log: pressed` was treated as a
@@ -716,9 +751,7 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     // Icon landed on the right button
     const lines = after.split("\n");
     const bIdx = lines.findIndex((l) => l.includes("name: Button B"));
-    const buttonBSlice = lines
-      .slice(bIdx, bIdx + 6)
-      .join("\n");
+    const buttonBSlice = lines.slice(bIdx, bIdx + 6).join("\n");
     expect(buttonBSlice).toContain('icon: "mdi:account"');
     // Sanity: only Button B got the icon (siblings stayed clean)
     expect(after.match(/icon:/g)).toHaveLength(1);
@@ -749,20 +782,11 @@ describe("parseYamlSectionValues / updateSectionInYaml — block scalars and com
     id: opening_sensor
 ${lambdaBlock}
 `;
-    const values = parseYamlSectionValues(
-      yaml,
-      "binary_sensor.template",
-      2,
-    );
+    const values = parseYamlSectionValues(yaml, "binary_sensor.template", 2);
     // Parser wraps the block scalar so the on-disk style round-trips.
     expect(values.lambda).toBeInstanceOf(YamlRawValue);
     // Re-save without editing → byte-identical YAML.
-    const after = updateSectionInYaml(
-      yaml,
-      "binary_sensor.template",
-      values,
-      2,
-    );
+    const after = updateSectionInYaml(yaml, "binary_sensor.template", values, 2);
     expect(after).toBe(yaml);
     // Belt + suspenders: even if a future serializer change
     // reformats some surrounding key, the lambda block itself
@@ -783,24 +807,15 @@ ${lambdaBlock}
     lambda: |-
       return original_body;
 `;
-    const values = parseYamlSectionValues(
-      yaml,
-      "binary_sensor.template",
-      2,
-    );
+    const values = parseYamlSectionValues(yaml, "binary_sensor.template", 2);
     const original = values.lambda;
     expect(original).toBeInstanceOf(YamlRawValue);
     // Simulate the form editing the body:
     values.lambda = YamlRawValue.fromBodyText(
       "return id(moving) && id(opening);",
-      original as YamlRawValue,
+      original as YamlRawValue
     );
-    const after = updateSectionInYaml(
-      yaml,
-      "binary_sensor.template",
-      values,
-      2,
-    );
+    const after = updateSectionInYaml(yaml, "binary_sensor.template", values, 2);
     // Block-scalar form is preserved.
     expect(after).toContain("lambda: |-");
     // Body has the new content at the original indent.
@@ -921,9 +936,7 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
       name: "Kitchen"
 `;
     const values = parseYamlSectionValues(yaml, "esphome");
-    expect(values.devices).toEqual([
-      { id: "front_door", name: "Front Door" },
-    ]);
+    expect(values.devices).toEqual([{ id: "front_door", name: "Front Door" }]);
     expect(values.areas).toEqual([
       { id: "entrance", name: "Entrance" },
       { id: "kitchen", name: "Kitchen" },
@@ -1060,10 +1073,7 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
       name: Kitchen
 `;
     const values = parseYamlSectionValues(yaml, "esphome");
-    expect(values.devices).toEqual([
-      {},
-      { id: "kitchen", name: "Kitchen" },
-    ]);
+    expect(values.devices).toEqual([{}, { id: "kitchen", name: "Kitchen" }]);
   });
 
   it("parses a list-of-mappings with a comment line between key and items", () => {
@@ -1142,10 +1152,7 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     -
 `;
     const values = parseYamlSectionValues(yaml, "esphome");
-    expect(values.devices).toEqual([
-      { id: "kitchen", name: "Kitchen" },
-      {},
-    ]);
+    expect(values.devices).toEqual([{ id: "kitchen", name: "Kitchen" }, {}]);
   });
 
   it("re-parses a bare-dash item inside a parseNestedBlock recursion", () => {
@@ -1386,7 +1393,7 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     it(`parses ${spelling} as boolean true`, () => {
       const values = parseYamlSectionValues(
         `wifi:\n  fast_connect: ${spelling}\n`,
-        "wifi",
+        "wifi"
       );
       expect(values.fast_connect).toBe(true);
     });
@@ -1396,7 +1403,7 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     it(`parses ${spelling} as boolean false`, () => {
       const values = parseYamlSectionValues(
         `wifi:\n  fast_connect: ${spelling}\n`,
-        "wifi",
+        "wifi"
       );
       expect(values.fast_connect).toBe(false);
     });
@@ -1405,7 +1412,7 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
   it("leaves non-boolean strings that resemble words alone", () => {
     const values = parseYamlSectionValues(
       "esphome:\n  name: enabled-device\n  comment: yesterday\n",
-      "esphome",
+      "esphome"
     );
     expect(values.name).toBe("enabled-device");
     expect(values.comment).toBe("yesterday");
@@ -1419,7 +1426,7 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     // the round-trip would emit ``true:`` instead.
     const values = parseYamlSectionValues(
       `mqtt:\n  mode: "on"\n  state: 'yes'\n  fallback: "True"\n  hint: 'enable'\n`,
-      "mqtt",
+      "mqtt"
     );
     expect(values.mode).toBe("on");
     expect(values.state).toBe("yes");
