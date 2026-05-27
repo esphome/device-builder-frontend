@@ -167,6 +167,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     <esphome-rename-device-dialog
       @rename-confirm=${host._executeRename}
     ></esphome-rename-device-dialog>
+    <esphome-bulk-labels-dialog></esphome-bulk-labels-dialog>
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog></esphome-create-config-dialog>

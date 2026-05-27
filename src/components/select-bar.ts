@@ -1,5 +1,11 @@
 import { consume } from "@lit/context";
-import { mdiArchiveOutline, mdiClose, mdiDelete, mdiUpdate } from "@mdi/js";
+import {
+  mdiArchiveOutline,
+  mdiClose,
+  mdiDelete,
+  mdiTagMultiple,
+  mdiUpdate,
+} from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -13,6 +19,7 @@ registerMdiIcons({
   "archive-outline": mdiArchiveOutline,
   close: mdiClose,
   delete: mdiDelete,
+  "tag-multiple": mdiTagMultiple,
   update: mdiUpdate,
 });
 
@@ -194,6 +201,7 @@ export class ESPHomeSelectBar extends LitElement {
   protected render() {
     const allSelected = this.allVisibleSelected;
     const cancelLabel = this._localize("layout.cancel");
+    const labelsLabel = this._localize("dashboard.labels_bulk_button");
     const archiveLabel = this._localize("dashboard.archive_selected", {
       count: this.selectedCount,
     });
@@ -229,6 +237,15 @@ export class ESPHomeSelectBar extends LitElement {
           >
             <wa-icon library="mdi" name="close"></wa-icon>
             <span class="btn-label">${cancelLabel}</span>
+          </button>
+          <button
+            class="btn btn--secondary"
+            aria-label=${labelsLabel}
+            ?disabled=${this.selectedCount === 0}
+            @click=${() => this._emit("labels-selected")}
+          >
+            <wa-icon library="mdi" name="tag-multiple"></wa-icon>
+            <span class="btn-label">${labelsLabel}</span>
           </button>
           <button
             class="btn btn--secondary"
