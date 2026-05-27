@@ -26,6 +26,7 @@ import {
   getCachedLightEffects,
   subscribeAutomationCatalogCache,
 } from "../../../util/automation-catalog-cache.js";
+import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   renderFieldError,
@@ -198,14 +199,9 @@ export class ESPHomeRegistryList extends LitElement {
     super.connectedCallback();
     const ops = this._ops();
     if (ops === null) return; // Unknown registry, surfaced in render().
-    const cached = ops.cache();
-    if (cached !== undefined) {
-      this._catalog = cached;
-    } else {
-      this._kickFetch(ops);
-    }
+    // Subscribe before kicking the fetch so a synchronous resolve
+    // can't fire-before-subscribe.
     this._unsubscribe = subscribeAutomationCatalogCache(() => {
-      // Cache subscribers outlive the element; bail if we're already gone.
       if (!this.isConnected) return;
       const live = this._ops();
       if (live === null) return;
@@ -215,6 +211,14 @@ export class ESPHomeRegistryList extends LitElement {
         this._fetchError = false;
       }
     });
+    const cached = ops.cache();
+    if (cached !== undefined) {
+      this._catalog = cached;
+      // Reconnect with cached data: clear any stale error from a prior session.
+      this._fetchError = false;
+    } else {
+      this._kickFetch(ops);
+    }
   }
 
   updated(): void {
@@ -301,7 +305,24 @@ export class ESPHomeRegistryList extends LitElement {
         </div>
       `;
     }
-    const rawList = asList(this.ctx.getAt(this.path));
+    const raw = this.ctx.getAt(this.path);
+    // YamlRawValue / non-array shape: the parser preserved a block that
+    // doesn't fit the polymorphic-list contract (dotted keys, block-scalar
+    // bodies, list-shaped nested content). Coercing to [] and offering
+    // Add would clobber the preserved YAML on first save — render the
+    // YAML-only notice instead, same pattern as renderNestedListField.
+    if (raw instanceof YamlRawValue || (raw !== undefined && !Array.isArray(raw))) {
+      return html`
+        <div class="field" data-field-key=${this.path.join(".")}>
+          ${renderLabel(this.entry, this.ctx)}
+          <p class="field-description">
+            ${this.ctx.localize("device.multi_value_yaml_only")}
+          </p>
+          ${renderFieldError(this.path, this.ctx)}
+        </div>
+      `;
+    }
+    const rawList = asList(raw);
     const { items } = editableEntries(rawList);
     const disabled = effectiveDisabled(this.entry, this.ctx);
     // Scope the catalog to entries valid for the parent section's
@@ -334,9 +355,11 @@ export class ESPHomeRegistryList extends LitElement {
     const statusHint: unknown = this._fetchError
       ? html`<p class="registry-list-fallback">
           ${this.ctx.localize("device.registry_list_error")}
-          <button type="button" class="multi-btn" @click=${this._retryFetch}>
-            ${this.ctx.localize("device.registry_list_retry")}
-          </button>
+          ${this._api
+            ? html`<button type="button" class="multi-btn" @click=${this._retryFetch}>
+                ${this.ctx.localize("device.registry_list_retry")}
+              </button>`
+            : nothing}
         </p>`
       : this._catalog === null
         ? html`<p class="registry-list-fallback">

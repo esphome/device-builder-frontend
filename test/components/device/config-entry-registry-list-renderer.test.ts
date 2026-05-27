@@ -15,6 +15,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, type LightEffect } from "../../../src/api/types.js";
 import "../../../src/components/device/config-entry-renderers/registry-list.js";
 import { type ESPHomeRegistryList } from "../../../src/components/device/config-entry-renderers/registry-list.js";
+import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const STUB_CATALOG: LightEffect[] = [
@@ -388,6 +389,42 @@ describe("renderRegistryListField — filter registry allows duplicates", () => 
     expect(values).toContain("delta");
     expect(values).toContain("lambda");
     expect(values).toContain("offset");
+  });
+});
+
+describe("renderRegistryListField — YAML-only fallback", () => {
+  it("Renders the YAML-only hint when raw value is a YamlRawValue", async () => {
+    // Parser bails to YamlRawValue when the block doesn't fit the
+    // polymorphic-list contract (dotted keys, block-scalar bodies).
+    // Coercing to [] and offering Add would clobber the preserved
+    // YAML on first save.
+    const { el, emit } = mount({
+      effects: new YamlRawValue(["    - on_turn_on:", "      - logger.log: hi"]),
+    });
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain("device.multi_value_yaml_only");
+    expect(el.shadowRoot!.querySelectorAll(".registry-list-row").length).toBe(0);
+    expect(el.shadowRoot!.querySelector(".multi-add")).toBeNull();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it("Renders the YAML-only hint when raw value is a non-array scalar", async () => {
+    // Schema drift: someone hand-wrote ``effects: "raw string"``; coercing
+    // to [] would silently overwrite on first Add click.
+    const { el, emit } = mount({ effects: "unexpected scalar" });
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).toContain("device.multi_value_yaml_only");
+    expect(el.shadowRoot!.querySelector(".multi-add")).toBeNull();
+    expect(emit).not.toHaveBeenCalled();
+  });
+
+  it("Renders normally when value is missing (no key in YAML)", async () => {
+    // raw === undefined is the first-render case — show the picker
+    // with an empty list, not the YAML-only fallback.
+    const { el } = mount({});
+    await el.updateComplete;
+    expect(el.shadowRoot!.textContent).not.toContain("device.multi_value_yaml_only");
+    expect(el.shadowRoot!.querySelector(".multi-add")).toBeTruthy();
   });
 });
 
