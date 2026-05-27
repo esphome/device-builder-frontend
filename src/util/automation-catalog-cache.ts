@@ -202,7 +202,9 @@ export function subscribeAutomationCatalogCache(listener: () => void): () => voi
 
 /** Test-only: drop all cached entries and pending promises. */
 export function _clearAutomationCatalogCache(): void {
-  for (const kind of ["triggers", "actions", "conditions", "light_effects"] as const) {
+  // Derive the kinds from `_cache` so new registries (filters,
+  // ...) don't have to remember to update this list separately.
+  for (const kind of Object.keys(_cache) as CatalogKind[]) {
     _cache[kind].clear();
     _inflight[kind].clear();
   }

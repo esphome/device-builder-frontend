@@ -4,6 +4,7 @@ import type {
   AutomationAction,
   AutomationCondition,
   AutomationTrigger,
+  Filter,
   LightEffect,
 } from "../../src/api/types.js";
 import {
@@ -11,10 +12,12 @@ import {
   fetchAutomationActions,
   fetchAutomationConditions,
   fetchAutomationTriggers,
+  fetchFilters,
   fetchLightEffects,
   getCachedAutomationActions,
   getCachedAutomationConditions,
   getCachedAutomationTriggers,
+  getCachedFilters,
   getCachedLightEffects,
   subscribeAutomationCatalogCache,
 } from "../../src/util/automation-catalog-cache.js";
@@ -244,5 +247,31 @@ describe("automation-catalog-cache", () => {
     unsubscribe();
     await fetchAutomationConditions(api);
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it("_clearAutomationCatalogCache drops every kind, filters included", async () => {
+    // Regression: the clear helper hard-coded the four pre-filters
+    // kinds and skipped the filters cache, so filter entries (and
+    // in-flight filter promises) leaked across tests that relied on
+    // it for isolation.
+    const filter: Filter = {
+      id: "delta",
+      name: "Delta",
+      config_entries: [],
+      applies_to: [],
+    };
+    const getFilters = vi.fn(() => Promise.resolve([filter]));
+    const api = { getFilters } as unknown as ESPHomeAPI;
+
+    await fetchFilters(api);
+    expect(getCachedFilters()?.map((f) => f.id)).toEqual(["delta"]);
+
+    _clearAutomationCatalogCache();
+    expect(getCachedFilters()).toBeUndefined();
+
+    // A fresh fetch after clear must hit the API again, proving the
+    // in-flight slot was also cleared.
+    await fetchFilters(api);
+    expect(getFilters).toHaveBeenCalledTimes(2);
   });
 });
