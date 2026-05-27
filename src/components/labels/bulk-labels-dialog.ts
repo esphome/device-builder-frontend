@@ -364,18 +364,18 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     const mixed = triState === "indeterminate";
     const ariaChecked = checked ? "true" : mixed ? "mixed" : "false";
     // ``title`` only when ``mixed``: ``renderLabelChip`` below
-    // sets its own ``title=${label.name}`` on the chip span, so
-    // a row-level title in the non-mixed case is duplicate.
-    // ``undefined`` removes the attribute entirely (Lit semantics).
-    const title = mixed
-      ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
-      : undefined;
+    // sets its own ``title=${label.name}`` on the chip span, so a
+    // row-level title in the non-mixed case is duplicate. Lit's
+    // ``nothing`` sentinel removes the attribute cleanly without
+    // the TypeScript cast a plain ``undefined`` would need.
     return html`<button
       class="option"
       type="button"
       role="checkbox"
       aria-checked=${ariaChecked}
-      title=${title}
+      title=${mixed
+        ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
+        : nothing}
       @click=${() => this._onToggle(label.id)}
     >
       <span
