@@ -228,19 +228,20 @@ export class ESPHomeSelectBar extends LitElement {
 
   protected render() {
     const allSelected = this.allVisibleSelected;
+    // Normalized button labelling: visible text is the verb only
+    // (keeps the row short enough to fit at tablet widths with all
+    // five actions present); the count moves into ``aria-label`` so
+    // screen readers still announce the scope.
+    const count = this.selectedCount;
     const cancelLabel = this._localize("layout.cancel");
-    const labelsLabel = this._localize("dashboard.labels_bulk_button", {
-      count: this.selectedCount,
-    });
-    const archiveLabel = this._localize("dashboard.archive_selected", {
-      count: this.selectedCount,
-    });
-    const deleteLabel = this._localize("dashboard.delete_selected", {
-      count: this.selectedCount,
-    });
-    const updateLabel = this._localize("dashboard.update_selected", {
-      count: this.selectedCount,
-    });
+    const labelsLabel = this._localize("dashboard.labels_bulk_button");
+    const labelsAriaLabel = this._localize("dashboard.labels_bulk_aria", { count });
+    const archiveLabel = this._localize("dashboard.archive_selected");
+    const archiveAriaLabel = this._localize("dashboard.archive_selected_aria", { count });
+    const deleteLabel = this._localize("dashboard.delete_selected");
+    const deleteAriaLabel = this._localize("dashboard.delete_selected_aria", { count });
+    const updateLabel = this._localize("dashboard.update_selected");
+    const updateAriaLabel = this._localize("dashboard.update_selected_aria", { count });
 
     return html`
       <div class="select-bar">
@@ -254,9 +255,7 @@ export class ESPHomeSelectBar extends LitElement {
               : this._localize("dashboard.select_all")}
           </button>
           <span class="count">
-            ${this._localize("dashboard.selected_count", {
-              count: this.selectedCount,
-            })}
+            ${this._localize("dashboard.selected_count", { count })}
           </span>
         </div>
         <div class="right">
@@ -270,8 +269,8 @@ export class ESPHomeSelectBar extends LitElement {
           </button>
           <button
             class="btn btn--secondary"
-            aria-label=${labelsLabel}
-            ?disabled=${this.selectedCount === 0}
+            aria-label=${labelsAriaLabel}
+            ?disabled=${count === 0}
             @click=${() => this._emit("labels-selected")}
           >
             <wa-icon library="mdi" name="tag-multiple"></wa-icon>
@@ -279,8 +278,8 @@ export class ESPHomeSelectBar extends LitElement {
           </button>
           <button
             class="btn btn--secondary"
-            aria-label=${archiveLabel}
-            ?disabled=${this.selectedCount === 0}
+            aria-label=${archiveAriaLabel}
+            ?disabled=${count === 0}
             @click=${() => this._emit("archive-selected")}
           >
             <wa-icon library="mdi" name="archive-outline"></wa-icon>
@@ -288,8 +287,8 @@ export class ESPHomeSelectBar extends LitElement {
           </button>
           <button
             class="btn btn--danger"
-            aria-label=${deleteLabel}
-            ?disabled=${this.selectedCount === 0}
+            aria-label=${deleteAriaLabel}
+            ?disabled=${count === 0}
             @click=${() => this._emit("delete-selected")}
           >
             <wa-icon library="mdi" name="delete"></wa-icon>
@@ -297,8 +296,8 @@ export class ESPHomeSelectBar extends LitElement {
           </button>
           <button
             class="btn btn--primary"
-            aria-label=${updateLabel}
-            ?disabled=${this.selectedCount === 0}
+            aria-label=${updateAriaLabel}
+            ?disabled=${count === 0}
             @click=${() => this._emit("update-selected")}
           >
             <wa-icon library="mdi" name="update"></wa-icon>

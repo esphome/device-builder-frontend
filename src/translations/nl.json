@@ -48,8 +48,8 @@
     "select_all": "Alles selecteren",
     "deselect_all": "Alles deselecteren",
     "selected_count": "{count} geselecteerd",
-    "update_selected": "{count} apparaat/apparaten bijwerken",
-    "delete_selected": "{count} apparaat/apparaten verwijderen",
+    "update_selected": "Bijwerken",
+    "delete_selected": "Verwijderen",
     "delete_selected_title": "Apparaten verwijderen",
     "delete_selected_desc": "Weet u zeker dat u {count} apparaat/apparaten wilt verwijderen? Dit verwijdert hun configuratiebestanden en kan niet ongedaan worden gemaakt.",
     "delete_selected_confirm": "Verwijderen",
@@ -176,7 +176,7 @@
     "labels_create_failed": "Kan label niet maken",
     "labels_save_failed": "Kan labels niet opslaan",
     "labels_save_submit": "Opslaan",
-    "labels_bulk_button": "Labels op {count} apparaat/apparaten",
+    "labels_bulk_button": "Labels",
     "labels_bulk_dialog_title_one": "Labels voor 1 apparaat",
     "labels_bulk_dialog_title_other": "Labels voor {count} apparaten",
     "labels_bulk_apply": "Toepassen",
@@ -286,7 +286,12 @@
     "archived_dialog_desc": "Gearchiveerde apparaten worden hier bewaard zodat je ze later kunt herstellen. Gebruik Dearchiveren om een apparaat terug in de actieve lijst te zetten, of Permanent verwijderen om het definitief weg te halen.",
     "archived_dialog_loading": "Laden…",
     "archived_dialog_empty": "Je hebt nog geen apparaten gearchiveerd.",
-    "archived_dialog_close": "Sluiten"
+    "archived_dialog_close": "Sluiten",
+    "labels_bulk_aria": "Labels op {count} geselecteerde",
+    "archive_selected": "Archiveren",
+    "archive_selected_aria": "{count} geselecteerde archiveren",
+    "delete_selected_aria": "{count} geselecteerde verwijderen",
+    "update_selected_aria": "{count} geselecteerde bijwerken"
   },
   "command": {
     "install_title": "Installeren — {name}",

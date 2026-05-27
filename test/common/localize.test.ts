@@ -48,8 +48,8 @@ describe("defaultLocalize", () => {
   });
 
   it("coerces numeric values to strings", () => {
-    const out = defaultLocalize("dashboard.update_selected", { count: 5 });
-    expect(out).toBe("Update 5 device(s)");
+    const out = defaultLocalize("dashboard.update_selected_aria", { count: 5 });
+    expect(out).toBe("Update 5 selected");
   });
 });
 
