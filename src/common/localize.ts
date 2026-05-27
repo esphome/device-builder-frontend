@@ -49,10 +49,19 @@ const LOCALE_STORAGE_KEY = "esphome-locale";
 
 function detectLocale(): SupportedLocale {
   const lang = navigator.language;
-  if ((SUPPORTED_LOCALES as readonly string[]).includes(lang)) {
+  // Try the full code first so regional variants we ship as
+  // distinct locales (zh-CN vs zh-TW / zh-HK / zh-MO / zh-SG)
+  // stay disambiguated, then fall back to the language prefix
+  // so fr-CA / fr-BE / fr-CH still resolve to fr, nl-BE to nl,
+  // etc.
+  const supported = SUPPORTED_LOCALES as readonly string[];
+  if (supported.includes(lang)) {
     return lang as SupportedLocale;
   }
-
+  const prefix = lang.split("-", 1)[0];
+  if (supported.includes(prefix)) {
+    return prefix as SupportedLocale;
+  }
   return "en";
 }
 

@@ -790,7 +790,7 @@
     "language_fr": "Français",
     "language_nl": "Nederlands",
     "language_hu": "Magyar",
-    "language_zh_cn": "Egyszerusitett kinai",
+    "language_zh_cn": "Egyszerűsített kínai",
     "theme_desc": "Válasszon világos, sötét vagy rendszerkövetési módot.",
     "yaml_diff_desc": "Különbség gomb megjelenítése a YAML-szerkesztőben a nem mentett változtatások és az utoljára mentett verzió összehasonlításához.",
     "show_yaml_diff_button": "YAML-különbség gomb megjelenítése",
