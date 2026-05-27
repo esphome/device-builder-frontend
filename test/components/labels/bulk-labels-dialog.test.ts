@@ -111,28 +111,30 @@ describe("esphome-bulk-labels-dialog tri-state cycle", () => {
 });
 
 describe("esphome-bulk-labels-dialog computeUpdates", () => {
-  test("no pending changes -> per-device label sets are unchanged", () => {
+  test("no pending changes -> no payload (every device is a no-op)", () => {
     const dialog = makeDialog();
     dialog.devices = [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-b"] }),
     ];
-    expect(dialog.computeUpdates()).toEqual([
-      { configuration: "a.yaml", labelIds: ["lbl-a"] },
-      { configuration: "b.yaml", labelIds: ["lbl-b"] },
-    ]);
+    // Diff filter: with no transitions, every device's after-set
+    // equals its before-set, so the payload is empty. The Apply
+    // button is disabled in this state anyway (``_hasPendingChanges``),
+    // but pinning the payload shape so the success-toast count
+    // reflects real changes only.
+    expect(dialog.computeUpdates()).toEqual([]);
   });
 
-  test("checked transition adds to every device that didn't already have it", () => {
+  test("checked transition only emits entries for devices that actually change", () => {
     const dialog = makeDialog();
     dialog.devices = [
       makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
       makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
     ];
     dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
-    const updates = dialog.computeUpdates();
-    expect(updates).toEqual([
-      { configuration: "a.yaml", labelIds: ["lbl-a"] },
+    // a.yaml already has lbl-a → no diff → skipped.
+    // b.yaml gains lbl-a → diff → included.
+    expect(dialog.computeUpdates()).toEqual([
       { configuration: "b.yaml", labelIds: ["lbl-a"] },
     ]);
   });
@@ -337,6 +339,34 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     (dialog as unknown as { open: () => void }).open();
 
     expect(dialog._failedConfigurations).toBeNull();
+  });
+
+  test("_apply re-entrancy guard drops a second concurrent call", async () => {
+    // A quick double-click on Apply could fire two ``_apply`` calls
+    // before Lit re-renders the disabled state. The second call
+    // must early-return so only one ``set_labels_bulk`` request hits
+    // the wire for the same payload.
+    let resolve!: (results: BulkActionResult[]) => void;
+    const inFlight = new Promise<BulkActionResult[]>((r) => {
+      resolve = r;
+    });
+    const dialog = makeMockedDialog(
+      () => inFlight,
+      [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    const first = dialog._apply();
+    const second = dialog._apply(); // should bail immediately
+
+    resolve([{ configuration: "a.yaml", success: true }]);
+    await Promise.all([first, second]);
+
+    // setDeviceLabelsBulk was called exactly once despite two _apply invocations.
+    expect(
+      (dialog._api as unknown as { setDeviceLabelsBulk: ReturnType<typeof vi.fn> })
+        .setDeviceLabelsBulk
+    ).toHaveBeenCalledTimes(1);
   });
 
   test("_onRequestClose vetoes dismissal while _saving is true", () => {

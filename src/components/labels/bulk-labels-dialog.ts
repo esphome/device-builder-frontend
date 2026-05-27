@@ -44,6 +44,12 @@ registerMdiIcons({
 
 export type TriState = "checked" | "unchecked" | "indeterminate";
 
+function _setsEqual<T>(a: Set<T>, b: Set<T>): boolean {
+  if (a.size !== b.size) return false;
+  for (const item of a) if (!b.has(item)) return false;
+  return true;
+}
+
 @customElement("esphome-bulk-labels-dialog")
 export class ESPHomeBulkLabelsDialog extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -96,19 +102,35 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     if (this._dialog) this._dialog.open = false;
   };
 
+  /** Per-label count of selected devices that carry that label,
+   *  memoised by ``devices`` reference. Lazy so it works whether
+   *  it's hit from the Lit lifecycle or from a bare test instance
+   *  that sets ``devices`` directly. O(devices × avgLabels) once,
+   *  then O(1) per label for the dialog's lifetime. */
+  private _labelCounts: Map<string, number> = new Map();
+  private _labelCountsFor: ConfiguredDevice[] | null = null;
+
+  private _ensureLabelCounts() {
+    if (this._labelCountsFor === this.devices) return;
+    const counts = new Map<string, number>();
+    for (const device of this.devices) {
+      for (const id of device.labels ?? []) {
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
+    }
+    this._labelCounts = counts;
+    this._labelCountsFor = this.devices;
+  }
+
   /** Derived tri-state for a label across the current device set. */
   private _derivedState(labelId: string): TriState {
-    if (this.devices.length === 0) return "unchecked";
-    let some = false;
-    let all = true;
-    for (const device of this.devices) {
-      const has = (device.labels ?? []).includes(labelId);
-      some = some || has;
-      all = all && has;
-    }
-    if (all) return "checked";
-    if (some) return "indeterminate";
-    return "unchecked";
+    const n = this.devices.length;
+    if (n === 0) return "unchecked";
+    this._ensureLabelCounts();
+    const has = this._labelCounts.get(labelId) ?? 0;
+    if (has === n) return "checked";
+    if (has === 0) return "unchecked";
+    return "indeterminate";
   }
 
   /** Effective state for rendering: pending override wins, else derived. */
@@ -120,11 +142,16 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
 
   /** Compute the per-device updates payload the Apply button would send.
    *
-   *  After a partial failure the dialog stays open and the next
-   *  Apply targets only the configurations that failed last time
-   *  (``_failedConfigurations``) — succeeded devices already
-   *  carry the desired labels, so re-sending them would just
-   *  cost an extra round trip + audit-log entry per device.
+   *  Two filters compose:
+   *  - After a partial failure, ``_failedConfigurations`` narrows to
+   *    only the configs that failed last Apply (avoids re-writing
+   *    devices that already succeeded).
+   *  - The diff filter drops devices whose resulting labels set is
+   *    byte-identical to their current ``device.labels`` (avoids
+   *    no-op writes on the FIRST Apply too — e.g. user toggles a
+   *    label that's already at the value the toggle would set
+   *    across some subset of selected devices). Also makes the
+   *    success-toast count reflect actual changes.
    *
    *  Exposed (not just inlined into ``_apply``) so the test suite
    *  can drive selection state and assert the resulting payload
@@ -134,13 +161,15 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     const targets = failed
       ? this.devices.filter((d) => failed.has(d.configuration))
       : this.devices;
-    return targets.map((device) => {
-      const next = new Set(device.labels ?? []);
+    return targets.flatMap((device) => {
+      const before = new Set(device.labels ?? []);
+      const after = new Set(before);
       for (const [labelId, change] of this._pendingChanges) {
-        if (change === "checked") next.add(labelId);
-        else next.delete(labelId);
+        if (change === "checked") after.add(labelId);
+        else after.delete(labelId);
       }
-      return { configuration: device.configuration, labelIds: [...next] };
+      if (_setsEqual(before, after)) return [];
+      return [{ configuration: device.configuration, labelIds: [...after] }];
     });
   }
 
@@ -258,17 +287,19 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   }
 
   private _renderOption(label: Label) {
-    const state = this.effectiveState(label.id);
-    const checked = state === "checked";
-    const mixed = state === "indeterminate";
+    // ``triState`` avoids shadowing the ``state`` decorator import.
+    const triState = this.effectiveState(label.id);
+    const checked = triState === "checked";
+    const mixed = triState === "indeterminate";
     const ariaChecked = checked ? "true" : mixed ? "mixed" : "false";
-    const hint = mixed ? this._localize("dashboard.labels_bulk_mixed_hint") : undefined;
     return html`<button
       class="option"
       type="button"
       role="checkbox"
       aria-checked=${ariaChecked}
-      title=${hint ?? label.name}
+      title=${mixed
+        ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
+        : label.name}
       @click=${() => this._onToggle(label.id)}
     >
       <span
@@ -320,6 +351,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   };
 
   private _apply = async () => {
+    // Re-entrancy guard: a quick double-click on Apply could fire
+    // two ``_apply`` calls before the Lit re-render disables the
+    // button via ``_saving``. Drop the second call here so we don't
+    // send two ``set_labels_bulk`` requests for the same payload.
+    if (this._saving || !this._hasPendingChanges) return;
     if (!this._api) return;
     const updates = this.computeUpdates();
     const count = updates.length;
