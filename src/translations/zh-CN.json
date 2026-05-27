@@ -284,7 +284,7 @@
     "labels_bulk_saved_one": "已在 1 个设备上更新标签",
     "labels_bulk_saved_other": "已在 {count} 个设备上更新标签",
     "labels_bulk_mixed_hint": "部分选中的设备已含有该标签",
-    "labels_bulk_dialog_empty": "尚无标签。请先在某个设备抽屉中创建一个,以便进行批量分配。",
+    "labels_bulk_dialog_empty": "尚无标签。请先在某个设备抽屉中创建一个，以便进行批量分配。",
     "labels_edit_label": "编辑标签",
     "labels_rename": "重命名标签",
     "labels_update_failed": "无法保存标签更改",

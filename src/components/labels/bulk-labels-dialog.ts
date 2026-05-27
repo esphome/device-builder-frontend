@@ -80,9 +80,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     if (this._dialog) this._dialog.open = true;
   }
 
-  close() {
+  // Arrow property so the Cancel button's ``@click=${this.close}``
+  // captures a bound reference; a plain method would lose ``this``
+  // when Lit re-dispatches the event and break the dialog dismiss.
+  close = () => {
     if (this._dialog) this._dialog.open = false;
-  }
+  };
 
   /** Derived tri-state for a label across the current device set. */
   private _derivedState(labelId: string): TriState {
@@ -319,6 +322,14 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         // edits. Matches the transport-failure branch below.
         this.close();
       } else {
+        // Mirror the transport-failure branch: log the failed
+        // configurations so the user can identify them in devtools
+        // while the toast carries only the count (the dialog stays
+        // open so they can also retry).
+        console.warn(
+          "set_labels_bulk partial failure:",
+          failures.map((f) => ({ configuration: f.configuration, error: f.error }))
+        );
         const key =
           failures.length === 1
             ? "dashboard.labels_bulk_save_failed_one"
