@@ -1579,10 +1579,11 @@ export class ESPHomeAPI {
    * coerce to `true` and persist the opposite of operator
    * intent on a security-relevant switch).
    */
-  async setOffloaderRemoteBuildSettings(args: {
-    remote_builds_enabled?: boolean;
-    allow_major_version_mismatch?: boolean;
-  }): Promise<OffloaderRemoteBuildSettings> {
+  async setOffloaderRemoteBuildSettings(
+    args:
+      | { remote_builds_enabled: boolean; allow_major_version_mismatch?: boolean }
+      | { remote_builds_enabled?: boolean; allow_major_version_mismatch: boolean }
+  ): Promise<OffloaderRemoteBuildSettings> {
     return this.sendCommand<OffloaderRemoteBuildSettings>(
       "remote_build/set_offloader_settings",
       args

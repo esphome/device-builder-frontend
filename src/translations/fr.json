@@ -888,7 +888,7 @@
     "build_offload_pairing_version_mismatch_patch": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}",
     "build_offload_pairing_version_mismatch_release": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}. Le YAML peut ne pas compiler à travers cet écart de version.",
     "offloader_allow_major_version_mismatch": "Autoriser une version majeure différente",
-    "offloader_allow_major_version_mismatch_desc": "Désactivé (recommandé) : ne router les compilations distantes que vers les serveurs exécutant la même version majeure d'ESPHome. Activé (par défaut) : autoriser le routage vers des serveurs de version différente ; le firmware peut ne pas se compiler correctement entre lignes de version.",
+    "offloader_allow_major_version_mismatch_desc": "Désactivé (recommandé) : ne router les compilations distantes que vers les serveurs sur la même ligne de version ESPHome (année + mois, ex. 2026.5). Activé (par défaut) : autoriser le routage entre lignes de version ; le firmware peut ne pas se compiler correctement quand la ligne diffère.",
     "remote_build_submit_action": "Compiler à distance",
     "remote_build_submit_aria": "Compiler à distance sur {label}",
     "remote_build_view_action": "Voir la compilation",
