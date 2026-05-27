@@ -629,6 +629,7 @@
     "multi_value_remove": "Verwijderen",
     "multi_value_yaml_only": "Deze lijst bevat YAML die de visuele editor niet kan modelleren — bewerk hem rechtstreeks in het YAML-paneel rechts.",
     "registry_list_loading": "Catalogus laden…",
+    "registry_list_select": "Selecteer een optie…",
     "map_empty": "Nog geen vermeldingen — klik op + om er een toe te voegen.",
     "map_add": "Vermelding toevoegen",
     "map_remove": "Vermelding verwijderen",

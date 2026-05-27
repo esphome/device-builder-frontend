@@ -46,6 +46,17 @@ function itemId(item: Record<string, unknown>): string {
   return keys.length > 0 ? keys[0] : "";
 }
 
+/** Per-row label for the type picker. The catalog stores names
+ *  with a redundant ``Domain → Name`` prefix (useful in the
+ *  cross-domain automation editor; noise in a single-domain
+ *  picker). Titlecase the id directly so the row reads as the
+ *  user typed it in YAML. Unknown ids (legacy configs) fall
+ *  through to the raw id. */
+function formatRegistryId(id: string): string {
+  if (!id) return "";
+  return id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 /** Cache + fetch pair for one named registry. New registries plug
  *  into this table; the renderer reads through ``entry.registry``
  *  with a fallback to ``light_effects`` for legacy configs missing
@@ -162,7 +173,7 @@ export class ESPHomeRegistryList extends LitElement {
             </p>`
           : nothing}
         ${items.map((item, i) => this._renderRow(item, i, catalog, disabled))}
-        ${renderListAddButton(this.ctx, disabled, () => this._addItem(catalog))}
+        ${renderListAddButton(this.ctx, disabled, () => this._addItem())}
         ${renderFieldError(this.path, this.ctx)}
       </div>
     `;
@@ -185,18 +196,21 @@ export class ESPHomeRegistryList extends LitElement {
         <wa-select
           .value=${currentId}
           ?disabled=${disabled}
+          placeholder=${this.ctx.localize("device.registry_list_select")}
           @change=${(e: Event) => {
             const next = (e.target as HTMLSelectElement).value;
             this._renameRow(index, next);
           }}
         >
           ${!knownInCatalog && currentId
-            ? html`<wa-option value=${currentId} selected>${currentId}</wa-option>`
+            ? html`<wa-option value=${currentId} selected
+                >${formatRegistryId(currentId)}</wa-option
+              >`
             : nothing}
           ${catalog.map(
             (effect) =>
               html`<wa-option value=${effect.id} ?selected=${effect.id === currentId}
-                >${effect.name || effect.id}</wa-option
+                >${formatRegistryId(effect.id)}</wa-option
               >`
           )}
         </wa-select>
@@ -205,11 +219,17 @@ export class ESPHomeRegistryList extends LitElement {
     `;
   }
 
-  private _addItem(catalog: (LightEffect | Filter)[]) {
+  private _addItem() {
+    // Emit an empty row rather than seeding the catalog's first id —
+    // that "first id" is alphabetical (``adalight``) which is rarely
+    // what the user wants AND it's invalid for many light platforms
+    // (``adalight`` only applies to non-addressable RGB lights), so
+    // the backend rejects it on save. The picker shows a placeholder
+    // until the user chooses an effect. Bare-dash placeholders on
+    // disk round-trip cleanly through ``serializeListItem``'s
+    // empty-mapping path.
     const items = asPolymorphicList(this.ctx.getAt(this.path));
-    const seedId = catalog[0]?.id ?? "";
-    const next = [...items, seedId ? { [seedId]: null } : {}];
-    this.ctx.emitChange(this.path, next);
+    this.ctx.emitChange(this.path, [...items, {}]);
   }
 
   private _removeAt(index: number) {

@@ -604,6 +604,7 @@
     "multi_value_remove": "Remove",
     "multi_value_yaml_only": "This list contains YAML the visual editor can't model — edit it directly in the YAML pane on the right.",
     "registry_list_loading": "Loading catalog…",
+    "registry_list_select": "Select an option…",
     "map_empty": "No entries yet — click + to add one.",
     "map_add": "Add entry",
     "map_remove": "Remove entry",

@@ -88,18 +88,44 @@ describe("renderRegistryListField — row rendering", () => {
     expect(values).toContain("addressable_rainbow");
     expect(values).toContain("pulse");
   });
+
+  it("formats option labels from the id, not the catalog's prefixed name", async () => {
+    // The catalog stores ``name: 'Light → Addressable Rainbow'``
+    // because ``_automation_label`` always emits ``Domain → Name``
+    // for component-scoped entries — useful in the global automation
+    // editor (hundreds of actions), redundant in a single-domain
+    // picker already labelled "Effects". Titlecase from the id so
+    // the row reads as the bare effect name.
+    const { el } = mount({ effects: [{ addressable_rainbow: null }] });
+    (el as unknown as { _catalog: LightEffect[] })._catalog = [
+      {
+        id: "addressable_rainbow",
+        name: "Light → Addressable Rainbow",
+        config_entries: [],
+        applies_to: [],
+      },
+    ];
+    el.requestUpdate();
+    await el.updateComplete;
+    const optionText = el.shadowRoot!.querySelector("wa-option")!.textContent?.trim();
+    expect(optionText).toBe("Addressable Rainbow");
+  });
 });
 
 describe("renderRegistryListField — emitChange contract", () => {
-  it("Add button appends a seed item using the catalog's first id", async () => {
+  it("Add button appends an empty row, not a preselected id", async () => {
+    // Preselecting ``catalog[0].id`` (alphabetically ``adalight``)
+    // landed effects the user didn't mean to pick AND those defaults
+    // are often invalid for the parent component (``adalight`` only
+    // applies to non-addressable RGB lights), so the backend
+    // rejected the save with "Unable to find effect with the name".
+    // Emit an empty mapping; the picker's placeholder prompts the
+    // user to choose.
     const { el, emit } = mount({ effects: [{ pulse: null }] });
     await el.updateComplete;
     const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
     addButton.click();
-    expect(emit).toHaveBeenCalledWith(
-      ["effects"],
-      [{ pulse: null }, { addressable_rainbow: null }]
-    );
+    expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }, {}]);
   });
 
   it("Remove button splices the targeted row", async () => {
