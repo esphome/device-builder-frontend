@@ -988,6 +988,85 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
     expect(values.triggers).toBeInstanceOf(YamlRawValue);
   });
 
+  it("parses light effects (single-key empty mappings) as an array (#941)", () => {
+    // Each ``- effect_id:`` is a polymorphic registry-list item: a
+    // single-key mapping whose value is either null (default params)
+    // or a nested mapping (per-effect overrides). Pre-fix the parser
+    // bailed on the empty value at ``parseFlatMappingField`` and the
+    // whole block fell back to YamlRawValue; the section editor
+    // then collapsed the body into a single text input.
+    const yaml = `light:
+  - platform: esp32_rmt_led_strip
+    name: RGB LEDs
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+`;
+    const values = parseYamlSectionValues(yaml, "light.esp32_rmt_led_strip", 2);
+    expect(values.effects).toEqual([
+      { addressable_rainbow: null },
+      { addressable_color_wipe: null },
+    ]);
+    expect(values.effects).not.toBeInstanceOf(YamlRawValue);
+  });
+
+  it("parses light effects with per-effect params (#941)", () => {
+    // ``- pulse:\n      transition_length: 1s`` — the dash header has
+    // empty value, the next line is strictly deeper than the
+    // flat-sub-key childIndent, and recursively forms the params
+    // mapping for the empty-keyed field.
+    const yaml = `light:
+  - platform: monochromatic
+    name: Lamp
+    effects:
+      - pulse:
+          transition_length: 1s
+          update_interval: 2s
+      - random:
+`;
+    const values = parseYamlSectionValues(yaml, "light.monochromatic", 2);
+    expect(values.effects).toEqual([
+      { pulse: { transition_length: "1s", update_interval: "2s" } },
+      { random: null },
+    ]);
+  });
+
+  it("falls back to YamlRawValue when a single-key item nests a list (#941)", () => {
+    // ``- then:\n  - logger.log: pressed`` is an automation handler
+    // (list under a single key), not a polymorphic params mapping.
+    // The polymorphic branch must bail so the inner list rounds-trips
+    // through YamlRawValue — same shape as the pre-fix behaviour for
+    // ``on_press:`` blocks.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - then:
+          - logger.log: pressed
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    expect(values.on_press).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("round-trips light effects through update with edits (#941)", () => {
+    const yaml = `light:
+  - platform: esp32_rmt_led_strip
+    name: RGB LEDs
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+`;
+    const values = parseYamlSectionValues(yaml, "light.esp32_rmt_led_strip", 2);
+    const effects = values.effects as Record<string, unknown>[];
+    effects.push({ pulse: { transition_length: "1s" } });
+    const after = updateSectionInYaml(yaml, "light.esp32_rmt_led_strip", values, 2);
+    expect(after).toContain("- addressable_rainbow:");
+    expect(after).toContain("- addressable_color_wipe:");
+    expect(after).toContain("- pulse:");
+    expect(after).toContain("transition_length: 1s");
+    expect(after).not.toContain("YamlRawValue");
+  });
+
   it("round-trips esphome.devices through update with edits to one item", () => {
     const yaml = `esphome:
   devices:

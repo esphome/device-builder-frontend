@@ -453,7 +453,16 @@ const parseFlatMappingField = (
   // so the surrounding parser keeps the block as YamlRawValue
   // and the serializer doesn't quote the dotted key on save.
   if (key.includes(".")) return null;
-  if (raw === "" || BLOCK_SCALAR_INLINE_RE.test(raw)) return null;
+  // Block-scalar headers (``key: |-``) stay opaque so the body
+  // round-trips through YamlRawValue; ``parseScalar("|-")`` would
+  // otherwise return the literal string ``"|-"``.
+  if (BLOCK_SCALAR_INLINE_RE.test(raw)) return null;
+  // ``key:`` with no value is structurally ``{key: null}`` in YAML.
+  // Recognising it here is what lets list-of-single-key-mappings
+  // (light ``effects:``, sensor ``filters:``, any registry-shaped
+  // field) round-trip through the section editor instead of
+  // falling back to YamlRawValue. #941.
+  if (raw === "") return { key, value: null };
   return { key, value: parseScalar(raw) };
 };
 
@@ -555,10 +564,42 @@ const collectBlockListMappings = (
     // Same null-prototype defence as the surrounding parser — see
     // the comment in ``parseYamlSectionValues``.
     const item: Record<string, unknown> = Object.create(null);
+    let firstEmptyKey: string | null = null;
     if (!LIST_ITEM_BARE_DASH_RE.test(lines[at])) {
       const header = _matchFlatMappingField(lines[at], headerRe);
       if (!header) return null;
       item[header.key] = header.value;
+      // ``- effect_id:`` with no value may be a polymorphic single-
+      // key item — the empty value's real shape sits as a nested
+      // mapping at strictly deeper indent than the flat sub-key
+      // level. Remember the key so the next-line peek below can
+      // upgrade the value from ``null`` to ``{params}``.
+      if (header.value === null) firstEmptyKey = header.key;
+    }
+    // Polymorphic branch (#941, light ``effects:``): a dash header
+    // with a single-key empty value can carry its params at strictly
+    // deeper indent than the dash-line key column. The threshold is
+    // ``dashIndent.length + 2`` (the column of the key after ``- ``),
+    // NOT the detected ``childIndent`` — the latter collapses to the
+    // deeper indent when no flat sibling exists, breaking the
+    // discriminator between "nested under empty key" and "flat sibling
+    // sub-keys". Bail on list-shaped nested content (``- then:`` →
+    // ``  - logger.log:``) so automation handlers still round-trip via
+    // YamlRawValue.
+    if (firstEmptyKey !== null) {
+      const dashKeyColumn = dashIndent.length + 2;
+      const peek = _skipBlankAndCommentLines(lines, at + 1);
+      if (peek < lines.length) {
+        const peekLead = _leadingIndent(lines[peek]);
+        if (peekLead.length > dashKeyColumn) {
+          if (lines[peek].slice(peekLead.length).startsWith("-")) return null;
+          const sub = parseNestedBlock(lines, at + 1, peekLead);
+          if (Object.keys(sub.values).length > 0) {
+            item[firstEmptyKey] = sub.values;
+          }
+          return { item, endIdx: sub.endIdx };
+        }
+      }
     }
     const after = _parseItemSubKeys(lines, at + 1, childIndent, childRe, item);
     return after === null ? null : { item, endIdx: after };
