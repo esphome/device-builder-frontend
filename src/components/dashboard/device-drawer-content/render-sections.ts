@@ -23,7 +23,7 @@ export function renderRow(
   icon: string,
   label: string,
   value: string | null,
-  mono = false,
+  mono = false
 ): TemplateResult {
   const empty = !value;
   return html`
@@ -43,7 +43,7 @@ export function renderRow(
 
 export function renderEncryptionBadge(
   localize: LocalizeFunc,
-  state: "active" | "plaintext" | "pending" | "mismatch" | "none",
+  state: "active" | "plaintext" | "pending" | "mismatch" | "none"
 ): TemplateResult | typeof nothing {
   const variants = {
     active: {
@@ -81,15 +81,11 @@ export function renderEncryptionBadge(
 
 function renderIntegrationTag(
   name: string,
-  integrationDocs: Record<string, string>,
+  integrationDocs: Record<string, string>
 ): TemplateResult {
   const url = integrationDocs[name];
   return url && isSafeDocsUrl(url)
-    ? html`<a
-        class="tag tag--link"
-        href=${url}
-        target="_blank"
-        rel="noopener noreferrer"
+    ? html`<a class="tag tag--link" href=${url} target="_blank" rel="noopener noreferrer"
         >${name}</a
       >`
     : html`<span class="tag">${name}</span>`;
@@ -102,20 +98,18 @@ function renderIntegrationTag(
 export function renderLoadedIntegrationsSection(
   d: ConfiguredDevice,
   localize: LocalizeFunc,
-  integrationDocs: Record<string, string>,
+  integrationDocs: Record<string, string>
 ): TemplateResult | typeof nothing {
   if (!d.loaded_integrations || d.loaded_integrations.length === 0) {
     return nothing;
   }
   const { direct, indirect } = splitIntegrations(
     d.loaded_integrations,
-    d.directly_referenced_integrations,
+    d.directly_referenced_integrations
   );
   return html`
     <div class="section">
-      <h4 class="section-title">
-        ${localize("dashboard.drawer_loaded_integrations")}
-      </h4>
+      <h4 class="section-title">${localize("dashboard.drawer_loaded_integrations")}</h4>
       <div class="tags-wrap">
         ${direct.map((i) => renderIntegrationTag(i, integrationDocs))}
       </div>
@@ -139,7 +133,7 @@ export function renderLoadedIntegrationsSection(
 
 export function renderLabelsSection(
   d: ConfiguredDevice,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult {
   return html`
     <div class="section">
@@ -155,7 +149,7 @@ export function renderLabelsSection(
 // reported yet (brand-new device, never compiled, never broadcast).
 export function renderVersionSection(
   d: ConfiguredDevice,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   const local = d.current_version || "";
   const deployed = d.deployed_version || "";
@@ -185,13 +179,13 @@ export function renderVersionSection(
               "tag-multiple",
               localize("dashboard.drawer_current_version"),
               local,
-              true,
+              true
             )}
             ${renderRow(
               "upload",
               localize("dashboard.drawer_deployed_version"),
               deployed,
-              true,
+              true
             )}
           `}
     </div>
@@ -202,7 +196,7 @@ export function renderVersionSection(
 // "the modified dot is on but the YAML hasn't changed — what's mismatched?".
 export function renderConfigHashSection(
   d: ConfiguredDevice,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   const expected = d.expected_config_hash || "";
   const deployed = d.deployed_config_hash || "";
@@ -218,9 +212,7 @@ export function renderConfigHashSection(
   const showStatus = !!expected && !!deployed;
   return html`
     <div class="section">
-      <h4 class="section-title">
-        ${localize("dashboard.drawer_config_hash_title")}
-      </h4>
+      <h4 class="section-title">${localize("dashboard.drawer_config_hash_title")}</h4>
       ${showStatus
         ? html`<div class=${statusCls}>
             <wa-icon library="mdi" name=${statusIcon}></wa-icon>
@@ -232,20 +224,20 @@ export function renderConfigHashSection(
             "fingerprint",
             localize("dashboard.drawer_config_hash_value"),
             expected,
-            true,
+            true
           )
         : html`
             ${renderRow(
               "fingerprint",
               localize("dashboard.drawer_config_hash_local"),
               expected,
-              true,
+              true
             )}
             ${renderRow(
               "fingerprint",
               localize("dashboard.drawer_config_hash_deployed"),
               deployed,
-              true,
+              true
             )}
           `}
     </div>
@@ -256,7 +248,7 @@ export function renderConfigHashSection(
 // primary with a chevron toggle so the drawer stays scannable.
 export function renderIpAddressRow(
   host: ESPHomeDeviceDrawerContent,
-  d: ConfiguredDevice,
+  d: ConfiguredDevice
 ): TemplateResult {
   const list = d.ip_addresses;
   const label = host._localize("dashboard.drawer_ip_address");
@@ -324,13 +316,13 @@ export function renderIpAddressRow(
 
 export function renderMacAddressRow(
   d: ConfiguredDevice,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult {
   return renderRow(
     "ethernet",
     localize("dashboard.drawer_mac_address"),
     d.mac_address,
-    true,
+    true
   );
 }
 
@@ -338,40 +330,40 @@ export function renderMacAddressRow(
 // (single-MAC RP2040 / RP2350 platforms).
 export function renderEthernetMacRow(
   d: ConfiguredDevice,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   if (!d.ethernet_mac || d.ethernet_mac === d.mac_address) return nothing;
   return renderRow(
     "ethernet",
     localize("dashboard.drawer_ethernet_mac"),
     d.ethernet_mac,
-    true,
+    true
   );
 }
 
 export function renderBluetoothMacRow(
   d: ConfiguredDevice,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): TemplateResult | typeof nothing {
   if (!d.bluetooth_mac || d.bluetooth_mac === d.mac_address) return nothing;
   return renderRow(
     "bluetooth",
     localize("dashboard.drawer_bluetooth_mac"),
     d.bluetooth_mac,
-    true,
+    true
   );
 }
 
 function emitCleanBuild(
   host: ESPHomeDeviceDrawerContent,
-  device: ConfiguredDevice,
+  device: ConfiguredDevice
 ): void {
   host.dispatchEvent(
     new CustomEvent("clean-build", {
       detail: device,
       bubbles: true,
       composed: true,
-    }),
+    })
   );
 }
 
@@ -381,7 +373,7 @@ function emitCleanBuild(
 // kebab — same backend job, same job-completion build-size refresh hook.
 export function renderBuildSizeRow(
   host: ESPHomeDeviceDrawerContent,
-  d: ConfiguredDevice,
+  d: ConfiguredDevice
 ): TemplateResult | typeof nothing {
   if (!d.build_size_bytes) return nothing;
   return html`
@@ -390,9 +382,7 @@ export function renderBuildSizeRow(
         <wa-icon library="mdi" name="harddisk"></wa-icon>
       </div>
       <div class="content">
-        <div class="label">
-          ${host._localize("dashboard.drawer_build_size")}
-        </div>
+        <div class="label">${host._localize("dashboard.drawer_build_size")}</div>
         <div class="value build-size-value">
           <span>${formatFileSize(d.build_size_bytes)}</span>
           <button

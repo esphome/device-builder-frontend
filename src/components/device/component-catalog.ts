@@ -28,10 +28,7 @@ import {
   filteredBundles,
   visibleComponents,
 } from "./component-catalog/filters.js";
-import {
-  renderBundleCard,
-  renderCard,
-} from "./component-catalog/renderers.js";
+import { renderBundleCard, renderCard } from "./component-catalog/renderers.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -47,7 +44,9 @@ registerMdiIcons({
 
 @customElement("esphome-component-catalog")
 export class ESPHomeComponentCatalog extends LitElement {
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
   // Forwarded to the backend so per-platform cv.SplitDefault defaults are pre-resolved.
@@ -100,9 +99,7 @@ export class ESPHomeComponentCatalog extends LitElement {
       (this.board?.featured_components?.length ?? 0) +
       (this.board?.featured_bundles?.length ?? 0);
     const hasFeatured =
-      this.lockedCategories.length === 0 &&
-      !!this.boardId &&
-      featuredCount > 0;
+      this.lockedCategories.length === 0 && !!this.boardId && featuredCount > 0;
     if (hasFeatured) {
       this._category = ComponentCategory.FEATURED;
     } else if (this._category === ComponentCategory.FEATURED) {
@@ -116,7 +113,7 @@ export class ESPHomeComponentCatalog extends LitElement {
   // output.gpio, output.ledc, …); otherwise fall back to the search query.
   public filterByDomain(domain: string) {
     const isCategory = Object.values(ComponentCategory).includes(
-      domain as ComponentCategory,
+      domain as ComponentCategory
     );
     if (isCategory) {
       this._search = "";
@@ -141,9 +138,7 @@ export class ESPHomeComponentCatalog extends LitElement {
           ? this._category
           : undefined;
       const exclude_category: string[] | undefined =
-        !locked && this.excludeCategories.length > 0
-          ? this.excludeCategories
-          : undefined;
+        !locked && this.excludeCategories.length > 0 ? this.excludeCategories : undefined;
       const response = await this._api.getComponents({
         query,
         category,
@@ -185,9 +180,7 @@ export class ESPHomeComponentCatalog extends LitElement {
     return html`
       ${showSidebar
         ? html`<div class="sidebar">
-            <p class="sidebar-label">
-              ${this._localize("device.component_categories")}
-            </p>
+            <p class="sidebar-label">${this._localize("device.component_categories")}</p>
             ${categories.map(
               ({ id, label, count }) => html`
                 <button
@@ -205,7 +198,7 @@ export class ESPHomeComponentCatalog extends LitElement {
                     <span class="category-count">${count}</span>
                   </span>
                 </button>
-              `,
+              `
             )}
           </div>`
         : nothing}
@@ -219,16 +212,14 @@ export class ESPHomeComponentCatalog extends LitElement {
         />
         ${!this._loading
           ? html`<span class="result-count"
-              >${visible.length + bundles.length} of
-              ${this._total + bundles.length} components</span
+              >${visible.length + bundles.length} of ${this._total + bundles.length}
+              components</span
             >`
           : ""}
         <div class="grid-scroll">
           <div class="components-grid">
             ${this._loading
-              ? html`<p class="empty">
-                  ${this._localize("device.loading_components")}
-                </p>`
+              ? html`<p class="empty">${this._localize("device.loading_components")}</p>`
               : visible.length + bundles.length
                 ? html`
                     ${bundles.map((b) => renderBundleCard(this, b))}
@@ -238,8 +229,8 @@ export class ESPHomeComponentCatalog extends LitElement {
                         c,
                         c.id === this._expandedId,
                         this._category === ComponentCategory.FEATURED,
-                        this._localize,
-                      ),
+                        this._localize
+                      )
                     )}
                   `
                 : html`<p class="empty">
@@ -273,7 +264,7 @@ export class ESPHomeComponentCatalog extends LitElement {
         detail: { component },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -283,7 +274,7 @@ export class ESPHomeComponentCatalog extends LitElement {
         detail: { bundle, boardId: this.boardId },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

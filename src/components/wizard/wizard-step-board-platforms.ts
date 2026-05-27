@@ -56,7 +56,7 @@ export function chipNameToFilterLabel(chipName: string): string | null {
   const byVariant = WIZARD_BOARD_PLATFORMS.find((p) => p.variant === family);
   if (byVariant) return byVariant.label;
   const byPlatform = WIZARD_BOARD_PLATFORMS.find(
-    (p) => p.platform === family && !p.variant,
+    (p) => p.platform === family && !p.variant
   );
   return byPlatform?.label ?? null;
 }

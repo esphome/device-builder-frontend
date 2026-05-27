@@ -23,13 +23,14 @@ const entry = (id: string, name: string): ComponentCatalogEntry =>
   }) as ComponentCatalogEntry;
 
 const mockApi = (
-  impl: (id: string, platform?: string, boardId?: string) =>
-    | Promise<ComponentCatalogEntry | null>
-    | ComponentCatalogEntry
-    | null,
+  impl: (
+    id: string,
+    platform?: string,
+    boardId?: string
+  ) => Promise<ComponentCatalogEntry | null> | ComponentCatalogEntry | null
 ): { api: ESPHomeAPI; getComponent: ReturnType<typeof vi.fn> } => {
   const getComponent = vi.fn((id: string, platform?: string, boardId?: string) =>
-    Promise.resolve(impl(id, platform, boardId)),
+    Promise.resolve(impl(id, platform, boardId))
   );
   return { api: { getComponent } as unknown as ESPHomeAPI, getComponent };
 };
@@ -57,7 +58,7 @@ describe("component-name-cache", () => {
   it("dedupes concurrent in-flight calls for the same key", async () => {
     let resolve!: (v: ComponentCatalogEntry) => void;
     const { api, getComponent } = mockApi(
-      () => new Promise<ComponentCatalogEntry>((r) => (resolve = r)),
+      () => new Promise<ComponentCatalogEntry>((r) => (resolve = r))
     );
 
     const a = fetchComponent(api, "binary_sensor.gpio", "esp32");
@@ -75,7 +76,7 @@ describe("component-name-cache", () => {
 
   it("keys cache entries by component id, platform, and board id", async () => {
     const { api, getComponent } = mockApi((id, platform) =>
-      entry(id, `${id}|${platform ?? ""}`),
+      entry(id, `${id}|${platform ?? ""}`)
     );
 
     await fetchComponent(api, "sensor.dht", "esp32");
@@ -83,12 +84,8 @@ describe("component-name-cache", () => {
     await fetchComponent(api, "sensor.dht");
 
     expect(getComponent).toHaveBeenCalledTimes(3);
-    expect(getCachedComponent("sensor.dht", "esp32")?.name).toBe(
-      "sensor.dht|esp32",
-    );
-    expect(getCachedComponent("sensor.dht", "esp8266")?.name).toBe(
-      "sensor.dht|esp8266",
-    );
+    expect(getCachedComponent("sensor.dht", "esp32")?.name).toBe("sensor.dht|esp32");
+    expect(getCachedComponent("sensor.dht", "esp8266")?.name).toBe("sensor.dht|esp8266");
     expect(getCachedComponent("sensor.dht")?.name).toBe("sensor.dht|");
   });
 

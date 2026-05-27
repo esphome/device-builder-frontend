@@ -107,11 +107,7 @@ describe("readPlatformSibling (regex fallback)", () => {
     // line as the enclosing list-item header and parses its
     // ``platform:`` value directly instead of breaking on
     // ``ind < cursorIndent``.
-    const lines = [
-      "binary_sensor:",
-      "  - platform: template",
-      "    name: hi",
-    ];
+    const lines = ["binary_sensor:", "  - platform: template", "    name: hi"];
     expect(readPlatformSibling(lines, 2, 4)).toBe("template");
   });
 

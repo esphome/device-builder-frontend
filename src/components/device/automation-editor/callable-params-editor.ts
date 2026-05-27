@@ -91,7 +91,7 @@ export class ESPHomeCallableParamsEditor extends LitElement {
     const matches =
       localNamed.length === fromWire.length &&
       localNamed.every(
-        (p, i) => p.name === fromWire[i].name && p.type === fromWire[i].type,
+        (p, i) => p.name === fromWire[i].name && p.type === fromWire[i].type
       );
     if (!matches) this._params = fromWire;
   }
@@ -102,9 +102,7 @@ export class ESPHomeCallableParamsEditor extends LitElement {
         ? html`<label class="field-label">${this.fieldLabel}</label>`
         : nothing}
       ${this.description
-        ? html`<p class="field-description">
-            ${renderMarkdown(this.description)}
-          </p>`
+        ? html`<p class="field-description">${renderMarkdown(this.description)}</p>`
         : nothing}
       ${this._params.length === 0
         ? nothing
@@ -150,9 +148,7 @@ export class ESPHomeCallableParamsEditor extends LitElement {
           })}
       >
         ${PARAM_TYPES.map(
-          (t) => html`<wa-option value=${t} ?selected=${t === p.type}
-            >${t}</wa-option
-          >`,
+          (t) => html`<wa-option value=${t} ?selected=${t === p.type}>${t}</wa-option>`
         )}
       </wa-select>
       <button
@@ -186,7 +182,7 @@ export class ESPHomeCallableParamsEditor extends LitElement {
         detail: { value: dict },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 

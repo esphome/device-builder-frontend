@@ -3,11 +3,7 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import {
-  CLEANUP_TTL_DEFAULT_SECONDS,
-  JobStatus,
-  Theme,
-} from "../api/types.js";
+import { CLEANUP_TTL_DEFAULT_SECONDS, JobStatus, Theme } from "../api/types.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -21,11 +17,7 @@ import type {
   RemoteBuildSubmitTarget,
   ServerInfoMessage,
 } from "../api/types.js";
-import {
-  defaultLocalize,
-  loadLocalize,
-  type LocalizeFunc,
-} from "../common/localize.js";
+import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
   darkModeContext,
@@ -57,10 +49,7 @@ import {
 import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { BASE_PATH } from "../util/base-path.js";
-import {
-  isRecentSerialActivity,
-  markSerialActivity,
-} from "../util/web-serial.js";
+import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import {
   loadIntegrationDocs,
   loadLabels,
@@ -107,30 +96,65 @@ export type AuthState = "connecting" | "needs-login" | "authing" | "authed";
 export class ESPHomeApp extends LitElement {
   @provide({ context: apiContext }) _api = new ESPHomeAPI();
   @provide({ context: devicesContext }) @state() _devices: ConfiguredDevice[] = [];
-  @provide({ context: importableDevicesContext }) @state() _importableDevices: AdoptableDevice[] = [];
+  @provide({ context: importableDevicesContext })
+  @state()
+  _importableDevices: AdoptableDevice[] = [];
   @provide({ context: devicesLoadedContext }) @state() _devicesLoaded = false;
   @provide({ context: versionContext }) @state() _version = "";
   @provide({ context: serverVersionContext }) @state() _serverVersion = "";
   @provide({ context: darkModeContext }) @state() _darkMode = false;
   @provide({ context: isHaIngressContext }) @state() _isHaIngress = false;
-  @provide({ context: activeJobsContext }) @state() _activeJobs: Map<string, FirmwareJob> = new Map();
-  @provide({ context: recentJobsContext }) @state() _recentJobs: Map<string, FirmwareJob> = new Map();
-  @provide({ context: firmwareJobsContext }) @state() _firmwareJobs: Map<string, FirmwareJob> = new Map();
-  @provide({ context: localizeContext }) @state() _localize: LocalizeFunc = defaultLocalize;
+  @provide({ context: activeJobsContext }) @state() _activeJobs: Map<
+    string,
+    FirmwareJob
+  > = new Map();
+  @provide({ context: recentJobsContext }) @state() _recentJobs: Map<
+    string,
+    FirmwareJob
+  > = new Map();
+  @provide({ context: firmwareJobsContext }) @state() _firmwareJobs: Map<
+    string,
+    FirmwareJob
+  > = new Map();
+  @provide({ context: localizeContext }) @state() _localize: LocalizeFunc =
+    defaultLocalize;
   @provide({ context: yamlDiffButtonContext }) @state() _yamlDiffButton = false;
   @provide({ context: remoteBuildEnabledContext }) @state() _remoteBuildEnabled = false;
-  @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl = CLEANUP_TTL_DEFAULT_SECONDS;
-  @provide({ context: integrationDocsContext }) @state() _integrationDocs: Record<string, string> = {};
+  @provide({ context: remoteBuildCleanupTtlContext }) @state() _remoteBuildCleanupTtl =
+    CLEANUP_TTL_DEFAULT_SECONDS;
+  @provide({ context: integrationDocsContext }) @state() _integrationDocs: Record<
+    string,
+    string
+  > = {};
   @provide({ context: labelsContext }) @state() _labels: Label[] = [];
   @provide({ context: onboardingPendingContext }) @state() _onboardingPending = false;
-  @provide({ context: buildServerIdentityRotationCounterContext }) @state() _buildServerIdentityRotationCounter = 0;
-  @provide({ context: buildServerPeersContext }) @state() _buildServerPeers: PeerSummary[] | null = null;
-  @provide({ context: buildServerPairingWindowStateContext }) @state() _buildServerPairingWindowState: PairingWindowState | null = null;
-  @provide({ context: buildOffloadDiscoveredHostsContext }) @state() _buildOffloadDiscoveredHosts: Map<string, RemoteBuildPeer> | null = null;
-  @provide({ context: buildOffloadPairingsContext }) @state() _buildOffloadPairings: Map<string, PairingSummary> | null = null;
-  @provide({ context: offloaderRemoteBuildsEnabledContext }) @state() _offloaderRemoteBuildsEnabled: boolean | null = null;
-  @provide({ context: buildOffloadAlertsContext }) @state() _buildOffloadAlerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
-  @provide({ context: buildOffloadJobsContext }) @state() _buildOffloadJobs: Map<string, RemoteBuildJobState> = new Map();
+  @provide({ context: buildServerIdentityRotationCounterContext })
+  @state()
+  _buildServerIdentityRotationCounter = 0;
+  @provide({ context: buildServerPeersContext }) @state() _buildServerPeers:
+    | PeerSummary[]
+    | null = null;
+  @provide({ context: buildServerPairingWindowStateContext })
+  @state()
+  _buildServerPairingWindowState: PairingWindowState | null = null;
+  @provide({ context: buildOffloadDiscoveredHostsContext })
+  @state()
+  _buildOffloadDiscoveredHosts: Map<string, RemoteBuildPeer> | null = null;
+  @provide({ context: buildOffloadPairingsContext }) @state() _buildOffloadPairings: Map<
+    string,
+    PairingSummary
+  > | null = null;
+  @provide({ context: offloaderRemoteBuildsEnabledContext })
+  @state()
+  _offloaderRemoteBuildsEnabled: boolean | null = null;
+  @provide({ context: buildOffloadAlertsContext }) @state() _buildOffloadAlerts: Map<
+    string,
+    OffloaderAlertSnapshotEntry
+  > | null = null;
+  @provide({ context: buildOffloadJobsContext }) @state() _buildOffloadJobs: Map<
+    string,
+    RemoteBuildJobState
+  > = new Map();
 
   @state() _onboardingShouldShow = false;
   @state() _onboardingSessionDismissed = false;
@@ -147,7 +171,8 @@ export class ESPHomeApp extends LitElement {
   private _router = createRouter(this);
 
   @query("esphome-settings-dialog") private _settingsDialog!: ESPHomeSettingsDialog;
-  @query("esphome-firmware-jobs-dialog") private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
+  @query("esphome-firmware-jobs-dialog")
+  private _firmwareJobsDialog!: ESPHomeFirmwareJobsDialog;
   @query("esphome-feedback-dialog") private _feedbackDialog!: ESPHomeFeedbackDialog;
   @query("esphome-onboarding-wifi-dialog")
   private _onboardingDialog?: HTMLElement & { open(): void };
@@ -268,7 +293,7 @@ export class ESPHomeApp extends LitElement {
           markSerialActivity();
           toast.dismiss("esphome-usb-device-connected");
           window.dispatchEvent(
-            new CustomEvent("esphome-serial-setup", { detail: { port } }),
+            new CustomEvent("esphome-serial-setup", { detail: { port } })
           );
         },
       },
@@ -452,8 +477,9 @@ export class ESPHomeApp extends LitElement {
           ?disconnected=${!this._apiConnected}
           .error=${this._authError}
           rate-limited-until=${this._rateLimitedUntil}
-          @submit-credentials=${(e: CustomEvent<{ username: string; password: string }>) =>
-            onLoginSubmit(this, e)}
+          @submit-credentials=${(
+            e: CustomEvent<{ username: string; password: string }>
+          ) => onLoginSubmit(this, e)}
         ></esphome-login>
       `;
     }
@@ -488,18 +514,18 @@ export class ESPHomeApp extends LitElement {
         @set-offloader-remote-builds-enabled=${(e: CustomEvent<boolean>) =>
           onSetOffloaderRemoteBuildsEnabled(this, e)}
         @set-offloader-pairing-enabled=${(
-          e: CustomEvent<{ pin_sha256: string; enabled: boolean }>,
+          e: CustomEvent<{ pin_sha256: string; enabled: boolean }>
         ) => onSetOffloaderPairingEnabled(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>
           onPairRequestSent(this, e)}
         @remote-build-job-submitted=${(
-          e: CustomEvent<Parameters<typeof onRemoteBuildJobSubmitted>[1]["detail"]>,
+          e: CustomEvent<Parameters<typeof onRemoteBuildJobSubmitted>[1]["detail"]>
         ) =>
           onRemoteBuildJobSubmitted(
             this,
-            e as Parameters<typeof onRemoteBuildJobSubmitted>[1],
+            e as Parameters<typeof onRemoteBuildJobSubmitted>[1]
           )}
         @remote-build-job-dismissed=${(e: CustomEvent<{ job_id: string }>) =>
           onRemoteBuildJobDismissed(this, e)}

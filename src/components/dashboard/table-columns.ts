@@ -3,10 +3,7 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import {
-  DEVICE_SORT_COLLATOR,
-  deviceSortKey,
-} from "../../util/device-sort.js";
+import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
@@ -68,7 +65,7 @@ const RECENT_LABEL_KEY: Record<JobStatus, string> = {
 const dispatchRowEvent = (e: Event, name: string, device: ConfiguredDevice) => {
   e.stopPropagation();
   (e.currentTarget as HTMLElement).dispatchEvent(
-    new CustomEvent(name, { detail: device, bubbles: true, composed: true }),
+    new CustomEvent(name, { detail: device, bubbles: true, composed: true })
   );
 };
 
@@ -92,7 +89,11 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
                 dispatchRowEvent(e, "show-progress", row._device);
               }
             }}
-          ><wa-spinner class="status-spinner" style="font-size:14px;--indicator-color:var(--esphome-primary);--track-color:transparent;"></wa-spinner></span>`;
+            ><wa-spinner
+              class="status-spinner"
+              style="font-size:14px;--indicator-color:var(--esphome-primary);--track-color:transparent;"
+            ></wa-spinner
+          ></span>`;
         }
         if (row.recentJob) {
           const status = row.recentJob.status;
@@ -101,20 +102,26 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             return html`<span
               class="cell-status status-recent ${RECENT_CLASS[status]}"
               title=${localize(RECENT_LABEL_KEY[status])}
-            ><wa-icon library="mdi" name=${icon}></wa-icon></span>`;
+              ><wa-icon library="mdi" name=${icon}></wa-icon
+            ></span>`;
           }
         }
         const state = info.getValue() as DeviceState;
-        const dotClass = state === DeviceState.ONLINE ? "online" : state === DeviceState.OFFLINE ? "offline" : "unknown";
-        const title = state === DeviceState.ONLINE
-          ? localize("dashboard.table_status_online")
-          : state === DeviceState.OFFLINE
-            ? localize("dashboard.table_status_offline")
-            : localize("dashboard.table_status_unknown");
-        return html`<span class="cell-status"><span
-          class="status-dot ${dotClass}"
-          title="${title}"
-        ></span></span>`;
+        const dotClass =
+          state === DeviceState.ONLINE
+            ? "online"
+            : state === DeviceState.OFFLINE
+              ? "offline"
+              : "unknown";
+        const title =
+          state === DeviceState.ONLINE
+            ? localize("dashboard.table_status_online")
+            : state === DeviceState.OFFLINE
+              ? localize("dashboard.table_status_offline")
+              : localize("dashboard.table_status_unknown");
+        return html`<span class="cell-status"
+          ><span class="status-dot ${dotClass}" title="${title}"></span
+        ></span>`;
       },
       size: 80,
       enableHiding: true,
@@ -140,10 +147,16 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         return html`<span class="cell-name-wrap">
           <span class="cell-name">${row.friendly_name || row.name}</span>
           ${row.hasPendingChanges
-            ? html`<span class="cell-indicator cell-indicator--modified" title=${localize("dashboard.status_modified")}></span>`
+            ? html`<span
+                class="cell-indicator cell-indicator--modified"
+                title=${localize("dashboard.status_modified")}
+              ></span>`
             : nothing}
           ${row.hasUpdateAvailable
-            ? html`<span class="cell-indicator cell-indicator--update" title=${localize("dashboard.status_update_available")}></span>`
+            ? html`<span
+                class="cell-indicator cell-indicator--update"
+                title=${localize("dashboard.status_update_available")}
+              ></span>`
             : nothing}
           ${encVisual
             ? html`<wa-icon
@@ -158,7 +171,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       sortingFn: (rowA, rowB) =>
         DEVICE_SORT_COLLATOR.compare(
           deviceSortKey(rowA.original),
-          deviceSortKey(rowB.original),
+          deviceSortKey(rowB.original)
         ),
       size: 200,
       enableHiding: true,
@@ -166,16 +179,14 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
     {
       accessorKey: "address",
       header: localize("dashboard.table_col_address"),
-      cell: (info) =>
-        html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
+      cell: (info) => html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
       size: 180,
       enableHiding: true,
     },
     {
       accessorKey: "ip",
       header: localize("dashboard.table_col_ip"),
-      cell: (info) =>
-        html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
+      cell: (info) => html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
       size: 140,
       enableHiding: true,
     },
@@ -206,24 +217,21 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
     {
       accessorKey: "version",
       header: localize("dashboard.table_col_version"),
-      cell: (info) =>
-        html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
+      cell: (info) => html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
       size: 150,
       enableHiding: true,
     },
     {
       accessorKey: "comment",
       header: localize("dashboard.table_col_comment"),
-      cell: (info) =>
-        html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
+      cell: (info) => html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
       size: 180,
       enableHiding: true,
     },
     {
       accessorKey: "area",
       header: localize("dashboard.table_col_area"),
-      cell: (info) =>
-        html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
+      cell: (info) => html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
       size: 160,
       enableHiding: true,
     },
@@ -247,8 +255,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
     {
       accessorKey: "config",
       header: localize("dashboard.table_col_config"),
-      cell: (info) =>
-        html`<span class="cell-mono cell-config">${info.getValue()}</span>`,
+      cell: (info) => html`<span class="cell-mono cell-config">${info.getValue()}</span>`,
       size: 180,
       enableHiding: true,
     },

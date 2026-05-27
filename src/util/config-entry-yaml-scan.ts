@@ -109,7 +109,7 @@ const pinMemo = createScanMemo<PinKey, Map<number, string>>(pinKeyEquals);
 export function findUsedPins(
   yaml: string,
   excludeFromLine?: number,
-  excludeToLine?: number,
+  excludeToLine?: number
 ): Map<number, string> {
   const probe: PinKey = { yaml, excludeFromLine, excludeToLine };
   const cached = pinMemo.get(probe);
@@ -157,10 +157,7 @@ export function findUsedPins(
  * section starting at `fromLine`. Used to bound `excludeToLine` for
  * `findUsedPins`. Returns `lines.length` if the section runs to EOF.
  */
-export function sectionEndLine(
-  yaml: string,
-  fromLine?: number,
-): number | undefined {
+export function sectionEndLine(yaml: string, fromLine?: number): number | undefined {
   if (fromLine === undefined) return undefined;
   const lines = yaml.split("\n");
   for (let i = fromLine; i < lines.length; i++) {
@@ -180,16 +177,12 @@ interface RefKey {
   yaml: string;
   domain: string;
 }
-const refKeyEquals = (a: RefKey, b: RefKey) =>
-  a.yaml === b.yaml && a.domain === b.domain;
-const refMemo = createScanMemo<
-  RefKey,
-  Array<{ id: string; name: string }>
->(refKeyEquals);
+const refKeyEquals = (a: RefKey, b: RefKey) => a.yaml === b.yaml && a.domain === b.domain;
+const refMemo = createScanMemo<RefKey, Array<{ id: string; name: string }>>(refKeyEquals);
 
 export function findReferencedComponents(
   yaml: string,
-  domain: string,
+  domain: string
 ): Array<{ id: string; name: string }> {
   if (!domain) return [];
   const probe: RefKey = { yaml, domain };

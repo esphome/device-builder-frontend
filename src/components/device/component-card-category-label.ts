@@ -22,11 +22,7 @@
  * render the card.
  */
 
-const ACRONYMS = new Set([
-  "adc",
-  "dac",
-  "ota",
-]);
+const ACRONYMS = new Set(["adc", "dac", "ota"]);
 
 export function categoryChipLabel(category: string): string {
   if (!category) return "";

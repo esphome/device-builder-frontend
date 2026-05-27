@@ -139,7 +139,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
         color: var(--wa-color-text-normal);
         font-size: var(--wa-font-size-s);
         text-decoration: none;
-        transition: background 0.12s, border-color 0.12s;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
       }
 
       .link:hover {
@@ -201,10 +203,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog
-        label=${this._localize("feedback.title")}
-        light-dismiss
-      >
+      <wa-dialog label=${this._localize("feedback.title")} light-dismiss>
         <p class="description">${this._localize("feedback.description")}</p>
         <div class="links">
           <a
@@ -216,11 +215,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
           >
             <wa-icon class="link-icon" library="mdi" name=${SURVEY_LINK.icon}></wa-icon>
             <span class="link-label">${this._localize(SURVEY_LINK.labelKey)}</span>
-            <wa-icon
-              class="link-external"
-              library="mdi"
-              name="open-in-new"
-            ></wa-icon>
+            <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
           </a>
           ${LINKS.map(
             (link) => html`
@@ -233,13 +228,9 @@ export class ESPHomeFeedbackDialog extends LitElement {
               >
                 <wa-icon class="link-icon" library="mdi" name=${link.icon}></wa-icon>
                 <span class="link-label">${this._localize(link.labelKey)}</span>
-                <wa-icon
-                  class="link-external"
-                  library="mdi"
-                  name="open-in-new"
-                ></wa-icon>
+                <wa-icon class="link-external" library="mdi" name="open-in-new"></wa-icon>
               </a>
-            `,
+            `
           )}
         </div>
       </wa-dialog>

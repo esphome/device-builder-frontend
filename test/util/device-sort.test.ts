@@ -4,10 +4,7 @@
  * order rows by what they display. #946.
  */
 import { describe, expect, it } from "vitest";
-import {
-  DEVICE_SORT_COLLATOR,
-  deviceSortKey,
-} from "../../src/util/device-sort.js";
+import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../src/util/device-sort.js";
 
 type SortInput = Parameters<typeof deviceSortKey>[0];
 

@@ -20,7 +20,7 @@ export const ADD_NEW_SENTINEL = "__esphome_add_new__";
 export function renderIdReferenceField(
   entry: ConfigEntry,
   path: string[],
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ) {
   const domain = entry.references_component || "";
   const candidates = findReferencedComponents(ctx.yaml, domain);
@@ -98,7 +98,7 @@ export function renderIdReferenceField(
                   >${c.name ? `${c.id} · ${domain}` : domain}</span
                 >
               </span>
-            </wa-option>`,
+            </wa-option>`
         )}
         ${addOption}
       </wa-select>

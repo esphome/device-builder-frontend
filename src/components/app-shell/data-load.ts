@@ -10,7 +10,7 @@ export async function loadOnboardingState(host: ESPHomeApp): Promise<void> {
     host._onboardingPending = isOnboardingPending(state);
     host._onboardingShouldShow = shouldAutoShowOnboarding(
       state,
-      host._onboardingSessionDismissed,
+      host._onboardingSessionDismissed
     );
   } catch (err) {
     // Non-critical — clear the badge (latest data unknown, "no nudge" is safer

@@ -11,24 +11,21 @@ describe("isEmptyToPopulatedYamlChange", () => {
     expect(isEmptyToPopulatedYamlChange(undefined, "esphome:\n  name: x\n")).toBe(true);
   });
 
-  it("fires on user-cleared-then-pasted (\"\" → real)", () => {
+  it('fires on user-cleared-then-pasted ("" → real)', () => {
     expect(isEmptyToPopulatedYamlChange("", "esphome:\n  name: x\n")).toBe(true);
   });
 
   it("does not fire on typing (real → real)", () => {
     expect(
-      isEmptyToPopulatedYamlChange(
-        "esphome:\n  name: x\n",
-        "esphome:\n  name: xy\n",
-      ),
+      isEmptyToPopulatedYamlChange("esphome:\n  name: x\n", "esphome:\n  name: xy\n")
     ).toBe(false);
   });
 
-  it("does not fire on user-cleared-the-pane (real → \"\")", () => {
+  it('does not fire on user-cleared-the-pane (real → "")', () => {
     expect(isEmptyToPopulatedYamlChange("esphome:\n  name: x\n", "")).toBe(false);
   });
 
-  it("does not fire on noop-empty (\"\" → \"\")", () => {
+  it('does not fire on noop-empty ("" → "")', () => {
     expect(isEmptyToPopulatedYamlChange("", "")).toBe(false);
   });
 

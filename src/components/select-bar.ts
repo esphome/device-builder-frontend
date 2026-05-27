@@ -32,7 +32,6 @@ export class ESPHomeSelectBar extends LitElement {
   @property({ type: Boolean, attribute: "all-visible-selected" })
   allVisibleSelected = false;
 
-
   static styles = [
     espHomeStyles,
     css`
@@ -210,8 +209,7 @@ export class ESPHomeSelectBar extends LitElement {
         <div class="left">
           <button
             class="toggle"
-            @click=${() =>
-              this._emit(allSelected ? "deselect-all" : "select-all")}
+            @click=${() => this._emit(allSelected ? "deselect-all" : "select-all")}
           >
             ${allSelected
               ? this._localize("dashboard.deselect_all")
@@ -265,9 +263,7 @@ export class ESPHomeSelectBar extends LitElement {
   }
 
   private _emit(name: string) {
-    this.dispatchEvent(
-      new CustomEvent(name, { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent(name, { bubbles: true, composed: true }));
   }
 }
 

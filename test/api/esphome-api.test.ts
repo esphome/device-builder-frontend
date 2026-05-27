@@ -1,11 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { JobType } from "../../src/api/types.js";
@@ -67,8 +60,11 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("upgrades to wss:// when the page is https", async () => {
-    (globalThis as unknown as { window: { location: { protocol: string; host: string } } }).window =
-      { location: { protocol: "https:", host: "example.test" } };
+    (
+      globalThis as unknown as {
+        window: { location: { protocol: string; host: string } };
+      }
+    ).window = { location: { protocol: "https:", host: "example.test" } };
     const api = new ESPHomeAPI();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
@@ -197,9 +193,7 @@ describe("ESPHomeAPI — sendCommand", () => {
 
   it("throws when the socket is not open", async () => {
     const api = new ESPHomeAPI();
-    await expect(api.sendCommand("ping")).rejects.toThrow(
-      /not connected/,
-    );
+    await expect(api.sendCommand("ping")).rejects.toThrow(/not connected/);
   });
 
   it("assigns sequential message_ids", async () => {
@@ -236,7 +230,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
     const pending = api.cloneDevice(
       "kitchen.yaml",
       "bedroom-bulb",
-      "Bedroom Reading Lamp",
+      "Bedroom Reading Lamp"
     );
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
 
@@ -363,7 +357,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
     ws.receive({ message_id: messageId, event: "output", data: "line 1" });
     ws.receive({ message_id: messageId, event: "output", data: "line 2" });
@@ -380,7 +374,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
     ws.receive({
       message_id: messageId,
@@ -400,7 +394,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onError },
+      { onError }
     );
     ws.receive({
       message_id: messageId,
@@ -427,7 +421,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput: vi.fn(), onResult: vi.fn() },
+      { onOutput: vi.fn(), onResult: vi.fn() }
     );
 
     const pending = api.stopStream(streamId);
@@ -452,7 +446,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
 
     // Pre-stop: events flow normally.
@@ -496,7 +490,7 @@ describe("ESPHomeAPI — event subscriptions", () => {
     const ws = await connect(api);
     const received: Array<{ event: string; data: unknown }> = [];
     const subscribed = api.subscribeEvents((event, data) =>
-      received.push({ event, data }),
+      received.push({ event, data })
     );
     const msgId = ws.sentAs<{ message_id: string }>(0).message_id;
     ws.receive({ message_id: msgId, result: { subscribed: true } });
@@ -540,7 +534,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       component_id: "dht",
       fields: { pin: "GPIO4" },
     });
-    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
     expect(sent.command).toBe("devices/add_component");
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -656,7 +654,7 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       details: "Could not detect a chip on /dev/cu.usbserial-10",
     });
     await expect(pending).rejects.toThrow(
-      /Could not detect a chip on \/dev\/cu\.usbserial-10/,
+      /Could not detect a chip on \/dev\/cu\.usbserial-10/
     );
   });
 
@@ -676,7 +674,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const pending = api.setRemoteBuildSettings({ enabled: true });
-    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
     const result = { enabled: true, peers: [] };
@@ -1119,7 +1121,7 @@ describe("ESPHomeAPI — auth", () => {
 
     // Fresh token persisted for the next reconnect.
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 }),
+      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 })
     );
   });
 
@@ -1182,7 +1184,7 @@ describe("ESPHomeAPI — auth", () => {
     });
     await expect(api.ready).resolves.toBeUndefined();
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 }),
+      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 })
     );
   });
 
@@ -1525,7 +1527,9 @@ describe("ESPHomeAPI — automations catalog", () => {
       actions: [],
       conditions: [],
       scripts: [{ id: "morning_alarm", parameters: [{ name: "hour", type: "int" }] }],
-      devices: [{ component_id: "switch.gpio", id: "kitchen_relay", name: "Kitchen Relay" }],
+      devices: [
+        { component_id: "switch.gpio", id: "kitchen_relay", name: "Kitchen Relay" },
+      ],
     };
     ws.receive({
       message_id: ws.sentAs<{ message_id: string }>(0).message_id,
@@ -1560,9 +1564,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
         automation: {
           trigger_id: "on_boot",
           trigger_params: {},
-          actions: [
-            { action_id: "logger.log", params: { message: "hi" } },
-          ],
+          actions: [{ action_id: "logger.log", params: { message: "hi" } }],
         },
         from_line: 2,
         to_line: 5,
@@ -1588,9 +1590,7 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     const automation = {
       trigger_id: "on_press",
       trigger_params: {},
-      actions: [
-        { action_id: "switch.toggle", params: { id: "my_switch" } },
-      ],
+      actions: [{ action_id: "switch.toggle", params: { id: "my_switch" } }],
     };
     const location = {
       kind: "component_on" as const,
@@ -1611,11 +1611,19 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     ws.receive({
       message_id: ws.sentAs<{ message_id: string }>(0).message_id,
       result: {
-        yaml_diff: { fromLine: 12, toLine: 14, replacement: "on_press:\n  then:\n    - switch.toggle: my_switch\n" },
+        yaml_diff: {
+          fromLine: 12,
+          toLine: 14,
+          replacement: "on_press:\n  then:\n    - switch.toggle: my_switch\n",
+        },
       },
     });
     await expect(pending).resolves.toEqual({
-      yaml_diff: { fromLine: 12, toLine: 14, replacement: "on_press:\n  then:\n    - switch.toggle: my_switch\n" },
+      yaml_diff: {
+        fromLine: 12,
+        toLine: 14,
+        replacement: "on_press:\n  then:\n    - switch.toggle: my_switch\n",
+      },
     });
   });
 

@@ -1,10 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { JobSource, JobStatus, JobType, type FirmwareJob } from "../../api/types.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
-import {
-  formatAbsoluteTime,
-  formatRelativeTime,
-} from "../../util/format-job-time.js";
+import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import type { ESPHomeFirmwareJobsDialog } from "../firmware-jobs-dialog.js";
 
@@ -30,15 +27,13 @@ export function renderEmpty(localize: LocalizeFunc): TemplateResult {
 export function renderGroups(
   host: ESPHomeFirmwareJobsDialog,
   active: FirmwareJob[],
-  terminal: FirmwareJob[],
+  terminal: FirmwareJob[]
 ): TemplateResult {
   return html`
     <div class="jobs">
       ${active.length > 0
         ? html`
-            <div class="group-label">
-              ${host._localize("firmware_jobs.group_active")}
-            </div>
+            <div class="group-label">${host._localize("firmware_jobs.group_active")}</div>
             ${active.map((j) => renderJob(host, j))}
           `
         : nothing}
@@ -54,10 +49,7 @@ export function renderGroups(
   `;
 }
 
-function renderJob(
-  host: ESPHomeFirmwareJobsDialog,
-  job: FirmwareJob,
-): TemplateResult {
+function renderJob(host: ESPHomeFirmwareJobsDialog, job: FirmwareJob): TemplateResult {
   const name = host._jobDisplayName(job);
   const typeIcon = TYPE_ICONS[job.job_type] ?? "hammer-wrench";
   const typeLabel = host._localize(`firmware_jobs.type_${job.job_type}`);
@@ -93,7 +85,7 @@ function renderJob(
 
 function renderRowAction(
   host: ESPHomeFirmwareJobsDialog,
-  job: FirmwareJob,
+  job: FirmwareJob
 ): TemplateResult {
   if (job.status === JobStatus.COMPLETED) {
     return html`
@@ -143,7 +135,7 @@ function renderRowAction(
 // dashboard's offloader.
 function renderSourceLine(
   host: ESPHomeFirmwareJobsDialog,
-  job: FirmwareJob,
+  job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.source === JobSource.REMOTE && job.source_label) {
     const display = job.source_esphome_version
@@ -170,7 +162,7 @@ function renderSourceLine(
 
 function renderStatus(
   host: ESPHomeFirmwareJobsDialog,
-  job: FirmwareJob,
+  job: FirmwareJob
 ): TemplateResult | typeof nothing {
   if (job.status === JobStatus.RUNNING) {
     return html`
@@ -218,7 +210,7 @@ function renderStatus(
 // terminal rows show absolute ("finished HH:MM") since the moment is fixed.
 function renderTimestamp(
   host: ESPHomeFirmwareJobsDialog,
-  job: FirmwareJob,
+  job: FirmwareJob
 ): TemplateResult | typeof nothing {
   const locale = activeLocale();
   if (job.status === JobStatus.RUNNING && job.started_at) {
@@ -258,11 +250,7 @@ function renderTimestamp(
 // most recent first so the latest finished job tops the history.
 export function compareJobs(a: FirmwareJob, b: FirmwareJob): number {
   const rank = (j: FirmwareJob) =>
-    j.status === JobStatus.RUNNING
-      ? 0
-      : j.status === JobStatus.QUEUED
-        ? 1
-        : 2;
+    j.status === JobStatus.RUNNING ? 0 : j.status === JobStatus.QUEUED ? 1 : 2;
   const ra = rank(a);
   const rb = rank(b);
   if (ra !== rb) return ra - rb;

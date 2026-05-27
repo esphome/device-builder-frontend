@@ -7,12 +7,9 @@ import {
 } from "../../util/hostname.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
 
-export function renderInputStep(
-  host: ESPHomePairBuildServerDialog,
-): TemplateResult {
+export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateResult {
   const portValid = parsePortInput(host._port) !== null;
-  const canSubmit =
-    !host._busy && host._hostname.trim().length > 0 && portValid;
+  const canSubmit = !host._busy && host._hostname.trim().length > 0 && portValid;
   return html`
     <div class="description">
       ${host._localize("settings.pair_build_server_input_desc")}
@@ -29,9 +26,7 @@ export function renderInputStep(
           autocomplete="off"
           spellcheck="false"
           ?disabled=${host._busy}
-          placeholder=${host._localize(
-            "settings.pair_build_server_hostname_placeholder",
-          )}
+          placeholder=${host._localize("settings.pair_build_server_hostname_placeholder")}
           .value=${host._hostname}
           @input=${(e: Event) => {
             host._hostname = (e.target as HTMLInputElement).value;
@@ -63,18 +58,12 @@ export function renderInputStep(
         />
       </div>
     </div>
-    <div class="helper">
-      ${host._localize("settings.pair_build_server_port_helper")}
-    </div>
+    <div class="helper">${host._localize("settings.pair_build_server_port_helper")}</div>
     ${host._error
       ? html`<div class="step-error" role="alert">${host._error}</div>`
       : nothing}
     <div class="actions">
-      <button
-        class="btn btn--cancel"
-        ?disabled=${host._busy}
-        @click=${host.close}
-      >
+      <button class="btn btn--cancel" ?disabled=${host._busy} @click=${host.close}>
         ${host._localize("layout.cancel")}
       </button>
       <button
@@ -90,9 +79,7 @@ export function renderInputStep(
   `;
 }
 
-export function renderConfirmStep(
-  host: ESPHomePairBuildServerDialog,
-): TemplateResult {
+export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateResult {
   const canSubmit =
     !host._busy &&
     host._receiverLabel.trim().length > 0 &&
@@ -107,9 +94,7 @@ export function renderConfirmStep(
       </span>
       <esphome-pin-emoji-grid .pin=${host._previewedPin}></esphome-pin-emoji-grid>
       <details class="pin-hex">
-        <summary>
-          ${host._localize("settings.pair_build_server_pin_hex_summary")}
-        </summary>
+        <summary>${host._localize("settings.pair_build_server_pin_hex_summary")}</summary>
         <code>${formatPinSha256(host._previewedPin)}</code>
       </details>
       <span class="pin-card-target">
@@ -133,7 +118,7 @@ export function renderConfirmStep(
         ?disabled=${host._busy}
         .value=${host._receiverLabel}
         placeholder=${host._localize(
-          "settings.pair_build_server_receiver_label_placeholder",
+          "settings.pair_build_server_receiver_label_placeholder"
         )}
         @input=${(e: Event) => {
           host._receiverLabel = (e.target as HTMLInputElement).value;
@@ -156,7 +141,7 @@ export function renderConfirmStep(
         ?disabled=${host._busy}
         .value=${host._offloaderLabel}
         placeholder=${host._localize(
-          "settings.pair_build_server_offloader_label_placeholder",
+          "settings.pair_build_server_offloader_label_placeholder"
         )}
         @input=${(e: Event) => {
           host._offloaderLabel = (e.target as HTMLInputElement).value;
@@ -191,9 +176,7 @@ export function renderConfirmStep(
   `;
 }
 
-export function renderSentStep(
-  host: ESPHomePairBuildServerDialog,
-): TemplateResult {
+export function renderSentStep(host: ESPHomePairBuildServerDialog): TemplateResult {
   return html`
     <div class="sent-body">
       ${host._localize("settings.pair_build_server_sent_desc", {

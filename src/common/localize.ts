@@ -100,15 +100,9 @@ function resolve(obj: Record<string, unknown>, key: string): string | undefined 
   return typeof current === "string" ? current : undefined;
 }
 
-function interpolate(
-  template: string,
-  values?: Record<string, string | number>
-): string {
+function interpolate(template: string, values?: Record<string, string | number>): string {
   if (!values) return template;
-  return template.replace(
-    /\{(\w+)\}/g,
-    (_, key) => String(values[key] ?? `{${key}}`)
-  );
+  return template.replace(/\{(\w+)\}/g, (_, key) => String(values[key] ?? `{${key}}`));
 }
 
 /** Deep-merge `override` onto `base`, preserving unoverridden nested keys. */
@@ -121,8 +115,10 @@ function deepMerge(
     const baseVal = base[key];
     const overrideVal = override[key];
     if (
-      typeof baseVal === "object" && baseVal !== null &&
-      typeof overrideVal === "object" && overrideVal !== null
+      typeof baseVal === "object" &&
+      baseVal !== null &&
+      typeof overrideVal === "object" &&
+      overrideVal !== null
     ) {
       result[key] = deepMerge(
         baseVal as Record<string, unknown>,
@@ -151,14 +147,10 @@ export const defaultLocalize: LocalizeFunc = buildLocalize(
  * If `force` is omitted, picks the stored locale (from a previous user
  * selection) or falls back to the browser locale.
  */
-export async function loadLocalize(
-  force?: SupportedLocale
-): Promise<LocalizeFunc> {
+export async function loadLocalize(force?: SupportedLocale): Promise<LocalizeFunc> {
   const locale = force ?? activeLocale();
   if (locale === "en") return defaultLocalize;
 
   const localeMessages = await loadLocaleMessages(locale);
-  return buildLocalize(
-    deepMerge(enMessages as Record<string, unknown>, localeMessages)
-  );
+  return buildLocalize(deepMerge(enMessages as Record<string, unknown>, localeMessages));
 }

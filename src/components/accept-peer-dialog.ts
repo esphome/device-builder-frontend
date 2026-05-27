@@ -178,9 +178,7 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
           </div>
           <ul class="checklist">
             <li>
-              ${this._localize(
-                "settings.build_server_peer_accept_confirm_checklist_pin"
-              )}
+              ${this._localize("settings.build_server_peer_accept_confirm_checklist_pin")}
             </li>
             <li>
               ${this._localize(
@@ -204,9 +202,7 @@ export class ESPHomeAcceptPeerDialog extends LitElement {
                     ? html`
                         <div class="peer-row">
                           <span class="label">
-                            ${this._localize(
-                              "settings.build_server_peer_ip_label"
-                            )}
+                            ${this._localize("settings.build_server_peer_ip_label")}
                           </span>
                           <code class="value">${peer.peer_ip}</code>
                         </div>

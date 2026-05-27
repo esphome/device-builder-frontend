@@ -120,11 +120,7 @@ export class ESPHomePasswordInput extends LitElement {
       }
 
       .toggle:hover {
-        background: color-mix(
-          in srgb,
-          var(--wa-color-text-normal),
-          transparent 92%
-        );
+        background: color-mix(in srgb, var(--wa-color-text-normal), transparent 92%);
         color: var(--wa-color-text-normal);
       }
 
@@ -141,7 +137,7 @@ export class ESPHomePasswordInput extends LitElement {
 
   protected render() {
     const label = this._localize(
-      this._revealed ? "device.password_hide" : "device.password_reveal",
+      this._revealed ? "device.password_hide" : "device.password_reveal"
     );
     return html`
       <div class="wrap">
@@ -165,10 +161,7 @@ export class ESPHomePasswordInput extends LitElement {
           aria-pressed=${this._revealed}
           @click=${this._onToggle}
         >
-          <wa-icon
-            library="mdi"
-            name=${this._revealed ? "eye-off" : "eye"}
-          ></wa-icon>
+          <wa-icon library="mdi" name=${this._revealed ? "eye-off" : "eye"}></wa-icon>
         </button>
       </div>
     `;

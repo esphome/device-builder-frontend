@@ -63,9 +63,7 @@ describe("wizard step-board platform chips", () => {
       // esptool-js returns names like "ESP32-C6 (QFN32) (revision v0.2)".
       // The function must strip everything from the first `(` onward
       // before matching, otherwise the variant lookup misses.
-      expect(chipNameToFilterLabel("ESP32-C6 (QFN32) (revision v0.2)")).toBe(
-        "ESP32-C6",
-      );
+      expect(chipNameToFilterLabel("ESP32-C6 (QFN32) (revision v0.2)")).toBe("ESP32-C6");
     });
 
     it("maps every ESP32 variant to its filter label", () => {

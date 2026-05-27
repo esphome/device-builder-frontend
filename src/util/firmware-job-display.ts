@@ -32,7 +32,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 export function firmwareJobDisplayName(
   job: FirmwareJob,
   devices: ConfiguredDevice[],
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): string {
   if (job.job_type === JobType.RESET_BUILD_ENV || !job.configuration) {
     return localize("firmware_jobs.build_env_label");
@@ -63,10 +63,7 @@ export function firmwareJobDisplayName(
        for the new YAML so devices using ``.yml`` keep matching. */
     const oldExtMatch = job.configuration.match(/\.ya?ml$/);
     const ext = oldExtMatch ? oldExtMatch[0] : ".yaml";
-    const oldName = job.configuration.slice(
-      0,
-      job.configuration.length - ext.length,
-    );
+    const oldName = job.configuration.slice(0, job.configuration.length - ext.length);
     const newConfiguration = `${job.new_name}${ext}`;
     /* Look the configured device up under either side of the rename.
        Mid-flight both YAMLs can briefly exist (the new one written

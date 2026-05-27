@@ -71,7 +71,7 @@ export function renderTemplatableField(
   entry: ConfigEntry,
   path: string[],
   ctx: RenderCtx,
-  innerRender: () => unknown,
+  innerRender: () => unknown
 ) {
   const raw = ctx.getAt(path);
   const isLambda = isLambdaValue(raw);

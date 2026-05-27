@@ -5,16 +5,13 @@ import {
   navigateToDep,
   type DepNavHost,
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
-import {
-  ComponentCategory,
-  type ComponentCatalogEntry,
-} from "../../../src/api/types.js";
+import { ComponentCategory, type ComponentCatalogEntry } from "../../../src/api/types.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function makeHost(
   getComponent: (...args: unknown[]) => unknown,
-  catalog: NonNullable<DepNavHost["_catalog"]> | null = null,
+  catalog: NonNullable<DepNavHost["_catalog"]> | null = null
 ): DepNavHost {
   return {
     _api: { getComponent } as unknown as ESPHomeAPI,

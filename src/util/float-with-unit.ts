@@ -44,15 +44,14 @@ export interface FloatWithUnit {
  */
 export function parseFloatWithUnit(
   raw: unknown,
-  unitOptions: readonly string[],
+  unitOptions: readonly string[]
 ): FloatWithUnit {
   const fallbackUnit = unitOptions[0] ?? "";
   // Funnel everything through `String().trim()` so the rest of the
   // function only deals with strings. NaN/Infinity numbers stringify
   // to "NaN"/"Infinity" which `Number()` round-trips back to non-finite
   // — caught by the final `Number.isFinite` guard.
-  const text =
-    raw === null || raw === undefined ? "" : String(raw).trim();
+  const text = raw === null || raw === undefined ? "" : String(raw).trim();
   if (text === "") return { value: null, unit: fallbackUnit };
 
   const lowerText = text.toLowerCase();
@@ -77,10 +76,7 @@ export function parseFloatWithUnit(
     // captures more of the user's input — ``"50mHz"`` should match
     // ``mHz`` over ``Hz`` so the ``m`` prefix isn't stranded as
     // part of the numeric portion).
-    if (
-      score > bestScore ||
-      (score === bestScore && option.length > bestLength)
-    ) {
+    if (score > bestScore || (score === bestScore && option.length > bestLength)) {
       match = option;
       bestScore = score;
       bestLength = option.length;
@@ -124,7 +120,7 @@ export function serializeFloatWithUnit(parsed: FloatWithUnit): string {
  */
 export function placeholderForFloatWithUnit(
   defaultValue: unknown,
-  unitOptions: readonly string[],
+  unitOptions: readonly string[]
 ): string {
   if (defaultValue === null || defaultValue === undefined) return "";
   const parsed = parseFloatWithUnit(defaultValue, unitOptions);
@@ -139,7 +135,7 @@ export function placeholderForFloatWithUnit(
  */
 export function defaultUnitForFloatWithUnit(
   defaultValue: unknown,
-  unitOptions: readonly string[],
+  unitOptions: readonly string[]
 ): string {
   if (defaultValue !== null && defaultValue !== undefined) {
     const parsed = parseFloatWithUnit(defaultValue, unitOptions);
@@ -169,11 +165,10 @@ export function chooseDisplayUnit(
   rawValue: unknown,
   defaultValue: unknown,
   pendingUnit: string | undefined,
-  unitOptions: readonly string[],
+  unitOptions: readonly string[]
 ): string {
   const canonicalUnit = unitOptions[0] ?? "";
-  const hasValue =
-    rawValue !== null && rawValue !== undefined && rawValue !== "";
+  const hasValue = rawValue !== null && rawValue !== undefined && rawValue !== "";
   if (hasValue) {
     return parseFloatWithUnit(rawValue, unitOptions).unit || canonicalUnit;
   }

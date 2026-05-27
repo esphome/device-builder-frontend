@@ -221,32 +221,22 @@ export class ESPHomeSettingsBuildServer extends LitElement {
               ${pairedAgoSeconds !== null
                 ? html`
                     <dt>
-                      ${this._localize(
-                        "settings.build_server_peer_paired_at_label",
-                      )}
+                      ${this._localize("settings.build_server_peer_paired_at_label")}
                     </dt>
                     <dd>${formatSecondsAgo(pairedAgoSeconds, activeLocale())}</dd>
                   `
                 : nothing}
               ${peer.peer_ip
                 ? html`
-                    <dt>
-                      ${this._localize("settings.build_server_peer_ip_label")}
-                    </dt>
+                    <dt>${this._localize("settings.build_server_peer_ip_label")}</dt>
                     <dd><code>${peer.peer_ip}</code></dd>
                   `
                 : nothing}
-              <dt>
-                ${this._localize(
-                  "settings.build_server_peer_dashboard_id_label",
-                )}
-              </dt>
+              <dt>${this._localize("settings.build_server_peer_dashboard_id_label")}</dt>
               <dd>
                 <code class="peer-dashboard-id">${peer.dashboard_id}</code>
                 <span class="peer-details-desc">
-                  ${this._localize(
-                    "settings.build_server_peer_dashboard_id_desc",
-                  )}
+                  ${this._localize("settings.build_server_peer_dashboard_id_desc")}
                 </span>
               </dd>
             </dl>

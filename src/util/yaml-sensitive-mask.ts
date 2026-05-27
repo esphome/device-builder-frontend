@@ -25,7 +25,12 @@
  */
 
 import { type Range } from "@codemirror/state";
-import { StateEffect, StateField, type EditorState, type Extension } from "@codemirror/state";
+import {
+  StateEffect,
+  StateField,
+  type EditorState,
+  type Extension,
+} from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { findSensitiveValueRanges } from "./yaml-sensitive-scan.js";
 
@@ -36,7 +41,7 @@ const sensitiveMark = Decoration.mark({ class: "cm-esphome-sensitive-value" });
 function computeDecorations(
   state: EditorState,
   revealed: boolean,
-  maskAllValues: boolean,
+  maskAllValues: boolean
 ): DecorationSet {
   if (revealed) return Decoration.none;
   const doc = state.doc;
@@ -62,7 +67,7 @@ function computeDecorations(
 
 export function sensitiveValueMaskExtension(
   initialReveal = false,
-  maskAllValues = false,
+  maskAllValues = false
 ): Extension {
   // Holds the current reveal flag so the field can short-circuit
   // when the user has the toolbar reveal button on.
@@ -91,9 +96,7 @@ export function sensitiveValueMaskExtension(
       computeDecorations(state, state.field(revealedField), maskAllValues),
     update(decos, tr) {
       const revealed = tr.state.field(revealedField);
-      const revealedChanged = tr.effects.some((e) =>
-        e.is(setRevealSensitiveEffect),
-      );
+      const revealedChanged = tr.effects.some((e) => e.is(setRevealSensitiveEffect));
       if (!tr.docChanged && !revealedChanged) {
         return decos.map(tr.changes);
       }

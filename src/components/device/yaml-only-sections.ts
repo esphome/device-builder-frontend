@@ -34,9 +34,6 @@ export const YAML_ONLY_SECTIONS: ReadonlySet<string> = new Set([
 
 /** True when the section should fall back to the YAML notice — either
  *  always-YAML, or the backend returned no schema entries to render. */
-export function isYamlOnlySection(
-  sectionKey: string,
-  entryCount: number,
-): boolean {
+export function isYamlOnlySection(sectionKey: string, entryCount: number): boolean {
   return YAML_ONLY_SECTIONS.has(sectionKey) || entryCount === 0;
 }

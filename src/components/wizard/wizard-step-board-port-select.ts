@@ -204,27 +204,21 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
     }
     if (this.ports.length === 0) {
       return html`
-        <div class="empty">
-          ${this._localize("wizard.connect_your_board_no_ports")}
-        </div>
+        <div class="empty">${this._localize("wizard.connect_your_board_no_ports")}</div>
       `;
     }
     return html`
       <div class="list">
         ${this.ports.map(
           (p) => html`
-            <button
-              type="button"
-              class="option"
-              @click=${() => this._onSelect(p.port)}
-            >
+            <button type="button" class="option" @click=${() => this._onSelect(p.port)}>
               <wa-icon library="mdi" name="serial-port"></wa-icon>
               <div class="info">
                 <span class="title">${p.port}</span>
                 ${p.desc ? html`<span class="desc">${p.desc}</span>` : nothing}
               </div>
             </button>
-          `,
+          `
         )}
       </div>
     `;
@@ -248,7 +242,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
         detail: { port },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 

@@ -1,10 +1,5 @@
 import { consume } from "@lit/context";
-import {
-  mdiChevronLeft,
-  mdiChevronRight,
-  mdiPageFirst,
-  mdiPageLast,
-} from "@mdi/js";
+import { mdiChevronLeft, mdiChevronRight, mdiPageFirst, mdiPageLast } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -60,8 +55,7 @@ export class ESPHomeTablePagination extends LitElement {
         padding: var(--wa-space-m) var(--wa-space-l);
         flex-wrap: wrap;
         gap: var(--wa-space-s);
-        border-top: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
 
       .info {
@@ -119,7 +113,9 @@ export class ESPHomeTablePagination extends LitElement {
         background: var(--wa-color-surface-raised);
         color: var(--wa-color-text-normal);
         cursor: pointer;
-        transition: background 0.12s, border-color 0.12s;
+        transition:
+          background 0.12s,
+          border-color 0.12s;
         padding: 0;
       }
 
@@ -142,7 +138,11 @@ export class ESPHomeTablePagination extends LitElement {
   protected render() {
     return html`
       <div class="pagination">
-        <span class="info">${this._localize("dashboard.pagination_total", { count: this.totalRows })}</span>
+        <span class="info"
+          >${this._localize("dashboard.pagination_total", {
+            count: this.totalRows,
+          })}</span
+        >
         <div class="controls">
           <div class="page-size">
             <span>${this._localize("dashboard.pagination_rows_per_page")}</span>
@@ -151,12 +151,15 @@ export class ESPHomeTablePagination extends LitElement {
                 (size) =>
                   html`<option value=${size} ?selected=${this.pageSize === size}>
                     ${size}
-                  </option>`,
+                  </option>`
               )}
             </select>
           </div>
           <span class="page-info">
-            ${this._localize("dashboard.pagination_page_of", { current: this.pageIndex + 1, total: this.pageCount || 1 })}
+            ${this._localize("dashboard.pagination_page_of", {
+              current: this.pageIndex + 1,
+              total: this.pageCount || 1,
+            })}
           </span>
           <div class="buttons">
             <button
@@ -203,7 +206,7 @@ export class ESPHomeTablePagination extends LitElement {
         detail: Number((e.target as HTMLSelectElement).value),
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -213,7 +216,7 @@ export class ESPHomeTablePagination extends LitElement {
         detail: pageIndex,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

@@ -21,12 +21,7 @@ export class ESPHomeSettingsLanguage extends LitElement {
   @state()
   private _language: LanguageChoice = readStoredLocale() ?? "system";
 
-  static styles = [
-    espHomeStyles,
-    inputStyles,
-    settingsSharedStyles,
-    settingsRowStyles,
-  ];
+  static styles = [espHomeStyles, inputStyles, settingsSharedStyles, settingsRowStyles];
 
   protected render() {
     return html`
@@ -41,7 +36,7 @@ export class ESPHomeSettingsLanguage extends LitElement {
               <wa-option value=${l.value}
                 >${l.flag} ${this._localize(l.labelKey)}</wa-option
               >
-            `,
+            `
           )}
         </wa-select>
       </div>
@@ -56,7 +51,7 @@ export class ESPHomeSettingsLanguage extends LitElement {
         detail: lang,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

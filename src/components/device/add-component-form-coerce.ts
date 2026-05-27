@@ -38,10 +38,7 @@ export function coerceFields(
       continue;
     }
 
-    if (
-      entry.type === ConfigEntryType.INTEGER &&
-      entry.display_format !== "hex"
-    ) {
+    if (entry.type === ConfigEntryType.INTEGER && entry.display_format !== "hex") {
       const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
       if (!Number.isNaN(n)) out[entry.key] = n;
     } else if (entry.type === ConfigEntryType.FLOAT) {

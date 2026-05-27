@@ -1,10 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { DeviceState, JobStatus, JobType } from "../../api/types.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
-import {
-  renderLabelChips,
-  resolveLabelIds,
-} from "../../util/label-chip-template.js";
+import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";
 
 const RECENT_JOB_ICON: Record<JobStatus, string | null> = {
@@ -46,7 +43,7 @@ export function renderLabels(card: ESPHomeDeviceCard): TemplateResult | typeof n
 // fleet) while keeping every other state including "waiting / unknown"
 // visible. (issue #141)
 export function renderEncryptionIcon(
-  card: ESPHomeDeviceCard,
+  card: ESPHomeDeviceCard
 ): TemplateResult | typeof nothing {
   const visual = getCompactEncryptionVisual({
     api_enabled: card.apiEnabled,

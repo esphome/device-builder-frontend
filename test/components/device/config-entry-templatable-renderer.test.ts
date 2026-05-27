@@ -42,7 +42,7 @@ function clickAt(template: unknown, label: "literal" | "lambda") {
   const handlers = clickHandlers(template);
   if (handlers.length < 2) {
     throw new Error(
-      `Expected two click handlers (literal + lambda); got ${handlers.length}`,
+      `Expected two click handlers (literal + lambda); got ${handlers.length}`
     );
   }
   const handler = label === "literal" ? handlers[0] : handlers[1];
@@ -74,20 +74,12 @@ describe("renderTemplatableField", () => {
 
   it("toggling literal → lambda emits a LambdaValue sentinel", () => {
     const emit = vi.fn();
-    const ctx = makeRenderCtx(
-      { field: "hello" },
-      { overrides: { emitChange: emit } },
-    );
+    const ctx = makeRenderCtx({ field: "hello" }, { overrides: { emitChange: emit } });
     const entry = makeEntry(ConfigEntryType.STRING, {
       key: "field",
       templatable: true,
     });
-    const template = renderTemplatableField(
-      entry,
-      ["field"],
-      ctx,
-      () => "<INNER>",
-    );
+    const template = renderTemplatableField(entry, ["field"], ctx, () => "<INNER>");
     clickAt(template, "lambda");
     expect(emit).toHaveBeenCalledTimes(1);
     const [path, value] = emit.mock.calls[0];
@@ -99,18 +91,13 @@ describe("renderTemplatableField", () => {
     const emit = vi.fn();
     const ctx = makeRenderCtx(
       { field: { _lambda: "return 1;" } },
-      { overrides: { emitChange: emit } },
+      { overrides: { emitChange: emit } }
     );
     const entry = makeEntry(ConfigEntryType.STRING, {
       key: "field",
       templatable: true,
     });
-    const template = renderTemplatableField(
-      entry,
-      ["field"],
-      ctx,
-      () => "<INNER>",
-    );
+    const template = renderTemplatableField(entry, ["field"], ctx, () => "<INNER>");
     clickAt(template, "literal");
     expect(emit).toHaveBeenCalledTimes(1);
     const [, value] = emit.mock.calls[0];
@@ -119,20 +106,12 @@ describe("renderTemplatableField", () => {
 
   it("re-clicking the active mode is a no-op (no double-emit)", () => {
     const emit = vi.fn();
-    const ctx = makeRenderCtx(
-      { field: "hello" },
-      { overrides: { emitChange: emit } },
-    );
+    const ctx = makeRenderCtx({ field: "hello" }, { overrides: { emitChange: emit } });
     const entry = makeEntry(ConfigEntryType.STRING, {
       key: "field",
       templatable: true,
     });
-    const template = renderTemplatableField(
-      entry,
-      ["field"],
-      ctx,
-      () => "<INNER>",
-    );
+    const template = renderTemplatableField(entry, ["field"], ctx, () => "<INNER>");
     clickAt(template, "literal");
     expect(emit).not.toHaveBeenCalled();
   });

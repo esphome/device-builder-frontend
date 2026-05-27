@@ -76,7 +76,7 @@ export function dispatchShowLogsAfterInstall(
  */
 export function postInstallShowLogsHandler(
   getLogsDialog: () => ESPHomeLogsDialog,
-  getLocalize: () => LocalizeFunc,
+  getLocalize: () => LocalizeFunc
 ): (e: CustomEvent<PostInstallShowLogsDetail>) => Promise<void> {
   return (e) => handlePostInstallShowLogs(e, getLogsDialog(), getLocalize());
 }
@@ -98,7 +98,7 @@ export function postInstallShowLogsHandler(
 async function openSerialWithRetry(
   port: SerialPort,
   baudRate: number,
-  timeoutMs: number,
+  timeoutMs: number
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   let lastErr: unknown = null;
@@ -129,7 +129,7 @@ async function openSerialWithRetry(
 export async function handlePostInstallShowLogs(
   e: CustomEvent<PostInstallShowLogsDetail>,
   logsDialog: ESPHomeLogsDialog,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
   e.preventDefault();
   const { configuration, name, port, webSerialPort, reopenInstall } = e.detail;

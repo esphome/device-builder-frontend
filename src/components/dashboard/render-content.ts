@@ -10,15 +10,12 @@ import {
   renderSelectToggle,
   renderViewToggle,
 } from "./render-toolbar.js";
-import {
-  DEVICE_SORT_COLLATOR,
-  deviceSortKey,
-} from "../../util/device-sort.js";
+import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export function renderDiscoveredSection(
-  host: ESPHomePageDashboard,
+  host: ESPHomePageDashboard
 ): TemplateResult | string {
   if (host._importableDevices.length === 0) return "";
   // Non-ignored discoveries first, then ignored ones — both
@@ -45,7 +42,7 @@ export function renderDiscoveredSection(
             visible.length === 1
               ? "dashboard.discovered_count_singular"
               : "dashboard.discovered_count_plural",
-            { count: visible.length },
+            { count: visible.length }
           )}</span
         >
         <button
@@ -74,11 +71,7 @@ export function renderDiscoveredSection(
             </button>`
           : ""}
       </header>
-      <div
-        id="discovered-grid"
-        class="discovered-section-grid"
-        ?hidden=${!expanded}
-      >
+      <div id="discovered-grid" class="discovered-section-grid" ?hidden=${!expanded}>
         ${visible.map(
           (device: AdoptableDevice) => html`
             <esphome-discovered-device-card
@@ -87,7 +80,7 @@ export function renderDiscoveredSection(
               @adopt=${() => host._adoptDialog.open(device)}
               @toggle-ignore=${() => host._toggleIgnore(device)}
             ></esphome-discovered-device-card>
-          `,
+          `
         )}
       </div>
     </section>
@@ -96,7 +89,7 @@ export function renderDiscoveredSection(
 
 export function renderCardGrid(
   host: ESPHomePageDashboard,
-  filtered: ConfiguredDevice[],
+  filtered: ConfiguredDevice[]
 ): TemplateResult {
   return html`
     <div class="devices-grid devices-grid--configured">
@@ -155,20 +148,17 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       ?select-mode=${host._selectMode}
       .selectedDevices=${host._selectedDevices}
       .highlightConfiguration=${host._recentlyAdopted}
-      @table-sort-change=${(e: CustomEvent<SortingState>) =>
-        host._saveTablePreference(e)}
+      @table-sort-change=${(e: CustomEvent<SortingState>) => host._saveTablePreference(e)}
       @table-visibility-change=${(e: CustomEvent<VisibilityState>) =>
         host._saveTablePreference(e)}
-      @table-page-size-change=${(e: CustomEvent<number>) =>
-        host._saveTablePreference(e)}
+      @table-page-size-change=${(e: CustomEvent<number>) => host._saveTablePreference(e)}
       @row-click=${(e: CustomEvent<ConfiguredDevice>) =>
         host._toggleDrawerForDevice(e.detail)}
       @show-progress=${(e: CustomEvent<ConfiguredDevice>) =>
         host._showJobProgress(e.detail)}
       @toggle-select=${(e: CustomEvent<string>) => host._toggleDevice(e.detail)}
       @select-all=${(e: CustomEvent<string[]>) => host._addToSelection(e.detail)}
-      @deselect-all=${(e: CustomEvent<string[]>) =>
-        host._removeFromSelection(e.detail)}
+      @deselect-all=${(e: CustomEvent<string[]>) => host._removeFromSelection(e.detail)}
       @edit-device=${(e: CustomEvent<ConfiguredDevice>) => editDevice(e.detail)}
       @update-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "install")}
@@ -192,13 +182,11 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmDeleteSingle(e.detail)}
-      @enter-select-mode=${(e: CustomEvent<string>) =>
-        host._onEnterSelectMode(e.detail)}
+      @enter-select-mode=${(e: CustomEvent<string>) => host._onEnterSelectMode(e.detail)}
     >
       <div slot="toolbar" class="toolbar-stack">
         <div class="toolbar-row">
-          ${renderSearchInput(host)} ${renderViewToggle(host)}
-          ${renderFacets(host)}
+          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         </div>
       </div>
       <div slot="before-columns">${renderSelectToggle(host)}</div>

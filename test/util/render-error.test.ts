@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { nothing } from "lit";
 
-import {
-  renderErrorBanner,
-  renderInlineError,
-} from "../../src/util/render-error.js";
+import { renderErrorBanner, renderInlineError } from "../../src/util/render-error.js";
 
 /**
  * Lit's TemplateResult exposes a ``strings`` array (the static
@@ -55,7 +52,7 @@ describe("renderErrorBanner", () => {
   it("renders a div.field-error[role=alert] wrapping the message", () => {
     const t = asTemplate(renderErrorBanner("connect refused"));
     expect(t.strings.join("")).toMatch(
-      /^<div class="field-error" role="alert">.*<\/div>$/,
+      /^<div class="field-error" role="alert">.*<\/div>$/
     );
     expect(t.values).toEqual(["connect refused"]);
   });

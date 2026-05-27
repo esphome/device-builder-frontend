@@ -92,10 +92,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import { matchesDeviceName } from "../util/device-search.js";
-import {
-  DEVICE_SORT_COLLATOR,
-  deviceSortKey,
-} from "../util/device-sort.js";
+import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -299,7 +296,10 @@ export class ESPHomePageDashboard extends LitElement {
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
-    window.addEventListener("esphome-show-ignored-from-menu", this._onShowIgnoredFromMenu);
+    window.addEventListener(
+      "esphome-show-ignored-from-menu",
+      this._onShowIgnoredFromMenu
+    );
     window.addEventListener("esphome-show-archived-dialog", this._onShowArchivedDialog);
     const pending = consumePendingHighlight();
     if (pending !== null) {
@@ -412,10 +412,7 @@ export class ESPHomePageDashboard extends LitElement {
     // under so an all-ignored / hide-ignored state doesn't leave
     // empty space at the top of the view.
     if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
-      this.toggleAttribute(
-        "has-discovered",
-        this._visibleImportableDevices.length > 0,
-      );
+      this.toggleAttribute("has-discovered", this._visibleImportableDevices.length > 0);
     }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
@@ -517,7 +514,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (this._sortedDevicesCache?.source === source)
       return this._sortedDevicesCache.sorted;
     const sorted = [...source].sort((a, b) =>
-      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b)),
+      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
     );
     this._sortedDevicesCache = { source, sorted };
     return sorted;
@@ -727,7 +724,7 @@ export class ESPHomePageDashboard extends LitElement {
   _openLogs = (device: ConfiguredDevice) => openLogs(this, device);
   _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
-    () => this._localize,
+    () => this._localize
   );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);

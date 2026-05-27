@@ -33,7 +33,7 @@ const collator = new Intl.Collator(undefined, {
 /** Tally a (raw → count) map and turn it into a sorted FacetOption[]. */
 function tallyToFacet(
   counts: Map<string, number>,
-  displayName: (raw: string) => string,
+  displayName: (raw: string) => string
 ): FacetOption[] {
   const entries: FacetOption[] = [];
   for (const [id, count] of counts) {
@@ -44,11 +44,7 @@ function tallyToFacet(
   // break keeps equal-count entries in a predictable order
   // between renders (and matches the order on the device cards /
   // table sort by name).
-  entries.sort(
-    (a, b) =>
-      b.count - a.count ||
-      collator.compare(a.name, b.name),
-  );
+  entries.sort((a, b) => b.count - a.count || collator.compare(a.name, b.name));
   return entries;
 }
 
@@ -72,9 +68,7 @@ export function computeAreaFacet(devices: ConfiguredDevice[]): FacetOption[] {
  *  exactly as-is; the dashboard pill carries the raw stem because
  *  that's what users see in YAML / docs and an aliasing layer
  *  would lie about what the device actually runs. */
-export function computePlatformFacet(
-  devices: ConfiguredDevice[],
-): FacetOption[] {
+export function computePlatformFacet(devices: ConfiguredDevice[]): FacetOption[] {
   const counts = new Map<string, number>();
   for (const d of devices) {
     const platform = d.target_platform?.trim();
@@ -92,7 +86,7 @@ export function computePlatformFacet(
  *  fleet wakes up). */
 export function computeStateFacet(
   devices: ConfiguredDevice[],
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): FacetOption[] {
   const counts = new Map<string, number>();
   // Seed every enum value at zero so a missing bucket still
@@ -111,6 +105,6 @@ export function computeStateFacet(
     [DeviceState.UNKNOWN]: "dashboard.unknown",
   };
   return tallyToFacet(counts, (raw) =>
-    localize(labelKeyByState[raw as DeviceState] ?? "dashboard.unknown"),
+    localize(labelKeyByState[raw as DeviceState] ?? "dashboard.unknown")
   );
 }

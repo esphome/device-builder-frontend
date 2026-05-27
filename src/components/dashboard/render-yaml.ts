@@ -32,7 +32,7 @@ export function highlightMatch(text: string, needle: string): unknown {
 
 export function renderYamlEmptyState(
   localize: LocalizeFunc,
-  messageKey: string,
+  messageKey: string
 ): TemplateResult {
   return html`
     <div class="empty-search">
@@ -45,7 +45,7 @@ export function renderYamlEmptyState(
 function renderSnippetBlock(
   hit: YamlSearchHit,
   block: YamlSnippetBlock,
-  query: string,
+  query: string
 ): TemplateResult {
   const href = yamlSnippetBlockHref(hit, block);
   return html`
@@ -64,7 +64,9 @@ function renderSnippetBlock(
         return html`
           <div class="yaml-snippet-line ${isMatch ? "yaml-snippet-line--match" : ""}">
             <span class="yaml-snippet-gutter">${lineNumber}</span>
-            <span class="yaml-snippet-text">${isMatch ? highlightMatch(text, query) : text}</span>
+            <span class="yaml-snippet-text"
+              >${isMatch ? highlightMatch(text, query) : text}</span
+            >
           </div>
         `;
       })}
@@ -75,7 +77,7 @@ function renderSnippetBlock(
 function renderYamlDeviceTitle(
   configuration: string,
   trailing: TemplateResult | string,
-  body: TemplateResult | string,
+  body: TemplateResult | string
 ): TemplateResult {
   const deviceHref = `/device/${encodeURIComponent(configuration)}`;
   return html`
@@ -99,9 +101,7 @@ function renderYamlDeviceTitle(
   `;
 }
 
-function renderYamlTitleList(
-  devices: ConfiguredDevice[],
-): TemplateResult {
+function renderYamlTitleList(devices: ConfiguredDevice[]): TemplateResult {
   return html`
     <div class="yaml-hits">
       ${devices.map((d) => renderYamlDeviceTitle(d.configuration, "", ""))}
@@ -112,7 +112,7 @@ function renderYamlTitleList(
 function renderYamlHits(
   localize: LocalizeFunc,
   hits: YamlSearchHit[],
-  query: string,
+  query: string
 ): TemplateResult {
   return html`
     <div class="yaml-hits">
@@ -122,14 +122,12 @@ function renderYamlHits(
         const countUnit = localize(
           matchCount === 1
             ? "yaml_search.match_count_singular"
-            : "yaml_search.match_count_plural",
+            : "yaml_search.match_count_plural"
         );
         const trailing = html`<span class="yaml-hit-group-count"
           >${matchCount} ${countUnit}</span
         >`;
-        const body = html`${blocks.map((block) =>
-          renderSnippetBlock(hit, block, query),
-        )}`;
+        const body = html`${blocks.map((block) => renderSnippetBlock(hit, block, query))}`;
         return renderYamlDeviceTitle(yamlHitDeviceLabel(hit), trailing, body);
       })}
     </div>
@@ -148,7 +146,7 @@ export function renderYamlMode(host: ESPHomePageDashboard): TemplateResult {
 export function renderYamlPreviewPivot(
   localize: LocalizeFunc,
   previewCount: number,
-  onPivot: () => void,
+  onPivot: () => void
 ): TemplateResult | string {
   if (previewCount === 0) return "";
   return html`<button class="empty-search-yaml-pivot" @click=${onPivot}>
@@ -157,7 +155,7 @@ export function renderYamlPreviewPivot(
       previewCount === 1
         ? "yaml_search.no_match_yaml_preview"
         : "yaml_search.no_match_yaml_preview_plural",
-      { count: previewCount },
+      { count: previewCount }
     )}
   </button>`;
 }

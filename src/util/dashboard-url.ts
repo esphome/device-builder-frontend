@@ -65,8 +65,7 @@ function toCsv(arr: readonly string[] | undefined): string | undefined {
 export function readDashboardUrl(): DashboardUrlState {
   const p = new URLSearchParams(window.location.search);
   const search = p.get("q") ?? undefined;
-  const view =
-    p.get("view") === "table" ? DashboardView.TABLE : undefined;
+  const view = p.get("view") === "table" ? DashboardView.TABLE : undefined;
   return {
     search: search && search.length > 0 ? search : undefined,
     labels: fromCsv(p.get("labels")),

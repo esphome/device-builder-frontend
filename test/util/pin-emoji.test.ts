@@ -44,9 +44,7 @@ describe("pinSha256ToEmojis", () => {
   it("yields different sequences for different pins", () => {
     const a = pinSha256ToEmojis("deadbeef".repeat(8));
     const b = pinSha256ToEmojis("cafebabe".repeat(8));
-    expect(a.map((s) => s.emoji).join("")).not.toBe(
-      b.map((s) => s.emoji).join(""),
-    );
+    expect(a.map((s) => s.emoji).join("")).not.toBe(b.map((s) => s.emoji).join(""));
   });
 
   it("truncates rather than padding when input is too short for count", () => {
@@ -88,9 +86,7 @@ describe("pinSha256ToEmojis", () => {
     // change, the security UX has changed and both
     // receiver-side and sender-side code paths need a
     // coordinated update — the test forces that conversation.
-    const pin =
-      "8b1a3f5e2c7d9061a4b8c5d2e3f47ab1" +
-      "0c5d6e7f8a9b1c2d3e4f5a6b7c8d9e0f";
+    const pin = "8b1a3f5e2c7d9061a4b8c5d2e3f47ab1" + "0c5d6e7f8a9b1c2d3e4f5a6b7c8d9e0f";
     const emojis = pinSha256ToEmojis(pin);
     expect(emojis.map((s) => s.name)).toEqual([
       "Wrench",

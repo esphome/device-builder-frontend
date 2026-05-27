@@ -18,10 +18,7 @@ import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types.js";
 import { renderLambdaField } from "../../../src/components/device/config-entry-renderers/lambda.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
-import {
-  findTemplatesByAnchor,
-  isTemplateResult,
-} from "../../_lit-template-walker.js";
+import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";
 import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 
 function getEditorBindings(template: unknown): Record<string, unknown> {
@@ -87,7 +84,7 @@ describe("renderLambdaField change handler", () => {
     const handler = b["@lambda-change"];
     expect(typeof handler).toBe("function");
     (handler as (e: CustomEvent<{ value: string }>) => void)(
-      new CustomEvent("lambda-change", { detail: { value: "return 7;" } }),
+      new CustomEvent("lambda-change", { detail: { value: "return 7;" } })
     );
     expect(emit).toHaveBeenCalledTimes(1);
     const [path, value] = emit.mock.calls[0];

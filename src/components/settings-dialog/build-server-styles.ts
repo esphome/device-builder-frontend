@@ -139,8 +139,7 @@ export const cleanupTtlStyles = css`
   .cleanup-ttl-number:focus {
     outline: none;
     border-color: var(--esphome-primary);
-    box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 80%);
   }
 
   .cleanup-ttl-unit {
