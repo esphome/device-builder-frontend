@@ -19,9 +19,9 @@
  * abstraction would muddy both.
  */
 import { consume } from "@lit/context";
-import { mdiCheck, mdiClose, mdiMinus } from "@mdi/js";
+import { mdiCheck, mdiMinus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types.js";
@@ -31,14 +31,13 @@ import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js"
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyles, renderLabelChip } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import "../base-dialog.js";
 import { labelsListStyles } from "./labels-list-styles.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   check: mdiCheck,
-  close: mdiClose,
   minus: mdiMinus,
 });
 
@@ -67,6 +66,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   @property({ attribute: false })
   devices: ConfiguredDevice[] = [];
 
+  /** Reactive ``open`` flag bound to ``<esphome-base-dialog>``.
+   *  Imperative ``open()`` flips this to true; ``@after-hide``
+   *  flips it back to false after any dismiss path. */
+  @state()
+  private _open = false;
+
   /** Per-label explicit user transitions. Absence means "leave
    *  derived state as-is on Apply" (no change to any device). */
   @state()
@@ -77,29 +82,35 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
 
   /** Set of configurations the previous Apply failed on. Null
    *  means "no prior failure; target the full selection."
-   *  Non-null means the dialog stays open after a partial failure
-   *  and the next Apply targets only this subset, avoiding a
-   *  redundant write to devices that already succeeded. Reset
-   *  on ``open()`` and on a fully-successful Apply. */
+   *  Non-null narrows the next Apply to only this subset so a
+   *  retry doesn't re-write devices that already succeeded.
+   *  Reset on ``open()``, on a fully-successful Apply, and on
+   *  any new ``_onToggle`` (a fresh edit expresses new intent,
+   *  not a retry). */
   @state()
   private _failedConfigurations: Set<string> | null = null;
 
-  @query("wa-dialog")
-  private _dialog?: HTMLElement & { open: boolean };
-
-  /** Open the dialog. Resets pending changes to the empty map so a
-   *  previous session's state doesn't leak. */
+  /** Open the dialog. Resets per-session state so a previous
+   *  session's pending changes or retry-narrow don't leak. */
   open() {
     this._pendingChanges = new Map();
     this._failedConfigurations = null;
-    if (this._dialog) this._dialog.open = true;
+    this._open = true;
   }
 
   // Arrow property so the Cancel button's ``@click=${this.close}``
   // captures a bound reference; a plain method would lose ``this``
-  // when Lit re-dispatches the event and break the dialog dismiss.
+  // when Lit re-dispatches the event.
   close = () => {
-    if (this._dialog) this._dialog.open = false;
+    this._open = false;
+  };
+
+  /** ``<esphome-base-dialog>`` re-emits ``after-hide`` for every
+   *  dismissal path (Esc / outside-click / X / reactive ``?open``
+   *  flip). Keep our local flag in sync so the next render's
+   *  ``?open`` matches the wrapper's state. */
+  private _onAfterHide = () => {
+    this._open = false;
   };
 
   /** Per-label count of selected devices that carry that label,
@@ -147,11 +158,9 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
    *    only the configs that failed last Apply (avoids re-writing
    *    devices that already succeeded).
    *  - The diff filter drops devices whose resulting labels set is
-   *    byte-identical to their current ``device.labels`` (avoids
-   *    no-op writes on the FIRST Apply too — e.g. user toggles a
-   *    label that's already at the value the toggle would set
-   *    across some subset of selected devices). Also makes the
-   *    success-toast count reflect actual changes.
+   *    byte-identical to their current ``device.labels`` so no-op
+   *    writes don't go on the wire (also makes the success-toast
+   *    count reflect actual changes).
    *
    *  Exposed (not just inlined into ``_apply``) so the test suite
    *  can drive selection state and assert the resulting payload
@@ -189,40 +198,41 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         display: contents;
       }
 
-      wa-dialog {
+      esphome-base-dialog {
         --width: min(480px, 92vw);
       }
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l) var(--wa-space-m);
       }
 
-      wa-dialog::part(footer) {
-        padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
-        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
       /* Cap the list height so the dialog fits short mobile
-         viewports without clipping the footer slot. Adds to
-         labelsListStyles which leaves height to the consumer. */
+         viewports without clipping the inline actions row. */
       .options {
         max-height: 60vh;
       }
 
-      .footer {
+      /* Inline action row at the end of the body — the project
+         convention (see base-dialog.ts docstring); the wrapper
+         doesn't expose a footer slot. Border-top + padding-top
+         visually separate the actions from the picker above. */
+      .actions {
         display: flex;
         justify-content: flex-end;
         gap: var(--wa-space-s);
+        margin-top: var(--wa-space-m);
+        padding-top: var(--wa-space-m);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
 
       /* Icon-text alignment + ≥ 44 px tap target on the action
@@ -248,10 +258,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         ? "dashboard.labels_bulk_dialog_title_one"
         : "dashboard.labels_bulk_dialog_title_other";
     return html`
-      <wa-dialog
-        label=${this._localize(titleKey, { count: this.devices.length })}
-        ?light-dismiss=${!this._saving}
-        @wa-request-close=${this._onRequestClose}
+      <esphome-base-dialog
+        ?open=${this._open}
+        ?busy=${this._saving}
+        .label=${this._localize(titleKey, { count: this.devices.length })}
+        @after-hide=${this._onAfterHide}
       >
         ${this._catalog.length === 0
           ? html`<div class="option-empty" role="status">
@@ -264,7 +275,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
             >
               ${this._catalog.map((label) => this._renderOption(label))}
             </div>`}
-        <div class="footer" slot="footer">
+        <div class="actions">
           <button
             class="btn btn--cancel"
             type="button"
@@ -282,7 +293,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
             ${this._localize("dashboard.labels_bulk_apply")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -344,17 +355,6 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // succeeded last time would silently miss the new transition.
     this._failedConfigurations = null;
   }
-
-  /** Block Esc / X / backdrop while a save is in flight so an
-   *  in-flight set_labels_bulk write can't be orphaned by a stray
-   *  dismissal. Mirrors the pattern used by onboarding-wifi-dialog
-   *  and adopt-dialog. The footer's disabled Cancel button covers
-   *  the explicit dismiss path; this covers the implicit ones. */
-  private _onRequestClose = (e: Event) => {
-    if (this._saving) {
-      e.preventDefault();
-    }
-  };
 
   private _apply = async () => {
     // Re-entrancy guard: a quick double-click on Apply could fire

@@ -17,6 +17,7 @@ interface DialogView {
   devices: ESPHomeBulkLabelsDialog["devices"];
   _pendingChanges: Map<string, "checked" | "unchecked">;
   _saving: boolean;
+  _open: boolean;
   _failedConfigurations: Set<string> | null;
   _api: ESPHomeAPI | undefined;
   effectiveState: ESPHomeBulkLabelsDialog["effectiveState"];
@@ -32,8 +33,9 @@ function makeDialog(): DialogView {
 
 /** Build a dialog with a stubbed ``_api`` whose ``setDeviceLabelsBulk``
  *  returns whatever the test passes in (a result list or a thrown
- *  error). Centralises the boilerplate so the three ``_apply`` branch
- *  tests below stay focused on their toast / state assertions. */
+ *  error). Centralises the boilerplate so the branch tests stay
+ *  focused on their toast / state assertions. ``_open`` is seeded
+ *  true so close-via-_open-flag assertions are observable. */
 function makeMockedDialog(
   setDeviceLabelsBulkImpl: (
     updates: Array<{ configuration: string; labelIds: string[] }>
@@ -45,9 +47,7 @@ function makeMockedDialog(
   dialog._api = {
     setDeviceLabelsBulk: vi.fn(setDeviceLabelsBulkImpl),
   } as unknown as ESPHomeAPI;
-  // Stub close() so the @query("wa-dialog") miss doesn't crash on
-  // the bare instance (we're not mounted).
-  dialog.close = vi.fn();
+  dialog._open = true;
   return dialog;
 }
 
@@ -237,7 +237,7 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
 
     expect(successSpy).toHaveBeenCalledTimes(1);
     expect(errorSpy).not.toHaveBeenCalled();
-    expect(dialog.close).toHaveBeenCalledTimes(1);
+    expect(dialog._open).toBe(false);
     expect(dialog._saving).toBe(false);
   });
 
@@ -267,7 +267,7 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
 
     expect(successSpy).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledTimes(1);
-    expect(dialog.close).not.toHaveBeenCalled();
+    expect(dialog._open).toBe(true);
     expect(dialog._saving).toBe(false);
   });
 
@@ -396,29 +396,6 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     ).toHaveBeenCalledTimes(1);
   });
 
-  test("_onRequestClose vetoes dismissal while _saving is true", () => {
-    // Esc / X / backdrop-click all surface through ``wa-request-close``;
-    // the handler must call preventDefault() to block them mid-save
-    // so the in-flight set_labels_bulk write isn't orphaned.
-    const dialog = makeMockedDialog(
-      async (updates) =>
-        updates.map((u) => ({ configuration: u.configuration, success: true })),
-      [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]
-    );
-
-    const event = new Event("wa-request-close", { cancelable: true });
-    dialog._saving = true;
-    (dialog as unknown as { _onRequestClose: (e: Event) => void })._onRequestClose(event);
-    expect(event.defaultPrevented).toBe(true);
-
-    const idleEvent = new Event("wa-request-close", { cancelable: true });
-    dialog._saving = false;
-    (dialog as unknown as { _onRequestClose: (e: Event) => void })._onRequestClose(
-      idleEvent
-    );
-    expect(idleEvent.defaultPrevented).toBe(false);
-  });
-
   test("transport-failure: bulk-failure i18n key fires, dialog stays open", async () => {
     // Pin the fix that swapped ``labels_save_failed`` (single-
     // device wording) for the bulk-specific key on the catch path.
@@ -439,7 +416,7 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(errorSpy).toHaveBeenCalledTimes(1);
     // The dialog does NOT close on transport failure (so the user
     // can retry without losing their tri-state edits).
-    expect(dialog.close).not.toHaveBeenCalled();
+    expect(dialog._open).toBe(true);
     expect(dialog._saving).toBe(false);
   });
 });
