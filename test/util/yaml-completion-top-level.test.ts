@@ -1,10 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompletionContext } from "@codemirror/autocomplete";
 import { EditorState } from "@codemirror/state";
-import {
-  ComponentCategory,
-  type ComponentCatalogEntry,
-} from "../../src/api/types.js";
+import { ComponentCategory, type ComponentCatalogEntry } from "../../src/api/types.js";
 import { _resetSchemaCacheForTests } from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
@@ -14,26 +11,12 @@ import {
   matchValuePosition,
   platformValueCompletion,
 } from "../../src/util/yaml-completion.js";
+import { makeComponentEntry } from "./_make-component-entry.js";
 
 type CatalogIndex = Parameters<typeof buildTopLevelCompletions>[0];
 
-function entry(
-  id: string,
-  category: ComponentCategory,
-): ComponentCatalogEntry {
-  return {
-    id,
-    name: id,
-    description: "",
-    category,
-    docs_url: "",
-    image_url: "",
-    dependencies: [],
-    multi_conf: false,
-    supported_platforms: [],
-    config_entries: [],
-  };
-}
+const entry = (id: string, category: ComponentCategory) =>
+  makeComponentEntry(id, { category });
 
 function catalog(entries: ComponentCatalogEntry[]): CatalogIndex {
   const byId = new Map<string, ComponentCatalogEntry>();
@@ -167,9 +150,7 @@ describe("resolveAvailableEntries (platform-merged)", () => {
     // walker pulls ``platform`` as ``parent.key``; the AST
     // supplies the real top-level block ``binary_sensor``. The
     // catalog keys this implementation as ``binary_sensor.template``.
-    const { resolveAvailableEntries } = await import(
-      "../../src/util/yaml-completion.js"
-    );
+    const { resolveAvailableEntries } = await import("../../src/util/yaml-completion.js");
     const platformEntry: ComponentCatalogEntry = {
       ...entry("binary_sensor.template", ComponentCategory.BINARY_SENSOR),
       config_entries: [
@@ -202,7 +183,7 @@ describe("resolveAvailableEntries (platform-merged)", () => {
       c,
       "platform", // parentKey from indent walker
       "template", // platformValue from sibling
-      "binary_sensor", // topLevelKey from AST
+      "binary_sensor" // topLevelKey from AST
     );
     expect(out.map((e: { key: string }) => e.key)).toContain("name");
   });
@@ -237,16 +218,14 @@ describe("platformValueCompletion", () => {
     // legacy ``getPlatformNames`` which yielded each entry as
     // the bare component name.
     const c = platformValueCompletion(
-      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR),
+      entry("binary_sensor.gpio", ComponentCategory.BINARY_SENSOR)
     );
     expect(c.label).toBe("gpio");
     expect(c.detail).toBe(ComponentCategory.BINARY_SENSOR);
   });
 
   it("leaves non-dotted ids alone (for safety)", () => {
-    const c = platformValueCompletion(
-      entry("plain", ComponentCategory.MISC),
-    );
+    const c = platformValueCompletion(entry("plain", ComponentCategory.MISC));
     expect(c.label).toBe("plain");
   });
 });
@@ -316,7 +295,7 @@ describe("createYamlCompletionSource (auto-fire at value position)", () => {
                 },
               },
             }),
-            { status: 200 },
+            { status: 200 }
           );
         }
         if (url.includes("sensor.json")) {
@@ -342,11 +321,11 @@ describe("createYamlCompletionSource (auto-fire at value position)", () => {
                 },
               },
             }),
-            { status: 200 },
+            { status: 200 }
           );
         }
         throw new Error(`unexpected fetch: ${url}`);
-      }),
+      })
     );
   });
 

@@ -30,10 +30,8 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  type ValidationError,
-} from "../../util/config-validation.js";
-import { filterRenderable } from "./config-entry-render-filter.js";
+import { type ValidationError } from "../../util/config-validation.js";
+import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -60,8 +58,11 @@ import {
   renderSelectField,
   renderStringField,
   renderTextareaField,
+  renderTimePeriodField,
   type RenderCtx,
 } from "./config-entry-renderers.js";
+import { renderLambdaField } from "./config-entry-renderers/lambda.js";
+import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
@@ -173,7 +174,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _filterRenderable = (
     entries: ConfigEntry[],
-    values: Record<string, unknown>,
+    values: Record<string, unknown>
   ): ConfigEntry[] =>
     filterRenderable(entries, values, {
       requiredOnly: this.requiredOnly,
@@ -190,7 +191,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     // the component itself is the map. Pass ``[]`` so the entry's
     // renderer sees the values dict directly via ``ctx.getAt([])``.
     return html`${visible.map((entry) =>
-      this._renderEntry(entry, entry.key ? [entry.key] : [], ctx),
+      this._renderEntry(entry, entry.key ? [entry.key] : [], ctx)
     )}`;
   }
 
@@ -228,9 +229,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   private async _syncSelectValues() {
     if (!this.shadowRoot) return;
-    const fields = this.shadowRoot.querySelectorAll<HTMLElement>(
-      "[data-field-key]",
-    );
+    const fields = this.shadowRoot.querySelectorAll<HTMLElement>("[data-field-key]");
     for (const field of fields) {
       const select = field.querySelector("wa-select") as
         | (HTMLElement & {
@@ -279,8 +278,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // binding instead.
       if (!isPrimitiveOrNullish(value)) {
         const current = Array.isArray(select.value)
-          ? select.value[0] ?? ""
-          : select.value ?? "";
+          ? (select.value[0] ?? "")
+          : (select.value ?? "");
         if (current !== "") select.value = "";
         continue;
       }
@@ -299,19 +298,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // i2c bus on ESP32-C3 lands on the right option instead of
       // showing an empty select.
       const options = Array.from(
-        select.querySelectorAll<HTMLElement & { value: string }>("wa-option"),
+        select.querySelectorAll<HTMLElement & { value: string }>("wa-option")
       );
       const rawGpio = raw.match(/^\s*(?:GPIO)?(\d+)\s*$/i)?.[1];
       const findByValue = (v: string) =>
         options.find((o) => o.value?.toLowerCase() === v.toLowerCase());
       const matched = raw
-        ? (findByValue(raw) ??
-            (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
+        ? (findByValue(raw) ?? (rawGpio ? findByValue(`GPIO${rawGpio}`) : undefined))
         : null;
       const desired = matched?.value ?? raw;
       const current = Array.isArray(select.value)
-        ? select.value[0] ?? ""
-        : select.value ?? "";
+        ? (select.value[0] ?? "")
+        : (select.value ?? "");
       if (current !== desired) {
         select.value = desired;
       }
@@ -329,7 +327,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     select: HTMLElement & {
       value: string | string[] | null;
       updateComplete?: Promise<unknown>;
-    },
+    }
   ) {
     if (select.updateComplete) {
       try {
@@ -338,14 +336,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
         // ignore
       }
     }
-    const selectedOption = select.querySelector<
-      HTMLElement & { value: string }
-    >("wa-option[selected]");
+    const selectedOption = select.querySelector<HTMLElement & { value: string }>(
+      "wa-option[selected]"
+    );
     const desired = selectedOption?.value ?? "";
     if (!desired) return;
     const current = Array.isArray(select.value)
-      ? select.value[0] ?? ""
-      : select.value ?? "";
+      ? (select.value[0] ?? "")
+      : (select.value ?? "");
     if (current !== desired) {
       select.value = desired;
     }
@@ -367,15 +365,13 @@ export class ESPHomeConfigEntryForm extends LitElement {
       console.error(
         "esphome-config-entry-form: render failed for entry",
         { key: entry.key, type: entry.type, path },
-        err,
+        err
       );
       const message = err instanceof Error ? err.message : String(err);
       return html`<div class="render-error" role="alert">
         <wa-icon library="mdi" name="alert-circle-outline"></wa-icon>
         <div>
-          <strong>
-            ${this._localize("device.entry_render_error_title")}
-          </strong>
+          <strong> ${this._localize("device.entry_render_error_title")} </strong>
           <code class="render-error-key"
             >${entry.key || "(empty key)"} · ${entry.type}</code
           >
@@ -388,8 +384,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _renderEntryUnsafe(
     entry: ConfigEntry,
     path: string[],
-    ctx: RenderCtx,
-  ) {
+    ctx: RenderCtx
+  ): unknown {
+    // Templatable wrapper pre-empts the type switch for any leaf
+    // entry that accepts a literal-or-lambda value. Structural
+    // types (NESTED / MAP / DIVIDER / LABEL / ALERT) opt out — a
+    // toggle on a group or annotation isn't a coherent control.
+    // The wrapper recurses by calling the inner renderer through
+    // a thunk so we don't need to duplicate the type switch here.
+    if (entry.templatable && !_isStructuralType(entry.type)) {
+      return renderTemplatableField(entry, path, ctx, () =>
+        this._renderEntryLeaf(entry, path, ctx)
+      );
+    }
+    return this._renderEntryLeaf(entry, path, ctx);
+  }
+
+  private _renderEntryLeaf(entry: ConfigEntry, path: string[], ctx: RenderCtx): unknown {
     if (entry.type === ConfigEntryType.DIVIDER) {
       return html`<wa-divider></wa-divider>`;
     }
@@ -437,6 +448,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
         return renderNumberField(entry, path, ctx);
       case ConfigEntryType.FLOAT_WITH_UNIT:
         return renderFloatWithUnitField(entry, path, ctx);
+      case ConfigEntryType.TIME_PERIOD:
+        return renderTimePeriodField(entry, path, ctx);
       case ConfigEntryType.PIN:
         return renderPinField(entry, path, ctx);
       case ConfigEntryType.COLOR:
@@ -444,10 +457,24 @@ export class ESPHomeConfigEntryForm extends LitElement {
       case ConfigEntryType.MAC_ADDRESS:
         return renderStringField(entry, "text", path, ctx);
       case ConfigEntryType.LAMBDA:
+        return renderLambdaField(entry, path, ctx);
       case ConfigEntryType.JSON:
         return renderTextareaField(entry, path, ctx);
       case ConfigEntryType.ICON:
         return renderIconField(entry, path, ctx);
+      case ConfigEntryType.TRIGGER:
+        // Schema-extraction normally strips ``then:`` from
+        // ``config_entries`` so a TRIGGER never reaches here; a
+        // surfaced one means the recursive action list is meant to
+        // be edited via the automation editor tree, not as a form
+        // field. Render a disabled placeholder so the user is told
+        // why the field is inert.
+        return html`<div class="field" data-field-key=${path.join(".")}>
+          ${labelFor(entry, ctx)}
+          <p class="trigger-placeholder" role="status">
+            ${ctx.localize("device.automation_trigger_field_placeholder")}
+          </p>
+        </div>`;
       default:
         return renderStringField(entry, "text", path, ctx);
     }
@@ -494,6 +521,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       clearEditingMagnitude: (path) => {
         this._editingMagnitudes.delete(path.join("."));
       },
+      // Stable object identity for renderer-local WeakMap stashes
+      // (templatable literal/lambda recovery, currently). The host
+      // element survives the per-render ctx rebuild so it's the
+      // right key to hang cross-render scratch state on.
+      stashOwner: this,
       // Self-reference: assigned after object creation so the inner
       // renderer can recurse through the dispatch.
       renderEntry: () => nothing,
@@ -517,7 +549,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         detail: { path, value },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -560,7 +592,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         detail: { domain },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

@@ -10,11 +10,7 @@
  */
 import { parser as yamlParser } from "@lezer/yaml";
 import { cppLanguage } from "@codemirror/lang-cpp";
-import {
-  LRLanguage,
-  LanguageSupport,
-  indentService,
-} from "@codemirror/language";
+import { LRLanguage, LanguageSupport, indentService } from "@codemirror/language";
 import { parseMixed } from "@lezer/common";
 import type { SyntaxNodeRef, Input } from "@lezer/common";
 

@@ -21,10 +21,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 type Globals = Record<string, unknown>;
 
-function setGlobals(opts: {
-  scriptSrc?: string;
-  pathname?: string;
-}): void {
+function setGlobals(opts: { scriptSrc?: string; pathname?: string }): void {
   const g = globalThis as Globals;
   // Fake HTMLScriptElement so the ``script instanceof HTMLScriptElement``
   // guard in ``base-path.ts`` doesn't throw on the missing constructor.
@@ -76,8 +73,7 @@ describe("BASE_PATH derivation", () => {
 
   it("derives the HA ingress prefix from the entry script URL", async () => {
     setGlobals({
-      scriptSrc:
-        "http://homeassistant.local:8123/api/hassio_ingress/TOKEN/app.abc123.js",
+      scriptSrc: "http://homeassistant.local:8123/api/hassio_ingress/TOKEN/app.abc123.js",
     });
     const { BASE_PATH } = await loadModule();
     expect(BASE_PATH).toBe("/api/hassio_ingress/TOKEN/");
@@ -123,7 +119,7 @@ describe("withBase", () => {
     expect(withBase("/")).toBe("/api/hassio_ingress/T/");
     expect(withBase("/dashboard")).toBe("/api/hassio_ingress/T/dashboard");
     expect(withBase("/assets/logo/esphome.svg")).toBe(
-      "/api/hassio_ingress/T/assets/logo/esphome.svg",
+      "/api/hassio_ingress/T/assets/logo/esphome.svg"
     );
   });
 

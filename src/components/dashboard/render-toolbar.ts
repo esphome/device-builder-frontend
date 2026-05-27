@@ -174,19 +174,30 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
       name=${host._yamlMode ? "code-braces" : "magnify"}
       aria-hidden="true"
     ></wa-icon>
-    <input
-      class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
-      type="search"
-      with-clear
+    <form
+      role="search"
       autocomplete="off"
-      placeholder=${placeholder}
-      .value=${host._search}
-      @input=${(e: Event) => {
-        host._search = (e.currentTarget as HTMLInputElement).value;
-        host._syncYamlSearch();
-      }}
-      @keydown=${host._onSearchKeyDown}
-    />
+      class="search-form"
+      @submit=${(e: SubmitEvent) => e.preventDefault()}
+    >
+      <input
+        class="search-input ${host._yamlMode ? "search-input--yaml" : ""}"
+        type="search"
+        name="q"
+        autocomplete="off"
+        autocorrect="off"
+        autocapitalize="off"
+        spellcheck="false"
+        aria-label=${placeholder}
+        placeholder=${placeholder}
+        .value=${host._search}
+        @input=${(e: Event) => {
+          host._search = (e.currentTarget as HTMLInputElement).value;
+          host._syncYamlSearch();
+        }}
+        @keydown=${host._onSearchKeyDown}
+      />
+    </form>
   </div>`;
 }
 
@@ -209,14 +220,11 @@ export function renderToolbar(
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)}
-        ${renderFacets(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         <span class="toolbar-spacer"></span>
         ${renderSelectToggle(host)}
       </div>
-      <span class="device-count"
-        ><strong>${matchCount}</strong> ${unit}${suffix}</span
-      >
+      <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
     </div>
   `;
 }
@@ -232,8 +240,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)}
-        ${renderFacets(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         <span class="toolbar-spacer"></span>
       </div>
       ${matchCount !== null
@@ -248,7 +255,7 @@ export function renderNoResultsExtras(host: ESPHomePageDashboard): TemplateResul
   return html`
     ${hasSearch
       ? renderYamlPreviewPivot(host._localize, host._yamlPreviewCount, () =>
-          host._setSearchMode(true),
+          host._setSearchMode(true)
         )
       : ""}
     <button class="empty-search-clear" @click=${host._clearAllFilters}>

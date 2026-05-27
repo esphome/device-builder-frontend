@@ -37,7 +37,7 @@ describe("parsePinGpio", () => {
         number: 0,
         mode: { input: true, pullup: true },
         inverted: true,
-      }),
+      })
     ).toBe(0);
     expect(parsePinGpio({ number: 13 })).toBe(13);
     expect(parsePinGpio({ number: "GPIO4" })).toBe(4);
@@ -75,7 +75,7 @@ describe("renderPinField wa-select binding", () => {
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
       ["pin"],
-      ctx,
+      ctx
     );
 
     const selects = findTemplatesByAnchor(result, "<wa-select");
@@ -89,7 +89,7 @@ describe("renderPinField wa-select binding", () => {
     const staticParts = tag.strings.join("§");
     expect(
       /\bdata-no-value-sync\b/.test(staticParts),
-      "wa-select must carry data-no-value-sync to opt out of _syncSelectValues",
+      "wa-select must carry data-no-value-sync to opt out of _syncSelectValues"
     ).toBe(true);
 
     // Pin the inverse: don't bind ``.value=`` on the parent. The
@@ -100,7 +100,7 @@ describe("renderPinField wa-select binding", () => {
     const bindings = extractAttributeBindings(tag);
     expect(
       ".value" in bindings,
-      "wa-select must not have a property binding to .value alongside data-no-value-sync",
+      "wa-select must not have a property binding to .value alongside data-no-value-sync"
     ).toBe(false);
   });
 });
@@ -151,7 +151,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: null,
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     expect(findTemplatesByAnchor(result, "<button").length).toBe(0);
   });
@@ -165,7 +165,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const toggles = findTemplatesByAnchor(result, "<button");
     expect(toggles.length, "Advanced toggle button must render").toBe(1);
@@ -180,7 +180,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
     const openSet = new Set<string>(["pin:pin-advanced"]);
     const ctx = makeRenderCtx(
       { pin: { number: "GPIO5" } },
-      { overrides: { nestedOpenSections: openSet } },
+      { overrides: { nestedOpenSections: openSet } }
     );
     const children = makeLongFormChildren();
     renderPinField(
@@ -190,20 +190,14 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: children,
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     // ``mode`` and ``inverted`` both rendered, each at its nested
     // path under the pin field. Order-sensitive — ``mode`` first
     // matches the catalog's emission order, which the form's
     // tab-order convention follows.
-    expect(ctx.renderEntry).toHaveBeenNthCalledWith(1, children[0], [
-      "pin",
-      "mode",
-    ]);
-    expect(ctx.renderEntry).toHaveBeenNthCalledWith(2, children[1], [
-      "pin",
-      "inverted",
-    ]);
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(1, children[0], ["pin", "mode"]);
+    expect(ctx.renderEntry).toHaveBeenNthCalledWith(2, children[1], ["pin", "inverted"]);
   });
 
   it("promotes the pin value to long form when the user opens Advanced", () => {
@@ -220,7 +214,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const toggle = findTemplatesByAnchor(result, "<button")[0];
     const onClick = extractAttributeBindings(toggle)["@click"] as () => void;
@@ -246,7 +240,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const toggle = findTemplatesByAnchor(result, "<button")[0];
     const onClick = extractAttributeBindings(toggle)["@click"] as () => void;
@@ -274,12 +268,10 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const select = findTemplatesByAnchor(result, "<wa-select")[0];
-    const onChange = extractAttributeBindings(select)["@change"] as (
-      e: Event,
-    ) => void;
+    const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
     // Synthesise the pick event the way wa-select dispatches it.
     onChange({ target: { value: "GPIO12" } } as never);
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "number"], "GPIO12");
@@ -299,12 +291,10 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const select = findTemplatesByAnchor(result, "<wa-select")[0];
-    const onChange = extractAttributeBindings(select)["@change"] as (
-      e: Event,
-    ) => void;
+    const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
     onChange({ target: { value: "GPIO12" } } as never);
     expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "GPIO12");
   });
@@ -316,10 +306,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
     // open the disclosure on a locked field, and the click handler
     // would fire the promotion ``emitChange`` and rewrite the
     // locked value.
-    const ctx = makeRenderCtx(
-      { pin: 5 },
-      { overrides: { disabled: true } },
-    );
+    const ctx = makeRenderCtx({ pin: 5 }, { overrides: { disabled: true } });
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
         key: "pin",
@@ -327,16 +314,16 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const toggle = findTemplatesByAnchor(result, "<button")[0];
     const bindings = extractAttributeBindings(toggle);
     expect(
       "?disabled" in bindings,
-      "Advanced toggle must carry a ?disabled binding",
+      "Advanced toggle must carry a ?disabled binding"
     ).toBe(true);
     expect(bindings["?disabled"], "binding must reflect the field-disabled state").toBe(
-      true,
+      true
     );
   });
 
@@ -345,10 +332,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
     // handler is still wired (the framework / accessibility tooling
     // / a synthetic event from a test could fire it). Confirm the
     // handler short-circuits before mutating state.
-    const ctx = makeRenderCtx(
-      { pin: "GPIO5" },
-      { overrides: { disabled: true } },
-    );
+    const ctx = makeRenderCtx({ pin: "GPIO5" }, { overrides: { disabled: true } });
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
         key: "pin",
@@ -356,7 +340,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     const toggle = findTemplatesByAnchor(result, "<button")[0];
     const onClick = extractAttributeBindings(toggle)["@click"] as () => void;
@@ -372,9 +356,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
     // filter here would let the long-form disclosure leak fields
     // the catalog has marked advanced or gated by platform.
     const openSet = new Set<string>(["pin:pin-advanced"]);
-    const filterMock = vi.fn(
-      (entries: ConfigEntry[]) => entries.slice(0, 1),
-    );
+    const filterMock = vi.fn((entries: ConfigEntry[]) => entries.slice(0, 1));
     const ctx = makeRenderCtx(
       { pin: { number: "GPIO5" } },
       {
@@ -382,7 +364,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
           nestedOpenSections: openSet,
           filterRenderable: filterMock as never,
         },
-      },
+      }
     );
     const children = makeLongFormChildren();
     renderPinField(
@@ -392,7 +374,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: children,
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     // Filter received the full children list; only the survivor
     // (the first child) gets handed to renderEntry. A regression
@@ -412,7 +394,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
     const filterMock = vi.fn(() => [] as ConfigEntry[]);
     const ctx = makeRenderCtx(
       { pin: 0 },
-      { overrides: { filterRenderable: filterMock as never } },
+      { overrides: { filterRenderable: filterMock as never } }
     );
     const result = renderPinField(
       makeEntry(ConfigEntryType.PIN, {
@@ -421,7 +403,7 @@ describe("renderPinField long-form Advanced disclosure", () => {
         config_entries: makeLongFormChildren(),
       }),
       ["pin"],
-      ctx,
+      ctx
     );
     expect(findTemplatesByAnchor(result, "<button").length).toBe(0);
   });

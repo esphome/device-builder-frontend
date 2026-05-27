@@ -1,11 +1,4 @@
-import {
-  afterEach,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
 import { JobType } from "../../src/api/types.js";
@@ -67,8 +60,11 @@ describe("ESPHomeAPI — connection", () => {
   });
 
   it("upgrades to wss:// when the page is https", async () => {
-    (globalThis as unknown as { window: { location: { protocol: string; host: string } } }).window =
-      { location: { protocol: "https:", host: "example.test" } };
+    (
+      globalThis as unknown as {
+        window: { location: { protocol: string; host: string } };
+      }
+    ).window = { location: { protocol: "https:", host: "example.test" } };
     const api = new ESPHomeAPI();
     const pending = api.connect();
     const ws = MockWebSocket.latest();
@@ -197,9 +193,7 @@ describe("ESPHomeAPI — sendCommand", () => {
 
   it("throws when the socket is not open", async () => {
     const api = new ESPHomeAPI();
-    await expect(api.sendCommand("ping")).rejects.toThrow(
-      /not connected/,
-    );
+    await expect(api.sendCommand("ping")).rejects.toThrow(/not connected/);
   });
 
   it("assigns sequential message_ids", async () => {
@@ -236,7 +230,7 @@ describe("ESPHomeAPI — cloneDevice", () => {
     const pending = api.cloneDevice(
       "kitchen.yaml",
       "bedroom-bulb",
-      "Bedroom Reading Lamp",
+      "Bedroom Reading Lamp"
     );
     const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
 
@@ -363,7 +357,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
     ws.receive({ message_id: messageId, event: "output", data: "line 1" });
     ws.receive({ message_id: messageId, event: "output", data: "line 2" });
@@ -380,7 +374,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
     ws.receive({
       message_id: messageId,
@@ -400,7 +394,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const messageId = api.sendStreamCommand(
       "devices/validate",
       { configuration: "foo.yaml" },
-      { onError },
+      { onError }
     );
     ws.receive({
       message_id: messageId,
@@ -427,7 +421,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput: vi.fn(), onResult: vi.fn() },
+      { onOutput: vi.fn(), onResult: vi.fn() }
     );
 
     const pending = api.stopStream(streamId);
@@ -452,7 +446,7 @@ describe("ESPHomeAPI — streaming commands", () => {
     const streamId = api.sendStreamCommand(
       "devices/logs",
       { configuration: "foo.yaml", port: "" },
-      { onOutput, onResult },
+      { onOutput, onResult }
     );
 
     // Pre-stop: events flow normally.
@@ -496,7 +490,7 @@ describe("ESPHomeAPI — event subscriptions", () => {
     const ws = await connect(api);
     const received: Array<{ event: string; data: unknown }> = [];
     const subscribed = api.subscribeEvents((event, data) =>
-      received.push({ event, data }),
+      received.push({ event, data })
     );
     const msgId = ws.sentAs<{ message_id: string }>(0).message_id;
     ws.receive({ message_id: msgId, result: { subscribed: true } });
@@ -540,7 +534,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       component_id: "dht",
       fields: { pin: "GPIO4" },
     });
-    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
     expect(sent.command).toBe("devices/add_component");
     expect(sent.args).toEqual({
       configuration: "foo.yaml",
@@ -624,6 +622,42 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     expect(sent.args).toEqual({ theme: "dark" });
   });
 
+  it("detectChip sends config/detect_chip with the port arg and unwraps the chip info", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const payload = {
+      chip_family: "ESP32-C3",
+      variant: "esp32c3",
+      platform: "esp32",
+      board_id: "starter-kit",
+    };
+    const pending = api.detectChip("/dev/cu.usbserial-10");
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("config/detect_chip");
+    expect(sent.args).toEqual({ port: "/dev/cu.usbserial-10" });
+    ws.receive({ message_id: sent.message_id, result: payload });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("detectChip surfaces a backend error message to the caller", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.detectChip("/dev/cu.usbserial-10");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      error_code: "unavailable",
+      details: "Could not detect a chip on /dev/cu.usbserial-10",
+    });
+    await expect(pending).rejects.toThrow(
+      /Could not detect a chip on \/dev\/cu\.usbserial-10/
+    );
+  });
+
   it("getRemoteBuildSettings sends remote_build/get_settings and unwraps the result", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
@@ -640,7 +674,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const pending = api.setRemoteBuildSettings({ enabled: true });
-    const sent = ws.sentAs<{ command: string; message_id: string; args: Record<string, unknown> }>(0);
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
     expect(sent.command).toBe("remote_build/set_settings");
     expect(sent.args).toEqual({ enabled: true });
     const result = { enabled: true, peers: [] };
@@ -1083,7 +1121,7 @@ describe("ESPHomeAPI — auth", () => {
 
     // Fresh token persisted for the next reconnect.
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 }),
+      JSON.stringify({ token: "fresh-tok", expires_at: 1_800_000_000 })
     );
   });
 
@@ -1146,7 +1184,7 @@ describe("ESPHomeAPI — auth", () => {
     });
     await expect(api.ready).resolves.toBeUndefined();
     expect(localStorage.getItem("esphome.auth-token")).toBe(
-      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 }),
+      JSON.stringify({ token: "new-tok", expires_at: 1_900_000_000 })
     );
   });
 
@@ -1367,5 +1405,263 @@ describe("ESPHomeAPI — auth", () => {
     await expect(logoutPromise).rejects.toBeInstanceOf(APIError);
     // Local state cleared regardless of the rejection.
     expect(localStorage.getItem("esphome.auth-token")).toBeNull();
+  });
+});
+
+describe("ESPHomeAPI — automations catalog", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``automations/get_triggers`` and returns the list as-is", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAutomationTriggers();
+    const sent = ws.sentAs<{ command: string; args?: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("automations/get_triggers");
+    // ``sendCommand`` strips an empty args object from the wire
+    // payload entirely (see esphome-api.ts: ``if (args &&
+    // Object.keys(args).length > 0)``). Confirm no args are sent
+    // so the backend's default platform / board path runs.
+    expect("args" in sent).toBe(false);
+
+    const triggers = [
+      {
+        id: "on_boot",
+        name: "On Boot",
+        description: "",
+        docs_url: "",
+        applies_to: [],
+        is_device_level: true,
+        config_entries: [],
+      },
+    ];
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: triggers,
+    });
+    await expect(pending).resolves.toEqual(triggers);
+  });
+
+  it("forwards platform and board_id when provided so per-platform defaults are pre-resolved", async () => {
+    // The backend uses ``platform`` / ``board_id`` to bake out any
+    // ``cv.SplitDefault`` defaults on the trigger-parameter schemas
+    // (same mechanism as ``getComponent``). The helper must forward
+    // them as snake_case ``board_id`` on the wire — TypeScript camel
+    // case at the call site, Python snake_case across the
+    // protocol.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.getAutomationTriggers("esp32", "esp32-s3-devkitc-1");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({
+      platform: "esp32",
+      board_id: "esp32-s3-devkitc-1",
+    });
+  });
+
+  it("sends ``automations/get_actions`` and returns the list", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAutomationActions("esp32");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+    expect(sent.command).toBe("automations/get_actions");
+    expect(sent.args).toEqual({ platform: "esp32" });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [],
+    });
+    await expect(pending).resolves.toEqual([]);
+  });
+
+  it("sends ``automations/get_conditions`` and returns the list", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAutomationConditions();
+    const sent = ws.sentAs<{ command: string }>(0);
+    expect(sent.command).toBe("automations/get_conditions");
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [],
+    });
+    await expect(pending).resolves.toEqual([]);
+  });
+
+  it("sends ``automations/get_light_effects`` and returns the list", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getLightEffects();
+    const sent = ws.sentAs<{ command: string }>(0);
+    expect(sent.command).toBe("automations/get_light_effects");
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [],
+    });
+    await expect(pending).resolves.toEqual([]);
+  });
+
+  it("sends ``automations/get_available`` with the YAML path and returns the context payload", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAvailableAutomations("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("automations/get_available");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+
+    const payload = {
+      triggers: [],
+      actions: [],
+      conditions: [],
+      scripts: [{ id: "morning_alarm", parameters: [{ name: "hour", type: "int" }] }],
+      devices: [
+        { component_id: "switch.gpio", id: "kitchen_relay", name: "Kitchen Relay" },
+      ],
+    };
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: payload,
+    });
+    await expect(pending).resolves.toEqual(payload);
+  });
+});
+
+describe("ESPHomeAPI — automations parse / upsert / delete", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``automations/parse`` and returns the structured ParsedAutomation list", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.parseDeviceAutomations("kitchen.yaml");
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("automations/parse");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml" });
+
+    const parsed = [
+      {
+        location: { kind: "device_on", trigger: "on_boot" },
+        label: "On boot",
+        automation: {
+          trigger_id: "on_boot",
+          trigger_params: {},
+          actions: [{ action_id: "logger.log", params: { message: "hi" } }],
+        },
+        from_line: 2,
+        to_line: 5,
+        raw_yaml: "on_boot:\n  then:\n    - logger.log: hi\n",
+      },
+    ];
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: parsed,
+    });
+    await expect(pending).resolves.toEqual(parsed);
+  });
+
+  it("sends ``automations/upsert`` with configuration / automation / location and returns a YamlDiff", async () => {
+    // The whole tree + the location locator round-trip together so
+    // the backend writer can produce a splice anchored at the right
+    // YAML range. Pin that the helper preserves the tree's shape
+    // verbatim (no key-mangling) so the structured editor's
+    // representation lines up with the backend dataclass.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const automation = {
+      trigger_id: "on_press",
+      trigger_params: {},
+      actions: [{ action_id: "switch.toggle", params: { id: "my_switch" } }],
+    };
+    const location = {
+      kind: "component_on" as const,
+      component_id: "boot_button",
+      trigger: "on_press",
+    };
+
+    const pending = api.upsertAutomation("kitchen.yaml", automation, location);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("automations/upsert");
+    expect(sent.args).toEqual({
+      configuration: "kitchen.yaml",
+      automation,
+      location,
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: {
+        yaml_diff: {
+          fromLine: 12,
+          toLine: 14,
+          replacement: "on_press:\n  then:\n    - switch.toggle: my_switch\n",
+        },
+      },
+    });
+    await expect(pending).resolves.toEqual({
+      yaml_diff: {
+        fromLine: 12,
+        toLine: 14,
+        replacement: "on_press:\n  then:\n    - switch.toggle: my_switch\n",
+      },
+    });
+  });
+
+  it("sends ``automations/delete`` with the location locator", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const location = { kind: "script" as const, id: "morning_alarm" };
+    const pending = api.deleteAutomation("kitchen.yaml", location);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("automations/delete");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml", location });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: { yaml_diff: { fromLine: 30, toLine: 38, replacement: "" } },
+    });
+    await expect(pending).resolves.toEqual({
+      yaml_diff: { fromLine: 30, toLine: 38, replacement: "" },
+    });
+  });
+
+  it("propagates backend INVALID_ARGS as an APIError so the editor can surface a typed parse error", async () => {
+    // Unknown action / condition ids inside an existing YAML are
+    // a parse failure the editor must show as "this automation
+    // has a non-catalog action — edit raw YAML" rather than
+    // best-effort-rebuild. Pin that the typed APIError shape
+    // round-trips.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.parseDeviceAutomations("broken.yaml");
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      error_code: "invalid_args",
+      details: "unknown action: switch.not_a_real_action",
+    });
+    await expect(pending).rejects.toBeInstanceOf(APIError);
   });
 });

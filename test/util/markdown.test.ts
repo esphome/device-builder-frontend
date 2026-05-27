@@ -64,7 +64,7 @@ describe("isSafeLinkHref — rejected schemes", () => {
     // ``data:text/html;…`` would let an injected catalog
     // description carry a base64-encoded HTML payload.
     expect(
-      isSafeLinkHref("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg=="),
+      isSafeLinkHref("data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==")
     ).toBe(false);
   });
 

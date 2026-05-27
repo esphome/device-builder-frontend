@@ -111,7 +111,7 @@ describe("EscapeController", () => {
         received = e;
         e.preventDefault();
       },
-      { target },
+      { target }
     );
     ctrl.set(true);
 

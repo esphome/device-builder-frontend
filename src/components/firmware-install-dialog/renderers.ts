@@ -1,4 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit";
+import { JobSource } from "../../api/types.js";
+import { splitTemplate } from "../../util/template-split.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 
 // Matches the receiver-side _fail_locally "peer-link session lost" shape from
@@ -8,10 +11,10 @@ function isPeerLinkSessionLostError(message: string): boolean {
 }
 
 function renderValidationFailureSuggestion(
-  host: ESPHomeFirmwareInstallDialog,
+  host: ESPHomeFirmwareInstallDialog
 ): TemplateResult {
   const text = host._localize("command.validation_failed_suggestion");
-  const [before, after = ""] = text.split("{editor_action}");
+  const [before, after] = splitTemplate(text, "{editor_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
@@ -22,12 +25,18 @@ function renderValidationFailureSuggestion(
 }
 
 // C++ build failure → clean (surgical) → reset (nuclear) staircase.
+// REMOTE-sourced jobs drop the link half — firmware/reset_build_env wipes
+// the LOCAL toolchain cache, which doesn't help when the broken cache is
+// on the paired receiver. Per esphome/device-builder#608 we deliberately
+// don't fan reset out to receivers; the operator-action model handles it.
 function renderBuildFailureSuggestion(
-  host: ESPHomeFirmwareInstallDialog,
+  host: ESPHomeFirmwareInstallDialog
 ): TemplateResult {
+  if (host._jobSource === JobSource.REMOTE && host._jobSourceLabel) {
+    return renderRemoteBuildFailureSuggestion(host, host._jobSourceLabel);
+  }
   const text = host._localize("command.try_reset_suggestion");
-  const [before, rest = ""] = text.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{reset_action}");
+  const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
@@ -42,7 +51,7 @@ function renderBuildFailureSuggestion(
 // Compile-step failure hint. Validation → editor. Receiver-session-lost →
 // skip (build env was fine, connection wasn't). C++ build → clean/reset.
 function renderResetSuggestion(
-  host: ESPHomeFirmwareInstallDialog,
+  host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   if (!host._failedDuringCompile) return nothing;
   if (host._failedDuringValidate) return renderValidationFailureSuggestion(host);
@@ -50,9 +59,7 @@ function renderResetSuggestion(
   return renderBuildFailureSuggestion(host);
 }
 
-export function renderStatus(
-  host: ESPHomeFirmwareInstallDialog,
-): TemplateResult {
+export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   if (host._step === "done") {
     return html`
       <div class="status">
@@ -134,7 +141,7 @@ export function renderStatus(
 }
 
 export function renderProgress(
-  host: ESPHomeFirmwareInstallDialog,
+  host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   if (host._step !== "flashing") return nothing;
   return html`
@@ -145,7 +152,7 @@ export function renderProgress(
 }
 
 export function renderLogs(
-  host: ESPHomeFirmwareInstallDialog,
+  host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   if (host._logLines.length === 0) return nothing;
   return html`
@@ -176,13 +183,9 @@ export function renderLogs(
   `;
 }
 
-export function renderFooter(
-  host: ESPHomeFirmwareInstallDialog,
-): TemplateResult {
+export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   const isRunning =
-    host._step !== "done" &&
-    host._step !== "error" &&
-    host._step !== "download-ready";
+    host._step !== "done" && host._step !== "error" && host._step !== "download-ready";
   if (isRunning) {
     // Web Serial only — installWebDownload doesn't connect to a device.
     const showToggle = host._installer === "web-serial";
@@ -236,9 +239,7 @@ export function renderFooter(
   // _onClose but not _close, so the button only renders while the SerialPort
   // reference is still around.
   const canShowLogs =
-    host._installer === "web-serial" &&
-    host._step === "done" &&
-    host._detected !== null;
+    host._installer === "web-serial" && host._step === "done" && host._detected !== null;
   return html`
     <div class="footer">
       ${canShowLogs

@@ -89,6 +89,15 @@ export interface RenderCtx {
   getEditingMagnitude: (path: string[]) => string | undefined;
   setEditingMagnitude: (path: string[], text: string) => void;
   clearEditingMagnitude: (path: string[]) => void;
+  /**
+   * Stable per-form object identity used by renderers that keep
+   * cross-render scratch state via a WeakMap (e.g. templatable
+   * literal/lambda stashing — see ``templatable.ts``). The form
+   * rebuilds the rest of the ctx every render so renderEntry /
+   * emitChange / etc. are fresh closures and can't be used as
+   * stable keys. ``stashOwner`` IS the host element itself.
+   */
+  stashOwner: object;
 }
 
 /**
@@ -106,10 +115,7 @@ export interface RenderCtx {
  * `RenderCtx` (e.g. the add-component dialog's hidden-validation
  * summary) can share the same chain.
  */
-export function resolveEntryLabel(
-  entry: ConfigEntry,
-  localize: LocalizeFunc,
-): string {
+export function resolveEntryLabel(entry: ConfigEntry, localize: LocalizeFunc): string {
   if (entry.translation_key) {
     const params = (entry.translation_params || undefined) as
       | Record<string, string | number>
@@ -166,18 +172,14 @@ export function renderLabel(
       ${includeHelpLink && entry.help_link ? renderHelpLink(entry, ctx) : nothing}
     </label>
     ${entry.description
-      ? html`<p class="field-description">
-          ${renderMarkdown(entry.description)}
-        </p>`
+      ? html`<p class="field-description">${renderMarkdown(entry.description)}</p>`
       : nothing}
   `;
 }
 
 export function renderFieldError(path: string[], ctx: RenderCtx) {
   const err = ctx.errorAt(path);
-  return renderInlineError(
-    err ? ctx.localize(err.code, err.params) : undefined,
-  );
+  return renderInlineError(err ? ctx.localize(err.code, err.params) : undefined);
 }
 
 /**
@@ -202,12 +204,11 @@ export function renderFieldShell(
   path: string[],
   ctx: RenderCtx,
   input: unknown,
-  trailing: unknown = nothing,
+  trailing: unknown = nothing
 ) {
   return html`
     <div class="field" data-field-key=${path.join(".")}>
-      ${renderLabel(entry, ctx)} ${input} ${trailing}
-      ${renderFieldError(path, ctx)}
+      ${renderLabel(entry, ctx)} ${input} ${trailing} ${renderFieldError(path, ctx)}
     </div>
   `;
 }
@@ -280,7 +281,7 @@ function renderSuggestionSelect(
   value: string,
   invalid: boolean,
   disabled: boolean,
-  ctx: RenderCtx,
+  ctx: RenderCtx
 ) {
   const valueLower = value.toLowerCase();
   const placeholder = String(entry.default_value ?? "");
@@ -289,8 +290,7 @@ function renderSuggestionSelect(
   // entry's YAML value must be a number or downstream validation
   // (and the backend's locked-value comparison) will reject it.
   const isNumeric =
-    entry.type === ConfigEntryType.INTEGER ||
-    entry.type === ConfigEntryType.FLOAT;
+    entry.type === ConfigEntryType.INTEGER || entry.type === ConfigEntryType.FLOAT;
   const coerce = (raw: string): string | number => {
     if (!isNumeric) return raw;
     if (raw === "") return raw;
@@ -309,9 +309,7 @@ function renderSuggestionSelect(
       >
         ${(entry.suggestions ?? []).map((s) => {
           const v = String(s);
-          return html`<wa-option
-            value=${v}
-            ?selected=${v.toLowerCase() === valueLower}
+          return html`<wa-option value=${v} ?selected=${v.toLowerCase() === valueLower}
             >${v}</wa-option
           >`;
         })}

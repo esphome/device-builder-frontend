@@ -1,18 +1,16 @@
 import { html, nothing, type TemplateResult } from "lit";
-import {
-  JobSource,
-  JobStatus,
-  type FirmwareJob,
-} from "../../api/types.js";
+import { JobSource, JobStatus, type FirmwareJob } from "../../api/types.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { splitTemplate } from "../../util/template-split.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
 // the locally-primed snapshot for the gap between followJob and the first
 // jobs-context update.
 export function renderRemoteBuilderSubLine(
-  host: ESPHomeCommandDialog,
+  host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (!host._jobId) return nothing;
   const liveJob = host._jobs.get(host._jobId);
@@ -27,9 +25,7 @@ export function renderRemoteBuilderSubLine(
   // the pairing hadn't completed a peer-link session yet. Render "<label>
   // (<version>)" so the operator can spot version skew vs the offloader.
   const version =
-    liveJob?.source_esphome_version ??
-    host._primedSource?.source_esphome_version ??
-    "";
+    liveJob?.source_esphome_version ?? host._primedSource?.source_esphome_version ?? "";
   const display = version ? `${label} (${version})` : label;
   // Only allow override for in-flight install — switching mid-upload or
   // mid-compile is a power-user shape without a UI today.
@@ -68,7 +64,7 @@ function runningJob(jobs: Map<string, FirmwareJob>): FirmwareJob | null {
 }
 
 export function renderQueuedOverlay(
-  host: ESPHomeCommandDialog,
+  host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (!host._isQueued && !host._isRemoteQueued) return nothing;
   // Only surface the "waiting for <device>" hint for same-offloader queues
@@ -95,7 +91,9 @@ export function renderQueuedOverlay(
   `;
 }
 
-export function renderBanner(host: ESPHomeCommandDialog): TemplateResult | typeof nothing {
+export function renderBanner(
+  host: ESPHomeCommandDialog
+): TemplateResult | typeof nothing {
   if (host._state !== "success" && host._state !== "error") return nothing;
   const isSuccess = host._state === "success";
   const icon = isSuccess ? "check-circle" : "alert-circle";
@@ -111,7 +109,7 @@ export function renderBanner(host: ESPHomeCommandDialog): TemplateResult | typeo
 // YAML validation failure → "open in editor". Build failure → clean → reset
 // staircase. _userStopped is shared — a user-cancel isn't a build problem.
 export function renderResetSuggestion(
-  host: ESPHomeCommandDialog,
+  host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (host._state !== "error") return nothing;
   if (host._userStopped) return nothing;
@@ -126,7 +124,7 @@ export function renderResetSuggestion(
 
 function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
   const text = host._localize("command.validation_failed_suggestion");
-  const [before, after = ""] = text.split("{editor_action}");
+  const [before, after] = splitTemplate(text, "{editor_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
@@ -136,10 +134,23 @@ function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): Template
   `;
 }
 
+// Resolve the receiver label for a REMOTE-sourced job. Returns null for
+// LOCAL builds (or when the live + primed snapshots both lack a label) so
+// the caller falls back to the local reset-build-env link.
+function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
+  const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
+  const primed = host._primedSource;
+  if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
+  return live?.source_label || primed?.source_label || null;
+}
+
 function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
+  const remoteLabel = remotePeerLabel(host);
+  if (remoteLabel !== null) {
+    return renderRemoteBuildFailureSuggestion(host, remoteLabel);
+  }
   const text = host._localize("command.try_reset_suggestion");
-  const [before, rest = ""] = text.split("{clean_action}");
-  const [middle, after = ""] = rest.split("{reset_action}");
+  const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");
   return html`
     <div class="reset-suggestion" role="status">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
@@ -164,7 +175,7 @@ interface ToolbarToggleOpts {
 
 function renderToolbarToggle(
   host: ESPHomeCommandDialog,
-  opts: ToolbarToggleOpts,
+  opts: ToolbarToggleOpts
 ): TemplateResult {
   const labelKey = opts.active ? opts.labelKeyActive : opts.labelKeyInactive;
   const tooltipKey = opts.active ? opts.tooltipKeyActive : opts.tooltipKeyInactive;
@@ -183,7 +194,7 @@ function renderToolbarToggle(
 // --show-secrets is an `esphome config` flag — hide the toggle on every other
 // command type to keep the toolbar from accumulating inert buttons.
 function renderShowSecretsToggle(
-  host: ESPHomeCommandDialog,
+  host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (host._commandType !== "validate") return nothing;
   return renderToolbarToggle(host, {
@@ -201,7 +212,7 @@ function renderShowSecretsToggle(
 // Disappears once the install settles — the user already declared their
 // preference, no point in showing a no-op control after.
 function renderShowLogsAfterInstallToggle(
-  host: ESPHomeCommandDialog,
+  host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (host._commandType !== "install") return nothing;
   if (host._state === "success" || host._state === "error") return nothing;

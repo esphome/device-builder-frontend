@@ -6,6 +6,28 @@ export interface YamlSection {
   id?: string; // "id:" value from a YAML list item
   platform?: string; // "platform:" value from a YAML list item
   parentKey?: string; // top-level key when this is an expanded list item
+  /**
+   * Human-readable label for the navigator. Set when ``key`` is a
+   * stable machine identifier (e.g. an automation's
+   * ``automation:component_on:<id>:on_press``) that wouldn't render
+   * well in the UI. Navigator consumers prefer ``displayLabel`` when
+   * present and fall back to ``key`` otherwise.
+   */
+  displayLabel?: string;
+  /**
+   * Bare trigger event key (``on_press``, ``on_turn_on``) for
+   * automation entries. The navigator combines this with
+   * ``parentKey`` to look up the trigger's pretty name in the
+   * catalog (``binary_sensor.on_press`` → "Pressed").
+   */
+  eventKey?: string;
+  /**
+   * Free-form metadata payload — currently used to surface the
+   * ``interval: 60s`` time on an interval entry so the navigator
+   * can show "Every 60s" instead of "interval #1". Optional for
+   * everything else.
+   */
+  meta?: Record<string, string>;
 }
 
 export interface CategorizedSections {
@@ -33,15 +55,38 @@ export interface CategorizedSections {
 // component and lives under "Components" in the navigator.
 export const CORE_KEYS = new Set([
   // Target platforms
-  "esp32", "esp8266", "rp2040", "bk72xx", "rtl87xx", "ln882x", "nrf52", "host",
+  "esp32",
+  "esp8266",
+  "rp2040",
+  "bk72xx",
+  "rtl87xx",
+  "ln882x",
+  "nrf52",
+  "host",
   // ESPHome infrastructure
-  "esphome", "logger", "api", "ota", "wifi", "ethernet", "mqtt", "mdns",
-  "network", "web_server", "captive_portal", "improv_serial",
-  "safe_mode", "debug", "preferences", "update",
+  "esphome",
+  "logger",
+  "api",
+  "ota",
+  "wifi",
+  "ethernet",
+  "mqtt",
+  "mdns",
+  "network",
+  "web_server",
+  "captive_portal",
+  "improv_serial",
+  "safe_mode",
+  "debug",
+  "preferences",
+  "update",
   // Device-wide config keys (not strictly components — no C++
   // implementation — but they share the top-level YAML namespace
   // alongside real components).
-  "external_components", "packages", "substitutions", "dashboard_import",
+  "external_components",
+  "packages",
+  "substitutions",
+  "dashboard_import",
   // `globals:` is technically a list of typed variables, but in
   // practice it acts as device-wide config metadata (variable
   // declarations, similar to substitutions) — we want it living next
@@ -206,7 +251,7 @@ export function _clearYamlSectionsMemo(): void {
  */
 function _expandListItems(
   lines: string[],
-  section: { key: string; fromLine: number; toLine: number },
+  section: { key: string; fromLine: number; toLine: number }
 ): YamlSection[] {
   // Sections marked non-expandable keep their list items hidden from
   // the navigator — the user navigates to the whole block, not the
@@ -259,8 +304,7 @@ function _expandListItems(
   const items: YamlSection[] = [];
   for (let idx = 0; idx < listStarts.length; idx++) {
     const itemStart = listStarts[idx];
-    const itemEnd =
-      idx + 1 < listStarts.length ? listStarts[idx + 1] - 1 : endIdx;
+    const itemEnd = idx + 1 < listStarts.length ? listStarts[idx + 1] - 1 : endIdx;
 
     let name = "";
     let id = "";
@@ -271,7 +315,7 @@ function _expandListItems(
       const idMatch = lines[j].match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
       if (idMatch) id = idMatch[1];
       const platformMatch = lines[j].match(
-        /^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*$/,
+        /^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*$/
       );
       if (platformMatch) platform = platformMatch[1];
     }
@@ -291,9 +335,28 @@ function _expandListItems(
 }
 
 /**
- * Finds inline ESPHome automation handlers (on_press:, on_value_range:, etc.)
- * nested inside component definitions and returns them as navigable sections.
- * The key is formatted as "<component name> → <event>" when a name is available.
+ * Synchronous fallback parser for automation sections. The navigator
+ * needs to paint instantly on every keystroke, so we can't wait for
+ * the backend's ``automations/parse`` round-trip; this regex-based
+ * pass detects:
+ *
+ * - Inline ``on_*:`` handlers nested inside component instances
+ *   (``component_on`` automations).
+ * - Device-level ``on_*:`` handlers directly under ``esphome:``
+ *   (``device_on`` automations).
+ * - List items under top-level ``script:`` and ``interval:`` blocks
+ *   (``script`` and ``interval`` automations).
+ *
+ * Emits stable machine-readable keys
+ * (``automation:component_on:<id>:on_press`` etc.) plus a separate
+ * ``displayLabel`` for the navigator UI. Section routing reads
+ * ``key`` (stable identifier the page can match against a
+ * ``ParsedAutomation.location``); the navigator displays
+ * ``displayLabel``.
+ *
+ * The backend's ``automations/parse`` is the canonical source — this
+ * fallback only sees what the regex catches, but it's load-bearing
+ * for keystroke-time UI responsiveness.
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
@@ -306,37 +369,287 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     const indent = match[1].length;
     const eventName = match[2];
     const fromLine = i + 1; // 1-indexed CM line
+    const toLine = _findBlockEnd(lines, i, indent);
 
-    // End of block = first non-empty line at same or lower indentation
-    let toLine = lines.length;
-    for (let j = i + 1; j < lines.length; j++) {
-      if (lines[j].trim() === "") continue;
-      const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
-      if (lineIndent <= indent) {
-        toLine = j; // array index j = CM line j (last line of this block is j-1+1 = j)
-        break;
-      }
+    // Walk backwards to identify the enclosing block (esphome:
+    // device-level, or a configured-component instance with its id).
+    const ancestry = _walkAncestry(lines, i, indent);
+
+    if (ancestry.parentKey === "esphome") {
+      automations.push({
+        key: `automation:device_on:${eventName}`,
+        // ``displayLabel`` is the legacy "Esphome → on_boot" label;
+        // the navigator now prefers catalog-resolved labels but
+        // keeps ``displayLabel`` as a graceful fallback for
+        // pre-catalog renders.
+        displayLabel: `esphome → ${eventName}`,
+        fromLine,
+        toLine,
+        parentKey: "esphome",
+        eventKey: eventName,
+      });
+    } else if (ancestry.componentId) {
+      const labelHead = ancestry.parentName || ancestry.componentId;
+      automations.push({
+        key: `automation:component_on:${ancestry.componentId}:${eventName}`,
+        displayLabel: `${labelHead} → ${eventName}`,
+        fromLine,
+        toLine,
+        id: ancestry.componentId,
+        name: ancestry.parentName ?? undefined,
+        parentKey: ancestry.parentKey ?? undefined,
+        eventKey: eventName,
+      });
+    } else {
+      // No clear ancestry — keep the event as the bare display
+      // label and emit a non-namespaced key so it doesn't collide
+      // with a properly-resolved automation later.
+      automations.push({
+        key: `automation:unscoped:${eventName}:${fromLine}`,
+        displayLabel: eventName,
+        fromLine,
+        toLine,
+        eventKey: eventName,
+      });
     }
+  }
 
-    // Look backwards for the nearest `name:` within the same component item
-    let parentName = "";
-    for (let j = i - 1; j >= 0; j--) {
-      if (lines[j].match(/^[a-zA-Z]/)) break; // hit a top-level key
-      const nameMatch = lines[j].match(/^\s+name:\s*["']?(.+?)["']?\s*$/);
-      if (nameMatch) {
-        parentName = nameMatch[1];
-        break;
+  // Top-level ``script:`` / ``interval:`` list items. These don't
+  // carry an ``on_*:`` key — the block kind is implied by the
+  // location's discriminator.
+  for (const top of ["script", "interval"] as const) {
+    const block = _findTopLevelBlock(lines, top);
+    if (!block) continue;
+    const items = _enumerateListItems(lines, block.fromLine, block.toLine);
+    items.forEach((item, idx) => {
+      const itemId = top === "script" ? _readKeyOnLine(lines, item.fromLine, "id") : null;
+      const key =
+        top === "script" && itemId
+          ? `automation:script:${itemId}`
+          : `automation:interval:${idx}`;
+      const display =
+        top === "script" && itemId ? `script: ${itemId}` : `interval #${idx + 1}`;
+      const meta: Record<string, string> = {};
+      if (top === "interval") {
+        // ``interval: 60s`` lives directly on the list item — pull
+        // it so the navigator can render "Every 60s" instead of
+        // a generic "interval #N". Optional; we fall back to the
+        // index when the field is missing or unparseable.
+        const every = _readKeyOnLine(lines, item.fromLine, "interval");
+        if (every) meta.every = every;
       }
-    }
-
-    automations.push({
-      key: parentName ? `${parentName} → ${eventName}` : eventName,
-      fromLine,
-      toLine,
+      automations.push({
+        key,
+        displayLabel: display,
+        fromLine: item.fromLine,
+        toLine: item.toLine,
+        id: top === "script" && itemId ? itemId : undefined,
+        parentKey: top,
+        meta: Object.keys(meta).length > 0 ? meta : undefined,
+      });
     });
   }
 
+  // ``api.actions:`` list items — Home Assistant-callable actions
+  // nested under the top-level ``api:`` block. Same callable shape
+  // as ``script:`` (named entry, no trigger key) but one level
+  // deeper in the YAML tree. Each item's ``action:`` (or legacy
+  // ``service:``) value is the stable discriminator.
+  const apiBlock = _findTopLevelBlock(lines, "api");
+  if (apiBlock) {
+    const actionsBlock = _findChildBlock(
+      lines,
+      apiBlock.fromLine,
+      apiBlock.toLine,
+      "actions"
+    );
+    if (actionsBlock) {
+      const items = _enumerateListItems(
+        lines,
+        actionsBlock.fromLine,
+        actionsBlock.toLine
+      );
+      for (const item of items) {
+        const actionName =
+          _readKeyOnLine(lines, item.fromLine, "action") ??
+          _readKeyOnLine(lines, item.fromLine, "service");
+        if (!actionName) continue;
+        automations.push({
+          key: `automation:api_action:${actionName}`,
+          displayLabel: `API: ${actionName}`,
+          fromLine: item.fromLine,
+          toLine: item.toLine,
+          id: actionName,
+          parentKey: "api",
+        });
+      }
+    }
+  }
+
   return automations;
+}
+
+/** First non-empty line at indent ≤ ``indent`` after ``startIdx``,
+ *  or end-of-file. */
+function _findBlockEnd(lines: string[], startIdx: number, indent: number): number {
+  for (let j = startIdx + 1; j < lines.length; j++) {
+    if (lines[j].trim() === "") continue;
+    const lineIndent = (lines[j].match(/^(\s*)/) ?? ["", ""])[1].length;
+    if (lineIndent <= indent) return j;
+  }
+  return lines.length;
+}
+
+interface Ancestry {
+  parentKey: string | null;
+  parentName: string | null;
+  componentId: string | null;
+}
+
+/**
+ * Walk backwards from an ``on_*:`` line to identify the enclosing
+ * block. Returns:
+ *
+ * - ``parentKey`` — the nearest top-level key
+ *   (``esphome``, ``binary_sensor``, …) discovered by scanning to
+ *   a column-0 anchor.
+ * - ``parentName`` — the configured component's ``name:`` if found,
+ *   used as a display label.
+ * - ``componentId`` — the configured component's ``id:`` if found,
+ *   used as the stable identifier.
+ */
+function _walkAncestry(lines: string[], startIdx: number, childIndent: number): Ancestry {
+  let parentKey: string | null = null;
+  let parentName: string | null = null;
+  let componentId: string | null = null;
+  // True once we've crossed our list item's leading ``-`` (at indent
+  // < childIndent). Beyond that boundary we keep scanning *only* to
+  // find the top-level key; we no longer harvest id / name (those
+  // would belong to a previous sibling, not us).
+  let crossedItemBoundary = false;
+  for (let j = startIdx - 1; j >= 0; j--) {
+    const line = lines[j];
+    if (line.trim() === "") continue;
+    const topLevel = line.match(/^([a-zA-Z_][\w]*)\s*:/);
+    if (topLevel) {
+      parentKey = topLevel[1];
+      break;
+    }
+    const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
+    // A list-item dash at an indent shallower than our handler is
+    // our own item's leading row (we're somewhere inside it). Cross
+    // it but keep walking — the top-level key still sits above us.
+    if (lineIndent < childIndent && /^\s*-\s/.test(line)) {
+      crossedItemBoundary = true;
+      continue;
+    }
+    // Deeper lines (nested blocks under our handler's siblings)
+    // can't contribute id / name for our automation.
+    if (lineIndent > childIndent) continue;
+    if (crossedItemBoundary) continue;
+    const idMatch = line.match(/^\s+(?:-\s+)?id:\s*["']?([^"'\s]+)["']?\s*$/);
+    if (idMatch && !componentId) componentId = idMatch[1];
+    const nameMatch = line.match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
+    if (nameMatch && !parentName) parentName = nameMatch[1];
+  }
+  return { parentKey, parentName, componentId };
+}
+
+/** Top-level key block (``script:`` / ``interval:``) with its
+ *  inclusive 1-indexed line range, or ``null`` when the key is
+ *  absent. */
+function _findTopLevelBlock(
+  lines: string[],
+  key: string
+): { fromLine: number; toLine: number } | null {
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(new RegExp(`^${key}\\s*:`));
+    if (!m) continue;
+    return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, 0) };
+  }
+  return null;
+}
+
+/** Find a nested key directly under a parent block (e.g.
+ *  ``actions:`` inside ``api:``). Returns the matched key's
+ *  inclusive 1-indexed line range. */
+function _findChildBlock(
+  lines: string[],
+  parentFromLine: number,
+  parentToLine: number,
+  childKey: string
+): { fromLine: number; toLine: number } | null {
+  // Locate the parent block's child indent by reading the first
+  // non-blank child line and capturing its leading whitespace —
+  // matches the convention used by ``_walkAncestry``.
+  let childIndent: number | null = null;
+  for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const leading = (line.match(/^(\s+)/) ?? ["", ""])[1].length;
+    if (leading > 0) {
+      childIndent = leading;
+      break;
+    }
+  }
+  if (childIndent === null) return null;
+  const pattern = new RegExp(`^\\s{${childIndent}}${childKey}\\s*:`);
+  for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
+    if (!pattern.test(lines[i])) continue;
+    return { fromLine: i + 1, toLine: _findBlockEnd(lines, i, childIndent) };
+  }
+  return null;
+}
+
+/** List items (``- key: value`` ...) directly inside a top-level
+ *  block. Nested list markers (the ``- logger.log`` inside a
+ *  ``then:`` clause) are deeper and skipped by pinning to the
+ *  block's first-row dash indent. */
+function _enumerateListItems(
+  lines: string[],
+  blockFromLine: number,
+  blockToLine: number
+): Array<{ fromLine: number; toLine: number }> {
+  const out: Array<{ fromLine: number; toLine: number }> = [];
+  let topIndent: number | null = null;
+  let inItem: { fromLine: number } | null = null;
+  for (let i = blockFromLine; i < blockToLine && i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const dash = line.match(/^(\s*)-\s/);
+    if (!dash) continue;
+    const indent = dash[1].length;
+    if (topIndent === null) topIndent = indent;
+    // Skip dashes deeper than the block's first row — those are
+    // nested action lists inside ``then:`` clauses, not block-level
+    // items.
+    if (indent > topIndent) continue;
+    if (inItem) out.push({ fromLine: inItem.fromLine, toLine: i });
+    inItem = { fromLine: i + 1 };
+  }
+  if (inItem) out.push({ fromLine: inItem.fromLine, toLine: blockToLine });
+  return out;
+}
+
+/** Read a leading ``key: value`` line inside a list item — used to
+ *  pull the script's ``id:`` for the stable section key. */
+function _readKeyOnLine(lines: string[], fromLine: number, key: string): string | null {
+  const target = lines[fromLine - 1];
+  // The script id can be on the same line as the leading dash:
+  // ``- id: my_alarm`` — or on the next non-empty line.
+  const inlineRe = new RegExp(`^\\s*-\\s*${key}:\\s*["']?([^"'\\s]+)["']?`);
+  const m = target.match(inlineRe);
+  if (m) return m[1];
+  const dashIndent = target.match(/^(\s*)-/)?.[1].length ?? 0;
+  for (let i = fromLine; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.trim() === "") continue;
+    const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
+    if (lineIndent <= dashIndent) break;
+    const kv = line.match(new RegExp(`^\\s+${key}:\\s*["']?([^"'\\s]+)["']?`));
+    if (kv) return kv[1];
+  }
+  return null;
 }
 
 /**
@@ -356,24 +669,20 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
 export function findAddedSection(
   yaml: string,
   componentId: string,
-  newId: string | undefined,
+  newId: string | undefined
 ): { sectionKey: string; fromLine: number } | null {
   const sections = parseYamlTopLevelSections(yaml);
 
   // Top-level (non-platform) component — match the bare key, e.g.
   // adding "wifi" navigates to the `wifi:` block.
   if (!componentId.includes(".")) {
-    const match = sections.find(
-      (s) => s.key === componentId && !s.platform,
-    );
+    const match = sections.find((s) => s.key === componentId && !s.platform);
     if (match) return { sectionKey: match.key, fromLine: match.fromLine };
   }
 
   // Platform-based component — find the list item(s) under the parent
   // block whose computed sectionKey matches componentId.
-  const candidates = sections.filter(
-    (s) => sectionKeyOf(s) === componentId,
-  );
+  const candidates = sections.filter((s) => sectionKeyOf(s) === componentId);
   if (candidates.length === 0) return null;
   if (candidates.length === 1) {
     return {
@@ -429,12 +738,47 @@ export function findAddedSection(
  * Tracked as a follow-up to extend `sectionAtLine` to consult
  * automations and prefer the most-specific (smallest) range.
  */
-export function sectionAtLine(
-  yaml: string,
-  line: number,
-): YamlSection | null {
-  const sections = parseYamlTopLevelSections(yaml);
-  return sections.find((s) => line >= s.fromLine && line <= s.toLine) ?? null;
+export function sectionAtLine(yaml: string, line: number): YamlSection | null {
+  // Automations take precedence over top-level sections whenever a
+  // click falls inside one: a click inside ``script: - id: proost``
+  // routes to the script editor (not the enclosing ``script:``
+  // component-editor); a click inside ``on_press:`` under a
+  // ``binary_sensor`` routes to the automation editor for that
+  // trigger (not the binary_sensor component editor).
+  //
+  // Within each layer we still prefer the smallest containing range
+  // — for example a nested ``if:`` block's ``then:`` versus its
+  // enclosing automation. Top-level fallback covers cases the
+  // automation parser doesn't touch (regular components, ``wifi:``,
+  // ``esphome:``, etc.).
+  // Skip ``automation:unscoped:*`` entries: those mark inline
+  // ``on_*:`` handlers whose host component has no ``id:`` and so
+  // can't be addressed by the structured editor (location decoder
+  // returns null for them). Routing a click there would hand the
+  // section editor an unknown key and surface as an error; better
+  // to fall through to the enclosing top-level section so the user
+  // lands somewhere useful.
+  const autos = parseYamlAutomations(yaml).filter(
+    (s) => !s.key.startsWith("automation:unscoped:")
+  );
+  const autoHit = _smallestContaining(autos, line);
+  if (autoHit) return autoHit;
+  const tops = parseYamlTopLevelSections(yaml);
+  return _smallestContaining(tops, line);
+}
+
+function _smallestContaining(sections: YamlSection[], line: number): YamlSection | null {
+  let best: YamlSection | null = null;
+  let bestSpan = Number.POSITIVE_INFINITY;
+  for (const s of sections) {
+    if (line < s.fromLine || line > s.toLine) continue;
+    const span = s.toLine - s.fromLine;
+    if (span < bestSpan) {
+      best = s;
+      bestSpan = span;
+    }
+  }
+  return best;
 }
 
 /**
@@ -487,20 +831,19 @@ export function sectionKeyOf(section: YamlSection): string {
 export function resolveCurrentFromLine(
   yaml: string,
   sectionKey: string,
-  staleFromLine?: number,
+  staleFromLine?: number
 ): number | undefined {
   if (!yaml || !sectionKey) return undefined;
   const matches = parseYamlTopLevelSections(yaml).filter(
-    (s) => sectionKeyOf(s) === sectionKey,
+    (s) => sectionKeyOf(s) === sectionKey
   );
   if (matches.length === 0) return undefined;
   if (matches.length === 1 || staleFromLine === undefined) {
     return matches[0].fromLine;
   }
   return matches.reduce((best, candidate) =>
-    Math.abs(candidate.fromLine - staleFromLine) <
-    Math.abs(best.fromLine - staleFromLine)
+    Math.abs(candidate.fromLine - staleFromLine) < Math.abs(best.fromLine - staleFromLine)
       ? candidate
-      : best,
+      : best
   ).fromLine;
 }

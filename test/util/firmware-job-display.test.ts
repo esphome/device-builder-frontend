@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { JobSource, JobStatus, JobType } from "../../src/api/types.js";
-import type {
-  ConfiguredDevice,
-  FirmwareJob,
-} from "../../src/api/types.js";
+import type { ConfiguredDevice, FirmwareJob } from "../../src/api/types.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { firmwareJobDisplayName } from "../../src/util/firmware-job-display.js";
 
@@ -58,22 +55,18 @@ describe("firmwareJobDisplayName (receiver-side remote-build jobs)", () => {
   it("prefers device_friendly_name when set", () => {
     const j = job({
       remote_peer: "alpha-dashboard",
-      configuration:
-        ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
+      configuration: ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
       device_name: "kitchen",
       device_friendly_name: "AC Float Monitor 32",
     });
 
-    expect(firmwareJobDisplayName(j, NO_DEVICES, localize)).toBe(
-      "AC Float Monitor 32",
-    );
+    expect(firmwareJobDisplayName(j, NO_DEVICES, localize)).toBe("AC Float Monitor 32");
   });
 
   it("falls back to device_name when friendly_name is empty", () => {
     const j = job({
       remote_peer: "alpha-dashboard",
-      configuration:
-        ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
+      configuration: ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
       device_name: "kitchen",
       device_friendly_name: "",
     });
@@ -88,8 +81,7 @@ describe("firmwareJobDisplayName (receiver-side remote-build jobs)", () => {
        configuration path. */
     const j = job({
       remote_peer: "alpha-dashboard",
-      configuration:
-        ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
+      configuration: ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
       device_name: "",
       device_friendly_name: "",
     });
@@ -104,8 +96,7 @@ describe("firmwareJobDisplayName (receiver-side remote-build jobs)", () => {
        must NOT shadow the offloader-sent name. */
     const j = job({
       remote_peer: "alpha-dashboard",
-      configuration:
-        ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
+      configuration: ".esphome/.remote_builds/alpha-dashboard/kitchen/kitchen.yaml",
       device_friendly_name: "AC Float Monitor 32",
     });
     const decoyDevices: ConfiguredDevice[] = [
@@ -116,9 +107,7 @@ describe("firmwareJobDisplayName (receiver-side remote-build jobs)", () => {
       } as ConfiguredDevice,
     ];
 
-    expect(firmwareJobDisplayName(j, decoyDevices, localize)).toBe(
-      "AC Float Monitor 32",
-    );
+    expect(firmwareJobDisplayName(j, decoyDevices, localize)).toBe("AC Float Monitor 32");
   });
 });
 

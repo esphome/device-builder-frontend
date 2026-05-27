@@ -211,6 +211,43 @@ function parseAnsiLine(line: string, state: AnsiState): AnsiSpan[] {
   return spans;
 }
 
+/** Strip leading non-SGR ANSI controls and trailing whitespace. */
+export function cleanLine(line: string): string {
+  return line
+    .replace(
+      /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
+      ""
+    )
+    .replace(/\s+$/, "");
+}
+
+/**
+ * Fold ``\r``- and ``\n``-terminated output chunks into visual lines.
+ *
+ * An empty-after-cleaning chunk (PIO's ``\x1b[K\r`` between progress
+ * ticks, a bare ``\r``) is a no-op that doesn't toggle the overwrite
+ * flag; without that, the next real tick pops a non-progress line
+ * above the bar instead of starting fresh (#840).
+ */
+export function chunksToVisualLines(chunks: string[]): string[] {
+  const visual: string[] = [];
+  let prevEndedInCR = false;
+  for (const chunk of chunks) {
+    const text = cleanLine(chunk.replace(/[\r\n]+$/, ""));
+    const hasContent = text.replace(ANSI_ESCAPE_RE, "").trim().length > 0;
+    if (hasContent) {
+      if (prevEndedInCR && chunk !== "\n" && visual.length > 0) {
+        visual.pop();
+      }
+      visual.push(text);
+      prevEndedInCR = chunk.endsWith("\r");
+    } else if (chunk.endsWith("\n")) {
+      prevEndedInCR = false;
+    }
+  }
+  return visual;
+}
+
 @customElement("esphome-ansi-log")
 export class ESPHomeAnsiLog extends LitElement {
   /** Use light theme instead of dark. */
@@ -253,6 +290,7 @@ export class ESPHomeAnsiLog extends LitElement {
         font-family:
           ui-monospace, "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", Menlo,
           Consolas, monospace;
+        font-variant-ligatures: none;
         font-size: 12px;
         padding: 8px 12px;
         border-radius: 8px;
@@ -309,12 +347,14 @@ export class ESPHomeAnsiLog extends LitElement {
 
   protected updated(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("lines") && this.autoScroll && !this._isUserScrolled) {
-      this._scrollToBottom();
+      // Sync (not rAF-deferred): ``updated`` runs post-DOM-commit,
+      // and a one-frame lag clips the bottom line during bursts.
+      this._syncScrollToBottom();
     }
   }
 
   protected render() {
-    const visual = this._chunksToVisualLines(this.lines);
+    const visual = chunksToVisualLines(this.lines);
     // One state object threaded through every line so multi-line
     // records (a WARNING that opens ``\x1b[33m`` on line 1 and only
     // resets on line 5) keep their colour on the continuation lines.
@@ -326,59 +366,6 @@ export class ESPHomeAnsiLog extends LitElement {
           : visual.map((line) => this._renderLine(line, state))}
       </div>
     `;
-  }
-
-  /**
-   * Fold an incoming stream of subprocess output chunks into the
-   * sequence of "visual" lines we want to render. The backend splits
-   * stdout at every `\n` _or_ `\r` and forwards each chunk including
-   * its terminator, which means progress updates (esptool's
-   * `Writing at 0x10000... (5%)\r`) arrive as CR-terminated chunks.
-   * Same rules the old ESPHome dashboard uses:
-   *   - A chunk that ends with `\r` "owns" the last visual line; the
-   *     next chunk (unless it's a bare `\n`) replaces that line in
-   *     place — that's how progress bars overwrite themselves.
-   *   - A bare `\n` chunk (the trailing half of a `\r\n` pair)
-   *     finalises the line in place — no replacement.
-   *   - Everything else is a new line appended to the bottom.
-   * Empty visual lines are dropped so stray newlines don't punch
-   * blank gaps into the output.
-   */
-  private _chunksToVisualLines(chunks: string[]): string[] {
-    const visual: string[] = [];
-    let prevEndedInCR = false;
-    for (const chunk of chunks) {
-      if (prevEndedInCR && chunk !== "\n" && visual.length > 0) {
-        visual.pop();
-      }
-      const text = this._cleanLine(chunk.replace(/[\r\n]+$/, ""));
-      if (text.replace(ANSI_ESCAPE_RE, "").trim().length > 0) {
-        visual.push(text);
-      }
-      prevEndedInCR = chunk.endsWith("\r");
-    }
-    return visual;
-  }
-
-  /**
-   * Strip trailing whitespace and any leading non-SGR ANSI control
-   * sequences (cursor moves, erase-line, OSC) from one chunk.
-   *
-   * Leading whitespace AND leading SGR colour codes are intentionally
-   * preserved: ESPHome's multi-line WARNING records open the colour
-   * on the first line and only reset it on the last, and the
-   * continuation lines (``clk:`` / ``  mode: CLK_OUT`` / ``  pin: 0``)
-   * use indentation as part of the rendered formatting. Stripping
-   * either would left-align continuation lines and drop the colour
-   * carry-over.
-   */
-  private _cleanLine(line: string): string {
-    return line
-      .replace(
-        /^(?:(?:\u001b|\\033)\[[\x30-\x3f]*[\x20-\x2f]*[\x40-\x6c\x6e-\x7e]|(?:\u001b|\\033)\][^\u0007\u001b]*(?:\u0007|\u001b\\|\\033\\)|(?:\u001b|\\033)[NOPVWX^_=>])*/g,
-        ""
-      )
-      .replace(/\s+$/, "");
   }
 
   private _renderLine(line: string, state: AnsiState) {
@@ -435,13 +422,14 @@ export class ESPHomeAnsiLog extends LitElement {
     this._isUserScrolled = scrollHeight - scrollTop - clientHeight > 40;
   }
 
+  private _syncScrollToBottom() {
+    if (!this._container) return;
+    this._ignoreNextScroll = true;
+    this._container.scrollTop = this._container.scrollHeight;
+  }
+
   private _scrollToBottom() {
-    requestAnimationFrame(() => {
-      if (this._container) {
-        this._ignoreNextScroll = true;
-        this._container.scrollTop = this._container.scrollHeight;
-      }
-    });
+    requestAnimationFrame(() => this._syncScrollToBottom());
   }
 
   /** Public method to scroll to bottom programmatically. */

@@ -172,10 +172,18 @@ export const componentCatalogStyles = css`
     display: flex;
     flex-direction: column;
     gap: 6px;
-    transition: border-color var(--wa-transition-normal) var(--wa-transition-easing);
+    cursor: pointer;
+    transition:
+      border-color var(--wa-transition-normal) var(--wa-transition-easing),
+      background var(--wa-transition-normal) var(--wa-transition-easing);
   }
 
   .component-card:hover {
+    border-color: var(--esphome-primary);
+    background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
+  }
+
+  .component-card:focus-within {
     border-color: var(--esphome-primary);
   }
 
@@ -194,6 +202,11 @@ export const componentCatalogStyles = css`
     flex-shrink: 0;
     color: var(--esphome-primary);
     font-size: 15px;
+  }
+
+  .expand-button:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 1px;
   }
 
   .expand-button wa-icon {
@@ -315,10 +328,20 @@ export const componentCatalogStyles = css`
     display: flex;
     align-items: center;
     gap: 3px;
+    border: none;
+    background: none;
+    padding: 0;
+    border-radius: 4px;
+    font-family: inherit;
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
     color: var(--esphome-primary);
     cursor: pointer;
+  }
+
+  .select-component:focus-visible {
+    outline: 2px solid var(--esphome-primary);
+    outline-offset: 3px;
   }
 
   .empty {

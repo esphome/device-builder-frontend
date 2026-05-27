@@ -53,11 +53,7 @@ describe("renderIpValue", () => {
   it("uses the localised visit-web label for aria-label and title", () => {
     const localize = (key: string): string =>
       key === "dashboard.action_visit_web_ui" ? "Visit web UI" : key;
-    const result = renderIpValue(
-      "192.168.1.42",
-      "http://kitchen.local",
-      localize,
-    );
+    const result = renderIpValue("192.168.1.42", "http://kitchen.local", localize);
     const [anchor] = findTemplatesByAnchor(result, "<a");
     const bindings = extractAttributeBindings(anchor);
     expect(bindings["aria-label"]).toBe("Visit web UI");

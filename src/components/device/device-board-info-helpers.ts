@@ -25,7 +25,7 @@
  */
 export function isEmptyToPopulatedYamlChange(
   prev: string | undefined | null,
-  next: string,
+  next: string
 ): boolean {
   return !prev && !!next;
 }

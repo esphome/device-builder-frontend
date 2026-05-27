@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
-import { mdiArrowCollapseLeft, mdiArrowCollapseRight } from "@mdi/js";
-import { html, LitElement } from "lit";
+import { mdiArrowLeft, mdiChevronRight } from "@mdi/js";
+import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
@@ -34,6 +34,7 @@ import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
+import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 
@@ -48,8 +49,8 @@ import "../components/unsaved-changes-dialog.js";
 import "../components/yaml-validation-dialog.js";
 
 registerMdiIcons({
-  "arrow-collapse-left": mdiArrowCollapseLeft,
-  "arrow-collapse-right": mdiArrowCollapseRight,
+  "arrow-left": mdiArrowLeft,
+  "chevron-right": mdiChevronRight,
 });
 
 @customElement("esphome-page-device")
@@ -111,11 +112,29 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _selectedFromLine?: number = this._readUrlLine();
 
+  /** Per-page navigation stack — each entry is a section the user
+   *  visited *before* the current one, ordered oldest-first. The
+   *  back button pops the top entry; an empty stack means "back goes
+   *  to the board-info / next-steps view". Cleared whenever the
+   *  current selection drops back to ``null`` so a later trip into a
+   *  section starts a fresh trail. */
+  @state()
+  private _sectionHistory: Array<{ key: string; fromLine?: number }> = [];
+
   @state()
   private _drawerOpen = false;
 
   @state()
   private _navCollapsed = false;
+
+  @state()
+  private _isMobile = window.matchMedia("(max-width: 900px)").matches;
+
+  private _mql = window.matchMedia("(max-width: 900px)");
+
+  private _onMqlChange = (e: MediaQueryListEvent) => {
+    this._isMobile = e.matches;
+  };
 
   /**
    * Live device YAML, fed down through `device-editor` →
@@ -191,6 +210,7 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onPostInstallShowLogs = postInstallShowLogsHandler(
     () => this._logsDialog,
+    () => this._localize
   );
 
   private _installCtrl = this._createInstallController();
@@ -342,6 +362,7 @@ export class ESPHomePageDevice extends LitElement {
     window.addEventListener("beforeunload", this._onBeforeUnload);
     window.addEventListener("popstate", this._onPopState, { capture: true });
     window.addEventListener("keydown", this._onKeydown);
+    this._mql.addEventListener("change", this._onMqlChange);
   }
 
   disconnectedCallback() {
@@ -350,6 +371,7 @@ export class ESPHomePageDevice extends LitElement {
     window.removeEventListener("beforeunload", this._onBeforeUnload);
     window.removeEventListener("popstate", this._onPopState, { capture: true });
     window.removeEventListener("keydown", this._onKeydown);
+    this._mql.removeEventListener("change", this._onMqlChange);
     // Drop any in-flight unsaved-changes guard so its caller's
     // ``await`` doesn't dangle past unmount — resolve as "don't
     // proceed" since the page is going away anyway.
@@ -358,9 +380,9 @@ export class ESPHomePageDevice extends LitElement {
 
   private _onKeydown = (e: KeyboardEvent) => {
     if (e.key !== "Escape") return;
-    /* If a deeper component (the fullscreen YAML editor, an open
-       dialog, etc.) already handled this Esc, don't also navigate
-       back. Mirrors the EscapeController guard so the leave-page
+    /* If a deeper component (open dialog, autocomplete dropdown,
+       etc.) already handled this Esc, don't also navigate back.
+       Mirrors the EscapeController guard so the leave-page
        behaviour only fires when nothing else has claimed the key. */
     if (e.defaultPrevented) return;
     /* Don't intercept Esc while the user is typing — the YAML editor,
@@ -536,8 +558,13 @@ export class ESPHomePageDevice extends LitElement {
   private _saveYaml = async (): Promise<boolean> => {
     // Promote any in-flight form keystroke (still inside its 200ms
     // debounce window) into ``_yaml`` so the save commits exactly
-    // what the user typed — not what was last flushed.
-    this._activeSection?.flushPending();
+    // what the user typed — not what was last flushed. The
+    // component editor's flushPending is sync (local YAML splice
+    // only); the automation/script editors return a Promise
+    // because their pending change is a backend upsert call.
+    // ``await`` handles both shapes — awaiting ``undefined``
+    // resolves immediately.
+    await this._activeSection?.flushPending();
     // The Save button activates on ``_isDirty`` (yaml diff OR the
     // section editor's transient pre-flush dirty flag), so a click
     // inside the debounce window can land here with the form
@@ -563,7 +590,12 @@ export class ESPHomePageDevice extends LitElement {
     // toast at this layer would shout-down its result.
     if (this.id) {
       try {
-        const res = await this._api.validateYaml(this.id, this._yaml);
+        // Reuse the linter's last result when it matches the
+        // current buffer exactly — saves a WS round-trip and an
+        // ESPHome validate pass that just ran in the background.
+        const res =
+          getLastValidatedResult(this.id, this._yaml) ??
+          (await this._api.validateYaml(this.id, this._yaml));
         const summary = summarizeValidation(res);
         if (summary.count > 0) {
           this._validationErrorCount = summary.count;
@@ -647,9 +679,7 @@ export class ESPHomePageDevice extends LitElement {
    *  navigator's selection to the containing section so the user
    *  isn't left looking at a different section's form panel after
    *  the scroll lands. */
-  private _onValidationGoTo = (
-    e: CustomEvent<{ line: number; col: number }>,
-  ) => {
+  private _onValidationGoTo = (e: CustomEvent<{ line: number; col: number }>) => {
     const line = e.detail.line;
     if (line && line >= 1) {
       // Sections-only layout would scroll a hidden editor — flip
@@ -689,8 +719,7 @@ export class ESPHomePageDevice extends LitElement {
   private _onValidateClick = () => {
     if (!this._device) return;
     this._commandDialog.configuration = this._device.configuration;
-    this._commandDialog.name =
-      this._device.friendly_name || this._device.name;
+    this._commandDialog.name = this._device.friendly_name || this._device.name;
     this._commandDialog.open("validate");
   };
 
@@ -716,9 +745,7 @@ export class ESPHomePageDevice extends LitElement {
    *    dialogs only ever surface for the current page's device),
    *    but defensively navigate to the requested device so the
    *    hint can never become a silent no-op. */
-  private _onRequestOpenEditor = (
-    e: CustomEvent<{ configuration: string }>
-  ) => {
+  private _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     e.stopPropagation();
     if (e.detail.configuration === this._device?.configuration) return;
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
@@ -733,6 +760,9 @@ export class ESPHomePageDevice extends LitElement {
       this.id ||
       this._localize("dashboard.create_device");
 
+    const showEdgeTab = this._isMobile ? !this._drawerOpen : this._navCollapsed;
+    const backLabel = this._localize("device.back");
+
     return html`
       <!-- Mobile drawer -->
       <div
@@ -746,6 +776,9 @@ export class ESPHomePageDevice extends LitElement {
         @section-toggle=${this._onSectionToggle}
         @section-select=${this._onSectionSelect}
         @yaml-highlight=${this._onYamlHighlight}
+        @yaml-updated=${this._onYamlUpdated}
+        @yaml-draft=${this._onYamlDraft}
+        @nav-collapse=${this._onNavCollapse}
       >
         ${this._renderNavigator("drawer-nav")}
       </div>
@@ -765,6 +798,7 @@ export class ESPHomePageDevice extends LitElement {
           @section-unmount=${this._onSectionUnmount}
           @dirty-change=${this._onSectionDirtyChange}
           @nav-section-show=${this._onNavSectionShow}
+          @nav-collapse=${this._onNavCollapse}
           @save-yaml=${this._saveYaml}
           @validate-device=${this._onValidateClick}
           @install-device=${this._installCtrl.onInstall}
@@ -790,11 +824,30 @@ export class ESPHomePageDevice extends LitElement {
             ?hasUpdateAvailable=${this._device?.update_available === true}
             ?busy=${this._activeJobs.has(this.id)}
           >
-            <button slot="mobile-menu" class="nav-toggle-btn" @click=${this._onNavToggle}>
-              <wa-icon library="mdi" name=${this._navToggleIcon}></wa-icon>
-            </button>
+            ${this._selectedSection
+              ? html`<button
+                  slot="header-start"
+                  class="back-btn"
+                  @click=${this._onBack}
+                  title=${backLabel}
+                  aria-label=${backLabel}
+                >
+                  <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                </button>`
+              : nothing}
           </esphome-device-editor>
         </div>
+        ${showEdgeTab
+          ? html`<button
+              type="button"
+              class="nav-edge-tab"
+              @click=${this._onNavExpand}
+              title=${this._localize("device.show_navigator")}
+              aria-label=${this._localize("device.show_navigator")}
+            >
+              <wa-icon library="mdi" name="chevron-right"></wa-icon>
+            </button>`
+          : nothing}
       </div>
       <esphome-unsaved-changes-dialog
         @discard=${this._onUnsavedDiscard}
@@ -831,27 +884,53 @@ export class ESPHomePageDevice extends LitElement {
     `;
   }
 
-  private get _isMobile(): boolean {
-    return window.matchMedia("(max-width: 900px)").matches;
-  }
+  /** Step one section back along the user's visit trail. With no
+   *  trail left we land on the board-info / next-steps view. Leaving
+   *  the device entirely is the app-shell's top-left back button —
+   *  not this one. */
+  private _onBack = () => {
+    this._guardSectionSwitch(() => {
+      const prev = this._sectionHistory.length
+        ? this._sectionHistory[this._sectionHistory.length - 1]
+        : null;
+      if (prev) {
+        this._sectionHistory = this._sectionHistory.slice(0, -1);
+        this._selectedSection = prev.key;
+        this._selectedFromLine = prev.fromLine;
+      } else {
+        this._selectedSection = null;
+        this._selectedFromLine = undefined;
+      }
+      this._highlightRange = null;
+      this._scrollToHighlight = false;
+      this._updateUrl();
+    });
+  };
 
-  private get _navToggleIcon(): string {
+  /** Left-edge expand affordance. On mobile it opens the drawer; on
+   *  desktop it un-collapses the navigator pane and persists that
+   *  preference — same write path the in-navigator collapse chevron
+   *  uses in reverse. */
+  private _onNavExpand = () => {
     if (this._isMobile) {
-      return "arrow-collapse-right";
+      this._drawerOpen = true;
+      return;
     }
-    return this._navCollapsed ? "arrow-collapse-right" : "arrow-collapse-left";
-  }
+    this._navCollapsed = false;
+    this._api.updatePreferences({ navigator_visible: true }).catch(() => {});
+  };
 
-  private _onNavToggle() {
+  /** Collapse request bubbling up from the navigator's own chevron.
+   *  Mirrors ``_onNavExpand`` in reverse — mobile closes the drawer,
+   *  desktop sets the collapsed preference. */
+  private _onNavCollapse = () => {
     if (this._isMobile) {
-      this._drawerOpen = !this._drawerOpen;
-    } else {
-      this._navCollapsed = !this._navCollapsed;
-      this._api
-        .updatePreferences({ navigator_visible: !this._navCollapsed })
-        .catch(() => {});
+      this._drawerOpen = false;
+      return;
     }
-  }
+    this._navCollapsed = true;
+    this._api.updatePreferences({ navigator_visible: false }).catch(() => {});
+  };
 
   /**
    * Accordion behaviour: clicking a closed section opens it and
@@ -1011,6 +1090,22 @@ export class ESPHomePageDevice extends LitElement {
       return;
     }
     this._guardSectionSwitch(() => {
+      // Back-stack bookkeeping: A → B pushes A so back returns to it.
+      // Going back to no-section clears the trail — a later trip into
+      // a section is a fresh navigation, not a continuation of the
+      // last one. The null-to-X case (first selection of the session)
+      // also leaves the stack untouched, which is what we want: back
+      // from there should land on board info regardless.
+      const prev = this._selectedSection;
+      const prevLine = this._selectedFromLine;
+      if (sectionKey === null) {
+        this._sectionHistory = [];
+      } else if (prev !== null) {
+        this._sectionHistory = [
+          ...this._sectionHistory,
+          { key: prev, fromLine: prevLine },
+        ];
+      }
       this._selectedSection = sectionKey;
       this._selectedFromLine = fromLine;
       this._drawerOpen = false;

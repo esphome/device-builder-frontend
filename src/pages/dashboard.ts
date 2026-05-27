@@ -92,6 +92,7 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -214,10 +215,6 @@ export class ESPHomePageDashboard extends LitElement {
   _pendingAdoptScroll: string | null = null;
   _actionDevice: ConfiguredDevice | null = null;
 
-  private static readonly _cardCollator = new Intl.Collator(undefined, {
-    sensitivity: "base",
-    numeric: true,
-  });
   private _sortedDevicesCache: {
     source: ConfiguredDevice[];
     sorted: ConfiguredDevice[];
@@ -273,6 +270,14 @@ export class ESPHomePageDashboard extends LitElement {
       })
     );
   };
+  // Kebab path: the banner is hidden when every importable is
+  // ignored, so users seeking those cards reach the toggle here.
+  // Pop the section open on the way in so they don't land on a
+  // collapsed banner and have to click "Show" a second time.
+  private _onShowIgnoredFromMenu = () => {
+    if (!this._showIgnored) this._showDiscovered = true;
+    this._toggleShowIgnored();
+  };
   private _onShowArchivedDialog = () => this._archivedDialog?.open();
 
   _onEnterSelectMode = (configuration?: string) => {
@@ -291,6 +296,10 @@ export class ESPHomePageDashboard extends LitElement {
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
+    window.addEventListener(
+      "esphome-show-ignored-from-menu",
+      this._onShowIgnoredFromMenu
+    );
     window.addEventListener("esphome-show-archived-dialog", this._onShowArchivedDialog);
     const pending = consumePendingHighlight();
     if (pending !== null) {
@@ -383,6 +392,10 @@ export class ESPHomePageDashboard extends LitElement {
       this._onShowIgnoredChanged
     );
     window.removeEventListener(
+      "esphome-show-ignored-from-menu",
+      this._onShowIgnoredFromMenu
+    );
+    window.removeEventListener(
       "esphome-show-archived-dialog",
       this._onShowArchivedDialog
     );
@@ -394,8 +407,12 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected willUpdate(changed: PropertyValues) {
     if (changed.has("_view")) this.setAttribute("view", this._view);
-    if (changed.has("_importableDevices")) {
-      this.toggleAttribute("has-discovered", this._importableDevices.length > 0);
+    // ``has-discovered`` is the hook that adds top padding for the
+    // discovery banner. Track the same condition the banner renders
+    // under so an all-ignored / hide-ignored state doesn't leave
+    // empty space at the top of the view.
+    if (changed.has("_importableDevices") || changed.has("_showIgnored")) {
+      this.toggleAttribute("has-discovered", this._visibleImportableDevices.length > 0);
     }
     if (changed.has("_devicesLoaded") && this._devicesLoaded) void loadPreferences(this);
     // The catalog arrives over WS after ``connectedCallback`` runs.
@@ -496,9 +513,9 @@ export class ESPHomePageDashboard extends LitElement {
     const source = this._devices;
     if (this._sortedDevicesCache?.source === source)
       return this._sortedDevicesCache.sorted;
-    const collator = ESPHomePageDashboard._cardCollator;
-    const sortKey = (d: ConfiguredDevice) => d.friendly_name || d.name || d.configuration;
-    const sorted = [...source].sort((a, b) => collator.compare(sortKey(a), sortKey(b)));
+    const sorted = [...source].sort((a, b) =>
+      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
+    );
     this._sortedDevicesCache = { source, sorted };
     return sorted;
   }
@@ -705,7 +722,10 @@ export class ESPHomePageDashboard extends LitElement {
   _onInstallMethodSelect = (e: CustomEvent<{ method: string; port?: string }>) =>
     onInstallMethodSelect(this, e);
   _openLogs = (device: ConfiguredDevice) => openLogs(this, device);
-  _onPostInstallShowLogs = postInstallShowLogsHandler(() => this._logsDialog);
+  _onPostInstallShowLogs = postInstallShowLogsHandler(
+    () => this._logsDialog,
+    () => this._localize
+  );
   _onRequestOpenEditor = (e: CustomEvent<{ configuration: string }>) => {
     navigate(`/device/${encodeURIComponent(e.detail.configuration)}`);
   };

@@ -38,10 +38,7 @@ import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  labelChipStyles,
-  resolveLabelIds,
-} from "../../util/label-chip-template.js";
+import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { tableCellStyles } from "./table-cell-styles.js";
 import type { ToggleableColumn } from "./table-column-toggle.js";
@@ -255,7 +252,10 @@ export class ESPHomeDeviceTable extends LitElement {
     }
     if (changed.has("initialColumnVisibility") && this.initialColumnVisibility !== null) {
       // Merge defaults so columns the user hasn't explicitly toggled stay hidden.
-      this._columnVisibility = { ...DEFAULT_HIDDEN_COLUMNS, ...this.initialColumnVisibility };
+      this._columnVisibility = {
+        ...DEFAULT_HIDDEN_COLUMNS,
+        ...this.initialColumnVisibility,
+      };
     }
     if (changed.has("initialPageSize")) {
       this._pageSize = this.initialPageSize;
@@ -334,9 +334,7 @@ export class ESPHomeDeviceTable extends LitElement {
     });
 
     const rows = table.getRowModel().rows;
-    this._visibleConfigs = table
-      .getFilteredRowModel()
-      .rows.map((r) => r.original.config);
+    this._visibleConfigs = table.getFilteredRowModel().rows.map((r) => r.original.config);
     const pgState = table.getState().pagination;
     const toggleCols: ToggleableColumn[] = table
       .getAllColumns()
@@ -376,7 +374,9 @@ export class ESPHomeDeviceTable extends LitElement {
         .device=${this._contextMenuDevice}
         .position=${this._contextMenuPos}
         ?anchor-right=${this._contextMenuAnchorRight}
-        ?busy=${this._contextMenuDevice ? this.activeJobs.has(this._contextMenuDevice.configuration) : false}
+        ?busy=${this._contextMenuDevice
+          ? this.activeJobs.has(this._contextMenuDevice.configuration)
+          : false}
         @menu-close=${this._closeContextMenu}
         @edit-device=${(e: CustomEvent) => {
           e.stopPropagation();
@@ -487,7 +487,9 @@ export class ESPHomeDeviceTable extends LitElement {
                       : sorted === "desc"
                         ? "descending"
                         : "none"}
-                    class="${canSort ? "sortable" : ""} ${sorted ? "sorted" : ""} col-${header.column.id}"
+                    class="${canSort ? "sortable" : ""} ${sorted
+                      ? "sorted"
+                      : ""} col-${header.column.id}"
                     style="width:${header.getSize()}px"
                     @click=${canSort ? () => header.column.toggleSorting() : nothing}
                   >
@@ -530,10 +532,8 @@ export class ESPHomeDeviceTable extends LitElement {
                   data-configuration=${row.original.config}
                   class=${classMap({
                     selected:
-                      this.selectMode &&
-                      this.selectedDevices.has(row.original.config),
-                    highlight:
-                      this.highlightConfiguration === row.original.config,
+                      this.selectMode && this.selectedDevices.has(row.original.config),
+                    highlight: this.highlightConfiguration === row.original.config,
                   })}
                   @click=${() =>
                     this.selectMode
@@ -635,7 +635,7 @@ export class ESPHomeDeviceTable extends LitElement {
     const root = this.shadowRoot;
     if (!root) return;
     const row = root.querySelector<HTMLElement>(
-      `tr[data-configuration="${CSS.escape(configuration)}"]`,
+      `tr[data-configuration="${CSS.escape(configuration)}"]`
     );
     row?.scrollIntoView({ behavior: "instant", block: "center" });
   }

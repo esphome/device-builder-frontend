@@ -49,7 +49,7 @@ export interface PackageImportUrlPreview {
 }
 
 export function previewPackageImportUrl(
-  raw: string | null | undefined,
+  raw: string | null | undefined
 ): PackageImportUrlPreview {
   if (!raw) {
     return { raw: "", browseUrl: null, service: null };

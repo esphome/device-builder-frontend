@@ -2,11 +2,13 @@ import { consume } from "@lit/context";
 import {
   mdiArrowDecisionOutline,
   mdiChevronDown,
+  mdiChevronLeft,
   mdiChevronRight,
   mdiChevronUp,
   mdiCog,
   mdiMemory,
   mdiPlusCircleOutline,
+  mdiScriptTextOutline,
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
@@ -14,8 +16,11 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
-import { AUTOMATIONS_ENABLED } from "../../feature-flags.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import {
+  fetchAutomationTriggers,
+  getCachedAutomationTriggers,
+} from "../../util/automation-catalog-cache.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -38,15 +43,19 @@ import "./add-component-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";
 import "./add-config-dialog.js";
 import type { ESPHomeAddConfigDialog } from "./add-config-dialog.js";
+import "./add-script-dialog.js";
+import type { ESPHomeAddScriptDialog } from "./add-script-dialog.js";
 
 registerMdiIcons({
   "chevron-down": mdiChevronDown,
+  "chevron-left": mdiChevronLeft,
   "chevron-up": mdiChevronUp,
   "chevron-right": mdiChevronRight,
   cog: mdiCog,
   "arrow-decision-outline": mdiArrowDecisionOutline,
   memory: mdiMemory,
   "plus-circle-outline": mdiPlusCircleOutline,
+  "script-text-outline": mdiScriptTextOutline,
 });
 
 @customElement("esphome-device-navigator")
@@ -99,6 +108,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @query("esphome-add-automation-dialog")
   private _addAutomationDialog!: ESPHomeAddAutomationDialog;
 
+  @query("esphome-add-script-dialog")
+  private _addScriptDialog!: ESPHomeAddScriptDialog;
+
   @property({ attribute: false })
   selectedKey: string | null = null;
 
@@ -124,7 +136,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
       .card {
         background: var(--wa-color-surface-default);
         border-radius: var(--navigator-border-radius, var(--wa-border-radius-l));
-        border: var(--navigator-border, var(--wa-border-width-s) solid var(--wa-color-surface-border));
+        border: var(
+          --navigator-border,
+          var(--wa-border-width-s) solid var(--wa-color-surface-border)
+        );
         box-shadow: var(--wa-elevation-02);
         display: flex;
         flex-direction: column;
@@ -134,6 +149,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
       .card-header {
         display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: var(--wa-space-s);
         padding: var(--wa-space-s) var(--wa-space-m);
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
@@ -144,6 +161,26 @@ export class ESPHomeDeviceNavigator extends LitElement {
         margin: 0;
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
+      }
+
+      .collapse-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: transparent;
+        color: var(--esphome-on-primary);
+        cursor: pointer;
+        padding: 2px 4px;
+        border-radius: var(--wa-border-radius-s);
+      }
+
+      .collapse-btn:hover {
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+      }
+
+      .collapse-btn wa-icon {
+        font-size: 18px;
       }
 
       .card-body {
@@ -272,21 +309,6 @@ export class ESPHomeDeviceNavigator extends LitElement {
         opacity: 0.9;
       }
 
-      /* Disabled action: greyed out, no hover, no pointer. The wrapper
-         drops its click handler so the underlying dialog is never
-         opened — this is purely visual confirmation. */
-      .action-item--disabled,
-      .action-item--disabled:hover {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-quiet);
-        cursor: not-allowed;
-        opacity: 0.65;
-      }
-
-      .action-item--disabled wa-icon {
-        color: var(--wa-color-text-quiet);
-      }
-
       .action-item p {
         margin: var(--wa-space-xs) 0;
         font-size: var(--wa-font-size-s);
@@ -359,8 +381,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
       const match =
         (this.selectedFromLine !== undefined
           ? allSections.find((s) => s.fromLine === this.selectedFromLine)
-          : undefined) ??
-        allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
+          : undefined) ?? allSections.find((s) => sectionKeyOf(s) === this.selectedKey);
       if (match) {
         this._selectedLine = match.fromLine;
         this._selectedRange = {
@@ -377,23 +398,51 @@ export class ESPHomeDeviceNavigator extends LitElement {
       components,
       automations: topLevelAutomations,
     } = categorizeSections(parseYamlTopLevelSections(this.yaml));
-    const automations = [...topLevelAutomations, ...parseYamlAutomations(this.yaml)].sort(
-      (a, b) => a.fromLine - b.fromLine
+    // ``parseYamlAutomations`` now enumerates individual ``script:``
+    // / ``interval:`` list items as stable-keyed entries
+    // (``automation:script:<id>``, ``automation:interval:<index>``),
+    // so the bare ``script:`` / ``interval:`` top-level blocks
+    // returned by the top-level parser would duplicate them. Drop
+    // those bare keys here so each automation shows up exactly once.
+    const detailed = parseYamlAutomations(this.yaml);
+    const filteredTopLevel = topLevelAutomations.filter(
+      (s) => s.key !== "script" && s.key !== "interval"
     );
+    // Light effects belong to their parent light component now, not
+    // the automations surface — clicking one in the navigator
+    // routed to the automation editor in a confusing standalone
+    // mode. Effects are managed through the light's own section
+    // editor; drop them here so they don't appear orphaned in the
+    // automations group.
+    //
+    // ``automation:unscoped:*`` entries are inline ``on_*:`` handlers
+    // on components that have no ``id:`` set. The structured editor
+    // can't address them (locationFromSectionKey returns null), so
+    // routing one through the navigator would surface as a failing
+    // ``fetchComponent`` and a blank section editor. Drop them too;
+    // the user fixes by adding an ``id:`` to the host component.
+    const automations = [...filteredTopLevel, ...detailed]
+      .filter(
+        (s) =>
+          !s.key.startsWith("automation:light_effect:") &&
+          !s.key.startsWith("automation:unscoped:")
+      )
+      .sort((a, b) => a.fromLine - b.fromLine);
 
     interface NavAction {
       label: string;
       icon: string;
       onClick: () => void;
-      disabled?: boolean;
-      disabledReason?: string;
     }
     interface NavSection {
       label: string;
       desc: string;
       items: YamlSection[];
       category: "core" | "component" | "automation";
-      action: NavAction;
+      /** A section can carry multiple "+ Add X" affordances —
+       *  Automations has both "+ Add automation" and "+ Add script",
+       *  the others have one. */
+      actions: NavAction[];
     }
     const sections: NavSection[] = [
       {
@@ -401,39 +450,44 @@ export class ESPHomeDeviceNavigator extends LitElement {
         desc: this._localize("device.section_core_desc"),
         items: core,
         category: "core",
-        action: {
-          label: this._localize("device.add_config"),
-          icon: "cog",
-          onClick: () => this._addConfigDialog.open(),
-        },
+        actions: [
+          {
+            label: this._localize("device.add_config"),
+            icon: "cog",
+            onClick: () => this._addConfigDialog.open(),
+          },
+        ],
       },
       {
         label: this._localize("device.section_components"),
         desc: this._localize("device.section_components_desc"),
         items: components,
         category: "component",
-        action: {
-          label: this._localize("device.add_component"),
-          icon: "memory",
-          onClick: () => this._addComponentDialog.open(),
-        },
+        actions: [
+          {
+            label: this._localize("device.add_component"),
+            icon: "memory",
+            onClick: () => this._addComponentDialog.open(),
+          },
+        ],
       },
       {
         label: this._localize("device.section_automations"),
         desc: this._localize("device.section_automations_desc"),
         items: automations,
         category: "automation",
-        // Add-automation is gated on a backend that doesn't yet exist
-        // — see `feature-flags.ts` and the README "Status" section.
-        // The list still renders existing automations parsed from
-        // YAML; only the action button is disabled.
-        action: {
-          label: this._localize("device.add_automation"),
-          icon: "arrow-decision-outline",
-          onClick: () => this._addAutomationDialog.open(),
-          disabled: !AUTOMATIONS_ENABLED,
-          disabledReason: this._localize("device.add_automation_unavailable"),
-        },
+        actions: [
+          {
+            label: this._localize("device.add_automation"),
+            icon: "arrow-decision-outline",
+            onClick: () => this._addAutomationDialog.open(),
+          },
+          {
+            label: this._localize("device.add_script"),
+            icon: "script-text-outline",
+            onClick: () => this._addScriptDialog.open(),
+          },
+        ],
       },
     ];
 
@@ -453,19 +507,36 @@ export class ESPHomeDeviceNavigator extends LitElement {
           .board=${this.board}
           .yaml=${this.yaml}
         ></esphome-add-component-dialog>
-        ${AUTOMATIONS_ENABLED
-          ? html`<esphome-add-automation-dialog
-              .boardName=${this.boardName}
-              .configuration=${this.configuration}
-            ></esphome-add-automation-dialog>`
-          : nothing}
+        <esphome-add-automation-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          @automation-added=${this._onAutomationAdded}
+        ></esphome-add-automation-dialog>
+        <esphome-add-script-dialog
+          .boardName=${this.boardName}
+          .configuration=${this.configuration}
+          .board=${this.board}
+          .yaml=${this.yaml}
+          @automation-added=${this._onAutomationAdded}
+        ></esphome-add-script-dialog>
         <header class="card-header">
           <h2 class="card-title">${this._localize("device.navigator_title")}</h2>
+          <button
+            type="button"
+            class="collapse-btn"
+            @click=${this._onCollapseClick}
+            title=${this._localize("device.hide_navigator")}
+            aria-label=${this._localize("device.hide_navigator")}
+          >
+            <wa-icon library="mdi" name="chevron-left"></wa-icon>
+          </button>
         </header>
         <div class="card-body">
           <p class="italic">${this._localize("device.navigator_desc")}</p>
           <div class="separator"></div>
-          ${sections.map(({ label, desc, items, category, action }, i) => {
+          ${sections.map(({ label, desc, items, category, actions }, i) => {
             const open = this.openSections.has(i);
             return html`
               <div class="nav-content" @click=${() => this._toggleSection(i)}>
@@ -483,8 +554,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
                       ? html`
                           <div class="nav-items">
                             ${items.map((item) => {
-                              const { primary, secondary } =
-                                this._navItemLabels(item, category);
+                              const { primary, secondary } = this._navItemLabels(
+                                item,
+                                category
+                              );
                               return html`
                                 <div
                                   class="nav-item ${this._selectedLine === item.fromLine
@@ -493,7 +566,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
                                     ? "nav-item--hovered"
                                     : ""}"
                                   @mouseenter=${() =>
-                                    this._onItemHover(item.fromLine, item.fromLine, item.toLine)}
+                                    this._onItemHover(
+                                      item.fromLine,
+                                      item.fromLine,
+                                      item.toLine
+                                    )}
                                   @mouseleave=${() => this._onItemLeave()}
                                   @click=${() => this._onItemClick(item)}
                                 >
@@ -512,27 +589,17 @@ export class ESPHomeDeviceNavigator extends LitElement {
                           </div>
                         `
                       : nothing}
-                    <div
-                      class="nav-items"
-                      @click=${action.disabled
-                        ? undefined
-                        : () => action.onClick()}
-                    >
-                      <div
-                        class="action-item ${action.disabled
-                          ? "action-item--disabled"
-                          : ""}"
-                        title=${action.disabled
-                          ? action.disabledReason ?? ""
-                          : ""}
-                        aria-disabled=${action.disabled ? "true" : "false"}
-                      >
-                        <div>
-                          <wa-icon library="mdi" name=${action.icon}></wa-icon>
-                          <p>${action.label}</p>
-                        </div>
-                        <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
-                      </div>
+                    <div class="nav-items">
+                      ${actions.map(
+                        (action) =>
+                          html`<div class="action-item" @click=${() => action.onClick()}>
+                            <div>
+                              <wa-icon library="mdi" name=${action.icon}></wa-icon>
+                              <p>${action.label}</p>
+                            </div>
+                            <wa-icon library="mdi" name="plus-circle-outline"></wa-icon>
+                          </div>`
+                      )}
                     </div>
                   `
                 : nothing}
@@ -554,6 +621,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
     );
   }
 
+  /** Ask the page to hide the navigator. The page decides between
+   *  desktop (set ``_navCollapsed`` + persist) and mobile (close the
+   *  drawer) — we just say "I'd like to disappear". */
+  private _onCollapseClick = () => {
+    this.dispatchEvent(
+      new CustomEvent("nav-collapse", {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
+
   /**
    * Fire-and-forget catalog lookups for any sections whose name we
    * haven't cached yet. Resolved entries land in the shared cache;
@@ -566,6 +645,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
     const sections = parseYamlTopLevelSections(this.yaml);
     const { core, components } = categorizeSections(sections);
     const platform = this.platform || undefined;
+    const boardId = this.board?.id;
     for (const item of [...core, ...components]) {
       const id = sectionKeyOf(item);
       if (getCachedComponent(id, platform) !== undefined) continue;
@@ -574,6 +654,24 @@ export class ESPHomeDeviceNavigator extends LitElement {
         // catalog entry is available, so a transient backend hiccup
         // shouldn't surface as an error here.
       });
+    }
+    // Trigger catalog: needed so automation entries can render as
+    // "Switch → Turn on" (catalog-pretty domain + trigger name)
+    // instead of "warmtepomp → on_turn_on" (raw YAML key). The cache
+    // is process-wide and the subscription path re-renders when an
+    // entry lands.
+    if (getCachedAutomationTriggers(platform, boardId) === undefined) {
+      void fetchAutomationTriggers(this._api, platform, boardId).then(
+        () => {
+          // Manual nudge — the subscription handler only fires for
+          // ``component-name`` writes; the trigger cache has no
+          // observer surface, so we force a re-render directly.
+          this._cacheTick++;
+        },
+        () => {
+          /* swallow — same rationale as the component fetch above. */
+        }
+      );
     }
   }
 
@@ -592,20 +690,112 @@ export class ESPHomeDeviceNavigator extends LitElement {
    */
   private _navItemLabels(
     item: YamlSection,
-    category: "core" | "component" | "automation",
+    category: "core" | "component" | "automation"
   ): { primary: string; secondary?: string } {
     const raw = sectionKeyOf(item);
 
-    let primary = raw;
-    if (category !== "automation") {
-      const cached = getCachedComponent(raw, this.platform || undefined);
-      if (cached?.name) primary = cached.name;
+    if (category === "automation") {
+      return this._automationLabels(item, raw);
     }
+
+    let primary = raw;
+    const cached = getCachedComponent(raw, this.platform || undefined);
+    if (cached?.name) primary = cached.name;
 
     const named = item.name || item.id;
     const secondary = named && named !== primary ? named : undefined;
 
     return { primary, secondary };
+  }
+
+  /**
+   * Two-line layout for automation entries — keeps the navigator
+   * consistent with how components render (catalog name on top,
+   * instance name/id below):
+   *
+   *   on_*: under a component  →  "Switch → Turn on" / instance name+id
+   *   script entry             →  "Script"           / id
+   *   interval entry           →  "Interval"         / "Every 60s"
+   *
+   * The catalog-derived "Switch" / "Turn on" pair comes from the
+   * automation triggers catalog. While the catalog is still loading
+   * we render a graceful fallback ("Switch → on_turn_on") so the
+   * navigator never blanks out on first paint.
+   */
+  private _automationLabels(
+    item: YamlSection,
+    raw: string
+  ): { primary: string; secondary?: string } {
+    // Script: line 1 = "Script", line 2 = id.
+    if (item.parentKey === "script") {
+      const primary = this._localize("device.script_header_title_static");
+      const secondary = item.id ?? raw;
+      return { primary, secondary: secondary !== primary ? secondary : undefined };
+    }
+    // Interval: line 1 = "Interval", line 2 = the time if known.
+    // Uses the bare "automation_interval_label" key (not the
+    // longer-form "On an interval" used by the kind picker) so the
+    // nav row stays scannable.
+    if (item.parentKey === "interval") {
+      const primary = this._localize("device.automation_interval_label");
+      const every = item.meta?.every;
+      const secondary = every
+        ? this._localize("device.automation_interval_every_n", { time: every })
+        : undefined;
+      return { primary, secondary };
+    }
+    // Device-level (``esphome → on_boot``) — no instance to show on
+    // line 2; keep line 2 empty since the trigger name already
+    // identifies the automation uniquely.
+    if (item.parentKey === "esphome" && item.eventKey) {
+      const primary = this._resolveTriggerName(
+        "esphome",
+        item.eventKey,
+        `${this._prettyDomain("esphome")} → ${item.eventKey}`
+      );
+      return { primary };
+    }
+    // Component-bound (``Switch → On Turn On`` resolved from the
+    // catalog; "Warmtepomp" on line 2).
+    if (item.parentKey && item.eventKey) {
+      const fallback = `${this._prettyDomain(item.parentKey)} → ${item.eventKey}`;
+      const primary = this._resolveTriggerName(item.parentKey, item.eventKey, fallback);
+      const named = item.name || item.id;
+      const secondary = named && named !== primary ? named : undefined;
+      return { primary, secondary };
+    }
+    // Unscoped / unrecognised — fall back to displayLabel.
+    return { primary: item.displayLabel || raw };
+  }
+
+  /** Resolve the catalog's pretty name for ``<domain>.<event>`` or
+   *  return ``fallback`` (typically the raw event key) when the
+   *  catalog hasn't loaded yet. The catalog's ``name`` field is the
+   *  full display label including the domain prefix
+   *  (``"Switch → On Turn On"``), so callers use the resolved value
+   *  as-is — no separate domain prepend. */
+  private _resolveTriggerName(
+    domain: string,
+    eventKey: string,
+    fallback: string
+  ): string {
+    const triggers = getCachedAutomationTriggers(
+      this.platform || undefined,
+      this.board?.id
+    );
+    if (!triggers) return fallback;
+    const catalogId = domain === "esphome" ? eventKey : `${domain}.${eventKey}`;
+    const hit = triggers.find((t) => t.id === catalogId);
+    return hit?.name || fallback;
+  }
+
+  /** Capitalize a YAML domain key for display (``binary_sensor`` →
+   *  ``Binary sensor``). Used only for the pre-catalog fallback
+   *  label so the navigator never shows a raw lowercase domain
+   *  while the trigger fetch is still in flight. */
+  private _prettyDomain(domain: string): string {
+    const spaced = domain.replace(/_/g, " ");
+    return spaced.charAt(0).toUpperCase() + spaced.slice(1);
   }
 
   private _onItemHover(line: number, fromLine: number, toLine: number) {
@@ -626,7 +816,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
       this.selectedKey = null;
       this._selectedLine = null;
       this._selectedRange = null;
-      this._emitHighlight(this._hoveredLine === fromLine ? { fromLine, toLine } : null, false);
+      this._emitHighlight(
+        this._hoveredLine === fromLine ? { fromLine, toLine } : null,
+        false
+      );
       this._emitSectionSelect(null, undefined);
     } else {
       this.selectedKey = sectionKey;
@@ -656,6 +849,20 @@ export class ESPHomeDeviceNavigator extends LitElement {
       })
     );
   }
+
+  /**
+   * Bubble up from the add-automation / add-script wizards. After
+   * a successful upsert we want the navigator to route to the new
+   * section so the user lands in the inline edit pane to fill in
+   * actions (and parameters, for scripts). The wizard emits with
+   * a stable section key built via ``sectionKeyFromLocation`` —
+   * the same key parseYamlAutomations will produce on the next
+   * navigator render once the YAML refresh propagates.
+   */
+  private _onAutomationAdded = (e: CustomEvent<{ sectionKey: string }>) => {
+    e.stopPropagation();
+    this._emitSectionSelect(e.detail.sectionKey, undefined);
+  };
 }
 
 declare global {

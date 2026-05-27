@@ -12,6 +12,12 @@ import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-t
 import type {
   AddComponentResponse,
   ArchivedDevice,
+  AutomationAction,
+  AutomationCondition,
+  AutomationTree,
+  AutomationTrigger,
+  AutomationLocation,
+  AvailableAutomations,
   BoardCatalogEntry,
   BulkActionResult,
   CommandMessage,
@@ -24,6 +30,8 @@ import type {
   EventSubscriptionCallback,
   FirmwareBinary,
   Label,
+  LightEffect,
+  ParsedAutomation,
   ReachabilityStateEvent,
   ReachabilitySubscription,
   FirmwareDownload,
@@ -39,6 +47,7 @@ import type {
   RemoteBuildSettings,
   RemoteBuildSubmitTarget,
   ResultMessage,
+  DetectChipResult,
   SerialPort,
   ServerInfoMessage,
   OnboardingState,
@@ -46,6 +55,7 @@ import type {
   UpdateDeviceResponse,
   UserPreferences,
   WizardResponse,
+  YamlDiff,
   YamlSearchHit,
 } from "./types.js";
 
@@ -591,7 +601,7 @@ export class ESPHomeAPI {
    */
   async subscribeDeviceReachability(
     deviceName: string,
-    callback: (state: ReachabilityStateEvent) => void,
+    callback: (state: ReachabilityStateEvent) => void
   ): Promise<ReachabilitySubscription> {
     if (!this._ws || this._ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
@@ -639,9 +649,7 @@ export class ESPHomeAPI {
         const timer = setTimeout(() => {
           this._pendingRequests.delete(messageId);
           reject(
-            new Error(
-              `subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`,
-            ),
+            new Error(`subscribe_reachability timed out after ${SUBSCRIBE_TIMEOUT_MS}ms`)
           );
         }, SUBSCRIBE_TIMEOUT_MS);
         this._pendingRequests.set(messageId, {
@@ -782,9 +790,7 @@ export class ESPHomeAPI {
     return this.sendCommand<{ configuration: string }>("devices/clone", {
       configuration,
       new_name: newName,
-      ...(newFriendlyName !== undefined
-        ? { new_friendly_name: newFriendlyName }
-        : {}),
+      ...(newFriendlyName !== undefined ? { new_friendly_name: newFriendlyName } : {}),
     });
   }
 
@@ -953,7 +959,7 @@ export class ESPHomeAPI {
    *  state without waiting for the ``device_updated`` event. */
   async setDeviceLabels(
     configuration: string,
-    labelIds: string[],
+    labelIds: string[]
   ): Promise<ConfiguredDevice> {
     return this.sendCommand<ConfiguredDevice>("devices/set_labels", {
       configuration,
@@ -971,10 +977,7 @@ export class ESPHomeAPI {
   /** Create a new label. ``name`` 1-50 chars, unique
    *  case-insensitively. ``color`` is ``#rrggbb`` (lowercased on
    *  save) or ``null`` / omitted for "no explicit color". */
-  async createLabel(args: {
-    name: string;
-    color?: string | null;
-  }): Promise<Label> {
+  async createLabel(args: { name: string; color?: string | null }): Promise<Label> {
     return this.sendCommand<Label>("labels/create", args);
   }
 
@@ -1109,7 +1112,7 @@ export class ESPHomeAPI {
   async firmwareInstall(
     configuration: string,
     port = "OTA",
-    forceLocal = false,
+    forceLocal = false
   ): Promise<FirmwareJob> {
     return this.sendCommand<FirmwareJob>("firmware/install", {
       configuration,
@@ -1277,6 +1280,169 @@ export class ESPHomeAPI {
     return result;
   }
 
+  // ─── Automations ─────────────────────────────────────────
+
+  /**
+   * Catalog of every trigger ESPHome knows about for the pinned
+   * version. Pass ``platform`` to have the backend resolve any
+   * per-platform ``cv.SplitDefault`` fields on trigger-parameter
+   * schemas (same mechanism as ``getComponent``). ``boardId``
+   * additionally narrows board-level constraints.
+   *
+   * The list is immutable for the lifetime of the WS session —
+   * callers should round-trip through
+   * ``src/util/automation-catalog-cache.ts`` rather than re-issuing
+   * the command on every render.
+   */
+  async getAutomationTriggers(
+    platform?: string,
+    boardId?: string
+  ): Promise<AutomationTrigger[]> {
+    return this.sendCommand<AutomationTrigger[]>("automations/get_triggers", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /** Catalog of every automation action. Same caching guidance as
+   *  ``getAutomationTriggers``. */
+  async getAutomationActions(
+    platform?: string,
+    boardId?: string
+  ): Promise<AutomationAction[]> {
+    return this.sendCommand<AutomationAction[]>("automations/get_actions", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /** Catalog of every automation condition. Same caching guidance as
+   *  ``getAutomationTriggers``. */
+  async getAutomationConditions(
+    platform?: string,
+    boardId?: string
+  ): Promise<AutomationCondition[]> {
+    return this.sendCommand<AutomationCondition[]>("automations/get_conditions", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /** Catalog of every light effect registered with ESPHome.
+   *  Surfaced as a separate command because effects sit on a
+   *  different editor surface (per-light list ergonomics) than the
+   *  trigger/action/condition tree. */
+  async getLightEffects(platform?: string, boardId?: string): Promise<LightEffect[]> {
+    return this.sendCommand<LightEffect[]>("automations/get_light_effects", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /**
+   * Context-aware automation catalog for a single device's YAML.
+   * Triggers are scoped to component types actually present in the
+   * config; actions / conditions are returned in full;
+   * ``scripts`` / ``devices`` feed action-parameter dropdowns
+   * (``script.execute`` needs declared script ids and their
+   * ``parameters:``; ``switch.turn_on`` needs the configured switch
+   * instance ids).
+   *
+   * Unlike the static catalog commands, the result depends on YAML
+   * contents — callers should re-fetch on each YAML change rather
+   * than caching across edits.
+   */
+  async getAvailableAutomations(configuration: string): Promise<AvailableAutomations> {
+    return this.sendCommand<AvailableAutomations>("automations/get_available", {
+      configuration,
+    });
+  }
+
+  /**
+   * Parse every automation in a device YAML into structured form.
+   * Returns one ``ParsedAutomation`` per top-level ``script:`` /
+   * ``interval:`` list item, per inline ``on_*:`` handler under a
+   * component, per device-level ``esphome.on_*``, and per light
+   * effect.
+   *
+   * The frontend treats this as the authoritative source for the
+   * automations navigator group and the editor's
+   * existing-automation hydrate path. The regex-based
+   * ``parseYamlAutomations`` in ``util/yaml-sections.ts`` remains
+   * as a synchronous fallback used during the brief window between
+   * a keystroke and the next round-trip.
+   */
+  async parseDeviceAutomations(
+    configuration: string,
+    /**
+     * Optional in-memory YAML override — same purpose as the
+     * matching parameter on ``upsertAutomation``. Pass when the
+     * caller is reading from a draft buffer the user hasn't
+     * saved yet (e.g. the editor's post-add hydrate that runs
+     * before global save).
+     */
+    yaml?: string
+  ): Promise<ParsedAutomation[]> {
+    return this.sendCommand<ParsedAutomation[]>("automations/parse", {
+      configuration,
+      ...(yaml !== undefined ? { yaml } : {}),
+    });
+  }
+
+  /**
+   * Insert a new automation or replace an existing one. ``location``
+   * discriminates top-level vs inline placement and pins the YAML
+   * range to splice; ``automation`` is the structured tree the
+   * editor maintains.
+   *
+   * Returns a ``YamlDiff`` (same shape the component flow uses) that
+   * the caller applies to its in-memory YAML and saves through the
+   * normal config-write debounce. The backend does NOT write the
+   * YAML file directly — the editor pane remains the single writer
+   * so optimistic-update + revert-on-failure stays exactly as it is
+   * for component edits.
+   */
+  async upsertAutomation(
+    configuration: string,
+    automation: AutomationTree,
+    location: AutomationLocation,
+    /**
+     * Optional in-memory YAML override. The editor's auto-apply
+     * runs multiple times before the user clicks Save, and each
+     * run's diff has to be computed against the previous run's
+     * draft — not against on-disk YAML. Pass the page's current
+     * ``_yaml`` here so the backend works with the same text the
+     * frontend is about to splice into.
+     */
+    yaml?: string
+  ): Promise<{ yaml_diff: YamlDiff }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/upsert", {
+      configuration,
+      automation,
+      location,
+      ...(yaml !== undefined ? { yaml } : {}),
+    });
+  }
+
+  /** Remove the automation at ``location`` from the YAML. Returns a
+   *  ``YamlDiff`` the caller applies to its in-memory YAML.
+   *  Adjacent siblings (other ``on_*:`` handlers on the same
+   *  component, other list items in the same ``script:`` block) are
+   *  left untouched. */
+  async deleteAutomation(
+    configuration: string,
+    location: AutomationLocation,
+    /** Optional in-memory YAML override — same purpose as for
+     *  ``upsertAutomation``. */
+    yaml?: string
+  ): Promise<{ yaml_diff: YamlDiff }> {
+    return this.sendCommand<{ yaml_diff: YamlDiff }>("automations/delete", {
+      configuration,
+      ...(yaml !== undefined ? { yaml } : {}),
+      location,
+    });
+  }
+
   // ─── Config Commands ──────────────────────────────────────
 
   /** Get ESPHome and server version. */
@@ -1287,6 +1453,16 @@ export class ESPHomeAPI {
   /** List available serial ports. */
   async getSerialPorts(): Promise<SerialPort[]> {
     return this.sendCommand<SerialPort[]>("config/serial_ports");
+  }
+
+  /**
+   * Detect what's plugged into a server-side serial port. Runs
+   * esptool chip-id + a best-effort read of the IDF app descriptor
+   * so the wizard's server-serial branch can auto-route on factory
+   * firmware the same way WebSerial does.
+   */
+  async detectChip(port: string): Promise<DetectChipResult> {
+    return this.sendCommand<DetectChipResult>("config/detect_chip", { port });
   }
 
   /** Get user preferences. */
@@ -1323,14 +1499,11 @@ export class ESPHomeAPI {
    * (32 char SSID, 64 char password) and surfaces violations as
    * ``CommandError(INVALID_ARGS)`` for the UI to render.
    */
-  async setOnboardingWifi(
-    ssid: string,
-    password: string,
-  ): Promise<OnboardingState> {
-    return this.sendCommand<OnboardingState>(
-      "onboarding/set_wifi_credentials",
-      { ssid, password },
-    );
+  async setOnboardingWifi(ssid: string, password: string): Promise<OnboardingState> {
+    return this.sendCommand<OnboardingState>("onboarding/set_wifi_credentials", {
+      ssid,
+      password,
+    });
   }
 
   /**
@@ -1372,10 +1545,7 @@ export class ESPHomeAPI {
     enabled: boolean;
     cleanup_ttl_seconds?: number;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/set_settings",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/set_settings", args);
   }
 
   /**
@@ -1435,10 +1605,7 @@ export class ESPHomeAPI {
     pin_sha256: string;
     enabled: boolean;
   }): Promise<PairingSummary> {
-    return this.sendCommand<PairingSummary>(
-      "remote_build/set_pairing_enabled",
-      args
-    );
+    return this.sendCommand<PairingSummary>("remote_build/set_pairing_enabled", args);
   }
 
   /**
@@ -1480,10 +1647,7 @@ export class ESPHomeAPI {
   async approveRemoteBuildPeer(args: {
     dashboard_id: string;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/approve_peer",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/approve_peer", args);
   }
 
   /**
@@ -1498,10 +1662,7 @@ export class ESPHomeAPI {
   async removeRemoteBuildPeer(args: {
     dashboard_id: string;
   }): Promise<RemoteBuildSettings> {
-    return this.sendCommand<RemoteBuildSettings>(
-      "remote_build/remove_peer",
-      args
-    );
+    return this.sendCommand<RemoteBuildSettings>("remote_build/remove_peer", args);
   }
 
   /**
@@ -1524,10 +1685,7 @@ export class ESPHomeAPI {
   async setRemoteBuildPairingWindow(args: {
     open: boolean;
   }): Promise<PairingWindowState> {
-    return this.sendCommand<PairingWindowState>(
-      "remote_build/set_pairing_window",
-      args
-    );
+    return this.sendCommand<PairingWindowState>("remote_build/set_pairing_window", args);
   }
 
   // ─── Remote build: offloader-side pair flow (phase 4a-o) ──
@@ -1550,10 +1708,7 @@ export class ESPHomeAPI {
     hostname: string;
     port: number;
   }): Promise<{ pin_sha256: string }> {
-    return this.sendCommand<{ pin_sha256: string }>(
-      "remote_build/preview_pair",
-      args
-    );
+    return this.sendCommand<{ pin_sha256: string }>("remote_build/preview_pair", args);
   }
 
   /**
@@ -1624,9 +1779,7 @@ export class ESPHomeAPI {
    * "stale on receiver, removed locally" case as a UI
    * affordance for the receiver-side admin.
    */
-  async unpairRemoteBuild(args: {
-    pin_sha256: string;
-  }): Promise<{ removed: boolean }> {
+  async unpairRemoteBuild(args: { pin_sha256: string }): Promise<{ removed: boolean }> {
     return this.sendCommand<{ removed: boolean }>("remote_build/unpair", args);
   }
 
@@ -1668,10 +1821,7 @@ export class ESPHomeAPI {
     hostname: string;
     port: number;
   }): Promise<PairingSummary> {
-    return this.sendCommand<PairingSummary>(
-      "remote_build/edit_pairing_endpoint",
-      args,
-    );
+    return this.sendCommand<PairingSummary>("remote_build/edit_pairing_endpoint", args);
   }
 
   /**
@@ -1752,10 +1902,7 @@ export class ESPHomeAPI {
     pin_sha256: string;
     job_id: string;
   }): Promise<{ sent: boolean }> {
-    return this.sendCommand<{ sent: boolean }>(
-      "remote_build/cancel_job",
-      args,
-    );
+    return this.sendCommand<{ sent: boolean }>("remote_build/cancel_job", args);
   }
 
   // ─── Remote build: receiver identity ──────────

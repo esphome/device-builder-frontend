@@ -24,6 +24,7 @@ export {
   renderNumberField,
   renderSelectField,
   renderTextareaField,
+  renderTimePeriodField,
 } from "./config-entry-renderers/primitives.js";
 
 export {

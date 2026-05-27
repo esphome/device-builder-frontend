@@ -11,6 +11,7 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   YamlRawValue,
   formatYamlScalar,
+  parseYamlBoolean,
   serializeYamlValues,
   type SerializeYamlOptions,
 } from "./yaml-serialize.js";
@@ -57,9 +58,7 @@ const TOP_LEVEL_KEY_START_RE = /^[a-zA-Z_]/;
  * "inline key" means; sharing the regex makes that a compile-time
  * fact.
  */
-const LIST_ITEM_INLINE_KEY_RE = new RegExp(
-  `^\\s+-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
-);
+const LIST_ITEM_INLINE_KEY_RE = new RegExp(`^\\s+-\\s+(${KEY_PATTERN}):\\s*(.*)$`);
 
 /**
  * Detect a YAML list-item start. Accepts both the standard
@@ -144,8 +143,7 @@ const childRegexFor = (indent: string) =>
 // the dash (detected from the actual list content by the caller),
 // not the parent key's indent — a 4-space user file puts the
 // dash at ``parent + 4``, not the canonical ``parent + 2``.
-const listItemRegexFor = (dashIndent: string) =>
-  new RegExp(`^${dashIndent}-\\s+(.*)$`);
+const listItemRegexFor = (dashIndent: string) => new RegExp(`^${dashIndent}-\\s+(.*)$`);
 
 /**
  * True when *line* is structurally invisible to the key/value
@@ -171,10 +169,7 @@ const isBlankOrCommentLine = (line: string): boolean => {
  * lines. Returns the first index that holds real content, or
  * ``lines.length`` if none.
  */
-const _skipBlankAndCommentLines = (
-  lines: string[],
-  startIdx: number,
-): number => {
+const _skipBlankAndCommentLines = (lines: string[], startIdx: number): number => {
   let j = startIdx;
   while (j < lines.length && isBlankOrCommentLine(lines[j])) j++;
   return j;
@@ -189,8 +184,7 @@ const _skipBlankAndCommentLines = (
  * 2-space canonical form, and pasting one into the editor
  * shouldn't silently come back empty.
  */
-const _leadingIndent = (line: string): string =>
-  line.match(/^ */)![0];
+const _leadingIndent = (line: string): string => line.match(/^ */)![0];
 
 /**
  * Walk forward from *startIdx* and return the indent of the first
@@ -204,7 +198,7 @@ const _leadingIndent = (line: string): string =>
 const _detectSectionChildIndent = (
   lines: string[],
   startIdx: number,
-  isListItem: boolean,
+  isListItem: boolean
 ): string => {
   // The "floor" is the column a child line must strictly beat. For
   // map sections that's the section header's leading whitespace;
@@ -212,9 +206,7 @@ const _detectSectionChildIndent = (
   // child key (at ``dash + 2``) clears it while a sibling dash
   // (same column as ours) doesn't.
   const headLine = lines[startIdx];
-  const floor = isListItem
-    ? headLine.indexOf("-") + 1
-    : _leadingIndent(headLine).length;
+  const floor = isListItem ? headLine.indexOf("-") + 1 : _leadingIndent(headLine).length;
   const fallback = isListItem
     ? `${ESPHOME_YAML_INDENT}${ESPHOME_YAML_INDENT}`
     : ESPHOME_YAML_INDENT;
@@ -243,7 +235,7 @@ const _detectSectionChildIndent = (
 const _detectListItemChildIndent = (
   lines: string[],
   startIdx: number,
-  dashIndent: string,
+  dashIndent: string
 ): string | null => {
   for (let i = startIdx; i < lines.length; i++) {
     const line = lines[i];
@@ -284,10 +276,7 @@ const isListItemLine = (line: string, dashIndent: string): boolean => {
  * list of the current key, regardless of which indent step the
  * user picked". 4-space YAML pastes work as a result.
  */
-const isDeeperListItemLine = (
-  line: string,
-  parentIndent: string,
-): boolean => {
+const isDeeperListItemLine = (line: string, parentIndent: string): boolean => {
   const lead = _leadingIndent(line);
   if (lead.length <= parentIndent.length) return false;
   const tail = line.slice(lead.length);
@@ -295,19 +284,27 @@ const isDeeperListItemLine = (
 };
 
 const stripQuotes = (s: string): string => {
-  if (
-    (s.startsWith('"') && s.endsWith('"')) ||
-    (s.startsWith("'") && s.endsWith("'"))
-  ) {
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     return s.slice(1, -1);
   }
   return s;
 };
 
+// Quoting in YAML is the explicit "treat me as a string" signal —
+// ``key: "on"`` must stay the literal ``"on"`` even though ``on`` is
+// a truthy spelling. Detect the quotes BEFORE stripping so we only
+// run the boolean coercion on plain scalars; otherwise a string
+// field that happens to hold ``"on"`` / ``"yes"`` would silently
+// flip to boolean ``true`` on round-trip.
 const parseScalar = (raw: string): unknown => {
+  const wasQuoted =
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"));
   const v = stripQuotes(raw);
-  if (v === "true") return true;
-  if (v === "false") return false;
+  if (!wasQuoted) {
+    const bool = parseYamlBoolean(v);
+    if (bool !== null) return bool;
+  }
   return v;
 };
 
@@ -321,7 +318,7 @@ const collectBlockListItems = (
   lines: string[],
   startIdx: number,
   prefix: string,
-  itemRegex: RegExp,
+  itemRegex: RegExp
 ): { items: string[]; endIdx: number } => {
   const items: string[] = [];
   let j = startIdx;
@@ -345,20 +342,16 @@ const collectBlockListItems = (
 const _detectFirstDashIndent = (
   lines: string[],
   startIdx: number,
-  fallback: string,
+  fallback: string
 ): { dashIndent: string; firstDashIdx: number } => {
   let firstDashIdx = startIdx;
-  while (
-    firstDashIdx < lines.length &&
-    isBlankOrCommentLine(lines[firstDashIdx])
-  ) {
+  while (firstDashIdx < lines.length && isBlankOrCommentLine(lines[firstDashIdx])) {
     firstDashIdx++;
   }
   if (firstDashIdx >= lines.length) {
     return { dashIndent: fallback, firstDashIdx };
   }
-  const dashIndent =
-    lines[firstDashIdx].match(/^( *)-/)?.[1] ?? fallback;
+  const dashIndent = lines[firstDashIdx].match(/^( *)-/)?.[1] ?? fallback;
   return { dashIndent, firstDashIdx };
 };
 
@@ -385,7 +378,7 @@ const _detectFirstDashIndent = (
 const parseListBlock = (
   lines: string[],
   startIdx: number,
-  parentIndent: string,
+  parentIndent: string
 ): {
   value: YamlRawValue | Record<string, unknown>[] | string[];
   endIdx: number;
@@ -395,7 +388,7 @@ const parseListBlock = (
   const { dashIndent, firstDashIdx } = _detectFirstDashIndent(
     lines,
     startIdx,
-    canonicalDashIndent,
+    canonicalDashIndent
   );
   const childIndent =
     _detectListItemChildIndent(lines, firstDashIdx + 1, dashIndent) ??
@@ -408,12 +401,7 @@ const parseListBlock = (
   // ``esphome.areas``); fall through to ``YamlRawValue`` for
   // shapes the editor can't round-trip.
   if (isComplex) {
-    const mapping = collectBlockListMappings(
-      lines,
-      startIdx,
-      dashIndent,
-      childIndent,
-    );
+    const mapping = collectBlockListMappings(lines, startIdx, dashIndent, childIndent);
     if (mapping) {
       return {
         value: mapping.items,
@@ -437,7 +425,7 @@ const parseListBlock = (
     lines,
     startIdx,
     `${dashIndent}- `,
-    listItemRegexFor(dashIndent),
+    listItemRegexFor(dashIndent)
   );
   return {
     value: items,
@@ -458,7 +446,7 @@ const parseListBlock = (
  */
 const parseFlatMappingField = (
   key: string,
-  raw: string,
+  raw: string
 ): { key: string; value: unknown } | null => {
   // Dotted keys (``logger.log:``, ``switch.turn_on:``) are
   // automation-action shorthand — not flat-mapping fields. Bail
@@ -481,7 +469,7 @@ const parseFlatMappingField = (
  */
 const _matchFlatMappingField = (
   line: string,
-  re: RegExp,
+  re: RegExp
 ): { key: string; value: unknown } | null => {
   const m = line.match(re);
   return m ? parseFlatMappingField(m[1], m[2].trim()) : null;
@@ -502,7 +490,7 @@ const _parseItemSubKeys = (
   startIdx: number,
   childIndent: string,
   childRe: RegExp,
-  item: Record<string, unknown>,
+  item: Record<string, unknown>
 ): number | null => {
   let j = startIdx;
   while (j < lines.length) {
@@ -542,11 +530,9 @@ const collectBlockListMappings = (
   lines: string[],
   startIdx: number,
   dashIndent: string,
-  childIndent: string,
+  childIndent: string
 ): { items: Record<string, unknown>[]; endIdx: number } | null => {
-  const headerRe = new RegExp(
-    `^${dashIndent}-\\s+(${KEY_PATTERN}):\\s*(.*)$`,
-  );
+  const headerRe = new RegExp(`^${dashIndent}-\\s+(${KEY_PATTERN}):\\s*(.*)$`);
   const childRe = new RegExp(`^${childIndent}(${KEY_PATTERN}):\\s*(.*)$`);
 
   /**
@@ -564,7 +550,7 @@ const collectBlockListMappings = (
    * predicates in lockstep.
    */
   const parseItem = (
-    at: number,
+    at: number
   ): { item: Record<string, unknown>; endIdx: number } | null => {
     // Same null-prototype defence as the surrounding parser — see
     // the comment in ``parseYamlSectionValues``.
@@ -630,7 +616,7 @@ const collectBlockListMappings = (
 const _scanValueBlock = (
   lines: string[],
   startIdx: number,
-  keyIndent: string,
+  keyIndent: string
 ): { endIdx: number; isComplex: boolean } => {
   let isComplex = false;
   for (let i = startIdx; i < lines.length; i++) {
@@ -659,7 +645,7 @@ const _scanValueBlock = (
 export function findSectionStart(
   lines: string[],
   sectionKey: string,
-  fromLine?: number,
+  fromLine?: number
 ): number {
   if (fromLine !== undefined) return fromLine - 1;
   for (let i = 0; i < lines.length; i++) {
@@ -682,7 +668,7 @@ export function findSectionStart(
 export function parseYamlSectionValues(
   yaml: string,
   sectionKey: string,
-  fromLine?: number,
+  fromLine?: number
 ): Record<string, unknown> {
   const lines = yaml.split("\n");
   // Null-prototype map so a YAML key like `__proto__` /
@@ -772,7 +758,7 @@ export function parseYamlSectionValues(
         const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,
-          childIndent,
+          childIndent
         );
         if (!isEmptyScalarList) {
           values[key] = value;
@@ -808,7 +794,7 @@ export function parseYamlSectionValues(
 function parseNestedBlock(
   lines: string[],
   startIdx: number,
-  indent: string,
+  indent: string
 ): { values: Record<string, unknown>; endIdx: number } {
   const childRegex = childRegexFor(indent);
   // Null-prototype — same prototype-pollution defense as the
@@ -845,10 +831,7 @@ function parseNestedBlock(
 
     if (raw === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
-      if (
-        peek < lines.length &&
-        isDeeperListItemLine(lines[peek], indent)
-      ) {
+      if (peek < lines.length && isDeeperListItemLine(lines[peek], indent)) {
         const { value, endIdx } = parseListBlock(lines, i + 1, indent);
         values[key] = value;
         i = endIdx;
@@ -895,7 +878,7 @@ function parseNestedBlock(
 export function findSectionRange(
   lines: string[],
   sectionKey: string,
-  fromLine?: number,
+  fromLine?: number
 ): { start: number; end: number } {
   const start = findSectionStart(lines, sectionKey, fromLine);
   if (start < 0) return { start: -1, end: -1 };
@@ -939,7 +922,7 @@ export function updateSectionInYaml(
   sectionKey: string,
   values: Record<string, unknown>,
   fromLine?: number,
-  options: SerializeYamlOptions = {},
+  options: SerializeYamlOptions = {}
 ): string {
   const lines = yaml.split("\n");
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
@@ -1015,9 +998,7 @@ export function updateSectionInYaml(
         const dashIndent = dashPrefixMatch[1];
         const dashPrefix = `${dashIndent}-${dashPrefixMatch[2]}`;
         if (_isInlinableScalar(values[inlineKey])) {
-          dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(
-            values[inlineKey],
-          )}`;
+          dashLine = `${dashPrefix}${inlineKey}: ${formatYamlScalar(values[inlineKey])}`;
           const { [inlineKey]: _omit, ...rest } = values;
           toSerialize = rest;
         } else {
@@ -1040,8 +1021,7 @@ export function updateSectionInYaml(
   // Default to canonical 2-space; the round-trip stays
   // valid-and-readable even when the surrounding file uses a
   // different step elsewhere.
-  const detectedStep =
-    !isListItem && childIndent ? childIndent : ESPHOME_YAML_INDENT;
+  const detectedStep = !isListItem && childIndent ? childIndent : ESPHOME_YAML_INDENT;
   const newLines = [
     dashLine,
     ...serializeYamlValues(toSerialize, childIndent, {
@@ -1074,7 +1054,7 @@ function _isInlinableScalar(value: unknown): boolean {
 export function removeSectionFromYaml(
   yaml: string,
   sectionKey: string,
-  fromLine?: number,
+  fromLine?: number
 ): string {
   const lines = yaml.split("\n");
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);

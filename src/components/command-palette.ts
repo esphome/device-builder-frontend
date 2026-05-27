@@ -6,7 +6,6 @@ import {
   mdiKeyVariant,
   mdiMagnify,
   mdiThemeLightDark,
-  mdiTranslate,
   mdiVectorDifference,
   mdiWeatherNight,
   mdiWeatherSunny,
@@ -15,7 +14,8 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice } from "../api/types.js";
-import type { LocalizeFunc, SupportedLocale } from "../common/localize.js";
+import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
+import { LANGUAGES } from "../common/localize.js";
 import {
   apiContext,
   devicesContext,
@@ -44,20 +44,10 @@ registerMdiIcons({
   "key-variant": mdiKeyVariant,
   magnify: mdiMagnify,
   "theme-light-dark": mdiThemeLightDark,
-  translate: mdiTranslate,
   "vector-difference": mdiVectorDifference,
   "weather-night": mdiWeatherNight,
   "weather-sunny": mdiWeatherSunny,
 });
-
-type LanguageChoice = SupportedLocale | "system";
-
-const LANGUAGES: { value: LanguageChoice; labelKey: string }[] = [
-  { value: "system", labelKey: "settings.language_system" },
-  { value: "en", labelKey: "settings.language_en" },
-  { value: "fr", labelKey: "settings.language_fr" },
-  { value: "nl", labelKey: "settings.language_nl" },
-];
 
 /** Recursively close every open popover in `root` and its shadow trees. */
 function closeAllOpenPopovers(root: Document | ShadowRoot) {
@@ -73,7 +63,13 @@ interface CommandAction {
   id: string;
   group: string;
   label: string;
+  /** MDI icon name registered via ``registerMdiIcons``; rendered
+   *  through ``<wa-icon library="mdi">``. Mutually exclusive with
+   *  ``flag`` — when both are set, ``flag`` wins. */
   icon?: string;
+  /** Emoji prefix shown in place of the MDI icon column. Used for
+   *  language entries so the picker reads as flags-not-icons. */
+  flag?: string;
   keywords?: string[];
   run: () => void;
 }
@@ -249,7 +245,7 @@ export class ESPHomeCommandPalette extends LitElement {
       id: `language.${l.value}`,
       group: languageGroup,
       label: t(l.labelKey),
-      icon: "translate",
+      flag: l.flag,
       keywords: ["language", "locale", l.value],
       run: () => this._setLanguage(l.value),
     }));
@@ -465,7 +461,11 @@ export class ESPHomeCommandPalette extends LitElement {
         @click=${() => this._run(item)}
         @mouseenter=${() => (this._selectedId = item.id)}
       >
-        ${item.icon ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>` : nothing}
+        ${item.flag
+          ? html`<span class="item-flag" aria-hidden="true">${item.flag}</span>`
+          : item.icon
+            ? html`<wa-icon library="mdi" name=${item.icon}></wa-icon>`
+            : nothing}
         <span class="item-label">${item.label}</span>
       </div>
     `;

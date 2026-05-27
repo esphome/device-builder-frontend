@@ -46,7 +46,9 @@ import {
 @customElement("esphome-pair-build-server-dialog")
 export class ESPHomePairBuildServerDialog extends LitElement {
   @consume({ context: apiContext, subscribe: true }) @state() _api?: ESPHomeAPI;
-  @consume({ context: localizeContext, subscribe: true }) @state() _localize: LocalizeFunc = (key) => key;
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  _localize: LocalizeFunc = (key) => key;
 
   // Auto-close watcher: matches the offloader pairings row by pin_sha256
   // and closes on status→approved. removed → rejection toast + close.

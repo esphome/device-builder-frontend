@@ -9,8 +9,9 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
+import type { BoardCatalogEntry, SerialPort } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
@@ -20,6 +21,7 @@ import {
 } from "./wizard-step-board-platforms.js";
 import { withBase } from "../../util/base-path.js";
 import { debounce } from "../../util/debounce.js";
+import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import {
@@ -33,6 +35,7 @@ import { inputStyles } from "../../styles/inputs.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./wizard-step-board-port-select.js";
 
 registerMdiIcons({
   "arrow-collapse-all": mdiArrowCollapseAll,
@@ -87,6 +90,24 @@ export class ESPHomeWizardStepBoard extends LitElement {
    *  manual filter clicks and by the "Show all boards" escape. */
   @state()
   private _filterFromDetection = false;
+
+  /** Which inner view the step is rendering: the boards picker, or
+   *  the server-side serial-port selector reached when the user
+   *  clicks "Connect your board" without WebSerial available. */
+  @state()
+  private _view: "boards" | "select-port" = "boards";
+
+  @state()
+  private _serverPorts: SerialPort[] = [];
+
+  @state()
+  private _loadingServerPorts = false;
+
+  @state()
+  private _detectingChip = false;
+
+  @state()
+  private _detectError = "";
 
   private _debouncedSearch = debounce(() => this._fetchBoards(), 300);
 
@@ -451,6 +472,20 @@ export class ESPHomeWizardStepBoard extends LitElement {
   ];
 
   protected render() {
+    if (this._view === "select-port") {
+      return html`
+        <esphome-wizard-step-board-port-select
+          .environment=${this._environment}
+          .ports=${this._serverPorts}
+          .loading=${this._loadingServerPorts}
+          .detecting=${this._detectingChip}
+          .errorMessage=${this._detectError}
+          @select-port=${this._onServerPortSelected}
+          @back=${this._onBackFromPortSelect}
+        ></esphome-wizard-step-board-port-select>
+      `;
+    }
+
     if (this._initialLoad && this._loading) {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
@@ -475,11 +510,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
                   family: this._selectedFilter,
                 })}
               </span>
-              <button
-                class="helper-link"
-                type="button"
-                @click=${this._exitDetectionMode}
-              >
+              <button class="helper-link" type="button" @click=${this._exitDetectionMode}>
                 ${this._localize("wizard.show_all_boards")}
               </button>
             </div>
@@ -500,16 +531,14 @@ export class ESPHomeWizardStepBoard extends LitElement {
             </div>
 
             <div class="helper-row">
-              ${isWebSerialSupported()
-                ? html`<button
-                    class="connect-board-btn"
-                    type="button"
-                    @click=${this._connectBoard}
-                  >
-                    <wa-icon library="mdi" name="usb-port"></wa-icon>
-                    ${this._localize("wizard.connect_your_board")}
-                  </button>`
-                : nothing}
+              <button
+                class="connect-board-btn"
+                type="button"
+                @click=${this._connectBoard}
+              >
+                <wa-icon library="mdi" name="usb-port"></wa-icon>
+                ${this._localize("wizard.connect_your_board")}
+              </button>
               <button class="helper-link" type="button">
                 ${this._localize("wizard.dont_know_board")}
               </button>
@@ -679,9 +708,28 @@ export class ESPHomeWizardStepBoard extends LitElement {
     );
   }
 
-  private async _connectBoard() {
-    if (!isWebSerialSupported()) return;
+  private get _environment(): DeploymentEnvironment {
+    return detectEnvironment(this._api);
+  }
 
+  /**
+   * "Connect your board" click — picks the right transport for
+   * the current browser. WebSerial is preferred when available
+   * (no backend round-trip); otherwise we fall back to the
+   * backend's enumerated serial ports, which works in browsers
+   * without WebSerial (Safari, Firefox, iOS) and in setups where
+   * the user reaches the dashboard from a different machine than
+   * the one the board is plugged into.
+   */
+  private _connectBoard = () => {
+    if (isWebSerialSupported()) {
+      void this._connectViaWebSerial();
+      return;
+    }
+    void this._openServerPortPicker();
+  };
+
+  private async _connectViaWebSerial() {
     try {
       const detected = await detectChip();
       // e.g. "ESP32-S3 (QFN56) (revision v0.2)"
@@ -723,6 +771,85 @@ export class ESPHomeWizardStepBoard extends LitElement {
       // User cancelled the port picker or detection failed
     }
   }
+
+  /**
+   * Open the server-side port picker, populate the port list via
+   * ``config/serial_ports``. The actual detection runs once the
+   * user picks a port (in ``_onServerPortSelected``).
+   */
+  private async _openServerPortPicker() {
+    this._view = "select-port";
+    this._detectError = "";
+    this._serverPorts = [];
+    this._loadingServerPorts = true;
+    try {
+      this._serverPorts = await this._api.getSerialPorts();
+    } catch (e) {
+      console.error("Failed to load server serial ports:", e);
+      this._serverPorts = [];
+      this._detectError = this._extractErrorDetail(
+        e,
+        this._localize("wizard.connect_your_board_detect_failed")
+      );
+    } finally {
+      this._loadingServerPorts = false;
+    }
+  }
+
+  private _onServerPortSelected = async (e: CustomEvent<{ port: string }>) => {
+    const port = e.detail?.port;
+    if (!port) return;
+    this._detectingChip = true;
+    this._detectError = "";
+    try {
+      const result = await this._api.detectChip(port);
+
+      if (result.board_id) {
+        try {
+          const knownBoard = await this._api.getBoard(result.board_id);
+          if (knownBoard) {
+            this._view = "boards";
+            this._onAdd(knownBoard);
+            return;
+          }
+        } catch {
+          // Catalog lookup failure shouldn't surface as a detect
+          // error — fall through to chip-family filtering instead.
+        }
+      }
+
+      if (result.chip_family) {
+        this._selectedFilter = result.chip_family;
+        this._filterFromDetection = true;
+        this._search = "";
+      }
+      this._view = "boards";
+      void this._fetchBoards();
+    } catch (err) {
+      this._detectError = this._extractErrorDetail(
+        err,
+        this._localize("wizard.connect_your_board_detect_failed")
+      );
+    } finally {
+      this._detectingChip = false;
+    }
+  };
+
+  /**
+   * Prefer ``APIError.details`` (the human-readable bit) over
+   * ``Error.message`` (which carries the ``<code>:`` prefix for an
+   * APIError) so the wizard's inline error reads cleanly to a user.
+   */
+  private _extractErrorDetail(err: unknown, fallback: string): string {
+    if (err instanceof APIError) return err.details || fallback;
+    if (err instanceof Error) return err.message || fallback;
+    return fallback;
+  }
+
+  private _onBackFromPortSelect = () => {
+    this._view = "boards";
+    this._detectError = "";
+  };
 
   private _exitDetectionMode() {
     this._selectedFilter = "";

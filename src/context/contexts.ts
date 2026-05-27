@@ -39,15 +39,15 @@ export const importableDevicesContext = createContext<AdoptableDevice[]>(
 export const versionContext = createContext<string>(Symbol("esphome-version"));
 
 /** Context for the Device Builder server version string. */
-export const serverVersionContext = createContext<string>(Symbol("esphome-server-version"));
+export const serverVersionContext = createContext<string>(
+  Symbol("esphome-server-version")
+);
 
 /** Context for dark mode state. */
 export const darkModeContext = createContext<boolean>(Symbol("esphome-dark-mode"));
 
 /** Context for the localize function. */
-export const localizeContext = createContext<LocalizeFunc>(
-  Symbol("esphome-localize")
-);
+export const localizeContext = createContext<LocalizeFunc>(Symbol("esphome-localize"));
 
 /** Context for whether the initial device list has been loaded. */
 export const devicesLoadedContext = createContext<boolean>(
@@ -55,9 +55,7 @@ export const devicesLoadedContext = createContext<boolean>(
 );
 
 /** Context for whether the frontend is running inside HA ingress. */
-export const isHaIngressContext = createContext<boolean>(
-  Symbol("esphome-is-ha-ingress")
-);
+export const isHaIngressContext = createContext<boolean>(Symbol("esphome-is-ha-ingress"));
 
 /** Context for active firmware jobs, keyed by device configuration.
  *  Tracks the latest non-terminal job per device (used for the busy
@@ -134,9 +132,7 @@ export const integrationDocsContext = createContext<Record<string, string>>(
  *  events. Per-device assignments live on each
  *  ``ConfiguredDevice.labels`` (an array of ids); consumers join
  *  against this map at render time to resolve name + color. */
-export const labelsContext = createContext<Label[]>(
-  Symbol("esphome-labels")
-);
+export const labelsContext = createContext<Label[]>(Symbol("esphome-labels"));
 
 /**
  * Context for whether onboarding still has work to do.
@@ -249,9 +245,10 @@ export const buildServerPairingWindowStateContext =
  * surface as inconsistent UI ordering between snapshot and
  * post-event renders.
  */
-export const buildOffloadDiscoveredHostsContext = createContext<
-  Map<string, RemoteBuildPeer> | null
->(Symbol("esphome-build-offload-discovered-hosts"));
+export const buildOffloadDiscoveredHostsContext = createContext<Map<
+  string,
+  RemoteBuildPeer
+> | null>(Symbol("esphome-build-offload-discovered-hosts"));
 
 /**
  * Offloader-side pairings (PENDING + APPROVED rows from the
@@ -280,9 +277,10 @@ export const buildOffloadDiscoveredHostsContext = createContext<
  * ``OFFLOADER_PAIR_STATUS_CHANGED`` after a sent
  * ``request_pair``.
  */
-export const buildOffloadPairingsContext = createContext<
-  Map<string, PairingSummary> | null
->(Symbol("esphome-build-offload-pairings"));
+export const buildOffloadPairingsContext = createContext<Map<
+  string,
+  PairingSummary
+> | null>(Symbol("esphome-build-offload-pairings"));
 
 /**
  * Offloader-side master "Remote builds enabled" toggle (7b).
@@ -302,9 +300,9 @@ export const buildOffloadPairingsContext = createContext<
  * pre-7b semantic where any APPROVED + connected + idle
  * pairing was eligible).
  */
-export const offloaderRemoteBuildsEnabledContext = createContext<
-  boolean | null
->(Symbol("esphome-offloader-remote-builds-enabled"));
+export const offloaderRemoteBuildsEnabledContext = createContext<boolean | null>(
+  Symbol("esphome-offloader-remote-builds-enabled")
+);
 
 /**
  * Offloader-side pair alerts (pin_mismatch / peer_revoked).
@@ -334,9 +332,10 @@ export const offloaderRemoteBuildsEnabledContext = createContext<
  * controller / still loading" from "loaded with zero
  * alerts".
  */
-export const buildOffloadAlertsContext = createContext<
-  Map<string, OffloaderAlertSnapshotEntry> | null
->(Symbol("esphome-build-offload-alerts"));
+export const buildOffloadAlertsContext = createContext<Map<
+  string,
+  OffloaderAlertSnapshotEntry
+> | null>(Symbol("esphome-build-offload-alerts"));
 
 /**
  * One in-flight (or recently terminal) remote-build job the
@@ -407,7 +406,7 @@ export const buildOffloadJobsContext = createContext<Map<
  */
 export function stubRemoteBuildJobState(
   job_id: string,
-  pin_sha256: string,
+  pin_sha256: string
 ): RemoteBuildJobState {
   return {
     job_id,

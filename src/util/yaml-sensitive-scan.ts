@@ -134,7 +134,7 @@ function isLineSource(value: string | LineSource): value is LineSource {
 
 export function findSensitiveValueRanges(
   yaml: string | LineSource,
-  options: FindSensitiveValueRangesOptions = {},
+  options: FindSensitiveValueRangesOptions = {}
 ): SensitiveValueRange[] {
   const { maskAllValues = false } = options;
   const ranges: SensitiveValueRange[] = [];

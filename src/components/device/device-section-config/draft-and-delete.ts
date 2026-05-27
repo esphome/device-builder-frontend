@@ -21,22 +21,15 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
   host._draftTimer = null;
   if (!host._config) return;
 
-  const renderEntries = resolveSectionEntries(
-    host.sectionKey,
-    host._config.entries,
-  );
+  const renderEntries = resolveSectionEntries(host.sectionKey, host._config.entries);
   host._fieldErrors = validateEntries(
     renderEntries,
     host._values,
     host._presentComponents,
-    host.board?.esphome.platform ?? null,
+    host.board?.esphome.platform ?? null
   );
 
-  const fromLine = resolveCurrentFromLine(
-    host.yaml,
-    host.sectionKey,
-    host.fromLine,
-  );
+  const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);
   if (fromLine === undefined) {
     // Section was removed from live YAML between keystroke and debounce
     // (paste / external edit). Drop the splice silently — next picker
@@ -54,7 +47,7 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
     // and must round-trip. Other MAP sections (packages) treat empty value
     // as an unfilled placeholder — packages schema validator rejects
     // empty-string definitions, so dropping placeholders keeps it loadable.
-    { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey) },
+    { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey) }
   );
 
   host._setDirty(false);
@@ -67,13 +60,13 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
       detail: { yaml: newYaml },
       bubbles: true,
       composed: true,
-    }),
+    })
   );
 }
 
 export function onValueChange(
   host: ESPHomeDeviceSectionConfig,
-  e: CustomEvent<ConfigEntryValueChange>,
+  e: CustomEvent<ConfigEntryValueChange>
 ): void {
   const { path, value } = e.detail;
   host._values = setIn(host._values, path, value);
@@ -87,15 +80,9 @@ export function onValueChange(
   host._scheduleDraftFlush();
 }
 
-export async function onDeleteConfirmed(
-  host: ESPHomeDeviceSectionConfig,
-): Promise<void> {
+export async function onDeleteConfirmed(host: ESPHomeDeviceSectionConfig): Promise<void> {
   if (!host._config) return;
-  const fromLine = resolveCurrentFromLine(
-    host.yaml,
-    host.sectionKey,
-    host.fromLine,
-  );
+  const fromLine = resolveCurrentFromLine(host.yaml, host.sectionKey, host.fromLine);
   if (fromLine === undefined) {
     host._error = host._localize("device.section_delete_error");
     return;
@@ -116,23 +103,21 @@ export async function onDeleteConfirmed(
         detail: { yaml: newYaml },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     host.dispatchEvent(
       new CustomEvent("section-select", {
         detail: { sectionKey: null },
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     toast.success(host._localize("device.section_deleted", { name: title }), {
       richColors: true,
     });
   } catch (e) {
     host._error =
-      e instanceof Error
-        ? e.message
-        : host._localize("device.section_delete_error");
+      e instanceof Error ? e.message : host._localize("device.section_delete_error");
   } finally {
     host._deleting = false;
   }

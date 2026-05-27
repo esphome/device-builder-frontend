@@ -24,11 +24,7 @@
 import type { ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import { isEntryVisible } from "../../util/config-validation.js";
-import {
-  asMappingList,
-  asRecord,
-  isPlainObject,
-} from "../../util/nested-values.js";
+import { asMappingList, asRecord, isPlainObject } from "../../util/nested-values.js";
 import { YamlRawValue } from "../../util/yaml-serialize.js";
 
 /**
@@ -42,6 +38,23 @@ import { YamlRawValue } from "../../util/yaml-serialize.js";
  * the global allowlist at runtime.
  */
 export const ALWAYS_SHOWN_KEYS: ReadonlySet<string> = new Set(["name"]);
+
+/**
+ * Structural ``ConfigEntryType`` members — entries whose role is
+ * layout, grouping, or annotation rather than a single editable
+ * value. The templatable-field wrapper skips these because a
+ * literal/lambda toggle on a divider or a nested group doesn't
+ * make sense; only leaf-shaped entries can be templatable.
+ */
+export function _isStructuralType(t: ConfigEntryType): boolean {
+  return (
+    t === ConfigEntryType.NESTED ||
+    t === ConfigEntryType.MAP ||
+    t === ConfigEntryType.DIVIDER ||
+    t === ConfigEntryType.LABEL ||
+    t === ConfigEntryType.ALERT
+  );
+}
 
 export interface RenderFilterOptions {
   /** When true, drop non-required leaves (except ALWAYS_SHOWN_KEYS). */
@@ -85,10 +98,7 @@ export interface RenderFilterOptions {
  * any descendant leaf is set; an advanced group with at least one
  * filled child needs to render so the child is reachable.
  */
-function hasMaterialValue(
-  entry: ConfigEntry,
-  values: Record<string, unknown>,
-): boolean {
+function hasMaterialValue(entry: ConfigEntry, values: Record<string, unknown>): boolean {
   const value = values[entry.key];
   if (entry.type === ConfigEntryType.NESTED) {
     if (entry.multi_value) {
@@ -105,9 +115,7 @@ function hasMaterialValue(
       return Array.isArray(value) && value.length > 0;
     }
     if (!isPlainObject(value)) return false;
-    return (entry.config_entries ?? []).some((child) =>
-      hasMaterialValue(child, value),
-    );
+    return (entry.config_entries ?? []).some((child) => hasMaterialValue(child, value));
   }
   return value !== undefined;
 }
@@ -115,25 +123,14 @@ function hasMaterialValue(
 export function filterRenderable(
   entries: ConfigEntry[],
   values: Record<string, unknown>,
-  opts: RenderFilterOptions,
+  opts: RenderFilterOptions
 ): ConfigEntry[] {
   const out: ConfigEntry[] = [];
   for (const entry of entries) {
-    if (
-      !isEntryVisible(
-        entry,
-        values,
-        opts.presentComponents,
-        opts.targetPlatform,
-      )
-    ) {
+    if (!isEntryVisible(entry, values, opts.presentComponents, opts.targetPlatform)) {
       continue;
     }
-    if (
-      entry.advanced &&
-      !opts.showAdvanced &&
-      !hasMaterialValue(entry, values)
-    ) {
+    if (entry.advanced && !opts.showAdvanced && !hasMaterialValue(entry, values)) {
       continue;
     }
     if (entry.type === ConfigEntryType.NESTED) {
@@ -146,7 +143,7 @@ export function filterRenderable(
         const renderableChildren = filterRenderable(
           entry.config_entries ?? [],
           asRecord(values[entry.key]),
-          opts,
+          opts
         );
         if (renderableChildren.length === 0) continue;
       }
@@ -187,7 +184,7 @@ export function collectRenderablePaths(
   values: Record<string, unknown>,
   opts: RenderFilterOptions,
   pathPrefix: string[] = [],
-  out: Set<string> = new Set(),
+  out: Set<string> = new Set()
 ): Set<string> {
   for (const entry of filterRenderable(entries, values, opts)) {
     if (entry.type === ConfigEntryType.NESTED) {
@@ -203,7 +200,7 @@ export function collectRenderablePaths(
             itemValues,
             opts,
             [...pathPrefix, entry.key, String(idx)],
-            out,
+            out
           );
         });
       } else {
@@ -212,7 +209,7 @@ export function collectRenderablePaths(
           asRecord(values[entry.key]),
           opts,
           [...pathPrefix, entry.key],
-          out,
+          out
         );
       }
       out.add([...pathPrefix, entry.key].join("."));

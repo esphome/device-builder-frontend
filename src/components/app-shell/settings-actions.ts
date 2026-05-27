@@ -21,10 +21,7 @@ export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   host._api.updatePreferences({ theme }).catch(() => {});
 }
 
-export function onSetYamlDiffButton(
-  host: ESPHomeApp,
-  e: CustomEvent<boolean>,
-): void {
+export function onSetYamlDiffButton(host: ESPHomeApp, e: CustomEvent<boolean>): void {
   const enabled = e.detail;
   host._yamlDiffButton = enabled;
   host._api.updatePreferences({ yaml_diff_button: enabled }).catch(() => {});
@@ -35,7 +32,7 @@ export function onSetYamlDiffButton(
 // racing the write can't clobber the optimistic value.
 export async function onSetRemoteBuildEnabled(
   host: ESPHomeApp,
-  e: CustomEvent<boolean>,
+  e: CustomEvent<boolean>
 ): Promise<void> {
   const enabled = e.detail;
   const previous = host._remoteBuildEnabled;
@@ -59,7 +56,7 @@ export async function onSetRemoteBuildEnabled(
 
 export async function onSetRemoteBuildCleanupTtl(
   host: ESPHomeApp,
-  e: CustomEvent<number>,
+  e: CustomEvent<number>
 ): Promise<void> {
   const requested = e.detail;
   if (
@@ -93,7 +90,7 @@ export async function onSetRemoteBuildCleanupTtl(
 
 export async function onSetOffloaderRemoteBuildsEnabled(
   host: ESPHomeApp,
-  e: CustomEvent<boolean>,
+  e: CustomEvent<boolean>
 ): Promise<void> {
   const enabled = e.detail;
   const previous = host._offloaderRemoteBuildsEnabled;
@@ -112,7 +109,7 @@ export async function onSetOffloaderRemoteBuildsEnabled(
 
 export async function onSetOffloaderPairingEnabled(
   host: ESPHomeApp,
-  e: CustomEvent<{ pin_sha256: string; enabled: boolean }>,
+  e: CustomEvent<{ pin_sha256: string; enabled: boolean }>
 ): Promise<void> {
   const { pin_sha256, enabled } = e.detail;
   const previous = host._buildOffloadPairings?.get(pin_sha256)?.enabled;
@@ -131,7 +128,7 @@ export async function onSetOffloaderPairingEnabled(
 
 export function onPairRequestSent(
   host: ESPHomeApp,
-  e: CustomEvent<{ summary: PairingSummary }>,
+  e: CustomEvent<{ summary: PairingSummary }>
 ): void {
   // Backend persists the row but doesn't fire OFFLOADER_PAIR_STATUS_CHANGED
   // for create (events only mark status flips), so seed the row locally.
@@ -149,21 +146,21 @@ export function onRemoteBuildJobSubmitted(
     receiver_label: string;
     configuration: string;
     target: RemoteBuildSubmitTarget;
-  }>,
+  }>
 ): void {
   host.registerRemoteBuildJob(e.detail);
 }
 
 export function onRemoteBuildJobDismissed(
   host: ESPHomeApp,
-  e: CustomEvent<{ job_id: string }>,
+  e: CustomEvent<{ job_id: string }>
 ): void {
   host.dismissRemoteBuildJob(e.detail.job_id);
 }
 
 export async function onSetLanguage(
   host: ESPHomeApp,
-  e: CustomEvent<SupportedLocale | "system">,
+  e: CustomEvent<SupportedLocale | "system">
 ): Promise<void> {
   const choice = e.detail;
   if (choice === "system") {

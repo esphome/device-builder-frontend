@@ -218,11 +218,12 @@ export class ESPHomeTableRowMenu extends LitElement {
     if (!this.device || !this.position) return nothing;
 
     return html`
-      <div class="backdrop" @click=${this._close} @contextmenu=${this._preventAndClose}></div>
       <div
-        class="menu"
-        style=${this._initialStyle()}
-      >
+        class="backdrop"
+        @click=${this._close}
+        @contextmenu=${this._preventAndClose}
+      ></div>
+      <div class="menu" style=${this._initialStyle()}>
         <div class="menu-item" @click=${() => this._emit("validate-device")}>
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
@@ -252,9 +253,7 @@ export class ESPHomeTableRowMenu extends LitElement {
         </div>
         <div
           class="menu-item ${this.busy ? "menu-item--disabled" : ""}"
-          @click=${this.busy
-            ? undefined
-            : () => this._emit("edit-friendly-name")}
+          @click=${this.busy ? undefined : () => this._emit("edit-friendly-name")}
         >
           <wa-icon library="mdi" name="form-textbox"></wa-icon>
           ${this._localize("dashboard.action_edit_friendly_name")}
@@ -365,9 +364,7 @@ export class ESPHomeTableRowMenu extends LitElement {
   private _close() {
     this.device = null;
     this.position = null;
-    this.dispatchEvent(
-      new CustomEvent("menu-close", { bubbles: true, composed: true }),
-    );
+    this.dispatchEvent(new CustomEvent("menu-close", { bubbles: true, composed: true }));
   }
 
   private _preventAndClose(e: Event) {
@@ -381,7 +378,7 @@ export class ESPHomeTableRowMenu extends LitElement {
         detail: this.device,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this._close();
   }

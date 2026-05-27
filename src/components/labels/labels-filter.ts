@@ -205,16 +205,11 @@ export class ESPHomeLabelsFilter extends LitElement {
       .row-action:focus-visible {
         outline: none;
         color: var(--wa-color-text-normal);
-        box-shadow: 0 0 0 2px
-          color-mix(in srgb, var(--esphome-primary), transparent 70%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
       }
 
       .row-action--danger:hover {
-        background: color-mix(
-          in srgb,
-          var(--wa-color-danger-fill-loud),
-          transparent 88%
-        );
+        background: color-mix(in srgb, var(--wa-color-danger-fill-loud), transparent 88%);
         border-color: color-mix(
           in srgb,
           var(--wa-color-danger-fill-loud),
@@ -275,8 +270,7 @@ export class ESPHomeLabelsFilter extends LitElement {
          visually separated from the list by a divider so the user
          reads the rows + create form as distinct sections. */
       .create-section {
-        border-top: var(--wa-border-width-s) solid
-          var(--wa-color-surface-border);
+        border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
         padding: var(--wa-space-2xs);
         flex-shrink: 0;
       }
@@ -317,8 +311,7 @@ export class ESPHomeLabelsFilter extends LitElement {
 
       .create-trigger:focus-visible {
         outline: none;
-        box-shadow: 0 0 0 2px
-          color-mix(in srgb, var(--esphome-primary), transparent 60%);
+        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 60%);
       }
 
       .create-trigger wa-icon {
@@ -495,10 +488,9 @@ export class ESPHomeLabelsFilter extends LitElement {
               const label = this._catalog.find((l) => l.id === id);
               if (!label) return nothing;
               const display = label.name;
-              const removeAria = this._localize(
-                "dashboard.labels_remove",
-                { name: display },
-              );
+              const removeAria = this._localize("dashboard.labels_remove", {
+                name: display,
+              });
               // Trigger badges stay neutral on purpose — the
               // popover shows the colour-tinted chips, but
               // surfacing label colour up in the toolbar pill
@@ -560,15 +552,11 @@ export class ESPHomeLabelsFilter extends LitElement {
                       : nothing}
                   </span>
                   <span class="facet-row-name">
-                    <span
-                      class="label-chip"
-                      style=${labelChipStyleString(label.color)}
+                    <span class="label-chip" style=${labelChipStyleString(label.color)}
                       >${label.name}</span
                     >
                   </span>
-                  <span class="facet-row-count" aria-hidden="true"
-                    >${count}</span
-                  >
+                  <span class="facet-row-count" aria-hidden="true">${count}</span>
                 </button>
                 <div class="row-actions">
                   <button
@@ -610,7 +598,7 @@ export class ESPHomeLabelsFilter extends LitElement {
                           detail: label,
                           bubbles: true,
                           composed: true,
-                        }),
+                        })
                       );
                     }}
                   >
@@ -628,11 +616,7 @@ export class ESPHomeLabelsFilter extends LitElement {
           </div>`
         : nothing}
       <div class="create-section ${isEmpty ? "create-section--empty" : ""}">
-        <button
-          class="create-trigger"
-          type="button"
-          @click=${this._openCreateDialog}
-        >
+        <button class="create-trigger" type="button" @click=${this._openCreateDialog}>
           <wa-icon library="mdi" name="plus"></wa-icon>
           ${this._localize("dashboard.labels_create")}
         </button>
@@ -652,9 +636,7 @@ export class ESPHomeLabelsFilter extends LitElement {
         >
           <wa-icon library="mdi" name="arrow-left"></wa-icon>
         </button>
-        <span class="edit-title"
-          >${this._localize("dashboard.labels_edit_label")}</span
-        >
+        <span class="edit-title">${this._localize("dashboard.labels_edit_label")}</span>
       </div>
       <div class="create-section create-section--empty">
         <esphome-label-form
@@ -735,7 +717,7 @@ export class ESPHomeLabelsFilter extends LitElement {
         detail: next,
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 

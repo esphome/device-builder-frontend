@@ -115,9 +115,8 @@
       :root,
       .wa-light,
       .wa-dark .wa-invert {
-        /* ESPHome brand color mapped to Web Awesome brand tokens */
-        --wa-color-brand-fill-loud: #009fee;
-        --wa-color-brand-on-loud: #ffffff;
+        --wa-color-brand-fill-loud: var(--primary-color, #009fee);
+        --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
       }
 
       body {

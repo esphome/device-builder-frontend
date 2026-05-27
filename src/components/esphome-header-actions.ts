@@ -6,6 +6,7 @@ import {
   mdiCogRefresh,
   mdiCommentQuestionOutline,
   mdiDotsVertical,
+  mdiEyeOffOutline,
   mdiEyeOutline,
   mdiKeyVariant,
   mdiPlaylistCheck,
@@ -14,11 +15,16 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { JobStatus } from "../api/types.js";
-import type { FirmwareJob, OffloaderAlertSnapshotEntry } from "../api/types.js";
+import type {
+  AdoptableDevice,
+  FirmwareJob,
+  OffloaderAlertSnapshotEntry,
+} from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   buildOffloadAlertsContext,
   firmwareJobsContext,
+  importableDevicesContext,
   localizeContext,
   onboardingPendingContext,
 } from "../context/index.js";
@@ -36,6 +42,7 @@ registerMdiIcons({
   "cog-refresh": mdiCogRefresh,
   "comment-question-outline": mdiCommentQuestionOutline,
   "dots-vertical": mdiDotsVertical,
+  "eye-off-outline": mdiEyeOffOutline,
   "eye-outline": mdiEyeOutline,
   "key-variant": mdiKeyVariant,
   "playlist-check": mdiPlaylistCheck,
@@ -78,6 +85,21 @@ export class ESPHomeHeaderActions extends LitElement {
   @state()
   private _onboardingPending = false;
 
+  /** Adoptable / ignored discoveries. Subscribed here so the
+   *  kebab can gate the "Show ignored discoveries" entry on the
+   *  presence of at least one ignored card — when there are no
+   *  ignored discoveries the action has nothing to flip. */
+  @consume({ context: importableDevicesContext, subscribe: true })
+  @state()
+  private _importableDevices: AdoptableDevice[] = [];
+
+  /** Mirror of the dashboard's ``_showIgnored`` flag (persisted
+   *  in ``localStorage``). The dashboard owns the write path; we
+   *  listen to the ``esphome-show-ignored-changed`` window event
+   *  so the menu label flips in real time. */
+  @state()
+  private _showIgnored = false;
+
   static styles = [
     espHomeStyles,
     css`
@@ -98,7 +120,9 @@ export class ESPHomeHeaderActions extends LitElement {
         padding: 6px;
         border-radius: var(--wa-border-radius-m);
         opacity: 0.85;
-        transition: opacity 0.12s, background 0.12s;
+        transition:
+          opacity 0.12s,
+          background 0.12s;
       }
 
       .menu-btn:hover {
@@ -146,8 +170,14 @@ export class ESPHomeHeaderActions extends LitElement {
       }
 
       @keyframes menu-in {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
       }
 
       .menu-item {
@@ -217,6 +247,24 @@ export class ESPHomeHeaderActions extends LitElement {
     `,
   ];
 
+  connectedCallback(): void {
+    super.connectedCallback();
+    this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
+    window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    window.removeEventListener(
+      "esphome-show-ignored-changed",
+      this._onShowIgnoredChanged
+    );
+  }
+
+  private _onShowIgnoredChanged = (e: Event) => {
+    this._showIgnored = (e as CustomEvent<{ value: boolean }>).detail.value;
+  };
+
   protected render() {
     let activeCount = 0;
     for (const job of this._jobs.values()) {
@@ -229,6 +277,7 @@ export class ESPHomeHeaderActions extends LitElement {
         ? this._localize("layout.more_options_with_count", { count: activeCount })
         : this._localize("dashboard.more_options");
     const hasAlerts = this._offloaderAlertsCount() > 0;
+    const ignoredCount = this._importableDevices.filter((d) => d.ignored).length;
     return html`
       <button
         type="button"
@@ -258,7 +307,9 @@ export class ESPHomeHeaderActions extends LitElement {
                 @keydown=${this._onMenuItemKeydown}
               >
                 <wa-icon library="mdi" name="playlist-check"></wa-icon>
-                <span class="menu-item-label">${this._localize("firmware_jobs.menu_item")}</span>
+                <span class="menu-item-label"
+                  >${this._localize("firmware_jobs.menu_item")}</span
+                >
                 ${activeCount > 0
                   ? html`<span class="menu-item-count">${activeCount}</span>`
                   : nothing}
@@ -297,6 +348,28 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="archive-outline"></wa-icon>
                 ${this._localize("layout.archived_devices")}
               </div>
+              ${ignoredCount > 0
+                ? html`<div
+                    class="menu-item"
+                    role="menuitemcheckbox"
+                    tabindex="0"
+                    aria-checked=${this._showIgnored ? "true" : "false"}
+                    @click=${this._toggleShowIgnoredDiscoveries}
+                    @keydown=${this._onMenuItemKeydown}
+                  >
+                    <wa-icon
+                      library="mdi"
+                      name=${this._showIgnored ? "eye-off-outline" : "eye-outline"}
+                    ></wa-icon>
+                    <span class="menu-item-label"
+                      >${this._showIgnored
+                        ? this._localize("layout.hide_ignored_discoveries")
+                        : this._localize("layout.show_ignored_discoveries", {
+                            count: ignoredCount,
+                          })}</span
+                    >
+                  </div>`
+                : nothing}
               <div
                 class="menu-item"
                 role="menuitem"
@@ -318,7 +391,9 @@ export class ESPHomeHeaderActions extends LitElement {
                 <wa-icon library="mdi" name="cog"></wa-icon>
                 <span class="menu-item-label">${this._localize("layout.settings")}</span>
                 ${hasAlerts
-                  ? html`<span class="menu-item-count">${this._offloaderAlertsCount()}</span>`
+                  ? html`<span class="menu-item-count"
+                      >${this._offloaderAlertsCount()}</span
+                    >`
                   : nothing}
               </div>
               <div class="menu-divider" role="separator"></div>
@@ -375,6 +450,16 @@ export class ESPHomeHeaderActions extends LitElement {
     window.dispatchEvent(new Event("esphome-show-archived-dialog"));
   };
 
+  private _toggleShowIgnoredDiscoveries = () => {
+    /* Dashboard owns the ``_showIgnored`` flag and the
+       ``localStorage`` persistence. Fire the intent here; the
+       dashboard handler also pops the discovery section open so
+       the banner doesn't reappear collapsed after the user
+       explicitly asked to see those cards. */
+    this._close();
+    window.dispatchEvent(new Event("esphome-show-ignored-from-menu"));
+  };
+
   private _openSecrets() {
     this._close();
     navigate("/secrets");
@@ -391,7 +476,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-onboarding-wifi", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -401,7 +486,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-firmware-jobs", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -411,7 +496,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-reset-build-env", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -421,7 +506,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-settings", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 
@@ -435,7 +520,7 @@ export class ESPHomeHeaderActions extends LitElement {
       new CustomEvent("open-feedback", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

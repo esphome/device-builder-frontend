@@ -22,6 +22,41 @@ interface BackendLinterOptions {
   getConfiguration: () => string;
 }
 
+/**
+ * Last successful linter result per configuration, keyed on exact
+ * content. The save path consults this to skip its own `validateYaml`
+ * WS round-trip when the linter just validated the same buffer.
+ *
+ * TTL mirrors the backend's `_VALIDATE_CACHE_TTL` (60s) so staleness
+ * semantics for externally-mutated `!include` /
+ * `external_components` files are symmetric on both paths.
+ */
+const _LAST_VALIDATED_TTL_MS = 60_000;
+const _lastValidated = new Map<
+  string,
+  { content: string; result: EditorValidateResponse; at: number }
+>();
+
+/** Return the linter's last result if it matches the current buffer and is fresh. */
+export function getLastValidatedResult(
+  configuration: string,
+  content: string
+): EditorValidateResponse | null {
+  const entry = _lastValidated.get(configuration);
+  if (entry === undefined || entry.content !== content) return null;
+  if (performance.now() - entry.at >= _LAST_VALIDATED_TTL_MS) return null;
+  return entry.result;
+}
+
+/** Test-only seed; production populates the map only through the linter. */
+export function __setLastValidatedForTesting(
+  configuration: string,
+  content: string,
+  result: EditorValidateResponse
+): void {
+  _lastValidated.set(configuration, { content, result, at: performance.now() });
+}
+
 /** Match `line N, column M` (1-indexed) anywhere in a YAML parse error message. */
 const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/i;
 /** Fallback: bare `line N` if the column is missing from the message. */
@@ -33,7 +68,7 @@ const YAML_LINE_RE = /line\s+(\d+)/i;
  */
 function rangeToOffsets(
   view: EditorView,
-  range: { start_line: number; start_col: number; end_line: number; end_col: number },
+  range: { start_line: number; start_col: number; end_line: number; end_col: number }
 ): { from: number; to: number } {
   const doc = view.state.doc;
   const totalLines = doc.lines;
@@ -69,7 +104,7 @@ function rangeToOffsets(
 function lineToOffsets(
   view: EditorView,
   line1: number,
-  col1: number | null,
+  col1: number | null
 ): { from: number; to: number } {
   const doc = view.state.doc;
   const lineNum = Math.min(Math.max(line1, 1), doc.lines);
@@ -110,6 +145,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         console.debug("[yaml-lint] validate_yaml failed:", err);
         return [];
       }
+      _lastValidated.set(configuration, { content, result: res, at: performance.now() });
 
       const diagnostics: Diagnostic[] = [];
 
@@ -157,6 +193,6 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
       // Don't auto-open the panel — we only want the inline wavy underlines
       // and hover tooltip.
       autoPanel: false,
-    },
+    }
   );
 }

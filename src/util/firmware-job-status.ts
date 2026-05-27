@@ -24,9 +24,7 @@ export const TERMINAL_JOB_STATUSES: ReadonlySet<JobStatus> = new Set([
  * meaning we haven't observed the job's status yet — counts as
  * non-terminal so the caller waits for an actual signal.
  */
-export function isTerminalJobStatus(
-  status: JobStatus | null | undefined,
-): boolean {
+export function isTerminalJobStatus(status: JobStatus | null | undefined): boolean {
   return status != null && TERMINAL_JOB_STATUSES.has(status);
 }
 

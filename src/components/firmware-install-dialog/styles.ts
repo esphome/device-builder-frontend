@@ -112,7 +112,6 @@ export const firmwareInstallDialogStyles = css`
     text-decoration-thickness: 2px;
     outline: none;
   }
-
   .instructions {
     margin: var(--wa-space-m) 0 0;
     padding-left: var(--wa-space-l);

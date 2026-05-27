@@ -101,6 +101,7 @@ export class ESPHomeYamlDiff extends LitElement {
       white-space: pre-wrap;
       word-break: break-word;
       overflow-wrap: anywhere;
+      font-variant-ligatures: none;
     }
 
     tr.add .marker,

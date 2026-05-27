@@ -164,14 +164,6 @@ Releases are produced by GitHub Actions:
 
 The backend's `pyproject.toml` references the wheel by GitHub release URL (no PyPI), so a release here is everything needed to ship a new dashboard build.
 
-## Status
-
-### Disabled features
-
-The frontend is wired up for some features the backend doesn't expose yet. Anything in this list is gated behind a flag in [`src/feature-flags.ts`](src/feature-flags.ts) — flip the flag to re-enable once the backend lands.
-
-- **Automations** (`AUTOMATIONS_ENABLED`) — the navigator's "Automations" group is still visible and lists existing automations parsed from the YAML, but the "+ Add automation" action button is greyed out (and the underlying dialog isn't mounted). The ESPHome WebSocket API doesn't yet expose the endpoints the UI needs to add new ones (catalog of triggers / conditions / actions, schema lookups, save-back hooks). Re-enable by setting `AUTOMATIONS_ENABLED = true` once those land.
-
 ## License
 
 Apache 2.0

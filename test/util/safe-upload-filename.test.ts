@@ -8,7 +8,7 @@ describe("safeUploadFilename", () => {
     // intent is "import my working config", so the filename should
     // round-trip character-for-character.
     expect(safeUploadFilename("test_web_server_ota_esp32")).toBe(
-      "test_web_server_ota_esp32",
+      "test_web_server_ota_esp32"
     );
   });
 

@@ -12,16 +12,20 @@ import { css } from "lit";
 export const espHomeStyles = css`
   :host {
     /* ─── Brand colors ─── */
-    --esphome-primary: #009fee;
-    --esphome-primary-light: #dff3fc;
-    --esphome-secondary: #009ac7;
+    --esphome-primary: var(--primary-color, #009fee);
+    --esphome-primary-light: color-mix(
+      in srgb,
+      var(--primary-color, #009fee) 12%,
+      transparent
+    );
+    --esphome-secondary: color-mix(in srgb, var(--primary-color, #009fee), black 8%);
     --esphome-success: #2ecc71;
     --esphome-warning: #f39c12;
     --esphome-error: #e74c3c;
     --esphome-offline: #95a5a6;
 
     /* Text color for use on primary / dark / colored backgrounds — white in both light and dark modes */
-    --esphome-on-primary: #ffffff;
+    --esphome-on-primary: var(--text-primary-color, #ffffff);
 
     /* ─── Layout ─── */
     --esphome-header-height: 56px;

@@ -63,7 +63,10 @@ export const firmwareJobsDialogStyles = css`
     font-weight: var(--wa-font-weight-bold);
     color: var(--wa-color-text-normal);
     cursor: pointer;
-    transition: background 0.1s, border-color 0.1s, color 0.1s;
+    transition:
+      background 0.1s,
+      border-color 0.1s,
+      color 0.1s;
   }
 
   .tool-btn:hover {
@@ -263,7 +266,9 @@ export const firmwareJobsDialogStyles = css`
     background: transparent;
     color: var(--wa-color-text-quiet);
     cursor: pointer;
-    transition: background 0.1s, color 0.1s;
+    transition:
+      background 0.1s,
+      color 0.1s;
   }
 
   .row-action:hover {

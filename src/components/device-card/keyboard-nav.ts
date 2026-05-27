@@ -7,7 +7,7 @@ export function navigateCards(card: ESPHomeDeviceCard, key: string): void {
   const grid = card.parentElement;
   if (!grid) return;
   const cards = Array.from(
-    grid.querySelectorAll<ESPHomeDeviceCard>("esphome-device-card"),
+    grid.querySelectorAll<ESPHomeDeviceCard>("esphome-device-card")
   );
   const idx = cards.indexOf(card);
   if (idx < 0) return;
@@ -31,7 +31,7 @@ export function navigateCards(card: ESPHomeDeviceCard, key: string): void {
   sameRow.sort(
     (a, b) =>
       Math.abs(a.r.left + a.r.width / 2 - myCenter) -
-      Math.abs(b.r.left + b.r.width / 2 - myCenter),
+      Math.abs(b.r.left + b.r.width / 2 - myCenter)
   );
   sameRow[0]?.c.focus();
 }
@@ -68,6 +68,6 @@ export function onHostContextMenu(card: ESPHomeDeviceCard, e: MouseEvent): void 
       detail: { x: e.clientX, y: e.clientY },
       bubbles: true,
       composed: true,
-    }),
+    })
   );
 }

@@ -584,9 +584,83 @@ export const configEntryFormStyles = css`
     min-width: 6rem;
   }
 
+  /* Time-period field: numeric input + unit picker. Same layout
+     as float_with_unit so the eye reads them as the same kind of
+     compound control. */
+  .time-period-inputs {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-s);
+  }
+
+  .time-period-inputs > input {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .time-period-inputs > wa-select {
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 6rem;
+  }
+
   .float-with-unit-suffix {
     flex: 0 0 auto;
     color: var(--wa-color-text-subtle);
     font-size: var(--wa-font-size-s);
+  }
+
+  /* Templatable field wrapper — small literal/lambda tab strip
+     above the active body. The toggle is a pair of buttons rather
+     than a wa-tab-group to keep the markup leaf-cheap and the
+     keyboard story explicit. */
+  .templatable-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-2xs);
+  }
+
+  .templatable-toggle {
+    display: inline-flex;
+    align-self: flex-start;
+    border-radius: var(--wa-border-radius-s);
+    background: var(--wa-color-surface-lowered);
+    padding: 2px;
+  }
+
+  .templatable-toggle button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-2xs);
+    font-weight: var(--wa-font-weight-semibold);
+    padding: 4px 10px;
+    border-radius: var(--wa-border-radius-s);
+    cursor: pointer;
+  }
+
+  .templatable-toggle button.active {
+    background: var(--wa-color-surface-default);
+    color: var(--wa-color-text-normal);
+    box-shadow: var(--wa-shadow-xs);
+  }
+
+  .templatable-toggle button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  /* TRIGGER placeholder — appears only when an action_list field
+     leaks through the schema-extraction pass and reaches the form
+     instead of the automation editor tree. */
+  .trigger-placeholder {
+    margin: 0;
+    padding: var(--wa-space-s);
+    border: 1px dashed var(--wa-color-neutral-border-quiet, #d1d5db);
+    border-radius: var(--wa-border-radius-s);
+    color: var(--wa-color-text-quiet);
+    font-size: var(--wa-font-size-2xs);
+    font-style: italic;
   }
 `;

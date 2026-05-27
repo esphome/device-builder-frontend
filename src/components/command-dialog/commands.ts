@@ -1,9 +1,5 @@
 import { APIError } from "../../api/api-error.js";
-import {
-  ErrorCode,
-  JobStatus,
-  type FirmwareJob,
-} from "../../api/types.js";
+import { ErrorCode, JobStatus, type FirmwareJob } from "../../api/types.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
@@ -27,6 +23,10 @@ export async function detachStream(host: ESPHomeCommandDialog): Promise<void> {
   if (!host._streamId) return;
   const streamId = host._streamId;
   host._streamId = "";
+  // Flush the rAF batch so teardowns that keep the buffer visible
+  // (close, hand-off, force-local) paint every line that arrived.
+  // Restart paths follow up with ``_resetPendingLines``.
+  host._flushPendingLines();
   try {
     await host._api.stopStream(streamId);
   } catch {
@@ -39,9 +39,16 @@ export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   host._jobId = "";
   host._state = "running";
   host._lines = [];
+  host._resetPendingLines();
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
+  // Clear primed snapshots so a Retry that picks a different source can't
+  // leak the prior job's REMOTE label into renderBuildFailureSuggestion
+  // before the new _jobs context update lands. open() already clears these
+  // on a fresh dialog; startCommand is the Retry path.
+  host._jobStatus = null;
+  host._primedSource = null;
 
   if (host._commandType === "validate") {
     startValidateStream(host);
@@ -56,23 +63,25 @@ export function startValidateStream(host: ESPHomeCommandDialog): void {
     host.configuration,
     {
       onOutput: (line) => {
-        host._lines = [...host._lines, line];
+        host._enqueueLine(line);
         if (isValidationFailureLine(line)) host._failedDuringValidate = true;
       },
       onResult: (data) => {
         host._streamId = "";
+        host._flushPendingLines();
         host._state = data.success ? "success" : "error";
         host._statusMessage = host._localize(
-          data.success ? "command.validate_success" : "command.validate_failed",
+          data.success ? "command.validate_success" : "command.validate_failed"
         );
       },
       onError: (error) => {
         host._streamId = "";
+        host._flushPendingLines();
         host._state = "error";
         host._statusMessage = error;
       },
     },
-    { showSecrets: host._showSecrets },
+    { showSecrets: host._showSecrets }
   );
 }
 
@@ -90,6 +99,7 @@ export async function toggleShowSecrets(host: ESPHomeCommandDialog): Promise<voi
   try {
     await detachStream(host);
     host._lines = [];
+    host._resetPendingLines();
     host._state = "running";
     host._statusMessage = "";
     host._resetAnsiLogScroll();
@@ -142,18 +152,19 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
   const wasLiveAtAttach = !isTerminalJobStatus(host._jobStatus);
   host._streamId = host._api.firmwareFollowJob(jobId, {
     onOutput: (line) => {
-      host._lines = [...host._lines, line];
+      host._enqueueLine(line);
       if (isValidationFailureLine(line)) host._failedDuringValidate = true;
     },
     onResult: (data) => {
       host._streamId = "";
+      host._flushPendingLines();
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
       host._state = success ? "success" : "error";
       host._statusMessage = host._localize(
         success
           ? `command.${host._commandType}_success`
-          : `command.${host._commandType}_failed`,
+          : `command.${host._commandType}_failed`
       );
       host._jobId = "";
       if (
@@ -167,6 +178,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
     },
     onError: (error) => {
       host._streamId = "";
+      host._flushPendingLines();
       host._state = "error";
       host._statusMessage = error;
       host._jobId = "";
@@ -190,8 +202,7 @@ export function stopCommand(host: ESPHomeCommandDialog): void {
 function isCancelAlreadyTerminal(err: unknown): boolean {
   if (!(err instanceof APIError)) return false;
   return (
-    err.errorCode === ErrorCode.NOT_FOUND ||
-    err.errorCode === ErrorCode.INVALID_ARGS
+    err.errorCode === ErrorCode.NOT_FOUND || err.errorCode === ErrorCode.INVALID_ARGS
   );
 }
 
@@ -224,7 +235,10 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     host._state = "error";
     host._statusMessage = host._localize("command.force_local_failed");
     const detail = formatForceLocalError(err);
-    if (detail) host._lines = [...host._lines, detail];
+    if (detail) {
+      host._flushPendingLines();
+      host._lines = [...host._lines, detail];
+    }
   } finally {
     host._switchingToLocal = false;
   }

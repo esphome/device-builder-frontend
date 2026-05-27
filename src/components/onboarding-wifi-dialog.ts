@@ -7,14 +7,14 @@ import { APIError } from "../api/index.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
+import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { type PasswordInputValueChange } from "./device/password-input-event.js";
 
-import "@home-assistant/webawesome/dist/components/button/button.js";
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/input/input.js";
 import "./device/password-input.js";
 
 registerMdiIcons({ wifi: mdiWifi });
@@ -85,6 +85,8 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    inputStyles,
+    dialogActionButtonStyles,
     css`
       wa-dialog {
         --width: 480px;
@@ -180,26 +182,25 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             ${this._localize("onboarding.wifi.intro")}
           </p>
           <div class="field">
-            <label for="onboarding-ssid">${this._localize("onboarding.wifi.ssid_label")}</label>
-            <wa-input
+            <label for="onboarding-ssid"
+              >${this._localize("onboarding.wifi.ssid_label")}</label
+            >
+            <input
               id="onboarding-ssid"
+              type="text"
               .value=${this._ssid}
               maxlength="32"
               placeholder=${this._localize("onboarding.wifi.ssid_placeholder")}
-              aria-label=${this._localize("onboarding.wifi.ssid_label")}
               ?disabled=${this._saving}
               @input=${(e: Event) => {
-                // Read from currentTarget so we get the wa-input
-                // host element's value rather than risking the
-                // retargeted inner native ``<input>`` (mirrors the
-                // pattern in ``label-form.ts``).
-                this._ssid = (e.currentTarget as unknown as { value: string })
-                  .value;
+                this._ssid = (e.target as HTMLInputElement).value;
               }}
-            ></wa-input>
+            />
           </div>
           <div class="field">
-            <label for="onboarding-password">${this._localize("onboarding.wifi.password_label")}</label>
+            <label for="onboarding-password"
+              >${this._localize("onboarding.wifi.password_label")}</label
+            >
             <esphome-password-input
               id="onboarding-password"
               .value=${this._password}
@@ -207,9 +208,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               .maxlength=${64}
               .label=${this._localize("onboarding.wifi.password_label")}
               ?disabled=${this._saving}
-              @password-input-change=${(
-                e: CustomEvent<PasswordInputValueChange>,
-              ) => {
+              @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) => {
                 this._password = e.detail.value;
               }}
             ></esphome-password-input>
@@ -228,22 +227,24 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
           </p>
         </div>
         <div slot="footer" class="actions">
-          <wa-button
-            appearance="plain"
+          <button
+            type="button"
+            class="btn btn--cancel"
             ?disabled=${this._saving}
             @click=${this._dismissForSession}
           >
             ${this._localize("onboarding.wifi.dismiss_session")}
-          </wa-button>
-          <wa-button
-            variant="brand"
+          </button>
+          <button
+            type="button"
+            class="btn btn--primary"
             ?disabled=${this._saving || !this._ssid.trim()}
             @click=${this._save}
           >
             ${this._saving
               ? this._localize("onboarding.wifi.saving")
               : this._localize("onboarding.wifi.save")}
-          </wa-button>
+          </button>
         </div>
       </wa-dialog>
     `;
@@ -276,9 +277,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     // circuit. Fired before ``markOnboardingAcknowledged`` so a
     // failure on the second call doesn't suppress the refresh
     // — the wifi write is the user-visible state change.
-    window.dispatchEvent(
-      new CustomEvent("secrets-saved", { detail: { source: this } }),
-    );
+    window.dispatchEvent(new CustomEvent("secrets-saved", { detail: { source: this } }));
     try {
       // Acknowledge so the dialog doesn't re-pop on next load even
       // if the badge logic wants to keep the menu indicator.
@@ -379,7 +378,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       new CustomEvent("onboarding-dismissed-session", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
     this.close();
   };
@@ -389,7 +388,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
       new CustomEvent("onboarding-acknowledged", {
         bubbles: true,
         composed: true,
-      }),
+      })
     );
   }
 }

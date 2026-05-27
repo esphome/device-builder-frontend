@@ -34,7 +34,7 @@ export function editDevice(device: ConfiguredDevice) {
 export async function archiveDevice(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<boolean> {
   const name = device.friendly_name || device.name;
   try {
@@ -76,23 +76,21 @@ export async function archiveDevice(
 export async function unarchiveDevice(
   device: ArchivedDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<boolean> {
   const name = device.friendly_name || device.name || device.configuration;
   try {
     await api.unarchiveDevice(device.configuration);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    toast.error(
-      localize("dashboard.action_unarchive_failed", { name, error }),
-      { richColors: true },
-    );
+    toast.error(localize("dashboard.action_unarchive_failed", { name, error }), {
+      richColors: true,
+    });
     return false;
   }
-  toast.success(
-    localize("dashboard.action_unarchive_success", { name }),
-    { richColors: true },
-  );
+  toast.success(localize("dashboard.action_unarchive_success", { name }), {
+    richColors: true,
+  });
   return true;
 }
 
@@ -105,23 +103,21 @@ export async function unarchiveDevice(
 export async function deleteArchivedDevice(
   device: ArchivedDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<boolean> {
   const name = device.friendly_name || device.name || device.configuration;
   try {
     await api.deleteArchivedDevice(device.configuration);
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    toast.error(
-      localize("dashboard.action_delete_archived_failed", { name, error }),
-      { richColors: true },
-    );
+    toast.error(localize("dashboard.action_delete_archived_failed", { name, error }), {
+      richColors: true,
+    });
     return false;
   }
-  toast.success(
-    localize("dashboard.action_delete_archived_success", { name }),
-    { richColors: true },
-  );
+  toast.success(localize("dashboard.action_delete_archived_success", { name }), {
+    richColors: true,
+  });
   return true;
 }
 
@@ -162,7 +158,7 @@ async function runBulkAction(
     successKey: string;
     failureKey: string;
     successOptions?: Parameters<typeof toast.success>[1];
-  },
+  }
 ) {
   let results: BulkActionResult[];
   try {
@@ -176,15 +172,15 @@ async function runBulkAction(
   const failed = results.filter((r) => !r.success);
 
   if (succeeded > 0) {
-    toast.success(
-      localize(copy.successKey, { count: succeeded }),
-      { richColors: true, ...copy.successOptions },
-    );
+    toast.success(localize(copy.successKey, { count: succeeded }), {
+      richColors: true,
+      ...copy.successOptions,
+    });
   }
   // Index by configuration up front so failure-toast naming is
   // O(failures) instead of O(failures × devices) on big selections.
   const devicesByConfiguration = new Map(
-    devices.map((d) => [d.configuration, d] as const),
+    devices.map((d) => [d.configuration, d] as const)
   );
   const fallbackError = localize("dashboard.bulk_failure_unknown_error");
   for (const result of failed) {
@@ -197,7 +193,7 @@ async function runBulkAction(
     // ``action_unarchive_failed`` interpolate ``{error}`` directly.
     toast.error(
       localize(copy.failureKey, { name, error: result.error || fallbackError }),
-      { richColors: true },
+      { richColors: true }
     );
   }
 }
@@ -211,30 +207,42 @@ export async function archiveBulkDevices(
   configurations: string[],
   devices: ConfiguredDevice[],
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
-  await runBulkAction(configurations, devices, localize, (c) => api.archiveBulkDevices(c), {
-    catchAllKey: "dashboard.archive_bulk_failed",
-    successKey: "dashboard.archive_bulk_success",
-    failureKey: "dashboard.action_archive_failed",
-    successOptions: {
-      description: localize("dashboard.action_archive_success_hint"),
-      duration: 8000,
-    },
-  });
+  await runBulkAction(
+    configurations,
+    devices,
+    localize,
+    (c) => api.archiveBulkDevices(c),
+    {
+      catchAllKey: "dashboard.archive_bulk_failed",
+      successKey: "dashboard.archive_bulk_success",
+      failureKey: "dashboard.action_archive_failed",
+      successOptions: {
+        description: localize("dashboard.action_archive_success_hint"),
+        duration: 8000,
+      },
+    }
+  );
 }
 
 export async function deleteBulkDevices(
   configurations: string[],
   devices: ConfiguredDevice[],
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ) {
-  await runBulkAction(configurations, devices, localize, (c) => api.deleteBulkDevices(c), {
-    catchAllKey: "dashboard.delete_bulk_failed",
-    successKey: "dashboard.delete_bulk_success",
-    failureKey: "dashboard.delete_failed",
-  });
+  await runBulkAction(
+    configurations,
+    devices,
+    localize,
+    (c) => api.deleteBulkDevices(c),
+    {
+      catchAllKey: "dashboard.delete_bulk_failed",
+      successKey: "dashboard.delete_bulk_success",
+      failureKey: "dashboard.delete_failed",
+    }
+  );
 }
 
 export async function downloadYaml(
@@ -268,7 +276,7 @@ export async function downloadYaml(
 export async function downloadFirmware(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
-  localize: LocalizeFunc,
+  localize: LocalizeFunc
 ): Promise<void> {
   const name = device.friendly_name || device.name;
   try {
@@ -311,7 +319,7 @@ export async function detectAndOpenWizard(
      *  this function stays UI-agnostic. */
     onRecognized?: (device: ConfiguredDevice) => void;
     localize?: LocalizeFunc;
-  } = {},
+  } = {}
 ): Promise<void> {
   try {
     const detected = options.port
@@ -327,7 +335,7 @@ export async function detectAndOpenWizard(
         const mac = await readMacAddress(detected.loader);
         recognized =
           options.devices.find(
-            (d) => d.mac_address && d.mac_address.toUpperCase() === mac,
+            (d) => d.mac_address && d.mac_address.toUpperCase() === mac
           ) ?? null;
       } catch {
         // MAC read failed (unsupported chip family, transport flap);
@@ -338,9 +346,7 @@ export async function detectAndOpenWizard(
     // Manifest lookup — runs only when MAC didn't match an existing
     // device. ``readDeviceManifest`` already swallows read / parse
     // failures and returns null, so this can't throw.
-    const manifest = recognized
-      ? null
-      : await readDeviceManifest(detected.loader);
+    const manifest = recognized ? null : await readDeviceManifest(detected.loader);
 
     await disconnect(detected.transport);
 
@@ -350,7 +356,7 @@ export async function detectAndOpenWizard(
           options.localize("dashboard.serial_recognized", {
             name: recognized.friendly_name || recognized.name,
           }),
-          { richColors: true },
+          { richColors: true }
         );
       }
       options.onRecognized(recognized);
@@ -365,7 +371,7 @@ export async function detectAndOpenWizard(
             options.localize("dashboard.serial_starterkit_detected", {
               name: board.name,
             }),
-            { richColors: true },
+            { richColors: true }
           );
         }
         createDialog.openWithBoard(board);
@@ -399,6 +405,26 @@ export async function fetchApiKey(
 }
 
 /**
+ * Format a wall-clock ``[HH:MM:SS]`` prefix to prepend to a serial
+ * log line. ESPHome firmware emits ``[LEVEL][component:line]: msg``
+ * over UART without a timestamp; the Python ``esphome logs`` CLI
+ * stamps the receive time as the line arrives so the dashboard's
+ * log pane has a time anchor. The Web Serial path bypasses that
+ * CLI, so we mirror the same prefix here (#338).
+ *
+ * Format and time source match esphome/dashboard's
+ * ``TimestampTransformer`` (``src/util/timestamp-transformer.ts``):
+ * second resolution (no milliseconds), local wall clock, no space
+ * between the timestamp and the level marker.
+ */
+function formatSerialTimestamp(now: Date): string {
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  return `[${hh}:${mm}:${ss}]`;
+}
+
+/**
  * Pipe a Web Serial port into the logs dialog's line buffer.
  *
  * Returns a cancel function the dialog stores and calls on
@@ -415,26 +441,43 @@ export async function fetchApiKey(
  *     readable would throw.
  */
 export function streamSerialToDialog(port: any, dialog: any): () => void {
-  const decoder = new TextDecoderStream();
-  port.readable.pipeTo(decoder.writable).catch(() => {
-    /* Pipe rejection happens when the reader is cancelled below;
-       swallow it so the unhandled promise rejection doesn't bubble
-       up into the console. */
-  });
-  const reader = decoder.readable.getReader();
+  /* Read directly from ``port.readable.getReader()`` and decode in
+     userland rather than going through ``port.readable.pipeTo()`` +
+     a ``TextDecoderStream``. The pipeTo plumbing has been observed
+     to silently swallow bytes on some bridge chips (notably CH9102F)
+     after a close/reopen within the same USB session — direct reads
+     do not. */
+  const reader = port.readable.getReader();
+  const decoder = new TextDecoder();
   let buffer = "";
   let cancelled = false;
   const readLoop = async () => {
     try {
       while (true) {
         const { value, done } = await reader.read();
-        if (done) break;
-        if (cancelled) break;
-        buffer += value;
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          dialog._lines = [...dialog._lines, line];
+        if (done || cancelled) break;
+        if (value && value.length) {
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            /* Strip trailing CR (CRLF endings from the ROM
+               bootloader and many serial sources). ``ansi-log``
+               treats any chunk ending in ``\r`` as a progress-style
+               overwrite — it pops the previous visual line and
+               replaces it in place — so a stream of CRLF-terminated
+               boot lines would collapse to just the last one. */
+            const cleaned = line.endsWith("\r") ? line.slice(0, -1) : line;
+            /* Stamp every line — including blanks — at receive time
+               so the log pane shows the same ``[HH:MM:SS]`` anchor it
+               does for WS-fed sessions. esphome/dashboard's
+               ``TimestampTransformer`` prefixes every chunk
+               unconditionally (the line break is preserved before
+               stamping), so we match that behaviour here for parity
+               between the two web serial paths. */
+            const stamped = `${formatSerialTimestamp(new Date())}${cleaned}`;
+            dialog._lines = [...dialog._lines, stamped];
+          }
         }
       }
     } catch {
@@ -469,4 +512,3 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
       });
   };
 }
-
