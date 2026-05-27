@@ -195,6 +195,34 @@ export class ESPHomeSelectBar extends LitElement {
           display: none;
         }
       }
+
+      /* Phone widths: 5 icon-only action buttons (cancel, labels,
+         archive, delete, update) plus the Select-all + count on the
+         left don't fit at the 700px-breakpoint padding/gap. Tighten
+         both, hide the now-redundant count text (Select-all is the
+         meaningful affordance), and pull the bar's horizontal
+         padding down so the trailing Update button stays on-screen. */
+      @media (max-width: 480px) {
+        .select-bar {
+          padding: var(--wa-space-s);
+        }
+
+        .left {
+          gap: var(--wa-space-s);
+        }
+
+        .count {
+          display: none;
+        }
+
+        .right {
+          gap: 4px;
+        }
+
+        .btn {
+          padding: 8px 10px;
+        }
+      }
     `,
   ];
 
