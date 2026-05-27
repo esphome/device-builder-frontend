@@ -27,10 +27,12 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
+import { dialogActionButtonStyles } from "../../styles/dialog-action-buttons.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyleString } from "../../util/label-style.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { labelsListStyles } from "./labels-list-styles.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -129,6 +131,8 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   static styles = [
     espHomeStyles,
     labelChipStyles,
+    labelsListStyles,
+    dialogActionButtonStyles,
     css`
       :host {
         display: contents;
@@ -157,81 +161,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
       }
 
+      /* Cap the list height so the dialog fits short mobile
+         viewports without clipping the footer slot. Adds to
+         labelsListStyles which leaves height to the consumer. */
       .options {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        /* Cap at ~60vh so on short mobile viewports the list still
-           leaves room for the footer + header without the dialog
-           clipping. */
         max-height: 60vh;
-        overflow-y: auto;
-        margin: 0 calc(var(--wa-space-l) * -1);
-        padding: 0 var(--wa-space-l);
-      }
-
-      .option {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        /* ≥ 44 px tap target on every row (WCAG / iOS HIG). */
-        min-height: 44px;
-        padding: 8px 10px;
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        background: transparent;
-        border: none;
-        text-align: left;
-        font-family: inherit;
-        color: inherit;
-        transition: background-color 0.12s;
-      }
-
-      .option:hover {
-        background: var(--wa-color-surface-lowered);
-      }
-
-      .option:focus-visible {
-        outline: none;
-        background: var(--wa-color-surface-lowered);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
-      }
-
-      .option-check {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 20px;
-        height: 20px;
-        border-radius: 5px;
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        flex-shrink: 0;
-        color: var(--esphome-on-primary);
-        background: var(--wa-color-surface-default);
-      }
-
-      .option-check--checked,
-      .option-check--mixed {
-        background: var(--esphome-primary);
-        border-color: var(--esphome-primary);
-      }
-
-      /* The mixed state uses the same fill as checked but with a
-         dash glyph instead of a tick, mirroring the platform-native
-         indeterminate-checkbox affordance on macOS / Windows. */
-      .option-check--mixed {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 30%);
-      }
-
-      .option-check wa-icon {
-        font-size: 14px;
-      }
-
-      .option-empty {
-        text-align: center;
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        padding: var(--wa-space-m);
       }
 
       .footer {
@@ -240,45 +174,19 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         gap: var(--wa-space-s);
       }
 
+      /* Icon-text alignment + ≥ 44 px tap target on the action
+         buttons. dialogActionButtonStyles supplies the base shape
+         (padding, radius, typography); these extend it. */
       .btn {
         display: inline-flex;
         align-items: center;
         gap: 6px;
         min-height: 44px;
-        padding: 8px 18px;
-        border-radius: var(--wa-border-radius-m);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: inherit;
-        cursor: pointer;
-        border: none;
-        transition:
-          background 0.12s,
-          opacity 0.12s;
       }
 
       .btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
-      }
-
-      .btn--cancel {
-        background: var(--wa-color-surface-lowered);
-        color: var(--wa-color-text-normal);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-      }
-
-      .btn--cancel:hover:not(:disabled) {
-        background: var(--wa-color-surface-border);
-      }
-
-      .btn--primary {
-        background: var(--esphome-primary);
-        color: var(--esphome-on-primary);
-      }
-
-      .btn--primary:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
       }
     `,
   ];
