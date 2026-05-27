@@ -337,6 +337,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       map.set(labelId, next);
     }
     this._pendingChanges = map;
+    // A new edit after a partial failure expresses fresh user intent
+    // ("apply this label across the WHOLE selection"), not a retry
+    // of the prior payload. Clear the retry-narrow so the next Apply
+    // targets every selected device again; otherwise devices that
+    // succeeded last time would silently miss the new transition.
+    this._failedConfigurations = null;
   }
 
   /** Block Esc / X / backdrop while a save is in flight so an

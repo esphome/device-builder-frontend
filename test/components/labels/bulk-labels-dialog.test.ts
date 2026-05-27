@@ -327,6 +327,33 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(dialog._failedConfigurations).toBeNull();
   });
 
+  test("a new toggle after partial failure clears the retry-narrow filter", async () => {
+    // The retry-narrow is for straight retries; a fresh edit
+    // expresses new intent for the whole selection. Without the
+    // clear, devices that succeeded last time would silently miss
+    // the new transition.
+    const dialog = makeMockedDialog(
+      async (updates) =>
+        updates.map((u, i) =>
+          i === 0
+            ? { configuration: u.configuration, success: false, error: "boom" }
+            : { configuration: u.configuration, success: true }
+        ),
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+    await dialog._apply();
+    expect(dialog._failedConfigurations).not.toBeNull();
+
+    // A new toggle (a different label) clears the narrow so the
+    // next Apply targets the whole selection again.
+    (dialog as unknown as { _onToggle: (id: string) => void })._onToggle("lbl-b");
+    expect(dialog._failedConfigurations).toBeNull();
+  });
+
   test("open() resets the retry-narrow filter from a previous session", () => {
     const dialog = makeMockedDialog(
       async (updates) =>
