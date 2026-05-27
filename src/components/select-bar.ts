@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArchiveOutline, mdiDelete, mdiUpdate } from "@mdi/js";
+import { mdiArchiveOutline, mdiClose, mdiDelete, mdiUpdate } from "@mdi/js";
 import { LitElement, css, html } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -11,6 +11,7 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
   "archive-outline": mdiArchiveOutline,
+  close: mdiClose,
   delete: mdiDelete,
   update: mdiUpdate,
 });
@@ -170,11 +171,39 @@ export class ESPHomeSelectBar extends LitElement {
       .btn wa-icon {
         font-size: 16px;
       }
+
+      @media (max-width: 700px) {
+        .select-bar {
+          padding: var(--wa-space-m);
+        }
+
+        .right {
+          gap: 6px;
+        }
+
+        .btn {
+          padding: 8px 12px;
+        }
+
+        .btn-label {
+          display: none;
+        }
+      }
     `,
   ];
 
   protected render() {
     const allSelected = this.allVisibleSelected;
+    const cancelLabel = this._localize("layout.cancel");
+    const archiveLabel = this._localize("dashboard.archive_selected", {
+      count: this.selectedCount,
+    });
+    const deleteLabel = this._localize("dashboard.delete_selected", {
+      count: this.selectedCount,
+    });
+    const updateLabel = this._localize("dashboard.update_selected", {
+      count: this.selectedCount,
+    });
 
     return html`
       <div class="select-bar">
@@ -195,38 +224,40 @@ export class ESPHomeSelectBar extends LitElement {
           </span>
         </div>
         <div class="right">
-          <button class="btn btn--cancel" @click=${() => this._emit("cancel")}>
-            ${this._localize("layout.cancel")}
+          <button
+            class="btn btn--cancel"
+            aria-label=${cancelLabel}
+            @click=${() => this._emit("cancel")}
+          >
+            <wa-icon library="mdi" name="close"></wa-icon>
+            <span class="btn-label">${cancelLabel}</span>
           </button>
           <button
             class="btn btn--secondary"
+            aria-label=${archiveLabel}
             ?disabled=${this.selectedCount === 0}
             @click=${() => this._emit("archive-selected")}
           >
             <wa-icon library="mdi" name="archive-outline"></wa-icon>
-            ${this._localize("dashboard.archive_selected", {
-              count: this.selectedCount,
-            })}
+            <span class="btn-label">${archiveLabel}</span>
           </button>
           <button
             class="btn btn--danger"
+            aria-label=${deleteLabel}
             ?disabled=${this.selectedCount === 0}
             @click=${() => this._emit("delete-selected")}
           >
             <wa-icon library="mdi" name="delete"></wa-icon>
-            ${this._localize("dashboard.delete_selected", {
-              count: this.selectedCount,
-            })}
+            <span class="btn-label">${deleteLabel}</span>
           </button>
           <button
             class="btn btn--primary"
+            aria-label=${updateLabel}
             ?disabled=${this.selectedCount === 0}
             @click=${() => this._emit("update-selected")}
           >
             <wa-icon library="mdi" name="update"></wa-icon>
-            ${this._localize("dashboard.update_selected", {
-              count: this.selectedCount,
-            })}
+            <span class="btn-label">${updateLabel}</span>
           </button>
         </div>
       </div>
