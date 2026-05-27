@@ -3,6 +3,10 @@ import type { ColumnDef } from "@tanstack/lit-table";
 import { DeviceState, JobStatus } from "../../api/types.js";
 import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import {
+  DEVICE_SORT_COLLATOR,
+  deviceSortKey,
+} from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { formatFileSize } from "../../util/format-file-size.js";
 import { renderLabelChips } from "../../util/label-chip-template.js";
@@ -36,21 +40,6 @@ export interface DeviceRow {
   recentJob: FirmwareJob | null;
   _device: ConfiguredDevice;
 }
-
-/** Locale-aware, case-insensitive, numeric-aware collator;
- *  mirrors the options used by ``_cardCollator`` in
- *  ``pages/dashboard.ts`` and ``discoveryCollator`` in
- *  ``render-content.ts``. Keep the three in sync. #946. */
-export const NAME_COLLATOR = new Intl.Collator(undefined, {
-  sensitivity: "base",
-  numeric: true,
-});
-
-/** Pick the string the Name column should sort by — the friendly
- *  name when set, the YAML hostname otherwise. Mirrors what the
- *  cell renderer displays. */
-export const nameSortKey = (row: DeviceRow): string =>
-  row.friendly_name || row.name;
 
 const RECENT_ICON: Record<JobStatus, string | null> = {
   [JobStatus.QUEUED]: null,
@@ -167,9 +156,9 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         </span>`;
       },
       sortingFn: (rowA, rowB) =>
-        NAME_COLLATOR.compare(
-          nameSortKey(rowA.original),
-          nameSortKey(rowB.original),
+        DEVICE_SORT_COLLATOR.compare(
+          deviceSortKey(rowA.original),
+          deviceSortKey(rowB.original),
         ),
       size: 200,
       enableHiding: true,

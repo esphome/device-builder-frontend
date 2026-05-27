@@ -92,6 +92,10 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import { matchesDeviceName } from "../util/device-search.js";
+import {
+  DEVICE_SORT_COLLATOR,
+  deviceSortKey,
+} from "../util/device-sort.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -214,10 +218,6 @@ export class ESPHomePageDashboard extends LitElement {
   _pendingAdoptScroll: string | null = null;
   _actionDevice: ConfiguredDevice | null = null;
 
-  private static readonly _cardCollator = new Intl.Collator(undefined, {
-    sensitivity: "base",
-    numeric: true,
-  });
   private _sortedDevicesCache: {
     source: ConfiguredDevice[];
     sorted: ConfiguredDevice[];
@@ -516,9 +516,9 @@ export class ESPHomePageDashboard extends LitElement {
     const source = this._devices;
     if (this._sortedDevicesCache?.source === source)
       return this._sortedDevicesCache.sorted;
-    const collator = ESPHomePageDashboard._cardCollator;
-    const sortKey = (d: ConfiguredDevice) => d.friendly_name || d.name || d.configuration;
-    const sorted = [...source].sort((a, b) => collator.compare(sortKey(a), sortKey(b)));
+    const sorted = [...source].sort((a, b) =>
+      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b)),
+    );
     this._sortedDevicesCache = { source, sorted };
     return sorted;
   }

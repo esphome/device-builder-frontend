@@ -10,13 +10,12 @@ import {
   renderSelectToggle,
   renderViewToggle,
 } from "./render-toolbar.js";
+import {
+  DEVICE_SORT_COLLATOR,
+  deviceSortKey,
+} from "../../util/device-sort.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
-
-const discoveryCollator = new Intl.Collator(undefined, {
-  sensitivity: "base",
-  numeric: true,
-});
 
 export function renderDiscoveredSection(
   host: ESPHomePageDashboard,
@@ -28,10 +27,7 @@ export function renderDiscoveredSection(
   // pushing them to the bottom keeps active discoveries on top.
   const visible = [...host._visibleImportableDevices].sort((a, b) => {
     if (a.ignored !== b.ignored) return a.ignored ? 1 : -1;
-    return discoveryCollator.compare(
-      a.friendly_name || a.name,
-      b.friendly_name || b.name,
-    );
+    return DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b));
   });
   // Nothing to announce when every importable is ignored and the
   // user has opted to hide them — the header kebab's "Show ignored
