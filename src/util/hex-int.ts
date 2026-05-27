@@ -95,16 +95,19 @@ export function parseHexInt(raw: string): string | null {
 }
 
 /**
- * Walk a values dict and rewrite numeric values whose corresponding
- * config entry has ``display_format === "hex"`` to their canonical
- * ``"0x..."`` string form.
+ * Walk a values dict and rewrite every hex-typed entry's value to
+ * its canonical lowercase ``"0x..."`` string form. Numeric (number
+ * or bigint) values stringify through ``formatHexInt``; string
+ * values (including uppercase, leading-zero, and decimal-typed-as-
+ * string shapes) round-trip through ``parseHexInt``; already-
+ * canonical strings short-circuit without allocating a copy.
  *
- * Why: YAML's hex literal grammar (`address: 0x76`) parses to a
- * plain integer (118) on the way in, so by the time the form
- * receives a values dict the hex notation is gone. Without this
- * normalisation, a user who edits an unrelated field in the same
- * section and clicks Save sees their hex address flip to decimal
- * (`address: 118`) on disk — the YAML serializer emits numbers
+ * Why: the form's values dict carries heterogeneous types
+ * (``parseYamlSectionValues`` hands hex literals back as raw
+ * strings; ``add-component`` paths can produce numbers / bigints).
+ * Without this pass, a user who edits an unrelated field in the
+ * same section and clicks Save sees their hex address flip shape
+ * on disk — the YAML serializer emits whatever's in the dict
  * verbatim, with no schema knowledge to reach for the hex form.
  *
  * Pre-formatting once at parse time means every save preserves the

@@ -44,19 +44,15 @@ describe("validateDeviceName", () => {
 describe("getDeviceNameWarning", () => {
   it("warns about underscores (mDNS hostname concern)", () => {
     expect(getDeviceNameWarning("my_device")?.code).toBe(
-      "validation.device_name_underscore",
+      "validation.device_name_underscore"
     );
   });
 
   it("warns about leading or trailing hyphens", () => {
     /* RFC 952/1123 forbids edge hyphens in DNS labels, so they
        have the same mDNS-resolution risk as underscores. */
-    expect(getDeviceNameWarning("-foo")?.code).toBe(
-      "validation.device_name_edge_hyphen",
-    );
-    expect(getDeviceNameWarning("foo-")?.code).toBe(
-      "validation.device_name_edge_hyphen",
-    );
+    expect(getDeviceNameWarning("-foo")?.code).toBe("validation.device_name_edge_hyphen");
+    expect(getDeviceNameWarning("foo-")?.code).toBe("validation.device_name_edge_hyphen");
   });
 
   it("returns null for clean hyphenated names", () => {
@@ -94,6 +90,35 @@ describe("validateEntry", () => {
     expect(validateEntry(entry, "abc")?.code).toBe("validation.not_a_number");
   });
 
+  it("validates hex-typed INTEGER fields via BigInt (#944 range honesty)", () => {
+    // ``Number(String(raw))`` rounds 0xbe030c9794184728 to
+    // 0xbe030c9794184800 before the comparison; a precise input would
+    // pass an imprecise bound by accident. BigInt routing keeps the
+    // comparison exact at the catalog's full cv.hex_uint64_t range.
+    const entry = makeEntry({
+      type: ConfigEntryType.INTEGER,
+      display_format: "hex",
+      range: [0, 18446744073709551615],
+    });
+    expect(validateEntry(entry, "0xbe030c9794184728")).toBeNull();
+    expect(validateEntry(entry, "0xffffffffffffffff")).toBeNull();
+    expect(validateEntry(entry, "0x76")).toBeNull();
+    expect(validateEntry(entry, "abc")?.code).toBe("validation.not_a_number");
+  });
+
+  it("enforces hex range bounds when both fit safely", () => {
+    // i2c-style hex field with a tight range; pre-#944 behaviour stays
+    // intact for the small-range case.
+    const entry = makeEntry({
+      type: ConfigEntryType.INTEGER,
+      display_format: "hex",
+      range: [0x08, 0x77],
+    });
+    expect(validateEntry(entry, "0x07")?.code).toBe("validation.min");
+    expect(validateEntry(entry, "0x78")?.code).toBe("validation.max");
+    expect(validateEntry(entry, "0x76")).toBeNull();
+  });
+
   it("accepts floats on FLOAT fields", () => {
     const entry = makeEntry({ type: ConfigEntryType.FLOAT });
     expect(validateEntry(entry, 3.5)).toBeNull();
@@ -106,9 +131,7 @@ describe("validateEntry", () => {
     });
     expect(validateEntry(entry, "50kHz")).toBeNull();
     expect(validateEntry(entry, "3.3 V")?.code).toBe("validation.not_a_number");
-    expect(validateEntry(entry, "abckHz")?.code).toBe(
-      "validation.not_a_number",
-    );
+    expect(validateEntry(entry, "abckHz")?.code).toBe("validation.not_a_number");
   });
 
   it("applies range only when FLOAT_WITH_UNIT value is in canonical unit", () => {
@@ -388,8 +411,9 @@ describe("validateEntries", () => {
         default_value: null,
       }),
     ];
-    expect(validateEntries(entries, { frequency: "abc" }).get("frequency")?.code)
-      .toBe("validation.not_a_number");
+    expect(validateEntries(entries, { frequency: "abc" }).get("frequency")?.code).toBe(
+      "validation.not_a_number"
+    );
     expect(validateEntries(entries, { frequency: 100 }).size).toBe(0);
   });
 
@@ -441,14 +465,12 @@ describe("validateEntries", () => {
         supported_platforms: ["esp32"],
       }),
     ];
-    expect(
-      validateEntries(entries, {}, undefined, "esp8266").size,
-    ).toBe(0);
+    expect(validateEntries(entries, {}, undefined, "esp8266").size).toBe(0);
     // On the matching platform the gate is a no-op and the missing
     // required field is still flagged.
-    expect(
-      validateEntries(entries, {}, undefined, "esp32").get("psram")?.code,
-    ).toBe("validation.required");
+    expect(validateEntries(entries, {}, undefined, "esp32").get("psram")?.code).toBe(
+      "validation.required"
+    );
   });
 
   it("treats a null/undefined targetPlatform as 'no gate'", () => {
@@ -464,12 +486,10 @@ describe("validateEntries", () => {
         supported_platforms: ["esp32"],
       }),
     ];
-    expect(
-      validateEntries(entries, {}).get("psram")?.code,
-    ).toBe("validation.required");
-    expect(
-      validateEntries(entries, {}, undefined, null).get("psram")?.code,
-    ).toBe("validation.required");
+    expect(validateEntries(entries, {}).get("psram")?.code).toBe("validation.required");
+    expect(validateEntries(entries, {}, undefined, null).get("psram")?.code).toBe(
+      "validation.required"
+    );
   });
 
   it("recurses through NESTED groups with the platform gate", () => {
@@ -493,13 +513,9 @@ describe("validateEntries", () => {
     // group" short-circuit doesn't skip validation — we want to
     // exercise the platform gate on the leaf.
     const values = { diagnostics: { psram: undefined } };
+    expect(validateEntries(entries, values, undefined, "esp8266").size).toBe(0);
     expect(
-      validateEntries(entries, values, undefined, "esp8266").size,
-    ).toBe(0);
-    expect(
-      validateEntries(entries, values, undefined, "esp32").get(
-        "diagnostics.psram",
-      )?.code,
+      validateEntries(entries, values, undefined, "esp32").get("diagnostics.psram")?.code
     ).toBe("validation.required");
   });
 });
