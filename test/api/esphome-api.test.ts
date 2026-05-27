@@ -768,6 +768,63 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
+  it("setOffloaderRemoteBuildSettings forwards allow_major_version_mismatch", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderRemoteBuildSettings({
+      allow_major_version_mismatch: false,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_offloader_settings");
+    expect(sent.args).toEqual({ allow_major_version_mismatch: false });
+    const result = {
+      remote_builds_enabled: true,
+      allow_major_version_mismatch: false,
+      pairings: [],
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setOffloaderPairingAllowMajorVersionMismatch sends the dedicated command", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderPairingAllowMajorVersionMismatch({
+      pin_sha256: "a".repeat(64),
+      allow_major_version_mismatch: false,
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_pairing_allow_major_version_mismatch");
+    expect(sent.args).toEqual({
+      pin_sha256: "a".repeat(64),
+      allow_major_version_mismatch: false,
+    });
+    const result = {
+      receiver_hostname: "build.local",
+      receiver_port: 6055,
+      pin_sha256: "a".repeat(64),
+      label: "desktop",
+      paired_at: 1.0,
+      status: "approved",
+      connected: true,
+      connecting: false,
+      last_connect_error: "",
+      esphome_version: "2026.5.0",
+      enabled: true,
+      allow_major_version_mismatch: false,
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
   // No ``listRemoteBuildHosts`` / ``addRemoteBuildManualHost`` /
   // ``removeRemoteBuildManualHost`` tests — the wrappers were
   // deleted in lockstep with the backend rip-out. Discovered

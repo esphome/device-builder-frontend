@@ -264,6 +264,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         localize: this._localize,
         appVersion: this._appVersion,
         latestJob: latestJobForPin(this._jobs, p.pin_sha256),
+        masterAllowMajorVersionMismatch: this._allowMajorVersionMismatch,
         onToggleEnabled: this._onTogglePairingEnabled,
         onToggleAllowMajorVersionMismatch: this._onTogglePairingAllowMajorVersionMismatch,
         onBuildRemote: this._onBuildRemoteClick,

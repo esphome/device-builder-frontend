@@ -40,6 +40,11 @@ interface PairingRowContext {
   localize: LocalizeFunc;
   appVersion: string;
   latestJob: RemoteBuildJobState | undefined;
+  /** Master "Allow major-version mismatch" state. The per-pairing
+   *  override is only meaningful when this is `false` (strict
+   *  mode); when `true` or `null` (loading) the override is
+   *  hidden because it would have no effect. */
+  masterAllowMajorVersionMismatch: boolean | null;
   onToggleEnabled: (pairing: PairingSummary) => void;
   onToggleAllowMajorVersionMismatch: (pairing: PairingSummary) => void;
   onBuildRemote: (pairing: PairingSummary) => void;
@@ -56,6 +61,7 @@ export function renderPairingRow(
     localize,
     appVersion,
     latestJob,
+    masterAllowMajorVersionMismatch,
     onToggleEnabled,
     onToggleAllowMajorVersionMismatch,
     onBuildRemote,
@@ -103,6 +109,7 @@ export function renderPairingRow(
           pairing,
           localize,
           appVersion,
+          masterAllowMajorVersionMismatch,
           onToggleAllowMajorVersionMismatch
         )}
       </div>
@@ -170,6 +177,7 @@ function renderVersionMismatch(
   pairing: PairingSummary,
   localize: LocalizeFunc,
   appVersion: string,
+  masterAllowMajorVersionMismatch: boolean | null,
   onToggleAllowMajorVersionMismatch: (pairing: PairingSummary) => void
 ): TemplateResult | typeof nothing {
   if (pairing.status !== "approved") return nothing;
@@ -179,14 +187,21 @@ function renderVersionMismatch(
     kind === "release"
       ? "settings.build_offload_pairing_version_mismatch_release"
       : "settings.build_offload_pairing_version_mismatch_patch";
+  // The per-pairing override is only consulted when the master
+  // gate is active (strict mode). Hiding it when the master
+  // allows mismatches keeps the row from showing a toggle that
+  // has no observable effect.
+  const showOverride = kind === "release" && masterAllowMajorVersionMismatch === false;
   return html`
     <span
       class=${`row-desc pairing-version-mismatch pairing-version-mismatch--${kind}`}
       role="status"
     >
       ${localize(key, { peer: pairing.esphome_version, local: appVersion })}
-      ${kind === "release"
-        ? html`
+    </span>
+    ${showOverride
+      ? html`
+          <label class="pairing-allow-mismatch">
             <button
               class="toggle pairing-allow-mismatch-toggle"
               role="switch"
@@ -195,14 +210,16 @@ function renderVersionMismatch(
                 { label: pairing.label }
               )}
               aria-checked=${pairing.allow_major_version_mismatch}
-              title=${localize(
-                "settings.build_offload_pairing_allow_major_version_mismatch_title"
-              )}
               @click=${() => onToggleAllowMajorVersionMismatch(pairing)}
             ></button>
-          `
-        : nothing}
-    </span>
+            <span class="pairing-allow-mismatch-label">
+              ${localize(
+                "settings.build_offload_pairing_allow_major_version_mismatch_inline_label"
+              )}
+            </span>
+          </label>
+        `
+      : nothing}
   `;
 }
 
