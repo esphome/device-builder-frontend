@@ -68,28 +68,30 @@
  * typing `0x76` saves as `address: 0x76`. Bare hex letters
  * (`"abc"`, `"ff"`) hit neither regex and return `null`.
  */
+// ``BigInt`` is more permissive than we want (``BigInt("")`` is
+// ``0n``, ``BigInt(" 1 ")`` is ``1n``); this regex gate accepts
+// only the two forms we route through it:
+//   - ``0x`` / ``0X`` prefix followed by one or more hex digits;
+//   - one or more decimal digits (negatives intentionally
+//     rejected — uint64 only for the address fields this targets).
+// Everything else — internal whitespace, ``+`` / ``-`` sign,
+// exponents (``1e3``), fractional (``3.14``), trailing characters,
+// unprefixed hex letters — falls through to ``return null``.
+const ACCEPTED_INPUT_RE = /^(?:0[xX][0-9a-fA-F]+|\d+)$/;
+
+// What ``parseHexInt`` / ``formatHexInt`` emit — minimum-width
+// lowercase ``"0x..."``. Tighter than the input regex on purpose:
+// ``"0x076"`` is rejected here so the canonical-form fast path in
+// ``formatHexInt`` / ``normalizeHexValues`` agrees bit-for-bit
+// with what the BigInt slow path would produce (which strips the
+// leading zero). Without this tightening the two paths return
+// different strings for the same input.
+const CANONICAL_HEX_RE = /^0x(?:[1-9a-f][0-9a-f]*|0)$/;
+
 export function parseHexInt(raw: string): string | null {
   const trimmed = raw.trim();
-  if (trimmed === "") return null;
-  // Strict regex gate. ``BigInt`` is more permissive than we want
-  // (``BigInt("")`` is ``0n``); the two regexes accept only:
-  //   - ``0x`` / ``0X`` prefix followed by one or more hex digits;
-  //   - one or more decimal digits (negatives intentionally
-  //     rejected — uint64 only for the address fields this
-  //     targets).
-  // Everything else — internal whitespace, ``+`` / ``-`` sign,
-  // exponents (``1e3``), fractional (``3.14``), trailing
-  // characters, unprefixed hex letters — falls through to
-  // ``return null``.
-  let n: bigint;
-  if (/^0[xX][0-9a-fA-F]+$/.test(trimmed)) {
-    n = BigInt(trimmed);
-  } else if (/^\d+$/.test(trimmed)) {
-    n = BigInt(trimmed);
-  } else {
-    return null;
-  }
-  return "0x" + n.toString(16);
+  if (!ACCEPTED_INPUT_RE.test(trimmed)) return null;
+  return "0x" + BigInt(trimmed).toString(16);
 }
 
 /**
@@ -153,7 +155,7 @@ export function normalizeHexValues(
       // Already-canonical lowercase ``"0x..."``: nothing to rewrite,
       // and the identity-return shortcut for non-hex sections
       // depends on us not allocating a copy here.
-      if (/^0x[0-9a-f]+$/.test(v)) continue;
+      if (CANONICAL_HEX_RE.test(v)) continue;
       // The `parseYamlSectionValues` parser hands hex literals back
       // as strings (`parseScalar` only special-cases true/false), so
       // this is the live path for fresh YAML loads. Canonicalising
@@ -225,7 +227,7 @@ export function formatHexInt(value: unknown): string {
     // Hot path: a canonical lowercase hex string from the parser
     // (or a prior `formatHexInt` call) flows through verbatim,
     // sidestepping `BigInt` allocation on every keystroke.
-    if (/^0x[0-9a-f]+$/.test(value)) return value;
+    if (CANONICAL_HEX_RE.test(value)) return value;
     return parseHexInt(value) ?? "";
   }
   if (typeof value === "number") {

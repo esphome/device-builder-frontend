@@ -53,6 +53,14 @@ describe("parseHexInt", () => {
     expect(parseHexInt("18446744073709551615")).toBe("0xffffffffffffffff");
   });
 
+  it("strips leading zeros from hex input", () => {
+    // ``BigInt("0x076").toString(16)`` is ``"76"``; the canonical
+    // form is unique so the form's display, the values dict, and
+    // on-disk YAML all agree on a single shape.
+    expect(parseHexInt("0x076")).toBe("0x76");
+    expect(parseHexInt("0x00be030c9794184728")).toBe("0xbe030c9794184728");
+  });
+
   it("trims surrounding whitespace", () => {
     expect(parseHexInt("  0x76 ")).toBe("0x76");
     expect(parseHexInt("\t118\n")).toBe("0x76");
@@ -120,6 +128,14 @@ describe("formatHexInt", () => {
     // regressing into the lossy Number.parseInt path.
     expect(formatHexInt("0xbe030c9794184728")).toBe("0xbe030c9794184728");
     expect(formatHexInt("0xffffffffffffffff")).toBe("0xffffffffffffffff");
+  });
+
+  it("canonicalises non-canonical hex strings (leading zeros)", () => {
+    // ``"0x076"`` matches the input regex but not the canonical-form
+    // gate, so the slow path strips the leading zero. Both formatters
+    // must agree on the output for a single value.
+    expect(formatHexInt("0x076")).toBe("0x76");
+    expect(formatHexInt("0x00be030c9794184728")).toBe("0xbe030c9794184728");
   });
 
   it("formats bigint inputs as 0x-prefixed lowercase hex", () => {
@@ -207,6 +223,17 @@ describe("normalizeHexValues", () => {
     const entries = [entry("address", { display_format: "hex" })];
     expect(normalizeHexValues({ address: "0xbe030c9794184728" }, entries)).toEqual({
       address: "0xbe030c9794184728",
+    });
+  });
+
+  it("strips leading zeros from non-canonical hex strings", () => {
+    // Without canonicalisation here the fast path returns the
+    // string verbatim while a later edit re-renders the value
+    // through ``parseHexInt`` and the leading zero disappears; the
+    // values dict and on-disk YAML would silently disagree.
+    const entries = [entry("address", { display_format: "hex" })];
+    expect(normalizeHexValues({ address: "0x076" }, entries)).toEqual({
+      address: "0x76",
     });
   });
 
