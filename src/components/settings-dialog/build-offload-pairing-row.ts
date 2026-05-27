@@ -63,11 +63,25 @@ export function renderPairingRow(
   } = ctx;
   const { pillClass, pillLabel } = pillFor(pairing, localize);
   return html`
-    <div class="row peer-row pairing-row">
+    <div class="row peer-row row--stacked">
       <div class="row-label">
         <span class="row-title">
           ${pairing.label}
           <span class=${pillClass}>${pillLabel}</span>
+          ${pairing.status === "approved"
+            ? html`
+                <button
+                  class="toggle pairing-toggle"
+                  role="switch"
+                  aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
+                    label: pairing.label,
+                  })}
+                  aria-checked=${pairing.enabled}
+                  title=${localize("settings.build_offload_pairing_enabled_title")}
+                  @click=${() => onToggleEnabled(pairing)}
+                ></button>
+              `
+            : nothing}
         </span>
         <span class="row-desc">
           ${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}
@@ -85,73 +99,62 @@ export function renderPairingRow(
           : nothing}
         ${renderVersionMismatch(pairing, localize, appVersion)}
       </div>
-      ${pairing.status === "approved"
-        ? html`
-            <button
-              class="toggle"
-              role="switch"
-              aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
-                label: pairing.label,
-              })}
-              aria-checked=${pairing.enabled}
-              title=${localize("settings.build_offload_pairing_enabled_title")}
-              @click=${() => onToggleEnabled(pairing)}
-            ></button>
-          `
-        : nothing}
-      ${pairing.status === "approved" && pairing.connected
-        ? html`
-            <button
-              type="button"
-              class="btn-build-remote"
-              aria-label=${localize("settings.remote_build_submit_aria", {
-                label: pairing.label,
-              })}
-              @click=${() => onBuildRemote(pairing)}
-            >
-              ${localize("settings.remote_build_submit_action")}
-            </button>
-          `
-        : nothing}
-      ${latestJob !== undefined
-        ? html`
-            <button
-              type="button"
-              class="btn-view-remote-build"
-              aria-label=${localize("settings.remote_build_view_aria", {
-                label: pairing.label,
-              })}
-              @click=${() => onViewBuild(latestJob.job_id)}
-            >
-              ${localize("settings.remote_build_view_action")}
-            </button>
-          `
-        : nothing}
-      ${pairing.status === "approved"
-        ? html`
-            <button
-              type="button"
-              class="btn-edit-endpoint"
-              aria-label=${localize("settings.edit_pairing_endpoint_aria", {
-                label: pairing.label,
-              })}
-              title=${localize("settings.edit_pairing_endpoint_aria", {
-                label: pairing.label,
-              })}
-              @click=${() => onEditEndpoint(pairing)}
-            >
-              <wa-icon library="mdi" name="pencil"></wa-icon>
-            </button>
-          `
-        : nothing}
-      <button
-        type="button"
-        class="peer-remove btn-unpair"
-        aria-label=${localize("settings.unpair_aria", { label: pairing.label })}
-        @click=${() => onUnpair(pairing)}
-      >
-        ${localize("settings.unpair_action")}
-      </button>
+      <div class="pairing-actions">
+        ${pairing.status === "approved" && pairing.connected
+          ? html`
+              <button
+                type="button"
+                class="btn-build-remote"
+                aria-label=${localize("settings.remote_build_submit_aria", {
+                  label: pairing.label,
+                })}
+                @click=${() => onBuildRemote(pairing)}
+              >
+                ${localize("settings.remote_build_submit_action")}
+              </button>
+            `
+          : nothing}
+        ${latestJob !== undefined
+          ? html`
+              <button
+                type="button"
+                class="btn-view-remote-build"
+                aria-label=${localize("settings.remote_build_view_aria", {
+                  label: pairing.label,
+                })}
+                @click=${() => onViewBuild(latestJob.job_id)}
+              >
+                ${localize("settings.remote_build_view_action")}
+              </button>
+            `
+          : nothing}
+        ${pairing.status === "approved"
+          ? html`
+              <button
+                type="button"
+                class="btn-edit-endpoint"
+                aria-label=${localize("settings.edit_pairing_endpoint_aria", {
+                  label: pairing.label,
+                })}
+                title=${localize("settings.edit_pairing_endpoint_aria", {
+                  label: pairing.label,
+                })}
+                @click=${() => onEditEndpoint(pairing)}
+              >
+                <wa-icon library="mdi" name="pencil"></wa-icon>
+              </button>
+            `
+          : nothing}
+        <button
+          type="button"
+          class="peer-remove btn-unpair"
+          aria-label=${localize("settings.unpair_aria", { label: pairing.label })}
+          title=${localize("settings.unpair_action")}
+          @click=${() => onUnpair(pairing)}
+        >
+          <wa-icon library="mdi" name="delete"></wa-icon>
+        </button>
+      </div>
     </div>
   `;
 }
