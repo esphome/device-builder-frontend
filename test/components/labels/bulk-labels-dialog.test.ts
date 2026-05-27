@@ -264,6 +264,38 @@ describe("esphome-bulk-labels-dialog stays bound to live devices", () => {
     expect(dialog._pendingChanges.has("lbl-a")).toBe(false);
     expect(dialog._hasPendingChanges).toBe(false);
   });
+
+  test("device shift that makes pending match derived drops the entry", () => {
+    // Pending was load-bearing: derived was "indeterminate" (some
+    // had it, some didn't), pending="checked" claimed the label
+    // for the rest. If another tab now applies the same change so
+    // every device has it, derived flips to "checked" and the
+    // pending override becomes a no-op. Without a second pass in
+    // updated(), Apply stays enabled and falls through to the
+    // "no changes" branch on click.
+    const dialog = makeDialog();
+    seedDevices(dialog, [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+    ]);
+    dialog._catalog = [{ id: "lbl-a", name: "Alpha", color: null }];
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+    expect(dialog._hasPendingChanges).toBe(true);
+
+    // Cross-tab application: every device now has the label.
+    seedDevices(dialog, [
+      makeConfiguredDevice({ configuration: "a.yaml", labels: ["lbl-a"] }),
+      makeConfiguredDevice({ configuration: "b.yaml", labels: ["lbl-a"] }),
+    ]);
+    (
+      dialog as unknown as {
+        updated: (m: Map<string, unknown>) => void;
+      }
+    ).updated(new Map([["_allDevices", []]]));
+
+    expect(dialog._pendingChanges.has("lbl-a")).toBe(false);
+    expect(dialog._hasPendingChanges).toBe(false);
+  });
 });
 
 describe("esphome-bulk-labels-dialog cycle-back drops stale pending changes", () => {
@@ -618,6 +650,11 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
 
     expect(successSpy).not.toHaveBeenCalled();
     expect(errorSpy).toHaveBeenCalledTimes(1);
+    // Pin the exact key string the error toast received (the
+    // dialog's default ``_localize`` returns the key unchanged
+    // when no provider is attached). Asserts we don't regress
+    // back to the single-device ``labels_save_failed`` key.
+    expect(errorSpy.mock.calls[0]?.[0]).toBe("dashboard.labels_bulk_save_failed_other");
     // The dialog does NOT close on transport failure (so the user
     // can retry without losing their tri-state edits).
     expect(dialog._open).toBe(true);

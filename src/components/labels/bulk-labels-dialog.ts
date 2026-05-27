@@ -164,6 +164,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   };
 
   protected updated(changed: Map<string, unknown>) {
+    if (this._pendingChanges.size === 0) return;
     // Reconcile ``_pendingChanges`` against the live catalog: if
     // a label was deleted elsewhere (another tab, the single-device
     // editor's delete flow) while the dialog was open, drop any
@@ -172,18 +173,31 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // and surface as a per-device failure with no UI affordance
     // for the user to clear it (the row is already gone from
     // the catalog list).
-    if (changed.has("_catalog") && this._pendingChanges.size > 0) {
-      const validIds = new Set(this._catalog.map((l) => l.id));
-      let mutated = false;
-      const map = new Map(this._pendingChanges);
-      for (const id of map.keys()) {
-        if (!validIds.has(id)) {
-          map.delete(id);
-          mutated = true;
-        }
+    //
+    // Second pass on ``_allDevices`` shifts: if a ``device_updated``
+    // event lands while we're open and slides a label's derived
+    // state up to match an existing pending override (e.g. another
+    // tab applied the same change), the override is now a no-op
+    // but stays in the map; Apply would stay enabled and fall
+    // through to the "no changes" branch. Drop it here to mirror
+    // the ``_onToggle`` cycle-back cleanup.
+    const validIds = new Set(this._catalog.map((l) => l.id));
+    const map = new Map(this._pendingChanges);
+    let mutated = false;
+    const catalogChanged = changed.has("_catalog");
+    const devicesChanged = changed.has("_allDevices");
+    for (const [id, change] of map) {
+      if (catalogChanged && !validIds.has(id)) {
+        map.delete(id);
+        mutated = true;
+        continue;
       }
-      if (mutated) this._pendingChanges = map;
+      if (devicesChanged && change === this._derivedState(id)) {
+        map.delete(id);
+        mutated = true;
+      }
     }
+    if (mutated) this._pendingChanges = map;
   }
 
   /** Per-label count of selected devices that carry that label.
@@ -322,15 +336,21 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   ];
 
   protected render() {
+    // After a partial-failure retry narrows ``_failedConfigurations``,
+    // ``computeUpdates`` filters down to that subset, so the title
+    // count tracks the retry target (not the original selection).
+    // Otherwise the user sees "Labels for 5 devices" while the next
+    // Apply only re-writes the 2 that failed — looks like a bug.
+    const targetCount = this._failedConfigurations?.size ?? this.devices.length;
     const titleKey =
-      this.devices.length === 1
+      targetCount === 1
         ? "dashboard.labels_bulk_dialog_title_one"
         : "dashboard.labels_bulk_dialog_title_other";
     return html`
       <esphome-base-dialog
         ?open=${this._open}
         ?busy=${this._saving}
-        .label=${this._localize(titleKey, { count: this.devices.length })}
+        .label=${this._localize(titleKey, { count: targetCount })}
         @after-hide=${this._onAfterHide}
       >
         ${this._catalog.length === 0
