@@ -16,7 +16,7 @@ const plainInt = makeConfigEntry({
   type: ConfigEntryType.INTEGER,
 });
 
-describe("coerceFields hex-display integers (#952)", () => {
+describe("coerceFields hex-display integers", () => {
   test("canonical 0x76 from the hex renderer passes through verbatim", () => {
     expect(coerceFields([hexAddress], { address: "0x76" })).toEqual({
       address: "0x76",

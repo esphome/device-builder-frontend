@@ -3,12 +3,10 @@ import { ConfigEntryType } from "../../api/types.js";
 import { parseYamlBoolean } from "../../util/yaml-serialize.js";
 
 /**
- * Convert raw form values into the API payload. Drops empty strings
- * (unless required), keeps arrays as-is, recurses through NESTED
- * groups. Numeric / boolean entries coerce so the backend sees `5`,
- * not `"5"`; hex-display integers pass through verbatim as the
- * renderer's canonical ``"0x..."`` string so the YAML serializer
- * keeps the hex form on disk (#952).
+ * Coerce raw form values for the WS payload: numbers / booleans to
+ * their proper types so the backend sees `5`, not `"5"`. Hex-display
+ * integers stay strings; the renderer's canonical `"0x..."` survives
+ * to YAML and `cv.hex_int` accepts both forms on parse.
  */
 export function coerceFields(
   entries: ConfigEntry[],
@@ -40,13 +38,12 @@ export function coerceFields(
       continue;
     }
 
-    if (entry.type === ConfigEntryType.INTEGER) {
-      if (entry.display_format === "hex") {
-        out[entry.key] = raw;
-      } else {
-        const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
-        if (!Number.isNaN(n)) out[entry.key] = n;
-      }
+    if (
+      entry.type === ConfigEntryType.INTEGER &&
+      entry.display_format !== "hex"
+    ) {
+      const n = typeof raw === "number" ? raw : Number.parseInt(String(raw), 10);
+      if (!Number.isNaN(n)) out[entry.key] = n;
     } else if (entry.type === ConfigEntryType.FLOAT) {
       const n = typeof raw === "number" ? raw : Number.parseFloat(String(raw));
       if (!Number.isNaN(n)) out[entry.key] = n;
