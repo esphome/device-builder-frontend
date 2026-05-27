@@ -22,6 +22,7 @@ import { consume } from "@lit/context";
 import { mdiCheck, mdiMinus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import { repeat } from "lit/directives/repeat.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types.js";
@@ -103,6 +104,16 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   @state()
   private _saving = false;
 
+  /** Monotonic counter incremented on every ``open()``. ``_apply``
+   *  snapshots the value before its WS round-trip and bails out
+   *  of the success/failure branches if the counter has advanced
+   *  by the time the promise resolves — i.e. the dialog was
+   *  closed and re-opened with a different selection while a save
+   *  was in flight. The wrapper's busy gate prevents most paths
+   *  from getting there in the first place; this is defense in
+   *  depth for any programmatic close that bypasses the wrapper. */
+  private _applyGeneration = 0;
+
   /** Set of configurations the previous Apply failed on. Null
    *  means "no prior failure; target the full selection."
    *  Non-null narrows the next Apply to only this subset so a
@@ -114,10 +125,15 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   private _failedConfigurations: Set<string> | null = null;
 
   /** Open the dialog. Resets per-session state so a previous
-   *  session's pending changes or retry-narrow don't leak. */
+   *  session's pending changes / retry-narrow / in-flight
+   *  ``_saving`` flag don't leak. Bumps ``_applyGeneration`` so
+   *  a still-pending ``_apply`` from the previous session can
+   *  detect it landed on a different dialog instance and bail. */
   open() {
     this._pendingChanges = new Map();
     this._failedConfigurations = null;
+    this._saving = false;
+    this._applyGeneration++;
     this._open = true;
   }
 
@@ -164,8 +180,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
    *  reference + ``configurations`` array reference) so each
    *  ``_derivedState`` call inside a single render is O(1) after
    *  the first. Rebuilds when either input changes — including
-   *  the ``device_updated`` event that replaces ``_allDevices``. */
+   *  the ``device_updated`` event that replaces ``_allDevices``.
+   *  ``_validDeviceCount`` is the denominator for tri-state
+   *  derivation; cached alongside so ``_derivedState`` doesn't
+   *  re-filter ``_allDevices`` per label render. */
   private _labelCounts: Map<string, number> = new Map();
+  private _validDeviceCount = 0;
   private _labelCountsFor: {
     all: ConfiguredDevice[];
     configs: string[];
@@ -180,24 +200,33 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     }
     const counts = new Map<string, number>();
     const targets = new Set(this.configurations);
+    let validCount = 0;
     for (const device of this._allDevices) {
       if (!targets.has(device.configuration)) continue;
+      validCount++;
       for (const id of device.labels ?? []) {
         counts.set(id, (counts.get(id) ?? 0) + 1);
       }
     }
     this._labelCounts = counts;
+    this._validDeviceCount = validCount;
     this._labelCountsFor = {
       all: this._allDevices,
       configs: this.configurations,
     };
   }
 
-  /** Derived tri-state for a label across the current device set. */
+  /** Derived tri-state for a label across the current device set.
+   *
+   *  O(1) per call after ``_ensureLabelCounts`` has populated the
+   *  count map + valid-device count for the current upstream
+   *  inputs. Reads ``_validDeviceCount`` rather than calling
+   *  ``this.devices.length`` so we don't re-run the filter pass
+   *  per label render. */
   private _derivedState(labelId: string): TriState {
-    const n = this.devices.length;
-    if (n === 0) return "unchecked";
     this._ensureLabelCounts();
+    const n = this._validDeviceCount;
+    if (n === 0) return "unchecked";
     const has = this._labelCounts.get(labelId) ?? 0;
     if (has === n) return "checked";
     if (has === 0) return "unchecked";
@@ -333,7 +362,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
               role="group"
               aria-label=${this._localize("dashboard.drawer_labels")}
             >
-              ${this._catalog.map((label) => this._renderOption(label))}
+              ${repeat(
+                this._catalog,
+                (label) => label.id,
+                (label) => this._renderOption(label)
+              )}
             </div>`}
         <div class="actions">
           <button
@@ -442,9 +475,15 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       this.close();
       return;
     }
+    // Snapshot the generation so a stale response (dialog closed +
+    // re-opened with a different selection mid-flight) bails out
+    // before mutating state or firing toasts that would apply to
+    // the new session.
+    const gen = this._applyGeneration;
     this._saving = true;
     try {
       const results = await this._api.setDeviceLabelsBulk(updates);
+      if (gen !== this._applyGeneration) return;
       const failures = results.filter((r) => !r.success);
       if (failures.length === 0) {
         const key =
@@ -499,6 +538,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
         });
       }
     } catch (err) {
+      if (gen !== this._applyGeneration) return;
       console.warn("set_labels_bulk failed", err);
       const key =
         count === 1
@@ -506,7 +546,11 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
           : "dashboard.labels_bulk_save_failed_other";
       toast.error(this._localize(key, { count }), { richColors: true });
     } finally {
-      this._saving = false;
+      // Only clear ``_saving`` if we're still the active session —
+      // a generation bump means a new ``open()`` call already reset
+      // local state and shouldn't have ``_saving`` clobbered by
+      // our late finally.
+      if (gen === this._applyGeneration) this._saving = false;
     }
   };
 }

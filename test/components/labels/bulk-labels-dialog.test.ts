@@ -500,6 +500,37 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(dialog._pendingChanges.size).toBe(0);
   });
 
+  test("stale _apply response (open() before resolve) bails without mutating state", async () => {
+    // Defense in depth against the busy-gate-bypass path: if some
+    // imperative close + re-open lands during an in-flight WS
+    // round-trip, the original promise must not fire toasts or
+    // close() against the new session.
+    let resolve!: (results: BulkActionResult[]) => void;
+    const inFlight = new Promise<BulkActionResult[]>((r) => {
+      resolve = r;
+    });
+    const dialog = makeMockedDialog(
+      () => inFlight,
+      [makeConfiguredDevice({ configuration: "a.yaml", labels: [] })]
+    );
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    const apply = dialog._apply();
+    // Simulate a re-open with a different selection mid-flight —
+    // bumps the generation counter.
+    (dialog as unknown as { open: () => void }).open();
+
+    resolve([{ configuration: "a.yaml", success: true }]);
+    await apply;
+
+    // Stale response didn't fire toasts (those belong to the
+    // previous selection, not the current one).
+    expect(successSpy).not.toHaveBeenCalled();
+    expect(errorSpy).not.toHaveBeenCalled();
+    // And didn't clobber the freshly-opened dialog's _saving state.
+    expect(dialog._saving).toBe(false);
+  });
+
   test("_apply re-entrancy guard drops a second concurrent call", async () => {
     // A quick double-click on Apply could fire two ``_apply`` calls
     // before Lit re-renders the disabled state. The second call
