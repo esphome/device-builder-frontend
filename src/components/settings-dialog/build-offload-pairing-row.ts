@@ -68,6 +68,20 @@ export function renderPairingRow(
         <span class="row-title">
           ${pairing.label}
           <span class=${pillClass}>${pillLabel}</span>
+          ${pairing.status === "approved"
+            ? html`
+                <button
+                  class="toggle pairing-toggle"
+                  role="switch"
+                  aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
+                    label: pairing.label,
+                  })}
+                  aria-checked=${pairing.enabled}
+                  title=${localize("settings.build_offload_pairing_enabled_title")}
+                  @click=${() => onToggleEnabled(pairing)}
+                ></button>
+              `
+            : nothing}
         </span>
         <span class="row-desc">
           ${trimTrailingDot(pairing.receiver_hostname)}:${pairing.receiver_port}
@@ -86,20 +100,6 @@ export function renderPairingRow(
         ${renderVersionMismatch(pairing, localize, appVersion)}
       </div>
       <div class="pairing-actions">
-        ${pairing.status === "approved"
-          ? html`
-              <button
-                class="toggle"
-                role="switch"
-                aria-label=${localize("settings.build_offload_pairing_enabled_aria", {
-                  label: pairing.label,
-                })}
-                aria-checked=${pairing.enabled}
-                title=${localize("settings.build_offload_pairing_enabled_title")}
-                @click=${() => onToggleEnabled(pairing)}
-              ></button>
-            `
-          : nothing}
         ${pairing.status === "approved" && pairing.connected
           ? html`
               <button
@@ -149,9 +149,10 @@ export function renderPairingRow(
           type="button"
           class="peer-remove btn-unpair"
           aria-label=${localize("settings.unpair_aria", { label: pairing.label })}
+          title=${localize("settings.unpair_action")}
           @click=${() => onUnpair(pairing)}
         >
-          ${localize("settings.unpair_action")}
+          <wa-icon library="mdi" name="delete"></wa-icon>
         </button>
       </div>
     </div>
