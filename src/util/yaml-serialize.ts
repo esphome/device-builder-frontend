@@ -18,19 +18,18 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
 
 /**
- * Emit a ``LambdaValue`` sentinel (``{_lambda: "<body>"}``) as a
- * block-scalar field at the given header / body indent. Mirrors
- * the backend's ``controllers/automations/emitter.encode_value``
- * convention of bare ``|-`` (no ``!lambda`` tag) so a freshly-
- * emitted YAML doesn't gain a tag the user wouldn't have typed;
- * ESPHome's parser accepts both bare and tagged forms.
+ * Bare ``|-`` (no ``!lambda`` tag) mirrors the backend's
+ * ``controllers/automations/emitter.encode_value`` convention so a
+ * fresh save doesn't gain a tag the user wouldn't have typed; the
+ * ESPHome parser accepts both forms.
  *
- * Without this branch the form serializer falls through into the
- * generic ``typeof val === "object"`` recursion and emits the
- * sentinel literally as ``key:\n  _lambda: "raw\nbody"``, which
- * is invalid YAML (``"`` doesn't escape embedded newlines) and
- * cascades into ``findSectionRange`` failing on the next save —
- * #940.
+ * Without this helper the serializer falls through the generic
+ * ``typeof val === "object"`` recursion and emits the sentinel as
+ * ``key:\n  _lambda: "raw\nbody"``. The double-quoted scalar
+ * doesn't escape embedded newlines, so the YAML is invalid and
+ * ``findSectionRange`` can't locate the section on the next save;
+ * each keystroke then appends a fresh copy alongside the
+ * malformed one. #940.
  */
 function lambdaBlockLines(
   headerLine: string,
