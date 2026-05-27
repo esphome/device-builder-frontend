@@ -54,6 +54,12 @@ export interface RenderCtx {
   disabled: boolean;
   yaml: string;
   fromLine?: number;
+  /** Section being edited (``light.esp32_rmt_led_strip``,
+   *  ``sensor.template``, …). Empty when the form runs outside a
+   *  section context. The REGISTRY_LIST renderer reads this to
+   *  scope its picker against ``applies_to`` so a sensor's filter
+   *  dropdown doesn't offer binary_sensor filters. */
+  sectionKey: string;
   board: BoardCatalogEntry | null;
   requiredOnly: boolean;
   nestedOpenSections: Set<string>;

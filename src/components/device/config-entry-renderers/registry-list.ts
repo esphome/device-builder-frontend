@@ -70,23 +70,33 @@ function formatRegistryId(id: string): string {
   return id.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-/** Cache + fetch pair for one named registry. New registries plug
- *  into this table; the renderer reads through ``entry.registry``
- *  with a fallback to ``light_effects`` for legacy configs missing
- *  the field. */
+/** Cache + fetch pair for one named registry, plus the rule that
+ *  scopes ``applies_to`` against the section being edited.
+ *
+ *  ``filter`` (sensor / binary_sensor / text_sensor filters)
+ *  applies_to is the bare domain (``"sensor"`` etc.) so we match
+ *  on the section's first dotted segment. ``light_effects``
+ *  applies_to lists qualified component ids
+ *  (``"light.esp32_rmt_led_strip"``), so we match on the whole
+ *  section key. */
 interface RegistryOps {
   cache: () => (LightEffect | Filter)[] | undefined;
   fetch: (api: ESPHomeAPI) => Promise<unknown>;
+  /** Project a section key (``light.esp32_rmt_led_strip``) into the
+   *  shape ``applies_to`` lists use for this registry. */
+  parentToken: (sectionKey: string) => string;
 }
 
 const REGISTRY_OPS: Record<string, RegistryOps> = {
   light_effects: {
     cache: () => getCachedLightEffects(),
     fetch: (api) => fetchLightEffects(api),
+    parentToken: (sectionKey) => sectionKey,
   },
   filter: {
     cache: () => getCachedFilters(),
     fetch: (api) => fetchFilters(api),
+    parentToken: (sectionKey) => sectionKey.split(".", 1)[0],
   },
 };
 
@@ -262,7 +272,21 @@ export class ESPHomeRegistryList extends LitElement {
     const rawList = asList(this.ctx.getAt(this.path));
     const { items } = editableEntries(rawList);
     const disabled = effectiveDisabled(this.entry, this.ctx);
-    const catalog = this._catalog ?? [];
+    // Scope the catalog to entries valid for the parent section's
+    // domain — sensor's picker should not offer binary_sensor's
+    // ``delayed_on`` filter; a monochromatic light's picker should
+    // not offer addressable-only effects. An empty ``applies_to``
+    // on a catalog entry means "no platform restriction" and passes
+    // through. Empty ``sectionKey`` (form mounted outside a section)
+    // also passes through so the add-component preview still renders
+    // the full catalog.
+    const parentToken = this.ctx.sectionKey ? ops.parentToken(this.ctx.sectionKey) : "";
+    const catalog = (this._catalog ?? []).filter(
+      (entry) =>
+        !parentToken ||
+        entry.applies_to.length === 0 ||
+        entry.applies_to.includes(parentToken)
+    );
     // Three discriminated states for the picker affordance:
     //   - error: fetch rejected, retry button.
     //   - loading: catalog is null and no error → fetch in flight.

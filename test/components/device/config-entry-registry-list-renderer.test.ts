@@ -32,6 +32,7 @@ function mount(
     registry?: string | null;
     key?: string;
     catalog?: LightEffect[] | null;
+    sectionKey?: string;
   } = {}
 ): { el: ESPHomeRegistryList; emit: EmitMock } {
   const emitFn = (options.emit ?? vi.fn()) as EmitMock;
@@ -44,7 +45,9 @@ function mount(
     multi_value: true,
   });
   el.path = [key];
-  el.ctx = makeRenderCtx(values, { overrides: { emitChange: emitFn } });
+  el.ctx = makeRenderCtx(values, {
+    overrides: { emitChange: emitFn, sectionKey: options.sectionKey ?? "" },
+  });
   document.body.append(el);
   // Mounting fires the element's connectedCallback which kicks the
   // catalog fetch; shortcut by setting the cached catalog directly
@@ -164,6 +167,131 @@ describe("renderRegistryListField — emitChange contract", () => {
     picker.value = "pulse";
     picker.dispatchEvent(new Event("change"));
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: { speed: 50 } }]);
+  });
+});
+
+describe("renderRegistryListField — applies_to filtering", () => {
+  it("scopes the light_effects catalog to the parent platform", async () => {
+    // adalight is registered as ADDRESSABLE-only; on a
+    // BRIGHTNESS_ONLY_LIGHT_SCHEMA platform like ``monochromatic``
+    // the picker must not offer it (compile error
+    // ``Unable to find effect with the name 'adalight'``).
+    const { el } = mount(
+      { effects: [] },
+      {
+        sectionKey: "light.monochromatic",
+        catalog: [
+          {
+            id: "adalight",
+            name: "Adalight",
+            config_entries: [],
+            applies_to: ["light.esp32_rmt_led_strip", "light.neopixelbus"],
+          },
+          {
+            id: "pulse",
+            name: "Pulse",
+            config_entries: [],
+            applies_to: ["light.monochromatic", "light.rgb", "light.esp32_rmt_led_strip"],
+          },
+          {
+            id: "strobe",
+            name: "Strobe",
+            config_entries: [],
+            applies_to: [],
+          },
+        ],
+      }
+    );
+    await el.updateComplete;
+    // Add a row so the picker renders options.
+    const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
+    addButton.click();
+    el.ctx = { ...el.ctx, getAt: () => [{}] } as never;
+    el.requestUpdate();
+    await el.updateComplete;
+    const optionValues = Array.from(el.shadowRoot!.querySelectorAll("wa-option")).map(
+      (o) => (o as HTMLElement).getAttribute("value")
+    );
+    expect(optionValues).toContain("pulse");
+    expect(optionValues).toContain("strobe"); // empty applies_to = no restriction
+    expect(optionValues).not.toContain("adalight");
+  });
+
+  it("scopes the filter catalog to the parent component's domain", async () => {
+    // ``delayed_on`` is a binary_sensor filter; on a
+    // ``sensor.template`` section the picker must not offer it
+    // (compile error ``Unable to find filter with the name
+    // 'delayed_on'``).
+    const { el } = mount(
+      { filters: [] },
+      {
+        registry: "filter",
+        key: "filters",
+        sectionKey: "sensor.template",
+        catalog: [
+          {
+            id: "delayed_on",
+            name: "Delayed On",
+            config_entries: [],
+            applies_to: ["binary_sensor"],
+          },
+          {
+            id: "delta",
+            name: "Delta",
+            config_entries: [],
+            applies_to: ["sensor"],
+          },
+          {
+            id: "lambda",
+            name: "Lambda",
+            config_entries: [],
+            applies_to: ["binary_sensor", "sensor", "text_sensor"],
+          },
+        ],
+      }
+    );
+    await el.updateComplete;
+    const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
+    addButton.click();
+    el.ctx = { ...el.ctx, getAt: () => [{}] } as never;
+    el.requestUpdate();
+    await el.updateComplete;
+    const optionValues = Array.from(el.shadowRoot!.querySelectorAll("wa-option")).map(
+      (o) => (o as HTMLElement).getAttribute("value")
+    );
+    expect(optionValues).toContain("delta");
+    expect(optionValues).toContain("lambda");
+    expect(optionValues).not.toContain("delayed_on");
+  });
+
+  it("falls through to the full catalog when sectionKey is empty", async () => {
+    // The add-component preview mounts the form without a section
+    // context; in that case the picker should show every catalog
+    // entry rather than collapsing to nothing.
+    const { el } = mount(
+      { effects: [] },
+      {
+        sectionKey: "",
+        catalog: [
+          {
+            id: "adalight",
+            name: "Adalight",
+            config_entries: [],
+            applies_to: ["light.esp32_rmt_led_strip"],
+          },
+        ],
+      }
+    );
+    await el.updateComplete;
+    const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
+    addButton.click();
+    el.ctx = { ...el.ctx, getAt: () => [{}] } as never;
+    el.requestUpdate();
+    await el.updateComplete;
+    const optionValues = Array.from(el.shadowRoot!.querySelectorAll("wa-option")).map(
+      (o) => (o as HTMLElement).getAttribute("value")
+    );
+    expect(optionValues).toContain("adalight");
   });
 });
 

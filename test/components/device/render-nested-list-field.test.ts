@@ -70,6 +70,7 @@ function makeCtx(values: Record<string, unknown>): CtxStub {
     disabled: false,
     yaml: "",
     fromLine: undefined,
+    sectionKey: "",
     board: null,
     requiredOnly: false,
     nestedOpenSections: new Set(),

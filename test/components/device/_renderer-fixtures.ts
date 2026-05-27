@@ -81,6 +81,7 @@ export function makeRenderCtx(
     disabled: false,
     yaml: "",
     fromLine: 0,
+    sectionKey: "",
     board: options.board ?? makeTestBoard(),
     requiredOnly: false,
     nestedOpenSections: new Set<string>(),

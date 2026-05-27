@@ -129,6 +129,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ type: Number, attribute: "from-line" })
   fromLine?: number;
 
+  /** Section key being edited (``light.esp32_rmt_led_strip`` /
+   *  ``sensor.template`` / etc.). Threaded through ``ctx`` so
+   *  ``REGISTRY_LIST`` renderers can scope their per-row picker
+   *  against the parent component's domain — without it a
+   *  binary_sensor's filter picker offers sensor-only filters
+   *  and a non-addressable light's effects picker offers
+   *  addressable-only effects. Empty when the form is mounted
+   *  outside a section context (the add-component dialog's
+   *  preview, etc.). */
+  @property({ attribute: "section-key" })
+  sectionKey = "";
+
   /** Top-level component keys present in the YAML — drives the
    *  `depends_on_component` visibility predicate. */
   @property({ attribute: false })
@@ -496,6 +508,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       disabled: this.disabled,
       yaml: this.yaml,
       fromLine: this.fromLine,
+      sectionKey: this.sectionKey,
       board: this.board,
       requiredOnly: this.requiredOnly,
       nestedOpenSections: this._nestedOpenSections,
