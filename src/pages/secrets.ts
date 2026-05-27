@@ -223,6 +223,15 @@ export class ESPHomePageSecrets extends LitElement {
       .reveal-toggle wa-icon {
         font-size: 16px;
       }
+
+      .loading {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        color: var(--wa-color-text-quiet);
+      }
     `,
   ];
 
@@ -252,25 +261,31 @@ export class ESPHomePageSecrets extends LitElement {
         </div>
         <wa-divider></wa-divider>
         <div class="editor-card">
-          <button
-            type="button"
-            class="save-button"
-            ?disabled=${this._saving || !this._loaded || this._yaml === this._savedYaml}
-            @click=${this._save}
-          >
-            <wa-icon library="mdi" name="content-save"></wa-icon>
-            ${this._saving
-              ? this._localize("secrets.saving")
-              : this._localize("secrets.save")}
-          </button>
-          <esphome-yaml-editor
-            .value=${this._yaml}
-            .maskAllValues=${true}
-            .revealSensitive=${this._revealSensitive}
-            @yaml-change=${(e: CustomEvent) => {
-              this._yaml = e.detail.value;
-            }}
-          ></esphome-yaml-editor>
+          ${this._loaded
+            ? html`
+                <button
+                  type="button"
+                  class="save-button"
+                  ?disabled=${this._saving ||
+                  this._yaml === this._savedYaml ||
+                  this._yaml.trim() === ""}
+                  @click=${this._save}
+                >
+                  <wa-icon library="mdi" name="content-save"></wa-icon>
+                  ${this._saving
+                    ? this._localize("secrets.saving")
+                    : this._localize("secrets.save")}
+                </button>
+                <esphome-yaml-editor
+                  .value=${this._yaml}
+                  .maskAllValues=${true}
+                  .revealSensitive=${this._revealSensitive}
+                  @yaml-change=${(e: CustomEvent) => {
+                    this._yaml = e.detail.value;
+                  }}
+                ></esphome-yaml-editor>
+              `
+            : html`<div class="loading"><wa-spinner></wa-spinner></div>`}
         </div>
       </div>
     `;
