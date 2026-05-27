@@ -18,29 +18,40 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
 
 /**
- * Bare ``|-`` (no ``!lambda`` tag) mirrors the backend's
- * ``controllers/automations/emitter.encode_value`` convention so a
- * fresh save doesn't gain a tag the user wouldn't have typed; the
- * ESPHome parser accepts both forms.
+ * Wrap a ``LambdaValue`` sentinel (``{_lambda: "<body>"}``) as a
+ * ``YamlRawValue`` so the serializer's existing block-scalar path
+ * handles the emission. Bare ``|-`` (no ``!lambda`` tag) mirrors
+ * the backend's ``controllers/automations/emitter.encode_value``
+ * convention; the ESPHome parser accepts both forms.
  *
- * Without this helper the serializer falls through the generic
- * ``typeof val === "object"`` recursion and emits the sentinel as
- * ``key:\n  _lambda: "raw\nbody"``. The double-quoted scalar
- * doesn't escape embedded newlines, so the YAML is invalid and
- * ``findSectionRange`` can't locate the section on the next save;
- * each keystroke then appends a fresh copy alongside the
+ * Without this conversion the form serializer falls through the
+ * generic ``typeof val === "object"`` recursion and emits the
+ * sentinel as ``key:\n  _lambda: "raw\nbody"``. The double-quoted
+ * scalar doesn't escape embedded newlines, so the YAML is invalid
+ * and ``findSectionRange`` can't locate the section on the next
+ * save; each keystroke then appends a fresh copy alongside the
  * malformed one. #940.
  */
-function lambdaBlockLines(
-  headerLine: string,
-  body: string,
-  bodyIndent: string
-): string[] {
-  const lines = [`${headerLine}: |-`];
-  for (const line of body.split("\n")) {
-    lines.push(line === "" ? "" : `${bodyIndent}${line}`);
-  }
-  return lines;
+function lambdaToRawValue(body: string, bodyIndent: string): YamlRawValue {
+  const lines = body
+    .split("\n")
+    .map((line) => (line === "" ? "" : `${bodyIndent}${line}`));
+  return new YamlRawValue(lines, "|-");
+}
+
+/**
+ * Emit a ``YamlRawValue`` under *key* at the given indent. Shared
+ * by the top-level and list-item serializers (which both need the
+ * same header + body shape) and by the ``LambdaValue`` dispatch.
+ *
+ * Returns an empty array when the value has no body and no header,
+ * mirroring the pre-existing skip in ``serializeYamlValues`` for a
+ * raw value that would emit just a bare ``key:`` line.
+ */
+function emitYamlRawValueLines(key: string, indent: string, raw: YamlRawValue): string[] {
+  if (raw.lines.length === 0 && !raw.inlineHeader) return [];
+  const header = raw.inlineHeader ? ` ${raw.inlineHeader}` : "";
+  return [`${indent}${key}:${header}`, ...raw.lines];
 }
 
 /**
@@ -228,19 +239,12 @@ function serializeListItem(
     entries.forEach(([k, v], idx) => {
       const prefix = idx === 0 ? `${dashIndent}- ` : childIndent;
       if (v instanceof YamlRawValue) {
-        const header = v.inlineHeader ? ` ${v.inlineHeader}` : "";
-        lines.push(`${prefix}${k}:${header}`);
-        lines.push(...v.lines);
+        lines.push(...emitYamlRawValueLines(k, prefix, v));
         return;
       }
       if (isLambdaValue(v)) {
-        lines.push(
-          ...lambdaBlockLines(
-            `${prefix}${k}`,
-            v._lambda,
-            `${childIndent}${ESPHOME_YAML_INDENT}`
-          )
-        );
+        const raw = lambdaToRawValue(v._lambda, `${childIndent}${ESPHOME_YAML_INDENT}`);
+        lines.push(...emitYamlRawValueLines(k, prefix, raw));
         return;
       }
       lines.push(`${prefix}${k}: ${formatYamlScalar(v)}`);
@@ -268,15 +272,12 @@ export function serializeYamlValues(
     if (val === "" && !keepEmpty) continue;
     if (val instanceof YamlRawValue) {
       // Raw block (block scalar, automation handler, …). Lines
-      // already carry their original indentation — emit `key:`
-      // (with the inline `|-` / `>+` marker when present) and
-      // paste them back unchanged. `instanceof` check before
-      // the generic `typeof === "object"` branch so the class
+      // already carry their original indentation; emit ``key:``
+      // (with the inline ``|-`` / ``>+`` marker when present) and
+      // paste them back unchanged. ``instanceof`` check before
+      // the generic ``typeof === "object"`` branch so the class
       // identity wins over the plain-object handling below.
-      if (val.lines.length === 0 && !val.inlineHeader) continue;
-      const header = val.inlineHeader ? ` ${val.inlineHeader}` : "";
-      lines.push(`${indent}${key}:${header}`);
-      lines.push(...val.lines);
+      lines.push(...emitYamlRawValueLines(key, indent, val));
       continue;
     }
     if (Array.isArray(val)) {
@@ -289,7 +290,8 @@ export function serializeYamlValues(
       continue;
     }
     if (isLambdaValue(val)) {
-      lines.push(...lambdaBlockLines(`${indent}${key}`, val._lambda, `${indent}${step}`));
+      const raw = lambdaToRawValue(val._lambda, `${indent}${step}`);
+      lines.push(...emitYamlRawValueLines(key, indent, raw));
       continue;
     }
     if (typeof val === "object") {
