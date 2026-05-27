@@ -23,6 +23,7 @@ import { mdiCheck, mdiMinus } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import { repeat } from "lit/directives/repeat.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types.js";
@@ -176,59 +177,38 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
   }
 
   /** Per-label count of selected devices that carry that label,
-   *  memoised by the upstream inputs (``_allDevices`` array
-   *  reference + ``configurations`` array reference) so each
-   *  ``_derivedState`` call inside a single render is O(1) after
-   *  the first. Rebuilds when either input changes — including
-   *  the ``device_updated`` event that replaces ``_allDevices``.
-   *  ``_validDeviceCount`` is the denominator for tri-state
-   *  derivation; cached alongside so ``_derivedState`` doesn't
-   *  re-filter ``_allDevices`` per label render. */
-  private _labelCounts: Map<string, number> = new Map();
-  private _validDeviceCount = 0;
-  private _labelCountsFor: {
-    all: ConfiguredDevice[];
-    configs: string[];
-  } | null = null;
-
-  private _ensureLabelCounts() {
-    if (
-      this._labelCountsFor?.all === this._allDevices &&
-      this._labelCountsFor?.configs === this.configurations
-    ) {
-      return;
-    }
-    const counts = new Map<string, number>();
-    const targets = new Set(this.configurations);
-    let validCount = 0;
-    for (const device of this._allDevices) {
-      if (!targets.has(device.configuration)) continue;
-      validCount++;
-      for (const id of device.labels ?? []) {
-        counts.set(id, (counts.get(id) ?? 0) + 1);
+   *  plus the valid-device denominator for tri-state derivation.
+   *  Memoised on the upstream array references (``_allDevices``
+   *  and ``configurations``) so each ``_derivedState`` call inside
+   *  one render is O(1) after the first. Rebuilds when either
+   *  input changes — including the ``device_updated`` event that
+   *  replaces ``_allDevices``. Same memo pattern Home Assistant's
+   *  frontend uses throughout. */
+  private _computeLabelCounts = memoizeOne(
+    (allDevices: ConfiguredDevice[], configurations: string[]) => {
+      const counts = new Map<string, number>();
+      const targets = new Set(configurations);
+      let validCount = 0;
+      for (const device of allDevices) {
+        if (!targets.has(device.configuration)) continue;
+        validCount++;
+        for (const id of device.labels ?? []) {
+          counts.set(id, (counts.get(id) ?? 0) + 1);
+        }
       }
+      return { counts, validCount };
     }
-    this._labelCounts = counts;
-    this._validDeviceCount = validCount;
-    this._labelCountsFor = {
-      all: this._allDevices,
-      configs: this.configurations,
-    };
-  }
+  );
 
-  /** Derived tri-state for a label across the current device set.
-   *
-   *  O(1) per call after ``_ensureLabelCounts`` has populated the
-   *  count map + valid-device count for the current upstream
-   *  inputs. Reads ``_validDeviceCount`` rather than calling
-   *  ``this.devices.length`` so we don't re-run the filter pass
-   *  per label render. */
+  /** Derived tri-state for a label across the current device set. */
   private _derivedState(labelId: string): TriState {
-    this._ensureLabelCounts();
-    const n = this._validDeviceCount;
-    if (n === 0) return "unchecked";
-    const has = this._labelCounts.get(labelId) ?? 0;
-    if (has === n) return "checked";
+    const { counts, validCount } = this._computeLabelCounts(
+      this._allDevices,
+      this.configurations
+    );
+    if (validCount === 0) return "unchecked";
+    const has = counts.get(labelId) ?? 0;
+    if (has === validCount) return "checked";
     if (has === 0) return "unchecked";
     return "indeterminate";
   }
