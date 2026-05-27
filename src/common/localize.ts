@@ -90,7 +90,10 @@ async function loadLocaleMessages(
     case "hu":
       return (await import("../translations/hu.json")).default as Record<string, unknown>;
     case "zh-CN":
-      return (await import("../translations/zh-CN.json")).default as Record<string, unknown>;
+      return (await import("../translations/zh-CN.json")).default as Record<
+        string,
+        unknown
+      >;
   }
 }
 
