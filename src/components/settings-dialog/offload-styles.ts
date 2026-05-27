@@ -151,8 +151,15 @@ export const pairingRowStyles = css`
     font-size: 16px;
   }
 
-  .pairing-row {
+  /* Lives at the bottom of a .row--stacked pairing row. Wraps so a
+     narrow dialog (HA-addon sidebar, mobile) doesn't clip the
+     rightmost button when toggle + Build + View + edit + Unpair
+     are all present. */
+  .pairing-actions {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: flex-end;
     gap: var(--wa-space-s);
   }
 
