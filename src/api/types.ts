@@ -621,10 +621,11 @@ export interface ConfigEntry {
    */
   display_format: "hex" | null;
   /**
-   * Catalog name for `REGISTRY_LIST` entries — currently only
-   * `"light_effects"` is wired. The renderer fetches the named
-   * catalog via the automation-catalog cache and uses its entries
-   * for the per-row type picker. Null on every other entry type.
+   * Catalog name for `REGISTRY_LIST` entries. Currently
+   * ``"light_effects"`` (light.effects) and ``"filter"``
+   * (sensor / binary_sensor / text_sensor filters) are wired; new
+   * registries plug into the frontend's REGISTRY_OPS table. Null
+   * on every other entry type.
    */
   registry: string | null;
   /**
@@ -808,9 +809,9 @@ export enum ConfigEntryType {
   // Polymorphic list of single-key items drawn from a named registry.
   // Each item is `{ <registry_id>: <params> | null }`. Frontend
   // renders a list of rows with a per-row type picker pulled from the
-  // catalog named by ``entry.registry`` (currently only
-  // ``"light_effects"`` is wired). Used for fields like
-  // ``light.effects`` and ``sensor.filters``. #941.
+  // catalog named by ``entry.registry``. Used for fields like
+  // ``light.effects`` (``registry: "light_effects"``) and
+  // ``sensor.filters`` (``registry: "filter"``). #941.
   REGISTRY_LIST = "registry_list",
   // Fallback for fields whose type couldn't be determined
   UNKNOWN = "unknown",

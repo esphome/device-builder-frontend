@@ -26,25 +26,34 @@ type EmitFn = (path: string[], value: unknown) => void;
 type EmitMock = EmitFn & ReturnType<typeof vi.fn>;
 
 function mount(
-  values: { effects?: unknown },
-  emit?: EmitMock
+  values: { effects?: unknown; filters?: unknown },
+  options: {
+    emit?: EmitMock;
+    registry?: string | null;
+    key?: string;
+    catalog?: LightEffect[] | null;
+  } = {}
 ): { el: ESPHomeRegistryList; emit: EmitMock } {
-  const emitFn = (emit ?? vi.fn()) as EmitMock;
+  const emitFn = (options.emit ?? vi.fn()) as EmitMock;
   const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+  const key = options.key ?? "effects";
   el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
-    key: "effects",
+    key,
     label: "Effects",
-    registry: "light_effects",
+    registry: options.registry === undefined ? "light_effects" : options.registry,
     multi_value: true,
   });
-  el.path = ["effects"];
+  el.path = [key];
   el.ctx = makeRenderCtx(values, { overrides: { emitChange: emitFn } });
   document.body.append(el);
   // Mounting fires the element's connectedCallback which kicks the
-  // catalog fetch; we shortcut by setting the cached catalog directly
+  // catalog fetch; shortcut by setting the cached catalog directly
   // via the internal state property so each test isolates from the
-  // module-level cache.
-  (el as unknown as { _catalog: LightEffect[] })._catalog = STUB_CATALOG;
+  // module-level cache. ``null`` keeps the loading state.
+  const cached = options.catalog === undefined ? STUB_CATALOG : options.catalog;
+  if (cached !== null) {
+    (el as unknown as { _catalog: LightEffect[] })._catalog = cached;
+  }
   el.requestUpdate();
   return { el, emit: emitFn };
 }
@@ -155,5 +164,115 @@ describe("renderRegistryListField — emitChange contract", () => {
     picker.value = "pulse";
     picker.dispatchEvent(new Event("change"));
     expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: { speed: 50 } }]);
+  });
+});
+
+describe("renderRegistryListField — foreign-entry preservation", () => {
+  it("Remove keeps non-editable entries verbatim (silent-data-loss fix)", async () => {
+    // The values dict can carry foreign entries — strings, scalars,
+    // a YamlRawValue from a parser bail — that the picker shouldn't
+    // touch. Pre-fix ``asPolymorphicList`` filtered them out and the
+    // next emit silently dropped them from disk.
+    const foreign = "!secret legacy_effect";
+    const { el, emit } = mount({
+      effects: [foreign, { pulse: null }, { addressable_rainbow: null }],
+    });
+    await el.updateComplete;
+    const firstRemove = el.shadowRoot!.querySelectorAll(
+      ".registry-list-row .multi-btn"
+    )[0] as HTMLButtonElement;
+    firstRemove.click();
+    expect(emit).toHaveBeenCalledWith(
+      ["effects"],
+      [foreign, { addressable_rainbow: null }]
+    );
+  });
+
+  it("Add preserves trailing foreign entries", async () => {
+    const foreign = "!secret legacy_effect";
+    const { el, emit } = mount({
+      effects: [{ pulse: null }, foreign],
+    });
+    await el.updateComplete;
+    const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
+    addButton.click();
+    expect(emit).toHaveBeenCalledWith(["effects"], [{ pulse: null }, {}, foreign]);
+  });
+
+  it("Multi-key items are skipped by the picker rather than truncated", async () => {
+    // A malformed config carrying ``- {a: 1, b: 2}`` (two keys per
+    // item) used to render with the picker showing only ``a`` and
+    // silently drop ``b`` on the next save. Recognise multi-key
+    // items as foreign so they pass through untouched.
+    const malformed = { a: 1, b: 2 };
+    const { el, emit } = mount({ effects: [malformed, { pulse: null }] });
+    await el.updateComplete;
+    const rows = el.shadowRoot!.querySelectorAll(".registry-list-row");
+    // Only the single-key item renders a picker row.
+    expect(rows.length).toBe(1);
+    const remove = rows[0].querySelector(".multi-btn") as HTMLButtonElement;
+    remove.click();
+    expect(emit).toHaveBeenCalledWith(["effects"], [malformed]);
+  });
+});
+
+describe("renderRegistryListField — status states", () => {
+  it("unknown registry shows an explicit error, not a stand-in catalog", async () => {
+    const { el } = mount({}, { registry: "made_up_registry" });
+    await el.updateComplete;
+    const txt = el.shadowRoot!.textContent ?? "";
+    expect(txt).toContain("device.registry_list_unsupported");
+    // No picker rows, no Add button — the field is read-only via YAML.
+    expect(el.shadowRoot!.querySelectorAll(".registry-list-row").length).toBe(0);
+    expect(el.shadowRoot!.querySelector(".multi-add")).toBeNull();
+  });
+
+  it("distinguishes loading from empty-catalog state", async () => {
+    // Catalog null → fetch in flight → "loading".
+    const loadingEl = mount({}, { catalog: null }).el;
+    await loadingEl.updateComplete;
+    expect(loadingEl.shadowRoot!.textContent).toContain("device.registry_list_loading");
+
+    // Catalog [] → registry has no entries → distinct copy. Not a
+    // permanent loading message.
+    const emptyEl = mount({}, { catalog: [] }).el;
+    await emptyEl.updateComplete;
+    expect(emptyEl.shadowRoot!.textContent).toContain(
+      "device.registry_list_empty_catalog"
+    );
+    expect(emptyEl.shadowRoot!.textContent).not.toContain("device.registry_list_loading");
+  });
+
+  it("disables the Add button while the catalog is loading or empty", async () => {
+    const { el } = mount({}, { catalog: null });
+    await el.updateComplete;
+    const addButton = el.shadowRoot!.querySelector(".multi-add") as HTMLButtonElement;
+    expect(addButton.disabled).toBe(true);
+  });
+});
+
+describe("renderRegistryListField — registry dispatch", () => {
+  it("filter registry pulls from the filters cache, not light_effects", async () => {
+    // Smoke test the REGISTRY_OPS dispatch on entry.registry: mounting
+    // with ``registry: "filter"`` uses the filter cache, so a stub
+    // filter catalog renders as picker options.
+    const { el } = mount(
+      { filters: [{ delta: null }] },
+      {
+        registry: "filter",
+        key: "filters",
+        catalog: [
+          { id: "delta", name: "Delta", config_entries: [], applies_to: ["sensor"] },
+          { id: "lambda", name: "Lambda", config_entries: [], applies_to: ["sensor"] },
+        ],
+      }
+    );
+    await el.updateComplete;
+    const options = el.shadowRoot!.querySelectorAll("wa-option");
+    const values = Array.from(options).map((o) =>
+      (o as HTMLElement).getAttribute("value")
+    );
+    expect(values).toContain("delta");
+    expect(values).toContain("lambda");
   });
 });

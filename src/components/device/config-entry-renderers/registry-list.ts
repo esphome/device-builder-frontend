@@ -40,10 +40,23 @@ import {
 
 /** Extract the single key from a polymorphic-list item. Items
  *  arriving from a freshly-pressed Add button can be ``{}`` until
- *  the user picks a type. */
+ *  the user picks a type. Items with more than one key are
+ *  malformed (the registry contract is one key per item); return
+ *  the empty string and let the row render with a placeholder so
+ *  the user notices and the next save doesn't silently truncate. */
 function itemId(item: Record<string, unknown>): string {
   const keys = Object.keys(item);
-  return keys.length > 0 ? keys[0] : "";
+  return keys.length === 1 ? keys[0] : "";
+}
+
+/** True when *item* looks like a registry-list item the renderer can
+ *  edit: a plain object with zero or one key. Multi-key items or
+ *  non-object entries are preserved verbatim through edits via
+ *  ``preserveForeignEntries`` so a click in the visual editor never
+ *  drops data the form doesn't understand. */
+function isEditableItem(raw: unknown): raw is Record<string, unknown> {
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return false;
+  return Object.keys(raw as Record<string, unknown>).length <= 1;
 }
 
 /** Per-row label for the type picker. The catalog stores names
@@ -77,16 +90,63 @@ const REGISTRY_OPS: Record<string, RegistryOps> = {
   },
 };
 
-/** Coerce ``ctx.getAt`` output to a mutable list of polymorphic items.
+/** Coerce ``ctx.getAt`` output to the raw list of mixed entries.
  *  Anything that isn't already an array (a freshly-mounted form with
  *  no value, a parser fallback to YamlRawValue) renders as an empty
- *  list — the user can click Add to start. */
-function asPolymorphicList(raw: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.filter(
-    (it): it is Record<string, unknown> =>
-      it !== null && typeof it === "object" && !Array.isArray(it)
-  );
+ *  list — the user can click Add to start. The renderer treats
+ *  non-object / multi-key entries as foreign and preserves them
+ *  verbatim through edits via :func:`spliceEditable`. */
+function asList(raw: unknown): unknown[] {
+  return Array.isArray(raw) ? raw : [];
+}
+
+/** Editable items + their positions in the original list. Foreign
+ *  entries (non-object or multi-key) stay in the list but the
+ *  picker doesn't render rows for them; ``spliceEditable`` glues
+ *  the edited slice back into the original positions on save. */
+function editableEntries(list: unknown[]): {
+  items: Record<string, unknown>[];
+  positions: number[];
+} {
+  const items: Record<string, unknown>[] = [];
+  const positions: number[] = [];
+  list.forEach((it, i) => {
+    if (isEditableItem(it)) {
+      items.push(it);
+      positions.push(i);
+    }
+  });
+  return { items, positions };
+}
+
+/** Re-emit *list* with the editable slice replaced by *next*. Foreign
+ *  entries keep their original positions; new entries from Add land
+ *  at the end of the editable slice (just before any trailing
+ *  foreign entries). */
+function spliceEditable(
+  list: unknown[],
+  positions: number[],
+  next: Record<string, unknown>[]
+): unknown[] {
+  const out: unknown[] = [...list];
+  // Replace each tracked editable slot, drop the trailing tail when
+  // ``next`` is shorter (Remove), append when longer (Add).
+  positions.forEach((pos, i) => {
+    if (i < next.length) out[pos] = next[i];
+  });
+  if (next.length < positions.length) {
+    // Remove the surplus tracked slots in descending order so earlier
+    // indices stay valid as we splice.
+    const removeAt = positions.slice(next.length).reverse();
+    for (const pos of removeAt) out.splice(pos, 1);
+  } else if (next.length > positions.length) {
+    // Add: insert new entries immediately after the last editable
+    // slot, preserving any foreign entries that came after.
+    const insertAt =
+      positions.length > 0 ? positions[positions.length - 1] + 1 : out.length;
+    out.splice(insertAt, 0, ...next.slice(positions.length));
+  }
+  return out;
 }
 
 @customElement("esphome-registry-list")
@@ -107,33 +167,57 @@ export class ESPHomeRegistryList extends LitElement {
   // ``config_entries``, ``applies_to``) across LightEffect and
   // Filter; the renderer only reads those fields so the union
   // covers both. New registries plug in by adding a row to
-  // ``REGISTRY_OPS`` below — no per-call dispatch logic.
+  // ``REGISTRY_OPS``.
   @state() private _catalog: (LightEffect | Filter)[] | null = null;
+  @state() private _fetchError = false;
 
   private _unsubscribe?: () => void;
 
   connectedCallback(): void {
     super.connectedCallback();
     const ops = this._ops();
+    if (ops === null) return; // Unknown registry, surfaced in render().
     const cached = ops.cache();
     if (cached !== undefined) {
       this._catalog = cached;
     } else if (this._api) {
       ops.fetch(this._api).catch(() => {
-        // Cache layer suppresses the rejection broadcast; render a
-        // placeholder via ``_catalog === null`` until either the
-        // user retries or a successful fetch refreshes the cache.
+        // Distinct from "still loading": flag the failure so render
+        // surfaces an error + retry affordance instead of a permanent
+        // loading message.
+        this._fetchError = true;
       });
     }
     this._unsubscribe = subscribeAutomationCatalogCache(() => {
-      const next = this._ops().cache();
-      if (next !== undefined) this._catalog = next;
+      const live = this._ops();
+      if (live === null) return;
+      const next = live.cache();
+      if (next !== undefined) {
+        this._catalog = next;
+        this._fetchError = false;
+      }
     });
   }
 
-  private _ops(): RegistryOps {
-    return REGISTRY_OPS[this.entry?.registry ?? ""] ?? REGISTRY_OPS.light_effects;
+  /** Resolve the cache + fetcher for ``entry.registry``. Returns
+   *  ``null`` for registries the frontend doesn't know about (typo,
+   *  newly-added backend registry the frontend hasn't wired yet) so
+   *  render can show an explicit error instead of silently
+   *  substituting a stand-in catalog. */
+  private _ops(): RegistryOps | null {
+    const registry = this.entry?.registry ?? "";
+    return REGISTRY_OPS[registry] ?? null;
   }
+
+  private _retryFetch = () => {
+    if (!this._api) return;
+    const ops = this._ops();
+    if (ops === null) return;
+    this._fetchError = false;
+    ops.fetch(this._api).catch(() => {
+      this._fetchError = true;
+    });
+  };
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
@@ -160,20 +244,58 @@ export class ESPHomeRegistryList extends LitElement {
   `;
 
   protected render() {
-    const items = asPolymorphicList(this.ctx.getAt(this.path));
+    const ops = this._ops();
+    if (ops === null) {
+      // Unknown registry name — explicit error so misconfigured
+      // catalog values surface instead of silently substituting a
+      // stand-in catalog.
+      return html`
+        <div class="field" data-field-key=${this.path.join(".")}>
+          ${renderLabel(this.entry, this.ctx)}
+          <p class="registry-list-fallback">
+            ${this.ctx.localize("device.registry_list_unsupported")}
+          </p>
+          ${renderFieldError(this.path, this.ctx)}
+        </div>
+      `;
+    }
+    const rawList = asList(this.ctx.getAt(this.path));
+    const { items } = editableEntries(rawList);
     const disabled = effectiveDisabled(this.entry, this.ctx);
     const catalog = this._catalog ?? [];
-    const fallback = catalog.length === 0;
+    // Three discriminated states for the picker affordance:
+    //   - error: fetch rejected, retry button.
+    //   - loading: catalog is null and no error → fetch in flight.
+    //   - empty: catalog is [] → registry has no entries (most
+    //     likely a backend-side misconfig). Distinct from loading
+    //     so the user isn't told something's happening when it
+    //     isn't.
+    const statusHint: unknown = this._fetchError
+      ? html`<p class="registry-list-fallback">
+          ${this.ctx.localize("device.registry_list_error")}
+          <button type="button" class="multi-btn" @click=${this._retryFetch}>
+            ${this.ctx.localize("device.registry_list_retry")}
+          </button>
+        </p>`
+      : this._catalog === null
+        ? html`<p class="registry-list-fallback">
+            ${this.ctx.localize("device.registry_list_loading")}
+          </p>`
+        : catalog.length === 0
+          ? html`<p class="registry-list-fallback">
+              ${this.ctx.localize("device.registry_list_empty_catalog")}
+            </p>`
+          : nothing;
+    // Add is gated on a populated catalog: clicking with no catalog
+    // would push ``{}`` and the picker would render with no options,
+    // leaving the row stuck.
+    const addDisabled = disabled || catalog.length === 0;
     return html`
       <div class="field" data-field-key=${this.path.join(".")}>
         ${renderLabel(this.entry, this.ctx)} ${renderListEmptyHint(items, this.ctx)}
-        ${fallback && items.length === 0
-          ? html`<p class="registry-list-fallback">
-              ${this.ctx.localize("device.registry_list_loading")}
-            </p>`
-          : nothing}
+        ${statusHint}
         ${items.map((item, i) => this._renderRow(item, i, catalog, disabled))}
-        ${renderListAddButton(this.ctx, disabled, () => this._addItem())}
+        ${renderListAddButton(this.ctx, addDisabled, () => this._addItem())}
         ${renderFieldError(this.path, this.ctx)}
       </div>
     `;
@@ -219,40 +341,48 @@ export class ESPHomeRegistryList extends LitElement {
     `;
   }
 
+  /** Shared mutator: read the on-disk list, run *transform* against
+   *  the editable slice, splice the result back over the original
+   *  list (preserving foreign / multi-key entries verbatim), and
+   *  emit. Centralises the "asList → editableEntries → emit via
+   *  spliceEditable" chain so Add / Remove / Rename can't drift on
+   *  the foreign-entry preservation contract. */
+  private _mutateEditable(
+    transform: (editable: Record<string, unknown>[]) => Record<string, unknown>[]
+  ): void {
+    const list = asList(this.ctx.getAt(this.path));
+    const { items, positions } = editableEntries(list);
+    const next = transform(items);
+    this.ctx.emitChange(this.path, spliceEditable(list, positions, next));
+  }
+
   private _addItem() {
     // Emit an empty row rather than seeding the catalog's first id —
     // that "first id" is alphabetical (``adalight``) which is rarely
-    // what the user wants AND it's invalid for many light platforms
-    // (``adalight`` only applies to non-addressable RGB lights), so
-    // the backend rejects it on save. The picker shows a placeholder
-    // until the user chooses an effect. Bare-dash placeholders on
-    // disk round-trip cleanly through ``serializeListItem``'s
-    // empty-mapping path.
-    const items = asPolymorphicList(this.ctx.getAt(this.path));
-    this.ctx.emitChange(this.path, [...items, {}]);
+    // what the user wants AND it's invalid for many light platforms,
+    // so the backend rejects it on save. The picker shows a
+    // placeholder until the user chooses; bare-dash placeholders
+    // round-trip cleanly through ``serializeListItem``.
+    this._mutateEditable((items) => [...items, {}]);
   }
 
   private _removeAt(index: number) {
-    const items = asPolymorphicList(this.ctx.getAt(this.path));
-    this.ctx.emitChange(
-      this.path,
-      items.filter((_, i) => i !== index)
-    );
+    this._mutateEditable((items) => items.filter((_, i) => i !== index));
   }
 
   private _renameRow(index: number, nextId: string) {
-    const items = asPolymorphicList(this.ctx.getAt(this.path));
-    const target = items[index];
-    if (!target) return;
-    const oldId = itemId(target);
-    if (oldId === nextId) return;
-    // Preserve the old key's params (the user's existing config) when
-    // the picker swaps effect types — the params shape might not be
-    // valid for the new effect, but the user's intent is to morph
-    // the row, and a lossless rename keeps the YAML editor in sync.
-    const params = oldId ? target[oldId] : null;
-    const next = items.map((it, i) => (i === index ? { [nextId]: params ?? null } : it));
-    this.ctx.emitChange(this.path, next);
+    this._mutateEditable((items) => {
+      const target = items[index];
+      if (!target) return items;
+      const oldId = itemId(target);
+      if (oldId === nextId) return items;
+      // Preserve the old key's params (the user's existing config)
+      // when the picker swaps types — the params shape may not be
+      // valid for the new type but a lossless rename keeps the YAML
+      // pane in sync with the visual editor.
+      const params = oldId ? target[oldId] : null;
+      return items.map((it, i) => (i === index ? { [nextId]: params ?? null } : it));
+    });
   }
 }
 
@@ -261,9 +391,6 @@ export function renderRegistryListField(
   path: string[],
   ctx: RenderCtx
 ) {
-  // Currently the only registry plumbed end-to-end is ``light_effects``;
-  // the element imports the cache directly. A future second registry
-  // would add a switch in the element on ``entry.registry``.
   return html`<esphome-registry-list
     .entry=${entry}
     .path=${path}
