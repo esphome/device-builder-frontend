@@ -464,13 +464,16 @@ export class ESPHomeRegistryList extends LitElement {
     // an inline lambda editor bound to the row's polymorphic value
     // position so users can fill in the body visually.
     const isLambdaForm = currentId === "lambda";
-    const childEntries = catalogEntry?.config_entries ?? [];
-    const renderableChildren =
-      childEntries.length && (params === null || paramsIsMapping)
-        ? this.ctx.filterRenderable(
-            childEntries,
-            paramsIsMapping ? (params as Record<string, unknown>) : {}
-          )
+    // Render every child unconditionally — the user opted into this
+    // filter/effect by picking it from the dropdown, so the outer
+    // form's advanced / requiredOnly gates don't apply (many filters
+    // mark their tuning fields ``advanced: true`` and would render as
+    // an empty sub-form otherwise; exponential_moving_average is the
+    // canonical case). No catalog filter/effect carries depends_on on
+    // sub-fields today; revisit if that changes.
+    const childEntries =
+      (params === null || paramsIsMapping) && catalogEntry?.config_entries
+        ? catalogEntry.config_entries
         : [];
     return html`
       <div class="registry-list-item" data-row-index=${index}>
@@ -513,9 +516,9 @@ export class ESPHomeRegistryList extends LitElement {
                   this._setLambdaBody(index, currentId, e.detail.value)}
               ></esphome-lambda-editor>
             </div>`
-          : renderableChildren.length > 0
+          : childEntries.length > 0
             ? html`<div class="registry-list-sub-form">
-                ${renderableChildren.map((child) =>
+                ${childEntries.map((child) =>
                   this.ctx.renderEntry(child, [
                     ...this.path,
                     String(index),

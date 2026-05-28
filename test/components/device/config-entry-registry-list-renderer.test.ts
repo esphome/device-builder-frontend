@@ -372,6 +372,57 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
   });
 
+  it("renders advanced sub-fields unconditionally for the picked filter", async () => {
+    // exponential_moving_average's three sub-fields are all marked
+    // advanced: true. The outer form's advanced gate filters those
+    // out unless the user toggles 'Show advanced'; picking the filter
+    // is itself an explicit opt-in, so the sub-form should render
+    // every field regardless of the outer setting.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "exponential_moving_average",
+        name: "EMA",
+        applies_to: [],
+        config_entries: [
+          makeEntry(ConfigEntryType.FLOAT, { key: "alpha", advanced: true }),
+          makeEntry(ConfigEntryType.INTEGER, { key: "send_every", advanced: true }),
+        ],
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ exponential_moving_average: null }] },
+      {
+        overrides: {
+          renderEntry,
+          // Simulate the outer form having advanced fields hidden;
+          // the sub-form ignores this.
+          filterRenderable: ((entries: (typeof catalog)[0]["config_entries"]) =>
+            entries.filter((e) => !e.advanced)) as never,
+        },
+      }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    const paths = renderEntry.mock.calls.map((c) => c[1]);
+    expect(paths).toContainEqual(["filters", "0", "exponential_moving_average", "alpha"]);
+    expect(paths).toContainEqual([
+      "filters",
+      "0",
+      "exponential_moving_average",
+      "send_every",
+    ]);
+  });
+
   it("renders the inline lambda editor when the picked id is 'lambda'", async () => {
     // ``lambda`` filter takes a C++ body as the whole polymorphic value
     // (``- lambda: |- return x;``). The catalog ships no config_entries
