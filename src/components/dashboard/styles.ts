@@ -208,7 +208,13 @@ export const dashboardStyles = css`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
-    padding: var(--wa-space-l);
+    /* No top padding: the .toolbar + device-count-row above
+       already provide the inter-row rhythm — keeping the
+       --wa-space-l top here stacked into a wide gap between the
+       count row and the first card. Sides and bottom keep the
+       full padding so the grid doesn't hug the viewport edges
+       or the FAB. */
+    padding: 0 var(--wa-space-l) var(--wa-space-l);
   }
 
   /* Only the configured-device grid needs FAB clearance: it's the
