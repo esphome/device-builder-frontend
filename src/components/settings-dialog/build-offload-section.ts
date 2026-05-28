@@ -47,8 +47,8 @@ import "../pair-build-server-dialog.js";
 import "../reauth-wizard-dialog.js";
 import "../remote-build-job-dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/radio/radio.js";
-import "@home-assistant/webawesome/dist/components/radio-group/radio-group.js";
+import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
   delete: mdiDelete,
@@ -136,26 +136,12 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     offloaderAlertStyles,
     pairingRowStyles,
     css`
-      .policy-row wa-radio-group::part(form-control) {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-2xs);
+      .policy-row wa-select {
+        width: 100%;
+        max-width: none;
       }
-
-      .policy-option {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-      }
-
-      .policy-title {
-        font-size: var(--wa-font-size-s);
-        color: var(--wa-color-text-normal);
-      }
-
-      .policy-desc {
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
+      .policy-selected-desc {
+        margin-top: var(--wa-space-2xs);
       }
     `,
   ];
@@ -254,45 +240,31 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _renderVersionMatchPolicyPicker() {
-    // Disable the radios until the snapshot lands so clicking the
-    // default-highlighted "any" can't silently relax a stricter
-    // backend policy that hasn't arrived yet.
-    const policy = this._versionMatchPolicy;
+    const selected = this._versionMatchPolicy ?? "any";
     return html`
       <div class="row row--stacked policy-row">
         <div class="row-label">
           <span id="offloader-version-match-policy-title" class="row-title">
             ${this._localize("settings.offloader_version_match_policy_heading")}
           </span>
-          <span class="row-desc">
-            ${this._localize("settings.offloader_version_match_policy_desc")}
-          </span>
         </div>
-        <wa-radio-group
-          orientation="vertical"
+        <wa-select
           aria-labelledby="offloader-version-match-policy-title"
-          .value=${policy ?? "any"}
-          ?disabled=${policy === null}
+          value=${selected}
           @change=${this._onVersionMatchPolicyChange}
         >
-          ${_VERSION_MATCH_POLICIES.map((p) => this._renderPolicyOption(p))}
-        </wa-radio-group>
-      </div>
-    `;
-  }
-
-  private _renderPolicyOption(policy: VersionMatchPolicy) {
-    return html`
-      <wa-radio value=${policy}>
-        <span class="policy-option">
-          <span class="policy-title">
-            ${this._localize(`settings.offloader_version_match_policy_${policy}`)}
-          </span>
-          <span class="policy-desc">
-            ${this._localize(`settings.offloader_version_match_policy_${policy}_desc`)}
-          </span>
+          ${_VERSION_MATCH_POLICIES.map(
+            (p) => html`
+              <wa-option value=${p}>
+                ${this._localize(`settings.offloader_version_match_policy_${p}`)}
+              </wa-option>
+            `
+          )}
+        </wa-select>
+        <span class="row-desc policy-selected-desc">
+          ${this._localize(`settings.offloader_version_match_policy_${selected}_desc`)}
         </span>
-      </wa-radio>
+      </div>
     `;
   }
 
@@ -404,11 +376,8 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _onVersionMatchPolicyChange = (e: Event) => {
-    // Refuse pre-snapshot dispatches even if the disabled radios
-    // somehow emit one; see _renderVersionMatchPolicyPicker.
     if (this._versionMatchPolicy === null) return;
-    const target = e.target as HTMLElement & { value: string | number | null };
-    const raw = target.value;
+    const raw = (e.target as HTMLSelectElement).value;
     if (!_VERSION_MATCH_POLICIES.includes(raw as VersionMatchPolicy)) return;
     const policy = raw as VersionMatchPolicy;
     if (policy === this._versionMatchPolicy) return;
