@@ -135,6 +135,10 @@ async function _flushBatch(bucketKey: string): Promise<void> {
     const entry = Object.prototype.hasOwnProperty.call(entries, componentId)
       ? entries[componentId]
       : null;
+    // Cache write MUST precede resolve. A sync `_notify` subscriber
+    // that re-calls `fetchComponent(api, id, ...)` hits the cache
+    // path; reordering would start a fresh round trip for an id
+    // we just resolved.
     _cache.set(_key(componentId, bucket.platform, bucket.boardId), entry);
     resolver.resolve(entry);
   }
@@ -172,8 +176,15 @@ function _notify(): void {
 /** Test-only: drop all cached entries and pending promises.
  *  Bucket waiters waiting on a flush that will never happen are
  *  rejected so the dangling promises settle and dependent tests
- *  don't hang on an `await fetchComponent(...)`. */
+ *  don't hang on an `await fetchComponent(...)`. Attach a noop
+ *  catch to each in-flight promise first so a test that fired
+ *  `fetchComponent` purely for cache side-effects (no await, no
+ *  catch) doesn't surface the rejection as
+ *  ``unhandledrejection`` under vitest strict mode. */
 export function _clearComponentCache(): void {
+  for (const promise of _inflight.values()) {
+    promise.catch(() => {});
+  }
   for (const bucket of _batches.values()) {
     for (const resolver of bucket.pending.values()) {
       resolver.reject(new Error("component cache cleared"));
