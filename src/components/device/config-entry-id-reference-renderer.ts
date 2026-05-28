@@ -10,6 +10,7 @@ import type { ConfigEntry } from "../../api/types.js";
 import { findReferencedComponents } from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   renderFieldError,
   renderLabel,
   renderYamlOnlyFallbackIfNonPrimitive,
@@ -65,7 +66,7 @@ export function renderIdReferenceField(
 
   if (empty) {
     return html`
-      <div class="field" data-field-key=${path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <wa-select
           class=${invalid ? "invalid" : ""}
@@ -81,7 +82,7 @@ export function renderIdReferenceField(
   }
 
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}

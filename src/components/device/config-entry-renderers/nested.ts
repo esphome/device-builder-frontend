@@ -1,10 +1,11 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types.js";
-import { asRecord } from "../../../util/nested-values.js";
+import { isPlainObject } from "../../../util/nested-values.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   labelFor,
   renderHelpLink,
   type RenderCtx,
@@ -48,7 +49,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   const label = labelFor(entry, ctx);
   const enableLabel = ctx.localize("device.enable_entity", { name: label });
   return html`
-    <div class="nested-group" data-field-key=${path.join(".")}>
+    <div class="nested-group" data-field-key=${fieldKeyAttr(path)}>
       <div class="nested-header">
         ${isOptionalEntity
           ? html`<wa-switch
@@ -62,7 +63,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
                   path,
                   key,
                   isOpen,
-                  (e.target as HTMLInputElement & { checked: boolean }).checked,
+                  (e.target as unknown as { checked: boolean }).checked,
                   label,
                   ctx
                 )}
@@ -128,9 +129,12 @@ export function onEnableToggle(
     }
     if (!isOpen) ctx.toggleNested(key);
   } else {
+    // A sub-reading's value is always a plain object; narrow on that
+    // (not the broader hasSerializableValue, which is also true for
+    // scalars / arrays) so the stashed type is genuinely a Record.
     const current = ctx.getAt(path);
-    if (hasSerializableValue(current)) {
-      stash.set(stashKey, asRecord(current));
+    if (isPlainObject(current) && hasSerializableValue(current)) {
+      stash.set(stashKey, current);
     }
     ctx.emitChange(path, undefined);
     if (isOpen) ctx.toggleNested(key);

@@ -12,6 +12,7 @@ import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   renderFieldError,
   renderLabel,
   renderStringField,
@@ -186,7 +187,7 @@ export function renderPinField(
   };
 
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         data-no-value-sync

@@ -30,6 +30,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
+import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -212,8 +213,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * the value/selected wiring through Lit's template doesn't always
    * land — especially on the first paint, when wa-select reads its
    * value before the slotted options are connected. Each field div
-   * carries a `data-field-key` (the dotted path) so we can look up
-   * the right value for its select.
+   * carries a `data-field-key` (the JSON-encoded path) so we can look
+   * up the right value for its select. Encoding the path as JSON
+   * rather than a dotted string keeps user-supplied map keys that
+   * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
    *
    * We wait for each select's `updateComplete` (and one frame after
    * that) to make sure wa-select's own first-render bookkeeping —
@@ -271,7 +274,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       }
       const key = field.getAttribute("data-field-key");
       if (!key) continue;
-      const path = key.split(".");
+      const path = parseFieldKey(key);
       const value = getIn(this.values, path);
       // ``wa-select`` only carries primitive values; if the YAML
       // path resolves to an object (transient state from a partial
@@ -483,7 +486,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         // be edited via the automation editor tree, not as a form
         // field. Render a disabled placeholder so the user is told
         // why the field is inert.
-        return html`<div class="field" data-field-key=${path.join(".")}>
+        return html`<div class="field" data-field-key=${fieldKeyAttr(path)}>
           ${labelFor(entry, ctx)}
           <p class="trigger-placeholder" role="status">
             ${ctx.localize("device.automation_trigger_field_placeholder")}

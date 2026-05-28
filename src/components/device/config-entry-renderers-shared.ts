@@ -41,6 +41,24 @@ export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
   return ctx.disabled || entry.locked;
 }
 
+/** Serialize a field path into the ``data-field-key`` attribute. JSON
+ *  (not ``path.join(".")``) so a user-supplied map key that itself
+ *  contains a dot (a ``logger.logs`` row keyed ``i2c.idf``) survives
+ *  the round-trip back to a path in ``parseFieldKey``. */
+export const fieldKeyAttr = (path: string[]): string => JSON.stringify(path);
+
+/** Recover a field path from a ``data-field-key`` attribute. Non-JSON
+ *  values (the pin-advanced toggle key) fall back to dot-splitting. */
+export const parseFieldKey = (attr: string): string[] => {
+  try {
+    const parsed: unknown = JSON.parse(attr);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch {
+    // not JSON — legacy / non-path attribute, fall through
+  }
+  return attr ? attr.split(".") : [];
+};
+
 /** ESPHome stores secret references as `!secret <key>` literal strings
  *  in the YAML — match that shape so any string-shaped field can flag
  *  values that point at the secrets store. */
@@ -223,7 +241,7 @@ export function renderFieldShell(
   trailing: unknown = nothing
 ) {
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${input} ${trailing} ${renderFieldError(path, ctx)}
     </div>
   `;
@@ -244,7 +262,7 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
 ) {
   if (isPrimitiveOrNullish(raw)) return null;
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <p class="field-description">${ctx.localize("device.value_yaml_only")}</p>
       ${renderFieldError(path, ctx)}
@@ -280,7 +298,7 @@ export function renderStringField(
   // means the form's re-renders don't blow it away.
   if (inputType === "password") {
     return html`
-      <div class="field" data-field-key=${path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <esphome-password-input
           .value=${value}
@@ -295,7 +313,7 @@ export function renderStringField(
     `;
   }
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <input
         type=${inputType}
@@ -340,7 +358,7 @@ function renderSuggestionSelect(
     return Number.isFinite(n) ? n : raw;
   };
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}

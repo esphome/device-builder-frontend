@@ -12,6 +12,7 @@ import { formatHexInt, parseHexInt } from "../../../util/hex-int.js";
 import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   renderFieldError,
   renderFieldShell,
   renderHelpLink,
@@ -211,7 +212,7 @@ export function renderTimePeriodField(
         ? defaultParsed.unit
         : parsed.unit;
   return html`
-    <div class="field time-period" data-field-key=${path.join(".")}>
+    <div class="field time-period" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <div class="time-period-inputs">
         <input
@@ -284,7 +285,7 @@ export function renderFloatWithUnitField(
   const emit = (next: { value: number | null; unit: string }) =>
     ctx.emitChange(path, serializeFloatWithUnit(next));
   return html`
-    <div class="field float-with-unit" data-field-key=${path.join(".")}>
+    <div class="field float-with-unit" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <div class="float-with-unit-inputs">
         <input
@@ -357,7 +358,7 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
   const effective = raw === undefined || raw === null ? entry.default_value : raw;
   const checked = parseYamlBoolean(effective) === true;
   return html`
-    <div class="switch-field" data-field-key=${path.join(".")}>
+    <div class="switch-field" data-field-key=${fieldKeyAttr(path)}>
       <div class="field-info">${renderLabel(entry, ctx, { includeHelpLink: false })}</div>
       ${renderHelpLink(entry, ctx)}
       <wa-switch
@@ -385,7 +386,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.suggestions && entry.suggestions.length > 0) {
     const valueLower = value.toLowerCase();
     return html`
-      <div class="field" data-field-key=${path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <wa-select
           class=${invalid ? "invalid" : ""}
@@ -408,7 +409,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.allow_custom_value && entry.options && entry.options.length > 0) {
     const listId = `combobox-${path.join("-")}`;
     return html`
-      <div class="field" data-field-key=${path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <input
           type="text"
@@ -439,7 +440,7 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
   );
   const placeholder = defaultOption?.label ?? defaultStr;
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}
@@ -479,7 +480,7 @@ export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: Ren
   const value = isRaw ? raw.body : String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <textarea
         class="textarea-field ${invalid ? "invalid" : ""}"
@@ -504,7 +505,7 @@ export function renderIconField(entry: ConfigEntry, path: string[], ctx: RenderC
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <esphome-mdi-icon-picker
         .value=${value}
