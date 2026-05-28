@@ -42,14 +42,12 @@ export const dashboardStyles = css`
      down so the collapsed pill doesn't sit on top of the view-toggle
      buttons.*/
   :host([has-discovered]) {
-    padding-top: var(--wa-space-2xl);
+    padding-top: var(--wa-space-xl);
   }
 
-  /* Mobile: the pill itself compacted to ~30px (see
-     .discovered-section-header @media block below); the desktop
-     gutter-top sized for the full pill leaves ~40px of dead space
-     between the now-shrunk pill and the search bar. Tighten the
-     gutter to match the new pill height. #41 */
+  /* Mobile compacts the pill further (see .discovered-section-header
+     @media block below), so the gutter tightens one more step to
+     match the smaller pill. #41 */
   @media (max-width: 600px) {
     :host([has-discovered]) {
       padding-top: var(--wa-space-l);
@@ -103,7 +101,7 @@ export const dashboardStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-s) var(--wa-space-l);
+    padding: var(--wa-space-xs) var(--wa-space-m);
     background: var(--esphome-primary-light);
     color: var(--esphome-primary);
     border: var(--wa-border-width-s) solid var(--esphome-primary);
@@ -123,7 +121,7 @@ export const dashboardStyles = css`
   }
 
   .discovered-section-header wa-icon {
-    font-size: var(--wa-font-size-l);
+    font-size: var(--wa-font-size-m);
     color: var(--esphome-primary);
   }
 
