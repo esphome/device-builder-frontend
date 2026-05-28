@@ -446,18 +446,20 @@ export class ESPHomeRegistryList extends LitElement {
     const knownInCatalog = catalogEntry !== undefined;
     // Sort by id so 39 sensor filters in the picker stay scannable.
     const sortedCatalog = [...catalog].sort((a, b) => a.id.localeCompare(b.id));
-    // Per-row params sub-form: the catalog entry's ``config_entries``
-    // describe the parameter schema for the picked id (e.g.
-    // ``calibrate_polynomial`` needs ``degree`` and ``datapoints``).
-    // Render through ``ctx.renderEntry`` so each child dispatches to
-    // the right per-field renderer — same pattern renderNestedListField
-    // uses. Path is ``[...this.path, index, currentId, child.key]`` so
-    // setIn lands the value under the row's polymorphic single key.
-    const params = currentId ? (item[currentId] as Record<string, unknown> | null) : null;
+    // Skip the sub-form when params is a scalar: the catalog may encode
+    // a mapping schema for an id ESPHome also accepts as a scalar
+    // shorthand, and editing the mapping would clobber the scalar.
+    const params = currentId ? item[currentId] : null;
+    const paramsIsMapping =
+      params !== null && typeof params === "object" && !Array.isArray(params);
     const childEntries = catalogEntry?.config_entries ?? [];
-    const renderableChildren = childEntries.length
-      ? this.ctx.filterRenderable(childEntries, params ?? {})
-      : [];
+    const renderableChildren =
+      childEntries.length && (params === null || paramsIsMapping)
+        ? this.ctx.filterRenderable(
+            childEntries,
+            paramsIsMapping ? (params as Record<string, unknown>) : {}
+          )
+        : [];
     return html`
       <div class="registry-list-item" data-row-index=${index}>
         <div class="registry-list-row">

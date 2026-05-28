@@ -335,6 +335,43 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
   });
 
+  it("renders no sub-form when the existing params is a scalar", async () => {
+    // ``delta: 0.5`` and ``throttle: 10s`` are scalar shorthands that
+    // ESPHome accepts even when the catalog encodes a mapping schema
+    // for the same id. Rendering the mapping inputs over a scalar
+    // would silently clobber the user's YAML on first edit.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "delta",
+        name: "Delta",
+        applies_to: [],
+        config_entries: [
+          makeEntry(ConfigEntryType.FLOAT, { key: "baseline" }),
+          makeEntry(ConfigEntryType.FLOAT, { key: "min_value" }),
+          makeEntry(ConfigEntryType.FLOAT, { key: "max_value" }),
+        ],
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ delta: "0.5" }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
+  });
+
   it("renders no sub-form on an empty / unselected row", async () => {
     const renderEntry = vi.fn();
     const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
