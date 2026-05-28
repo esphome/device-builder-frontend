@@ -28,6 +28,13 @@ import "./lambda-editor.js";
  *   byte-for-byte.
  * - plain string — fall back for hand-edited values.
  */
+/** Registry id used for the ``lambda`` filter / effect across the
+ *  light_effects and filter registries. Co-located with the other
+ *  lambda helpers so the coupling between the registry-list
+ *  renderer's special-case and the lambda editor is searchable in
+ *  one grep. */
+export const LAMBDA_REGISTRY_ID = "lambda";
+
 export function lambdaBodyOf(raw: unknown): string {
   if (isLambdaValue(raw)) return raw._lambda;
   if (raw instanceof YamlRawValue) return raw.body;

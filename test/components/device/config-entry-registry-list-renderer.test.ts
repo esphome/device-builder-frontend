@@ -372,6 +372,39 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
   });
 
+  it("renders no sub-form when the existing params is a YamlRawValue", async () => {
+    // A YamlRawValue at the params position means the parser preserved
+    // a block the loader couldn't normalize. Rendering the mapping
+    // sub-form over the opaque raw text would clobber it on the first
+    // child edit; same class of bug as the scalar bail.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "calibrate_polynomial",
+        name: "Calibrate Polynomial",
+        applies_to: [],
+        config_entries: [makeEntry(ConfigEntryType.INTEGER, { key: "degree" })],
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ calibrate_polynomial: new YamlRawValue(["  - 1 -> 1"]) }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
+  });
+
   it("renders advanced sub-fields unconditionally for the picked filter", async () => {
     // exponential_moving_average's three sub-fields are all marked
     // advanced: true. The outer form's advanced gate filters those

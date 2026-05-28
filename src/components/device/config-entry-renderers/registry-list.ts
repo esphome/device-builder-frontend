@@ -29,7 +29,7 @@ import {
 } from "../../../util/automation-catalog-cache.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import "./lambda-editor.js";
-import { lambdaBodyOf } from "./lambda.js";
+import { LAMBDA_REGISTRY_ID, lambdaBodyOf } from "./lambda.js";
 import {
   effectiveDisabled,
   fieldRendererStyles,
@@ -464,13 +464,14 @@ export class ESPHomeRegistryList extends LitElement {
       params !== null &&
       typeof params === "object" &&
       !Array.isArray(params) &&
-      !isLambdaValue(params);
+      !isLambdaValue(params) &&
+      !(params instanceof YamlRawValue);
     // ``lambda`` filter / effect takes a C++ body as the whole value
     // (``- lambda: |- return x;``); the schema bundle exposes no
     // config_vars for it, so the catalog has 0 config_entries. Render
     // an inline lambda editor bound to the row's polymorphic value
     // position so users can fill in the body visually.
-    const isLambdaForm = currentId === "lambda";
+    const isLambdaForm = currentId === LAMBDA_REGISTRY_ID;
     // Render every child unconditionally — the user opted into this
     // filter/effect by picking it from the dropdown, so the outer
     // form's advanced / requiredOnly gates don't apply (many filters
