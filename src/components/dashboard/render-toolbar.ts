@@ -212,17 +212,19 @@ export function renderToolbar(
       ? host._localize("dashboard.device_singular")
       : host._localize("dashboard.device_plural");
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
-  // Layout: [search] [view-toggle] [facets…] <spacer> [Select multiple]
+  // Layout: [search] [view-toggle] [Select multiple] [facets…]
   //         [X devices]
-  // The spacer between the facet cluster and the select-mode
-  // toggle visually separates "filter the list" from "operate on
-  // the list" so the toggle no longer reads as another facet.
+  // Select-multiple sits between the view switcher and the facet
+  // chips so the row wraps cleanly at narrow widths (the trailing
+  // facets wrap to a new line first, keeping Select-multiple on
+  // the same row as the view switcher). Unified across card and
+  // table views so the toggle's position doesn't shift when the
+  // user flips the view.
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
-        <span class="toolbar-spacer"></span>
-        ${renderSelectToggle(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderSelectToggle(host)}
+        ${renderFacets(host)}
       </div>
       <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
     </div>

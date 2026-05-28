@@ -186,10 +186,10 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
     >
       <div slot="toolbar" class="toolbar-stack">
         <div class="toolbar-row">
-          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
+          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderSelectToggle(host)}
+          ${renderFacets(host)}
         </div>
       </div>
-      <div slot="before-columns">${renderSelectToggle(host)}</div>
       <button
         slot="actions"
         class="table-create-btn"
