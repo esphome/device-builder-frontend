@@ -21,8 +21,8 @@ function strippedEntry(): Record<string, unknown> {
     esphome: { platform: "esp32", board: "esp32dev" },
     // hardware / images / tags / pins / docs_url / product_url
     // / featured / is_generic / featured_components /
-    // featured_bundles / default_components all OMITTED by the
-    // strip — hydrator must fill them.
+    // featured_bundles all OMITTED by the strip — hydrator must
+    // fill them.
   };
 }
 
@@ -112,6 +112,53 @@ describe("hydrateBoard", () => {
     const [fb] = hydrateBoard(entry).featured_bundles;
     expect(fb.description).toBe("");
     expect(fb.component_ids).toEqual([]);
+  });
+
+  it("preserves unknown fields the backend may add later (forward-compat)", () => {
+    // Every helper spreads its input before applying defaults, so
+    // a wire payload that carries an additional field a future
+    // backend version introduced flows through the hydrator
+    // instead of being silently dropped. Pin the additive
+    // contract on the helpers Copilot specifically called out —
+    // _hydrateHardware and _hydrateFieldPreset both used to
+    // rebuild without spreading — plus a representative top-level
+    // pass-through.
+    const entry = {
+      ...strippedEntry(),
+      future_top_level: "kept",
+      hardware: { flash_size: "4 MB", future_hw_field: 42 },
+      featured_components: [
+        {
+          id: "led",
+          component_id: "output.gpio",
+          future_fc_field: "kept",
+          fields: {
+            pin: { value: 5, future_preset_field: ["kept"] },
+          },
+        },
+      ],
+      featured_bundles: [{ id: "sl", name: "Status LED", future_bundle_field: true }],
+      pins: [{ gpio: 13, future_pin_field: "kept" }],
+      esphome: {
+        platform: "esp32",
+        board: "esp32dev",
+        future_esphome_field: "kept",
+      },
+    } as unknown as BoardCatalogEntry;
+    const hydrated = hydrateBoard(entry) as unknown as Record<string, unknown>;
+    expect(hydrated.future_top_level).toBe("kept");
+    expect((hydrated.hardware as Record<string, unknown>).future_hw_field).toBe(42);
+    expect((hydrated.esphome as Record<string, unknown>).future_esphome_field).toBe(
+      "kept"
+    );
+    const [pin] = hydrated.pins as Record<string, unknown>[];
+    expect(pin.future_pin_field).toBe("kept");
+    const [fc] = hydrated.featured_components as Record<string, unknown>[];
+    expect(fc.future_fc_field).toBe("kept");
+    const preset = (fc.fields as Record<string, Record<string, unknown>>).pin;
+    expect(preset.future_preset_field).toEqual(["kept"]);
+    const [fb] = hydrated.featured_bundles as Record<string, unknown>[];
+    expect(fb.future_bundle_field).toBe(true);
   });
 
   it("preserves populated fields", () => {

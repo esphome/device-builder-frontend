@@ -20,12 +20,16 @@ import type {
  * `models/boards.py` and `models/common.py` exactly — diverging
  * means a fresh fetch silently disagrees with what `from_dict`
  * round-trips on the backend.
+ *
+ * Each helper spreads the input before overriding defaults, so
+ * a forward-compat field added to the wire shape carries through
+ * the hydrator instead of being silently dropped.
  */
 export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
   return {
     ...entry,
     esphome: _hydrateEsphome(entry.esphome),
-    hardware: _hydrateHardware(entry.hardware ?? ({} as BoardHardware)),
+    hardware: _hydrateHardware(entry.hardware),
     images: entry.images ?? [],
     tags: entry.tags ?? [],
     pins: (entry.pins ?? []).map(_hydratePin),
@@ -52,12 +56,13 @@ function _hydrateEsphome(esphome: BoardEsphomeConfig): BoardEsphomeConfig {
   };
 }
 
-function _hydrateHardware(hardware: BoardHardware): BoardHardware {
+function _hydrateHardware(hardware: BoardHardware | null | undefined): BoardHardware {
   return {
-    flash_size: hardware.flash_size ?? null,
-    ram_size: hardware.ram_size ?? null,
-    cpu_frequency: hardware.cpu_frequency ?? null,
-    connectivity: hardware.connectivity ?? [],
+    ...hardware,
+    flash_size: hardware?.flash_size ?? null,
+    ram_size: hardware?.ram_size ?? null,
+    cpu_frequency: hardware?.cpu_frequency ?? null,
+    connectivity: hardware?.connectivity ?? [],
   };
 }
 
@@ -96,6 +101,7 @@ function _hydrateFeaturedBundle(fb: FeaturedBundle): FeaturedBundle {
 
 function _hydrateFieldPreset(preset: FieldPreset): FieldPreset {
   return {
+    ...preset,
     value: preset.value ?? null,
     locked: preset.locked ?? false,
     suggestions: preset.suggestions ?? null,
