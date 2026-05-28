@@ -13,6 +13,7 @@ import {
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type {
@@ -217,14 +218,12 @@ export class ESPHomePageDashboard extends LitElement {
   _pendingAdoptScroll: string | null = null;
   _actionDevice: ConfiguredDevice | null = null;
 
-  private _sortedDevicesCache: {
-    source: ConfiguredDevice[];
-    sorted: ConfiguredDevice[];
-  } | null = null;
-  private _labelUsageCache: {
-    source: ConfiguredDevice[];
-    map: Record<string, number>;
-  } | null = null;
+  private _sortDevices = memoizeOne((source: ConfiguredDevice[]) =>
+    [...source].sort((a, b) =>
+      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
+    )
+  );
+  private _computeLabelUsageMemo = memoizeOne(computeLabelUsage);
 
   @query("esphome-api-key-dialog") _apiKeyDialog!: ESPHomeApiKeyDialog;
   @query("esphome-archived-devices-dialog")
@@ -513,14 +512,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   get _sortedDevices(): ConfiguredDevice[] {
-    const source = this._devices;
-    if (this._sortedDevicesCache?.source === source)
-      return this._sortedDevicesCache.sorted;
-    const sorted = [...source].sort((a, b) =>
-      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
-    );
-    this._sortedDevicesCache = { source, sorted };
-    return sorted;
+    return this._sortDevices(this._devices);
   }
 
   /** True when any facet or text search would currently narrow the
@@ -628,11 +620,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   _computeLabelUsage(): Record<string, number> {
-    const source = this._devices;
-    if (this._labelUsageCache?.source === source) return this._labelUsageCache.map;
-    const map = computeLabelUsage(source);
-    this._labelUsageCache = { source, map };
-    return map;
+    return this._computeLabelUsageMemo(this._devices);
   }
 
   _enterDeviceView = (view: DashboardView) => {
