@@ -619,6 +619,7 @@
     "multi_value_add": "Hozzáadás",
     "multi_value_remove": "Eltávolítás",
     "multi_value_yaml_only": "Ez a lista olyan YAML-t tartalmaz, amelyet a vizuális szerkesztő nem tud kezelni – szerkessze közvetlenül a jobb oldali YAML-panelben.",
+    "value_yaml_only": "Ezt az értéket a vizuális szerkesztő nem tudja modellezni; szerkessze közvetlenül a jobb oldali YAML-panelben.",
     "registry_list_loading": "Katalógus betöltése…",
     "registry_list_select": "Válasszon egy lehetőséget…",
     "registry_list_empty_catalog": "Nincsenek elérhető lehetőségek ehhez a regiszterhez.",

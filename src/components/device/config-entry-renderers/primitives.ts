@@ -17,6 +17,7 @@ import {
   renderHelpLink,
   renderLabel,
   renderStringField,
+  renderYamlOnlyFallbackIfNonPrimitive,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -26,10 +27,15 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.suggestions && entry.suggestions.length > 0) {
     return renderStringField(entry, "number", path, ctx);
   }
+  const raw = ctx.getAt(path);
+  // Bail above the hex dispatch so the hex variant inherits the
+  // guard without each renderer having to repeat the check.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   if (entry.display_format === "hex") {
     return renderHexIntField(entry, path, ctx);
   }
-  const value = String(ctx.getAt(path) ?? "");
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const min = entry.range ? String(entry.range[0]) : undefined;
   const max = entry.range ? String(entry.range[1]) : undefined;
@@ -173,6 +179,11 @@ export function renderTimePeriodField(
   ctx: RenderCtx
 ) {
   const raw = ctx.getAt(path);
+  // Bail above parseTimePeriod — its ``String(raw).trim()`` would
+  // turn a single-element list ``["5s"]`` into the parseable string
+  // ``"5s"`` and a save would clobber the original list.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   const parsed = parseTimePeriod(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
@@ -248,6 +259,11 @@ export function renderFloatWithUnitField(
   const unitOptions = entry.unit_options ?? [];
   const canonicalUnit = unitOptions[0] ?? "";
   const rawValue = ctx.getAt(path);
+  // Bail above parseFloatWithUnit — same data-loss shape as
+  // renderTimePeriodField: a single-element list like ``["50Hz"]``
+  // stringifies to a parseable scalar and a save would clobber it.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, rawValue);
+  if (bail) return bail;
   const parsed = parseFloatWithUnit(rawValue, unitOptions);
   // Edit buffer survives intermediate typing states ("-", "1e", "1.") that
   // the parser turns into null/"". Cleared on blur and on entries change.
@@ -332,6 +348,12 @@ export function renderFloatWithUnitField(
 // YAML editor reflects ON in the form view (issue device-builder#923).
 export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
+  // A list / mapping under a boolean-shaped catalog field renders
+  // unchecked (``parseYamlBoolean`` returns null), but the first
+  // user toggle emits ``true`` and clobbers the YAML structure.
+  // Bail to the YAML-only notice instead.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   const effective = raw === undefined || raw === null ? entry.default_value : raw;
   const checked = parseYamlBoolean(effective) === true;
   return html`
@@ -352,7 +374,10 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
 }
 
 export function renderSelectField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   // Featured suggestions override options — board author narrowed the choice.
@@ -443,6 +468,14 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
 export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
   const isRaw = raw instanceof YamlRawValue;
+  // YamlRawValue is an intentional textarea shape (block scalars
+  // like ``|-``); anything else non-primitive (a list / mapping
+  // that landed under a textarea-shaped field) should bail rather
+  // than coerce through ``String(...)``.
+  if (!isRaw) {
+    const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+    if (bail) return bail;
+  }
   const value = isRaw ? raw.body : String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`
@@ -465,7 +498,10 @@ export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: Ren
 }
 
 export function renderIconField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`
     <div class="field" data-field-key=${path.join(".")}>

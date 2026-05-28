@@ -13,6 +13,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -228,6 +229,29 @@ export function renderFieldShell(
   `;
 }
 
+/** Defensive bail for scalar field renderers: when the value at *path*
+ *  isn't a primitive (a YAML list or mapping that landed under a
+ *  scalar-shaped catalog field because the upstream schema bundle
+ *  missed ``is_list`` or a similar shape marker), refuse to render an
+ *  editable input. ``String([...])`` would silently coerce the list
+ *  to a comma-joined string and a save would clobber the user's value.
+ *  Returns the bail template, or ``null`` when *raw* is safe to coerce. */
+export function renderYamlOnlyFallbackIfNonPrimitive(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  raw: unknown
+) {
+  if (isPrimitiveOrNullish(raw)) return null;
+  return html`
+    <div class="field" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      <p class="field-description">${ctx.localize("device.value_yaml_only")}</p>
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
 // Re-exported by `config-entry-renderers.ts`; placed here so the pin
 // renderer can fall back to a string field without importing the
 // barrel and creating a cycle.
@@ -237,7 +261,10 @@ export function renderStringField(
   path: string[],
   ctx: RenderCtx
 ) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const placeholder = String(entry.default_value ?? "");
   const disabled = effectiveDisabled(entry, ctx);

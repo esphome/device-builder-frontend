@@ -269,16 +269,19 @@ const isListItemLine = (line: string, dashIndent: string): boolean => {
 };
 
 /**
- * True when *line* is a list-item dash deeper than *parentIndent*.
- * The exact dash column doesn't matter at peek time — that's
- * detected later by ``parseListBlock`` from the actual line —
- * so the peek check only needs to confirm "this is a child
- * list of the current key, regardless of which indent step the
- * user picked". 4-space YAML pastes work as a result.
+ * True when *line* is a list-item dash that belongs to *parentIndent*'s
+ * child list. Accepts both deeper-indent dashes (the standard YAML
+ * shape) and same-indent dashes (YAML 1.2's compact block-sequence
+ * form: ``calibration:\n- a\n- b`` parses to ``{calibration: [a, b]}``).
+ * The exact dash column doesn't matter at peek time — ``parseListBlock``
+ * picks it up from the actual line — so the peek only needs to
+ * confirm "this is a child list of the current key, regardless of
+ * which indent step the user picked". 4-space YAML pastes and ESPHome
+ * example snippets both work as a result.
  */
-const isDeeperListItemLine = (line: string, parentIndent: string): boolean => {
+const isChildListItemLine = (line: string, parentIndent: string): boolean => {
   const lead = _leadingIndent(line);
-  if (lead.length <= parentIndent.length) return false;
+  if (lead.length < parentIndent.length) return false;
   const tail = line.slice(lead.length);
   return tail === "-" || tail.startsWith("- ");
 };
@@ -664,7 +667,15 @@ const _scanValueBlock = (
     const line = lines[i];
     if (isBlankOrCommentLine(line)) continue;
     const lead = line.match(/^ */)![0];
-    if (lead.length <= keyIndent.length) return { endIdx: i, isComplex };
+    if (lead.length < keyIndent.length) return { endIdx: i, isComplex };
+    if (lead.length === keyIndent.length) {
+      // YAML's compact block-sequence form allows a child list to
+      // share the parent key's indent (``calibration:\n- a\n- b``).
+      // Same-indent dash lines stay in the block; any other shape
+      // at this indent terminates as before.
+      const tail = line.slice(lead.length);
+      if (tail !== "-" && !tail.startsWith("- ")) return { endIdx: i, isComplex };
+    }
     if (!isComplex) {
       if (
         BLOCK_SCALAR_RE.test(line) ||
@@ -795,7 +806,7 @@ export function parseYamlSectionValues(
       if (peek >= lines.length) continue;
       const peekLine = lines[peek];
 
-      if (isDeeperListItemLine(peekLine, childIndent)) {
+      if (isChildListItemLine(peekLine, childIndent)) {
         const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,
@@ -872,7 +883,11 @@ function parseNestedBlock(
 
     if (raw === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
-      if (peek < lines.length && isDeeperListItemLine(lines[peek], indent)) {
+      // ``key:`` followed by a block list. Accept both the standard
+      // (deeper-indent) and compact (same-indent) forms; the compact
+      // shape is what ESPHome examples produce for short
+      // ``calibration:`` / ``datapoints:`` lists.
+      if (peek < lines.length && isChildListItemLine(lines[peek], indent)) {
         const { value, endIdx } = parseListBlock(lines, i + 1, indent);
         values[key] = value;
         i = endIdx;

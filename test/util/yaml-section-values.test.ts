@@ -936,6 +936,102 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
   // nested-list renderer would then show "No items yet" even when
   // the YAML had items.
 
+  it("parses a compact (same-indent) list under a nested key", () => {
+    // YAML 1.2 compact block-sequence form: ``key:`` followed by
+    // dash lines at the SAME indent as the key (not strictly
+    // deeper). ESPHome examples produce this for short
+    // ``calibration:`` / ``datapoints:`` lists. Pre-fix the parser
+    // required strictly-deeper dashes and silently dropped the
+    // list, so to_ntc_resistance loaded with an empty calibration
+    // field even when the YAML had values.
+    const yaml = `sensor:
+  - platform: template
+    name: Probe
+    filters:
+      - to_ntc_resistance:
+          calibration:
+          - 10.0kOhm -> 25°C
+          - 27.219kOhm -> 0°C
+          - 14.674kOhm -> 15°C
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.filters).toEqual([
+      {
+        to_ntc_resistance: {
+          calibration: ["10.0kOhm -> 25°C", "27.219kOhm -> 0°C", "14.674kOhm -> 15°C"],
+        },
+      },
+    ]);
+  });
+
+  it("compact list followed by a sibling key at the same indent", () => {
+    // Sibling key after the dashes; the sibling must NOT get
+    // absorbed into the compact list. The terminator path in
+    // ``_scanValueBlock`` distinguishes same-indent dashes (stay
+    // in the block) from same-indent non-dash (end the block).
+    const yaml = `sensor:
+  - platform: template
+    filters:
+      - to_ntc_resistance:
+          calibration:
+          - "10.0kOhm -> 25°C"
+          - "27.219kOhm -> 0°C"
+          b_constant: 3950
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.filters).toEqual([
+      {
+        to_ntc_resistance: {
+          calibration: ["10.0kOhm -> 25°C", "27.219kOhm -> 0°C"],
+          b_constant: "3950",
+        },
+      },
+    ]);
+  });
+
+  it("two sibling compact lists under the same parent", () => {
+    const yaml = `sensor:
+  - platform: template
+    filters:
+      - to_ntc_resistance:
+          calibration:
+          - a
+          - b
+          other:
+          - c
+          - d
+`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.filters).toEqual([
+      {
+        to_ntc_resistance: {
+          calibration: ["a", "b"],
+          other: ["c", "d"],
+        },
+      },
+    ]);
+  });
+
+  it("compact list at the very end of input (no trailing newline)", () => {
+    // EOF terminates the list cleanly — no trailing key, no blank
+    // line. Pins that the dash-walk doesn't depend on a terminator.
+    const yaml = `sensor:
+  - platform: template
+    filters:
+      - to_ntc_resistance:
+          calibration:
+          - x
+          - y`;
+    const values = parseYamlSectionValues(yaml, "sensor.template", 2);
+    expect(values.filters).toEqual([
+      {
+        to_ntc_resistance: {
+          calibration: ["x", "y"],
+        },
+      },
+    ]);
+  });
+
   it("parses esphome.devices into an array of plain objects", () => {
     const yaml = `esphome:
   name: test
