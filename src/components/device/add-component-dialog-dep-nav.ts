@@ -1,5 +1,6 @@
 import type { ComponentCatalogEntry } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
+import { fetchComponent } from "../../util/component-name-cache.js";
 
 /** Slice of ``ESPHomeAddComponentDialog`` state ``navigateToDep`` reads / writes. */
 export interface DepNavHost {
@@ -33,7 +34,8 @@ export async function navigateToDep(host: DepNavHost, domain: string): Promise<v
   const seq = ++host._depNavSeq;
   let direct: ComponentCatalogEntry | null = null;
   try {
-    direct = await host._api.getComponent(
+    direct = await fetchComponent(
+      host._api,
       domain,
       host.platform || undefined,
       host.board?.id ?? undefined

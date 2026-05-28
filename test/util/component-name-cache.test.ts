@@ -113,6 +113,29 @@ describe("component-name-cache", () => {
     expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
+  it("dedupes a same-id fetch that arrives after the batch has flushed", async () => {
+    // After the microtask flush, a same-id call must join the
+    // pending in-flight promise instead of triggering a second
+    // batch. Closes the "between flush and response" race window.
+    let resolve!: (v: Record<string, ComponentCatalogEntry>) => void;
+    const { api, getComponentBodies } = mockApi(
+      () => null,
+      () => new Promise<Record<string, ComponentCatalogEntry>>((r) => (resolve = r))
+    );
+
+    const a = fetchComponent(api, "wifi");
+    // Drain the microtask queue so the batch has flushed (api call started).
+    await Promise.resolve();
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
+
+    const b = fetchComponent(api, "wifi");
+    resolve({ wifi: entry("wifi", "WiFi") });
+
+    await expect(a).resolves.toMatchObject({ name: "WiFi" });
+    await expect(b).resolves.toMatchObject({ name: "WiFi" });
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
+  });
+
   it("batches per (platform, boardId) context", async () => {
     const { api, getComponentBodies } = mockApi((id, platform) =>
       entry(id, `${id}|${platform ?? ""}`)

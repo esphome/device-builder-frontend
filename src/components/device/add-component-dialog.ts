@@ -8,6 +8,7 @@ import {
   type FeaturedBundle,
 } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
+import { fetchComponent } from "../../util/component-name-cache.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
@@ -406,9 +407,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // (still on the catalog view but with bundle state about to be set
     // by the rest of this handler). Catch and surface via the same
     // banner the form submit uses, then bail.
-    let component: Awaited<ReturnType<ESPHomeAPI["getComponent"]>>;
+    let component: ComponentCatalogEntry | null;
     try {
-      component = await this._api.getComponent(
+      component = await fetchComponent(
+        this._api,
         first,
         this.platform || undefined,
         boardId
@@ -538,7 +540,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
-        const nextComponent = await this._api.getComponent(
+        const nextComponent = await fetchComponent(
+          this._api,
           nextId,
           this.platform || undefined,
           this.board?.id ?? undefined

@@ -1231,31 +1231,17 @@ export class ESPHomeAPI {
   // ─── Component Commands ───────────────────────────────────
 
   /**
-   * Get a single component by ID.
+   * Fetch component bodies in one round trip.
    *
-   * Pass `platform` (the device's target platform, e.g. "esp32",
-   * "esp8266") to have the backend resolve any per-platform
-   * `cv.SplitDefault` fields into a single `default_value`. Pass
-   * `boardId` to additionally narrow board-level constraints. Omit
-   * both when querying the generic catalog.
-   */
-  async getComponent(
-    componentId: string,
-    platform?: string,
-    boardId?: string
-  ): Promise<ComponentCatalogEntry | null> {
-    return this.sendCommand("components/get_component", {
-      component_id: componentId,
-      ...(platform ? { platform } : {}),
-      ...(boardId ? { board_id: boardId } : {}),
-    });
-  }
-
-  /**
-   * Batch variant of `getComponent`. Fetches every requested id in a
-   * single round trip; missing ids are absent from the returned map.
-   * `platform` / `boardId` resolve per-platform defaults exactly as
-   * the singular call does, applied uniformly across the batch.
+   * Returns a map keyed by the requested id; missing ids are absent
+   * from the result. Pass `platform` (the device's target platform,
+   * e.g. "esp32", "esp8266") to have the backend resolve any
+   * per-platform `cv.SplitDefault` fields into a single
+   * `default_value`; `boardId` additionally narrows board-level
+   * constraints. Omit both when querying the generic catalog. Most
+   * callers go through `fetchComponent` in
+   * `component-name-cache.ts`, which caches results and
+   * microtask-coalesces concurrent fetches into one call.
    */
   async getComponentBodies(
     componentIds: string[],
@@ -1277,8 +1263,9 @@ export class ESPHomeAPI {
   /**
    * Get components with optional filtering, search, and pagination.
    *
-   * `platform` works the same as in `getComponent` — pass the device's
-   * target platform to have per-platform defaults pre-resolved.
+   * `platform` works the same as in `getComponentBodies`; pass the
+   * device's target platform to have per-platform defaults
+   * pre-resolved.
    */
   async getComponents(args?: {
     query?: string;

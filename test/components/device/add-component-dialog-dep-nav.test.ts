@@ -1,4 +1,4 @@
-import { describe, expect, test, vi } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import {
   matchesDepDomain,
@@ -7,14 +7,15 @@ import {
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
 import { ComponentCategory, type ComponentCatalogEntry } from "../../../src/api/types.js";
 import type { ESPHomeAPI } from "../../../src/api/index.js";
+import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 
 function makeHost(
-  getComponent: (...args: unknown[]) => unknown,
+  getComponentBodies: (...args: unknown[]) => unknown,
   catalog: NonNullable<DepNavHost["_catalog"]> | null = null
 ): DepNavHost {
   return {
-    _api: { getComponent } as unknown as ESPHomeAPI,
+    _api: { getComponentBodies } as unknown as ESPHomeAPI,
     platform: "esp32",
     board: { id: "apollo-esk-1" },
     _catalog: catalog,
@@ -36,20 +37,32 @@ function deferred<T>(): { promise: Promise<T>; resolve: (v: T) => void } {
   return { promise, resolve };
 }
 
+/** `fetchComponent` routes through `getComponentBodies` and returns
+ *  the entry under the requested id (or null when absent). Tests
+ *  pass the entry they want returned and this helper wraps it. */
+const respond = (entry: ComponentCatalogEntry | null) =>
+  vi
+    .fn()
+    .mockImplementation((ids: string[]) =>
+      Promise.resolve(entry ? { [ids[0]]: entry } : {})
+    );
+
 describe("navigateToDep", () => {
   const aht20 = makeComponentEntry("sensor.aht10");
   const i2c = makeComponentEntry("i2c");
   const uart = makeComponentEntry("uart");
 
+  afterEach(() => _clearComponentCache());
+
   test("exact-id dep retargets the form to the fetched component", async () => {
-    const getComponent = vi.fn().mockResolvedValue(i2c);
+    const getComponentBodies = respond(i2c);
     const filterByDomain = vi.fn();
-    const host = makeHost(getComponent, { filterByDomain });
+    const host = makeHost(getComponentBodies, { filterByDomain });
     host._selected = aht20;
 
     await navigateToDep(host, "i2c");
 
-    expect(getComponent).toHaveBeenCalledWith("i2c", "esp32", "apollo-esk-1");
+    expect(getComponentBodies).toHaveBeenCalledWith(["i2c"], "esp32", "apollo-esk-1");
     expect(host._selected).toBe(i2c);
     expect(host._returnTo).toBe(aht20);
     expect(host._depDomain).toBe("i2c");
@@ -57,24 +70,24 @@ describe("navigateToDep", () => {
   });
 
   test("domain-level dep with no matching id falls back to the catalog filter", async () => {
-    const getComponent = vi.fn().mockResolvedValue(null);
+    const getComponentBodies = respond(null);
     const filterByDomain = vi.fn();
-    const host = makeHost(getComponent, { filterByDomain });
+    const host = makeHost(getComponentBodies, { filterByDomain });
     host._selected = aht20;
 
     await navigateToDep(host, "output");
 
-    expect(getComponent).toHaveBeenCalledWith("output", "esp32", "apollo-esk-1");
+    expect(getComponentBodies).toHaveBeenCalledWith(["output"], "esp32", "apollo-esk-1");
     expect(host._selected).toBeNull();
     expect(host._returnTo).toBe(aht20);
     expect(host._depDomain).toBe("output");
     expect(filterByDomain).toHaveBeenCalledWith("output");
   });
 
-  test("a transient getComponent failure falls back to the catalog filter", async () => {
-    const getComponent = vi.fn().mockRejectedValue(new Error("boom"));
+  test("a transient backend failure falls back to the catalog filter", async () => {
+    const getComponentBodies = vi.fn().mockRejectedValue(new Error("boom"));
     const filterByDomain = vi.fn();
-    const host = makeHost(getComponent, { filterByDomain });
+    const host = makeHost(getComponentBodies, { filterByDomain });
     host._selected = aht20;
 
     await navigateToDep(host, "i2c");
@@ -83,16 +96,16 @@ describe("navigateToDep", () => {
     expect(filterByDomain).toHaveBeenCalledWith("i2c");
   });
 
-  test("a stale getComponent response is dropped after _depNavSeq bumps", async () => {
+  test("a stale response is dropped after _depNavSeq bumps", async () => {
     // Simulates _resetDetourState or _onFormSubmit bumping mid-flight.
-    const d = deferred<ComponentCatalogEntry>();
+    const d = deferred<Record<string, ComponentCatalogEntry>>();
     const filterByDomain = vi.fn();
     const host = makeHost(() => d.promise, { filterByDomain });
     host._selected = aht20;
 
     const navPromise = navigateToDep(host, "i2c");
     host._depNavSeq++;
-    d.resolve(i2c);
+    d.resolve({ i2c });
     await navPromise;
 
     expect(host._selected).toBe(aht20);
@@ -102,7 +115,7 @@ describe("navigateToDep", () => {
   test("_returnTo stays null while the exact-id lookup is in flight", async () => {
     // A submit during this window would otherwise be misclassified
     // as completing a dep detour by _onFormSubmit.
-    const d = deferred<ComponentCatalogEntry>();
+    const d = deferred<Record<string, ComponentCatalogEntry>>();
     const host = makeHost(() => d.promise);
     host._selected = aht20;
 
@@ -110,42 +123,40 @@ describe("navigateToDep", () => {
     expect(host._returnTo).toBeNull();
     expect(host._depDomain).toBeNull();
 
-    d.resolve(i2c);
+    d.resolve({ i2c });
     await navPromise;
     expect(host._returnTo).toBe(aht20);
     expect(host._depDomain).toBe("i2c");
   });
 
   test("a superseded navigation does not race against the latest one", async () => {
-    const first = deferred<ComponentCatalogEntry>();
-    const second = deferred<ComponentCatalogEntry>();
-    const getComponent = vi
-      .fn()
-      .mockReturnValueOnce(first.promise)
-      .mockReturnValueOnce(second.promise);
-    const host = makeHost(getComponent);
+    // Both navigations queue into one batched `getComponentBodies`
+    // call; the seq guard inside navigateToDep is what prevents
+    // the earlier (now superseded) call from applying its result.
+    const batch = deferred<Record<string, ComponentCatalogEntry>>();
+    const getComponentBodies = vi.fn().mockReturnValue(batch.promise);
+    const host = makeHost(getComponentBodies);
     host._selected = aht20;
 
     const firstNav = navigateToDep(host, "i2c");
     const secondNav = navigateToDep(host, "uart");
-    // First resolves AFTER second — late arrival must not stomp.
-    second.resolve(uart);
-    first.resolve(i2c);
+    batch.resolve({ i2c, uart });
     await Promise.all([firstNav, secondNav]);
 
     expect(host._selected).toBe(uart);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
   test("does nothing while a submit is in flight", async () => {
-    const getComponent = vi.fn();
+    const getComponentBodies = vi.fn();
     const filterByDomain = vi.fn();
-    const host = makeHost(getComponent, { filterByDomain });
+    const host = makeHost(getComponentBodies, { filterByDomain });
     host._submitting = true;
     const before = host._selected;
 
     await navigateToDep(host, "i2c");
 
-    expect(getComponent).not.toHaveBeenCalled();
+    expect(getComponentBodies).not.toHaveBeenCalled();
     expect(filterByDomain).not.toHaveBeenCalled();
     expect(host._selected).toBe(before);
   });
