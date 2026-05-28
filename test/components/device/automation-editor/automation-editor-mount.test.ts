@@ -1,12 +1,11 @@
 /**
  * @vitest-environment happy-dom
  *
- * Behavioral mount tests for ``automation-editor.ts``. The bulk of
- * the editor's deps drag CodeMirror in through ``config-entry-form``
- * → ``lambda-editor``, plus the action-list / target-picker /
- * trigger-picker children, none of which we need to exercise the
- * mount-time load path. ``vi.mock`` no-ops them so the editor itself
- * can construct in a happy-dom window.
+ * Behavioral mount tests for ``automation-editor.ts``. The editor's
+ * deps drag CodeMirror in through ``config-entry-form`` →
+ * ``lambda-editor``, plus the action-list / target-picker /
+ * trigger-picker children. ``vi.mock`` no-ops them so the editor
+ * itself can construct in a happy-dom window.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -45,6 +44,24 @@ async function flushPending(times = 5): Promise<void> {
   for (let i = 0; i < times; i++) await Promise.resolve();
 }
 
+/** Construct an editor, plant the api on its consumer-private
+ *  ``_api`` slot (no Lit context provider in the test tree),
+ *  optionally set ``configuration``, then mount and settle the
+ *  lifecycle. */
+async function mountEditor(
+  api: ESPHomeAPI,
+  configuration?: string
+): Promise<ESPHomeAutomationEditor> {
+  const editor = new ESPHomeAutomationEditor();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (editor as any)._api = api;
+  if (configuration !== undefined) editor.configuration = configuration;
+  document.body.appendChild(editor);
+  await editor.updateComplete;
+  await flushPending();
+  return editor;
+}
+
 describe("automation-editor mount-time load (behavioral)", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -53,20 +70,9 @@ describe("automation-editor mount-time load (behavioral)", () => {
   it("editor mounted with configuration preset issues exactly one getAvailableAutomations call", async () => {
     const getAvailableAutomations = vi.fn().mockResolvedValue(slimAvailable());
     const getAutomationBodies = vi.fn().mockResolvedValue({});
-    const api = {
-      getAvailableAutomations,
-      getAutomationBodies,
-    } as unknown as ESPHomeAPI;
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeAutomationEditor();
-    // ``_api`` lives behind a Lit context consumer; in tests we
-    // assign it directly because there's no provider in the tree.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    editor.configuration = "device.yaml";
-    document.body.appendChild(editor);
-    await editor.updateComplete;
-    await flushPending();
+    await mountEditor(api, "device.yaml");
 
     expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
     expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml");
@@ -76,26 +82,16 @@ describe("automation-editor mount-time load (behavioral)", () => {
     const getAvailableAutomations = vi.fn().mockResolvedValue(slimAvailable());
     const api = { getAvailableAutomations } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeAutomationEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    document.body.appendChild(editor);
-    await editor.updateComplete;
-    await flushPending();
+    await mountEditor(api);
 
     expect(getAvailableAutomations).not.toHaveBeenCalled();
   });
 
   it("drops the loading spinner once the slim list lands (paint before hydration)", async () => {
-    // Without ``onSlim`` flipping ``_loading=false``, ``render()``
-    // returns the spinner through both the slim and hydration
-    // awaits, so the "paint the picker immediately" intent never
-    // surfaces. Pin that the loading flag is cleared as soon as
-    // the slim list resolves, before bodies hydrate. Uses a
-    // non-empty trigger list so hydration actually needs to await
+    // Uses a non-empty trigger list so hydration actually awaits
     // ``getAutomationBodies``; an empty list resolves the inner
-    // ``Promise.allSettled`` synchronously and there's no "during
-    // hydration" state to observe.
+    // ``Promise.allSettled`` synchronously and there's no
+    // "during hydration" state to observe.
     const slim = {
       triggers: [{ id: "on_boot", config_entries: [] }],
       actions: [],
@@ -111,27 +107,15 @@ describe("automation-editor mount-time load (behavioral)", () => {
           resolveBodies = r;
         })
     );
-    const api = {
-      getAvailableAutomations,
-      getAutomationBodies,
-    } as unknown as ESPHomeAPI;
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeAutomationEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    editor.configuration = "device.yaml";
-    document.body.appendChild(editor);
-    await editor.updateComplete;
-    // Let the slim list resolve; hydration is still blocked on
-    // ``getAutomationBodies``.
-    await flushPending();
+    const editor = await mountEditor(api, "device.yaml");
 
     expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
     expect(getAutomationBodies).toHaveBeenCalled();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((editor as any)._loading).toBe(false);
 
-    // Let hydration complete so the rest of the test cleans up.
     resolveBodies({});
     await flushPending();
   });
@@ -139,16 +123,9 @@ describe("automation-editor mount-time load (behavioral)", () => {
   it("setting configuration after mount triggers the load", async () => {
     const getAvailableAutomations = vi.fn().mockResolvedValue(slimAvailable());
     const getAutomationBodies = vi.fn().mockResolvedValue({});
-    const api = {
-      getAvailableAutomations,
-      getAutomationBodies,
-    } as unknown as ESPHomeAPI;
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
 
-    const editor = new ESPHomeAutomationEditor();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (editor as any)._api = api;
-    document.body.appendChild(editor);
-    await editor.updateComplete;
+    const editor = await mountEditor(api);
     expect(getAvailableAutomations).not.toHaveBeenCalled();
 
     editor.configuration = "device.yaml";

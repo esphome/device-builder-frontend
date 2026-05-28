@@ -164,14 +164,23 @@ describe("loadAndHydrateAvailable", () => {
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
     } as unknown as ESPHomeAPI;
+    // Capture the slim ref the orchestration paints through ``onSlim``
+    // so we can compare against the post-hydration arrays.
+    let painted: AvailableAutomations | null = null;
 
-    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
+      onSlim: (s) => {
+        painted = s;
+      },
+    });
     if (outcome.status !== "ok") throw new Error("expected ok");
+    if (painted === null) throw new Error("expected onSlim to fire");
+    const slimPainted: AvailableAutomations = painted;
 
-    expect(outcome.available).not.toBe(outcome.slim);
-    expect(outcome.available.triggers).not.toBe(outcome.slim.triggers);
-    expect(outcome.available.actions).not.toBe(outcome.slim.actions);
-    expect(outcome.available.conditions).not.toBe(outcome.slim.conditions);
+    expect(outcome.available).not.toBe(slimPainted);
+    expect(outcome.available.triggers).not.toBe(slimPainted.triggers);
+    expect(outcome.available.actions).not.toBe(slimPainted.actions);
+    expect(outcome.available.conditions).not.toBe(slimPainted.conditions);
   });
 
   it("paints via onSlim before awaiting hydration", async () => {

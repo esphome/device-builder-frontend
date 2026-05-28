@@ -13,8 +13,6 @@ import {
   type HydrationResult,
 } from "../../../util/automation-body-hydration.js";
 
-export type { AutomationBodyFetcher, HydrationResult };
-
 type _AutomationListType = "triggers" | "actions" | "conditions";
 type _AutomationEntry = AutomationTrigger | AutomationAction | AutomationCondition;
 
@@ -55,12 +53,7 @@ export async function hydrateAvailableBodies(
 
 /** Discriminated outcome of :func:`loadAndHydrateAvailable`. */
 export type LoadAndHydrateOutcome =
-  | {
-      status: "ok";
-      slim: AvailableAutomations;
-      available: AvailableAutomations;
-      hydration: HydrationResult;
-    }
+  | { status: "ok"; available: AvailableAutomations; hydration: HydrationResult }
   | { status: "stale" }
   | { status: "error"; error: unknown };
 
@@ -97,7 +90,7 @@ export async function loadAndHydrateAvailable(
       actions: [...slim.actions],
       conditions: [...slim.conditions],
     };
-    return { status: "ok", slim, available, hydration };
+    return { status: "ok", available, hydration };
   } catch (error) {
     if (options?.isStale?.()) return { status: "stale" };
     return { status: "error", error };
