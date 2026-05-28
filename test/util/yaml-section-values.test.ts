@@ -6,7 +6,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
-import { YamlRawValue } from "../../src/util/yaml-serialize.js";
+import { serializeYamlValues, YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 /** 1-indexed line of the *n*th (1-based) list-item dash following
  *  `parent:` in `yaml`. Section-editor callers pass that line as
@@ -825,6 +825,43 @@ ${lambdaBlock}
   });
 });
 
+describe("serializeYamlValues — single-key null-value list items", () => {
+  // The polymorphic carve-out in serializeListItem is in the
+  // shared helper, so it affects every list-of-mapping consumer,
+  // not just REGISTRY_LIST. Pin the contract here so a future
+  // shape change doesn't quietly flip non-registry consumers
+  // back to the pre-#941 bare-dash emit.
+
+  it("emits `- key:` for a single-key null value (registry case)", () => {
+    const lines = serializeYamlValues({ effects: [{ pulse: null }] }, "");
+    expect(lines).toEqual(["effects:", "  - pulse:"]);
+  });
+
+  it("emits `- key:` for any single-key null value, not just registries", () => {
+    // No code path produces this shape today on a non-registry
+    // multi-value list, but the carve-out is structural: every
+    // list-of-mapping consumer with a single null-keyed entry
+    // gets the same output. Pin it so a future caller can rely.
+    const lines = serializeYamlValues({ areas: [{ id: null }] }, "");
+    expect(lines).toEqual(["areas:", "  - id:"]);
+  });
+
+  it("still drops a null field on a multi-key item (pre-#941 semantics)", () => {
+    // The carve-out fires only when the WHOLE item collapses to one
+    // null-valued key. Multi-key items keep the "drop null field"
+    // semantic, mirroring how the form treats cleared scalar fields.
+    const lines = serializeYamlValues({ areas: [{ id: "kitchen", name: null }] }, "");
+    expect(lines).toEqual(["areas:", "  - id: kitchen"]);
+  });
+
+  it("emits bare `-` when every field is null (no carve-out match)", () => {
+    // Two null-valued keys: not the single-key shape, so the
+    // null-filter strips both and the placeholder dash remains.
+    const lines = serializeYamlValues({ areas: [{ id: null, name: null }] }, "");
+    expect(lines).toEqual(["areas:", "  -"]);
+  });
+});
+
 describe("updateSectionInYaml — keepEmptyStrings option", () => {
   // Regression pin for Copilot's post-merge finding on #161:
   // ``serializeYamlValues`` drops ``""`` values by default
@@ -986,6 +1023,147 @@ describe("parseYamlSectionValues — list-of-mappings (multi_value=true)", () =>
 `;
     const values = parseYamlSectionValues(yaml, "sensor.template", 2);
     expect(values.triggers).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("parses effects from the #941 reporter's exact YAML shape", () => {
+    // The reporter's fixture: real config preamble (esphome / esp32 /
+    // logger / sensor) sits ahead of the light section. The parser
+    // has to resolve the dash line by name + 1-indexed line number,
+    // not by counting from zero. Without this regression test, a
+    // future shift in the fromLine semantics could land effects in
+    // an empty array again and the rendered list would show "No
+    // items yet" — the visible bug the user screenshot caught.
+    const yaml = `esphome:
+  name: test-light
+
+esp32:
+  board: esp32dev
+
+logger:
+
+light:
+  - platform: esp32_rmt_led_strip
+    name: RGB LEDs
+    id: rgb_leds
+    pin: GPIO14
+    num_leds: 10
+    rgb_order: GRB
+    chipset: WS2812
+    rmt_symbols: 48
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+
+sensor:
+  - platform: template
+    name: Probe
+    id: probe_sensor
+    filters:
+      - delta: 0.1
+      - multiply: 2.0
+`;
+    const lightLine =
+      yaml
+        .split("\n")
+        .findIndex((l) => l.startsWith("  - platform: esp32_rmt_led_strip")) + 1;
+    const lightValues = parseYamlSectionValues(
+      yaml,
+      "light.esp32_rmt_led_strip",
+      lightLine
+    );
+    expect(lightValues.effects).toEqual([
+      { addressable_rainbow: null },
+      { addressable_color_wipe: null },
+    ]);
+    // Filters with simple scalar args also round-trip as an array
+    // of single-key mappings. A lambda filter would force a
+    // YamlRawValue fallback because the parser can't model block
+    // scalars inside list items; that's a pre-existing path,
+    // covered by the existing "falls back to YamlRawValue when
+    // items contain block scalars" test.
+    const sensorLine =
+      yaml.split("\n").findIndex((l) => l.startsWith("  - platform: template")) + 1;
+    const sensorValues = parseYamlSectionValues(yaml, "sensor.template", sensorLine);
+    expect(sensorValues.filters).toEqual([{ delta: "0.1" }, { multiply: "2.0" }]);
+  });
+
+  it("parses light effects (single-key empty mappings) as an array (#941)", () => {
+    // Each ``- effect_id:`` is a polymorphic registry-list item: a
+    // single-key mapping whose value is either null (default params)
+    // or a nested mapping (per-effect overrides). Pre-fix the parser
+    // bailed on the empty value at ``parseFlatMappingField`` and the
+    // whole block fell back to YamlRawValue; the section editor
+    // then collapsed the body into a single text input.
+    const yaml = `light:
+  - platform: esp32_rmt_led_strip
+    name: RGB LEDs
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+`;
+    const values = parseYamlSectionValues(yaml, "light.esp32_rmt_led_strip", 2);
+    expect(values.effects).toEqual([
+      { addressable_rainbow: null },
+      { addressable_color_wipe: null },
+    ]);
+    expect(values.effects).not.toBeInstanceOf(YamlRawValue);
+  });
+
+  it("parses light effects with per-effect params (#941)", () => {
+    // ``- pulse:\n      transition_length: 1s`` — the dash header has
+    // empty value, the next line is strictly deeper than the
+    // flat-sub-key childIndent, and recursively forms the params
+    // mapping for the empty-keyed field.
+    const yaml = `light:
+  - platform: monochromatic
+    name: Lamp
+    effects:
+      - pulse:
+          transition_length: 1s
+          update_interval: 2s
+      - random:
+`;
+    const values = parseYamlSectionValues(yaml, "light.monochromatic", 2);
+    expect(values.effects).toEqual([
+      { pulse: { transition_length: "1s", update_interval: "2s" } },
+      { random: null },
+    ]);
+  });
+
+  it("falls back to YamlRawValue when a single-key item nests a list (#941)", () => {
+    // ``- then:\n  - logger.log: pressed`` is an automation handler
+    // (list under a single key), not a polymorphic params mapping.
+    // The polymorphic branch must bail so the inner list rounds-trips
+    // through YamlRawValue — same shape as the pre-fix behaviour for
+    // ``on_press:`` blocks.
+    const yaml = `binary_sensor:
+  - platform: gpio
+    pin: D1
+    on_press:
+      - then:
+          - logger.log: pressed
+`;
+    const values = parseYamlSectionValues(yaml, "binary_sensor.gpio", 2);
+    expect(values.on_press).toBeInstanceOf(YamlRawValue);
+  });
+
+  it("round-trips light effects through update with edits (#941)", () => {
+    const yaml = `light:
+  - platform: esp32_rmt_led_strip
+    name: RGB LEDs
+    effects:
+      - addressable_rainbow:
+      - addressable_color_wipe:
+`;
+    const values = parseYamlSectionValues(yaml, "light.esp32_rmt_led_strip", 2);
+    const effects = values.effects as Record<string, unknown>[];
+    effects.push({ pulse: { transition_length: "1s" } });
+    const after = updateSectionInYaml(yaml, "light.esp32_rmt_led_strip", values, 2);
+    expect(after).toContain("- addressable_rainbow:");
+    expect(after).toContain("- addressable_color_wipe:");
+    expect(after).toContain("- pulse:");
+    expect(after).toContain("transition_length: 1s");
+    expect(after).not.toContain("YamlRawValue");
   });
 
   it("round-trips esphome.devices through update with edits to one item", () => {

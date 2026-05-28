@@ -32,6 +32,7 @@ export function makeConfigEntry(overrides: Partial<ConfigEntry> = {}): ConfigEnt
     allow_custom_value: false,
     range: null,
     display_format: null,
+    registry: null,
     unit_options: null,
     help_link: null,
     multi_value: false,

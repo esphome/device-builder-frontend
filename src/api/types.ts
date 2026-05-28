@@ -621,6 +621,14 @@ export interface ConfigEntry {
    */
   display_format: "hex" | null;
   /**
+   * Catalog name for `REGISTRY_LIST` entries. Currently
+   * ``"light_effects"`` (light.effects) and ``"filter"``
+   * (sensor / binary_sensor / text_sensor filters) are wired; new
+   * registries plug into the frontend's REGISTRY_OPS table. Null
+   * on every other entry type.
+   */
+  registry: string | null;
+  /**
    * Unit choices for `FLOAT_WITH_UNIT` entries. The frontend renders
    * a unit picker populated from this list; each option's string is
    * what the YAML serialization appends after the numeric value
@@ -798,6 +806,13 @@ export enum ConfigEntryType {
   // `substitutions:`, `globals:`, `api.actions:`, etc. — places where
   // the schema would otherwise need to enumerate every possible key.
   MAP = "map",
+  // Polymorphic list of single-key items drawn from a named registry.
+  // Each item is `{ <registry_id>: <params> | null }`. Frontend
+  // renders a list of rows with a per-row type picker pulled from the
+  // catalog named by ``entry.registry``. Used for fields like
+  // ``light.effects`` (``registry: "light_effects"``) and
+  // ``sensor.filters`` (``registry: "filter"``). #941.
+  REGISTRY_LIST = "registry_list",
   // Fallback for fields whose type couldn't be determined
   UNKNOWN = "unknown",
   /** @deprecated Backend signals dropdown via populated `options` instead. Kept for legacy callers. */
@@ -871,19 +886,32 @@ export interface AutomationCondition {
   accepts_condition_list: boolean;
 }
 
-/** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).
- *  Each effect is itself a registry entry with its own parameter
- *  schema. Surfaced through a separate editor surface because the
- *  list ergonomics differ from actions (effects compose into a list
- *  on a single ``light`` block; actions form a tree). */
-export interface LightEffect {
-  id: string; // "pulse", "flicker", "addressable_lambda"
+/** Common shape for the polymorphic-list registry catalogs
+ *  (`light_effects`, `filter`, future additions). One entry per
+ *  registered id; `config_entries` is the per-id parameter schema;
+ *  `applies_to` scopes the entry to the parent sections it's valid
+ *  on. The token shape in `applies_to` is per-registry: qualified
+ *  component ids (`"light.addressable_rgb"`) for `light_effects`,
+ *  bare component domains (`"sensor"`) for `filter`. */
+export interface RegistryCatalogEntry {
+  id: string;
   name: string;
   config_entries: ConfigEntry[];
-  /** Light platform types this effect is valid on
-   *  (``["light.binary"]``, ``["light.addressable_rgb"]``…). */
   applies_to: string[];
 }
+
+/** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).
+ *  Each effect is itself a registry entry with its own parameter
+ *  schema. `applies_to` carries qualified component ids
+ *  (``["light.addressable_rgb"]``). */
+export type LightEffect = RegistryCatalogEntry;
+
+/** A sensor / binary_sensor / text_sensor filter (``delta``,
+ *  ``lambda``, ``calibrate_linear``…). `applies_to` carries bare
+ *  component domains (``["sensor"]`` / ``["binary_sensor"]``).
+ *  Filters with the same id across domains merge into one catalog
+ *  entry whose `applies_to` spans every domain it lives in. */
+export type Filter = RegistryCatalogEntry;
 
 /** Tagged-union locator for an automation inside a device YAML.
  *  Mirrors the backend's ``AutomationLocation`` Python dataclass.

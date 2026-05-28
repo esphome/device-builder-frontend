@@ -366,6 +366,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .board=${this.board}
               .yaml=${this.yaml}
               .fromLine=${this._resolvedFromLine}
+              .sectionKey=${this.sectionKey}
               .presentComponents=${this._presentComponents}
               ?show-advanced=${showAdvanced}
               @value-change=${this._onValueChange}

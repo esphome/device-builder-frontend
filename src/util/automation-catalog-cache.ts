@@ -3,6 +3,7 @@ import type {
   AutomationAction,
   AutomationCondition,
   AutomationTrigger,
+  Filter,
   LightEffect,
 } from "../api/types.js";
 
@@ -30,13 +31,14 @@ import type {
  * meaningful code.
  */
 
-type CatalogKind = "triggers" | "actions" | "conditions" | "light_effects";
+type CatalogKind = "triggers" | "actions" | "conditions" | "light_effects" | "filters";
 
 type CatalogValue = {
   triggers: AutomationTrigger[];
   actions: AutomationAction[];
   conditions: AutomationCondition[];
   light_effects: LightEffect[];
+  filters: Filter[];
 };
 
 const _cache: {
@@ -46,6 +48,7 @@ const _cache: {
   actions: new Map(),
   conditions: new Map(),
   light_effects: new Map(),
+  filters: new Map(),
 };
 
 const _inflight: {
@@ -55,6 +58,7 @@ const _inflight: {
   actions: new Map(),
   conditions: new Map(),
   light_effects: new Map(),
+  filters: new Map(),
 };
 
 const _listeners = new Set<() => void>();
@@ -171,6 +175,21 @@ export function fetchLightEffects(
   return _fetch("light_effects", (p, b) => api.getLightEffects(p, b), platform, boardId);
 }
 
+export function getCachedFilters(
+  platform?: string,
+  boardId?: string
+): Filter[] | undefined {
+  return _cache.filters.get(_key(platform, boardId));
+}
+
+export function fetchFilters(
+  api: ESPHomeAPI,
+  platform?: string,
+  boardId?: string
+): Promise<Filter[]> {
+  return _fetch("filters", (p, b) => api.getFilters(p, b), platform, boardId);
+}
+
 /** Subscribe to cache updates. Returns an unsubscribe function.
  *  Listeners fire once per fresh entry (across any of the four
  *  catalogues); failed fetches do not fire. */
@@ -183,7 +202,9 @@ export function subscribeAutomationCatalogCache(listener: () => void): () => voi
 
 /** Test-only: drop all cached entries and pending promises. */
 export function _clearAutomationCatalogCache(): void {
-  for (const kind of ["triggers", "actions", "conditions", "light_effects"] as const) {
+  // Derive the kinds from `_cache` so new registries (filters,
+  // ...) don't have to remember to update this list separately.
+  for (const kind of Object.keys(_cache) as CatalogKind[]) {
     _cache[kind].clear();
     _inflight[kind].clear();
   }

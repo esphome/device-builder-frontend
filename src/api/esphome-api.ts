@@ -30,6 +30,7 @@ import type {
   EventSubscriptionCallback,
   FirmwareBinary,
   Label,
+  Filter,
   LightEffect,
   ParsedAutomation,
   ReachabilityStateEvent,
@@ -1353,6 +1354,18 @@ export class ESPHomeAPI {
    *  trigger/action/condition tree. */
   async getLightEffects(platform?: string, boardId?: string): Promise<LightEffect[]> {
     return this.sendCommand<LightEffect[]>("automations/get_light_effects", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /** Catalog of every sensor / binary_sensor / text_sensor filter.
+   *  Mirrors getLightEffects: one flat list, deduped across the
+   *  three domains; ``applies_to`` on each entry says which domains
+   *  the filter is valid on. The frontend's REGISTRY_LIST renderer
+   *  filters this list by parent-component domain. #941. */
+  async getFilters(platform?: string, boardId?: string): Promise<Filter[]> {
+    return this.sendCommand<Filter[]>("automations/get_filters", {
       ...(platform ? { platform } : {}),
       ...(boardId ? { board_id: boardId } : {}),
     });
