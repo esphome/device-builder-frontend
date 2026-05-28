@@ -946,6 +946,7 @@ export const dashboardStyles = css`
     .devices-grid {
       padding-left: var(--wa-space-s);
       padding-right: var(--wa-space-s);
+      gap: var(--wa-space-s);
     }
 
     .toolbar {
