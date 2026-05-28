@@ -328,4 +328,15 @@ export const tableLayoutStyles = css`
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-s);
   }
+
+  /* Mobile margin trim for the table outline. Placed at the end
+     of the stylesheet so source-order beats the default
+     .table-wrap shorthand above (which would otherwise reset
+     margin-left / margin-right when the @media block fires).
+     Matches the card grid's mobile side padding. #41 */
+  @media (max-width: 600px) {
+    .table-wrap {
+      margin: 0 var(--wa-space-s) var(--wa-space-s);
+    }
+  }
 `;
