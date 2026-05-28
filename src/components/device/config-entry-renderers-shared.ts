@@ -262,7 +262,7 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
 ) {
   if (isPrimitiveOrNullish(raw)) return null;
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <p class="field-description">${ctx.localize("device.value_yaml_only")}</p>
       ${renderFieldError(path, ctx)}
