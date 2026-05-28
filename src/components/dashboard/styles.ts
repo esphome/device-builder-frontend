@@ -527,14 +527,14 @@ export const dashboardStyles = css`
      card view's .toolbar gap:2px so the inter-row spacing reads
      identically between views. */
   .table-device-count-row {
-    padding: 2px var(--wa-space-l) 0;
+    padding: 2px var(--wa-space-l);
   }
 
   /* Mobile: tighten the table-view count-row gutter to match the
      .controls / .table-wrap trim in PR-H (see table-styles.ts). */
   @media (max-width: 600px) {
     .table-device-count-row {
-      padding: 2px var(--wa-space-s) 0;
+      padding: 2px var(--wa-space-s);
     }
   }
 
