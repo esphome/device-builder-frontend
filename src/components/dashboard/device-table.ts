@@ -347,6 +347,7 @@ export class ESPHomeDeviceTable extends LitElement {
 
     return html`
       ${this._renderControls(table, toggleCols)}
+      <slot name="below-controls"></slot>
       <div class="table-wrap">
         <div class="table-scroll">
           <table role="grid">

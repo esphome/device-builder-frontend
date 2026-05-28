@@ -518,6 +518,25 @@ export const dashboardStyles = css`
     gap: var(--wa-space-m);
   }
 
+  /* Table view slots the device-count-row through esphome-device-
+     table's below-controls slot so the row spans the full table
+     width and Select-multiple right-aligns with Columns / Create
+     device in the row above. Horizontal padding matches .controls
+     and .table-wrap above/below so the count and toggle line up
+     with the column headers on the right. */
+  .table-device-count-row {
+    padding: 0 var(--wa-space-l) var(--wa-space-s);
+  }
+
+  /* Mobile: tighten the table-view count-row gutter to match the
+     .controls / .table-wrap trim in PR-H (see table-styles.ts). */
+  @media (max-width: 600px) {
+    .table-device-count-row {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
+  }
+
   /* ─── View Toggle ─── */
 
   .view-toggle {

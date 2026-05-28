@@ -188,6 +188,8 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         <div class="toolbar-row">
           ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         </div>
+      </div>
+      <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
       <button
