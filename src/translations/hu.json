@@ -841,7 +841,7 @@
     "editor": "Szerkesztő",
     "yaml_diff_button": "YAML-különbség gomb",
     "more_options_with_count": "További lehetőségek ({count} aktív firmware-feladat)",
-    "preview_badge": "Előnézet"
+    "preview_badge": "Beta"
   },
   "feedback": {
     "title": "Hibát talált? Van új ötlete?",
