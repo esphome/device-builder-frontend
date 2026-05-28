@@ -1561,6 +1561,69 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 });
 
+describe("ESPHomeAPI — getComponentBodies", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``components/get_component_bodies`` with the requested ids", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getComponentBodies(["wifi", "api"]);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("components/get_component_bodies");
+    expect(sent.args).toEqual({ component_ids: ["wifi", "api"] });
+
+    const payload = {
+      wifi: { id: "wifi", name: "Wi-Fi" },
+      api: { id: "api", name: "API" },
+    };
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: payload,
+    });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("forwards platform / board_id as snake_case when provided", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.getComponentBodies(["wifi"], "esp32", "esp32-s3-devkitc-1");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({
+      component_ids: ["wifi"],
+      platform: "esp32",
+      board_id: "esp32-s3-devkitc-1",
+    });
+  });
+
+  it("omits platform / board_id when not provided so the backend's default path runs", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.getComponentBodies(["wifi"]);
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({ component_ids: ["wifi"] });
+    expect("platform" in sent.args).toBe(false);
+    expect("board_id" in sent.args).toBe(false);
+  });
+
+  it("short-circuits on an empty id list without touching the socket", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const result = await api.getComponentBodies([]);
+    expect(result).toEqual({});
+    expect(ws.sent).toHaveLength(0);
+  });
+});
+
 describe("ESPHomeAPI — automations parse / upsert / delete", () => {
   beforeEach(() => {
     installMockWebSocket();

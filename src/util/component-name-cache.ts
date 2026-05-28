@@ -166,8 +166,16 @@ function _notify(): void {
   }
 }
 
-/** Test-only: drop all cached entries and pending promises. */
+/** Test-only: drop all cached entries and pending promises.
+ *  Bucket waiters waiting on a flush that will never happen are
+ *  rejected so the dangling promises settle and dependent tests
+ *  don't hang on an `await fetchComponent(...)`. */
 export function _clearComponentCache(): void {
+  for (const bucket of _batches.values()) {
+    for (const resolver of bucket.pending.values()) {
+      resolver.reject(new Error("component cache cleared"));
+    }
+  }
   _cache.clear();
   _inflight.clear();
   _listeners.clear();

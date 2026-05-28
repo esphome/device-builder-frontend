@@ -136,6 +136,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
     bundleName: string;
   } | null = null;
 
+  /**
+   * Monotonically increasing token guarding async selection
+   * mutations against stale-response races. Every code path that
+   * starts an async hydration captures the current value, then
+   * checks it after the await; if the user clicked something else
+   * in between (and we bumped the token), the late response is
+   * discarded. Same shape as `_depNavSeq` in navigateToDep.
+   */
+  private _selectionSeq = 0;
+
   static styles = [
     espHomeStyles,
     css`
@@ -257,6 +267,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   public open() {
     this._resetDetourState();
+    this._selectionSeq++;
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
@@ -273,6 +284,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   public openWithSearch(domain: string) {
     this._resetDetourState();
+    this._selectionSeq++;
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
@@ -415,11 +427,15 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // The catalog list endpoint returns slim index entries (no
     // `config_entries`); the form needs the full body to render
     // its fields. Hydrate through the cached + batched fetch path
-    // so a subsequent click on the same card is instant.
+    // so a subsequent click on the same card is instant. Capture
+    // the selection token before the await so a slower earlier
+    // click can't overwrite a faster later one.
+    const seq = ++this._selectionSeq;
     const full = await this._hydrateBody(
       e.detail.component.id,
       this.board?.id ?? undefined
     );
+    if (seq !== this._selectionSeq) return;
     if (!full) return;
     this._selected = full;
     this._submitError = "";
@@ -443,7 +459,12 @@ export class ESPHomeAddComponentDialog extends LitElement {
       (localId) => `featured.${boardId}.${localId}`
     );
     const [first, ...rest] = fullIds;
+    // Same stale-response guard as `_onComponentSelected`; a quick
+    // re-pick or a card click landing between this bundle's flush
+    // and response must not let the bundle resurrect itself.
+    const seq = ++this._selectionSeq;
     const component = await this._hydrateBody(first, boardId);
+    if (seq !== this._selectionSeq) return;
     if (!component) return;
     // Picking a bundle is a fresh sequence — abandon any in-flight
     // dep-detour state from the previous component the user was filling.
@@ -466,6 +487,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _onBack() {
     if (this._submitting) return;
+    // Bump the selection token so any hydration still in flight
+    // can't write back over the restored / cleared `_selected`.
+    this._selectionSeq++;
     // If the user is in the middle of a "go add a dependency" detour
     // and they hit back, treat it as cancelling the detour: drop them
     // back at the original component they were filling in, instead of
@@ -561,10 +585,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
+        // Same stale-response guard as the catalog/bundle pick
+        // entry points; a quick bundle-abandon (back button,
+        // dialog close, fresh selection) between the flush and
+        // response must not let this step apply its prefill.
+        const seq = ++this._selectionSeq;
         const nextComponent = await this._hydrateBody(
           nextId,
           this.board?.id ?? undefined
         );
+        if (seq !== this._selectionSeq) return;
         if (!nextComponent) return;
         // Hand the just-added component's id to the next step's matching
         // `references_component` field. Bundles are designed to chain —

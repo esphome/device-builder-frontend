@@ -113,6 +113,21 @@ describe("component-name-cache", () => {
     expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
+  it("rejects pending bucket waiters when the cache is cleared mid-flight", async () => {
+    // Tests that call _clearComponentCache while a fetch is still
+    // pending would otherwise hang on the dangling promise; the
+    // cleanup path must settle every waiter explicitly.
+    const { api } = mockApi(
+      () => null,
+      () => new Promise<Record<string, ComponentCatalogEntry>>(() => {})
+    );
+
+    const pending = fetchComponent(api, "wifi");
+    _clearComponentCache();
+
+    await expect(pending).rejects.toThrow("component cache cleared");
+  });
+
   it("does not resolve prototype keys as cache hits", async () => {
     // Reachable from yaml-completion when the user types a key
     // whose name shadows an Object.prototype member (`toString`,
