@@ -818,6 +818,7 @@
       "ssid_placeholder": "MyHomeWifi",
       "password_label": "Wi-Fi 密码",
       "password_placeholder": "开放网络请留空",
+      "password_too_short": "Wi-Fi 密码至少需要 8 个字符",
       "save": "保存凭据",
       "saving": "保存中…",
       "save_success": "Wi-Fi 凭据已保存",

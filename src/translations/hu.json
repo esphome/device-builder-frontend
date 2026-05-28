@@ -810,6 +810,7 @@
       "ssid_placeholder": "OtthoniWifi",
       "password_label": "Wi-Fi jelszó",
       "password_placeholder": "Hagyja üresen nyílt hálózat esetén",
+      "password_too_short": "A Wi-Fi jelszónak legalább 8 karakterből kell állnia",
       "save": "Hitelesítő adatok mentése",
       "saving": "Mentés…",
       "save_success": "Wi-Fi hitelesítő adatok mentve",

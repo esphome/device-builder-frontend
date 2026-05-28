@@ -697,6 +697,7 @@
       "ssid_placeholder": "MijnThuisWifi",
       "password_label": "Wi-Fi-wachtwoord",
       "password_placeholder": "Laat leeg voor een open netwerk",
+      "password_too_short": "Wi-Fi-wachtwoord moet minstens 8 tekens bevatten",
       "save": "Opslaan",
       "saving": "Bezig met opslaan…",
       "save_success": "Wi-Fi-inloggegevens opgeslagen",

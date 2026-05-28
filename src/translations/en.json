@@ -818,6 +818,7 @@
       "ssid_placeholder": "MyHomeWifi",
       "password_label": "Wi-Fi password",
       "password_placeholder": "Leave blank for an open network",
+      "password_too_short": "Wi-Fi password must be at least 8 characters",
       "save": "Save credentials",
       "saving": "Saving…",
       "save_success": "Wi-Fi credentials saved",

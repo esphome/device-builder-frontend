@@ -697,6 +697,7 @@
       "ssid_placeholder": "MonWifiMaison",
       "password_label": "Mot de passe Wi-Fi",
       "password_placeholder": "Laisser vide pour un réseau ouvert",
+      "password_too_short": "Le mot de passe Wi-Fi doit comporter au moins 8 caractères",
       "save": "Enregistrer",
       "saving": "Enregistrement…",
       "save_success": "Identifiants Wi-Fi enregistrés",
