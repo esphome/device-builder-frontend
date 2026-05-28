@@ -206,10 +206,16 @@ export const dashboardStyles = css`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
-    /* Tight 4px top so the count row above doesn't butt against
-       the first card; sides and bottom keep the full padding so
-       the grid doesn't hug the viewport edges or the FAB. */
-    padding: var(--wa-space-xs) var(--wa-space-l) var(--wa-space-l);
+    padding: var(--wa-space-l);
+  }
+
+  /* When the grid follows the toolbar's count row (whether directly
+     or with the empty-search pivot wedged between), the count row
+     already provides spacing above the first card. Tighten the
+     grid's top padding so the two rows don't double up. */
+  .toolbar + .devices-grid,
+  .toolbar + .empty-search + .devices-grid {
+    padding-top: var(--wa-space-xs);
   }
 
   /* Only the configured-device grid needs FAB clearance: it's the
