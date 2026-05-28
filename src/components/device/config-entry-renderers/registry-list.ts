@@ -36,6 +36,7 @@ import {
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   fieldRendererStyles,
   renderFieldError,
   renderLabel,
@@ -346,7 +347,7 @@ export class ESPHomeRegistryList extends LitElement {
       // catalog values surface instead of silently substituting a
       // stand-in catalog.
       return html`
-        <div class="field" data-field-key=${this.path.join(".")}>
+        <div class="field" data-field-key=${fieldKeyAttr(this.path)}>
           ${renderLabel(this.entry, this.ctx)}
           <p class="registry-list-fallback">
             ${this.ctx.localize("device.registry_list_unsupported")}
@@ -363,7 +364,7 @@ export class ESPHomeRegistryList extends LitElement {
     // YAML-only notice instead, same pattern as renderNestedListField.
     if (raw instanceof YamlRawValue || (raw !== undefined && !Array.isArray(raw))) {
       return html`
-        <div class="field" data-field-key=${this.path.join(".")}>
+        <div class="field" data-field-key=${fieldKeyAttr(this.path)}>
           ${renderLabel(this.entry, this.ctx)}
           <p class="field-description">
             ${this.ctx.localize("device.multi_value_yaml_only")}
@@ -429,7 +430,7 @@ export class ESPHomeRegistryList extends LitElement {
     // leaving the row stuck.
     const addDisabled = disabled || catalog.length === 0;
     return html`
-      <div class="field" data-field-key=${this.path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(this.path)}>
         ${renderLabel(this.entry, this.ctx)} ${renderListEmptyHint(items, this.ctx)}
         ${statusHint}
         ${items.map((item, i) =>

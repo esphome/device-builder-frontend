@@ -2,6 +2,7 @@ import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import {
+  fieldKeyAttr,
   labelFor,
   renderHelpLink,
   type RenderCtx,
@@ -19,7 +20,7 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
     ctx.scopeValues(path)
   );
   return html`
-    <div class="nested-group" data-field-key=${path.join(".")}>
+    <div class="nested-group" data-field-key=${fieldKeyAttr(path)}>
       <div class="nested-header">
         <button
           type="button"

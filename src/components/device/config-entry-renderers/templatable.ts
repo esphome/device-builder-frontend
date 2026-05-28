@@ -22,7 +22,7 @@
 import { html } from "lit";
 import type { ConfigEntry } from "../../../api/types.js";
 import { isLambdaValue } from "../../../api/types.js";
-import type { RenderCtx } from "../config-entry-renderers-shared.js";
+import { fieldKeyAttr, type RenderCtx } from "../config-entry-renderers-shared.js";
 import { renderLambdaField } from "./lambda.js";
 
 interface StashEntry {
@@ -76,7 +76,7 @@ export function renderTemplatableField(
   const raw = ctx.getAt(path);
   const isLambda = isLambdaValue(raw);
   const stash = stashFor(ctx, path);
-  const fieldKey = path.join(".");
+  const fieldKey = fieldKeyAttr(path);
 
   const switchTo = (toLambda: boolean) => {
     if (toLambda === isLambda) return;
