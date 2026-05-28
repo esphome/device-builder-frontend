@@ -220,7 +220,15 @@ const _hydratedEntries = new WeakSet<RegistryCatalogEntry>();
  *  not yet in ``_hydratedEntries`` so the happy-path retry is a
  *  no-op walk — only entries whose previous attempt failed hit the
  *  network, and the body cache coalesces those into one
- *  ``get_bodies`` round trip. */
+ *  ``get_bodies`` round trip.
+ *
+ *  Concurrency: the ``_hydratedEntries`` filter is best-effort
+ *  dedup — two concurrent ``fetchLightEffects`` calls that race
+ *  past the filter will both walk the same entries and both run
+ *  ``structuredClone`` + reassign. The body cache's in-flight
+ *  promise dedup is the real network-concurrency guard; the
+ *  WeakSet just keeps subsequent calls fast. Idempotent: last
+ *  write wins with identical data. */
 async function _hydrateRegistryConfigEntries(
   api: ESPHomeAPI,
   type: AutomationCatalogBodyType,

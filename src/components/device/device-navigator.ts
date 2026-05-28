@@ -382,17 +382,18 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (
       (changedProperties.has("yaml") || changedProperties.has("platform")) &&
-      this.yaml &&
-      this.platform
+      this.yaml
     ) {
-      // Gate on ``platform`` being set: the parent typically
-      // resolves ``yaml`` first and ``platform`` once the board
-      // manifest lands a beat later. Firing on the yaml-only edge
-      // sends ``get_component_bodies`` / ``get_triggers`` with
-      // ``platform=undefined``, which lands in a different
-      // ``BatchedCache`` bucket than the eventual platform-scoped
-      // fetch and gets discarded — two WS round trips for one
-      // navigator mount. Wait for the full context.
+      // Fire on both edges: the parent typically resolves ``yaml``
+      // first and ``platform`` once the board manifest lands a
+      // beat later. The yaml-edge fire goes into a
+      // ``platform=undefined`` ``BatchedCache`` bucket; the
+      // platform-edge fire refreshes labels with platform-scoped
+      // values. We intentionally pay the one-time double-fetch
+      // rather than gate on ``this.platform`` truthy, because a
+      // device without a resolvable board (``board_id`` missing,
+      // board fetch failed) would otherwise never get its labels
+      // resolved at all — see ``device.ts::_loadBoard``.
       this._kickoffNameResolves();
     }
 
