@@ -399,14 +399,25 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (!this._api) return;
     const api = this._api;
     type Entry = AutomationTrigger | AutomationAction | AutomationCondition;
-    const jobs: Promise<void>[] = [];
+    // ``allSettled`` so one body fetch failure (transport hiccup,
+    // mid-flight cache clear, server glitch on one ref) doesn't
+    // abort the whole editor load — the slim entry is enough to
+    // render the picker; the form re-fetches on focus.
+    const jobs: Promise<unknown>[] = [];
     const merge = (type: "triggers" | "actions" | "conditions", list: Entry[]): void => {
       for (const entry of list) {
         jobs.push(
           fetchAutomationBody(api, type, entry.id).then((body) => {
             if (body && "config_entries" in body) {
               entry.config_entries = body.config_entries;
+              return;
             }
+            // The list endpoint just advertised this id; a null or
+            // shapeless response from get_bodies is a contract
+            // violation worth surfacing in the console.
+            console.warn(
+              `automation-editor: ${type}/${entry.id} body missing config_entries; form will render empty`
+            );
           })
         );
       }
@@ -414,7 +425,12 @@ export class ESPHomeAutomationEditor extends LitElement {
     merge("triggers", available.triggers);
     merge("actions", available.actions);
     merge("conditions", available.conditions);
-    await Promise.all(jobs);
+    const results = await Promise.allSettled(jobs);
+    for (const r of results) {
+      if (r.status === "rejected") {
+        console.warn("automation-editor: body fetch failed", r.reason);
+      }
+    }
   }
 
   protected render() {
