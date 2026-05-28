@@ -289,6 +289,75 @@ describe("ESPHomeAPI — cloneDevice", () => {
   });
 });
 
+describe("ESPHomeAPI — getAvailableAutomations", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("backfills missing config_entries on triggers/actions/conditions", async () => {
+    // Backend's slim ``*Index`` shapes drop ``config_entries`` from
+    // the wire payload entirely. Renderers
+    // (``automation-action-node._renderActionParams`` and similar)
+    // read ``def.config_entries.length`` synchronously, so the
+    // client must normalize undefined to ``[]`` before any consumer
+    // touches the result. Pin the normalization at the client
+    // boundary so every caller is safe by construction (avoids
+    // duplicating the backfill in ``loadAndHydrateAvailable``,
+    // ``api-action-editor``, ``script-editor``, etc.).
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAvailableAutomations("device.yaml");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        // Wire shape: no ``config_entries`` field at all.
+        triggers: [{ id: "on_boot", name: "On Boot" }],
+        actions: [{ id: "delay", name: "Delay" }],
+        conditions: [{ id: "lambda", name: "Lambda" }],
+        scripts: [],
+        devices: [],
+      },
+    });
+    const result = await pending;
+
+    expect(result.triggers[0].config_entries).toEqual([]);
+    expect(result.actions[0].config_entries).toEqual([]);
+    expect(result.conditions[0].config_entries).toEqual([]);
+  });
+
+  it("preserves config_entries when the wire payload already carries them", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAvailableAutomations("device.yaml");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        triggers: [
+          {
+            id: "on_boot",
+            name: "On Boot",
+            config_entries: [{ key: "trigger_id" }],
+          },
+        ],
+        actions: [],
+        conditions: [],
+        scripts: [],
+        devices: [],
+      },
+    });
+    const result = await pending;
+
+    expect(result.triggers[0].config_entries).toEqual([{ key: "trigger_id" }]);
+  });
+});
+
 describe("ESPHomeAPI — editFriendlyName", () => {
   beforeEach(() => {
     installMockWebSocket();

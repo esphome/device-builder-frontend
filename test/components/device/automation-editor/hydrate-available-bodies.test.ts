@@ -162,41 +162,6 @@ describe("loadAndHydrateAvailable", () => {
     expect(outcome.status).toBe("ok");
   });
 
-  it("backfills config_entries when the backend's slim shape omits it", async () => {
-    // Backend's ``AutomationActionIndex`` / ``AutomationTriggerIndex``
-    // etc. drop the ``config_entries`` field entirely from the wire
-    // payload. Renderers like ``automation-action-node`` read
-    // ``def.config_entries.length`` synchronously, so the
-    // pre-hydration paint must normalize undefined to ``[]`` or
-    // child components crash.
-    const slim = {
-      triggers: [{ id: "on_boot" } as AutomationTrigger], // no config_entries
-      actions: [{ id: "delay" } as AutomationAction], // no config_entries
-      conditions: [{ id: "lambda" } as AutomationCondition], // no config_entries
-      scripts: [],
-      devices: [],
-    } as unknown as AvailableAutomations;
-    const api = {
-      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
-    } as unknown as ESPHomeAPI;
-    let painted: AvailableAutomations | null = null;
-
-    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
-      onPaint: (p) => {
-        painted = p;
-      },
-    });
-    if (outcome.status !== "ok") throw new Error("expected ok");
-    if (painted === null) throw new Error("expected onPaint to fire");
-    const p: AvailableAutomations = painted;
-
-    expect(p.triggers[0].config_entries).toEqual([]);
-    expect(p.actions[0].config_entries).toEqual([]);
-    expect(p.conditions[0].config_entries).toEqual([]);
-    // The raw api response stays unmutated.
-    expect("config_entries" in slim.triggers[0]).toBe(false);
-  });
-
   it("returns fresh array refs in the hydrated outcome", async () => {
     const slim = emptySlim();
     const api = {

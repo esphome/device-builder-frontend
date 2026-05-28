@@ -4,7 +4,6 @@ import type {
   AutomationCondition,
   AutomationTrigger,
   AvailableAutomations,
-  ConfigEntry,
 } from "../../../api/types.js";
 import {
   emptyHydrationResult,
@@ -85,14 +84,16 @@ export async function loadAndHydrateAvailable(
   try {
     const slim = await api.getAvailableAutomations(configuration);
     if (options?.isStale?.()) return { status: "stale" };
-    // Backend's slim shape omits ``config_entries`` entirely; backfill
-    // ``[]`` so pre-hydration renders don't read undefined. Shallow
-    // clone keeps mutations off the raw api response.
+    // Shallow-clone each entry so ``hydrateAvailableBodies``
+    // mutates ``available``'s copies, not the api-client object
+    // (other consumers paint with the same reference). The client
+    // already backfills missing ``config_entries`` to ``[]`` at the
+    // wire boundary, so pre-hydration renders are safe.
     const available: AvailableAutomations = {
       ...slim,
-      triggers: slim.triggers.map(_normalizeEntry),
-      actions: slim.actions.map(_normalizeEntry),
-      conditions: slim.conditions.map(_normalizeEntry),
+      triggers: slim.triggers.map((e) => ({ ...e })),
+      actions: slim.actions.map((e) => ({ ...e })),
+      conditions: slim.conditions.map((e) => ({ ...e })),
     };
     options?.onPaint?.(available);
     const hydration = await hydrateAvailableBodies(api, available);
@@ -111,8 +112,4 @@ export async function loadAndHydrateAvailable(
     if (options?.isStale?.()) return { status: "stale" };
     return { status: "error", error };
   }
-}
-
-function _normalizeEntry<T extends { config_entries?: ConfigEntry[] }>(entry: T): T {
-  return { ...entry, config_entries: entry.config_entries ?? [] };
 }

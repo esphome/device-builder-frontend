@@ -1417,9 +1417,24 @@ export class ESPHomeAPI {
    * than caching across edits.
    */
   async getAvailableAutomations(configuration: string): Promise<AvailableAutomations> {
-    return this.sendCommand<AvailableAutomations>("automations/get_available", {
-      configuration,
-    });
+    const raw = await this.sendCommand<AvailableAutomations>(
+      "automations/get_available",
+      { configuration }
+    );
+    // Backend ships slim ``*Index`` shapes that drop ``config_entries``
+    // entirely. Renderers (``automation-action-node``,
+    // ``automation-trigger-picker``, ``automation-condition-tree``)
+    // read ``def.config_entries.length`` synchronously, so a missing
+    // field crashes on the first paint before per-form hydration
+    // fills the schema in. Backfill once at the API boundary so every
+    // ``getAvailableAutomations`` consumer is safe by construction;
+    // mirrors the precedent set by #432 (boards-client default
+    // backfill). Mutates in place — these objects belong to the call
+    // site and have no other readers yet.
+    for (const e of raw.triggers) e.config_entries ??= [];
+    for (const e of raw.actions) e.config_entries ??= [];
+    for (const e of raw.conditions) e.config_entries ??= [];
+    return raw;
   }
 
   /**
