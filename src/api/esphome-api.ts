@@ -1216,10 +1216,6 @@ export class ESPHomeAPI {
 
   /** Get a single board by ID. */
   async getBoard(boardId: string): Promise<BoardCatalogEntry | null> {
-    // ``hydrateBoard`` re-defaults the fields the backend omits via
-    // mashumaro's omit_default (see util/board-hydrate.ts) so
-    // downstream consumers can read board.pins / .hardware etc
-    // without an ``?? []`` at every site.
     const board = await this.sendCommand<BoardCatalogEntry | null>("boards/get_board", {
       board_id: boardId,
     });

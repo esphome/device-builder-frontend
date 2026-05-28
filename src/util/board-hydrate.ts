@@ -88,16 +88,13 @@ function _hydratePin(pin: BoardPin): BoardPin {
 }
 
 function _hydrateFeaturedComponent(fc: FeaturedComponent): FeaturedComponent {
-  const fields = fc.fields ?? {};
-  const hydratedFields: Record<string, FieldPreset> = {};
-  for (const [key, preset] of Object.entries(fields)) {
-    hydratedFields[key] = _hydrateFieldPreset(preset);
-  }
   return {
     ...fc,
     name: fc.name ?? null,
     description: fc.description ?? null,
-    fields: hydratedFields,
+    fields: Object.fromEntries(
+      Object.entries(fc.fields ?? {}).map(([k, v]) => [k, _hydrateFieldPreset(v)])
+    ),
   };
 }
 

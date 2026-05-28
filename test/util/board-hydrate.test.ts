@@ -115,14 +115,9 @@ describe("hydrateBoard", () => {
   });
 
   it("preserves unknown fields the backend may add later (forward-compat)", () => {
-    // Every helper spreads its input before applying defaults, so
-    // a wire payload that carries an additional field a future
-    // backend version introduced flows through the hydrator
-    // instead of being silently dropped. Pin the additive
-    // contract on the helpers Copilot specifically called out —
-    // _hydrateHardware and _hydrateFieldPreset both used to
-    // rebuild without spreading — plus a representative top-level
-    // pass-through.
+    // Each helper spreads its input before applying defaults, so
+    // wire fields the hydrator doesn't know about pass through
+    // instead of being silently dropped.
     const entry = {
       ...strippedEntry(),
       future_top_level: "kept",
