@@ -4,10 +4,10 @@ import type { AdoptableDevice, ConfiguredDevice } from "../../api/types.js";
 import { downloadYaml, editDevice } from "./actions.js";
 import {
   renderAddDeviceCard,
+  renderDeviceCountRow,
   renderFacets,
   renderNoResultsExtras,
   renderSearchInput,
-  renderSelectToggle,
   renderViewToggle,
 } from "./render-toolbar.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
@@ -186,9 +186,9 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
     >
       <div slot="toolbar" class="toolbar-stack">
         <div class="toolbar-row">
-          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderSelectToggle(host)}
-          ${renderFacets(host)}
+          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         </div>
+        ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
       <button
         slot="actions"

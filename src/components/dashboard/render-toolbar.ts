@@ -201,7 +201,10 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
   </div>`;
 }
 
-export function renderToolbar(
+/** Pairs the device-count with Select-multiple on one row. Used
+ *  by both the card-view toolbar and the table-view toolbar so the
+ *  toggle's position doesn't shift when the user flips the view. */
+export function renderDeviceCountRow(
   host: ESPHomePageDashboard,
   matchCount: number,
   total: number
@@ -212,6 +215,19 @@ export function renderToolbar(
       ? host._localize("dashboard.device_singular")
       : host._localize("dashboard.device_plural");
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
+  return html`
+    <div class="device-count-row">
+      <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+      ${renderSelectToggle(host)}
+    </div>
+  `;
+}
+
+export function renderToolbar(
+  host: ESPHomePageDashboard,
+  matchCount: number,
+  total: number
+): TemplateResult {
   // Layout: [search] [view-toggle] [facets…]
   //         [X devices]                 [Select multiple]
   // Select-multiple sits paired with the device-count on its own
@@ -223,10 +239,7 @@ export function renderToolbar(
       <div class="toolbar-row">
         ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
       </div>
-      <div class="device-count-row">
-        <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
-        ${renderSelectToggle(host)}
-      </div>
+      ${renderDeviceCountRow(host, matchCount, total)}
     </div>
   `;
 }
