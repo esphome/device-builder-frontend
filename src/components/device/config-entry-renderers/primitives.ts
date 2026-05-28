@@ -27,12 +27,14 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.suggestions && entry.suggestions.length > 0) {
     return renderStringField(entry, "number", path, ctx);
   }
+  const raw = ctx.getAt(path);
+  // Bail above the hex dispatch so the hex variant inherits the
+  // non-primitive guard without a second call.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   if (entry.display_format === "hex") {
     return renderHexIntField(entry, path, ctx);
   }
-  const raw = ctx.getAt(path);
-  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
-  if (bail) return bail;
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const min = entry.range ? String(entry.range[0]) : undefined;
@@ -450,6 +452,14 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
 export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
   const isRaw = raw instanceof YamlRawValue;
+  // YamlRawValue is an intentional textarea shape (block scalars
+  // like ``|-``); anything else non-primitive (a list / mapping
+  // that landed under a textarea-shaped field) should bail rather
+  // than coerce through ``String(...)``.
+  if (!isRaw) {
+    const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+    if (bail) return bail;
+  }
   const value = isRaw ? raw.body : String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`

@@ -249,7 +249,7 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
   return html`
     <div class="field" data-field-key=${path.join(".")}>
       ${renderLabel(entry, ctx)}
-      <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
+      <p class="field-description">${ctx.localize("device.value_yaml_only")}</p>
       ${renderFieldError(path, ctx)}
     </div>
   `;

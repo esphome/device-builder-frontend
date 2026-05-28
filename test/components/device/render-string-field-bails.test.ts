@@ -61,13 +61,11 @@ function makeCtx(values: Record<string, unknown>): {
  *  (different ``inputType``, restructured input element) doesn't silently
  *  false-pass. */
 function rendersBailBranch(json: string): boolean {
-  return (
-    json.includes("device.multi_value_yaml_only") && json.includes("field-description")
-  );
+  return json.includes("device.value_yaml_only") && json.includes("field-description");
 }
 
 function rendersEditableBranch(json: string): boolean {
-  return json.includes("placeholder") && !json.includes("device.multi_value_yaml_only");
+  return json.includes("placeholder") && !json.includes("device.value_yaml_only");
 }
 
 describe("renderStringField — defensive bail on non-primitive values", () => {

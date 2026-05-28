@@ -620,6 +620,7 @@
     "multi_value_add": "添加",
     "multi_value_remove": "移除",
     "multi_value_yaml_only": "此列表包含可视化编辑器无法建模的 YAML，请直接在右侧 YAML 面板中编辑。",
+    "value_yaml_only": "此值无法由可视化编辑器建模，请直接在右侧 YAML 面板中编辑。",
     "registry_list_loading": "正在加载目录…",
     "registry_list_select": "请选择一个选项…",
     "registry_list_empty_catalog": "此注册表暂无可用选项。",

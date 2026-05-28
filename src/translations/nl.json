@@ -646,6 +646,7 @@
     "multi_value_add": "Toevoegen",
     "multi_value_remove": "Verwijderen",
     "multi_value_yaml_only": "Deze lijst bevat YAML die de visuele editor niet kan modelleren — bewerk hem rechtstreeks in het YAML-paneel rechts.",
+    "value_yaml_only": "Deze waarde kan de visuele editor niet modelleren; bewerk hem rechtstreeks in het YAML-paneel rechts.",
     "registry_list_loading": "Catalogus laden…",
     "registry_list_select": "Selecteer een optie…",
     "registry_list_empty_catalog": "Geen opties beschikbaar voor dit register.",
