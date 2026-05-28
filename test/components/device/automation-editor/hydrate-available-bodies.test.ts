@@ -162,35 +162,64 @@ describe("loadAndHydrateAvailable", () => {
     expect(outcome.status).toBe("ok");
   });
 
+  it("backfills config_entries when the backend's slim shape omits it", async () => {
+    // Backend's ``AutomationActionIndex`` / ``AutomationTriggerIndex``
+    // etc. drop the ``config_entries`` field entirely from the wire
+    // payload. Renderers like ``automation-action-node`` read
+    // ``def.config_entries.length`` synchronously, so the
+    // pre-hydration paint must normalize undefined to ``[]`` or
+    // child components crash.
+    const slim = {
+      triggers: [{ id: "on_boot" } as AutomationTrigger], // no config_entries
+      actions: [{ id: "delay" } as AutomationAction], // no config_entries
+      conditions: [{ id: "lambda" } as AutomationCondition], // no config_entries
+      scripts: [],
+      devices: [],
+    } as unknown as AvailableAutomations;
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+    } as unknown as ESPHomeAPI;
+    let painted: AvailableAutomations | null = null;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
+      onPaint: (p) => {
+        painted = p;
+      },
+    });
+    if (outcome.status !== "ok") throw new Error("expected ok");
+    if (painted === null) throw new Error("expected onPaint to fire");
+    const p: AvailableAutomations = painted;
+
+    expect(p.triggers[0].config_entries).toEqual([]);
+    expect(p.actions[0].config_entries).toEqual([]);
+    expect(p.conditions[0].config_entries).toEqual([]);
+    // The raw api response stays unmutated.
+    expect("config_entries" in slim.triggers[0]).toBe(false);
+  });
+
   it("returns fresh array refs in the hydrated outcome", async () => {
     const slim = emptySlim();
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
     } as unknown as ESPHomeAPI;
-    // Capture the slim ref the orchestration paints through ``onSlim``
-    // so we can compare against the post-hydration arrays.
     let painted: AvailableAutomations | null = null;
 
     const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
-      onSlim: (s) => {
-        painted = s;
+      onPaint: (p) => {
+        painted = p;
       },
     });
     if (outcome.status !== "ok") throw new Error("expected ok");
-    if (painted === null) throw new Error("expected onSlim to fire");
-    const slimPainted: AvailableAutomations = painted;
+    if (painted === null) throw new Error("expected onPaint to fire");
+    const p: AvailableAutomations = painted;
 
-    expect(outcome.available).not.toBe(slimPainted);
-    expect(outcome.available.triggers).not.toBe(slimPainted.triggers);
-    expect(outcome.available.actions).not.toBe(slimPainted.actions);
-    expect(outcome.available.conditions).not.toBe(slimPainted.conditions);
+    expect(outcome.available).not.toBe(p);
+    expect(outcome.available.triggers).not.toBe(p.triggers);
+    expect(outcome.available.actions).not.toBe(p.actions);
+    expect(outcome.available.conditions).not.toBe(p.conditions);
   });
 
-  it("keeps the slim snapshot immutable during hydration", async () => {
-    // ``onSlim`` should hand the caller a stable view; the
-    // hydration mutations land on ``available`` (which is a
-    // per-entry shallow clone), never on the snapshot the picker
-    // paints from.
+  it("keeps the raw api response immutable during hydration", async () => {
     const slim = {
       triggers: [
         { id: "on_boot", config_entries: [] as ConfigEntry[] } as AutomationTrigger,
@@ -212,37 +241,27 @@ describe("loadAndHydrateAvailable", () => {
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
     } as unknown as ESPHomeAPI;
-    let painted: AvailableAutomations | null = null;
 
-    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
-      onSlim: (s) => {
-        painted = s;
-      },
-    });
-    // Force-hydrate ``available`` separately so the entry's
-    // ``config_entries`` is populated.
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
     if (outcome.status !== "ok") throw new Error("expected ok");
     await hydrateAvailableBodies(api, outcome.available, async () => body);
 
-    expect(painted).toBe(slim);
-    // The slim snapshot's entry still has its original empty
-    // ``config_entries``; only ``available``'s shallow-cloned
-    // entry got hydrated.
+    // Raw api response's entry stays untouched; orchestration
+    // works against a per-entry shallow clone.
     expect(slim.triggers[0].config_entries).toEqual([]);
     expect(outcome.available.triggers[0]).not.toBe(slim.triggers[0]);
   });
 
-  it("paints via onSlim before awaiting hydration", async () => {
+  it("paints via onPaint before awaiting hydration", async () => {
     const slim = emptySlim();
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
     } as unknown as ESPHomeAPI;
-    const onSlim = vi.fn();
+    const onPaint = vi.fn();
 
-    await loadAndHydrateAvailable(api, "device.yaml", { onSlim });
+    await loadAndHydrateAvailable(api, "device.yaml", { onPaint });
 
-    expect(onSlim).toHaveBeenCalledTimes(1);
-    expect(onSlim).toHaveBeenCalledWith(slim);
+    expect(onPaint).toHaveBeenCalledTimes(1);
   });
 
   it("returns 'stale' when isStale flips during the fetch", async () => {
@@ -250,15 +269,15 @@ describe("loadAndHydrateAvailable", () => {
     const api = {
       getAvailableAutomations: vi.fn().mockResolvedValue(slim),
     } as unknown as ESPHomeAPI;
-    const onSlim = vi.fn();
+    const onPaint = vi.fn();
 
     const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
-      onSlim,
+      onPaint,
       isStale: () => true,
     });
 
     expect(outcome.status).toBe("stale");
-    expect(onSlim).not.toHaveBeenCalled();
+    expect(onPaint).not.toHaveBeenCalled();
   });
 
   it("returns 'error' when the api call rejects", async () => {

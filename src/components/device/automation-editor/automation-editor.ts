@@ -391,9 +391,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         // the background. The post-hydration ``_available``
         // reassignment below carries fresh array refs to force a
         // re-render with the hydrated ``config_entries``.
-        onSlim: (slim) => {
+        onPaint: (painted) => {
           if (seq !== this._loadAvailableSeq) return;
-          this._available = slim;
+          this._available = painted;
           this._loading = false;
         },
         isStale: () => seq !== this._loadAvailableSeq,

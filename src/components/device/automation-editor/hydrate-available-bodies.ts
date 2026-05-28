@@ -4,6 +4,7 @@ import type {
   AutomationCondition,
   AutomationTrigger,
   AvailableAutomations,
+  ConfigEntry,
 } from "../../../api/types.js";
 import {
   emptyHydrationResult,
@@ -58,49 +59,60 @@ export type LoadAndHydrateOutcome =
   | { status: "error"; error: unknown };
 
 /** Fetch the slim ``AvailableAutomations`` for *configuration* and
- *  hydrate ``config_entries`` for every entry, returning fresh
- *  array references so identity-based ``hasChanged`` consumers
- *  re-render with the hydrated entries. The caller owns the
+ *  hydrate ``config_entries`` for every entry. The orchestration
+ *  builds a per-entry shallow clone with ``config_entries`` backed
+ *  by an empty array (the wire-shape backend slims drop the field
+ *  entirely), so child renderers can read ``.config_entries.length``
+ *  before hydration completes without a crash. The caller owns the
  *  state-mutation policy (``_available`` / ``_loading`` /
- *  ``_error`` on the editor element); this function is a thin
- *  orchestration wrapper that the editor element wires into its
- *  Lit lifecycle.
+ *  ``_error`` on the editor element).
  *
- *  ``onSlim`` lets the caller paint the picker with the slim list
- *  immediately, before awaiting hydration. The slim snapshot is
- *  guaranteed stable — hydration runs against a per-entry shallow
- *  clone so ``config_entries`` mutations land on ``available`` and
- *  never on the ``slim`` object the caller paints from. ``isStale``
- *  is checked after each await so an overlapping load can bail
- *  out cleanly. */
+ *  ``onPaint`` fires with the normalized pre-hydration object so
+ *  the picker dropdowns can mount immediately. Hydration mutates
+ *  the same object's per-entry ``config_entries`` in place; the
+ *  returned ``available`` carries fresh array refs so identity-
+ *  checking ``hasChanged`` consumers re-render with the hydrated
+ *  entries. ``isStale`` is checked after each await so an
+ *  overlapping load can bail out cleanly. */
 export async function loadAndHydrateAvailable(
   api: ESPHomeAPI,
   configuration: string,
   options?: {
-    onSlim?: (slim: AvailableAutomations) => void;
+    onPaint?: (available: AvailableAutomations) => void;
     isStale?: () => boolean;
   }
 ): Promise<LoadAndHydrateOutcome> {
   try {
     const slim = await api.getAvailableAutomations(configuration);
     if (options?.isStale?.()) return { status: "stale" };
-    options?.onSlim?.(slim);
-    // Shallow-clone each entry so ``hydrateAvailableBodies``
-    // mutates ``available``'s copies, not the ``slim`` snapshot.
-    // Entry-level ``config_entries`` reassignment ends in a deep
-    // ``structuredClone`` inside the per-entry hydrator, so the
-    // cached body stays disjoint either way.
+    // Backend's slim shape omits ``config_entries`` entirely; backfill
+    // ``[]`` so pre-hydration renders don't read undefined. Shallow
+    // clone keeps mutations off the raw api response.
     const available: AvailableAutomations = {
       ...slim,
-      triggers: slim.triggers.map((e) => ({ ...e })),
-      actions: slim.actions.map((e) => ({ ...e })),
-      conditions: slim.conditions.map((e) => ({ ...e })),
+      triggers: slim.triggers.map(_normalizeEntry),
+      actions: slim.actions.map(_normalizeEntry),
+      conditions: slim.conditions.map(_normalizeEntry),
     };
+    options?.onPaint?.(available);
     const hydration = await hydrateAvailableBodies(api, available);
     if (options?.isStale?.()) return { status: "stale" };
-    return { status: "ok", available, hydration };
+    // Fresh array refs so identity-based ``hasChanged`` consumers
+    // re-render with the hydrated entries (entries' object identity
+    // is preserved so per-entry caches stay valid).
+    const refreshed: AvailableAutomations = {
+      ...available,
+      triggers: [...available.triggers],
+      actions: [...available.actions],
+      conditions: [...available.conditions],
+    };
+    return { status: "ok", available: refreshed, hydration };
   } catch (error) {
     if (options?.isStale?.()) return { status: "stale" };
     return { status: "error", error };
   }
+}
+
+function _normalizeEntry<T extends { config_entries?: ConfigEntry[] }>(entry: T): T {
+  return { ...entry, config_entries: entry.config_entries ?? [] };
 }
