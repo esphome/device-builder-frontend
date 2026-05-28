@@ -12,6 +12,7 @@ import {
   effectiveDisabled,
   renderFieldError,
   renderLabel,
+  renderYamlOnlyFallbackIfNonPrimitive,
   type RenderCtx,
 } from "./config-entry-renderers-shared.js";
 
@@ -24,7 +25,10 @@ export function renderIdReferenceField(
 ) {
   const domain = entry.references_component || "";
   const candidates = findReferencedComponents(ctx.yaml, domain);
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const empty = candidates.length === 0;
 

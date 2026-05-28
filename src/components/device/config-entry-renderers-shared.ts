@@ -232,6 +232,29 @@ export function renderFieldShell(
 // Re-exported by `config-entry-renderers.ts`; placed here so the pin
 // renderer can fall back to a string field without importing the
 // barrel and creating a cycle.
+/** Defensive bail for scalar field renderers: when the value at *path*
+ *  isn't a primitive (a YAML list or mapping that landed under a
+ *  scalar-shaped catalog field because the upstream schema bundle
+ *  missed ``is_list`` or a similar shape marker), refuse to render an
+ *  editable input. ``String([...])`` would silently coerce the list
+ *  to a comma-joined string and a save would clobber the user's value.
+ *  Returns the bail template, or ``null`` when *raw* is safe to coerce. */
+export function renderYamlOnlyFallbackIfNonPrimitive(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  raw: unknown
+) {
+  if (isPrimitiveOrNullish(raw)) return null;
+  return html`
+    <div class="field" data-field-key=${path.join(".")}>
+      ${renderLabel(entry, ctx)}
+      <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
+      ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
 export function renderStringField(
   entry: ConfigEntry,
   inputType: string,
@@ -239,24 +262,8 @@ export function renderStringField(
   ctx: RenderCtx
 ) {
   const raw = ctx.getAt(path);
-  // Defensive bail: when the value at *path* isn't a primitive
-  // (e.g. a YAML list that landed under a mapping-shaped catalog
-  // field because the upstream schema bundle missed ``is_list``,
-  // or an inline mapping under a scalar-shaped field), refuse to
-  // render an editable input. ``String([...])`` would silently
-  // coerce the list to a comma-joined string and a save would
-  // clobber the user's list with that string. Surface a YAML-only
-  // notice instead, same pattern ``renderNestedListField`` uses
-  // when the parser preserves a block as ``YamlRawValue``.
-  if (!isPrimitiveOrNullish(raw)) {
-    return html`
-      <div class="field" data-field-key=${path.join(".")}>
-        ${renderLabel(entry, ctx)}
-        <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
-        ${renderFieldError(path, ctx)}
-      </div>
-    `;
-  }
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const placeholder = String(entry.default_value ?? "");

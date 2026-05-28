@@ -12,6 +12,7 @@ import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
+import { getIn } from "../../../src/util/nested-values.js";
 
 function makeStringEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -35,17 +36,7 @@ function makeCtx(values: Record<string, unknown>): {
     board: null,
     requiredOnly: false,
     nestedOpenSections: new Set(),
-    getAt: (path: string[]) => {
-      let cur: unknown = values;
-      for (const k of path) {
-        if (cur === null || typeof cur !== "object" || Array.isArray(cur)) {
-          if (path.indexOf(k) === path.length - 1 && Array.isArray(cur)) return cur;
-          return undefined;
-        }
-        cur = (cur as Record<string, unknown>)[k];
-      }
-      return cur;
-    },
+    getAt: (path: string[]) => getIn(values, path),
     errorAt: () => null,
     emitChange,
     toggleNested: () => {},
@@ -63,6 +54,22 @@ function makeCtx(values: Record<string, unknown>): {
   return { ctx, emitChange };
 }
 
+/** The bail branch is the only one that emits a ``<p class="field-description">``
+ *  containing the YAML-only translation key; the editable branch emits an
+ *  ``<input>`` whose binding includes a ``placeholder`` attribute. Key the
+ *  branch checks off those bail-specific markers so a future renderer change
+ *  (different ``inputType``, restructured input element) doesn't silently
+ *  false-pass. */
+function rendersBailBranch(json: string): boolean {
+  return (
+    json.includes("device.multi_value_yaml_only") && json.includes("field-description")
+  );
+}
+
+function rendersEditableBranch(json: string): boolean {
+  return json.includes("placeholder") && !json.includes("device.multi_value_yaml_only");
+}
+
 describe("renderStringField — defensive bail on non-primitive values", () => {
   it("renders a YAML-only notice when the value is a list", () => {
     // to_ntc_resistance.calibration shape: the schema bundle drops
@@ -74,9 +81,8 @@ describe("renderStringField — defensive bail on non-primitive values", () => {
     });
     const tpl = renderStringField(makeStringEntry(), "text", ["calibration"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
-    expect(json).toContain("device.multi_value_yaml_only");
-    // No editable <input type="text"> mounted.
-    expect(json).not.toContain('"text"');
+    expect(rendersBailBranch(json)).toBe(true);
+    expect(rendersEditableBranch(json)).toBe(false);
   });
 
   it("renders a YAML-only notice when the value is a mapping", () => {
@@ -85,14 +91,16 @@ describe("renderStringField — defensive bail on non-primitive values", () => {
     });
     const tpl = renderStringField(makeStringEntry(), "text", ["calibration"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
-    expect(json).toContain("device.multi_value_yaml_only");
+    expect(rendersBailBranch(json)).toBe(true);
+    expect(rendersEditableBranch(json)).toBe(false);
   });
 
   it("renders the editable input for actual strings", () => {
     const { ctx } = makeCtx({ calibration: "hello" });
     const tpl = renderStringField(makeStringEntry(), "text", ["calibration"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
-    expect(json).not.toContain("device.multi_value_yaml_only");
+    expect(rendersEditableBranch(json)).toBe(true);
+    expect(rendersBailBranch(json)).toBe(false);
     expect(json).toContain("hello");
   });
 
@@ -100,6 +108,7 @@ describe("renderStringField — defensive bail on non-primitive values", () => {
     const { ctx } = makeCtx({ calibration: null });
     const tpl = renderStringField(makeStringEntry(), "text", ["calibration"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
-    expect(json).not.toContain("device.multi_value_yaml_only");
+    expect(rendersEditableBranch(json)).toBe(true);
+    expect(rendersBailBranch(json)).toBe(false);
   });
 });

@@ -17,6 +17,7 @@ import {
   renderHelpLink,
   renderLabel,
   renderStringField,
+  renderYamlOnlyFallbackIfNonPrimitive,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -29,7 +30,10 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   if (entry.display_format === "hex") {
     return renderHexIntField(entry, path, ctx);
   }
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const min = entry.range ? String(entry.range[0]) : undefined;
   const max = entry.range ? String(entry.range[1]) : undefined;
@@ -352,7 +356,10 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
 }
 
 export function renderSelectField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   // Featured suggestions override options — board author narrowed the choice.
@@ -465,7 +472,10 @@ export function renderTextareaField(entry: ConfigEntry, path: string[], ctx: Ren
 }
 
 export function renderIconField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   return html`
     <div class="field" data-field-key=${path.join(".")}>
