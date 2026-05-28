@@ -89,9 +89,10 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
-      // Skip both offloader settings fields when a write is in flight so a
-      // reconnect snapshot can't clobber the optimistic value.
-      if (!host._offloaderSettingsSetInFlight) {
+      // Skip both offloader settings fields while any write is in flight so a
+      // reconnect snapshot can't clobber an optimistic value. Counter (not bool)
+      // so two concurrent toggles don't release the guard before both settle.
+      if (host._offloaderSettingsInFlightCount === 0) {
         if (remote_builds_enabled !== undefined) {
           host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
         }
