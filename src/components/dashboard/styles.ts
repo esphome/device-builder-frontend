@@ -950,8 +950,7 @@ export const dashboardStyles = css`
     }
 
     .toolbar {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
+      padding: var(--wa-space-s) var(--wa-space-s) 0;
     }
 
     /* When the discovered banner is present, the host already
