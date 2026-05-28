@@ -43,9 +43,16 @@ const stubHost = () => {
 
 const mockApi = (
   impl: (id: string) => ComponentCatalogEntry | null
-): { api: ESPHomeAPI; getComponent: ReturnType<typeof vi.fn> } => {
-  const getComponent = vi.fn((id: string) => Promise.resolve(impl(id)));
-  return { api: { getComponent } as unknown as ESPHomeAPI, getComponent };
+): { api: ESPHomeAPI; getComponentBodies: ReturnType<typeof vi.fn> } => {
+  const getComponentBodies = vi.fn((ids: string[]) => {
+    const result: Record<string, ComponentCatalogEntry> = {};
+    for (const id of ids) {
+      const e = impl(id);
+      if (e !== null) result[id] = e;
+    }
+    return Promise.resolve(result);
+  });
+  return { api: { getComponentBodies } as unknown as ESPHomeAPI, getComponentBodies };
 };
 
 describe("ComponentNameResolverController", () => {
@@ -99,9 +106,9 @@ describe("ComponentNameResolverController", () => {
 
     disconnect();
     requestUpdate.mockClear();
-    // Unsubscribed — a new cache write should not bump the host.
+    // Unsubscribed; a new cache write should not bump the host.
     const { api: api2 } = mockApi((id) => entry(id, "Logger"));
-    await api2.getComponent("logger");
+    await api2.getComponentBodies(["logger"]);
     expect(requestUpdate).not.toHaveBeenCalled();
   });
 
@@ -118,7 +125,7 @@ describe("ComponentNameResolverController", () => {
 
   it("does not re-fetch ids already present in the cache", async () => {
     const { host, connect } = stubHost();
-    const { api, getComponent } = mockApi((id) => entry(id, "Cached"));
+    const { api, getComponentBodies } = mockApi((id) => entry(id, "Cached"));
     const ctl = new ComponentNameResolverController(
       host,
       () => api,
@@ -129,10 +136,10 @@ describe("ComponentNameResolverController", () => {
     ctl.kickoff(["spi"]);
     await Promise.resolve();
     await Promise.resolve();
-    expect(getComponent).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
 
     ctl.kickoff(["spi"]);
     await Promise.resolve();
-    expect(getComponent).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 });

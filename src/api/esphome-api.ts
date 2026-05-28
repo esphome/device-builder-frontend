@@ -1252,6 +1252,29 @@ export class ESPHomeAPI {
   }
 
   /**
+   * Batch variant of `getComponent`. Fetches every requested id in a
+   * single round trip; missing ids are absent from the returned map.
+   * `platform` / `boardId` resolve per-platform defaults exactly as
+   * the singular call does, applied uniformly across the batch.
+   */
+  async getComponentBodies(
+    componentIds: string[],
+    platform?: string,
+    boardId?: string
+  ): Promise<Record<string, ComponentCatalogEntry>> {
+    if (componentIds.length === 0) return {};
+    const raw = await this.sendCommand<unknown>("components/get_component_bodies", {
+      component_ids: componentIds,
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+      return {};
+    }
+    return raw as Record<string, ComponentCatalogEntry>;
+  }
+
+  /**
    * Get components with optional filtering, search, and pagination.
    *
    * `platform` works the same as in `getComponent` — pass the device's

@@ -22,17 +22,32 @@ const entry = (id: string, name: string): ComponentCatalogEntry =>
     config_entries: [],
   }) as ComponentCatalogEntry;
 
+interface MockApi {
+  api: ESPHomeAPI;
+  getComponentBodies: ReturnType<typeof vi.fn>;
+}
+
+/** Mock that mirrors the batched WS shape: `getComponentBodies(ids,
+ *  platform, boardId)` resolves a map of id → entry. `impl` returns
+ *  the entry for one id (or `null` for a miss); the mock plumbs that
+ *  across the requested ids and accepts an optional override promise
+ *  so tests can pin in-flight behaviour. */
 const mockApi = (
-  impl: (
-    id: string,
-    platform?: string,
-    boardId?: string
-  ) => Promise<ComponentCatalogEntry | null> | ComponentCatalogEntry | null
-): { api: ESPHomeAPI; getComponent: ReturnType<typeof vi.fn> } => {
-  const getComponent = vi.fn((id: string, platform?: string, boardId?: string) =>
-    Promise.resolve(impl(id, platform, boardId))
+  impl: (id: string, platform?: string, boardId?: string) => ComponentCatalogEntry | null,
+  overridePromise?: () => Promise<Record<string, ComponentCatalogEntry>>
+): MockApi => {
+  const getComponentBodies = vi.fn(
+    (ids: string[], platform?: string, boardId?: string) => {
+      if (overridePromise) return overridePromise();
+      const result: Record<string, ComponentCatalogEntry> = {};
+      for (const id of ids) {
+        const e = impl(id, platform, boardId);
+        if (e !== null) result[id] = e;
+      }
+      return Promise.resolve(result);
+    }
   );
-  return { api: { getComponent } as unknown as ESPHomeAPI, getComponent };
+  return { api: { getComponentBodies } as unknown as ESPHomeAPI, getComponentBodies };
 };
 
 describe("component-name-cache", () => {
@@ -41,72 +56,101 @@ describe("component-name-cache", () => {
   });
 
   it("fetches uncached components and caches the result", async () => {
-    const { api, getComponent } = mockApi(() => entry("wifi", "WiFi"));
+    const { api, getComponentBodies } = mockApi(() => entry("wifi", "WiFi"));
 
     expect(getCachedComponent("wifi")).toBeUndefined();
     const got = await fetchComponent(api, "wifi");
 
     expect(got?.name).toBe("WiFi");
-    expect(getComponent).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
     expect(getCachedComponent("wifi")?.name).toBe("WiFi");
 
     // Second call hits the cache, no extra backend round-trip.
     await fetchComponent(api, "wifi");
-    expect(getComponent).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces parallel fetches into one batched call", async () => {
+    const { api, getComponentBodies } = mockApi((id) => entry(id, `name:${id}`));
+
+    const [a, b, c] = await Promise.all([
+      fetchComponent(api, "wifi"),
+      fetchComponent(api, "api"),
+      fetchComponent(api, "logger"),
+    ]);
+
+    expect(a?.name).toBe("name:wifi");
+    expect(b?.name).toBe("name:api");
+    expect(c?.name).toBe("name:logger");
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledWith(
+      ["wifi", "api", "logger"],
+      undefined,
+      undefined
+    );
   });
 
   it("dedupes concurrent in-flight calls for the same key", async () => {
-    let resolve!: (v: ComponentCatalogEntry) => void;
-    const { api, getComponent } = mockApi(
-      () => new Promise<ComponentCatalogEntry>((r) => (resolve = r))
+    let resolve!: (v: Record<string, ComponentCatalogEntry>) => void;
+    const { api, getComponentBodies } = mockApi(
+      () => null,
+      () => new Promise<Record<string, ComponentCatalogEntry>>((r) => (resolve = r))
     );
 
     const a = fetchComponent(api, "binary_sensor.gpio", "esp32");
     const b = fetchComponent(api, "binary_sensor.gpio", "esp32");
     const c = fetchComponent(api, "binary_sensor.gpio", "esp32");
 
-    expect(getComponent).toHaveBeenCalledTimes(1);
-    resolve(entry("binary_sensor.gpio", "GPIO Binary Sensor"));
+    // Give the microtask queue a chance to flush the batch.
+    await Promise.resolve();
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
+
+    resolve({ "binary_sensor.gpio": entry("binary_sensor.gpio", "GPIO Binary Sensor") });
 
     await expect(a).resolves.toMatchObject({ name: "GPIO Binary Sensor" });
     await expect(b).resolves.toMatchObject({ name: "GPIO Binary Sensor" });
     await expect(c).resolves.toMatchObject({ name: "GPIO Binary Sensor" });
-    expect(getComponent).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
-  it("keys cache entries by component id, platform, and board id", async () => {
-    const { api, getComponent } = mockApi((id, platform) =>
+  it("batches per (platform, boardId) context", async () => {
+    const { api, getComponentBodies } = mockApi((id, platform) =>
       entry(id, `${id}|${platform ?? ""}`)
     );
 
-    await fetchComponent(api, "sensor.dht", "esp32");
-    await fetchComponent(api, "sensor.dht", "esp8266");
-    await fetchComponent(api, "sensor.dht");
+    await Promise.all([
+      fetchComponent(api, "sensor.dht", "esp32"),
+      fetchComponent(api, "sensor.dht", "esp8266"),
+      fetchComponent(api, "sensor.dht"),
+    ]);
 
-    expect(getComponent).toHaveBeenCalledTimes(3);
+    expect(getComponentBodies).toHaveBeenCalledTimes(3);
     expect(getCachedComponent("sensor.dht", "esp32")?.name).toBe("sensor.dht|esp32");
     expect(getCachedComponent("sensor.dht", "esp8266")?.name).toBe("sensor.dht|esp8266");
     expect(getCachedComponent("sensor.dht")?.name).toBe("sensor.dht|");
   });
 
   it("caches null (catalog miss) so unknown ids aren't re-fetched", async () => {
-    const { api, getComponent } = mockApi(() => null);
+    const { api, getComponentBodies } = mockApi(() => null);
 
     const first = await fetchComponent(api, "nonsense.id");
     expect(first).toBeNull();
     expect(getCachedComponent("nonsense.id")).toBeNull();
 
     await fetchComponent(api, "nonsense.id");
-    expect(getComponent).toHaveBeenCalledTimes(1);
+    expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
   it("does not cache transport errors (allows retry)", async () => {
     let attempts = 0;
-    const { api } = mockApi(() => {
-      attempts++;
-      if (attempts === 1) return Promise.reject(new Error("network down"));
-      return entry("wifi", "WiFi");
-    });
+    const { api } = mockApi(
+      () => entry("wifi", "WiFi"),
+      () => {
+        attempts++;
+        if (attempts === 1) return Promise.reject(new Error("network down"));
+        return Promise.resolve({ wifi: entry("wifi", "WiFi") });
+      }
+    );
 
     await expect(fetchComponent(api, "wifi")).rejects.toThrow("network down");
     expect(getCachedComponent("wifi")).toBeUndefined();
@@ -137,13 +181,14 @@ describe("component-name-cache", () => {
     errSpy.mockRestore();
   });
 
-  it("notifies subscribers exactly once per fresh entry", async () => {
+  it("notifies subscribers once per flushed batch", async () => {
     const listener = vi.fn();
     const unsubscribe = subscribeComponentCache(listener);
 
-    const { api } = mockApi(() => entry("api", "API"));
-    await fetchComponent(api, "api");
+    const { api } = mockApi((id) => entry(id, id));
+    await Promise.all([fetchComponent(api, "api"), fetchComponent(api, "wifi")]);
 
+    // One batched flush → one notify, not one per id.
     expect(listener).toHaveBeenCalledTimes(1);
 
     // Cached read shouldn't notify again.
