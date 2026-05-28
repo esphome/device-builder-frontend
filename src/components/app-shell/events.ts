@@ -89,11 +89,15 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
-      if (remote_builds_enabled !== undefined) {
-        host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
-      }
-      if (allow_major_version_mismatch !== undefined) {
-        host._offloaderAllowMajorVersionMismatch = allow_major_version_mismatch;
+      // Skip both offloader settings fields when a write is in flight so a
+      // reconnect snapshot can't clobber the optimistic value.
+      if (!host._offloaderSettingsSetInFlight) {
+        if (remote_builds_enabled !== undefined) {
+          host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
+        }
+        if (allow_major_version_mismatch !== undefined) {
+          host._offloaderAllowMajorVersionMismatch = allow_major_version_mismatch;
+        }
       }
       break;
     }

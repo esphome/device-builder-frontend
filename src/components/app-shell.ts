@@ -172,6 +172,7 @@ export class ESPHomeApp extends LitElement {
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
+  _offloaderSettingsSetInFlight = false;
 
   private _router = createRouter(this);
 
