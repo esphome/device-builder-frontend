@@ -106,9 +106,11 @@ export class ESPHomePageDevice extends LitElement {
 
   /** ``true`` once this device's platform is known (manifest
    *  fetched, fetch failed, or no ``board_id``). The navigator
-   *  gates its kickoff on this so it fires once with the final
-   *  platform instead of twice (yaml-edge + platform-edge).
-   *  Resets on device-id change. */
+   *  gates on this to avoid the typical mount-time double-fetch
+   *  (yaml-edge with ``platform=""``, then platform-edge with the
+   *  real value); the no-board branch below has a documented
+   *  narrow window where it can still flip early. Resets on
+   *  device-id change. */
   @state()
   private _platformReady = false;
 

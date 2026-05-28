@@ -135,10 +135,10 @@ export class ESPHomeDeviceNavigator extends LitElement {
   platform = "";
 
   /** ``true`` once the parent's platform resolution settles.
-   *  Without this gate the kickoff fires twice (yaml-edge with
-   *  ``platform=""``, then platform-edge with the real value);
-   *  the two land in different ``BatchedCache`` buckets so the
-   *  first round-trip is orphaned. */
+   *  Without this gate the kickoff would routinely fire twice
+   *  (yaml-edge with ``platform=""``, then platform-edge with the
+   *  real value), landing in different ``BatchedCache`` buckets
+   *  so the first round-trip is orphaned. */
   @property({ type: Boolean })
   platformReady = false;
 
@@ -388,8 +388,9 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
-    // Fire on whichever of yaml / platform / platformReady arrives
-    // last; the conjunction ensures one kickoff per mount.
+    // Fire on the edge that satisfies the gate — typically just
+    // the last of (yaml, platformReady) to land. A subsequent
+    // ``platform`` change (post-mount reconnect, etc.) refires.
     if (
       (changedProperties.has("yaml") ||
         changedProperties.has("platform") ||
