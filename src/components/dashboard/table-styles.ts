@@ -84,6 +84,15 @@ export const tableLayoutStyles = css`
       padding-right: var(--wa-space-s);
     }
 
+    /* Mirrors the dashboard's :host([has-discovered]) .toolbar
+       trim: when the banner is present the dashboard already
+       provides padding-top equal to the banner's height, so the
+       controls' own padding-top stacks as dead space. Drop one
+       step so the table view matches the card / YAML views. #41 */
+    :host([has-discovered]) .controls {
+      padding-top: var(--wa-space-s);
+    }
+
     .table-wrap {
       margin-left: var(--wa-space-s);
       margin-right: var(--wa-space-s);

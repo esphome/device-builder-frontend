@@ -146,6 +146,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       .initialSorting=${host._tableSorting}
       .initialColumnVisibility=${host._tableColumnVisibility}
       ?select-mode=${host._selectMode}
+      ?has-discovered=${host._visibleImportableDevices.length > 0}
       .selectedDevices=${host._selectedDevices}
       .highlightConfiguration=${host._recentlyAdopted}
       @table-sort-change=${(e: CustomEvent<SortingState>) => host._saveTablePreference(e)}
