@@ -967,6 +967,25 @@ export class ESPHomeAPI {
     });
   }
 
+  /** Bulk-assign labels across multiple devices.
+   *
+   * Each update is a ``{configuration, labelIds}`` pair, where
+   * ``labelIds`` is the full replacement list for that device.
+   * Returns one ``BulkActionResult`` per entry. Per-entry failures
+   * (unknown label id, missing device) don't block the rest, so the
+   * caller can surface partial-success toasts.
+   */
+  async setDeviceLabelsBulk(
+    updates: Array<{ configuration: string; labelIds: string[] }>
+  ): Promise<BulkActionResult[]> {
+    return this.sendCommand<BulkActionResult[]>("devices/set_labels_bulk", {
+      updates: updates.map((u) => ({
+        configuration: u.configuration,
+        label_ids: u.labelIds,
+      })),
+    });
+  }
+
   // ─── Labels Commands ──────────────────────────────────────
 
   /** Return every label in the global catalog. */

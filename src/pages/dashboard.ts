@@ -122,6 +122,8 @@ import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-instal
 import "../components/friendly-name-dialog.js";
 import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
 import "../components/install-method-dialog.js";
+import "../components/labels/bulk-labels-dialog.js";
+import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
 import "../components/labels/labels-filter.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
@@ -231,6 +233,7 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-create-config-dialog") _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-clone-device-dialog") _cloneDialog!: ESPHomeCloneDeviceDialog;
   @query("esphome-friendly-name-dialog") _friendlyNameDialog!: ESPHomeFriendlyNameDialog;
+  @query("esphome-bulk-labels-dialog") _bulkLabelsDialog!: ESPHomeBulkLabelsDialog;
   @query("esphome-rename-device-dialog") _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") _commandDialog!: ESPHomeCommandDialog;
@@ -774,6 +777,16 @@ export class ESPHomePageDashboard extends LitElement {
       return;
     }
     this._openConfirm({ kind: "archive-bulk" });
+  };
+
+  _labelsSelected = () => {
+    if (this._selectedDevices.size === 0) return;
+    // Pass configurations (ids) rather than ``Device`` objects; the
+    // dialog consumes ``devicesContext`` to resolve them on each
+    // render so they stay fresh through any DEVICE_UPDATED events
+    // that arrive while the dialog is open.
+    this._bulkLabelsDialog.configurations = [...this._selectedDevices];
+    this._bulkLabelsDialog.open();
   };
 
   _confirmDeleteSingle = (device: ConfiguredDevice) =>
