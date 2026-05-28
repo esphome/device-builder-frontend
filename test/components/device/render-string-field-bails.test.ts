@@ -12,6 +12,7 @@ import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
+  renderBooleanField,
   renderFloatWithUnitField,
   renderTextareaField,
   renderTimePeriodField,
@@ -203,5 +204,30 @@ describe("renderTimePeriodField / renderFloatWithUnitField — bail on non-primi
     const tpl = renderFloatWithUnitField(entry, ["frequency"], ctx);
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersBailBranch(json)).toBe(false);
+  });
+});
+
+// ``parseYamlBoolean`` returns null for non-boolean/non-string inputs,
+// so a list / mapping under a boolean field renders unchecked. The
+// first user toggle would then write ``true`` back and clobber the
+// YAML structure. Pin both halves.
+describe("renderBooleanField — bail on non-primitive", () => {
+  const entry = (): ConfigEntry =>
+    makeConfigEntry({ key: "enabled", type: ConfigEntryType.BOOLEAN, label: "Enabled" });
+
+  it("bails when the value is a list under a boolean field", () => {
+    const { ctx } = makeCtx({ enabled: [true] });
+    const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+    expect(json).not.toContain("wa-switch");
+  });
+
+  it("renders the switch for an actual boolean", () => {
+    const { ctx } = makeCtx({ enabled: true });
+    const tpl = renderBooleanField(entry(), ["enabled"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("wa-switch");
   });
 });

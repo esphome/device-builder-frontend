@@ -348,6 +348,12 @@ export function renderFloatWithUnitField(
 // YAML editor reflects ON in the form view (issue device-builder#923).
 export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
+  // A list / mapping under a boolean-shaped catalog field renders
+  // unchecked (``parseYamlBoolean`` returns null), but the first
+  // user toggle emits ``true`` and clobbers the YAML structure.
+  // Bail to the YAML-only notice instead.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   const effective = raw === undefined || raw === null ? entry.default_value : raw;
   const checked = parseYamlBoolean(effective) === true;
   return html`
