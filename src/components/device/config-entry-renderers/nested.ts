@@ -57,9 +57,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
               ?disabled=${effectiveDisabled(entry, ctx)}
               aria-label=${enableLabel}
               title=${enableLabel}
-              @click=${(e: Event) => e.stopPropagation()}
               @change=${(e: Event) =>
-                _onEnableToggle(
+                onEnableToggle(
                   path,
                   key,
                   isOpen,
@@ -103,7 +102,8 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
 // becomes non-empty and serializes. Either way it expands for editing.
 // Disabling stashes the current group, then clears it — the serializer
 // prunes the empty object so the block leaves the YAML — and collapses.
-function _onEnableToggle(
+// Exported for direct unit testing (the render path only wires it up).
+export function onEnableToggle(
   path: string[],
   key: string,
   isOpen: boolean,

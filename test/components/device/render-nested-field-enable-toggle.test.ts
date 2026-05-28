@@ -1,20 +1,23 @@
 /**
- * Tests for the optional-entity enable toggle in ``renderNestedField``.
+ * Tests for the optional-entity enable toggle.
  *
  * Optional entity sub-readings (a debug component's per-metric
  * sensors, a DHT's temperature/humidity) only land in YAML once
  * their group holds a value, so an untouched one is silently "off".
- * The renderer gives those a ``wa-switch``: on seeds the name +
- * expands, off clears the group. Switch state is derived from the
- * current values (loaded from YAML), so it round-trips.
+ * ``renderNestedField`` gives those a ``wa-switch``; ``onEnableToggle``
+ * is the change handler: on restores the stashed config (or seeds the
+ * name) and expands, off stashes then clears the group so the block
+ * leaves the YAML. Switch state derives from the current values
+ * (loaded from YAML), so it round-trips.
  *
- * Runs in vitest's default ``node`` environment — no DOM — so we
- * inspect the returned ``TemplateResult`` and invoke the collected
- * event handlers directly rather than mounting a shadow root.
+ * The render smoke tests inspect the returned ``TemplateResult``; the
+ * behaviour tests drive ``onEnableToggle`` directly so they don't
+ * depend on the order Lit serialises template bindings.
  */
 import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import { renderNestedField } from "../../../src/components/device/config-entry-renderers.js";
+import { onEnableToggle } from "../../../src/components/device/config-entry-renderers/nested.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { getIn, setIn } from "../../../src/util/nested-values.js";
@@ -33,25 +36,18 @@ interface CtxStub {
   ctx: RenderCtx;
   emitChange: ReturnType<typeof vi.fn>;
   toggleNested: ReturnType<typeof vi.fn>;
+  read: (path: string[]) => unknown;
 }
 
-function collectHandlers(values: unknown[]): Array<(...args: unknown[]) => unknown> {
-  const out: Array<(...args: unknown[]) => unknown> = [];
-  const walk = (v: unknown): void => {
-    if (typeof v === "function") {
-      out.push(v as (...args: unknown[]) => unknown);
-    } else if (Array.isArray(v)) {
-      v.forEach(walk);
-    } else if (v && typeof v === "object" && "values" in v) {
-      walk((v as { values: unknown[] }).values);
-    }
-  };
-  walk(values);
-  return out;
-}
-
-function makeCtx(values: Record<string, unknown>, openKeys: string[] = []): CtxStub {
-  const emitChange = vi.fn();
+// A ctx whose ``emitChange`` mutates a live values object (as the
+// form's reducer would) so a follow-up ``getAt`` sees the change —
+// needed for the off/on round-trip. ``stashOwner`` is stable per ctx
+// so the disable-time stash survives into the re-enable call.
+function makeCtx(initial: Record<string, unknown>): CtxStub {
+  let values = initial;
+  const emitChange = vi.fn((path: string[], value: unknown) => {
+    values = setIn(values, path, value);
+  });
   const toggleNested = vi.fn();
   const ctx: RenderCtx = {
     localize: (key, params) => (params ? `${key}:${JSON.stringify(params)}` : key),
@@ -61,7 +57,7 @@ function makeCtx(values: Record<string, unknown>, openKeys: string[] = []): CtxS
     sectionKey: "",
     board: null,
     requiredOnly: false,
-    nestedOpenSections: new Set(openKeys),
+    nestedOpenSections: new Set(),
     getAt: (path: string[]) => getIn(values, path),
     errorAt: () => null,
     emitChange,
@@ -77,17 +73,13 @@ function makeCtx(values: Record<string, unknown>, openKeys: string[] = []): CtxS
     clearEditingMagnitude: () => {},
     stashOwner: {},
   };
-  return { ctx, emitChange, toggleNested };
+  return { ctx, emitChange, toggleNested, read: (path) => getIn(values, path) };
 }
 
 const json = (tpl: unknown): string =>
   JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
 
-// Handler render order: switch @click (stopPropagation), switch
-// @change (the toggle), button @click (expand/collapse).
-const SWITCH_CHANGE_IDX = 1;
-
-describe("renderNestedField enable toggle", () => {
+describe("renderNestedField enable switch", () => {
   it("renders the switch for an optional entity sub-reading", () => {
     const tpl = renderNestedField(makeSensorEntry(), ["min_free"], makeCtx({}).ctx);
     expect(json(tpl)).toContain("device.enable_entity");
@@ -104,67 +96,37 @@ describe("renderNestedField enable toggle", () => {
     const tpl = renderNestedField(entry, ["min_free"], makeCtx({}).ctx);
     expect(json(tpl)).not.toContain("device.enable_entity");
   });
+});
 
-  it("enabling seeds the name with the entity label and expands the group", () => {
+describe("onEnableToggle", () => {
+  it("enabling with no stash seeds the name with the entity label and expands", () => {
     const { ctx, emitChange, toggleNested } = makeCtx({});
-    const tpl = renderNestedField(makeSensorEntry(), ["min_free"], ctx);
-    const handlers = collectHandlers(tpl.values);
-    handlers[SWITCH_CHANGE_IDX]({ target: { checked: true } });
+    onEnableToggle(["min_free"], "min_free", false, true, "Min Free", ctx);
     expect(emitChange).toHaveBeenCalledWith(["min_free", "name"], "Min Free");
     expect(toggleNested).toHaveBeenCalledWith("min_free");
   });
 
+  it("does not re-expand an already-open group on enable", () => {
+    const { ctx, toggleNested } = makeCtx({});
+    onEnableToggle(["min_free"], "min_free", true, true, "Min Free", ctx);
+    expect(toggleNested).not.toHaveBeenCalled();
+  });
+
   it("disabling clears the whole group and collapses it", () => {
-    const { ctx, emitChange, toggleNested } = makeCtx(
-      { min_free: { name: "Min Free" } },
-      ["min_free"]
-    );
-    const tpl = renderNestedField(makeSensorEntry(), ["min_free"], ctx);
-    const handlers = collectHandlers(tpl.values);
-    handlers[SWITCH_CHANGE_IDX]({ target: { checked: false } });
+    const { ctx, emitChange, toggleNested } = makeCtx({ min_free: { name: "Min Free" } });
+    onEnableToggle(["min_free"], "min_free", true, false, "Min Free", ctx);
     expect(emitChange).toHaveBeenCalledWith(["min_free"], undefined);
     expect(toggleNested).toHaveBeenCalledWith("min_free");
   });
 
-  it("does not re-expand an already-open group on enable", () => {
-    const { ctx, toggleNested } = makeCtx({}, ["min_free"]);
-    const tpl = renderNestedField(makeSensorEntry(), ["min_free"], ctx);
-    const handlers = collectHandlers(tpl.values);
-    handlers[SWITCH_CHANGE_IDX]({ target: { checked: true } });
-    expect(toggleNested).not.toHaveBeenCalled();
-  });
-
   it("restores the stashed config on off/on so no work is lost", () => {
-    // One ctx (one stashOwner) reused across both renders; emitChange
-    // applies to a live values object so the second render sees the
-    // cleared group, exactly as the form's reducer would.
-    const configured = {
-      name: "Custom",
-      unit_of_measurement: "%",
-      accuracy_decimals: 2,
-    };
-    let values: Record<string, unknown> = { min_free: { ...configured } };
-    const emitChange = vi.fn((path: string[], value: unknown) => {
-      values = setIn(values, path, value);
-    });
-    const ctx: RenderCtx = {
-      ...makeCtx({}, ["min_free"]).ctx,
-      getAt: (path: string[]) => getIn(values, path),
-      emitChange,
-    };
+    const configured = { name: "Custom", unit_of_measurement: "%", accuracy_decimals: 2 };
+    const { ctx, emitChange, read } = makeCtx({ min_free: { ...configured } });
 
-    // Toggle OFF: clears the YAML block but stashes the config.
-    const offHandlers = collectHandlers(
-      renderNestedField(makeSensorEntry(), ["min_free"], ctx).values
-    );
-    offHandlers[SWITCH_CHANGE_IDX]({ target: { checked: false } });
-    expect(getIn(values, ["min_free"])).toBeUndefined();
+    onEnableToggle(["min_free"], "min_free", true, false, "Min Free", ctx);
+    expect(read(["min_free"])).toBeUndefined();
 
-    // Toggle ON again: the full configuration comes back, not just the name.
-    const onHandlers = collectHandlers(
-      renderNestedField(makeSensorEntry(), ["min_free"], ctx).values
-    );
-    onHandlers[SWITCH_CHANGE_IDX]({ target: { checked: true } });
+    onEnableToggle(["min_free"], "min_free", false, true, "Min Free", ctx);
     expect(emitChange).toHaveBeenLastCalledWith(["min_free"], configured);
   });
 });

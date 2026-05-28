@@ -282,12 +282,15 @@ function serializeListItem(
 
 /**
  * True when *value* would emit at least one line through
- * ``serializeYamlValues`` — i.e. it survives the round-trip to YAML.
+ * ``serializeYamlValues`` under its *default* options.
  *
- * Mirrors the per-value skip rules below so a caller asking "does
- * this group hold anything?" agrees with what actually lands in the
+ * Mirrors the default per-value skip rules below so a caller asking
+ * "does this group hold anything?" agrees with what lands in the
  * YAML. ``""`` / null / undefined / empty array / a mapping whose
- * every descendant is itself empty all count as no value.
+ * every descendant is itself empty all count as no value. This
+ * disagrees with ``serializeYamlValues(..., {keepEmptyStrings:
+ * true})``, which keeps ``""`` — don't use this helper to predict
+ * output for that mode.
  */
 export function hasSerializableValue(value: unknown): boolean {
   if (value === undefined || value === null || value === "") return false;
