@@ -8,7 +8,6 @@ import {
   type FeaturedBundle,
 } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import { fetchComponent } from "../../util/component-name-cache.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, apiContext } from "../../context/index.js";
@@ -20,6 +19,10 @@ import {
   navigateToDep,
   type DepNavHost,
 } from "./add-component-dialog-dep-nav.js";
+import {
+  hydrateForSelection,
+  type SelectionHost,
+} from "./add-component-dialog-selection.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -390,54 +393,25 @@ export class ESPHomeAddComponentDialog extends LitElement {
     `;
   }
 
-  /** Hydrate a slim catalog id to its full body, going through the
-   *  cached + batched fetch path. Returns `null` and sets
-   *  `_submitError` on either a transport failure or a catalog
-   *  miss, so callers can bail uniformly. The WS layer can throw
-   *  on a transient disconnect / timeout; surfacing that via the
-   *  same banner as a missing-id keeps the dialog from
-   *  half-transitioning. */
-  private async _hydrateBody(
-    componentId: string,
-    boardId: string | undefined
-  ): Promise<ComponentCatalogEntry | null> {
-    try {
-      const entry = await fetchComponent(
-        this._api,
-        componentId,
-        this.platform || undefined,
-        boardId
-      );
-      if (!entry) {
-        this._submitError = this._localize("device.add_component_error");
-        return null;
-      }
-      return entry;
-    } catch (err) {
-      this._submitError =
-        err instanceof Error ? err.message : this._localize("device.add_component_error");
-      return null;
-    }
-  }
-
   private async _onComponentSelected(
     e: CustomEvent<{ component: ComponentCatalogEntry }>
   ) {
     e.stopPropagation();
     // The catalog list endpoint returns slim index entries (no
-    // `config_entries`); the form needs the full body to render
-    // its fields. Hydrate through the cached + batched fetch path
-    // so a subsequent click on the same card is instant. Capture
-    // the selection token before the await so a slower earlier
-    // click can't overwrite a faster later one.
-    const seq = ++this._selectionSeq;
-    const full = await this._hydrateBody(
-      e.detail.component.id,
-      this.board?.id ?? undefined
+    // `config_entries`); the form needs the full body. Hydration
+    // goes through `hydrateForSelection` so the cached + batched
+    // fetch path runs and the helper's seq guard discards a
+    // slower earlier click that returns after a faster later one.
+    const result = await hydrateForSelection(
+      this as unknown as SelectionHost,
+      e.detail.component.id
     );
-    if (seq !== this._selectionSeq) return;
-    if (!full) return;
-    this._selected = full;
+    if (result.kind === "stale") return;
+    if (result.kind === "error") {
+      this._submitError = result.message;
+      return;
+    }
+    this._selected = result.entry;
     this._submitError = "";
   }
 
@@ -459,13 +433,20 @@ export class ESPHomeAddComponentDialog extends LitElement {
       (localId) => `featured.${boardId}.${localId}`
     );
     const [first, ...rest] = fullIds;
-    // Same stale-response guard as `_onComponentSelected`; a quick
+    // Same selection guard as `_onComponentSelected`; a quick
     // re-pick or a card click landing between this bundle's flush
     // and response must not let the bundle resurrect itself.
-    const seq = ++this._selectionSeq;
-    const component = await this._hydrateBody(first, boardId);
-    if (seq !== this._selectionSeq) return;
-    if (!component) return;
+    const result = await hydrateForSelection(
+      this as unknown as SelectionHost,
+      first,
+      boardId
+    );
+    if (result.kind === "stale") return;
+    if (result.kind === "error") {
+      this._submitError = result.message;
+      return;
+    }
+    const component = result.entry;
     // Picking a bundle is a fresh sequence — abandon any in-flight
     // dep-detour state from the previous component the user was filling.
     // Without this clear, the bundle's first submit would route through
@@ -585,17 +566,20 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
-        // Same stale-response guard as the catalog/bundle pick
-        // entry points; a quick bundle-abandon (back button,
-        // dialog close, fresh selection) between the flush and
-        // response must not let this step apply its prefill.
-        const seq = ++this._selectionSeq;
-        const nextComponent = await this._hydrateBody(
-          nextId,
-          this.board?.id ?? undefined
+        // Same selection guard as the catalog/bundle pick entry
+        // points; a quick bundle-abandon (back button, dialog
+        // close, fresh selection) between the flush and response
+        // must not let this step apply its prefill.
+        const nextResult = await hydrateForSelection(
+          this as unknown as SelectionHost,
+          nextId
         );
-        if (seq !== this._selectionSeq) return;
-        if (!nextComponent) return;
+        if (nextResult.kind === "stale") return;
+        if (nextResult.kind === "error") {
+          this._submitError = nextResult.message;
+          return;
+        }
+        const nextComponent = nextResult.entry;
         // Hand the just-added component's id to the next step's matching
         // `references_component` field. Bundles are designed to chain —
         // e.g. `Status LED (full setup)` adds an `output.gpio`, then a

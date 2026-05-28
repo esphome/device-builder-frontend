@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../src/api/types.js";
-import { _clearComponentCache } from "../../src/util/component-name-cache.js";
+import {
+  _clearComponentCache,
+  fetchComponent,
+} from "../../src/util/component-name-cache.js";
 import { ComponentNameResolverController } from "../../src/util/component-name-resolver-controller.js";
 
 const entry = (id: string, name: string): ComponentCatalogEntry =>
@@ -107,8 +110,14 @@ describe("ComponentNameResolverController", () => {
     disconnect();
     requestUpdate.mockClear();
     // Unsubscribed; a new cache write should not bump the host.
+    // Routes through ``fetchComponent`` so the cache actually
+    // populates and ``_notify()`` fires — calling
+    // ``api.getComponentBodies`` directly bypasses the cache layer
+    // and the assertion passes trivially without exercising
+    // anything. Uses a fresh id so the new fetch doesn't
+    // short-circuit on an already-cached entry.
     const { api: api2 } = mockApi((id) => entry(id, "Logger"));
-    await api2.getComponentBodies(["logger"]);
+    await fetchComponent(api2, "logger");
     expect(requestUpdate).not.toHaveBeenCalled();
   });
 
