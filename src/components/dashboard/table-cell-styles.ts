@@ -253,9 +253,32 @@ export const tableCellStyles = css`
     .cell-action-btn--logs {
       display: none;
     }
+    /* Progressive column hiding for the table-view fallback on
+       narrow viewports (mobile users default to the card grid; this
+       only kicks in when they toggle to table view on a small
+       screen, or on tablet portraits). Same priority order as the
+       action-button ladder above: drop the lowest-signal columns
+       first, keep select / status / name / actions visible as the
+       four-column spine at every width.
+       Priority order (highest → lowest, last to drop):
+         select / status / name / actions  (always visible)
+         address (last to drop, useful for hostname-based access)
+         platform
+         config (file name — least useful when name is visible) */
+    .col-config {
+      display: none;
+    }
   }
   @media (max-width: 820px) {
     .cell-action-btn--install {
+      display: none;
+    }
+    .col-platform {
+      display: none;
+    }
+  }
+  @media (max-width: 700px) {
+    .col-address {
       display: none;
     }
   }
