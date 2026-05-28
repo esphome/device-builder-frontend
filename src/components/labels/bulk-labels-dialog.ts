@@ -360,7 +360,7 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
           : html`<div
               class="options"
               role="group"
-              aria-label=${this._localize("dashboard.drawer_labels")}
+              aria-label=${this._localize("dashboard.labels_bulk_group_aria")}
             >
               ${repeat(
                 this._catalog,
@@ -407,7 +407,9 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
       role="checkbox"
       aria-checked=${ariaChecked}
       title=${mixed
-        ? `${label.name}: ${this._localize("dashboard.labels_bulk_mixed_hint")}`
+        ? this._localize("dashboard.labels_bulk_mixed_title", {
+            name: label.name,
+          })
         : label.name}
       @click=${() => this._onToggle(label.id)}
     >
