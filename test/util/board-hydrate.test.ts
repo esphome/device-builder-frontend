@@ -221,4 +221,17 @@ describe("hydratePagedBoardsResponse", () => {
     expect(hydrated.offset).toBe(0);
     expect(hydrated.limit).toBe(50);
   });
+
+  it("re-defaults a wholly-stripped wrapper (forward-compat against omit_default on PagedResponse)", () => {
+    // If the backend ever applies omit_default to PagedResponse,
+    // a zero-result query strips boards/total/offset/limit — the
+    // .map would throw and pagination would surface as undefined.
+    // Pin the defensive defaults.
+    const response = {} as unknown as PagedBoardsResponse;
+    const hydrated = hydratePagedBoardsResponse(response);
+    expect(hydrated.boards).toEqual([]);
+    expect(hydrated.total).toBe(0);
+    expect(hydrated.offset).toBe(0);
+    expect(hydrated.limit).toBe(50);
+  });
 });

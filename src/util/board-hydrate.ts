@@ -45,7 +45,17 @@ export function hydrateBoard(entry: BoardCatalogEntry): BoardCatalogEntry {
 export function hydratePagedBoardsResponse(
   response: PagedBoardsResponse
 ): PagedBoardsResponse {
-  return { ...response, boards: response.boards.map(hydrateBoard) };
+  // Defensive: PagedResponse on the backend doesn't strip today,
+  // but adding omit_default later would strip an empty page's
+  // boards: [] outright and crash the .map. Re-default symmetric
+  // with the nested hydration so the contract is robust.
+  return {
+    ...response,
+    total: response.total ?? 0,
+    offset: response.offset ?? 0,
+    limit: response.limit ?? 50,
+    boards: (response.boards ?? []).map(hydrateBoard),
+  };
 }
 
 function _hydrateEsphome(esphome: BoardEsphomeConfig): BoardEsphomeConfig {
