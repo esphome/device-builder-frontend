@@ -14,6 +14,7 @@ import type {
   ArchivedDevice,
   AutomationAction,
   AutomationCatalogBody,
+  AutomationCatalogBodyType,
   AutomationCondition,
   AutomationTree,
   AutomationTrigger,
@@ -1393,7 +1394,7 @@ export class ESPHomeAPI {
    * concurrent fetches into one batched call.
    */
   async getAutomationBodies(
-    refs: { type: string; id: string }[]
+    refs: { type: AutomationCatalogBodyType; id: string }[]
   ): Promise<Record<string, AutomationCatalogBody>> {
     if (refs.length === 0) return {};
     return this.sendCommand<Record<string, AutomationCatalogBody>>(

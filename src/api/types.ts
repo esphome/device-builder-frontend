@@ -931,12 +931,11 @@ export type LightEffect = RegistryCatalogEntry;
  *  entry whose `applies_to` spans every domain it lives in. */
 export type Filter = RegistryCatalogEntry;
 
-/** Discriminated union of every full body the
- *  ``automations/get_bodies`` batch endpoint can return. The
- *  endpoint keys the response by ``"<type>/<id>"`` and emits the
- *  matching member; the wire shape is the full type (with
- *  ``config_entries``) regardless of which type-list endpoint the
- *  slim ``id`` was originally pulled from. */
+/** Union of every full body the ``automations/get_bodies`` batch
+ *  endpoint can return. There is no per-body discriminator field;
+ *  the discriminator is the ``"<type>/<id>"`` response key, so
+ *  narrowing happens at the call site against the type the caller
+ *  asked for, not via structural inspection. */
 export type AutomationCatalogBody =
   | AutomationTrigger
   | AutomationAction

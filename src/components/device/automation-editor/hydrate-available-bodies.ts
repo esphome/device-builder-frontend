@@ -39,8 +39,10 @@ export async function hydrateAvailableBodies(
             entry.config_entries = [...body.config_entries];
             return;
           }
+          const reason =
+            body === null ? "no body returned" : "body shape missing config_entries";
           console.warn(
-            `automation-editor: ${type}/${entry.id} body missing config_entries; form will render empty`
+            `automation-editor: ${type}/${entry.id} ${reason}; form will render empty`
           );
         })
       );

@@ -18,9 +18,16 @@ const _cache = new BatchedCache<AutomationCatalogBody, void>({
   // recover.
   cacheMisses: false,
   fetch: (api, keys) => {
+    // Keys are produced by ``_key`` below — by construction the
+    // prefix is a valid ``AutomationCatalogBodyType``. The cast
+    // keeps the public ``getAutomationBodies`` signature tight
+    // (literal union, no bare ``string``).
     const refs = keys.map((key) => {
       const slash = key.indexOf("/");
-      return { type: key.slice(0, slash), id: key.slice(slash + 1) };
+      return {
+        type: key.slice(0, slash) as AutomationCatalogBodyType,
+        id: key.slice(slash + 1),
+      };
     });
     return api.getAutomationBodies(refs);
   },

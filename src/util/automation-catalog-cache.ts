@@ -1,11 +1,14 @@
 import type { ESPHomeAPI } from "../api/index.js";
 import type {
   AutomationAction,
+  AutomationCatalogBodyType,
   AutomationCondition,
   AutomationTrigger,
   Filter,
   LightEffect,
+  RegistryCatalogEntry,
 } from "../api/types.js";
+import { fetchAutomationBody } from "./automation-body-cache.js";
 
 /**
  * Session-scoped cache of the four automation catalogues —
@@ -172,7 +175,16 @@ export function fetchLightEffects(
   platform?: string,
   boardId?: string
 ): Promise<LightEffect[]> {
-  return _fetch("light_effects", (p, b) => api.getLightEffects(p, b), platform, boardId);
+  return _fetch(
+    "light_effects",
+    async (p, b) => {
+      const list = await api.getLightEffects(p, b);
+      await _hydrateRegistryConfigEntries(api, "light_effects", list);
+      return list;
+    },
+    platform,
+    boardId
+  );
 }
 
 export function getCachedFilters(
@@ -187,7 +199,43 @@ export function fetchFilters(
   platform?: string,
   boardId?: string
 ): Promise<Filter[]> {
-  return _fetch("filters", (p, b) => api.getFilters(p, b), platform, boardId);
+  return _fetch(
+    "filters",
+    async (p, b) => {
+      const list = await api.getFilters(p, b);
+      await _hydrateRegistryConfigEntries(api, "filters", list);
+      return list;
+    },
+    platform,
+    boardId
+  );
+}
+
+/** Populate ``config_entries`` on each entry by routing through the
+ *  body cache. After backend #1016, ``automations/get_light_effects``
+ *  and ``automations/get_filters`` ship slim shapes (no
+ *  ``config_entries``); ``registry-list`` reads ``config_entries``
+ *  off cached entries, so the list has to land already hydrated. The
+ *  body cache coalesces the fan-out into one ``get_bodies`` round
+ *  trip. */
+async function _hydrateRegistryConfigEntries(
+  api: ESPHomeAPI,
+  type: AutomationCatalogBodyType,
+  list: RegistryCatalogEntry[]
+): Promise<void> {
+  const results = await Promise.allSettled(
+    list.map(async (entry) => {
+      const body = await fetchAutomationBody(api, type, entry.id);
+      if (body && "config_entries" in body) {
+        entry.config_entries = [...body.config_entries];
+      }
+    })
+  );
+  for (const r of results) {
+    if (r.status === "rejected") {
+      console.warn(`${type} hydration failed`, r.reason);
+    }
+  }
 }
 
 /** Subscribe to cache updates. Returns an unsubscribe function.

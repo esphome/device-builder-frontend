@@ -70,7 +70,11 @@ describe("hydrateAvailableBodies", () => {
     expect(available.triggers[1].config_entries).toEqual([]);
     expect(warnSpy).toHaveBeenCalled();
     expect(
-      warnSpy.mock.calls.some((args) => String(args[0]).includes("triggers/missing"))
+      warnSpy.mock.calls.some(
+        (args) =>
+          String(args[0]).includes("triggers/missing") &&
+          String(args[0]).includes("no body returned")
+      )
     ).toBe(true);
     warnSpy.mockRestore();
   });
