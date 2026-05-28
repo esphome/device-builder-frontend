@@ -523,9 +523,11 @@ export const dashboardStyles = css`
      width and Select-multiple right-aligns with Columns / Create
      device in the row above. Horizontal padding matches .controls
      and .table-wrap above/below so the count and toggle line up
-     with the column headers on the right. */
+     with the column headers on the right. Vertical padding pairs
+     the row with the .controls strip above (--wa-space-xs gap)
+     and the .table-wrap below (--wa-space-s breathing room). */
   .table-device-count-row {
-    padding: 0 var(--wa-space-l) var(--wa-space-s);
+    padding: var(--wa-space-xs) var(--wa-space-l) var(--wa-space-s);
   }
 
   /* Mobile: tighten the table-view count-row gutter to match the

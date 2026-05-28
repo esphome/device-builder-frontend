@@ -23,13 +23,17 @@ export const tableLayoutStyles = css`
     display: flex;
     /* Top-align the right-cluster (Columns + Create device) with
        the toolbar-stack's first row (search + view-toggle +
-       facets). The slotted toolbar now contains TWO stacked rows
-       (toolbar-row + device-count-row), and align-items:center
-       would float the right-cluster between them. */
+       facets). The slotted toolbar's right edge sits at the same
+       y as Columns / Create. */
     align-items: flex-start;
     gap: var(--wa-space-s);
     padding: var(--wa-space-l) var(--wa-space-l) 0;
-    margin-bottom: var(--wa-space-l);
+    /* No bottom margin: the below-controls slot now carries the
+       device-count + Select-multiple row, and its own bottom
+       padding handles spacing to the .table-wrap. Keeping the
+       old --wa-space-l here would stack with the count row's
+       padding into ~32px of dead space. */
+    margin-bottom: 0;
     flex-shrink: 0;
   }
 
