@@ -523,19 +523,20 @@ export const dashboardStyles = css`
      width and Select-multiple right-aligns with Columns / Create
      device in the row above. Horizontal padding matches .controls
      and .table-wrap above/below so the count and toggle line up
-     with the column headers on the right. Vertical padding pairs
-     the row with the .controls strip above (--wa-space-xs gap)
-     and the .table-wrap below (--wa-space-s breathing room). */
+     with the column headers on the right. No vertical padding:
+     .controls sits directly above and .table-wrap directly below,
+     so the row butts against both — same shape as card view
+     where the count row hangs off the toolbar's bottom edge with
+     the .toolbar gap:2px providing the only inter-row spacing. */
   .table-device-count-row {
-    padding: var(--wa-space-xs) var(--wa-space-l) var(--wa-space-s);
+    padding: 0 var(--wa-space-l);
   }
 
   /* Mobile: tighten the table-view count-row gutter to match the
      .controls / .table-wrap trim in PR-H (see table-styles.ts). */
   @media (max-width: 600px) {
     .table-device-count-row {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
+      padding: 0 var(--wa-space-s);
     }
   }
 
