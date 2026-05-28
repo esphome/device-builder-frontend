@@ -795,7 +795,8 @@
     "unsaved_message": "此设备有未保存的更改。如果离开且不保存，这些更改将丢失。",
     "leave_anyway": "仍然离开",
     "discard_changes": "放弃",
-    "save_and_leave": "保存"
+    "save_and_leave": "保存",
+    "automation_partial_hydration": "{count} 个自动化表单加载失败。部分表单可能显示为空。"
   },
   "validation": {
     "required": "此字段为必填项",
