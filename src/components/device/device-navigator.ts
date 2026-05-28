@@ -382,8 +382,17 @@ export class ESPHomeDeviceNavigator extends LitElement {
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (
       (changedProperties.has("yaml") || changedProperties.has("platform")) &&
-      this.yaml
+      this.yaml &&
+      this.platform
     ) {
+      // Gate on ``platform`` being set: the parent typically
+      // resolves ``yaml`` first and ``platform`` once the board
+      // manifest lands a beat later. Firing on the yaml-only edge
+      // sends ``get_component_bodies`` / ``get_triggers`` with
+      // ``platform=undefined``, which lands in a different
+      // ``BatchedCache`` bucket than the eventual platform-scoped
+      // fetch and gets discarded — two WS round trips for one
+      // navigator mount. Wait for the full context.
       this._kickoffNameResolves();
     }
 
