@@ -301,39 +301,6 @@ export class ESPHomeWizardStepBoard extends LitElement {
         gap: var(--wa-space-s);
       }
 
-      @media (max-width: 480px) {
-        .boards-grid {
-          grid-template-columns: 1fr;
-        }
-
-        /* Featured (Apollo Starter Kit) card: image-left + text-right
-           wraps to one word per line at phone width. Stack vertically
-           so the description has the full card width. #41 */
-        .featured-card {
-          flex-direction: column;
-          gap: var(--wa-space-s);
-        }
-
-        .featured-image {
-          width: 100%;
-          height: 160px;
-        }
-
-        /* Regular board cards: header row was image-on-left + title-on-
-           the-right; at narrow widths the right column shrinks to
-           ~140px and titles wrap awkwardly. Stack image above title
-           so each row gets the full card width. #41 */
-        .board-card-header {
-          flex-direction: column;
-          align-items: stretch;
-        }
-
-        .board-image {
-          width: 100%;
-          height: 100px;
-        }
-      }
-
       .board-card {
         position: relative;
         border-radius: var(--wa-border-radius-l);
@@ -511,6 +478,47 @@ export class ESPHomeWizardStepBoard extends LitElement {
         font-size: var(--wa-font-size-s);
         text-align: center;
         padding: var(--wa-space-xl);
+      }
+
+      /* Mobile overrides — placed at the end of the stylesheet so
+         they win the same-specificity source-order fight against
+         the base .featured-card / .featured-image /
+         .board-card-header / .board-image rules above. Caught by
+         Copilot review on PR #400 — the prior placement inline
+         with the base rules left align-items / width / height
+         silently overridden. #41 */
+      @media (max-width: 480px) {
+        .boards-grid {
+          grid-template-columns: 1fr;
+        }
+
+        /* Featured (Apollo Starter Kit) card: image-left +
+           text-right wraps to one word per line at phone width.
+           Stack vertically so the description has the full card
+           width. */
+        .featured-card {
+          flex-direction: column;
+          gap: var(--wa-space-s);
+        }
+
+        .featured-image {
+          width: 100%;
+          height: 160px;
+        }
+
+        /* Regular board cards: header row was image-on-left +
+           title-on-the-right; at narrow widths the right column
+           shrinks to ~140px and titles wrap awkwardly. Stack
+           image above title so each row gets the full card width. */
+        .board-card-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .board-image {
+          width: 100%;
+          height: 100px;
+        }
       }
     `,
   ];
