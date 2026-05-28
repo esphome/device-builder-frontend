@@ -93,6 +93,9 @@ export function fetchComponent(
     const bucketKey = _batchKey(platform, boardId);
     let bucket = _batches.get(bucketKey);
     if (bucket === undefined) {
+      // Bucket captures the first caller's `api`. Assumes one
+      // live `ESPHomeAPI` per app (context-provided by app-shell);
+      // a future second instance would need `api` in the bucket key.
       bucket = { api, platform, boardId, pending: new Map() };
       _batches.set(bucketKey, bucket);
       queueMicrotask(() => _flushBatch(bucketKey));

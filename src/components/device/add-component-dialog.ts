@@ -139,14 +139,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
     bundleName: string;
   } | null = null;
 
-  /**
-   * Monotonically increasing token guarding async selection
-   * mutations against stale-response races. Every code path that
-   * starts an async hydration captures the current value, then
-   * checks it after the await; if the user clicked something else
-   * in between (and we bumped the token), the late response is
-   * discarded. Same shape as `_depNavSeq` in navigateToDep.
-   */
+  /** Monotonic token guarding async selection against stale responses.
+   *  Bumped by `_resetDetourState` and by `hydrateForSelection`; a
+   *  hydrate whose captured token doesn't match `_selectionSeq` at
+   *  resolve time discards its result. */
   private _selectionSeq = 0;
 
   static styles = [
@@ -270,7 +266,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   public open() {
     this._resetDetourState();
-    this._selectionSeq++;
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
@@ -287,7 +282,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
    */
   public openWithSearch(domain: string) {
     this._resetDetourState();
-    this._selectionSeq++;
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
@@ -305,6 +299,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._bundleQueue = [];
     this._bundleProgress = null;
     this._depNavSeq++;
+    // Bumping here couples bundle/detour teardown to the selection
+    // token so an in-flight hydrate can't resurrect cleared state.
+    this._selectionSeq++;
   }
 
   protected render() {
@@ -468,9 +465,6 @@ export class ESPHomeAddComponentDialog extends LitElement {
 
   private _onBack() {
     if (this._submitting) return;
-    // Bump the selection token so any hydration still in flight
-    // can't write back over the restored / cleared `_selected`.
-    this._selectionSeq++;
     // If the user is in the middle of a "go add a dependency" detour
     // and they hit back, treat it as cancelling the detour: drop them
     // back at the original component they were filling in, instead of
@@ -566,10 +560,10 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
-        // Same selection guard as the catalog/bundle pick entry
-        // points; a quick bundle-abandon (back button, dialog
-        // close, fresh selection) between the flush and response
-        // must not let this step apply its prefill.
+        // The stale-return path is safe to leave the local
+        // `remaining` snapshot dangling because
+        // `_resetDetourState` bumps the seq AND wipes the queue
+        // in one synchronous block.
         const nextResult = await hydrateForSelection(
           this as unknown as SelectionHost,
           nextId
