@@ -953,6 +953,16 @@ export const dashboardStyles = css`
       padding-right: var(--wa-space-s);
     }
 
+    /* When the discovered banner is present, the host already
+       provides padding-top equal to the banner height; the
+       toolbar's own padding-top stacks on top of that and reads
+       as dead space between the banner bottom and the search
+       input. Shrink to one step so the two rows breathe without
+       the doubled gutter. #41 */
+    :host([has-discovered]) .toolbar {
+      padding-top: var(--wa-space-s);
+    }
+
     .yaml-hits {
       padding-left: var(--wa-space-s);
       padding-right: var(--wa-space-s);
