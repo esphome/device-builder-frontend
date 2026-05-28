@@ -29,7 +29,7 @@ export function renderNumberField(entry: ConfigEntry, path: string[], ctx: Rende
   }
   const raw = ctx.getAt(path);
   // Bail above the hex dispatch so the hex variant inherits the
-  // non-primitive guard without a second call.
+  // guard without each renderer having to repeat the check.
   const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
   if (bail) return bail;
   if (entry.display_format === "hex") {

@@ -229,9 +229,6 @@ export function renderFieldShell(
   `;
 }
 
-// Re-exported by `config-entry-renderers.ts`; placed here so the pin
-// renderer can fall back to a string field without importing the
-// barrel and creating a cycle.
 /** Defensive bail for scalar field renderers: when the value at *path*
  *  isn't a primitive (a YAML list or mapping that landed under a
  *  scalar-shaped catalog field because the upstream schema bundle
@@ -255,6 +252,9 @@ export function renderYamlOnlyFallbackIfNonPrimitive(
   `;
 }
 
+// Re-exported by `config-entry-renderers.ts`; placed here so the pin
+// renderer can fall back to a string field without importing the
+// barrel and creating a cycle.
 export function renderStringField(
   entry: ConfigEntry,
   inputType: string,
