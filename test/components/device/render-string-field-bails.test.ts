@@ -11,7 +11,11 @@ import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
-import { renderTextareaField } from "../../../src/components/device/config-entry-renderers/primitives.js";
+import {
+  renderFloatWithUnitField,
+  renderTextareaField,
+  renderTimePeriodField,
+} from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { getIn } from "../../../src/util/nested-values.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
@@ -142,5 +146,62 @@ describe("renderTextareaField — bail asymmetry with YamlRawValue", () => {
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersBailBranch(json)).toBe(true);
     expect(json).not.toContain("textarea");
+  });
+});
+
+// parseTimePeriod / parseFloatWithUnit both run ``String(raw).trim()``
+// internally — a single-element list like ``["5s"]`` or ``["50Hz"]``
+// would otherwise stringify to a parseable scalar, render an editable
+// UI, and clobber the original list on save. Pin both call-sites.
+describe("renderTimePeriodField / renderFloatWithUnitField — bail on non-primitive", () => {
+  it("bails on a list value for a time-period field", () => {
+    const entry = makeConfigEntry({
+      key: "delay",
+      type: ConfigEntryType.TIME_PERIOD,
+      label: "Delay",
+    });
+    const { ctx } = makeCtx({ delay: ["5s"] });
+    const tpl = renderTimePeriodField(entry, ["delay"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+  });
+
+  it("renders the editable time-period UI for an actual scalar", () => {
+    const entry = makeConfigEntry({
+      key: "delay",
+      type: ConfigEntryType.TIME_PERIOD,
+      label: "Delay",
+    });
+    const { ctx } = makeCtx({ delay: "5s" });
+    const tpl = renderTimePeriodField(entry, ["delay"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("time-period");
+  });
+
+  it("bails on a list value for a float-with-unit field", () => {
+    const entry = makeConfigEntry({
+      key: "frequency",
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      label: "Frequency",
+      unit_options: ["Hz", "kHz", "MHz"],
+    });
+    const { ctx } = makeCtx({ frequency: ["50Hz"] });
+    const tpl = renderFloatWithUnitField(entry, ["frequency"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+  });
+
+  it("renders the editable float-with-unit UI for an actual scalar", () => {
+    const entry = makeConfigEntry({
+      key: "frequency",
+      type: ConfigEntryType.FLOAT_WITH_UNIT,
+      label: "Frequency",
+      unit_options: ["Hz", "kHz", "MHz"],
+    });
+    const { ctx } = makeCtx({ frequency: "50Hz" });
+    const tpl = renderFloatWithUnitField(entry, ["frequency"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
   });
 });

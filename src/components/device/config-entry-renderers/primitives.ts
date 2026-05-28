@@ -179,6 +179,11 @@ export function renderTimePeriodField(
   ctx: RenderCtx
 ) {
   const raw = ctx.getAt(path);
+  // Bail above parseTimePeriod — its ``String(raw).trim()`` would
+  // turn a single-element list ``["5s"]`` into the parseable string
+  // ``"5s"`` and a save would clobber the original list.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
   const parsed = parseTimePeriod(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
@@ -254,6 +259,11 @@ export function renderFloatWithUnitField(
   const unitOptions = entry.unit_options ?? [];
   const canonicalUnit = unitOptions[0] ?? "";
   const rawValue = ctx.getAt(path);
+  // Bail above parseFloatWithUnit — same data-loss shape as
+  // renderTimePeriodField: a single-element list like ``["50Hz"]``
+  // stringifies to a parseable scalar and a save would clobber it.
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, rawValue);
+  if (bail) return bail;
   const parsed = parseFloatWithUnit(rawValue, unitOptions);
   // Edit buffer survives intermediate typing states ("-", "1e", "1.") that
   // the parser turns into null/"". Cleared on blur and on entries change.
