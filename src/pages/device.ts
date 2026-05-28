@@ -1197,7 +1197,12 @@ export class ESPHomePageDevice extends LitElement {
 
     const qs = params.toString();
     const newUrl = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
-    window.history.replaceState(null, "", newUrl);
+    // Preserve the existing state object rather than nulling it: the
+    // header back button's _goHome() reads history.state to tell an
+    // in-app arrival ({} -> pop back to the filtered dashboard) from a
+    // deep-link / fresh load (null -> navigate("/")). Replacing only the
+    // URL keeps that distinction across section navigation.
+    window.history.replaceState(window.history.state, "", newUrl);
   }
 }
 
