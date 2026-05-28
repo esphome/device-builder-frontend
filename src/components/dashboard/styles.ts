@@ -44,6 +44,17 @@ export const dashboardStyles = css`
     padding-top: var(--wa-space-2xl);
   }
 
+  /* Mobile: the pill itself compacted to ~30px (see
+     .discovered-section-header @media block below); the desktop
+     gutter-top sized for the full pill leaves ~40px of dead space
+     between the now-shrunk pill and the search bar. Tighten the
+     gutter to match the new pill height. #41 */
+  @media (max-width: 600px) {
+    :host([has-discovered]) {
+      padding-top: var(--wa-space-l);
+    }
+  }
+
   /* ─── Discovered Banner ─── */
 
   /* ─── Discovered section ─── */
