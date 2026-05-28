@@ -7,6 +7,21 @@ export const tableLayoutStyles = css`
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    /* Clip any internal overflow so the pagination row doesn't
+       slide past the host's bottom edge — covers the case where
+       the .controls + below-controls slot push .table-wrap's
+       flex:1 share down enough that its pagination child can't
+       fit inside its remaining height. */
+    overflow: hidden;
+  }
+
+  /* Slotted content uses content-driven height — flex-shrink:0
+     prevents the .table-device-count-row from collapsing below
+     its intrinsic height when the column is tight, so the row's
+     count + toggle stay legible while .table-wrap absorbs the
+     remaining space. */
+  ::slotted([slot="below-controls"]) {
+    flex-shrink: 0;
   }
 
   /* When the dashboard's floating multi-select bar is visible, reserve
