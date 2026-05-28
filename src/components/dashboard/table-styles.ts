@@ -54,6 +54,24 @@ export const tableLayoutStyles = css`
     }
   }
 
+  /* Mobile content-padding trim. The controls strip and the
+     table-wrap claim --wa-space-l (24px) of horizontal padding /
+     margin on each side; on a 375px phone viewport that's ~13% of
+     the width per side gone to chrome. Match the dashboard's
+     .toolbar / .devices-grid trim so all three views share the
+     same tight gutters at narrow widths. #41 */
+  @media (max-width: 600px) {
+    .controls {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
+
+    .table-wrap {
+      margin-left: var(--wa-space-s);
+      margin-right: var(--wa-space-s);
+    }
+  }
+
   /* ─── Table ─── */
 
   .table-wrap {
