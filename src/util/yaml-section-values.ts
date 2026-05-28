@@ -269,27 +269,16 @@ const isListItemLine = (line: string, dashIndent: string): boolean => {
 };
 
 /**
- * True when *line* is a list-item dash deeper than *parentIndent*.
- * The exact dash column doesn't matter at peek time — that's
- * detected later by ``parseListBlock`` from the actual line —
- * so the peek check only needs to confirm "this is a child
- * list of the current key, regardless of which indent step the
- * user picked". 4-space YAML pastes work as a result.
+ * True when *line* is a list-item dash that belongs to *parentIndent*'s
+ * child list. Accepts both deeper-indent dashes (the standard YAML
+ * shape) and same-indent dashes (YAML 1.2's compact block-sequence
+ * form: ``calibration:\n- a\n- b`` parses to ``{calibration: [a, b]}``).
+ * The exact dash column doesn't matter at peek time — ``parseListBlock``
+ * picks it up from the actual line — so the peek only needs to
+ * confirm "this is a child list of the current key, regardless of
+ * which indent step the user picked". 4-space YAML pastes and ESPHome
+ * example snippets both work as a result.
  */
-const isDeeperListItemLine = (line: string, parentIndent: string): boolean => {
-  const lead = _leadingIndent(line);
-  if (lead.length <= parentIndent.length) return false;
-  const tail = line.slice(lead.length);
-  return tail === "-" || tail.startsWith("- ");
-};
-
-/** YAML's compact block-sequence form allows a dash-list under a
- *  mapping key at the SAME indent as the key (not strictly deeper).
- *  ``calibration:\n- a\n- b`` is valid YAML for
- *  ``{calibration: [a, b]}``. ``isDeeperListItemLine`` rejects that
- *  shape because the parent-block loop terminator requires strict-
- *  greater indent; this predicate covers the equal-indent case so the
- *  block-list under a key with no inline value loads correctly. */
 const isChildListItemLine = (line: string, parentIndent: string): boolean => {
   const lead = _leadingIndent(line);
   if (lead.length < parentIndent.length) return false;
@@ -817,7 +806,7 @@ export function parseYamlSectionValues(
       if (peek >= lines.length) continue;
       const peekLine = lines[peek];
 
-      if (isDeeperListItemLine(peekLine, childIndent)) {
+      if (isChildListItemLine(peekLine, childIndent)) {
         const { value, endIdx, isEmptyScalarList } = parseListBlock(
           lines,
           i + 1,

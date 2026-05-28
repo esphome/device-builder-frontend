@@ -11,8 +11,10 @@ import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { renderTextareaField } from "../../../src/components/device/config-entry-renderers/primitives.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { getIn } from "../../../src/util/nested-values.js";
+import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 
 function makeStringEntry(): ConfigEntry {
   return makeConfigEntry({
@@ -108,5 +110,37 @@ describe("renderStringField — defensive bail on non-primitive values", () => {
     const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
     expect(rendersEditableBranch(json)).toBe(true);
     expect(rendersBailBranch(json)).toBe(false);
+  });
+});
+
+function makeTextareaEntry(): ConfigEntry {
+  return makeConfigEntry({
+    key: "lambda",
+    type: ConfigEntryType.LAMBDA,
+    label: "Lambda",
+  });
+}
+
+// The textarea bail is conditional on ``!isRaw`` — a ``YamlRawValue``
+// is an intentional block-scalar (``|-`` / ``>-`` etc.) and must still
+// reach the textarea so the user can edit the body. The two cases
+// below pin that asymmetry so a future reorder of the bail / isRaw
+// check can't silently regress the lambda editor.
+describe("renderTextareaField — bail asymmetry with YamlRawValue", () => {
+  it("renders the textarea for a YamlRawValue (block scalar)", () => {
+    const raw = new YamlRawValue(["  return x;"], "|-");
+    const { ctx } = makeCtx({ lambda: raw });
+    const tpl = renderTextareaField(makeTextareaEntry(), ["lambda"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(false);
+    expect(json).toContain("textarea");
+  });
+
+  it("bails when the value is a list under a textarea field", () => {
+    const { ctx } = makeCtx({ lambda: ["a", "b"] });
+    const tpl = renderTextareaField(makeTextareaEntry(), ["lambda"], ctx);
+    const json = JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
+    expect(rendersBailBranch(json)).toBe(true);
+    expect(json).not.toContain("textarea");
   });
 });
