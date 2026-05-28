@@ -99,12 +99,25 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       /* Mobile: drop both width variants to fullscreen so the
          wizard's board picker and per-step bodies have room to
          breathe instead of getting boxed into a 520px column
-         flanked by black gutters. #41 */
+         flanked by black gutters. Mirrors the same shape the
+         logs-dialog uses — the --width custom property alone
+         doesn't work because wa-dialog's internal dialog part
+         carries a max-width calc(100% - …) and a UA max-height
+         that keep the dialog at its desktop size unless we
+         override them on the part directly. The dvh fallback
+         after vh lets modern browsers shrink the dialog as iOS
+         Safari's URL bar collapses. #41 */
       @media (max-width: 600px) {
-        wa-dialog,
-        wa-dialog.wide {
-          --width: 100vw;
-          --height: 100vh;
+        wa-dialog::part(dialog) {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100vh;
+          height: 100dvh;
+          max-width: none;
+          max-height: none;
+          margin: 0;
+          border-radius: 0;
         }
       }
 
