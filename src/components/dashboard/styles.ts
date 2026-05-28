@@ -494,6 +494,17 @@ export const dashboardStyles = css`
     font-weight: var(--wa-font-weight-bold);
   }
 
+  /* Pairs the count with the Select-multiple toggle on a row of
+     their own — both reference the device list, so they belong
+     side-by-side. justify-content:space-between puts the count on
+     the left and the toggle on the right at every width. */
+  .device-count-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wa-space-m);
+  }
+
   /* ─── View Toggle ─── */
 
   .view-toggle {
