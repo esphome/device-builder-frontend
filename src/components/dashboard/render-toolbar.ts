@@ -212,21 +212,21 @@ export function renderToolbar(
       ? host._localize("dashboard.device_singular")
       : host._localize("dashboard.device_plural");
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
-  // Layout: [search] [view-toggle] [Select multiple] [facets…]
-  //         [X devices]
-  // Select-multiple sits between the view switcher and the facet
-  // chips so the row wraps cleanly at narrow widths (the trailing
-  // facets wrap to a new line first, keeping Select-multiple on
-  // the same row as the view switcher). Unified across card and
-  // table views so the toggle's position doesn't shift when the
-  // user flips the view.
+  // Layout: [search] [view-toggle] [facets…]
+  //         [X devices]                 [Select multiple]
+  // Select-multiple sits paired with the device-count on its own
+  // row — both reference the device list ("operate on these N
+  // devices") so semantically they belong together. Frees the
+  // toolbar-row above for filter-related controls only.
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderSelectToggle(host)}
-        ${renderFacets(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
       </div>
-      <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+      <div class="device-count-row">
+        <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+        ${renderSelectToggle(host)}
+      </div>
     </div>
   `;
 }
