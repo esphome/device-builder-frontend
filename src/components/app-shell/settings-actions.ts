@@ -95,7 +95,6 @@ export async function onSetOffloaderRemoteBuildsEnabled(
   const enabled = e.detail;
   const previous = host._offloaderRemoteBuildsEnabled;
   host._offloaderRemoteBuildsEnabled = enabled;
-  host._offloaderSettingsInFlightCount += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       remote_builds_enabled: enabled,
@@ -105,8 +104,6 @@ export async function onSetOffloaderRemoteBuildsEnabled(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
-  } finally {
-    host._offloaderSettingsInFlightCount -= 1;
   }
 }
 
@@ -136,7 +133,6 @@ export async function onSetOffloaderAllowMajorVersionMismatch(
   const allow = e.detail;
   const previous = host._offloaderAllowMajorVersionMismatch;
   host._offloaderAllowMajorVersionMismatch = allow;
-  host._offloaderSettingsInFlightCount += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       allow_major_version_mismatch: allow,
@@ -146,8 +142,6 @@ export async function onSetOffloaderAllowMajorVersionMismatch(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
-  } finally {
-    host._offloaderSettingsInFlightCount -= 1;
   }
 }
 
