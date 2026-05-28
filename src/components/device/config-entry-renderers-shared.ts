@@ -13,6 +13,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
+import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -237,7 +238,26 @@ export function renderStringField(
   path: string[],
   ctx: RenderCtx
 ) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  // Defensive bail: when the value at *path* isn't a primitive
+  // (e.g. a YAML list that landed under a mapping-shaped catalog
+  // field because the upstream schema bundle missed ``is_list``,
+  // or an inline mapping under a scalar-shaped field), refuse to
+  // render an editable input. ``String([...])`` would silently
+  // coerce the list to a comma-joined string and a save would
+  // clobber the user's list with that string. Surface a YAML-only
+  // notice instead, same pattern ``renderNestedListField`` uses
+  // when the parser preserves a block as ``YamlRawValue``.
+  if (!isPrimitiveOrNullish(raw)) {
+    return html`
+      <div class="field" data-field-key=${path.join(".")}>
+        ${renderLabel(entry, ctx)}
+        <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
+        ${renderFieldError(path, ctx)}
+      </div>
+    `;
+  }
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const placeholder = String(entry.default_value ?? "");
   const disabled = effectiveDisabled(entry, ctx);
