@@ -48,15 +48,16 @@ describe("hydrateAvailableBodies", () => {
     const available = slimAvailable();
     const goodEntry = available.triggers[0];
 
-    await hydrateAvailableBodies(makeApi(), available, fetchBody);
+    const result = await hydrateAvailableBodies(makeApi(), available, fetchBody);
 
     expect(goodEntry.config_entries).toEqual(sharedEntries);
     // Cloned, not aliased — mutating the entry's array can't leak
     // back into the cached body.
     expect(goodEntry.config_entries).not.toBe(sharedEntries);
+    expect(result.succeeded).toBe(1);
   });
 
-  it("logs and skips entries whose body is missing config_entries", async () => {
+  it("counts and logs missing-body responses", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const fetchBody: (
       api: ESPHomeAPI,
@@ -65,15 +66,39 @@ describe("hydrateAvailableBodies", () => {
     ) => Promise<AutomationCatalogBody | null> = async (_api, _type, _id) => null;
     const available = slimAvailable();
 
-    await hydrateAvailableBodies(makeApi(), available, fetchBody);
+    const result = await hydrateAvailableBodies(makeApi(), available, fetchBody);
 
     expect(available.triggers[1].config_entries).toEqual([]);
-    expect(warnSpy).toHaveBeenCalled();
+    expect(result.missingBody).toBe(3);
+    expect(result.succeeded).toBe(0);
     expect(
       warnSpy.mock.calls.some(
         (args) =>
           String(args[0]).includes("triggers/missing") &&
           String(args[0]).includes("no body returned")
+      )
+    ).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it("counts body shapes missing config_entries separately from null bodies", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchBody = vi.fn(async (_api, _type, id) => {
+      if (id === "good") return triggerBody("good", []);
+      // Body present but no config_entries field — contract violation
+      // of a different flavor than null.
+      return { id, name: id } as unknown as AutomationCatalogBody;
+    });
+    const available = slimAvailable();
+
+    const result = await hydrateAvailableBodies(makeApi(), available, fetchBody);
+
+    expect(result.succeeded).toBe(1);
+    expect(result.missingField).toBe(2);
+    expect(result.missingBody).toBe(0);
+    expect(
+      warnSpy.mock.calls.some((args) =>
+        String(args[0]).includes("body shape missing config_entries")
       )
     ).toBe(true);
     warnSpy.mockRestore();
@@ -88,9 +113,12 @@ describe("hydrateAvailableBodies", () => {
     });
     const available = slimAvailable();
 
-    await hydrateAvailableBodies(makeApi(), available, fetchBody);
+    const result = await hydrateAvailableBodies(makeApi(), available, fetchBody);
 
     expect(available.triggers[0].config_entries).toEqual([configEntry("foo")]);
+    expect(result.rejected).toBe(1);
+    expect(result.missingBody).toBe(1);
+    expect(result.succeeded).toBe(1);
     expect(
       warnSpy.mock.calls.some((args) => String(args[0]).includes("body fetch failed"))
     ).toBe(true);

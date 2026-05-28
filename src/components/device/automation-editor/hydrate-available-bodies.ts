@@ -14,31 +14,58 @@ export type AutomationBodyFetcher = typeof fetchAutomationBody;
 type _AutomationListType = "triggers" | "actions" | "conditions";
 type _AutomationEntry = AutomationTrigger | AutomationAction | AutomationCondition;
 
+/** Aggregate hydration outcome — caller can toast / set _error if
+ *  any entries failed. */
+export interface HydrationResult {
+  /** Entries whose ``config_entries`` was successfully replaced. */
+  succeeded: number;
+  /** Body fetches that returned null. */
+  missingBody: number;
+  /** Body shapes lacking ``config_entries``. */
+  missingField: number;
+  /** Body fetches that threw (transport error, cache cleared, …). */
+  rejected: number;
+}
+
 /**
  * Hydrate ``config_entries`` for every entry in *available* by
  * fetching its body through the batched body cache. Mutates the
- * passed lists in place (caller already holds the array refs).
- * ``allSettled`` so one fetch failure doesn't abort the rest;
- * missing-``config_entries`` shapes are logged but otherwise
- * skipped (the body cache's ``cacheMisses: false`` lets a re-mount
- * recover).
+ * passed lists in place. ``allSettled`` so one fetch failure
+ * doesn't abort the rest; the returned :class:`HydrationResult`
+ * lets the caller decide whether to surface a partial failure
+ * (the body cache's ``cacheMisses: false`` lets a re-mount
+ * recover from contract-violation misses; transport rejections
+ * are also retry-able).
  */
 export async function hydrateAvailableBodies(
   api: ESPHomeAPI,
   available: AvailableAutomations,
   fetchBody: AutomationBodyFetcher = fetchAutomationBody
-): Promise<void> {
+): Promise<HydrationResult> {
+  const result: HydrationResult = {
+    succeeded: 0,
+    missingBody: 0,
+    missingField: 0,
+    rejected: 0,
+  };
   const jobs: Promise<unknown>[] = [];
   const merge = (type: _AutomationListType, list: _AutomationEntry[]): void => {
     for (const entry of list) {
       jobs.push(
         fetchBody(api, type, entry.id).then((body) => {
           if (body && "config_entries" in body) {
-            // Shallow-clone so downstream form mutations can't
-            // poison the shared cache.
+            // Shallow-clone the array so add/remove/reorder on the
+            // entry's ``config_entries`` can't leak back into the
+            // shared cache. Individual ``ConfigEntry`` objects are
+            // still aliased; downstream forms must not mutate them
+            // in place (they don't today — the form returns a new
+            // value, never patches the schema).
             entry.config_entries = [...body.config_entries];
+            result.succeeded++;
             return;
           }
+          if (body === null) result.missingBody++;
+          else result.missingField++;
           const reason =
             body === null ? "no body returned" : "body shape missing config_entries";
           console.warn(
@@ -51,10 +78,12 @@ export async function hydrateAvailableBodies(
   merge("triggers", available.triggers);
   merge("actions", available.actions);
   merge("conditions", available.conditions);
-  const results = await Promise.allSettled(jobs);
-  for (const r of results) {
+  const settled = await Promise.allSettled(jobs);
+  for (const r of settled) {
     if (r.status === "rejected") {
+      result.rejected++;
       console.warn("automation-editor: body fetch failed", r.reason);
     }
   }
+  return result;
 }

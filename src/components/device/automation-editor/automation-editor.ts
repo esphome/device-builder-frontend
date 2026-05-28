@@ -388,12 +388,32 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (!this._api || !this.configuration) return;
     try {
       const available = await this._api.getAvailableAutomations(this.configuration);
-      // Paint the picker with the slim list before awaiting body
-      // hydration; entries mutate in place and a ``requestUpdate``
-      // re-renders the forms once bodies arrive.
+      // Paint the picker with the slim list immediately.
       this._available = available;
-      await hydrateAvailableBodies(this._api, available);
-      this.requestUpdate();
+      const hydration = await hydrateAvailableBodies(this._api, available);
+      // Reassign ``_available`` with fresh array refs so child
+      // components (trigger picker, condition tree, action node)
+      // whose ``@property`` bindings default to identity-based
+      // ``hasChanged`` re-render with the hydrated entries.
+      this._available = {
+        ...available,
+        triggers: [...available.triggers],
+        actions: [...available.actions],
+        conditions: [...available.conditions],
+      };
+      const failures =
+        hydration.missingBody + hydration.missingField + hydration.rejected;
+      if (failures > 0) {
+        // Soft surface: log + non-blocking toast. Don't set
+        // ``_error`` since the picker is still usable for the
+        // entries that hydrated; ``cacheMisses: false`` lets a
+        // re-mount retry the missing ones.
+        toast.error(
+          this._localize("device.automation_partial_hydration", {
+            count: String(failures),
+          })
+        );
+      }
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     }
