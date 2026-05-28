@@ -179,12 +179,12 @@ export class ESPHomeLayout extends LitElement {
 
         /* Tighten the chrome around the logo: the 44px button sized
            for a desktop touch target carries more whitespace than a
-           phone needs, and the app-header's --wa-space-m gap +
-           --wa-space-s padding together claim ~24px the title could
-           use to fit "Builder" before the PREVIEW badge. */
+           phone needs, and the app-header's --wa-space-m gap claims
+           extra room the title could use to fit "Builder" before
+           the PREVIEW badge. Keep the horizontal padding at the
+           desktop value so the logo doesn't hug the viewport edge. */
         .app-header {
           gap: var(--wa-space-s);
-          padding: 0 var(--wa-space-2xs);
         }
 
         .header-logo {
