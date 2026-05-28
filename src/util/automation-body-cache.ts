@@ -12,6 +12,11 @@ import { BatchedCache } from "./batched-cache.js";
 const _cache = new BatchedCache<AutomationCatalogBody, void>({
   name: "automation-body-cache",
   bucketKey: () => "",
+  // The list endpoint advertises every (type, id) the editor will
+  // ask for; a missing body is a backend contract violation, not a
+  // permanent catalog miss. Don't cache the null so a re-mount can
+  // recover.
+  cacheMisses: false,
   fetch: (api, keys) => {
     const refs = keys.map((key) => {
       const slash = key.indexOf("/");

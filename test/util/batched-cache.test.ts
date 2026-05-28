@@ -9,6 +9,50 @@ interface Ctx {
 const makeApi = () => ({ getComponentBodies: vi.fn() }) as unknown as ESPHomeAPI;
 
 describe("BatchedCache", () => {
+  it("caches misses by default so unknown keys aren't re-fetched", async () => {
+    const fetcher = vi.fn(
+      (_api: ESPHomeAPI, _keys: string[]): Promise<Record<string, string>> =>
+        Promise.resolve({})
+    );
+    const cache = new BatchedCache<string, Ctx>({
+      name: "default-misses",
+      bucketKey: (ctx) => ctx.platform,
+      fetch: fetcher,
+    });
+    const api = makeApi();
+
+    await cache.fetch(api, "ghost", { platform: "esp32" });
+    expect(cache.getCached("ghost", { platform: "esp32" })).toBeNull();
+    await cache.fetch(api, "ghost", { platform: "esp32" });
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it("with cacheMisses: false re-fetches advertised keys whose body was absent", async () => {
+    let attempts = 0;
+    const fetcher = vi.fn(
+      (_api: ESPHomeAPI, _keys: string[]): Promise<Record<string, string>> => {
+        attempts++;
+        const out: Record<string, string> = attempts === 1 ? {} : { ghost: "recovered" };
+        return Promise.resolve(out);
+      }
+    );
+    const cache = new BatchedCache<string, Ctx>({
+      name: "no-miss-cache",
+      bucketKey: (ctx) => ctx.platform,
+      fetch: fetcher,
+      cacheMisses: false,
+    });
+    const api = makeApi();
+
+    const first = await cache.fetch(api, "ghost", { platform: "esp32" });
+    expect(first).toBeNull();
+    expect(cache.getCached("ghost", { platform: "esp32" })).toBeUndefined();
+
+    const second = await cache.fetch(api, "ghost", { platform: "esp32" });
+    expect(second).toBe("recovered");
+    expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
   it("does not collide when keys or bucket-keys contain the | delimiter", async () => {
     // Two callers whose flat ``${key}|${bucketKey}`` composition
     // would collide (``a|b`` + ``c`` and ``a`` + ``b|c``) MUST stay

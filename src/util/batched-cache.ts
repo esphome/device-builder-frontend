@@ -22,6 +22,13 @@ export interface BatchedCacheOptions<V, Ctx> {
   /** Same string = same fetcher round trip. */
   bucketKey: (ctx: Ctx) => string;
   fetch: (api: ESPHomeAPI, keys: string[], ctx: Ctx) => Promise<Record<string, V>>;
+  /** Cache ``null`` for keys absent from the fetcher response.
+   *  Default ``true`` — right for an immutable catalog where a
+   *  miss is permanent. Set ``false`` when a missing key is a
+   *  server contract violation (the caller advertised the id) so
+   *  a re-mount can recover instead of seeing a sticky empty
+   *  result. */
+  cacheMisses?: boolean;
 }
 
 export class BatchedCache<V, Ctx> {
@@ -105,16 +112,16 @@ export class BatchedCache<V, Ctx> {
       cacheBucket = new Map();
       this._cache.set(bucketKey, cacheBucket);
     }
+    const cacheMisses = this.opts.cacheMisses ?? true;
     for (const [key, resolver] of bucket.pending) {
       // Own-property check: the wire payload is a plain object so a
       // bare lookup would resolve ``toString`` / ``constructor`` via
       // the prototype chain and cache that garbage as a hit.
-      const value = Object.prototype.hasOwnProperty.call(entries, key)
-        ? entries[key]
-        : null;
+      const present = Object.prototype.hasOwnProperty.call(entries, key);
+      const value = present ? entries[key] : null;
       // Cache write before resolve so a sync listener re-calling
       // ``fetch`` for the same key hits the cache path.
-      cacheBucket.set(key, value);
+      if (present || cacheMisses) cacheBucket.set(key, value);
       resolver.resolve(value);
     }
     this._notify();

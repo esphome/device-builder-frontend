@@ -50,11 +50,11 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
-import { fetchAutomationBody } from "../../../util/automation-body-cache.js";
 import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
+import { hydrateAvailableBodies } from "./hydrate-available-bodies.js";
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -388,48 +388,14 @@ export class ESPHomeAutomationEditor extends LitElement {
     if (!this._api || !this.configuration) return;
     try {
       const available = await this._api.getAvailableAutomations(this.configuration);
-      await this._hydrateAvailableBodies(available);
+      // Paint the picker with the slim list before awaiting body
+      // hydration; entries mutate in place and a ``requestUpdate``
+      // re-renders the forms once bodies arrive.
       this._available = available;
+      await hydrateAvailableBodies(this._api, available);
+      this.requestUpdate();
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
-    }
-  }
-
-  private async _hydrateAvailableBodies(available: AvailableAutomations): Promise<void> {
-    if (!this._api) return;
-    const api = this._api;
-    type Entry = AutomationTrigger | AutomationAction | AutomationCondition;
-    // ``allSettled`` so one body fetch failure (transport hiccup,
-    // mid-flight cache clear, server glitch on one ref) doesn't
-    // abort the whole editor load — the slim entry is enough to
-    // render the picker; the form re-fetches on focus.
-    const jobs: Promise<unknown>[] = [];
-    const merge = (type: "triggers" | "actions" | "conditions", list: Entry[]): void => {
-      for (const entry of list) {
-        jobs.push(
-          fetchAutomationBody(api, type, entry.id).then((body) => {
-            if (body && "config_entries" in body) {
-              entry.config_entries = body.config_entries;
-              return;
-            }
-            // The list endpoint just advertised this id; a null or
-            // shapeless response from get_bodies is a contract
-            // violation worth surfacing in the console.
-            console.warn(
-              `automation-editor: ${type}/${entry.id} body missing config_entries; form will render empty`
-            );
-          })
-        );
-      }
-    };
-    merge("triggers", available.triggers);
-    merge("actions", available.actions);
-    merge("conditions", available.conditions);
-    const results = await Promise.allSettled(jobs);
-    for (const r of results) {
-      if (r.status === "rejected") {
-        console.warn("automation-editor: body fetch failed", r.reason);
-      }
     }
   }
 

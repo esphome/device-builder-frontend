@@ -122,18 +122,33 @@ describe("automation-body-cache", () => {
 
     const result = await fetchAutomationBody(api, "triggers", "toString");
     expect(result).toBeNull();
-    expect(getCachedAutomationBody("triggers", "toString")).toBeNull();
   });
 
-  it("caches null (catalog miss) so unknown ids aren't re-fetched", async () => {
-    const { api, getAutomationBodies } = mockApi(() => null);
+  it("does not cache misses (advertised ids may recover on retry)", async () => {
+    // The list endpoint advertises every (type, id) the editor
+    // asks for; a null body is a server contract violation, not a
+    // permanent catalog miss. ``cacheMisses: false`` lets a second
+    // call re-attempt instead of pinning the null.
+    let attempts = 0;
+    const { api, getAutomationBodies } = mockApi(
+      () => null,
+      () => {
+        attempts++;
+        const out: Record<string, AutomationCatalogBody> =
+          attempts === 1
+            ? {}
+            : { "triggers/recovered": trigger("recovered", "Recovered") };
+        return Promise.resolve(out);
+      }
+    );
 
-    const first = await fetchAutomationBody(api, "triggers", "nope");
+    const first = await fetchAutomationBody(api, "triggers", "recovered");
     expect(first).toBeNull();
-    expect(getCachedAutomationBody("triggers", "nope")).toBeNull();
+    expect(getCachedAutomationBody("triggers", "recovered")).toBeUndefined();
 
-    await fetchAutomationBody(api, "triggers", "nope");
-    expect(getAutomationBodies).toHaveBeenCalledTimes(1);
+    const second = await fetchAutomationBody(api, "triggers", "recovered");
+    expect(second?.name).toBe("Recovered");
+    expect(getAutomationBodies).toHaveBeenCalledTimes(2);
   });
 
   it("does not cache transport errors (allows retry)", async () => {
