@@ -886,6 +886,12 @@ export interface AutomationCondition {
   accepts_condition_list: boolean;
 }
 
+/** Scalar primitives a polymorphic registry entry can take at the
+ *  key position (``- throttle: 10s``, ``- lambda: |- ...``). Union
+ *  rather than plain string so a misspelled tag is a compile-time
+ *  error against the renderer's dispatch table. */
+export type RegistryValueType = "time_period" | "float" | "integer" | "string" | "lambda";
+
 /** Common shape for the polymorphic-list registry catalogs
  *  (`light_effects`, `filter`, future additions). One entry per
  *  registered id; `config_entries` is the per-id parameter schema;
@@ -899,11 +905,11 @@ export interface RegistryCatalogEntry {
   config_entries: ConfigEntry[];
   applies_to: string[];
   /** Set when the entry takes a single scalar at the polymorphic
-   *  key position (`- throttle: 10s`, `- delayed_on: 50ms`) rather
-   *  than a nested mapping. The renderer mounts the matching inline
-   *  input (time-period widget, number, lambda body) at the row's
-   *  polymorphic value position instead of an empty sub-form. */
-  value_type?: string | null;
+   *  key position (``- throttle: 10s``, ``- delayed_on: 50ms``)
+   *  rather than a nested mapping. The renderer mounts the matching
+   *  inline input at the polymorphic value position instead of an
+   *  empty sub-form. */
+  value_type?: RegistryValueType | null;
 }
 
 /** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).

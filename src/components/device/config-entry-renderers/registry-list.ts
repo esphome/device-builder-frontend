@@ -17,7 +17,11 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
-import type { ConfigEntry, RegistryCatalogEntry } from "../../../api/types.js";
+import type {
+  ConfigEntry,
+  RegistryCatalogEntry,
+  RegistryValueType,
+} from "../../../api/types.js";
 import { ConfigEntryType, isLambdaValue } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
 import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
@@ -110,7 +114,7 @@ interface RegistryOps {
  *  registry-list sub-form constructs a synthetic ConfigEntry of the
  *  matching type and routes through ``ctx.renderEntry`` so each
  *  scalar shape reuses the same input widget the regular form does. */
-const VALUE_TYPE_TO_CONFIG_TYPE: Record<string, ConfigEntryType> = {
+const VALUE_TYPE_TO_CONFIG_TYPE: Record<RegistryValueType, ConfigEntryType> = {
   time_period: ConfigEntryType.TIME_PERIOD,
   float: ConfigEntryType.FLOAT,
   integer: ConfigEntryType.INTEGER,
@@ -560,7 +564,13 @@ export class ESPHomeRegistryList extends LitElement {
     params: unknown
   ): ConfigEntryType | null {
     const tagged = catalogEntry?.value_type;
-    if (tagged && tagged in VALUE_TYPE_TO_CONFIG_TYPE) {
+    // hasOwnProperty rather than ``in`` so prototype-chain keys
+    // (``toString`` etc.) coming through a non-typed payload don't
+    // accidentally resolve to a non-ConfigEntryType value.
+    if (
+      tagged &&
+      Object.prototype.hasOwnProperty.call(VALUE_TYPE_TO_CONFIG_TYPE, tagged)
+    ) {
       return VALUE_TYPE_TO_CONFIG_TYPE[tagged];
     }
     if (looksLikeTimePeriodScalar(params)) {
