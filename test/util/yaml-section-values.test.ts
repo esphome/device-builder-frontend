@@ -6,7 +6,7 @@ import {
   removeSectionFromYaml,
   updateSectionInYaml,
 } from "../../src/util/yaml-section-values.js";
-import { YamlRawValue } from "../../src/util/yaml-serialize.js";
+import { serializeYamlValues, YamlRawValue } from "../../src/util/yaml-serialize.js";
 
 /** 1-indexed line of the *n*th (1-based) list-item dash following
  *  `parent:` in `yaml`. Section-editor callers pass that line as
@@ -822,6 +822,43 @@ ${lambdaBlock}
     expect(after).toContain("      return id(moving) && id(opening);");
     // Old body is gone.
     expect(after).not.toContain("return original_body");
+  });
+});
+
+describe("serializeYamlValues — single-key null-value list items", () => {
+  // The polymorphic carve-out in serializeListItem is in the
+  // shared helper, so it affects every list-of-mapping consumer,
+  // not just REGISTRY_LIST. Pin the contract here so a future
+  // shape change doesn't quietly flip non-registry consumers
+  // back to the pre-#941 bare-dash emit.
+
+  it("emits `- key:` for a single-key null value (registry case)", () => {
+    const lines = serializeYamlValues({ effects: [{ pulse: null }] }, "");
+    expect(lines).toEqual(["effects:", "  - pulse:"]);
+  });
+
+  it("emits `- key:` for any single-key null value, not just registries", () => {
+    // No code path produces this shape today on a non-registry
+    // multi-value list, but the carve-out is structural: every
+    // list-of-mapping consumer with a single null-keyed entry
+    // gets the same output. Pin it so a future caller can rely.
+    const lines = serializeYamlValues({ areas: [{ id: null }] }, "");
+    expect(lines).toEqual(["areas:", "  - id:"]);
+  });
+
+  it("still drops a null field on a multi-key item (pre-#941 semantics)", () => {
+    // The carve-out fires only when the WHOLE item collapses to one
+    // null-valued key. Multi-key items keep the "drop null field"
+    // semantic, mirroring how the form treats cleared scalar fields.
+    const lines = serializeYamlValues({ areas: [{ id: "kitchen", name: null }] }, "");
+    expect(lines).toEqual(["areas:", "  - id: kitchen"]);
+  });
+
+  it("emits bare `-` when every field is null (no carve-out match)", () => {
+    // Two null-valued keys: not the single-key shape, so the
+    // null-filter strips both and the placeholder dash remains.
+    const lines = serializeYamlValues({ areas: [{ id: null, name: null }] }, "");
+    expect(lines).toEqual(["areas:", "  -"]);
   });
 });
 
