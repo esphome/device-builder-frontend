@@ -283,6 +283,20 @@ const isDeeperListItemLine = (line: string, parentIndent: string): boolean => {
   return tail === "-" || tail.startsWith("- ");
 };
 
+/** YAML's compact block-sequence form allows a dash-list under a
+ *  mapping key at the SAME indent as the key (not strictly deeper).
+ *  ``calibration:\n- a\n- b`` is valid YAML for
+ *  ``{calibration: [a, b]}``. ``isDeeperListItemLine`` rejects that
+ *  shape because the parent-block loop terminator requires strict-
+ *  greater indent; this predicate covers the equal-indent case so the
+ *  block-list under a key with no inline value loads correctly. */
+const isChildListItemLine = (line: string, parentIndent: string): boolean => {
+  const lead = _leadingIndent(line);
+  if (lead.length < parentIndent.length) return false;
+  const tail = line.slice(lead.length);
+  return tail === "-" || tail.startsWith("- ");
+};
+
 const stripQuotes = (s: string): string => {
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     return s.slice(1, -1);
@@ -664,7 +678,15 @@ const _scanValueBlock = (
     const line = lines[i];
     if (isBlankOrCommentLine(line)) continue;
     const lead = line.match(/^ */)![0];
-    if (lead.length <= keyIndent.length) return { endIdx: i, isComplex };
+    if (lead.length < keyIndent.length) return { endIdx: i, isComplex };
+    if (lead.length === keyIndent.length) {
+      // YAML's compact block-sequence form allows a child list to
+      // share the parent key's indent (``calibration:\n- a\n- b``).
+      // Same-indent dash lines stay in the block; any other shape
+      // at this indent terminates as before.
+      const tail = line.slice(lead.length);
+      if (tail !== "-" && !tail.startsWith("- ")) return { endIdx: i, isComplex };
+    }
     if (!isComplex) {
       if (
         BLOCK_SCALAR_RE.test(line) ||
@@ -872,7 +894,11 @@ function parseNestedBlock(
 
     if (raw === "") {
       const peek = _skipBlankAndCommentLines(lines, i + 1);
-      if (peek < lines.length && isDeeperListItemLine(lines[peek], indent)) {
+      // ``key:`` followed by a block list. Accept both the standard
+      // (deeper-indent) and compact (same-indent) forms; the compact
+      // shape is what ESPHome examples produce for short
+      // ``calibration:`` / ``datapoints:`` lists.
+      if (peek < lines.length && isChildListItemLine(lines[peek], indent)) {
         const { value, endIdx } = parseListBlock(lines, i + 1, indent);
         values[key] = value;
         i = endIdx;
