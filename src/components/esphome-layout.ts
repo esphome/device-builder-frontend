@@ -116,6 +116,18 @@ export class ESPHomeLayout extends LitElement {
         gap: var(--wa-space-xs);
       }
 
+      /* The title span is a flex item and needs its own min-width:0
+         + overflow handling for text-overflow:ellipsis to apply —
+         flex items default to min-width:auto, which keeps them at
+         intrinsic width and pushes later siblings (the
+         .preview-badge) past the h1's overflow:hidden. Without this
+         the badge clipped to just "P|" on phone-width viewports. */
+      .header-title-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
       .preview-badge {
         font-size: 9px;
         font-weight: var(--wa-font-weight-bold);
@@ -149,6 +161,20 @@ export class ESPHomeLayout extends LitElement {
       @media (max-width: 700px) {
         .header-text p {
           display: none;
+        }
+
+        /* The spacer's flex:1 was eating the slack between the title
+           and the kebab actions — desktop's intentional layout but on
+           a phone that's where the title needs room to fit "ESPHome
+           Device Builder" alongside the PREVIEW badge without
+           truncating. Drop the spacer and grow the header-text into
+           the freed space instead. */
+        .header-spacer {
+          display: none;
+        }
+
+        .header-text {
+          flex: 1;
         }
       }
 
@@ -213,7 +239,7 @@ export class ESPHomeLayout extends LitElement {
         </div>
         <div class="header-text">
           <h1>
-            <span>${this._localize("dashboard.title")}</span>
+            <span class="header-title-text">${this._localize("dashboard.title")}</span>
             <span class="preview-badge">${this._localize("layout.preview_badge")}</span>
           </h1>
           <p>${this._localize("dashboard.subtitle")}</p>

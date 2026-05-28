@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "ESPHome - Device Builder",
+    "title": "ESPHome Device Builder",
     "subtitle": "创建并构建你的智能设备和自动化",
     "discovered_count_singular": "发现了 {count} 台设备",
     "discovered_count_plural": "发现了 {count} 台设备",

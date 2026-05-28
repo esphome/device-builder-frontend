@@ -8,7 +8,7 @@ import {
 
 describe("defaultLocalize", () => {
   it("resolves a top-level string key", () => {
-    expect(defaultLocalize("dashboard.title")).toBe("ESPHome - Device Builder");
+    expect(defaultLocalize("dashboard.title")).toBe("ESPHome Device Builder");
   });
 
   it("resolves a deeply nested key", () => {

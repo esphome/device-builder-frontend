@@ -1,6 +1,6 @@
 {
   "dashboard": {
-    "title": "ESPHome - Device Builder",
+    "title": "ESPHome Device Builder",
     "subtitle": "Create and make your smart devices and automations",
     "discovered_count_singular": "Discovered {count} device",
     "discovered_count_plural": "Discovered {count} devices",
