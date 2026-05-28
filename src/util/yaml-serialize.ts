@@ -281,6 +281,24 @@ function serializeListItem(
 }
 
 /**
+ * True when *value* would emit at least one line through
+ * ``serializeYamlValues`` — i.e. it survives the round-trip to YAML.
+ *
+ * Mirrors the per-value skip rules below so a caller asking "does
+ * this group hold anything?" agrees with what actually lands in the
+ * YAML. ``""`` / null / undefined / empty array / a mapping whose
+ * every descendant is itself empty all count as no value.
+ */
+export function hasSerializableValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") return false;
+  if (value instanceof YamlRawValue) return true;
+  if (Array.isArray(value)) return value.length > 0;
+  if (isLambdaValue(value)) return true;
+  if (isPlainObject(value)) return Object.values(value).some(hasSerializableValue);
+  return true;
+}
+
+/**
  * Serialize a values dict as YAML lines at the given indent.
  * Returns an array of lines (not a joined string) so callers can
  * splice them into existing YAML when needed.

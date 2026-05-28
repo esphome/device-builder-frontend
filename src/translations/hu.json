@@ -618,6 +618,7 @@
     "docs": "Dokumentáció",
     "advanced_options": "Speciális beállítások",
     "show_advanced": "Speciális beállítások megjelenítése",
+    "enable_entity": "{name} engedélyezése",
     "multi_value_empty": "Még nincsenek elemek – Kattintson a + gombra egy hozzáadásához.",
     "multi_value_add": "Hozzáadás",
     "multi_value_remove": "Eltávolítás",

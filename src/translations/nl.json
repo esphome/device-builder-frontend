@@ -645,6 +645,7 @@
     "docs": "Documentatie",
     "advanced_options": "Geavanceerde opties",
     "show_advanced": "Geavanceerde instellingen tonen",
+    "enable_entity": "{name} inschakelen",
     "multi_value_empty": "Nog geen items — klik op + om er een toe te voegen.",
     "multi_value_add": "Toevoegen",
     "multi_value_remove": "Verwijderen",

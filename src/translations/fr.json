@@ -645,6 +645,7 @@
     "docs": "Documentation",
     "advanced_options": "Options avancées",
     "show_advanced": "Afficher les paramètres avancés",
+    "enable_entity": "Activer {name}",
     "multi_value_empty": "Aucun élément — cliquez sur + pour en ajouter un.",
     "multi_value_add": "Ajouter",
     "multi_value_remove": "Supprimer",

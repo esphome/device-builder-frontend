@@ -619,6 +619,7 @@
     "docs": "Docs",
     "advanced_options": "Advanced options",
     "show_advanced": "Show advanced settings",
+    "enable_entity": "Enable {name}",
     "multi_value_empty": "No items yet — click + to add one.",
     "multi_value_add": "Add",
     "multi_value_remove": "Remove",

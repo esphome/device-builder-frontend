@@ -619,6 +619,7 @@
     "docs": "文档",
     "advanced_options": "高级选项",
     "show_advanced": "显示高级设置",
+    "enable_entity": "启用{name}",
     "multi_value_empty": "还没有项目，点击 + 添加一个。",
     "multi_value_add": "添加",
     "multi_value_remove": "移除",
