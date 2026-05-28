@@ -216,13 +216,15 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
               .placeholder=${this._localize("onboarding.wifi.password_placeholder")}
               .maxlength=${64}
               .label=${this._localize("onboarding.wifi.password_label")}
+              .invalid=${this._passwordTooShort}
+              .describedby=${this._passwordTooShort ? "onboarding-password-error" : ""}
               ?disabled=${this._saving}
               @password-input-change=${(e: CustomEvent<PasswordInputValueChange>) => {
                 this._password = e.detail.value;
               }}
             ></esphome-password-input>
             ${this._passwordTooShort
-              ? html`<p class="error" role="alert">
+              ? html`<p id="onboarding-password-error" class="error" role="alert">
                   ${this._localize("onboarding.wifi.password_too_short")}
                 </p>`
               : nothing}

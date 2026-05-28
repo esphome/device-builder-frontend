@@ -76,6 +76,15 @@ export class ESPHomePasswordInput extends LitElement {
   @property()
   label = "";
 
+  /** Optional ``aria-describedby`` forwarded to the inner ``<input>``.
+   *  The error/help text it points at lives in the consumer's shadow
+   *  root, not this one, so the consumer owns the id; we only relay
+   *  it onto the real focusable control. Default empty (no
+   *  ``aria-describedby`` attribute) so existing call sites are
+   *  unchanged. */
+  @property()
+  describedby = "";
+
   @state()
   private _revealed = false;
 
@@ -150,6 +159,8 @@ export class ESPHomePasswordInput extends LitElement {
           autocomplete="off"
           maxlength=${this.maxlength > 0 ? this.maxlength : nothing}
           aria-label=${this.label || nothing}
+          aria-invalid=${this.invalid ? "true" : nothing}
+          aria-describedby=${this.describedby || nothing}
           @input=${this._onInput}
         />
         <button
