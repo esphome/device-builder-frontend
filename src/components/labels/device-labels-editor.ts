@@ -34,10 +34,15 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { labelChipStyleString } from "../../util/label-style.js";
-import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
+import {
+  labelChipStyles,
+  renderLabelChip,
+  resolveLabelIds,
+} from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";
+import { labelsListStyles } from "./labels-list-styles.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -108,6 +113,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   static styles = [
     espHomeStyles,
     labelChipStyles,
+    labelsListStyles,
     css`
       :host {
         display: block;
@@ -223,68 +229,12 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         display: none;
       }
 
+      /* Cap the list height for the in-drawer editor (the bulk
+         picker uses a viewport-relative cap). labelsListStyles
+         supplies overflow + bleed-into-padding + the row + check
+         shapes; this just sets the local height limit. */
       .options {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
         max-height: 320px;
-        overflow-y: auto;
-        margin: 0 calc(var(--wa-space-l) * -1);
-        padding: 0 var(--wa-space-l);
-      }
-
-      .option {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 8px 10px;
-        border-radius: var(--wa-border-radius-m);
-        cursor: pointer;
-        background: transparent;
-        border: none;
-        text-align: left;
-        font-family: inherit;
-        color: inherit;
-        transition: background-color 0.12s;
-      }
-
-      .option:hover {
-        background: var(--wa-color-surface-lowered);
-      }
-
-      .option:focus-visible {
-        outline: none;
-        background: var(--wa-color-surface-lowered);
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
-      }
-
-      .option-check {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 20px;
-        height: 20px;
-        border-radius: 5px;
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        flex-shrink: 0;
-        color: var(--esphome-on-primary);
-        background: var(--wa-color-surface-default);
-      }
-
-      .option-check--checked {
-        background: var(--esphome-primary);
-        border-color: var(--esphome-primary);
-      }
-
-      .option-check wa-icon {
-        font-size: 14px;
-      }
-
-      .option-empty {
-        text-align: center;
-        font-size: var(--wa-font-size-xs);
-        color: var(--wa-color-text-quiet);
-        padding: var(--wa-space-m);
       }
 
       .create-section {
@@ -387,9 +337,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
                       ? html`<wa-icon library="mdi" name="check"></wa-icon>`
                       : nothing}
                   </span>
-                  <span class="label-chip" style=${labelChipStyleString(label.color)}
-                    >${label.name}</span
-                  >
+                  ${renderLabelChip(label)}
                 </button>`;
               })}
         </div>

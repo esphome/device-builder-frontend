@@ -1665,3 +1665,70 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
     await expect(pending).rejects.toBeInstanceOf(APIError);
   });
 });
+
+describe("ESPHomeAPI — setDeviceLabelsBulk", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/set_labels_bulk`` and maps labelIds to label_ids", async () => {
+    // Pin the camelCase → snake_case key transform inside
+    // ``updates.map(...)``. A future refactor that drops the map
+    // and spreads ``updates`` straight through would break the
+    // backend contract silently because the dialog-side tests
+    // only exercise ``computeUpdates()``'s in-memory shape.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.setDeviceLabelsBulk([
+      { configuration: "kitchen.yaml", labelIds: ["lbl-a"] },
+      { configuration: "garage.yaml", labelIds: [] },
+    ]);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/set_labels_bulk");
+    expect(sent.args).toEqual({
+      updates: [
+        { configuration: "kitchen.yaml", label_ids: ["lbl-a"] },
+        { configuration: "garage.yaml", label_ids: [] },
+      ],
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [
+        { configuration: "kitchen.yaml", success: true },
+        { configuration: "garage.yaml", success: true },
+      ],
+    });
+    await expect(pending).resolves.toEqual([
+      { configuration: "kitchen.yaml", success: true },
+      { configuration: "garage.yaml", success: true },
+    ]);
+  });
+
+  it("forwards per-entry failures from the backend response", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.setDeviceLabelsBulk([
+      { configuration: "kitchen.yaml", labelIds: ["lbl-a"] },
+    ]);
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [
+        {
+          configuration: "kitchen.yaml",
+          success: false,
+          error: "unknown label id: lbl-a",
+        },
+      ],
+    });
+    await expect(pending).resolves.toEqual([
+      { configuration: "kitchen.yaml", success: false, error: "unknown label id: lbl-a" },
+    ]);
+  });
+});

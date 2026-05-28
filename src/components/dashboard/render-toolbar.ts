@@ -326,6 +326,7 @@ export function renderSelectBarOrFab(
         @update-selected=${host._updateSelected}
         @archive-selected=${host._archiveSelected}
         @delete-selected=${host._deleteSelected}
+        @labels-selected=${host._labelsSelected}
       ></esphome-select-bar>
     `;
   }
