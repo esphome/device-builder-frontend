@@ -170,6 +170,26 @@ export const dashboardStyles = css`
     display: none;
   }
 
+  /* Mobile: shrink the floating pill so it stops eating ~70px of
+     viewport above the first device card. Same horizontal shape
+     (icon + count + Show), just denser padding and smaller text /
+     icon. The expandable grid below keeps its existing sizing —
+     this only compacts the collapsed-state header. #41 */
+  @media (max-width: 600px) {
+    .discovered-section-header {
+      padding: var(--wa-space-2xs) var(--wa-space-s);
+      gap: var(--wa-space-xs);
+    }
+
+    .discovered-section-header wa-icon {
+      font-size: var(--wa-font-size-s);
+    }
+
+    .discovered-section-count {
+      font-size: var(--wa-font-size-xs);
+    }
+  }
+
   /* ─── Card Grid ─── */
 
   .devices-grid {
