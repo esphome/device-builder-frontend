@@ -261,6 +261,19 @@ export class ESPHomeAddComponentDialog extends LitElement {
         font-size: 14px;
         color: var(--esphome-primary);
       }
+
+      /* Surfaces a hydrate / WS-transport failure on the catalog
+         view; the form's own banner is unreachable when _selected
+         is still null. */
+      .catalog-error {
+        margin-bottom: var(--wa-space-m);
+        padding: var(--wa-space-xs) var(--wa-space-s);
+        background: color-mix(in srgb, var(--wa-color-danger-60), transparent 88%);
+        border-left: 3px solid var(--wa-color-danger-60);
+        border-radius: var(--wa-border-radius-s);
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-normal);
+      }
     `,
   ];
 
@@ -363,6 +376,9 @@ export class ESPHomeAddComponentDialog extends LitElement {
                 })}</span
               >
             </div>`
+          : nothing}
+        ${!isForm && this._submitError
+          ? html`<div class="catalog-error" role="alert">${this._submitError}</div>`
           : nothing}
         <esphome-component-catalog
           ?hidden=${isForm}
