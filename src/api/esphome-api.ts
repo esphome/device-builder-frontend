@@ -9,6 +9,7 @@
 import { APIError } from "./api-error.js";
 import { BASE_PATH } from "../util/base-path.js";
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
+import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
 import type {
   AddComponentResponse,
   ArchivedDevice,
@@ -1213,7 +1214,14 @@ export class ESPHomeAPI {
 
   /** Get a single board by ID. */
   async getBoard(boardId: string): Promise<BoardCatalogEntry | null> {
-    return this.sendCommand("boards/get_board", { board_id: boardId });
+    // ``hydrateBoard`` re-defaults the fields the backend omits via
+    // mashumaro's omit_default (see util/board-hydrate.ts) so
+    // downstream consumers can read board.pins / .hardware etc
+    // without an ``?? []`` at every site.
+    const board = await this.sendCommand<BoardCatalogEntry | null>("boards/get_board", {
+      board_id: boardId,
+    });
+    return board === null ? null : hydrateBoard(board);
   }
 
   /** Get boards with optional filtering, search, and pagination. */
@@ -1225,7 +1233,11 @@ export class ESPHomeAPI {
     offset?: number;
     limit?: number;
   }): Promise<PagedBoardsResponse> {
-    return this.sendCommand<PagedBoardsResponse>("boards/get_boards", args);
+    const response = await this.sendCommand<PagedBoardsResponse>(
+      "boards/get_boards",
+      args
+    );
+    return hydratePagedBoardsResponse(response);
   }
 
   // ─── Component Commands ───────────────────────────────────
