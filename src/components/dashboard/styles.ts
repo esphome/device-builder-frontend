@@ -239,6 +239,19 @@ export const dashboardStyles = css`
     padding: var(--wa-space-l) var(--wa-space-l) 0;
     flex-shrink: 0;
   }
+
+  /* Table-view counterpart to .toolbar (sits inside the
+     device-table's named toolbar slot, where the slotted rule on
+     .controls handles the outer padding). Without this rule the
+     inner rows stacked at 0px gap while card view stacked at 2px,
+     so flipping the view-toggle made the X-devices row jump 2px
+     vertically. */
+  .toolbar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   .toolbar-row {
     display: flex;
     align-items: center;
