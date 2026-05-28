@@ -4,18 +4,13 @@ import type { PairingSummary, PeerStatus } from "../api/types.js";
  * Compare the local dashboard's bundled ESPHome version against
  * a paired build-server's reported version and classify the
  * result for the operator-facing mismatch sub-line in Settings →
- * Build server → paired build servers.
+ * Build server → paired build servers, and for the per-policy
+ * filter under ``VersionMatchPolicy.RELEASE`` (year + month
+ * match) and ``EXACT`` (full match).
  *
  * Versions are ESPHome's ``YYYY.M[.P][-suffix]`` shape (e.g.
- * ``2026.5.0``, ``2026.5.0b1``, ``2026.5.0-dev``). The first
- * two components (year + month) advance in lockstep with the
- * monthly ESPHome release and are what the scheduler's
- * allow-major-version-mismatch toggle keys on once 7a-3 +
- * 7b-toggle land: a YAML produced by the offloader against
- * ``2026.5`` is generally safe to compile on a receiver that
- * is also ``2026.5.*`` (patch differences are bugfix-only by
- * convention), but cross-month drift is the case the operator
- * wants to know about and explicitly accept.
+ * ``2026.5.0``, ``2026.5.0b1``, ``2026.5.0-dev``); year + month
+ * advance in lockstep with the monthly ESPHome release.
  *
  * Returned shape:
  *   * ``null`` — versions match, or either side is unknown
@@ -26,12 +21,6 @@ import type { PairingSummary, PeerStatus } from "../api/types.js";
  *   * ``"release"`` — year+month differs. Cautionary; the
  *     YAML may reference fields the receiver's schema does
  *     not recognise (or vice versa).
- *
- * The helper returns the classification kind only; it does
- * not echo back the version strings. The caller already
- * holds both values and renders them verbatim in the
- * translated sub-line (see settings-dialog's
- * ``_renderPairingVersionMismatch``).
  */
 export type VersionMismatchKind = "patch" | "release" | null;
 
@@ -97,14 +86,19 @@ export type NoCompatiblePeerReason = "offline" | "version" | "mixed";
  *
  * Only APPROVED + enabled rows count — PENDING and disabled
  * rows aren't operator-intentional, so the backend's hard-fail
- * doesn't fire on them. If there are no intentional pairings
+ * doesn't fire on them. If there are no intentional pairings,
  * the policy itself can't be the failure cause; return
  * ``"mixed"`` so the caller falls through to the generic toast.
+ * Same fallback when ``offloaderVersion`` is empty — without a
+ * local baseline ``classifyVersionMismatch`` short-circuits to
+ * ``null``, which would misattribute the bucket and leak an
+ * empty ``{local}`` placeholder into the toast string.
  */
 export function classifyNoCompatiblePeerReason(
   pairings: Iterable<PairingSummary>,
   offloaderVersion: string
 ): NoCompatiblePeerReason {
+  if (!offloaderVersion) return "mixed";
   let offline = 0;
   let version = 0;
   for (const p of pairings) {

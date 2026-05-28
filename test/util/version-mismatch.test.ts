@@ -107,4 +107,18 @@ describe("classifyNoCompatiblePeerReason", () => {
     // of the error the classifier shouldn't pretend to know why.
     expect(classifyNoCompatiblePeerReason([pairing({})], LOCAL)).toBe("mixed");
   });
+
+  it("returns 'mixed' when offloaderVersion is empty (reconnect race)", () => {
+    // Without a local baseline classifyVersionMismatch short-
+    // circuits to null, which would mis-attribute the bucket
+    // and leak an empty {local} placeholder into the toast.
+    // Caller is expected to fall through to the generic toast,
+    // but the classifier itself should not pretend to know.
+    expect(classifyNoCompatiblePeerReason([pairing({ connected: false })], "")).toBe(
+      "mixed"
+    );
+    expect(
+      classifyNoCompatiblePeerReason([pairing({ esphome_version: "2026.4.0" })], "")
+    ).toBe("mixed");
+  });
 });

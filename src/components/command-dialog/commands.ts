@@ -214,7 +214,15 @@ function formatForceLocalError(err: unknown): string {
 }
 
 function _installErrorMessage(host: ESPHomeCommandDialog, err: unknown): string {
-  if (err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER) {
+  if (
+    err instanceof APIError &&
+    err.errorCode === ErrorCode.NO_COMPATIBLE_PEER &&
+    host._appVersion
+  ) {
+    // ``_appVersion`` empty during a reconnect race would leak ``""``
+    // into the ``{local}`` placeholder and misattribute the bucket;
+    // fall through to the raw backend message until the version
+    // snapshot lands.
     const reason = classifyNoCompatiblePeerReason(
       host._pairings?.values() ?? [],
       host._appVersion

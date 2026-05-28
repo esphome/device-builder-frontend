@@ -790,7 +790,14 @@ export class ESPHomePageDashboard extends LitElement {
     try {
       await this._api.firmwareInstallBulk(selected);
     } catch (err) {
-      if (err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER) {
+      if (
+        err instanceof APIError &&
+        err.errorCode === ErrorCode.NO_COMPATIBLE_PEER &&
+        this._appVersion
+      ) {
+        // ``_appVersion`` empty during a reconnect race would leak
+        // into the ``{local}`` placeholder and misattribute the
+        // bucket; fall through to the generic toast.
         const reason = classifyNoCompatiblePeerReason(
           this._pairings?.values() ?? [],
           this._appVersion

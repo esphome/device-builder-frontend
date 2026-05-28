@@ -378,7 +378,12 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
 
   private _onVersionMatchPolicyChange = (e: Event) => {
     if (this._versionMatchPolicy === null) return;
-    const raw = (e.target as HTMLSelectElement).value;
+    // wa-select isn't a native ``<select>`` — typing the cast as
+    // ``HTMLSelectElement`` reads correct but is misleading. WA's
+    // value property is string | number | null; narrow against
+    // the policy union before dispatching.
+    const raw = (e.target as HTMLElement & { value: string | number | null }).value;
+    if (typeof raw !== "string") return;
     if (!_VERSION_MATCH_POLICIES.includes(raw as VersionMatchPolicy)) return;
     const policy = raw as VersionMatchPolicy;
     if (policy === this._versionMatchPolicy) return;
