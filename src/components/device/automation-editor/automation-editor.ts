@@ -411,7 +411,8 @@ export class ESPHomeAutomationEditor extends LitElement {
         toast.error(
           this._localize("device.automation_partial_hydration", {
             count: String(failures),
-          })
+          }),
+          { richColors: true }
         );
       }
     } catch (err) {

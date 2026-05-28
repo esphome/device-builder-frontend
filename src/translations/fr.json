@@ -687,8 +687,7 @@
     "unsaved_message": "Vous avez des modifications non enregistrées sur cet appareil. Si vous quittez sans enregistrer, elles seront perdues.",
     "leave_anyway": "Quitter quand même",
     "discard_changes": "Annuler",
-    "save_and_leave": "Enregistrer",
-    "automation_partial_hydration": "{count} automation form(s) could not be loaded. Some forms may render empty."
+    "save_and_leave": "Enregistrer"
   },
   "onboarding": {
     "menu_item_setup_wifi": "Configurer le Wi-Fi",

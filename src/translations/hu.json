@@ -787,8 +787,7 @@
     "unsaved_message": "Nem mentett változtatások vannak ennél az eszköznél. Ha mentés nélkül lép ki innen, módosításai elvesznek.",
     "leave_anyway": "Elhagyás mindenképpen",
     "discard_changes": "Elvetés",
-    "save_and_leave": "Mentés",
-    "automation_partial_hydration": "{count} automation form(s) could not be loaded. Some forms may render empty."
+    "save_and_leave": "Mentés"
   },
   "validation": {
     "required": "Ez a mező kötelező",

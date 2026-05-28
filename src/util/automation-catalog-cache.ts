@@ -228,7 +228,16 @@ async function _hydrateRegistryConfigEntries(
       const body = await fetchAutomationBody(api, type, entry.id);
       if (body && "config_entries" in body) {
         entry.config_entries = [...body.config_entries];
+        return;
       }
+      // Same backend contract violation we surface from
+      // ``hydrateAvailableBodies``: the list endpoint just
+      // advertised this id, so a null or shapeless body is a
+      // server bug. Log it so the registry-list empty form has a
+      // breadcrumb in the console.
+      const reason =
+        body === null ? "no body returned" : "body shape missing config_entries";
+      console.warn(`${type}/${entry.id} ${reason}; form will render empty`);
     })
   );
   for (const r of results) {
