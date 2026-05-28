@@ -481,6 +481,22 @@ export class ESPHomePageDevice extends LitElement {
       // still needs the gate to flip, and a yaml-fallback would
       // reintroduce the double-fetch this PR removes when yaml
       // beats the context.
+      //
+      // Known narrow window: a wizard-just-created device fires
+      // the backend event that adds it to ``_devices`` a beat
+      // after navigation lands. In that gap ``_devicesLoaded``
+      // is already true (from the initial subscribe-events
+      // payload) but ``_device`` is still null, so the gate
+      // flips here with ``platform=""`` and the navigator
+      // kickoff fires once against the empty bucket. When the
+      // event arrives and ``_device`` resolves with a real
+      // ``board_id``, the board-fetch branch resets the gate
+      // and the navigator fires again with the resolved
+      // platform. Self-correcting (labels still come up) but
+      // does pay the one extra round trip the rest of this PR
+      // exists to avoid. The tightest fix would be a "context
+      // has settled for *this id*" signal; we don't have one
+      // today.
       if (this._loadedBoardId !== null) {
         this._loadedBoardId = null;
         this._board = null;
