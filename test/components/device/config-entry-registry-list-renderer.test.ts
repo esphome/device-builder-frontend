@@ -498,29 +498,24 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     ]);
   });
 
-  it("LAMBDA dispatch round-trips through emitChange as the {_lambda} sentinel", async () => {
-    // The previous implementation wrote ``{lambda: {_lambda: body}}``
-    // explicitly via ``_setLambdaBody``. After the refactor the LAMBDA
-    // renderer (``renderLambdaField``) emits the same ``{_lambda: body}``
-    // sentinel at the row's polymorphic value position; the serializer's
-    // existing list-item lambda branch turns that into ``- lambda: |- body``.
-    // Wire a stub renderEntry that fires renderLambdaField's @lambda-change
-    // shape so a future LAMBDA-renderer change can't silently drift the
-    // contract between this dispatch and the YAML round-trip.
-    const emit = vi.fn();
-    const renderEntry = vi.fn((_entry: unknown, path: string[]) => {
-      // Simulate the LAMBDA renderer's emit shape: a single
-      // ``{ _lambda: body }`` write to the field's path.
-      emit(path, { _lambda: "return x;" });
-      return null;
-    });
+  it("suppresses scalar dispatch when params is already a mapping (defensive)", async () => {
+    // Belt-and-braces: if the backend ever mistags a mapping-valued
+    // id with value_type: 'time_period' (catalog miscategorisation),
+    // the runtime params shape wins so an existing mapping doesn't
+    // get clobbered by a scalar input.
+    const renderEntry = vi.fn();
     const catalog = [
       {
-        id: "lambda",
-        name: "Lambda",
-        config_entries: [],
+        id: "delayed_on_off",
+        name: "Delayed On Off",
         applies_to: [],
-        value_type: "lambda",
+        config_entries: [
+          makeEntry(ConfigEntryType.TIME_PERIOD, { key: "time_on" }),
+          makeEntry(ConfigEntryType.TIME_PERIOD, { key: "time_off" }),
+        ],
+        // Hypothetical miscategorisation: catalog says scalar, YAML
+        // has a mapping.
+        value_type: "time_period",
       },
     ];
     const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
@@ -531,18 +526,26 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     });
     el.path = ["filters"];
     el.ctx = makeRenderCtx(
-      { filters: [{ lambda: null }] },
-      { overrides: { renderEntry: renderEntry as never } }
+      { filters: [{ delayed_on_off: { time_on: "50ms", time_off: "100ms" } }] },
+      { overrides: { renderEntry } }
     );
     document.body.append(el);
     (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
     el.requestUpdate();
     await el.updateComplete;
-    // emit was called with the polymorphic value-position path, not
-    // a nested child path. setIn at that path lands the sentinel
-    // under the row's single key (``{lambda: {_lambda: body}}``).
-    expect(emit).toHaveBeenCalledWith(["filters", "0", "lambda"], {
-      _lambda: "return x;",
+    const calls = renderEntry.mock.calls.map((c) => ({
+      type: (c[0] as { type: string }).type,
+      path: c[1],
+    }));
+    // Mapping dispatch fires (per-key children), scalar dispatch
+    // doesn't (no TIME_PERIOD bound to the polymorphic value path).
+    expect(calls).toContainEqual({
+      type: ConfigEntryType.TIME_PERIOD,
+      path: ["filters", "0", "delayed_on_off", "time_on"],
+    });
+    expect(calls).not.toContainEqual({
+      type: ConfigEntryType.TIME_PERIOD,
+      path: ["filters", "0", "delayed_on_off"],
     });
   });
 

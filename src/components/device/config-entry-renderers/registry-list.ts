@@ -108,12 +108,12 @@ interface RegistryOps {
   dedupByTypeId: boolean;
 }
 
-/** Map a registry entry's ``value_type`` (backend's scalar-extends
- *  classification: time_period / float / integer / string) to the
- *  ConfigEntryType the per-field renderer dispatch knows. The
- *  registry-list sub-form constructs a synthetic ConfigEntry of the
- *  matching type and routes through ``ctx.renderEntry`` so each
- *  scalar shape reuses the same input widget the regular form does. */
+/** Map a registry entry's ``value_type`` (time_period / float /
+ *  integer / string / lambda) to the ConfigEntryType the per-field
+ *  renderer dispatch knows. The registry-list sub-form constructs a
+ *  synthetic ConfigEntry of the matching type and routes through
+ *  ``ctx.renderEntry`` so each scalar shape reuses the same input
+ *  widget the regular form does. */
 const VALUE_TYPE_TO_CONFIG_TYPE: Record<RegistryValueType, ConfigEntryType> = {
   time_period: ConfigEntryType.TIME_PERIOD,
   float: ConfigEntryType.FLOAT,
@@ -490,8 +490,12 @@ export class ESPHomeRegistryList extends LitElement {
     // reuses the same widgets the regular form does. Falls back to a
     // runtime check on the params value for polymorphic shorthands
     // (``delayed_on_off: 50ms`` shorthand for the mapping form) the
-    // catalog doesn't classify.
-    const scalarConfigType = this._scalarDispatchType(catalogEntry, params);
+    // catalog doesn't classify. Suppressed when params is already a
+    // mapping so a hypothetical catalog miscategorisation can't
+    // clobber an existing nested config.
+    const scalarConfigType = paramsIsMapping
+      ? null
+      : this._scalarDispatchType(catalogEntry, params);
     // Render every child unconditionally — the user opted into this
     // filter/effect by picking it from the dropdown, so the outer
     // form's advanced / requiredOnly gates don't apply (many filters
