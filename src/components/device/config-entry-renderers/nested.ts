@@ -119,6 +119,11 @@ export function onEnableToggle(
       stash.delete(stashKey);
       ctx.emitChange(path, restored);
     } else {
+      // Seed the *localized* label the user is looking at, so the
+      // name they get matches the switch they clicked (WYSIWYG) and
+      // reads natively in their dashboard locale. It's a plain
+      // editable value, not locale-pinned state — don't "fix" this
+      // to the entry key.
       ctx.emitChange([...path, "name"], label);
     }
     if (!isOpen) ctx.toggleNested(key);

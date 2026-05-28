@@ -23,6 +23,13 @@ describe("hasSerializableValue", () => {
     expect(hasSerializableValue({ name: "", id: undefined, nested: {} })).toBe(false);
   });
 
+  it("treats a non-empty list as a value even when its items are empty", () => {
+    // serializeListItem emits a bare ``-`` dash for {} / null items,
+    // so any non-empty array produces output regardless of contents.
+    expect(hasSerializableValue([{}])).toBe(true);
+    expect(hasSerializableValue([null])).toBe(true);
+  });
+
   it("treats scalars and non-empty containers as a value", () => {
     expect(hasSerializableValue("x")).toBe(true);
     expect(hasSerializableValue(0)).toBe(true);

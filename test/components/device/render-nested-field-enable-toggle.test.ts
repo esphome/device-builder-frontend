@@ -79,6 +79,27 @@ function makeCtx(initial: Record<string, unknown>): CtxStub {
 const json = (tpl: unknown): string =>
   JSON.stringify(tpl, (k, v) => (k === "_$litType$" ? 0 : v));
 
+// Locate the wa-switch sub-template by its label binding (robust to
+// sibling render order) and return its bound values.
+function switchBindings(tpl: { values: unknown[] }): unknown[] | null {
+  let found: unknown[] | null = null;
+  const walk = (v: unknown): void => {
+    if (found) return;
+    if (Array.isArray(v)) {
+      v.forEach(walk);
+    } else if (v && typeof v === "object" && "values" in v) {
+      const vals = (v as { values: unknown[] }).values;
+      if (vals.some((x) => typeof x === "string" && x.includes("device.enable_entity"))) {
+        found = vals;
+      } else {
+        walk(vals);
+      }
+    }
+  };
+  walk(tpl.values);
+  return found;
+}
+
 describe("renderNestedField enable switch", () => {
   it("renders the switch for an optional entity sub-reading", () => {
     const tpl = renderNestedField(makeSensorEntry(), ["min_free"], makeCtx({}).ctx);
@@ -95,6 +116,21 @@ describe("renderNestedField enable switch", () => {
     const entry = makeSensorEntry({ required: true });
     const tpl = renderNestedField(entry, ["min_free"], makeCtx({}).ctx);
     expect(json(tpl)).not.toContain("device.enable_entity");
+  });
+
+  it("renders the switch disabled for a board-locked entry", () => {
+    const tpl = renderNestedField(
+      makeSensorEntry({ locked: true }),
+      ["min_free"],
+      makeCtx({}).ctx
+    );
+    const vals = switchBindings(tpl);
+    expect(vals).not.toBeNull();
+    // Switch boolean bindings, template order: [.checked, ?disabled].
+    expect((vals as unknown[]).filter((v) => typeof v === "boolean")).toEqual([
+      false,
+      true,
+    ]);
   });
 });
 

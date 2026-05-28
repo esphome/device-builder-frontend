@@ -295,6 +295,9 @@ function serializeListItem(
 export function hasSerializableValue(value: unknown): boolean {
   if (value === undefined || value === null || value === "") return false;
   if (value instanceof YamlRawValue) return true;
+  // A non-empty list always emits: ``serializeListItem`` renders a
+  // bare ``-`` dash even for ``{}`` / ``null`` items, so length alone
+  // decides (no per-item recursion needed to agree with the output).
   if (Array.isArray(value)) return value.length > 0;
   if (isLambdaValue(value)) return true;
   if (isPlainObject(value)) return Object.values(value).some(hasSerializableValue);
