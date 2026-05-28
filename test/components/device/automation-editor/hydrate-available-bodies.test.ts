@@ -6,7 +6,10 @@ import type {
   AvailableAutomations,
   ConfigEntry,
 } from "../../../../src/api/types.js";
-import { hydrateAvailableBodies } from "../../../../src/components/device/automation-editor/hydrate-available-bodies.js";
+import {
+  hydrateAvailableBodies,
+  loadAndHydrateAvailable,
+} from "../../../../src/components/device/automation-editor/hydrate-available-bodies.js";
 
 const configEntry = (key: string): ConfigEntry => ({ key }) as ConfigEntry;
 
@@ -131,5 +134,97 @@ describe("hydrateAvailableBodies", () => {
       warnSpy.mock.calls.some((args) => String(args[0]).includes("body fetch failed"))
     ).toBe(true);
     warnSpy.mockRestore();
+  });
+});
+
+describe("loadAndHydrateAvailable", () => {
+  const emptySlim = (): AvailableAutomations =>
+    ({
+      triggers: [],
+      actions: [],
+      conditions: [],
+      scripts: [],
+      devices: [],
+    }) as unknown as AvailableAutomations;
+
+  it("issues exactly one getAvailableAutomations call per invocation", async () => {
+    const slim = emptySlim();
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slim);
+    const api = { getAvailableAutomations } as unknown as ESPHomeAPI;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
+
+    expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
+    expect(getAvailableAutomations).toHaveBeenCalledWith("device.yaml");
+    expect(outcome.status).toBe("ok");
+  });
+
+  it("returns fresh array refs in the hydrated outcome", async () => {
+    const slim = emptySlim();
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+    } as unknown as ESPHomeAPI;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
+    if (outcome.status !== "ok") throw new Error("expected ok");
+
+    expect(outcome.available).not.toBe(outcome.slim);
+    expect(outcome.available.triggers).not.toBe(outcome.slim.triggers);
+    expect(outcome.available.actions).not.toBe(outcome.slim.actions);
+    expect(outcome.available.conditions).not.toBe(outcome.slim.conditions);
+  });
+
+  it("paints via onSlim before awaiting hydration", async () => {
+    const slim = emptySlim();
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+    } as unknown as ESPHomeAPI;
+    const onSlim = vi.fn();
+
+    await loadAndHydrateAvailable(api, "device.yaml", { onSlim });
+
+    expect(onSlim).toHaveBeenCalledTimes(1);
+    expect(onSlim).toHaveBeenCalledWith(slim);
+  });
+
+  it("returns 'stale' when isStale flips during the fetch", async () => {
+    const slim = emptySlim();
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+    } as unknown as ESPHomeAPI;
+    const onSlim = vi.fn();
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
+      onSlim,
+      isStale: () => true,
+    });
+
+    expect(outcome.status).toBe("stale");
+    expect(onSlim).not.toHaveBeenCalled();
+  });
+
+  it("returns 'error' when the api call rejects", async () => {
+    const api = {
+      getAvailableAutomations: vi.fn().mockRejectedValue(new Error("network down")),
+    } as unknown as ESPHomeAPI;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml");
+
+    expect(outcome.status).toBe("error");
+    if (outcome.status === "error") {
+      expect((outcome.error as Error).message).toBe("network down");
+    }
+  });
+
+  it("error path defers to 'stale' when the load was superseded", async () => {
+    const api = {
+      getAvailableAutomations: vi.fn().mockRejectedValue(new Error("net")),
+    } as unknown as ESPHomeAPI;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
+      isStale: () => true,
+    });
+
+    expect(outcome.status).toBe("stale");
   });
 });

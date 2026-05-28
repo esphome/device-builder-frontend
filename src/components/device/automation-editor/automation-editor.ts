@@ -52,7 +52,7 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { hydrateAvailableBodies } from "./hydrate-available-bodies.js";
+import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -385,29 +385,31 @@ export class ESPHomeAutomationEditor extends LitElement {
     this._loading = true;
     this._error = "";
     try {
-      const available = await this._api.getAvailableAutomations(this.configuration);
-      if (seq !== this._loadAvailableSeq) return;
-      // Paint the picker with the slim list immediately.
-      this._available = available;
-      const hydration = await hydrateAvailableBodies(this._api, available);
-      if (seq !== this._loadAvailableSeq) return;
-      // Reassign ``_available`` with fresh array refs so child
-      // components (trigger picker, condition tree, action node)
-      // whose ``@property`` bindings default to identity-based
-      // ``hasChanged`` re-render with the hydrated entries.
-      this._available = {
-        ...available,
-        triggers: [...available.triggers],
-        actions: [...available.actions],
-        conditions: [...available.conditions],
-      };
-      const failures =
-        hydration.missingBody + hydration.missingField + hydration.rejected;
+      const outcome = await loadAndHydrateAvailable(this._api, this.configuration, {
+        // Paint the picker with the slim list immediately so the
+        // dropdowns mount before bodies hydrate.
+        onSlim: (slim) => {
+          if (seq === this._loadAvailableSeq) this._available = slim;
+        },
+        isStale: () => seq !== this._loadAvailableSeq,
+      });
+      if (outcome.status === "stale") return;
+      if (outcome.status === "error") {
+        this._error =
+          outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+        return;
+      }
+      // Fresh array refs so identity-based ``hasChanged`` consumers
+      // (trigger picker, condition tree, action node) re-render
+      // with the hydrated entries.
+      this._available = outcome.available;
+      const { missingBody, missingField, rejected } = outcome.hydration;
+      const failures = missingBody + missingField + rejected;
       if (failures > 0) {
-        // Soft surface: log + non-blocking toast. Don't set
-        // ``_error`` since the picker is still usable for the
-        // entries that hydrated; ``cacheMisses: false`` lets a
-        // re-mount retry the missing ones.
+        // Soft surface: non-blocking toast. Don't set ``_error``
+        // since the picker is still usable for the entries that
+        // hydrated; ``cacheMisses: false`` lets a re-mount retry
+        // the missing ones.
         toast.error(
           this._localize("device.automation_partial_hydration", {
             count: String(failures),
@@ -415,9 +417,6 @@ export class ESPHomeAutomationEditor extends LitElement {
           { richColors: true }
         );
       }
-    } catch (err) {
-      if (seq !== this._loadAvailableSeq) return;
-      this._error = err instanceof Error ? err.message : String(err);
     } finally {
       if (seq === this._loadAvailableSeq) this._loading = false;
     }

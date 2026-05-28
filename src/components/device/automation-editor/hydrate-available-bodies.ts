@@ -52,3 +52,54 @@ export async function hydrateAvailableBodies(
   }
   return result;
 }
+
+/** Discriminated outcome of :func:`loadAndHydrateAvailable`. */
+export type LoadAndHydrateOutcome =
+  | {
+      status: "ok";
+      slim: AvailableAutomations;
+      available: AvailableAutomations;
+      hydration: HydrationResult;
+    }
+  | { status: "stale" }
+  | { status: "error"; error: unknown };
+
+/** Fetch the slim ``AvailableAutomations`` for *configuration* and
+ *  hydrate ``config_entries`` for every entry, returning fresh
+ *  array references so identity-based ``hasChanged`` consumers
+ *  re-render with the hydrated entries. The caller owns the
+ *  state-mutation policy (``_available`` / ``_loading`` /
+ *  ``_error`` on the editor element); this function is a thin
+ *  orchestration wrapper that the editor element wires into its
+ *  Lit lifecycle.
+ *
+ *  ``onSlim`` lets the caller paint the picker with the slim list
+ *  immediately, before awaiting hydration. ``isStale`` is checked
+ *  after each await so an overlapping load can bail out
+ *  cleanly. */
+export async function loadAndHydrateAvailable(
+  api: ESPHomeAPI,
+  configuration: string,
+  options?: {
+    onSlim?: (slim: AvailableAutomations) => void;
+    isStale?: () => boolean;
+  }
+): Promise<LoadAndHydrateOutcome> {
+  try {
+    const slim = await api.getAvailableAutomations(configuration);
+    if (options?.isStale?.()) return { status: "stale" };
+    options?.onSlim?.(slim);
+    const hydration = await hydrateAvailableBodies(api, slim);
+    if (options?.isStale?.()) return { status: "stale" };
+    const available: AvailableAutomations = {
+      ...slim,
+      triggers: [...slim.triggers],
+      actions: [...slim.actions],
+      conditions: [...slim.conditions],
+    };
+    return { status: "ok", slim, available, hydration };
+  } catch (error) {
+    if (options?.isStale?.()) return { status: "stale" };
+    return { status: "error", error };
+  }
+}
