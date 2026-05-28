@@ -882,4 +882,28 @@ export const dashboardStyles = css`
   .fab-btn wa-icon {
     font-size: 18px;
   }
+
+  /* Mobile content-padding trim. The card grid, toolbar, and YAML
+     hit list all sit at --wa-space-l (24px) horizontal padding;
+     on a 375px phone viewport that's ~13% of the width per side
+     gone to chrome. Tighten to --wa-space-s (8px) so device cards
+     and the toolbar row claim the available width. Placed last in
+     the stylesheet so source-order wins against the base
+     declarations above. #41 */
+  @media (max-width: 600px) {
+    .devices-grid {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
+
+    .toolbar {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
+
+    .yaml-hits {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
+  }
 `;
