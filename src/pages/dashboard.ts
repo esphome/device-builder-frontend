@@ -224,6 +224,13 @@ export class ESPHomePageDashboard extends LitElement {
     )
   );
   private _computeLabelUsageMemo = memoizeOne(computeLabelUsage);
+  /** id → name map rebuilt once per labels-catalog reference change.
+   *  ``_syncUrl`` looks up the names for every selected label id; the
+   *  prior shape was a linear search per id, which is O(N×M) over the
+   *  full catalog on every search keystroke / facet click. */
+  private _labelNamesById = memoizeOne(
+    (catalog: Label[]) => new Map(catalog.map((l) => [l.id, l.name]))
+  );
 
   @query("esphome-api-key-dialog") _apiKeyDialog!: ESPHomeApiKeyDialog;
   @query("esphome-archived-devices-dialog")
@@ -369,12 +376,11 @@ export class ESPHomePageDashboard extends LitElement {
     // refresh during that window doesn't drop the param. Once the
     // catalog arrives and we resolve to ids, the catalog → name
     // mapping kicks in below.
+    const byId = this._labelNamesById(this._labelsCatalog);
     const labelNames =
       this._pendingLabelNames !== null
         ? this._pendingLabelNames
-        : this._selectedLabels
-            .map((id) => this._labelsCatalog.find((l) => l.id === id)?.name)
-            .filter((n): n is string => !!n);
+        : this._selectedLabels.map((id) => byId.get(id)).filter((n): n is string => !!n);
     writeDashboardUrl({
       search: this._search,
       labels: labelNames,
