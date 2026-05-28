@@ -34,6 +34,8 @@ import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
+  AutomationAction,
+  AutomationCondition,
   AutomationLocation,
   AutomationTree,
   AutomationTrigger,
@@ -48,6 +50,7 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { fetchAutomationBody } from "../../../util/automation-body-cache.js";
 import {
   fetchComponent,
   getCachedComponent,
@@ -384,10 +387,34 @@ export class ESPHomeAutomationEditor extends LitElement {
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     try {
-      this._available = await this._api.getAvailableAutomations(this.configuration);
+      const available = await this._api.getAvailableAutomations(this.configuration);
+      await this._hydrateAvailableBodies(available);
+      this._available = available;
     } catch (err) {
       this._error = err instanceof Error ? err.message : String(err);
     }
+  }
+
+  private async _hydrateAvailableBodies(available: AvailableAutomations): Promise<void> {
+    if (!this._api) return;
+    const api = this._api;
+    type Entry = AutomationTrigger | AutomationAction | AutomationCondition;
+    const jobs: Promise<void>[] = [];
+    const merge = (type: "triggers" | "actions" | "conditions", list: Entry[]): void => {
+      for (const entry of list) {
+        jobs.push(
+          fetchAutomationBody(api, type, entry.id).then((body) => {
+            if (body && "config_entries" in body) {
+              entry.config_entries = body.config_entries;
+            }
+          })
+        );
+      }
+    };
+    merge("triggers", available.triggers);
+    merge("actions", available.actions);
+    merge("conditions", available.conditions);
+    await Promise.all(jobs);
   }
 
   protected render() {

@@ -13,6 +13,7 @@ import type {
   AddComponentResponse,
   ArchivedDevice,
   AutomationAction,
+  AutomationCatalogBody,
   AutomationCondition,
   AutomationTree,
   AutomationTrigger,
@@ -1379,6 +1380,26 @@ export class ESPHomeAPI {
       ...(platform ? { platform } : {}),
       ...(boardId ? { board_id: boardId } : {}),
     });
+  }
+
+  /**
+   * Hydrate full automation bodies (config_entries trees) in one
+   * round trip. Each ref is ``{type, id}`` where ``type`` is one of
+   * ``triggers`` / ``actions`` / ``conditions`` / ``light_effects``
+   * / ``filters``. The response is keyed by ``"<type>/<id>"`` and
+   * carries the full body. Missing / unknown refs are absent.
+   * Callers should go through ``automation-body-cache.ts`` rather
+   * than calling this directly; it caches results and coalesces
+   * concurrent fetches into one batched call.
+   */
+  async getAutomationBodies(
+    refs: { type: string; id: string }[]
+  ): Promise<Record<string, AutomationCatalogBody>> {
+    if (refs.length === 0) return {};
+    return this.sendCommand<Record<string, AutomationCatalogBody>>(
+      "automations/get_bodies",
+      { refs }
+    );
   }
 
   /**

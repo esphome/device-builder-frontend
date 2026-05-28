@@ -125,7 +125,7 @@ describe("component-name-cache", () => {
     const pending = fetchComponent(api, "wifi");
     _clearComponentCache();
 
-    await expect(pending).rejects.toThrow("component cache cleared");
+    await expect(pending).rejects.toThrow("component-name-cache cleared");
   });
 
   it("does not resolve prototype keys as cache hits", async () => {
