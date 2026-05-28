@@ -5,6 +5,7 @@ export const dashboardStyles = css`
     display: flex;
     flex-direction: column;
     position: relative;
+    box-sizing: border-box;
     height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
