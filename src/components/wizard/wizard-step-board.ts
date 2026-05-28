@@ -305,6 +305,33 @@ export class ESPHomeWizardStepBoard extends LitElement {
         .boards-grid {
           grid-template-columns: 1fr;
         }
+
+        /* Featured (Apollo Starter Kit) card: image-left + text-right
+           wraps to one word per line at phone width. Stack vertically
+           so the description has the full card width. #41 */
+        .featured-card {
+          flex-direction: column;
+          gap: var(--wa-space-s);
+        }
+
+        .featured-image {
+          width: 100%;
+          height: 160px;
+        }
+
+        /* Regular board cards: header row was image-on-left + title-on-
+           the-right; at narrow widths the right column shrinks to
+           ~140px and titles wrap awkwardly. Stack image above title
+           so each row gets the full card width. #41 */
+        .board-card-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .board-image {
+          width: 100%;
+          height: 100px;
+        }
       }
 
       .board-card {

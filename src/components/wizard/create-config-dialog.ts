@@ -96,6 +96,18 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         --width: 750px;
       }
 
+      /* Mobile: drop both width variants to fullscreen so the
+         wizard's board picker and per-step bodies have room to
+         breathe instead of getting boxed into a 520px column
+         flanked by black gutters. #41 */
+      @media (max-width: 600px) {
+        wa-dialog,
+        wa-dialog.wide {
+          --width: 100vw;
+          --height: 100vh;
+        }
+      }
+
       wa-dialog::part(header) {
         background: var(--esphome-primary);
         /* Right padding is 0 so the close button sits flush with the
