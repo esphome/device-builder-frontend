@@ -64,12 +64,10 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _devices: ConfiguredDevice[] = [];
 
-  /** Flips ``true`` after the initial devices-list fetch has
-   *  resolved, regardless of whether it returned any devices. The
-   *  ``_platformReady`` gate uses this to distinguish "context still
-   *  loading" from "context delivered, our id isn't here" — using
-   *  ``_devices.length > 0`` would miss the legitimate zero-device
-   *  state and strand the gate forever. */
+  /** ``true`` once the initial subscribe-events payload landed.
+   *  ``_platformReady`` uses this to tell "context still loading"
+   *  apart from "context delivered, our id isn't here" — a length
+   *  check would strand the gate on a zero-device dashboard. */
   @consume({ context: devicesLoadedContext, subscribe: true })
   @state()
   private _devicesLoaded = false;
@@ -106,14 +104,11 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _board: BoardCatalogEntry | null = null;
 
-  /** Flips ``true`` once we know the answer about this device's
-   *  ``platform``: either the board manifest resolved (success or
-   *  definitive failure), or the device has no ``board_id`` (no
-   *  manifest to fetch). The navigator gates its name-resolve
-   *  kickoff on this signal so it fires exactly once with the
-   *  final ``platform`` context instead of double-fetching on the
-   *  yaml-edge with ``platform=undefined`` and then again on the
-   *  platform-edge. Re-fetched per device-id change. */
+  /** ``true`` once this device's platform is known (manifest
+   *  fetched, fetch failed, or no ``board_id``). The navigator
+   *  gates its kickoff on this so it fires once with the final
+   *  platform instead of twice (yaml-edge + platform-edge).
+   *  Resets on device-id change. */
   @state()
   private _platformReady = false;
 
@@ -460,43 +455,21 @@ export class ESPHomePageDevice extends LitElement {
     const boardId = this._device?.board_id ?? null;
     if (boardId && boardId !== this._loadedBoardId) {
       this._loadedBoardId = boardId;
-      // Drop the previous board immediately so derived props
-      // (``.platform``, ``.boardName``) don't stay out of sync
-      // with the in-flight ``board_id``. Restored by the success
-      // branch of ``_loadBoard``; left null on failure.
+      // Drop the previous board now so derived props
+      // (``.platform``, ``.boardName``) don't lag the in-flight
+      // ``board_id``. Restored on success, left null on failure.
       this._board = null;
       this._platformReady = false;
       this._loadBoard(boardId);
     } else if (!boardId) {
-      // No board id to fetch — either the device resolved with no
-      // ``board_id`` (wizard re-run / created without one), or
-      // the devices context has loaded and our id isn't in it
-      // (deleted / stale link). Both are signals that no manifest
-      // fetch is coming; release the gate.
-      //
-      // We gate the missing-id branch on
-      // ``this._devicesLoaded`` (provided by ``app-shell`` via
-      // ``devicesLoadedContext``) rather than
-      // ``_devices.length > 0`` — the legitimate zero-device case
-      // still needs the gate to flip, and a yaml-fallback would
-      // reintroduce the double-fetch this PR removes when yaml
-      // beats the context.
-      //
-      // Known narrow window: a wizard-just-created device fires
-      // the backend event that adds it to ``_devices`` a beat
-      // after navigation lands. In that gap ``_devicesLoaded``
-      // is already true (from the initial subscribe-events
-      // payload) but ``_device`` is still null, so the gate
-      // flips here with ``platform=""`` and the navigator
-      // kickoff fires once against the empty bucket. When the
-      // event arrives and ``_device`` resolves with a real
-      // ``board_id``, the board-fetch branch resets the gate
-      // and the navigator fires again with the resolved
-      // platform. Self-correcting (labels still come up) but
-      // does pay the one extra round trip the rest of this PR
-      // exists to avoid. The tightest fix would be a "context
-      // has settled for *this id*" signal; we don't have one
-      // today.
+      // No manifest to fetch (device has no ``board_id`` or our
+      // id isn't in the loaded context — deleted / stale link).
+      // Gate on ``_devicesLoaded`` rather than ``_devices.length
+      // > 0`` so a zero-device dashboard still releases. Known
+      // transient: a wizard-just-created device flips the gate
+      // here once with ``platform=""``, then the device-add
+      // event refires it with the real platform — self-correcting
+      // one-extra-fetch in that narrow window.
       if (this._loadedBoardId !== null) {
         this._loadedBoardId = null;
         this._board = null;
@@ -544,11 +517,9 @@ export class ESPHomePageDevice extends LitElement {
       }
     } catch (e) {
       console.error("Failed to load board:", e);
-      // Definitive failure — drop any previously-cached board
-      // (stale from a prior board_id) so the navigator doesn't
+      // Drop any stale ``_board`` so the navigator doesn't
       // resolve labels against the wrong platform, then release
-      // the gate so labels still come up (with
-      // ``platform=undefined``).
+      // the gate (labels come up with ``platform=undefined``).
       if (this._loadedBoardId === boardId) {
         this._board = null;
         this._platformReady = true;

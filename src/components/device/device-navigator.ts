@@ -134,12 +134,11 @@ export class ESPHomeDeviceNavigator extends LitElement {
   @property()
   platform = "";
 
-  /** ``true`` once the parent has settled the platform resolution
-   *  (board manifest fetched or definitively absent). Until this
-   *  flips true, ``_kickoffNameResolves`` holds off so we don't
-   *  fire one fetch with ``platform=""`` and another with the real
-   *  platform — both would hit different ``BatchedCache`` buckets
-   *  and the first would be orphaned. */
+  /** ``true`` once the parent's platform resolution settles.
+   *  Without this gate the kickoff fires twice (yaml-edge with
+   *  ``platform=""``, then platform-edge with the real value);
+   *  the two land in different ``BatchedCache`` buckets so the
+   *  first round-trip is orphaned. */
   @property({ type: Boolean })
   platformReady = false;
 
@@ -389,12 +388,8 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
-    // Gate the name-resolve kickoff on ``platformReady`` so we fire
-    // exactly once with the final platform context. Re-fire when
-    // ``yaml``, ``platform``, or the readiness flag itself flips —
-    // typical mount order is ``yaml`` first, then ``platformReady``
-    // when the parent's board fetch settles, which lands here as
-    // the single edge we want.
+    // Fire on whichever of yaml / platform / platformReady arrives
+    // last; the conjunction ensures one kickoff per mount.
     if (
       (changedProperties.has("yaml") ||
         changedProperties.has("platform") ||
