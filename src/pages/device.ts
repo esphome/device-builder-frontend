@@ -451,16 +451,22 @@ export class ESPHomePageDevice extends LitElement {
       this._loadedBoardId = boardId;
       this._platformReady = false;
       this._loadBoard(boardId);
-    } else if (!boardId && this._device !== null) {
-      // Device context has resolved with no ``board_id`` (rare —
-      // wizard re-run cleared it, or device was created without a
-      // board pin). No manifest to fetch; platform is
-      // definitively unknown.
+    } else if (!boardId) {
+      // No board id to fetch: either the device context has
+      // resolved with no ``board_id`` (rare — wizard re-run
+      // cleared it / device created without a board pin), or the
+      // device isn't in the devices context at all (deleted /
+      // stale id / context not yet loaded). In both cases there's
+      // no manifest to fetch; release the gate once we have
+      // *some* signal the page is operable, so the navigator can
+      // resolve labels with ``platform=undefined``.
       if (this._loadedBoardId !== null) {
         this._loadedBoardId = null;
         this._board = null;
       }
-      this._platformReady = true;
+      if (this._device !== null || this._yaml) {
+        this._platformReady = true;
+      }
     }
   }
 
