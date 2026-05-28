@@ -113,11 +113,10 @@ export function onEnableToggle(
   ctx: RenderCtx
 ): void {
   const stash = _enableStash(ctx);
-  const stashKey = key;
   if (checked) {
-    const restored = stash.get(stashKey);
+    const restored = stash.get(key);
     if (restored && hasSerializableValue(restored)) {
-      stash.delete(stashKey);
+      stash.delete(key);
       ctx.emitChange(path, restored);
     } else {
       // Seed the *localized* label the user is looking at, so the
@@ -134,7 +133,7 @@ export function onEnableToggle(
     // scalars / arrays) so the stashed type is genuinely a Record.
     const current = ctx.getAt(path);
     if (isPlainObject(current) && hasSerializableValue(current)) {
-      stash.set(stashKey, current);
+      stash.set(key, current);
     }
     ctx.emitChange(path, undefined);
     if (isOpen) ctx.toggleNested(key);
