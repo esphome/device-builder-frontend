@@ -219,7 +219,10 @@ export class ESPHomeAutomationEditor extends LitElement {
     // and re-pins location) don't accidentally unlock the picker
     // after it should stay locked.
     this._editMode = !this.addMode;
-    void this._loadCatalogs();
+    // ``_loadAvailable`` fires from ``updated()`` on the first
+    // render once ``configuration`` lands — no separate kickoff
+    // here, otherwise we'd send two ``automations/get_available``
+    // calls per mount.
     // Announce so the page-level save guard (device.ts) can hold a
     // direct ref and call flushPending() before its global save.
     // Mirrors device-section-config's section-mount event.
@@ -358,19 +361,6 @@ export class ESPHomeAutomationEditor extends LitElement {
     }
   }
 
-  private async _loadCatalogs() {
-    if (!this._api) return;
-    this._loading = true;
-    this._error = "";
-    try {
-      if (this.configuration) await this._loadAvailable();
-    } catch (err) {
-      this._error = err instanceof Error ? err.message : String(err);
-    } finally {
-      this._loading = false;
-    }
-  }
-
   /**
    * Re-hydrate from the live YAML. Called by the parent
    * (``device-board-info``) when the YAML pane changes the document
@@ -394,6 +384,8 @@ export class ESPHomeAutomationEditor extends LitElement {
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
     const seq = ++this._loadAvailableSeq;
+    this._loading = true;
+    this._error = "";
     try {
       const available = await this._api.getAvailableAutomations(this.configuration);
       if (seq !== this._loadAvailableSeq) return;
@@ -428,6 +420,8 @@ export class ESPHomeAutomationEditor extends LitElement {
     } catch (err) {
       if (seq !== this._loadAvailableSeq) return;
       this._error = err instanceof Error ? err.message : String(err);
+    } finally {
+      if (seq === this._loadAvailableSeq) this._loading = false;
     }
   }
 
