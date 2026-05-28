@@ -15,6 +15,7 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -125,10 +126,22 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   static styles = [espHomeStyles, firmwareJobsDialogStyles];
 
+  /** Bucket the live jobs Map into sorted / active / terminal lists.
+   *  Memoised on the upstream Map reference; the context provider
+   *  hands out a new Map identity on every job-lifecycle push, so
+   *  the cache invalidates exactly when the lists would change. One
+   *  sort + two filter passes per push, not per render. */
+  private _bucketJobs = memoizeOne((jobs: Map<string, FirmwareJob>) => {
+    const sorted = [...jobs.values()].sort(compareJobs);
+    return {
+      sorted,
+      active: sorted.filter((j) => !isTerminal(j)),
+      terminal: sorted.filter((j) => isTerminal(j)),
+    };
+  });
+
   protected render() {
-    const sorted = [...this._jobs.values()].sort(compareJobs);
-    const active = sorted.filter((j) => !isTerminal(j));
-    const terminal = sorted.filter((j) => isTerminal(j));
+    const { sorted, active, terminal } = this._bucketJobs(this._jobs);
     const hasJobs = sorted.length > 0;
 
     return html`
