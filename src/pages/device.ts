@@ -95,6 +95,17 @@ export class ESPHomePageDevice extends LitElement {
   @state()
   private _board: BoardCatalogEntry | null = null;
 
+  /** Flips ``true`` once we know the answer about this device's
+   *  ``platform``: either the board manifest resolved (success or
+   *  definitive failure), or the device has no ``board_id`` (no
+   *  manifest to fetch). The navigator gates its name-resolve
+   *  kickoff on this signal so it fires exactly once with the
+   *  final ``platform`` context instead of double-fetching on the
+   *  yaml-edge with ``platform=undefined`` and then again on the
+   *  platform-edge. Re-fetched per device-id change. */
+  @state()
+  private _platformReady = false;
+
   /** Last `board_id` we kicked off a fetch for. Used to dedupe so a
    *  re-render doesn't refetch the same board, and to detect board
    *  changes (rename / wizard re-run) and refetch when needed. */
@@ -429,6 +440,7 @@ export class ESPHomePageDevice extends LitElement {
       // next fetch can repopulate.
       this._loadedBoardId = null;
       this._board = null;
+      this._platformReady = false;
       this._loadYaml();
     }
     // Devices context arrives async after connect; kick off the board
@@ -437,11 +449,18 @@ export class ESPHomePageDevice extends LitElement {
     const boardId = this._device?.board_id ?? null;
     if (boardId && boardId !== this._loadedBoardId) {
       this._loadedBoardId = boardId;
+      this._platformReady = false;
       this._loadBoard(boardId);
-    } else if (!boardId && this._loadedBoardId !== null && this._board) {
-      // Device dropped its board_id (rare — wizard re-run cleared it).
-      this._loadedBoardId = null;
-      this._board = null;
+    } else if (!boardId && this._device !== null) {
+      // Device context has resolved with no ``board_id`` (rare —
+      // wizard re-run cleared it, or device was created without a
+      // board pin). No manifest to fetch; platform is
+      // definitively unknown.
+      if (this._loadedBoardId !== null) {
+        this._loadedBoardId = null;
+        this._board = null;
+      }
+      this._platformReady = true;
     }
   }
 
@@ -478,9 +497,14 @@ export class ESPHomePageDevice extends LitElement {
       // `_loadedBoardId` will already point at the new id.
       if (this._loadedBoardId === boardId) {
         this._board = board;
+        this._platformReady = true;
       }
     } catch (e) {
       console.error("Failed to load board:", e);
+      // Definitive failure — release the navigator from its
+      // platform-ready wait so labels still resolve (with
+      // platform=undefined).
+      if (this._loadedBoardId === boardId) this._platformReady = true;
     }
   }
 
@@ -994,6 +1018,7 @@ export class ESPHomePageDevice extends LitElement {
       .boardName=${this._board?.name ?? ""}
       .configuration=${this.id}
       .platform=${this._board?.esphome.platform ?? ""}
+      .platformReady=${this._platformReady}
       .selectedKey=${this._selectedSection}
       .selectedFromLine=${this._selectedFromLine}
     ></esphome-device-navigator>`;
