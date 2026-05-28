@@ -17,6 +17,9 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
+import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
+import { configEntryFormStyles } from "../config-entry-form.styles.js";
 import type { ConfigEntry, RegistryCatalogEntry } from "../../../api/types.js";
 import { isLambdaValue } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
@@ -284,35 +287,45 @@ export class ESPHomeRegistryList extends LitElement {
     this._kickedFetch = false;
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
-    .registry-list-item {
-      margin-bottom: 1rem;
-    }
-    .registry-list-row {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-      margin-bottom: 0.5rem;
-    }
-    .registry-list-row wa-select {
-      flex: 1;
-    }
-    .registry-list-sub-form {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-left: 1rem;
-      padding-left: 1rem;
-      border-left: 2px solid var(--wa-color-surface-border);
-    }
-    .registry-list-fallback {
-      color: var(--wa-color-neutral-fill-loud);
-      font-size: 0.9rem;
-    }
-  `;
+  static styles = [
+    // ctx.renderEntry renders ``.field`` / ``.time-period-inputs`` /
+    // ``.nested-fields`` etc. into the sub-form; those classes live
+    // in the form's stylesheet and don't cross the shadow DOM
+    // boundary into <esphome-registry-list>'s own root, so pull in
+    // the same three stylesheet modules the form mounts.
+    espHomeStyles,
+    inputStyles,
+    configEntryFormStyles,
+    css`
+      :host {
+        display: block;
+      }
+      .registry-list-item {
+        margin-bottom: 1rem;
+      }
+      .registry-list-row {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+        margin-bottom: 0.5rem;
+      }
+      .registry-list-row wa-select {
+        flex: 1;
+      }
+      .registry-list-sub-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-left: 1rem;
+        padding-left: 1rem;
+        border-left: 2px solid var(--wa-color-surface-border);
+      }
+      .registry-list-fallback {
+        color: var(--wa-color-neutral-fill-loud);
+        font-size: 0.9rem;
+      }
+    `,
+  ];
 
   protected render() {
     const ops = this._ops();
