@@ -17,9 +17,6 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
-import { inputStyles } from "../../../styles/inputs.js";
-import { espHomeStyles } from "../../../styles/shared.js";
-import { configEntryFormStyles } from "../config-entry-form.styles.js";
 import type { ConfigEntry, RegistryCatalogEntry } from "../../../api/types.js";
 import { isLambdaValue } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
@@ -35,6 +32,7 @@ import "./lambda-editor.js";
 import { lambdaBodyOf } from "./lambda.js";
 import {
   effectiveDisabled,
+  fieldRendererStyles,
   renderFieldError,
   renderLabel,
   type RenderCtx,
@@ -288,14 +286,10 @@ export class ESPHomeRegistryList extends LitElement {
   }
 
   static styles = [
-    // ctx.renderEntry renders ``.field`` / ``.time-period-inputs`` /
-    // ``.nested-fields`` etc. into the sub-form; those classes live
-    // in the form's stylesheet and don't cross the shadow DOM
-    // boundary into <esphome-registry-list>'s own root, so pull in
-    // the same three stylesheet modules the form mounts.
-    espHomeStyles,
-    inputStyles,
-    configEntryFormStyles,
+    // ctx.renderEntry output uses .field / .time-period-inputs etc.
+    // which live in the form's stylesheets; the shared bundle gives
+    // them to anything hosting renderEntry output across shadow roots.
+    ...fieldRendererStyles,
     css`
       :host {
         display: block;

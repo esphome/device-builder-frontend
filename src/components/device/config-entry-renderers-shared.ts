@@ -15,6 +15,15 @@ import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { inputStyles } from "../../styles/inputs.js";
+import { espHomeStyles } from "../../styles/shared.js";
+import { configEntryFormStyles } from "./config-entry-form.styles.js";
+
+/** Stylesheets every element that hosts ``ctx.renderEntry`` output
+ *  needs in its shadow root: field shell, input styling, and the
+ *  layout rules for compound widgets (``.time-period-inputs``,
+ *  ``.nested-fields``, …) the per-field renderers emit. */
+export const fieldRendererStyles = [espHomeStyles, inputStyles, configEntryFormStyles];
 
 registerMdiIcons({
   "key-variant": mdiKeyVariant,

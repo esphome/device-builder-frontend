@@ -28,8 +28,6 @@ import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { inputStyles } from "../../styles/inputs.js";
-import { espHomeStyles } from "../../styles/shared.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
@@ -42,8 +40,8 @@ import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
 import "./password-input.js";
-import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import {
+  fieldRendererStyles,
   labelFor,
   renderBooleanField,
   renderFloatWithUnitField,
@@ -177,7 +175,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _editingMagnitudes: Map<string, string> = new Map();
 
-  static styles = [espHomeStyles, inputStyles, configEntryFormStyles];
+  static styles = fieldRendererStyles;
 
   /**
    * Filter `entries` for rendering. Delegates to the shared
