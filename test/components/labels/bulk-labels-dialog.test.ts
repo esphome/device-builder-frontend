@@ -660,4 +660,28 @@ describe("esphome-bulk-labels-dialog _apply branches", () => {
     expect(dialog._open).toBe(true);
     expect(dialog._saving).toBe(false);
   });
+
+  test("missing _api routes through catch and surfaces bulk-failure toast", async () => {
+    // The context provider is always wired in production. The
+    // ``!this._api`` branch used to silently early-return,
+    // producing a dead-click Apply button. The fix throws inside
+    // the try block so the (edge-case) failure flows through the
+    // same bulk-failure toast as a transport error.
+    const dialog = makeMockedDialog(
+      async () => [],
+      [
+        makeConfiguredDevice({ configuration: "a.yaml", labels: [] }),
+        makeConfiguredDevice({ configuration: "b.yaml", labels: [] }),
+      ]
+    );
+    dialog._api = undefined;
+    dialog._pendingChanges = new Map([["lbl-a", "checked"]]);
+
+    await dialog._apply();
+
+    expect(errorSpy).toHaveBeenCalledTimes(1);
+    expect(errorSpy.mock.calls[0]?.[0]).toBe("dashboard.labels_bulk_save_failed_other");
+    expect(dialog._open).toBe(true);
+    expect(dialog._saving).toBe(false);
+  });
 });

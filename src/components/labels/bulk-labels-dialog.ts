@@ -474,7 +474,6 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     // button via ``_saving``. Drop the second call here so we don't
     // send two ``set_labels_bulk`` requests for the same payload.
     if (this._saving || !this._hasPendingChanges) return;
-    if (!this._api) return;
     const updates = this.computeUpdates();
     const count = updates.length;
     if (count === 0) {
@@ -499,6 +498,12 @@ export class ESPHomeBulkLabelsDialog extends LitElement {
     const gen = this._applyGeneration;
     this._saving = true;
     try {
+      // The context provider is always wired in production; an
+      // unreachable null here would have silently produced a
+      // dead-click Apply button before. Routing it through the
+      // catch makes the (admittedly edge-case) failure surface
+      // with the same bulk-failure toast as a transport error.
+      if (!this._api) throw new Error("apiContext provider missing");
       const results = await this._api.setDeviceLabelsBulk(updates);
       if (gen !== this._applyGeneration) return;
       const failures = results.filter((r) => !r.success);
