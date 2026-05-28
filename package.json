@@ -32,7 +32,7 @@
     "urlpattern-polyfill": "10.1.0"
   },
   "devDependencies": {
-    "@rspack/core": "2.0.4",
+    "@rspack/core": "2.0.5",
     "@rspack/dev-server": "2.0.1",
     "@swc/helpers": "0.5.23",
     "@types/node": "25.9.1",
