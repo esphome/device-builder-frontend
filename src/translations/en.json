@@ -970,6 +970,8 @@
     "offloader_remote_builds_enabled": "Auto-route installs to remote build",
     "offloader_remote_builds_enabled_desc": "When enabled, the dashboard picks a paired remote build server for each install when one is available; turn off to keep every install local while leaving your pairings in place.",
     "offloader_remote_builds_enabled_loading": "Loading…",
+    "offloader_allow_major_version_mismatch": "Allow mismatched ESPHome release line",
+    "offloader_allow_major_version_mismatch_desc": "Off (recommended): only route remote builds to servers on the same ESPHome release line (year + month, e.g. 2026.5). On (default): allow routing across release lines; firmware may not compile correctly when the line differs.",
     "build_offload_pairing_connected": "Connected",
     "build_offload_pairing_connecting": "Connecting…",
     "build_offload_pairing_disconnected": "Disconnected",

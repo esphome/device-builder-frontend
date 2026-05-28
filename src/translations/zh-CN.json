@@ -978,6 +978,8 @@
     "build_offload_pairing_enabled_title": "自动路由安装时使用此服务器",
     "build_offload_pairing_version_mismatch_patch": "构建服务器运行的是 ESPHome {peer}；你当前为 {local}",
     "build_offload_pairing_version_mismatch_release": "构建服务器运行的是 ESPHome {peer}；你当前为 {local}。跨此版本差异时 YAML 可能无法编译。",
+    "offloader_allow_major_version_mismatch": "允许 ESPHome 发布线不一致",
+    "offloader_allow_major_version_mismatch_desc": "关闭（推荐）：仅将远程构建路由到同一 ESPHome 发布线（年 + 月，例如 2026.5）上的服务器。开启（默认）：允许在不同发布线之间路由；当发布线不同时，固件可能无法正确编译。",
     "remote_build_submit_action": "远程构建",
     "remote_build_submit_aria": "在 {label} 上远程构建",
     "remote_build_view_action": "查看构建",

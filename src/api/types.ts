@@ -1435,6 +1435,8 @@ export enum DeviceEventType {
   // sync their switch state without polling.
   OFFLOADER_REMOTE_BUILDS_TOGGLED = "offloader_remote_builds_toggled",
   OFFLOADER_PAIRING_ENABLED_CHANGED = "offloader_pairing_enabled_changed",
+  // Master major-version-match gate flip.
+  OFFLOADER_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED = "offloader_allow_major_version_mismatch_changed",
 }
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
@@ -1525,6 +1527,9 @@ export interface InitialStateEventData {
    *  install (matches the pre-7b semantic where any APPROVED
    *  + connected + idle pairing was eligible). */
   remote_builds_enabled?: boolean;
+  /** Offloader-side master toggle for the major-version-match
+   *  gate; `true` (default) skips the gate. */
+  allow_major_version_mismatch?: boolean;
 }
 
 /**
@@ -1903,6 +1908,11 @@ export interface PairingWindowState {
  */
 export interface OffloaderRemoteBuildSettings {
   remote_builds_enabled: boolean;
+  /**
+   * Master toggle for the major-version-match gate; `true`
+   * (default) bypasses the gate, `false` activates it.
+   */
+  allow_major_version_mismatch: boolean;
   pairings: PairingSummary[];
 }
 
@@ -2094,6 +2104,11 @@ export interface OffloaderRemoteBuildsToggledEventData {
 export interface OffloaderPairingEnabledChangedEventData {
   pin_sha256: string;
   enabled: boolean;
+}
+
+/** Data payload for ``offloader_allow_major_version_mismatch_changed``. */
+export interface OffloaderAllowMajorVersionMismatchChangedEventData {
+  allow_major_version_mismatch: boolean;
 }
 
 /**

@@ -913,6 +913,8 @@
     "build_offload_pairing_last_error": "Dernière erreur de connexion : {detail}",
     "build_offload_pairing_version_mismatch_patch": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}",
     "build_offload_pairing_version_mismatch_release": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}. Le YAML peut ne pas compiler à travers cet écart de version.",
+    "offloader_allow_major_version_mismatch": "Autoriser une ligne de version ESPHome différente",
+    "offloader_allow_major_version_mismatch_desc": "Désactivé (recommandé) : ne router les compilations distantes que vers les serveurs sur la même ligne de version ESPHome (année + mois, ex. 2026.5). Activé (par défaut) : autoriser le routage entre lignes de version ; le firmware peut ne pas se compiler correctement quand la ligne diffère.",
     "remote_build_submit_action": "Compiler à distance",
     "remote_build_submit_aria": "Compiler à distance sur {label}",
     "remote_build_view_action": "Voir la compilation",

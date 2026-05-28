@@ -1599,21 +1599,23 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Flip the offloader-side master "Remote builds enabled"
-   * toggle (7b).
+   * Flip one or both offloader-side master toggles (7b).
    *
-   * When set to `false`, the backend's ``pick_build_path``
-   * short-circuits every install to LOCAL; paired peer-link
-   * sessions stay open and the Send-builds power-user dialog
-   * still works — only the implicit auto-route is gated.
-   * Strict boolean validation on the backend rejects truthy
-   * non-booleans (the string ``"false"`` would otherwise
-   * coerce to `true` and persist the opposite of operator
-   * intent on a security-relevant switch).
+   * ``remote_builds_enabled=false`` short-circuits every install
+   * to LOCAL; paired peer-link sessions stay open and the
+   * Send-builds power-user dialog still works.
+   * ``allow_major_version_mismatch=false`` keeps remote routing
+   * on but filters receivers whose ESPHome release line (year +
+   * month) differs from the offloader's. Strict boolean
+   * validation on the backend rejects truthy non-booleans on
+   * either field. The arg type requires at least one of the
+   * two; an all-undefined call is rejected as INVALID_ARGS.
    */
-  async setOffloaderRemoteBuildSettings(args: {
-    remote_builds_enabled: boolean;
-  }): Promise<OffloaderRemoteBuildSettings> {
+  async setOffloaderRemoteBuildSettings(
+    args:
+      | { remote_builds_enabled: boolean; allow_major_version_mismatch?: boolean }
+      | { remote_builds_enabled?: boolean; allow_major_version_mismatch: boolean }
+  ): Promise<OffloaderRemoteBuildSettings> {
     return this.sendCommand<OffloaderRemoteBuildSettings>(
       "remote_build/set_offloader_settings",
       args

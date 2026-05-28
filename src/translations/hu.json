@@ -970,6 +970,8 @@
     "build_offload_pairing_enabled_title": "Ezt a szervert használja a telepítések automatikus irányításakor",
     "build_offload_pairing_version_mismatch_patch": "Az összeállítási szerver ESPHome {peer} verziót futtat; ön {local} verzión van",
     "build_offload_pairing_version_mismatch_release": "Az összeállítási szerver ESPHome {peer} verziót futtat; ön {local} verzión van. Előfordulhat, hogy a YAML ezen a kiadási különbségen nem fordul le.",
+    "offloader_allow_major_version_mismatch": "Eltérő ESPHome kiadási sor engedélyezése",
+    "offloader_allow_major_version_mismatch_desc": "Kikapcsolva (ajánlott): a távoli összeállításokat csak ugyanazon az ESPHome kiadási soron (év + hónap, pl. 2026.5) lévő szerverekhez irányítja. Bekapcsolva (alapértelmezett): engedélyezi az irányítást a kiadási sorok között; a firmware nem feltétlenül fordul le helyesen, ha a sor eltér.",
     "remote_build_submit_action": "Távoli összeállítás",
     "remote_build_submit_aria": "Távoli összeállítás ezen: {label}",
     "remote_build_view_action": "Összeállítás megtekintése",

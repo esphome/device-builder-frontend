@@ -18,6 +18,7 @@ import {
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
   localizeContext,
+  offloaderAllowMajorVersionMismatchContext,
   offloaderRemoteBuildsEnabledContext,
   versionContext,
 } from "../../context/index.js";
@@ -77,6 +78,13 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   @state()
   private _remoteBuildsEnabled: boolean | null = null;
 
+  @consume({
+    context: offloaderAllowMajorVersionMismatchContext,
+    subscribe: true,
+  })
+  @state()
+  private _allowMajorVersionMismatch: boolean | null = null;
+
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
   private _alerts: Map<string, OffloaderAlertSnapshotEntry> | null = null;
@@ -120,6 +128,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   protected render() {
     return html`
       ${this._renderAlerts()} ${this._renderRemoteBuildsToggle()}
+      ${this._renderAllowMajorVersionMismatchToggle()}
 
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
@@ -204,6 +213,29 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           aria-labelledby="offloader-remote-builds-enabled-title"
           aria-checked=${this._remoteBuildsEnabled}
           @click=${this._onToggleRemoteBuilds}
+        ></button>
+      </div>
+    `;
+  }
+
+  private _renderAllowMajorVersionMismatchToggle() {
+    if (this._allowMajorVersionMismatch === null) return nothing;
+    return html`
+      <div class="row">
+        <div class="row-label">
+          <span id="offloader-allow-major-version-mismatch-title" class="row-title">
+            ${this._localize("settings.offloader_allow_major_version_mismatch")}
+          </span>
+          <span class="row-desc">
+            ${this._localize("settings.offloader_allow_major_version_mismatch_desc")}
+          </span>
+        </div>
+        <button
+          class="toggle"
+          role="switch"
+          aria-labelledby="offloader-allow-major-version-mismatch-title"
+          aria-checked=${this._allowMajorVersionMismatch}
+          @click=${this._onToggleAllowMajorVersionMismatch}
         ></button>
       </div>
     `;
@@ -315,6 +347,17 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       port: String(this._pendingUnpair.port),
     });
   }
+
+  private _onToggleAllowMajorVersionMismatch = () => {
+    if (this._allowMajorVersionMismatch === null) return;
+    this.dispatchEvent(
+      new CustomEvent("set-offloader-allow-major-version-mismatch", {
+        detail: !this._allowMajorVersionMismatch,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   private _onToggleRemoteBuilds = () => {
     if (this._remoteBuildsEnabled === null) return;

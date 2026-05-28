@@ -9,6 +9,7 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry, SerialPort } from "../../api/types.js";
@@ -64,6 +65,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   @state()
   private _boards: BoardCatalogEntry[] = [];
+
+  /** Split the live board catalog into the single featured tile +
+   *  the rest. Memoised on the ``_boards`` reference so the find +
+   *  filter pair shares one walk per catalog change (each search
+   *  keystroke replaces ``_boards`` with a freshly-filtered list,
+   *  so the cache invalidates exactly when the split needs to). */
+  private _splitBoards = memoizeOne((boards: BoardCatalogEntry[]) => ({
+    featured: boards.find((b) => b.featured),
+    regular: boards.filter((b) => !b.featured),
+  }));
 
   @state()
   private _loading = true;
@@ -490,8 +501,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
 
-    const featured = this._boards.find((b) => b.featured);
-    const regular = this._boards.filter((b) => !b.featured);
+    const { featured, regular } = this._splitBoards(this._boards);
 
     return html`
       <input

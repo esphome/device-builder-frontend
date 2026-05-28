@@ -12,6 +12,7 @@ import {
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -82,6 +83,40 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
   @property({ attribute: false })
   yaml = "";
+
+  /** Derive the three navigator buckets (core, components,
+   *  automations) from the YAML string. Memoised on the YAML
+   *  source so the parse + categorize + filter + sort pipeline
+   *  runs once per YAML edit, not per render. Two parser passes
+   *  and three list traversals collapse into a single cached
+   *  result. The render path destructures from this object. */
+  private _deriveBuckets = memoizeOne((yaml: string) => {
+    const {
+      core,
+      components,
+      automations: topLevelAutomations,
+    } = categorizeSections(parseYamlTopLevelSections(yaml));
+    // ``parseYamlAutomations`` enumerates individual ``script:`` /
+    // ``interval:`` list items as stable-keyed entries; drop the
+    // bare top-level blocks so each automation shows up exactly
+    // once.
+    const detailed = parseYamlAutomations(yaml);
+    const filteredTopLevel = topLevelAutomations.filter(
+      (s) => s.key !== "script" && s.key !== "interval"
+    );
+    // Drop ``light_effect`` (managed via the parent light's section
+    // editor) and ``unscoped`` entries (inline ``on_*:`` handlers
+    // on id-less components that the structured editor can't
+    // address).
+    const automations = [...filteredTopLevel, ...detailed]
+      .filter(
+        (s) =>
+          !s.key.startsWith("automation:light_effect:") &&
+          !s.key.startsWith("automation:unscoped:")
+      )
+      .sort((a, b) => a.fromLine - b.fromLine);
+    return { core, components, automations };
+  });
 
   /** Optional board metadata; forwarded to the add-component dialog so
    * the embedded form can render GPIO pin selectors. */
@@ -393,41 +428,7 @@ export class ESPHomeDeviceNavigator extends LitElement {
   }
 
   protected render() {
-    const {
-      core,
-      components,
-      automations: topLevelAutomations,
-    } = categorizeSections(parseYamlTopLevelSections(this.yaml));
-    // ``parseYamlAutomations`` now enumerates individual ``script:``
-    // / ``interval:`` list items as stable-keyed entries
-    // (``automation:script:<id>``, ``automation:interval:<index>``),
-    // so the bare ``script:`` / ``interval:`` top-level blocks
-    // returned by the top-level parser would duplicate them. Drop
-    // those bare keys here so each automation shows up exactly once.
-    const detailed = parseYamlAutomations(this.yaml);
-    const filteredTopLevel = topLevelAutomations.filter(
-      (s) => s.key !== "script" && s.key !== "interval"
-    );
-    // Light effects belong to their parent light component now, not
-    // the automations surface — clicking one in the navigator
-    // routed to the automation editor in a confusing standalone
-    // mode. Effects are managed through the light's own section
-    // editor; drop them here so they don't appear orphaned in the
-    // automations group.
-    //
-    // ``automation:unscoped:*`` entries are inline ``on_*:`` handlers
-    // on components that have no ``id:`` set. The structured editor
-    // can't address them (locationFromSectionKey returns null), so
-    // routing one through the navigator would surface as a failing
-    // ``fetchComponent`` and a blank section editor. Drop them too;
-    // the user fixes by adding an ``id:`` to the host component.
-    const automations = [...filteredTopLevel, ...detailed]
-      .filter(
-        (s) =>
-          !s.key.startsWith("automation:light_effect:") &&
-          !s.key.startsWith("automation:unscoped:")
-      )
-      .sort((a, b) => a.fromLine - b.fromLine);
+    const { core, components, automations } = this._deriveBuckets(this.yaml);
 
     interface NavAction {
       label: string;

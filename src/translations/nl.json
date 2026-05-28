@@ -913,6 +913,8 @@
     "build_offload_pairing_last_error": "Laatste verbindingsfout: {detail}",
     "build_offload_pairing_version_mismatch_patch": "Build server gebruikt ESPHome {peer}; u gebruikt {local}",
     "build_offload_pairing_version_mismatch_release": "Build server gebruikt ESPHome {peer}; u gebruikt {local}. YAML kan mogelijk niet compileren over dit versieverschil.",
+    "offloader_allow_major_version_mismatch": "Verschillende ESPHome-release-lijn toestaan",
+    "offloader_allow_major_version_mismatch_desc": "Uit (aanbevolen): routeer externe builds alleen naar servers op dezelfde ESPHome-release-lijn (jaar + maand, bv. 2026.5). Aan (standaard): sta routering tussen release-lijnen toe; firmware compileert mogelijk niet correct als de lijn verschilt.",
     "remote_build_submit_action": "Bouw op afstand",
     "remote_build_submit_aria": "Bouw op afstand op {label}",
     "remote_build_view_action": "Bouw bekijken",

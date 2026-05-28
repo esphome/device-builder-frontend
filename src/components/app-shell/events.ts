@@ -7,6 +7,7 @@ import type {
   InitialStateEventData,
   LabelDeletedEventData,
   LabelEventData,
+  OffloaderAllowMajorVersionMismatchChangedEventData,
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
@@ -61,6 +62,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         offloader_alerts,
         remote_jobs,
         remote_builds_enabled,
+        allow_major_version_mismatch,
       } = data as InitialStateEventData;
       host._devices = devices;
       host._importableDevices = importable;
@@ -89,6 +91,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       }
       if (remote_builds_enabled !== undefined) {
         host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
+      }
+      if (allow_major_version_mismatch !== undefined) {
+        host._offloaderAllowMajorVersionMismatch = allow_major_version_mismatch;
       }
       break;
     }
@@ -320,6 +325,11 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.OFFLOADER_PAIRING_ENABLED_CHANGED: {
       const evt = data as OffloaderPairingEnabledChangedEventData;
       patchOffloadPairing(host, evt.pin_sha256, { enabled: evt.enabled });
+      break;
+    }
+    case DeviceEventType.OFFLOADER_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED: {
+      const evt = data as OffloaderAllowMajorVersionMismatchChangedEventData;
+      host._offloaderAllowMajorVersionMismatch = evt.allow_major_version_mismatch;
       break;
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {

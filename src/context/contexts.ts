@@ -305,6 +305,18 @@ export const offloaderRemoteBuildsEnabledContext = createContext<boolean | null>
 );
 
 /**
+ * Offloader-side master "Allow major-version mismatch" toggle.
+ *
+ * Default `true` skips the major-version-match gate in
+ * ``pick_build_path``; flipping `false` enforces matching
+ * ``YYYY.MM`` between offloader and receiver. `null` until
+ * the snapshot lands.
+ */
+export const offloaderAllowMajorVersionMismatchContext = createContext<boolean | null>(
+  Symbol("esphome-offloader-allow-major-version-mismatch")
+);
+
+/**
  * Offloader-side pair alerts (pin_mismatch / peer_revoked).
  * Keyed on ``${hostname}:${port}`` to match the backend's
  * ``_offloader_alerts`` dict. Seeded from

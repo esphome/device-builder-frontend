@@ -126,6 +126,25 @@ export async function onSetOffloaderPairingEnabled(
   }
 }
 
+export async function onSetOffloaderAllowMajorVersionMismatch(
+  host: ESPHomeApp,
+  e: CustomEvent<boolean>
+): Promise<void> {
+  const allow = e.detail;
+  const previous = host._offloaderAllowMajorVersionMismatch;
+  host._offloaderAllowMajorVersionMismatch = allow;
+  try {
+    await host._api.setOffloaderRemoteBuildSettings({
+      allow_major_version_mismatch: allow,
+    });
+  } catch {
+    host._offloaderAllowMajorVersionMismatch = previous;
+    toast.error(host._localize("settings.remote_build_save_failed"), {
+      richColors: true,
+    });
+  }
+}
+
 export function onPairRequestSent(
   host: ESPHomeApp,
   e: CustomEvent<{ summary: PairingSummary }>
