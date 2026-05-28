@@ -28,7 +28,7 @@ import "./lambda-editor.js";
  *   byte-for-byte.
  * - plain string — fall back for hand-edited values.
  */
-function bodyOf(raw: unknown): string {
+export function lambdaBodyOf(raw: unknown): string {
   if (isLambdaValue(raw)) return raw._lambda;
   if (raw instanceof YamlRawValue) return raw.body;
   if (raw == null) return "";
@@ -37,7 +37,7 @@ function bodyOf(raw: unknown): string {
 
 export function renderLambdaField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
-  const value = bodyOf(raw);
+  const value = lambdaBodyOf(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   return renderFieldShell(

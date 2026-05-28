@@ -372,6 +372,30 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
   });
 
+  it("renders the inline lambda editor when the picked id is 'lambda'", async () => {
+    // ``lambda`` filter takes a C++ body as the whole polymorphic value
+    // (``- lambda: |- return x;``). The catalog ships no config_entries
+    // for it (no schema), so the mapping sub-form path doesn't fire;
+    // the renderer instead mounts <esphome-lambda-editor> bound to the
+    // row's polymorphic value position.
+    const catalog = [
+      { id: "lambda", name: "Lambda", config_entries: [], applies_to: [] },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx({ filters: [{ lambda: null }] });
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(el.shadowRoot!.querySelector("esphome-lambda-editor")).toBeTruthy();
+  });
+
   it("renders no sub-form on an empty / unselected row", async () => {
     const renderEntry = vi.fn();
     const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;

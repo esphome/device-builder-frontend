@@ -18,6 +18,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
 import type { ConfigEntry, RegistryCatalogEntry } from "../../../api/types.js";
+import { isLambdaValue } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
 import {
   fetchFilters,
@@ -27,6 +28,8 @@ import {
   subscribeAutomationCatalogCache,
 } from "../../../util/automation-catalog-cache.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
+import "./lambda-editor.js";
+import { lambdaBodyOf } from "./lambda.js";
 import {
   effectiveDisabled,
   renderFieldError,
@@ -451,7 +454,16 @@ export class ESPHomeRegistryList extends LitElement {
     // shorthand, and editing the mapping would clobber the scalar.
     const params = currentId ? item[currentId] : null;
     const paramsIsMapping =
-      params !== null && typeof params === "object" && !Array.isArray(params);
+      params !== null &&
+      typeof params === "object" &&
+      !Array.isArray(params) &&
+      !isLambdaValue(params);
+    // ``lambda`` filter / effect takes a C++ body as the whole value
+    // (``- lambda: |- return x;``); the schema bundle exposes no
+    // config_vars for it, so the catalog has 0 config_entries. Render
+    // an inline lambda editor bound to the row's polymorphic value
+    // position so users can fill in the body visually.
+    const isLambdaForm = currentId === "lambda";
     const childEntries = catalogEntry?.config_entries ?? [];
     const renderableChildren =
       childEntries.length && (params === null || paramsIsMapping)
@@ -492,18 +504,27 @@ export class ESPHomeRegistryList extends LitElement {
           </wa-select>
           ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
         </div>
-        ${renderableChildren.length > 0
+        ${isLambdaForm
           ? html`<div class="registry-list-sub-form">
-              ${renderableChildren.map((child) =>
-                this.ctx.renderEntry(child, [
-                  ...this.path,
-                  String(index),
-                  currentId,
-                  child.key,
-                ])
-              )}
+              <esphome-lambda-editor
+                .value=${lambdaBodyOf(params)}
+                ?disabled=${disabled}
+                @lambda-change=${(e: CustomEvent<{ value: string }>) =>
+                  this._setLambdaBody(index, currentId, e.detail.value)}
+              ></esphome-lambda-editor>
             </div>`
-          : nothing}
+          : renderableChildren.length > 0
+            ? html`<div class="registry-list-sub-form">
+                ${renderableChildren.map((child) =>
+                  this.ctx.renderEntry(child, [
+                    ...this.path,
+                    String(index),
+                    currentId,
+                    child.key,
+                  ])
+                )}
+              </div>`
+            : nothing}
       </div>
     `;
   }
@@ -521,6 +542,12 @@ export class ESPHomeRegistryList extends LitElement {
     const { items, positions } = editableEntries(list);
     const next = transform(items);
     this.ctx.emitChange(this.path, spliceEditable(list, positions, next));
+  }
+
+  private _setLambdaBody(index: number, registryId: string, body: string) {
+    this._mutateEditable((items) =>
+      items.map((it, i) => (i === index ? { [registryId]: { _lambda: body } } : it))
+    );
   }
 
   private _addItem() {
