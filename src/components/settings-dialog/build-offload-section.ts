@@ -56,6 +56,21 @@ registerMdiIcons({
   pencil: mdiPencil,
 });
 
+/**
+ * Canonical order of :type:`VersionMatchPolicy` values, lenient
+ * to strict. The renderer iterates this for the radio group;
+ * the change handler uses it to narrow the raw radio value
+ * before dispatching, so a stray fifth ``<wa-radio>`` (or a
+ * future wa-radio-group quirk) can't silently push a garbage
+ * string at the backend.
+ */
+const _VERSION_MATCH_POLICIES: readonly VersionMatchPolicy[] = [
+  "any",
+  "release",
+  "exact",
+  "exact_required",
+];
+
 @customElement("esphome-settings-build-offload")
 export class ESPHomeSettingsBuildOffload extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -245,15 +260,18 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _renderVersionMatchPolicyPicker() {
-    // Always render: the picker is a preemptive setting and the
-    // operator should be able to flip it whether or not a mismatch
-    // currently exists. Fall back to the backend default until the
-    // snapshot lands so the row paints on first connect.
-    const value: VersionMatchPolicy = this._versionMatchPolicy ?? "any";
+    // The picker is a preemptive setting and the operator should
+    // be able to flip it whether or not a mismatch currently
+    // exists, so the row paints on first connect. While the
+    // initial_state snapshot is still in flight ``policy`` is
+    // ``null`` and we disable the radios — otherwise clicking on
+    // the default-highlighted ``any`` before the backend's actual
+    // (stricter) policy lands would silently relax it.
+    const policy = this._versionMatchPolicy;
     return html`
       <div class="row row--stacked policy-row">
         <div class="row-label">
-          <span class="row-title">
+          <span id="offloader-version-match-policy-title" class="row-title">
             ${this._localize("settings.offloader_version_match_policy_heading")}
           </span>
           <span class="row-desc">
@@ -262,12 +280,12 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         </div>
         <wa-radio-group
           orientation="vertical"
-          .value=${value}
+          aria-labelledby="offloader-version-match-policy-title"
+          .value=${policy ?? "any"}
+          ?disabled=${policy === null}
           @change=${this._onVersionMatchPolicyChange}
         >
-          ${this._renderPolicyOption("any")} ${this._renderPolicyOption("release")}
-          ${this._renderPolicyOption("exact")}
-          ${this._renderPolicyOption("exact_required")}
+          ${_VERSION_MATCH_POLICIES.map((p) => this._renderPolicyOption(p))}
         </wa-radio-group>
       </div>
     `;
@@ -396,9 +414,14 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _onVersionMatchPolicyChange = (e: Event) => {
+    // Snapshot not yet landed — the picker is disabled in the
+    // template but a programmatic change still fires; refuse it
+    // so the operator can't relax a strict policy by clicking
+    // before the backend's value paints over the ``any`` default.
+    if (this._versionMatchPolicy === null) return;
     const target = e.target as HTMLElement & { value: string | number | null };
     const raw = target.value;
-    if (typeof raw !== "string") return;
+    if (!_VERSION_MATCH_POLICIES.includes(raw as VersionMatchPolicy)) return;
     const policy = raw as VersionMatchPolicy;
     if (policy === this._versionMatchPolicy) return;
     this.dispatchEvent(

@@ -128,12 +128,7 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
     }
   } catch (err) {
     host._state = "error";
-    host._statusMessage =
-      err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER
-        ? host._localize("command.install_no_compatible_peer")
-        : err instanceof Error
-          ? err.message
-          : String(err);
+    host._statusMessage = _installErrorMessage(host, err);
     return;
   }
 
@@ -213,6 +208,14 @@ function isCancelAlreadyTerminal(err: unknown): boolean {
 
 function formatForceLocalError(err: unknown): string {
   if (err instanceof APIError) return err.details || err.errorCode;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function _installErrorMessage(host: ESPHomeCommandDialog, err: unknown): string {
+  if (err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER) {
+    return host._localize("command.install_no_compatible_peer");
+  }
   if (err instanceof Error) return err.message;
   return String(err);
 }
