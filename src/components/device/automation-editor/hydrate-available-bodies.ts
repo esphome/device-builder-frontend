@@ -67,9 +67,12 @@ export type LoadAndHydrateOutcome =
  *  Lit lifecycle.
  *
  *  ``onSlim`` lets the caller paint the picker with the slim list
- *  immediately, before awaiting hydration. ``isStale`` is checked
- *  after each await so an overlapping load can bail out
- *  cleanly. */
+ *  immediately, before awaiting hydration. The slim snapshot is
+ *  guaranteed stable — hydration runs against a per-entry shallow
+ *  clone so ``config_entries`` mutations land on ``available`` and
+ *  never on the ``slim`` object the caller paints from. ``isStale``
+ *  is checked after each await so an overlapping load can bail
+ *  out cleanly. */
 export async function loadAndHydrateAvailable(
   api: ESPHomeAPI,
   configuration: string,
@@ -82,14 +85,19 @@ export async function loadAndHydrateAvailable(
     const slim = await api.getAvailableAutomations(configuration);
     if (options?.isStale?.()) return { status: "stale" };
     options?.onSlim?.(slim);
-    const hydration = await hydrateAvailableBodies(api, slim);
-    if (options?.isStale?.()) return { status: "stale" };
+    // Shallow-clone each entry so ``hydrateAvailableBodies``
+    // mutates ``available``'s copies, not the ``slim`` snapshot.
+    // Entry-level ``config_entries`` reassignment ends in a deep
+    // ``structuredClone`` inside the per-entry hydrator, so the
+    // cached body stays disjoint either way.
     const available: AvailableAutomations = {
       ...slim,
-      triggers: [...slim.triggers],
-      actions: [...slim.actions],
-      conditions: [...slim.conditions],
+      triggers: slim.triggers.map((e) => ({ ...e })),
+      actions: slim.actions.map((e) => ({ ...e })),
+      conditions: slim.conditions.map((e) => ({ ...e })),
     };
+    const hydration = await hydrateAvailableBodies(api, available);
+    if (options?.isStale?.()) return { status: "stale" };
     return { status: "ok", available, hydration };
   } catch (error) {
     if (options?.isStale?.()) return { status: "stale" };

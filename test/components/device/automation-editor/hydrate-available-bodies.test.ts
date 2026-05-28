@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
 import type {
+  AutomationAction,
   AutomationCatalogBody,
   AutomationCatalogBodyType,
+  AutomationCondition,
+  AutomationTrigger,
   AvailableAutomations,
   ConfigEntry,
 } from "../../../../src/api/types.js";
@@ -181,6 +184,52 @@ describe("loadAndHydrateAvailable", () => {
     expect(outcome.available.triggers).not.toBe(slimPainted.triggers);
     expect(outcome.available.actions).not.toBe(slimPainted.actions);
     expect(outcome.available.conditions).not.toBe(slimPainted.conditions);
+  });
+
+  it("keeps the slim snapshot immutable during hydration", async () => {
+    // ``onSlim`` should hand the caller a stable view; the
+    // hydration mutations land on ``available`` (which is a
+    // per-entry shallow clone), never on the snapshot the picker
+    // paints from.
+    const slim = {
+      triggers: [
+        { id: "on_boot", config_entries: [] as ConfigEntry[] } as AutomationTrigger,
+      ],
+      actions: [] as AutomationAction[],
+      conditions: [] as AutomationCondition[],
+      scripts: [],
+      devices: [],
+    } as unknown as AvailableAutomations;
+    const body: AutomationCatalogBody = {
+      id: "on_boot",
+      name: "On Boot",
+      description: "",
+      docs_url: "",
+      applies_to: [],
+      is_device_level: true,
+      config_entries: [configEntry("interval")],
+    } as AutomationCatalogBody;
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slim),
+    } as unknown as ESPHomeAPI;
+    let painted: AvailableAutomations | null = null;
+
+    const outcome = await loadAndHydrateAvailable(api, "device.yaml", {
+      onSlim: (s) => {
+        painted = s;
+      },
+    });
+    // Force-hydrate ``available`` separately so the entry's
+    // ``config_entries`` is populated.
+    if (outcome.status !== "ok") throw new Error("expected ok");
+    await hydrateAvailableBodies(api, outcome.available, async () => body);
+
+    expect(painted).toBe(slim);
+    // The slim snapshot's entry still has its original empty
+    // ``config_entries``; only ``available``'s shallow-cloned
+    // entry got hydrated.
+    expect(slim.triggers[0].config_entries).toEqual([]);
+    expect(outcome.available.triggers[0]).not.toBe(slim.triggers[0]);
   });
 
   it("paints via onSlim before awaiting hydration", async () => {
