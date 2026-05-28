@@ -301,6 +301,12 @@ export class ESPHomeWizardStepBoard extends LitElement {
         gap: var(--wa-space-s);
       }
 
+      @media (max-width: 480px) {
+        .boards-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
       .board-card {
         position: relative;
         border-radius: var(--wa-border-radius-l);
