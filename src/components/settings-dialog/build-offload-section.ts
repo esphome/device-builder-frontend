@@ -56,14 +56,8 @@ registerMdiIcons({
   pencil: mdiPencil,
 });
 
-/**
- * Canonical order of :type:`VersionMatchPolicy` values, lenient
- * to strict. The renderer iterates this for the radio group;
- * the change handler uses it to narrow the raw radio value
- * before dispatching, so a stray fifth ``<wa-radio>`` (or a
- * future wa-radio-group quirk) can't silently push a garbage
- * string at the backend.
- */
+/** Canonical order of :type:`VersionMatchPolicy` values, lenient to strict.
+ *  Drives both the radio-group render and the change-handler narrowing. */
 const _VERSION_MATCH_POLICIES: readonly VersionMatchPolicy[] = [
   "any",
   "release",
@@ -260,13 +254,9 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _renderVersionMatchPolicyPicker() {
-    // The picker is a preemptive setting and the operator should
-    // be able to flip it whether or not a mismatch currently
-    // exists, so the row paints on first connect. While the
-    // initial_state snapshot is still in flight ``policy`` is
-    // ``null`` and we disable the radios — otherwise clicking on
-    // the default-highlighted ``any`` before the backend's actual
-    // (stricter) policy lands would silently relax it.
+    // Disable the radios until the snapshot lands so clicking the
+    // default-highlighted "any" can't silently relax a stricter
+    // backend policy that hasn't arrived yet.
     const policy = this._versionMatchPolicy;
     return html`
       <div class="row row--stacked policy-row">
@@ -414,10 +404,8 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   }
 
   private _onVersionMatchPolicyChange = (e: Event) => {
-    // Snapshot not yet landed — the picker is disabled in the
-    // template but a programmatic change still fires; refuse it
-    // so the operator can't relax a strict policy by clicking
-    // before the backend's value paints over the ``any`` default.
+    // Refuse pre-snapshot dispatches even if the disabled radios
+    // somehow emit one; see _renderVersionMatchPolicyPicker.
     if (this._versionMatchPolicy === null) return;
     const target = e.target as HTMLElement & { value: string | number | null };
     const raw = target.value;
