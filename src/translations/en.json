@@ -978,7 +978,6 @@
     "offloader_remote_builds_enabled_desc": "When enabled, the dashboard picks a paired remote build server for each install when one is available; turn off to keep every install local while leaving your pairings in place.",
     "offloader_remote_builds_enabled_loading": "Loading…",
     "offloader_version_match_policy_heading": "ESPHome version match",
-    "offloader_version_match_policy_desc": "How strictly the dashboard filters paired build servers by their ESPHome version. Stricter policies reduce the chance of a build server compiling against a different schema than the one this dashboard expects.",
     "offloader_version_match_policy_any": "Allow any release-line mismatch (default)",
     "offloader_version_match_policy_any_desc": "Route to any paired build server regardless of its ESPHome version.",
     "offloader_version_match_policy_release": "Require matching release line",

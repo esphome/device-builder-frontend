@@ -57,7 +57,7 @@ registerMdiIcons({
 });
 
 /** Canonical order of :type:`VersionMatchPolicy` values, lenient to strict.
- *  Drives both the radio-group render and the change-handler narrowing. */
+ *  Drives the wa-option render and the change-handler narrowing. */
 const _VERSION_MATCH_POLICIES: readonly VersionMatchPolicy[] = [
   "any",
   "release",
@@ -251,6 +251,7 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
         <wa-select
           aria-labelledby="offloader-version-match-policy-title"
           value=${selected}
+          ?disabled=${this._versionMatchPolicy === null}
           @change=${this._onVersionMatchPolicyChange}
         >
           ${_VERSION_MATCH_POLICIES.map(

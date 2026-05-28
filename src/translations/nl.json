@@ -921,7 +921,6 @@
     "build_offload_pairing_version_mismatch_patch": "Build server gebruikt ESPHome {peer}; u gebruikt {local}",
     "build_offload_pairing_version_mismatch_release": "Build server gebruikt ESPHome {peer}; u gebruikt {local}. YAML kan mogelijk niet compileren over dit versieverschil.",
     "offloader_version_match_policy_heading": "ESPHome-versie-overeenkomst",
-    "offloader_version_match_policy_desc": "Hoe strikt het dashboard gekoppelde build servers filtert op hun ESPHome-versie. Strengere beleidsregels verminderen de kans dat een build server compileert tegen een ander schema dan dit dashboard verwacht.",
     "offloader_version_match_policy_any": "Elke release-lijn-mismatch toestaan (standaard)",
     "offloader_version_match_policy_any_desc": "Routeer naar elke gekoppelde build server, ongeacht zijn ESPHome-versie.",
     "offloader_version_match_policy_release": "Overeenkomende release-lijn vereisen",

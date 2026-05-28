@@ -921,7 +921,6 @@
     "build_offload_pairing_version_mismatch_patch": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}",
     "build_offload_pairing_version_mismatch_release": "Le serveur de compilation utilise ESPHome {peer} ; vous êtes sur {local}. Le YAML peut ne pas compiler à travers cet écart de version.",
     "offloader_version_match_policy_heading": "Correspondance de version ESPHome",
-    "offloader_version_match_policy_desc": "Avec quelle rigueur le tableau de bord filtre les serveurs de compilation appairés selon leur version ESPHome. Des politiques plus strictes réduisent le risque qu'un serveur de compilation compile contre un schéma différent de celui attendu par ce tableau de bord.",
     "offloader_version_match_policy_any": "Autoriser toute différence de ligne de version (par défaut)",
     "offloader_version_match_policy_any_desc": "Acheminer vers n'importe quel serveur de compilation appairé, quelle que soit sa version ESPHome.",
     "offloader_version_match_policy_release": "Exiger une ligne de version correspondante",

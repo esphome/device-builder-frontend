@@ -978,7 +978,6 @@
     "build_offload_pairing_version_mismatch_patch": "Az összeállítási szerver ESPHome {peer} verziót futtat; ön {local} verzión van",
     "build_offload_pairing_version_mismatch_release": "Az összeállítási szerver ESPHome {peer} verziót futtat; ön {local} verzión van. Előfordulhat, hogy a YAML ezen a kiadási különbségen nem fordul le.",
     "offloader_version_match_policy_heading": "ESPHome-verzió egyezés",
-    "offloader_version_match_policy_desc": "Mennyire szigorúan szűri a felület a párosított összeállítási szervereket az ESPHome-verziójuk szerint. A szigorúbb szabályok csökkentik annak esélyét, hogy egy összeállítási szerver más sémához fordítson, mint amit ez a felület vár.",
     "offloader_version_match_policy_any": "Bármilyen kiadási sor eltérés engedélyezett (alapértelmezett)",
     "offloader_version_match_policy_any_desc": "Útválasztás bármely párosított összeállítási szerverre, függetlenül az ESPHome-verziójától.",
     "offloader_version_match_policy_release": "Egyező kiadási sor szükséges",

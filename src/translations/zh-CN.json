@@ -986,7 +986,6 @@
     "build_offload_pairing_version_mismatch_patch": "构建服务器运行的是 ESPHome {peer}；你当前为 {local}",
     "build_offload_pairing_version_mismatch_release": "构建服务器运行的是 ESPHome {peer}；你当前为 {local}。跨此版本差异时 YAML 可能无法编译。",
     "offloader_version_match_policy_heading": "ESPHome 版本匹配",
-    "offloader_version_match_policy_desc": "仪表板按 ESPHome 版本筛选配对构建服务器的严格程度。更严格的策略可降低构建服务器针对与本仪表板预期不同的架构进行编译的可能性。",
     "offloader_version_match_policy_any": "允许任何发布线不一致（默认）",
     "offloader_version_match_policy_any_desc": "无论 ESPHome 版本如何，都路由到任何配对的构建服务器。",
     "offloader_version_match_policy_release": "要求匹配的发布线",
