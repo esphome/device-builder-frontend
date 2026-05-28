@@ -5,6 +5,7 @@ import {
   type PairingSummary,
   type RemoteBuildSubmitTarget,
   type Theme,
+  type VersionMatchPolicy,
 } from "../../api/types.js";
 import {
   clearStoredLocale,
@@ -126,19 +127,19 @@ export async function onSetOffloaderPairingEnabled(
   }
 }
 
-export async function onSetOffloaderAllowMajorVersionMismatch(
+export async function onSetOffloaderVersionMatchPolicy(
   host: ESPHomeApp,
-  e: CustomEvent<boolean>
+  e: CustomEvent<VersionMatchPolicy>
 ): Promise<void> {
-  const allow = e.detail;
-  const previous = host._offloaderAllowMajorVersionMismatch;
-  host._offloaderAllowMajorVersionMismatch = allow;
+  const policy = e.detail;
+  const previous = host._offloaderVersionMatchPolicy;
+  host._offloaderVersionMatchPolicy = policy;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
-      allow_major_version_mismatch: allow,
+      version_match_policy: policy,
     });
   } catch {
-    host._offloaderAllowMajorVersionMismatch = previous;
+    host._offloaderVersionMatchPolicy = previous;
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });

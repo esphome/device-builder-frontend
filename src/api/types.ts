@@ -71,6 +71,12 @@ export enum ErrorCode {
    *  hasn't opened the Pairing requests screen — UI should
    *  prompt the user to coordinate with the receiver admin. */
   NO_PAIRING_WINDOW = "no_pairing_window",
+  /** The offloader's ``version_match_policy="exact_required"``
+   *  filtered every paired peer and the install refused to
+   *  fall back to LOCAL. UI surfaces this as a toast on the
+   *  install flow with a hint to relax the policy in Settings
+   *  → Build server. */
+  NO_COMPATIBLE_PEER = "no_compatible_peer",
 }
 
 // ─── Paged Responses ─────────────────────────────────────────
@@ -1447,9 +1453,20 @@ export enum DeviceEventType {
   // sync their switch state without polling.
   OFFLOADER_REMOTE_BUILDS_TOGGLED = "offloader_remote_builds_toggled",
   OFFLOADER_PAIRING_ENABLED_CHANGED = "offloader_pairing_enabled_changed",
-  // Master major-version-match gate flip.
-  OFFLOADER_ALLOW_MAJOR_VERSION_MISMATCH_CHANGED = "offloader_allow_major_version_mismatch_changed",
+  // Master version-match policy change.
+  OFFLOADER_VERSION_MATCH_POLICY_CHANGED = "offloader_version_match_policy_changed",
 }
+
+/**
+ * How strictly the offloader filters paired peers by ESPHome
+ * version when picking a build path. ``exact_required`` is the
+ * only value that hard-fails the install (raises
+ * ``no_compatible_peer``) instead of falling back to LOCAL
+ * when no peer survives the filter. See the backend
+ * ``VersionMatchPolicy`` enum + ``set_offloader_settings`` for
+ * the full per-value contract.
+ */
+export type VersionMatchPolicy = "any" | "release" | "exact" | "exact_required";
 
 /** Data payload for job lifecycle events (queued, started, completed, failed). */
 export interface JobEventData {
@@ -1539,9 +1556,9 @@ export interface InitialStateEventData {
    *  install (matches the pre-7b semantic where any APPROVED
    *  + connected + idle pairing was eligible). */
   remote_builds_enabled?: boolean;
-  /** Offloader-side master toggle for the major-version-match
-   *  gate; `true` (default) skips the gate. */
-  allow_major_version_mismatch?: boolean;
+  /** Offloader-side master version-match policy. See
+   *  :type:`VersionMatchPolicy` for the per-value semantics. */
+  version_match_policy?: VersionMatchPolicy;
 }
 
 /**
@@ -1921,10 +1938,10 @@ export interface PairingWindowState {
 export interface OffloaderRemoteBuildSettings {
   remote_builds_enabled: boolean;
   /**
-   * Master toggle for the major-version-match gate; `true`
-   * (default) bypasses the gate, `false` activates it.
+   * Master version-match policy; see :type:`VersionMatchPolicy`
+   * for the per-value semantics.
    */
-  allow_major_version_mismatch: boolean;
+  version_match_policy: VersionMatchPolicy;
   pairings: PairingSummary[];
 }
 
@@ -2118,9 +2135,9 @@ export interface OffloaderPairingEnabledChangedEventData {
   enabled: boolean;
 }
 
-/** Data payload for ``offloader_allow_major_version_mismatch_changed``. */
-export interface OffloaderAllowMajorVersionMismatchChangedEventData {
-  allow_major_version_mismatch: boolean;
+/** Data payload for ``offloader_version_match_policy_changed``. */
+export interface OffloaderVersionMatchPolicyChangedEventData {
+  version_match_policy: VersionMatchPolicy;
 }
 
 /**

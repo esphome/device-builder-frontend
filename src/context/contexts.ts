@@ -19,6 +19,7 @@ import {
   type PeerSummary,
   type RemoteBuildPeer,
   type RemoteBuildSubmitTarget,
+  type VersionMatchPolicy,
 } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
@@ -305,16 +306,17 @@ export const offloaderRemoteBuildsEnabledContext = createContext<boolean | null>
 );
 
 /**
- * Offloader-side master "Allow major-version mismatch" toggle.
+ * Offloader-side master version-match policy.
  *
- * Default `true` skips the major-version-match gate in
- * ``pick_build_path``; flipping `false` enforces matching
- * ``YYYY.MM`` between offloader and receiver. `null` until
- * the snapshot lands.
+ * See :type:`VersionMatchPolicy` for the per-value contract.
+ * `null` until ``subscribe_events.initial_state`` lands; the
+ * Settings picker falls back to the backend default (`"any"`)
+ * while the seed is in flight so the row is always rendered.
  */
-export const offloaderAllowMajorVersionMismatchContext = createContext<boolean | null>(
-  Symbol("esphome-offloader-allow-major-version-mismatch")
-);
+export const offloaderVersionMatchPolicyContext =
+  createContext<VersionMatchPolicy | null>(
+    Symbol("esphome-offloader-version-match-policy")
+  );
 
 /**
  * Offloader-side pair alerts (pin_mismatch / peer_revoked).

@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
 import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
@@ -9,6 +9,7 @@ import type {
   OffloaderAlertSnapshotEntry,
   PairingSummary,
   RemoteBuildPeer,
+  VersionMatchPolicy,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
@@ -18,8 +19,8 @@ import {
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
   localizeContext,
-  offloaderAllowMajorVersionMismatchContext,
   offloaderRemoteBuildsEnabledContext,
+  offloaderVersionMatchPolicyContext,
   versionContext,
 } from "../../context/index.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
@@ -46,6 +47,8 @@ import "../pair-build-server-dialog.js";
 import "../reauth-wizard-dialog.js";
 import "../remote-build-job-dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/radio/radio.js";
+import "@home-assistant/webawesome/dist/components/radio-group/radio-group.js";
 
 registerMdiIcons({
   delete: mdiDelete,
@@ -79,11 +82,11 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   private _remoteBuildsEnabled: boolean | null = null;
 
   @consume({
-    context: offloaderAllowMajorVersionMismatchContext,
+    context: offloaderVersionMatchPolicyContext,
     subscribe: true,
   })
   @state()
-  private _allowMajorVersionMismatch: boolean | null = null;
+  private _versionMatchPolicy: VersionMatchPolicy | null = null;
 
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
@@ -123,12 +126,35 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     peerRowStyles,
     offloaderAlertStyles,
     pairingRowStyles,
+    css`
+      .policy-row wa-radio-group::part(form-control) {
+        display: flex;
+        flex-direction: column;
+        gap: var(--wa-space-2xs);
+      }
+
+      .policy-option {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .policy-title {
+        font-size: var(--wa-font-size-s);
+        color: var(--wa-color-text-normal);
+      }
+
+      .policy-desc {
+        font-size: var(--wa-font-size-xs);
+        color: var(--wa-color-text-quiet);
+      }
+    `,
   ];
 
   protected render() {
     return html`
       ${this._renderAlerts()} ${this._renderRemoteBuildsToggle()}
-      ${this._renderAllowMajorVersionMismatchToggle()}
+      ${this._renderVersionMatchPolicyPicker()}
 
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
@@ -218,26 +244,47 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     `;
   }
 
-  private _renderAllowMajorVersionMismatchToggle() {
-    if (this._allowMajorVersionMismatch === null) return nothing;
+  private _renderVersionMatchPolicyPicker() {
+    // Always render: the picker is a preemptive setting and the
+    // operator should be able to flip it whether or not a mismatch
+    // currently exists. Fall back to the backend default until the
+    // snapshot lands so the row paints on first connect.
+    const value: VersionMatchPolicy = this._versionMatchPolicy ?? "any";
     return html`
-      <div class="row">
+      <div class="row row--stacked policy-row">
         <div class="row-label">
-          <span id="offloader-allow-major-version-mismatch-title" class="row-title">
-            ${this._localize("settings.offloader_allow_major_version_mismatch")}
+          <span class="row-title">
+            ${this._localize("settings.offloader_version_match_policy_heading")}
           </span>
           <span class="row-desc">
-            ${this._localize("settings.offloader_allow_major_version_mismatch_desc")}
+            ${this._localize("settings.offloader_version_match_policy_desc")}
           </span>
         </div>
-        <button
-          class="toggle"
-          role="switch"
-          aria-labelledby="offloader-allow-major-version-mismatch-title"
-          aria-checked=${this._allowMajorVersionMismatch}
-          @click=${this._onToggleAllowMajorVersionMismatch}
-        ></button>
+        <wa-radio-group
+          orientation="vertical"
+          .value=${value}
+          @change=${this._onVersionMatchPolicyChange}
+        >
+          ${this._renderPolicyOption("any")} ${this._renderPolicyOption("release")}
+          ${this._renderPolicyOption("exact")}
+          ${this._renderPolicyOption("exact_required")}
+        </wa-radio-group>
       </div>
+    `;
+  }
+
+  private _renderPolicyOption(policy: VersionMatchPolicy) {
+    return html`
+      <wa-radio value=${policy}>
+        <span class="policy-option">
+          <span class="policy-title">
+            ${this._localize(`settings.offloader_version_match_policy_${policy}`)}
+          </span>
+          <span class="policy-desc">
+            ${this._localize(`settings.offloader_version_match_policy_${policy}_desc`)}
+          </span>
+        </span>
+      </wa-radio>
     `;
   }
 
@@ -348,11 +395,15 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     });
   }
 
-  private _onToggleAllowMajorVersionMismatch = () => {
-    if (this._allowMajorVersionMismatch === null) return;
+  private _onVersionMatchPolicyChange = (e: Event) => {
+    const target = e.target as HTMLElement & { value: string | number | null };
+    const raw = target.value;
+    if (typeof raw !== "string") return;
+    const policy = raw as VersionMatchPolicy;
+    if (policy === this._versionMatchPolicy) return;
     this.dispatchEvent(
-      new CustomEvent("set-offloader-allow-major-version-mismatch", {
-        detail: !this._allowMajorVersionMismatch,
+      new CustomEvent("set-offloader-version-match-policy", {
+        detail: policy,
         bubbles: true,
         composed: true,
       })

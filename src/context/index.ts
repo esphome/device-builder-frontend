@@ -22,7 +22,7 @@ export {
   buildServerPeersContext,
   buildOffloadDiscoveredHostsContext,
   buildOffloadPairingsContext,
-  offloaderAllowMajorVersionMismatchContext,
+  offloaderVersionMatchPolicyContext,
   offloaderRemoteBuildsEnabledContext,
   buildOffloadAlertsContext,
   buildOffloadJobsContext,

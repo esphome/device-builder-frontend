@@ -15,7 +15,9 @@ import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import toast from "sonner-js";
+import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
+import { ErrorCode } from "../api/types.js";
 import type {
   AdoptableDevice,
   ArchivedDevice,
@@ -772,8 +774,12 @@ export class ESPHomePageDashboard extends LitElement {
     });
     try {
       await this._api.firmwareInstallBulk(selected);
-    } catch {
-      toast.error(this._localize("layout.update_all_error"), { richColors: true });
+    } catch (err) {
+      const key =
+        err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER
+          ? "layout.update_all_no_compatible_peer"
+          : "layout.update_all_error";
+      toast.error(this._localize(key), { richColors: true });
     }
   };
 

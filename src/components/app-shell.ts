@@ -3,7 +3,12 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import { CLEANUP_TTL_DEFAULT_SECONDS, JobStatus, Theme } from "../api/types.js";
+import {
+  CLEANUP_TTL_DEFAULT_SECONDS,
+  JobStatus,
+  Theme,
+  type VersionMatchPolicy,
+} from "../api/types.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -28,7 +33,7 @@ import {
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
-  offloaderAllowMajorVersionMismatchContext,
+  offloaderVersionMatchPolicyContext,
   offloaderRemoteBuildsEnabledContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
@@ -71,7 +76,7 @@ import {
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
   onSetLanguage,
-  onSetOffloaderAllowMajorVersionMismatch,
+  onSetOffloaderVersionMatchPolicy,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
   onSetRemoteBuildCleanupTtl,
@@ -149,9 +154,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: offloaderRemoteBuildsEnabledContext })
   @state()
   _offloaderRemoteBuildsEnabled: boolean | null = null;
-  @provide({ context: offloaderAllowMajorVersionMismatchContext })
+  @provide({ context: offloaderVersionMatchPolicyContext })
   @state()
-  _offloaderAllowMajorVersionMismatch: boolean | null = null;
+  _offloaderVersionMatchPolicy: VersionMatchPolicy | null = null;
   @provide({ context: buildOffloadAlertsContext }) @state() _buildOffloadAlerts: Map<
     string,
     OffloaderAlertSnapshotEntry
@@ -521,8 +526,8 @@ export class ESPHomeApp extends LitElement {
         @set-offloader-pairing-enabled=${(
           e: CustomEvent<{ pin_sha256: string; enabled: boolean }>
         ) => onSetOffloaderPairingEnabled(this, e)}
-        @set-offloader-allow-major-version-mismatch=${(e: CustomEvent<boolean>) =>
-          onSetOffloaderAllowMajorVersionMismatch(this, e)}
+        @set-offloader-version-match-policy=${(e: CustomEvent<VersionMatchPolicy>) =>
+          onSetOffloaderVersionMatchPolicy(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>

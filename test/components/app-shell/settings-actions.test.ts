@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { onSetOffloaderAllowMajorVersionMismatch } from "../../../src/components/app-shell/settings-actions.js";
+import { onSetOffloaderVersionMatchPolicy } from "../../../src/components/app-shell/settings-actions.js";
+import type { VersionMatchPolicy } from "../../../src/api/types.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
@@ -11,23 +12,23 @@ vi.mock("sonner-js", () => ({
 
 type StubHost = Pick<
   ESPHomeApp,
-  "_offloaderAllowMajorVersionMismatch" | "_offloaderRemoteBuildsEnabled" | "_localize"
+  "_offloaderVersionMatchPolicy" | "_offloaderRemoteBuildsEnabled" | "_localize"
 > & {
   _api: {
-    setOffloaderRemoteBuildSettings: (args: Record<string, boolean>) => Promise<unknown>;
+    setOffloaderRemoteBuildSettings: (args: Record<string, unknown>) => Promise<unknown>;
   };
 };
 
 function makeHost(api: StubHost["_api"]): StubHost {
   return {
-    _offloaderAllowMajorVersionMismatch: true,
+    _offloaderVersionMatchPolicy: "any" as VersionMatchPolicy,
     _offloaderRemoteBuildsEnabled: true,
     _localize: ((key: string) => key) as ESPHomeApp["_localize"],
     _api: api,
   };
 }
 
-describe("onSetOffloaderAllowMajorVersionMismatch", () => {
+describe("onSetOffloaderVersionMatchPolicy", () => {
   beforeEach(() => {
     toastError.mockClear();
   });
@@ -39,13 +40,13 @@ describe("onSetOffloaderAllowMajorVersionMismatch", () => {
     const setApi = vi.fn(async () => ({}));
     const host = makeHost({ setOffloaderRemoteBuildSettings: setApi });
 
-    await onSetOffloaderAllowMajorVersionMismatch(
+    await onSetOffloaderVersionMatchPolicy(
       host as unknown as ESPHomeApp,
-      new CustomEvent("x", { detail: false })
+      new CustomEvent("x", { detail: "exact_required" as VersionMatchPolicy })
     );
 
-    expect(setApi).toHaveBeenCalledWith({ allow_major_version_mismatch: false });
-    expect(host._offloaderAllowMajorVersionMismatch).toBe(false);
+    expect(setApi).toHaveBeenCalledWith({ version_match_policy: "exact_required" });
+    expect(host._offloaderVersionMatchPolicy).toBe("exact_required");
     expect(toastError).not.toHaveBeenCalled();
   });
 
@@ -55,12 +56,12 @@ describe("onSetOffloaderAllowMajorVersionMismatch", () => {
     });
     const host = makeHost({ setOffloaderRemoteBuildSettings: setApi });
 
-    await onSetOffloaderAllowMajorVersionMismatch(
+    await onSetOffloaderVersionMatchPolicy(
       host as unknown as ESPHomeApp,
-      new CustomEvent("x", { detail: false })
+      new CustomEvent("x", { detail: "exact_required" as VersionMatchPolicy })
     );
 
-    expect(host._offloaderAllowMajorVersionMismatch).toBe(true);
+    expect(host._offloaderVersionMatchPolicy).toBe("any");
     expect(toastError).toHaveBeenCalledOnce();
   });
 });

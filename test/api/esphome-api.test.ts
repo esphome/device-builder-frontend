@@ -768,11 +768,11 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await expect(pending).resolves.toEqual(result);
   });
 
-  it("setOffloaderRemoteBuildSettings forwards allow_major_version_mismatch", async () => {
+  it("setOffloaderRemoteBuildSettings forwards version_match_policy", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);
     const pending = api.setOffloaderRemoteBuildSettings({
-      allow_major_version_mismatch: false,
+      version_match_policy: "exact_required",
     });
     const sent = ws.sentAs<{
       command: string;
@@ -780,10 +780,10 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       args: Record<string, unknown>;
     }>(0);
     expect(sent.command).toBe("remote_build/set_offloader_settings");
-    expect(sent.args).toEqual({ allow_major_version_mismatch: false });
+    expect(sent.args).toEqual({ version_match_policy: "exact_required" });
     const result = {
       remote_builds_enabled: true,
-      allow_major_version_mismatch: false,
+      version_match_policy: "exact_required",
       pairings: [],
     };
     ws.receive({ message_id: sent.message_id, result });

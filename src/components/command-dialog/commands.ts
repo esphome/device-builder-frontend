@@ -128,7 +128,12 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
     }
   } catch (err) {
     host._state = "error";
-    host._statusMessage = err instanceof Error ? err.message : String(err);
+    host._statusMessage =
+      err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER
+        ? host._localize("command.install_no_compatible_peer")
+        : err instanceof Error
+          ? err.message
+          : String(err);
     return;
   }
 
