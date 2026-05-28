@@ -13,6 +13,7 @@ import {
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type {
@@ -551,35 +552,60 @@ export class ESPHomePageDashboard extends LitElement {
   };
 
   /** Apply every active facet filter to the device list. Labels
-   *  use AND semantics (a device must carry every selected label
-   *  — the original "drill down by tag stack" behaviour we shipped
+   *  use AND semantics (a device must carry every selected label,
+   *  the original "drill down by tag stack" behaviour we shipped
    *  with the labels filter); area, platform, and status use OR
    *  within the facet and AND across facets, the conventional
-   *  faceted-search shape. */
+   *  faceted-search shape.
+   *
+   *  Memoised on the five upstream references (``devices`` plus
+   *  the four selection arrays) so the two callers inside one
+   *  render cycle (``render()`` and ``_currentlyVisibleConfigurations``)
+   *  share a single filter pass. Lit's reactive @state pattern
+   *  hands out new array references on every selection change,
+   *  so the cache invalidates exactly when the user changes a
+   *  facet or the upstream device list shifts. */
+  private _applyFacetFiltersMemo = memoizeOne(
+    (
+      devices: ConfiguredDevice[],
+      selectedLabels: string[],
+      selectedAreas: string[],
+      selectedPlatforms: string[],
+      selectedStates: string[]
+    ): ConfiguredDevice[] => {
+      let out = devices;
+      if (selectedLabels.length > 0) {
+        out = out.filter((d) => {
+          const ids = d.labels;
+          if (!ids || ids.length === 0) return false;
+          const set = new Set(ids);
+          return selectedLabels.every((id) => set.has(id));
+        });
+      }
+      if (selectedAreas.length > 0) {
+        const set = new Set(selectedAreas);
+        out = out.filter((d) => !!d.area && set.has(d.area));
+      }
+      if (selectedPlatforms.length > 0) {
+        const set = new Set(selectedPlatforms);
+        out = out.filter((d) => set.has(d.target_platform));
+      }
+      if (selectedStates.length > 0) {
+        const set = new Set(selectedStates);
+        out = out.filter((d) => set.has(d.state));
+      }
+      return out;
+    }
+  );
+
   _applyFacetFilters(devices: ConfiguredDevice[]): ConfiguredDevice[] {
-    let out = devices;
-    if (this._selectedLabels.length > 0) {
-      const required = this._selectedLabels;
-      out = out.filter((d) => {
-        const ids = d.labels;
-        if (!ids || ids.length === 0) return false;
-        const set = new Set(ids);
-        return required.every((id) => set.has(id));
-      });
-    }
-    if (this._selectedAreas.length > 0) {
-      const set = new Set(this._selectedAreas);
-      out = out.filter((d) => !!d.area && set.has(d.area));
-    }
-    if (this._selectedPlatforms.length > 0) {
-      const set = new Set(this._selectedPlatforms);
-      out = out.filter((d) => set.has(d.target_platform));
-    }
-    if (this._selectedStates.length > 0) {
-      const set = new Set(this._selectedStates);
-      out = out.filter((d) => set.has(d.state));
-    }
-    return out;
+    return this._applyFacetFiltersMemo(
+      devices,
+      this._selectedLabels,
+      this._selectedAreas,
+      this._selectedPlatforms,
+      this._selectedStates
+    );
   }
 
   // Card view: name match. Table view: also matches address/IP/platform so
