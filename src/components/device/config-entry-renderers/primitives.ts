@@ -123,12 +123,14 @@ const TIME_PERIOD_UNITS = ["us", "ms", "s", "min", "h", "d"] as const;
 type TimePeriodUnit = (typeof TIME_PERIOD_UNITS)[number];
 
 /** Detect a polymorphic time-period scalar shorthand (``50ms``,
- *  ``2.5s``). Requires an explicit unit suffix so unitless numbers
- *  like ``delta: 0.5`` don't false-positive. Shared by callers that
- *  need to classify a raw YAML value without going through the full
- *  ``parseTimePeriod`` parse / unit pair. */
+ *  ``2.5s``); requires an explicit unit suffix so unitless numbers
+ *  like ``delta: 0.5`` don't false-positive. Units are escaped when
+ *  building the regex so a future entry with regex metacharacters
+ *  doesn't quietly malform the pattern. */
 const TIME_PERIOD_SCALAR_RE = new RegExp(
-  `^\\d+(?:\\.\\d+)?(?:${TIME_PERIOD_UNITS.join("|")})$`
+  `^\\d+(?:\\.\\d+)?(?:${TIME_PERIOD_UNITS.map((u) =>
+    u.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+  ).join("|")})$`
 );
 export function looksLikeTimePeriodScalar(raw: unknown): boolean {
   return typeof raw === "string" && TIME_PERIOD_SCALAR_RE.test(raw.trim());
