@@ -377,55 +377,14 @@ export class ESPHomeDeviceNavigator extends LitElement {
     super.disconnectedCallback();
     this._unsubscribeCache?.();
     this._unsubscribeCache = undefined;
-    if (this._pendingKickoff !== null) {
-      clearTimeout(this._pendingKickoff);
-      this._pendingKickoff = null;
-    }
   }
-
-  /** Window we wait on the yaml-edge for ``platform`` to land
-   *  before firing without it. Long enough for the typical
-   *  board-manifest fetch round trip (small JSON, sub-100ms LAN);
-   *  short enough that a platform-less device (board id missing
-   *  / manifest 404) feels responsive when labels do resolve. */
-  private static readonly _KICKOFF_DEFER_MS = 500;
-
-  /** Pending yaml-edge kickoff that's waiting for ``platform`` to
-   *  arrive. The platform-edge cancels it and fires with full
-   *  context; the disconnect cancels it cleanly. */
-  private _pendingKickoff: ReturnType<typeof setTimeout> | null = null;
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (
       (changedProperties.has("yaml") || changedProperties.has("platform")) &&
       this.yaml
     ) {
-      // Coalesce the yaml-then-platform mount sequence into one
-      // fetch: yaml typically lands first and ``platform``
-      // (derived from the board manifest fetch) a beat later. If
-      // we fire on both edges, the yaml-edge call hits a
-      // ``platform=undefined`` ``BatchedCache`` bucket and the
-      // platform-edge call hits a separate bucket — two WS round
-      // trips per mount, the first one's results orphaned.
-      //
-      // Instead, defer the yaml-edge fire by a short window so
-      // the platform-edge can cancel it and run once with full
-      // context. The fallback timer ensures devices without a
-      // resolvable board (board_id missing, manifest fetch
-      // failed — see ``device.ts::_loadBoard``) still get their
-      // labels resolved, just with platform-undefined values.
-      if (this._pendingKickoff !== null) {
-        clearTimeout(this._pendingKickoff);
-        this._pendingKickoff = null;
-      }
-      if (this.platform) {
-        this._kickoffNameResolves();
-      } else {
-        this._pendingKickoff = setTimeout(() => {
-          this._pendingKickoff = null;
-          if (this.yaml) this._kickoffNameResolves();
-        }, ESPHomeDeviceNavigator._KICKOFF_DEFER_MS);
-      }
+      this._kickoffNameResolves();
     }
 
     // Sync `_selectedLine`/`_selectedRange` whenever the externally-

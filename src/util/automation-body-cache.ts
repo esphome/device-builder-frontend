@@ -37,11 +37,15 @@ function _key(type: AutomationCatalogBodyType, id: string): string {
   return `${type}/${id}`;
 }
 
+/** Synchronous cache read. ``cacheMisses: false`` on the underlying
+ *  store means we never persist a null body, so the return is just
+ *  ``AutomationCatalogBody | undefined`` — the ``null`` half of
+ *  ``BatchedCache.getCached`` can't surface here. */
 export function getCachedAutomationBody(
   type: AutomationCatalogBodyType,
   id: string
-): AutomationCatalogBody | null | undefined {
-  return _cache.getCached(_key(type, id), undefined);
+): AutomationCatalogBody | undefined {
+  return _cache.getCached(_key(type, id), undefined) ?? undefined;
 }
 
 export function fetchAutomationBody(
