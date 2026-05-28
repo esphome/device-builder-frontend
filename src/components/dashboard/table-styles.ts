@@ -21,7 +21,12 @@ export const tableLayoutStyles = css`
 
   .controls {
     display: flex;
-    align-items: center;
+    /* Top-align the right-cluster (Columns + Create device) with
+       the toolbar-stack's first row (search + view-toggle +
+       facets). The slotted toolbar now contains TWO stacked rows
+       (toolbar-row + device-count-row), and align-items:center
+       would float the right-cluster between them. */
+    align-items: flex-start;
     gap: var(--wa-space-s);
     padding: var(--wa-space-l) var(--wa-space-l) 0;
     margin-bottom: var(--wa-space-l);
