@@ -18,8 +18,10 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
 import type { ConfigEntry, RegistryCatalogEntry } from "../../../api/types.js";
-import { isLambdaValue } from "../../../api/types.js";
+import { ConfigEntryType, isLambdaValue } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
+import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
+import { looksLikeTimePeriodScalar } from "./primitives.js";
 import {
   fetchFilters,
   fetchLightEffects,
@@ -28,8 +30,6 @@ import {
   subscribeAutomationCatalogCache,
 } from "../../../util/automation-catalog-cache.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
-import "./lambda-editor.js";
-import { LAMBDA_REGISTRY_ID, lambdaBodyOf } from "./lambda.js";
 import {
   effectiveDisabled,
   fieldRendererStyles,
@@ -103,6 +103,20 @@ interface RegistryOps {
    *  YAML expressiveness. */
   dedupByTypeId: boolean;
 }
+
+/** Map a registry entry's ``value_type`` (backend's scalar-extends
+ *  classification: time_period / float / integer / string) to the
+ *  ConfigEntryType the per-field renderer dispatch knows. The
+ *  registry-list sub-form constructs a synthetic ConfigEntry of the
+ *  matching type and routes through ``ctx.renderEntry`` so each
+ *  scalar shape reuses the same input widget the regular form does. */
+const VALUE_TYPE_TO_CONFIG_TYPE: Record<string, ConfigEntryType> = {
+  time_period: ConfigEntryType.TIME_PERIOD,
+  float: ConfigEntryType.FLOAT,
+  integer: ConfigEntryType.INTEGER,
+  string: ConfigEntryType.STRING,
+  lambda: ConfigEntryType.LAMBDA,
+};
 
 const REGISTRY_OPS: Record<string, RegistryOps> = {
   light_effects: {
@@ -466,12 +480,14 @@ export class ESPHomeRegistryList extends LitElement {
       !Array.isArray(params) &&
       !isLambdaValue(params) &&
       !(params instanceof YamlRawValue);
-    // ``lambda`` filter / effect takes a C++ body as the whole value
-    // (``- lambda: |- return x;``); the schema bundle exposes no
-    // config_vars for it, so the catalog has 0 config_entries. Render
-    // an inline lambda editor bound to the row's polymorphic value
-    // position so users can fill in the body visually.
-    const isLambdaForm = currentId === LAMBDA_REGISTRY_ID;
+    // Scalar-valued entries (``throttle: 10s``, ``delayed_on: 50ms``,
+    // ``- lambda: |- ...``): dispatch the matching per-type renderer
+    // through ctx.renderEntry via a synthetic ConfigEntry so the row
+    // reuses the same widgets the regular form does. Falls back to a
+    // runtime check on the params value for polymorphic shorthands
+    // (``delayed_on_off: 50ms`` shorthand for the mapping form) the
+    // catalog doesn't classify.
+    const scalarConfigType = this._scalarDispatchType(catalogEntry, params);
     // Render every child unconditionally — the user opted into this
     // filter/effect by picking it from the dropdown, so the outer
     // form's advanced / requiredOnly gates don't apply (many filters
@@ -515,27 +531,7 @@ export class ESPHomeRegistryList extends LitElement {
           </wa-select>
           ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
         </div>
-        ${isLambdaForm
-          ? html`<div class="registry-list-sub-form">
-              <esphome-lambda-editor
-                .value=${lambdaBodyOf(params)}
-                ?disabled=${disabled}
-                @lambda-change=${(e: CustomEvent<{ value: string }>) =>
-                  this._setLambdaBody(index, currentId, e.detail.value)}
-              ></esphome-lambda-editor>
-            </div>`
-          : childEntries.length > 0
-            ? html`<div class="registry-list-sub-form">
-                ${childEntries.map((child) =>
-                  this.ctx.renderEntry(child, [
-                    ...this.path,
-                    String(index),
-                    currentId,
-                    child.key,
-                  ])
-                )}
-              </div>`
-            : nothing}
+        ${this._renderSubForm(index, currentId, scalarConfigType, childEntries)}
       </div>
     `;
   }
@@ -555,10 +551,51 @@ export class ESPHomeRegistryList extends LitElement {
     this.ctx.emitChange(this.path, spliceEditable(list, positions, next));
   }
 
-  private _setLambdaBody(index: number, registryId: string, body: string) {
-    this._mutateEditable((items) =>
-      items.map((it, i) => (i === index ? { [registryId]: { _lambda: body } } : it))
-    );
+  /** Decide which scalar input type to dispatch to, if any.
+   *  Backend ``value_type`` wins; otherwise sniff polymorphic
+   *  shorthands at runtime (a time-period string under a
+   *  mapping-shaped catalog entry is the common case). */
+  private _scalarDispatchType(
+    catalogEntry: RegistryCatalogEntry | undefined,
+    params: unknown
+  ): ConfigEntryType | null {
+    const tagged = catalogEntry?.value_type;
+    if (tagged && tagged in VALUE_TYPE_TO_CONFIG_TYPE) {
+      return VALUE_TYPE_TO_CONFIG_TYPE[tagged];
+    }
+    if (looksLikeTimePeriodScalar(params)) {
+      return ConfigEntryType.TIME_PERIOD;
+    }
+    return null;
+  }
+
+  /** Render the per-row sub-form: a synthetic scalar field when the
+   *  catalog entry takes a scalar value (``- throttle: 10s``,
+   *  ``- lambda: |- ...``), the mapping sub-form when it carries
+   *  config_entries, or nothing for ids with no params. */
+  private _renderSubForm(
+    index: number,
+    currentId: string,
+    scalarConfigType: ConfigEntryType | null,
+    childEntries: ConfigEntry[]
+  ) {
+    if (scalarConfigType !== null) {
+      return html`<div class="registry-list-sub-form">
+        ${this.ctx.renderEntry(makeConfigEntry({ type: scalarConfigType }), [
+          ...this.path,
+          String(index),
+          currentId,
+        ])}
+      </div>`;
+    }
+    if (childEntries.length > 0) {
+      return html`<div class="registry-list-sub-form">
+        ${childEntries.map((child) =>
+          this.ctx.renderEntry(child, [...this.path, String(index), currentId, child.key])
+        )}
+      </div>`;
+    }
+    return nothing;
   }
 
   private _addItem() {

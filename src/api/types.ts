@@ -898,6 +898,12 @@ export interface RegistryCatalogEntry {
   name: string;
   config_entries: ConfigEntry[];
   applies_to: string[];
+  /** Set when the entry takes a single scalar at the polymorphic
+   *  key position (`- throttle: 10s`, `- delayed_on: 50ms`) rather
+   *  than a nested mapping. The renderer mounts the matching inline
+   *  input (time-period widget, number, lambda body) at the row's
+   *  polymorphic value position instead of an empty sub-form. */
+  value_type?: string | null;
 }
 
 /** A light effect (``pulse``, ``flicker``, ``addressable_lambda``…).

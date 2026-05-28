@@ -335,11 +335,53 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
   });
 
-  it("renders no sub-form when the existing params is a scalar", async () => {
-    // ``delta: 0.5`` and ``throttle: 10s`` are scalar shorthands that
-    // ESPHome accepts even when the catalog encodes a mapping schema
-    // for the same id. Rendering the mapping inputs over a scalar
-    // would silently clobber the user's YAML on first edit.
+  it("dispatches a time-period scalar shorthand under a mapping-shaped catalog entry", async () => {
+    // ``delayed_on_off: 50ms`` is a polymorphic shorthand for the
+    // ``{time_on, time_off}`` mapping form. The catalog has the
+    // mapping config_entries, but the YAML carries a string; the
+    // runtime sniff routes it through TIME_PERIOD so the user can
+    // see and edit the 50ms value.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "delayed_on_off",
+        name: "Delayed On Off",
+        applies_to: [],
+        config_entries: [
+          makeEntry(ConfigEntryType.TIME_PERIOD, { key: "time_on" }),
+          makeEntry(ConfigEntryType.TIME_PERIOD, { key: "time_off" }),
+        ],
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ delayed_on_off: "50ms" }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    const calls = renderEntry.mock.calls.map((c) => ({
+      type: (c[0] as { type: string }).type,
+      path: c[1],
+    }));
+    expect(calls).toContainEqual({
+      type: ConfigEntryType.TIME_PERIOD,
+      path: ["filters", "0", "delayed_on_off"],
+    });
+  });
+
+  it("renders no sub-form when the existing params is a non-time-period scalar", async () => {
+    // ``delta: 0.5`` is a unitless float; the runtime sniff requires
+    // an explicit time-period unit suffix so this stays picker-only
+    // rather than misrouting through TIME_PERIOD.
     const renderEntry = vi.fn();
     const catalog = [
       {
@@ -456,14 +498,28 @@ describe("renderRegistryListField — per-row params sub-form", () => {
     ]);
   });
 
-  it("renders the inline lambda editor when the picked id is 'lambda'", async () => {
-    // ``lambda`` filter takes a C++ body as the whole polymorphic value
-    // (``- lambda: |- return x;``). The catalog ships no config_entries
-    // for it (no schema), so the mapping sub-form path doesn't fire;
-    // the renderer instead mounts <esphome-lambda-editor> bound to the
-    // row's polymorphic value position.
+  it("dispatches scalar value_types (time_period, lambda, ...) through ctx.renderEntry", async () => {
+    // The polymorphic value for ``- throttle: 10s`` / ``- lambda: |- ...``
+    // sits at the row's polymorphic key position rather than under a
+    // mapping. The renderer constructs a synthetic ConfigEntry of the
+    // matching type and routes through ctx.renderEntry so the row
+    // reuses the same per-type widgets the regular form does.
+    const renderEntry = vi.fn();
     const catalog = [
-      { id: "lambda", name: "Lambda", config_entries: [], applies_to: [] },
+      {
+        id: "throttle",
+        name: "Throttle",
+        config_entries: [],
+        applies_to: [],
+        value_type: "time_period",
+      },
+      {
+        id: "lambda",
+        name: "Lambda",
+        config_entries: [],
+        applies_to: [],
+        value_type: "lambda",
+      },
     ];
     const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
     el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
@@ -472,12 +528,26 @@ describe("renderRegistryListField — per-row params sub-form", () => {
       multi_value: true,
     });
     el.path = ["filters"];
-    el.ctx = makeRenderCtx({ filters: [{ lambda: null }] });
+    el.ctx = makeRenderCtx(
+      { filters: [{ throttle: "10s" }, { lambda: null }] },
+      { overrides: { renderEntry } }
+    );
     document.body.append(el);
     (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
     el.requestUpdate();
     await el.updateComplete;
-    expect(el.shadowRoot!.querySelector("esphome-lambda-editor")).toBeTruthy();
+    const calls = renderEntry.mock.calls.map((c) => ({
+      type: (c[0] as { type: string }).type,
+      path: c[1],
+    }));
+    expect(calls).toContainEqual({
+      type: ConfigEntryType.TIME_PERIOD,
+      path: ["filters", "0", "throttle"],
+    });
+    expect(calls).toContainEqual({
+      type: ConfigEntryType.LAMBDA,
+      path: ["filters", "1", "lambda"],
+    });
   });
 
   it("renders no sub-form on an empty / unselected row", async () => {
