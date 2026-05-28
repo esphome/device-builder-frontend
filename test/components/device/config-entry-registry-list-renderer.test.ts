@@ -252,6 +252,108 @@ describe("renderRegistryListField — emitChange contract", () => {
   });
 });
 
+describe("renderRegistryListField — per-row params sub-form", () => {
+  it("renders a sub-form for the picked entry's config_entries", async () => {
+    // calibrate_polynomial requires ``degree`` + ``datapoints``;
+    // without a sub-form the user has to hand-edit YAML to set
+    // required params and the validator flags missing fields.
+    const renderEntry = vi.fn();
+    const catalog = [
+      {
+        id: "calibrate_polynomial",
+        name: "Calibrate Polynomial",
+        applies_to: [],
+        config_entries: [
+          makeEntry(ConfigEntryType.INTEGER, { key: "degree", required: true }),
+          makeEntry(ConfigEntryType.STRING, { key: "datapoints", required: true }),
+        ],
+      },
+    ];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "filters",
+      registry: "filter",
+      multi_value: true,
+    });
+    el.path = ["filters"];
+    el.ctx = makeRenderCtx(
+      { filters: [{ calibrate_polynomial: { degree: 2, datapoints: ["0 -> 0"] } }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    const paths = renderEntry.mock.calls.map((c) => c[1]);
+    expect(paths).toContainEqual(["filters", "0", "calibrate_polynomial", "degree"]);
+    expect(paths).toContainEqual(["filters", "0", "calibrate_polynomial", "datapoints"]);
+    expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeTruthy();
+  });
+
+  it("renders no sub-form when the picked entry has no config_entries", async () => {
+    const renderEntry = vi.fn();
+    const catalog = [{ id: "pulse", name: "Pulse", config_entries: [], applies_to: [] }];
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "effects",
+      registry: "light_effects",
+      multi_value: true,
+    });
+    el.path = ["effects"];
+    el.ctx = makeRenderCtx(
+      { effects: [{ pulse: null }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: typeof catalog })._catalog = catalog;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
+  });
+
+  it("renders no sub-form when the picked id is missing from the catalog", async () => {
+    // Legacy id case: the picker still surfaces the value but we
+    // don't have the schema, so no fields to render.
+    const renderEntry = vi.fn();
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "effects",
+      registry: "light_effects",
+      multi_value: true,
+    });
+    el.path = ["effects"];
+    el.ctx = makeRenderCtx(
+      { effects: [{ unknown_effect: null }] },
+      { overrides: { renderEntry } }
+    );
+    document.body.append(el);
+    (el as unknown as { _catalog: LightEffect[] })._catalog = STUB_CATALOG;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
+  });
+
+  it("renders no sub-form on an empty / unselected row", async () => {
+    const renderEntry = vi.fn();
+    const el = document.createElement("esphome-registry-list") as ESPHomeRegistryList;
+    el.entry = makeEntry(ConfigEntryType.REGISTRY_LIST, {
+      key: "effects",
+      registry: "light_effects",
+      multi_value: true,
+    });
+    el.path = ["effects"];
+    el.ctx = makeRenderCtx({ effects: [{}] }, { overrides: { renderEntry } });
+    document.body.append(el);
+    (el as unknown as { _catalog: LightEffect[] })._catalog = STUB_CATALOG;
+    el.requestUpdate();
+    await el.updateComplete;
+    expect(renderEntry).not.toHaveBeenCalled();
+    expect(el.shadowRoot!.querySelector(".registry-list-sub-form")).toBeNull();
+  });
+});
+
 describe("renderRegistryListField — applies_to filtering", () => {
   it("scopes the light_effects catalog to the parent platform", async () => {
     // adalight is registered as ADDRESSABLE-only; on a

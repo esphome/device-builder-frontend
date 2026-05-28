@@ -285,6 +285,9 @@ export class ESPHomeRegistryList extends LitElement {
     :host {
       display: block;
     }
+    .registry-list-item {
+      margin-bottom: 1rem;
+    }
     .registry-list-row {
       display: flex;
       gap: 0.5rem;
@@ -293,6 +296,14 @@ export class ESPHomeRegistryList extends LitElement {
     }
     .registry-list-row wa-select {
       flex: 1;
+    }
+    .registry-list-sub-form {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-left: 1rem;
+      padding-left: 1rem;
+      border-left: 2px solid var(--wa-color-surface-border);
     }
     .registry-list-fallback {
       color: var(--wa-color-neutral-fill-loud);
@@ -431,39 +442,66 @@ export class ESPHomeRegistryList extends LitElement {
     // (older configs may carry an effect the schema dropped) so the
     // value round-trips on the next save instead of silently
     // disappearing from the picker.
-    const knownInCatalog = catalog.some((e) => e.id === currentId);
+    const catalogEntry = catalog.find((e) => e.id === currentId);
+    const knownInCatalog = catalogEntry !== undefined;
     // Sort by id so 39 sensor filters in the picker stay scannable.
     const sortedCatalog = [...catalog].sort((a, b) => a.id.localeCompare(b.id));
+    // Per-row params sub-form: the catalog entry's ``config_entries``
+    // describe the parameter schema for the picked id (e.g.
+    // ``calibrate_polynomial`` needs ``degree`` and ``datapoints``).
+    // Render through ``ctx.renderEntry`` so each child dispatches to
+    // the right per-field renderer — same pattern renderNestedListField
+    // uses. Path is ``[...this.path, index, currentId, child.key]`` so
+    // setIn lands the value under the row's polymorphic single key.
+    const params = currentId ? (item[currentId] as Record<string, unknown> | null) : null;
+    const childEntries = catalogEntry?.config_entries ?? [];
+    const renderableChildren = childEntries.length
+      ? this.ctx.filterRenderable(childEntries, params ?? {})
+      : [];
     return html`
-      <div class="registry-list-row" data-row-index=${index}>
-        <wa-select
-          .value=${currentId}
-          ?disabled=${disabled}
-          placeholder=${this.ctx.localize("device.registry_list_select")}
-          aria-label=${this.ctx.localize("device.registry_list_row_label", {
-            index: String(index + 1),
-          })}
-          @change=${(e: Event) => {
-            // wa-select isn't an HTMLSelectElement; cast to the read field.
-            const next = (e.target as unknown as { value: string }).value;
-            this._renameRow(index, next);
-          }}
-        >
-          ${!knownInCatalog && currentId
-            ? html`<wa-option value=${currentId} selected
-                >${formatRegistryId(currentId)}</wa-option
-              >`
-            : nothing}
-          ${sortedCatalog
-            .filter((effect) => effect.id === currentId || !takenIds.has(effect.id))
-            .map(
-              (effect) =>
-                html`<wa-option value=${effect.id} ?selected=${effect.id === currentId}
-                  >${formatRegistryId(effect.id)}</wa-option
+      <div class="registry-list-item" data-row-index=${index}>
+        <div class="registry-list-row">
+          <wa-select
+            .value=${currentId}
+            ?disabled=${disabled}
+            placeholder=${this.ctx.localize("device.registry_list_select")}
+            aria-label=${this.ctx.localize("device.registry_list_row_label", {
+              index: String(index + 1),
+            })}
+            @change=${(e: Event) => {
+              // wa-select isn't an HTMLSelectElement; cast to the read field.
+              const next = (e.target as unknown as { value: string }).value;
+              this._renameRow(index, next);
+            }}
+          >
+            ${!knownInCatalog && currentId
+              ? html`<wa-option value=${currentId} selected
+                  >${formatRegistryId(currentId)}</wa-option
                 >`
-            )}
-        </wa-select>
-        ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
+              : nothing}
+            ${sortedCatalog
+              .filter((effect) => effect.id === currentId || !takenIds.has(effect.id))
+              .map(
+                (effect) =>
+                  html`<wa-option value=${effect.id} ?selected=${effect.id === currentId}
+                    >${formatRegistryId(effect.id)}</wa-option
+                  >`
+              )}
+          </wa-select>
+          ${renderListRemoveButton(this.ctx, disabled, () => this._removeAt(index))}
+        </div>
+        ${renderableChildren.length > 0
+          ? html`<div class="registry-list-sub-form">
+              ${renderableChildren.map((child) =>
+                this.ctx.renderEntry(child, [
+                  ...this.path,
+                  String(index),
+                  currentId,
+                  child.key,
+                ])
+              )}
+            </div>`
+          : nothing}
       </div>
     `;
   }
