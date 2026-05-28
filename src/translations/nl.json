@@ -687,7 +687,8 @@
     "unsaved_message": "U heeft niet-opgeslagen wijzigingen op dit apparaat. Als u zonder opslaan vertrekt, gaan ze verloren.",
     "leave_anyway": "Toch verlaten",
     "discard_changes": "Negeren",
-    "save_and_leave": "Opslaan"
+    "save_and_leave": "Opslaan",
+    "automation_partial_hydration": "Kon {count} automatiseringsformulier(en) niet laden. Sommige formulieren worden mogelijk leeg weergegeven."
   },
   "onboarding": {
     "menu_item_setup_wifi": "Wi-Fi instellen",

@@ -931,6 +931,26 @@ export type LightEffect = RegistryCatalogEntry;
  *  entry whose `applies_to` spans every domain it lives in. */
 export type Filter = RegistryCatalogEntry;
 
+/** Union of every full body the ``automations/get_bodies`` batch
+ *  endpoint can return. There is no per-body discriminator field;
+ *  the discriminator is the ``"<type>/<id>"`` response key, so
+ *  narrowing happens at the call site against the type the caller
+ *  asked for, not via structural inspection. */
+export type AutomationCatalogBody =
+  | AutomationTrigger
+  | AutomationAction
+  | AutomationCondition
+  | LightEffect
+  | Filter;
+
+/** Wire ``type`` field on an ``automations/get_bodies`` ref. */
+export type AutomationCatalogBodyType =
+  | "triggers"
+  | "actions"
+  | "conditions"
+  | "light_effects"
+  | "filters";
+
 /** Tagged-union locator for an automation inside a device YAML.
  *  Mirrors the backend's ``AutomationLocation`` Python dataclass.
  *  ``parse`` returns these and ``upsert`` / ``delete`` consume them

@@ -4,6 +4,7 @@ import type {
   AutomationAction,
   AutomationCondition,
   AutomationTrigger,
+  ConfigEntry,
   Filter,
   LightEffect,
 } from "../../src/api/types.js";
@@ -21,6 +22,7 @@ import {
   getCachedLightEffects,
   subscribeAutomationCatalogCache,
 } from "../../src/util/automation-catalog-cache.js";
+import { _clearAutomationBodyCache } from "../../src/util/automation-body-cache.js";
 
 const trigger = (id: string): AutomationTrigger => ({
   id,
@@ -99,12 +101,14 @@ const stubApi = (impls?: {
   const getLightEffects = vi.fn((platform?: string, boardId?: string) =>
     Promise.resolve(impls?.effects?.(platform, boardId) ?? [effect("pulse")])
   );
+  const getAutomationBodies = vi.fn(() => Promise.resolve({}));
   return {
     api: {
       getAutomationTriggers,
       getAutomationActions,
       getAutomationConditions,
       getLightEffects,
+      getAutomationBodies,
     } as unknown as ESPHomeAPI,
     getAutomationTriggers,
     getAutomationActions,
@@ -116,6 +120,7 @@ const stubApi = (impls?: {
 describe("automation-catalog-cache", () => {
   afterEach(() => {
     _clearAutomationCatalogCache();
+    _clearAutomationBodyCache();
   });
 
   it("fetches each catalogue on first call and caches the result", async () => {
@@ -261,7 +266,8 @@ describe("automation-catalog-cache", () => {
       applies_to: [],
     };
     const getFilters = vi.fn(() => Promise.resolve([filter]));
-    const api = { getFilters } as unknown as ESPHomeAPI;
+    const getAutomationBodies = vi.fn(() => Promise.resolve({}));
+    const api = { getFilters, getAutomationBodies } as unknown as ESPHomeAPI;
 
     await fetchFilters(api);
     expect(getCachedFilters()?.map((f) => f.id)).toEqual(["delta"]);
@@ -273,5 +279,212 @@ describe("automation-catalog-cache", () => {
     // in-flight slot was also cleared.
     await fetchFilters(api);
     expect(getFilters).toHaveBeenCalledTimes(2);
+  });
+
+  it("hydrates config_entries on fetchLightEffects via the body cache", async () => {
+    // After backend #1016, the list endpoint ships slim shapes
+    // (no config_entries); fetchLightEffects must hydrate via
+    // automations/get_bodies before the entry lands in the cache,
+    // because registry-list.ts reads config_entries off it.
+    const getLightEffects = vi.fn(() =>
+      Promise.resolve([
+        { id: "pulse", name: "Pulse", config_entries: [], applies_to: [] } as LightEffect,
+      ])
+    );
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const list = await fetchLightEffects(api);
+
+    expect(list[0].config_entries).toEqual([{ key: "transition_length" }]);
+    expect(getAutomationBodies).toHaveBeenCalledTimes(1);
+    expect(getAutomationBodies).toHaveBeenCalledWith([
+      { type: "light_effects", id: "pulse" },
+    ]);
+  });
+
+  it("retries hydration on a cached list when the previous attempt failed", async () => {
+    // Pre-merge bug: the list cache pinned a partially-hydrated
+    // list so a one-off body-fetch failure stayed empty for the
+    // session. Per-entry WeakSet flag now lets the next call's
+    // post-fetch hydration pick up only the still-empty entries.
+    const getLightEffects = vi.fn(() =>
+      Promise.resolve([
+        { id: "pulse", name: "Pulse", config_entries: [], applies_to: [] } as LightEffect,
+      ])
+    );
+    let attempts = 0;
+    const getAutomationBodies = vi.fn(() => {
+      attempts++;
+      const out: Record<string, LightEffect> =
+        attempts === 1
+          ? {} // contract violation: list advertised "pulse" but get_bodies returns nothing.
+          : {
+              "light_effects/pulse": {
+                id: "pulse",
+                name: "Pulse",
+                config_entries: [{ key: "transition_length" }],
+                applies_to: [],
+              } as unknown as LightEffect,
+            };
+      return Promise.resolve(out);
+    });
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const first = await fetchLightEffects(api);
+    expect(first[0].config_entries).toEqual([]); // still slim after failure
+
+    const second = await fetchLightEffects(api);
+    // Same entry mutated in place — the entry object identity is
+    // preserved across calls. The wrapping array identity differs
+    // after the post-hydration swap (so identity-checking
+    // subscribers re-render), but the underlying entry object
+    // received its ``config_entries`` from the second body fetch.
+    expect(second[0]).toBe(first[0]);
+    expect(second[0].config_entries).toEqual([{ key: "transition_length" }]);
+    expect(getLightEffects).toHaveBeenCalledTimes(1); // list cache hit
+    expect(getAutomationBodies).toHaveBeenCalledTimes(2); // two body fetches (first failed, second recovered)
+  });
+
+  it("skips body fetches on a fully-hydrated cache hit", async () => {
+    const getLightEffects = vi.fn(() =>
+      Promise.resolve([
+        { id: "pulse", name: "Pulse", config_entries: [], applies_to: [] } as LightEffect,
+      ])
+    );
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    await fetchLightEffects(api);
+    await fetchLightEffects(api);
+    await fetchLightEffects(api);
+
+    // First call fetched both list and body; second + third
+    // short-circuit both: list cache hit + WeakSet says hydrated.
+    expect(getLightEffects).toHaveBeenCalledTimes(1);
+    expect(getAutomationBodies).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies subscribers with a fresh array reference after hydration", async () => {
+    // Without this, the slim list lands in the cache and ``_notify``
+    // fires; subscribers re-read ``cache()`` and store the slim
+    // array. Then hydration mutates ``config_entries`` in place but
+    // never re-notifies, so registry-list keeps showing empty forms
+    // because Lit's identity-based ``hasChanged`` says nothing
+    // changed on the array prop.
+    const slimEntry = {
+      id: "pulse",
+      name: "Pulse",
+      config_entries: [] as ConfigEntry[],
+      applies_to: [] as string[],
+    } as LightEffect;
+    const getLightEffects = vi.fn(() => Promise.resolve([slimEntry]));
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const notifications: (LightEffect[] | undefined)[] = [];
+    const unsub = subscribeAutomationCatalogCache(() => {
+      notifications.push(getCachedLightEffects());
+    });
+
+    const returned = await fetchLightEffects(api);
+
+    // Two notifications: one when slim lands inside ``_fetch``, one
+    // after hydration replaces the cached array.
+    expect(notifications.length).toBe(2);
+    const slim = notifications[0]!;
+    const hydrated = notifications[1]!;
+    // Distinct array identity so Lit's hasChanged trips.
+    expect(hydrated).not.toBe(slim);
+    // Hydrated entries carry the populated ``config_entries``.
+    expect(hydrated[0].config_entries).toEqual([{ key: "transition_length" }]);
+    // The returned list matches what's now in the cache.
+    expect(returned).toBe(hydrated);
+    expect(returned).toBe(getCachedLightEffects());
+    unsub();
+  });
+
+  it("does not double-notify when hydration is a no-op (all entries already hydrated)", async () => {
+    const slimEntry = {
+      id: "pulse",
+      name: "Pulse",
+      config_entries: [] as ConfigEntry[],
+      applies_to: [] as string[],
+    } as LightEffect;
+    const getLightEffects = vi.fn(() => Promise.resolve([slimEntry]));
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    await fetchLightEffects(api); // first call: slim + hydrate-notify
+
+    let extraNotifications = 0;
+    const unsub = subscribeAutomationCatalogCache(() => {
+      extraNotifications++;
+    });
+
+    await fetchLightEffects(api); // second call: cache hit, hydration no-op
+
+    expect(extraNotifications).toBe(0);
+    unsub();
+  });
+
+  it("hydrates config_entries on fetchFilters via the body cache", async () => {
+    const getFilters = vi.fn(() =>
+      Promise.resolve([
+        { id: "delta", name: "Delta", config_entries: [], applies_to: [] } as Filter,
+      ])
+    );
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "filters/delta": {
+          id: "delta",
+          name: "Delta",
+          config_entries: [{ key: "min_change" }],
+          applies_to: [],
+        } as unknown as Filter,
+      })
+    );
+    const api = { getFilters, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const list = await fetchFilters(api);
+
+    expect(list[0].config_entries).toEqual([{ key: "min_change" }]);
+    expect(getAutomationBodies).toHaveBeenCalledTimes(1);
   });
 });

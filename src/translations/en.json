@@ -755,6 +755,7 @@
     "automation_action_delay_unit_d": "Days",
     "automation_light_effect": "Effect",
     "automation_parse_error": "Could not parse this automation. Edit the YAML directly to recover.",
+    "automation_partial_hydration": "{count} automation form(s) could not be loaded. Some forms may render empty.",
     "automation_save_error": "Failed to save automation",
     "automation_yaml_only_fallback": "This automation uses a value the editor doesn't recognise yet. Edit the YAML directly.",
     "add_action": "Add action",
