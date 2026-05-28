@@ -309,14 +309,24 @@ function _expandListItems(
     let name = "";
     let id = "";
     let platform = "";
+    // Only the list item's own top-level keys count: the dash line's
+    // inline key, plus continuation keys at exactly the direct-child
+    // indent. Deeper lines belong to nested sub-mappings (a sensor
+    // platform's temperature:/humidity: blocks, the debug component's
+    // per-metric sensors) whose name:/id: must not override the item's.
+    const dashIndent = lines[itemStart].match(/^ */)?.[0].length ?? 0;
+    const childIndent = dashIndent + 2;
     for (let j = itemStart; j <= itemEnd; j++) {
-      const nameMatch = lines[j].match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
+      const line = lines[j];
+      if (j !== itemStart) {
+        const indent = line.match(/^ */)?.[0].length ?? 0;
+        if (indent !== childIndent) continue;
+      }
+      const nameMatch = line.match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
       if (nameMatch) name = nameMatch[1];
-      const idMatch = lines[j].match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
+      const idMatch = line.match(/^\s+(?:-\s+)?id:\s*["']?(\S+?)["']?\s*$/);
       if (idMatch) id = idMatch[1];
-      const platformMatch = lines[j].match(
-        /^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*$/
-      );
+      const platformMatch = line.match(/^\s+(?:-\s+)?platform:\s*["']?(\S+?)["']?\s*$/);
       if (platformMatch) platform = platformMatch[1];
     }
 
