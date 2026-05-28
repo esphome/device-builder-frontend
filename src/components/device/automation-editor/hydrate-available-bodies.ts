@@ -54,13 +54,13 @@ export async function hydrateAvailableBodies(
       jobs.push(
         fetchBody(api, type, entry.id).then((body) => {
           if (body && "config_entries" in body) {
-            // Shallow-clone the array so add/remove/reorder on the
-            // entry's ``config_entries`` can't leak back into the
-            // shared cache. Individual ``ConfigEntry`` objects are
-            // still aliased; downstream forms must not mutate them
-            // in place (they don't today — the form returns a new
-            // value, never patches the schema).
-            entry.config_entries = [...body.config_entries];
+            // Deep-clone via ``structuredClone`` so the per-entry
+            // tree is structurally disjoint from the cached body —
+            // no add/remove/reorder OR entry-object mutation can
+            // leak back. JSON-shaped data only (primitives + arrays
+            // + plain objects from the wire), so structuredClone
+            // is faithful.
+            entry.config_entries = structuredClone(body.config_entries);
             result.succeeded++;
             return;
           }

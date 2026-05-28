@@ -227,7 +227,8 @@ async function _hydrateRegistryConfigEntries(
     list.map(async (entry) => {
       const body = await fetchAutomationBody(api, type, entry.id);
       if (body && "config_entries" in body) {
-        entry.config_entries = [...body.config_entries];
+        // Deep-clone — see hydrate-available-bodies.ts.
+        entry.config_entries = structuredClone(body.config_entries);
         return;
       }
       // Same backend contract violation we surface from

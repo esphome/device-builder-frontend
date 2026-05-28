@@ -37,12 +37,11 @@ const slimAvailable = (): AvailableAutomations =>
 const makeApi = () => ({}) as ESPHomeAPI;
 
 describe("hydrateAvailableBodies", () => {
-  it("populates config_entries from the body cache and clones the array", async () => {
+  it("populates config_entries from the body cache and deep-clones the tree", async () => {
     const sharedEntries = [configEntry("foo"), configEntry("bar")];
+    const cachedBody = triggerBody("good", sharedEntries);
     const fetchBody = vi.fn(async (_api, type, id) => {
-      if (type === "triggers" && id === "good") {
-        return triggerBody("good", sharedEntries);
-      }
+      if (type === "triggers" && id === "good") return cachedBody;
       return null;
     });
     const available = slimAvailable();
@@ -51,9 +50,18 @@ describe("hydrateAvailableBodies", () => {
     const result = await hydrateAvailableBodies(makeApi(), available, fetchBody);
 
     expect(goodEntry.config_entries).toEqual(sharedEntries);
-    // Cloned, not aliased — mutating the entry's array can't leak
-    // back into the cached body.
+    // Array reference is distinct (add/remove/reorder safety).
     expect(goodEntry.config_entries).not.toBe(sharedEntries);
+    // Each entry object is also distinct (in-place mutation safety).
+    expect(goodEntry.config_entries[0]).not.toBe(sharedEntries[0]);
+
+    // Pin the invariant in code: mutate the hydrated copy and
+    // confirm the cached body's entries are untouched.
+    (goodEntry.config_entries[0] as unknown as { key: string }).key = "mutated";
+    expect(sharedEntries[0].key).toBe("foo");
+    if ("config_entries" in cachedBody) {
+      expect(cachedBody.config_entries[0].key).toBe("foo");
+    }
     expect(result.succeeded).toBe(1);
   });
 

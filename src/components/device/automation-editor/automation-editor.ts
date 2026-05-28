@@ -129,6 +129,13 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  device's YAML) so the dropdowns only show what's usable. */
   @state() private _available: AvailableAutomations | null = null;
 
+  /** Monotonic generation token for ``_loadAvailable``. Two
+   *  overlapping reconnect-driven loads can otherwise have the
+   *  earlier one's stale assignment land after the later one's
+   *  fresh assignment; this lets each invocation drop its results
+   *  if the seq has moved on while it awaited. */
+  private _loadAvailableSeq = 0;
+
   /** Component catalog entry for the ``interval`` component, lazily
    *  fetched the first time we render an interval automation. Drives
    *  the header (name / description / docs / image) and the inline
@@ -386,11 +393,14 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
+    const seq = ++this._loadAvailableSeq;
     try {
       const available = await this._api.getAvailableAutomations(this.configuration);
+      if (seq !== this._loadAvailableSeq) return;
       // Paint the picker with the slim list immediately.
       this._available = available;
       const hydration = await hydrateAvailableBodies(this._api, available);
+      if (seq !== this._loadAvailableSeq) return;
       // Reassign ``_available`` with fresh array refs so child
       // components (trigger picker, condition tree, action node)
       // whose ``@property`` bindings default to identity-based
@@ -416,6 +426,7 @@ export class ESPHomeAutomationEditor extends LitElement {
         );
       }
     } catch (err) {
+      if (seq !== this._loadAvailableSeq) return;
       this._error = err instanceof Error ? err.message : String(err);
     }
   }
