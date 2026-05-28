@@ -452,19 +452,26 @@ export class ESPHomePageDevice extends LitElement {
       this._platformReady = false;
       this._loadBoard(boardId);
     } else if (!boardId) {
-      // No board id to fetch: either the device context has
-      // resolved with no ``board_id`` (rare — wizard re-run
-      // cleared it / device created without a board pin), or the
-      // device isn't in the devices context at all (deleted /
-      // stale id / context not yet loaded). In both cases there's
-      // no manifest to fetch; release the gate once we have
-      // *some* signal the page is operable, so the navigator can
-      // resolve labels with ``platform=undefined``.
+      // No board id to fetch — either the device resolved with no
+      // ``board_id`` (wizard re-run / created without one), or
+      // the devices context has loaded and our id isn't in it
+      // (deleted / stale link). Both are signals that no manifest
+      // fetch is coming; release the gate.
+      //
+      // We gate on ``_devices.length > 0`` for the missing-id
+      // case rather than ``this._yaml`` — yaml can resolve
+      // independently of the devices context, and a yaml-fallback
+      // would prematurely flip the gate when the context is just
+      // late, then we'd refetch when the context arrives with a
+      // real board_id, reintroducing the double-fetch this PR
+      // removes. ``_devices.length > 0`` means the context has
+      // delivered at least once; if our id still isn't there,
+      // it's actually missing.
       if (this._loadedBoardId !== null) {
         this._loadedBoardId = null;
         this._board = null;
       }
-      if (this._device !== null || this._yaml) {
+      if (this._device !== null || this._devices.length > 0) {
         this._platformReady = true;
       }
     }
@@ -507,10 +514,15 @@ export class ESPHomePageDevice extends LitElement {
       }
     } catch (e) {
       console.error("Failed to load board:", e);
-      // Definitive failure — release the navigator from its
-      // platform-ready wait so labels still resolve (with
-      // platform=undefined).
-      if (this._loadedBoardId === boardId) this._platformReady = true;
+      // Definitive failure — drop any previously-cached board
+      // (stale from a prior board_id) so the navigator doesn't
+      // resolve labels against the wrong platform, then release
+      // the gate so labels still come up (with
+      // ``platform=undefined``).
+      if (this._loadedBoardId === boardId) {
+        this._board = null;
+        this._platformReady = true;
+      }
     }
   }
 
