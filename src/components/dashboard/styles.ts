@@ -208,13 +208,10 @@ export const dashboardStyles = css`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
-    /* No top padding: the .toolbar + device-count-row above
-       already provide the inter-row rhythm — keeping the
-       --wa-space-l top here stacked into a wide gap between the
-       count row and the first card. Sides and bottom keep the
-       full padding so the grid doesn't hug the viewport edges
-       or the FAB. */
-    padding: 0 var(--wa-space-l) var(--wa-space-l);
+    /* Tight 4px top so the count row above doesn't butt against
+       the first card; sides and bottom keep the full padding so
+       the grid doesn't hug the viewport edges or the FAB. */
+    padding: var(--wa-space-xs) var(--wa-space-l) var(--wa-space-l);
   }
 
   /* Only the configured-device grid needs FAB clearance: it's the
@@ -533,14 +530,14 @@ export const dashboardStyles = css`
      card view's .toolbar gap:2px so the inter-row spacing reads
      identically between views. */
   .table-device-count-row {
-    padding: 2px var(--wa-space-l);
+    padding: 2px var(--wa-space-l) var(--wa-space-xs);
   }
 
   /* Mobile: tighten the table-view count-row gutter to match the
      .controls / .table-wrap trim in PR-H (see table-styles.ts). */
   @media (max-width: 600px) {
     .table-device-count-row {
-      padding: 2px var(--wa-space-s);
+      padding: 2px var(--wa-space-s) var(--wa-space-xs);
     }
   }
 
