@@ -1,3 +1,5 @@
+import type { PairingSummary, PeerStatus } from "../api/types.js";
+
 /**
  * Compare the local dashboard's bundled ESPHome version against
  * a paired build-server's reported version and classify the
@@ -73,4 +75,49 @@ export function classifyVersionMismatch(
 function stripSuffix(component: string): string {
   const match = component.match(/^(\d+)/);
   return match ? match[1] : component;
+}
+
+/**
+ * Why a backend `NO_COMPATIBLE_PEER` install error fired.
+ *
+ *   * ``offline`` — every operator-intentional pairing is currently
+ *     not connected to its peer-link; the toast should suggest
+ *     waiting for the build server to reconnect.
+ *   * ``version`` — every operator-intentional pairing is connected
+ *     but on a version that doesn't satisfy the policy; the toast
+ *     should suggest matching versions or relaxing the policy.
+ *   * ``mixed`` — both reasons present (or one each across
+ *     multiple peers); the generic toast applies.
+ */
+export type NoCompatiblePeerReason = "offline" | "version" | "mixed";
+
+/**
+ * Walk the pairings to attribute a ``NO_COMPATIBLE_PEER`` failure
+ * to one of the actionable buckets above.
+ *
+ * Only APPROVED + enabled rows count — PENDING and disabled
+ * rows aren't operator-intentional, so the backend's hard-fail
+ * doesn't fire on them. If there are no intentional pairings
+ * the policy itself can't be the failure cause; return
+ * ``"mixed"`` so the caller falls through to the generic toast.
+ */
+export function classifyNoCompatiblePeerReason(
+  pairings: Iterable<PairingSummary>,
+  offloaderVersion: string
+): NoCompatiblePeerReason {
+  let offline = 0;
+  let version = 0;
+  for (const p of pairings) {
+    if ((p.status as PeerStatus) !== "approved" || !p.enabled) continue;
+    if (!p.connected) {
+      offline += 1;
+      continue;
+    }
+    if (classifyVersionMismatch(offloaderVersion, p.esphome_version) !== null) {
+      version += 1;
+    }
+  }
+  if (offline > 0 && version === 0) return "offline";
+  if (version > 0 && offline === 0) return "version";
+  return "mixed";
 }

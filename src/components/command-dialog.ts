@@ -17,16 +17,18 @@ import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import { JobSource, JobStatus, JobType } from "../api/types.js";
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type { ConfiguredDevice, FirmwareJob, PairingSummary } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import {
   apiContext,
   buildOffloadJobsContext,
+  buildOffloadPairingsContext,
   darkModeContext,
   devicesContext,
   firmwareJobsContext,
   localizeContext,
+  versionContext,
 } from "../context/index.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
@@ -116,6 +118,18 @@ export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: buildOffloadJobsContext, subscribe: true })
   @state()
   _offloadJobs: Map<string, RemoteBuildJobState> | null = null;
+
+  // Pairings + offloader version drive the per-reason NO_COMPATIBLE_PEER
+  // toast — frontend classifies "all offline" vs "all wrong version"
+  // from the local snapshot so the wording matches the operator's
+  // actual remediation step.
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  _appVersion = "";
 
   @property() configuration = "";
   @property() name = "";

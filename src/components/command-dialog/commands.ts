@@ -1,6 +1,7 @@
 import { APIError } from "../../api/api-error.js";
 import { ErrorCode, JobStatus, type FirmwareJob } from "../../api/types.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
 // Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
@@ -214,7 +215,13 @@ function formatForceLocalError(err: unknown): string {
 
 function _installErrorMessage(host: ESPHomeCommandDialog, err: unknown): string {
   if (err instanceof APIError && err.errorCode === ErrorCode.NO_COMPATIBLE_PEER) {
-    return host._localize("command.install_no_compatible_peer");
+    const reason = classifyNoCompatiblePeerReason(
+      host._pairings?.values() ?? [],
+      host._appVersion
+    );
+    return host._localize(`command.install_no_compatible_peer_${reason}`, {
+      local: host._appVersion,
+    });
   }
   if (err instanceof Error) return err.message;
   return String(err);
