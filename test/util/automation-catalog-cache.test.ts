@@ -4,6 +4,7 @@ import type {
   AutomationAction,
   AutomationCondition,
   AutomationTrigger,
+  ConfigEntry,
   Filter,
   LightEffect,
 } from "../../src/api/types.js";
@@ -343,9 +344,12 @@ describe("automation-catalog-cache", () => {
     expect(first[0].config_entries).toEqual([]); // still slim after failure
 
     const second = await fetchLightEffects(api);
-    // List cache returned cached array (same identity); retry
-    // hydration populated the entry in place.
-    expect(second).toBe(first);
+    // Same entry mutated in place — the entry object identity is
+    // preserved across calls. The wrapping array identity differs
+    // after the post-hydration swap (so identity-checking
+    // subscribers re-render), but the underlying entry object
+    // received its ``config_entries`` from the second body fetch.
+    expect(second[0]).toBe(first[0]);
     expect(second[0].config_entries).toEqual([{ key: "transition_length" }]);
     expect(getLightEffects).toHaveBeenCalledTimes(1); // list cache hit
     expect(getAutomationBodies).toHaveBeenCalledTimes(2); // two body fetches (first failed, second recovered)
@@ -377,6 +381,87 @@ describe("automation-catalog-cache", () => {
     // short-circuit both: list cache hit + WeakSet says hydrated.
     expect(getLightEffects).toHaveBeenCalledTimes(1);
     expect(getAutomationBodies).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies subscribers with a fresh array reference after hydration", async () => {
+    // Without this, the slim list lands in the cache and ``_notify``
+    // fires; subscribers re-read ``cache()`` and store the slim
+    // array. Then hydration mutates ``config_entries`` in place but
+    // never re-notifies, so registry-list keeps showing empty forms
+    // because Lit's identity-based ``hasChanged`` says nothing
+    // changed on the array prop.
+    const slimEntry = {
+      id: "pulse",
+      name: "Pulse",
+      config_entries: [] as ConfigEntry[],
+      applies_to: [] as string[],
+    } as LightEffect;
+    const getLightEffects = vi.fn(() => Promise.resolve([slimEntry]));
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const notifications: (LightEffect[] | undefined)[] = [];
+    const unsub = subscribeAutomationCatalogCache(() => {
+      notifications.push(getCachedLightEffects());
+    });
+
+    const returned = await fetchLightEffects(api);
+
+    // Two notifications: one when slim lands inside ``_fetch``, one
+    // after hydration replaces the cached array.
+    expect(notifications.length).toBe(2);
+    const slim = notifications[0]!;
+    const hydrated = notifications[1]!;
+    // Distinct array identity so Lit's hasChanged trips.
+    expect(hydrated).not.toBe(slim);
+    // Hydrated entries carry the populated ``config_entries``.
+    expect(hydrated[0].config_entries).toEqual([{ key: "transition_length" }]);
+    // The returned list matches what's now in the cache.
+    expect(returned).toBe(hydrated);
+    expect(returned).toBe(getCachedLightEffects());
+    unsub();
+  });
+
+  it("does not double-notify when hydration is a no-op (all entries already hydrated)", async () => {
+    const slimEntry = {
+      id: "pulse",
+      name: "Pulse",
+      config_entries: [] as ConfigEntry[],
+      applies_to: [] as string[],
+    } as LightEffect;
+    const getLightEffects = vi.fn(() => Promise.resolve([slimEntry]));
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    await fetchLightEffects(api); // first call: slim + hydrate-notify
+
+    let extraNotifications = 0;
+    const unsub = subscribeAutomationCatalogCache(() => {
+      extraNotifications++;
+    });
+
+    await fetchLightEffects(api); // second call: cache hit, hydration no-op
+
+    expect(extraNotifications).toBe(0);
+    unsub();
   });
 
   it("hydrates config_entries on fetchFilters via the body cache", async () => {

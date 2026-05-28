@@ -386,10 +386,15 @@ export class ESPHomeAutomationEditor extends LitElement {
     this._error = "";
     try {
       const outcome = await loadAndHydrateAvailable(this._api, this.configuration, {
-        // Paint the picker with the slim list immediately so the
-        // dropdowns mount before bodies hydrate.
+        // Paint the picker with the slim list AND drop the loading
+        // spinner so the dropdowns mount while hydration runs in
+        // the background. The post-hydration ``_available``
+        // reassignment below carries fresh array refs to force a
+        // re-render with the hydrated ``config_entries``.
         onSlim: (slim) => {
-          if (seq === this._loadAvailableSeq) this._available = slim;
+          if (seq !== this._loadAvailableSeq) return;
+          this._available = slim;
+          this._loading = false;
         },
         isStale: () => seq !== this._loadAvailableSeq,
       });

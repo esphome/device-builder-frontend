@@ -86,6 +86,56 @@ describe("automation-editor mount-time load (behavioral)", () => {
     expect(getAvailableAutomations).not.toHaveBeenCalled();
   });
 
+  it("drops the loading spinner once the slim list lands (paint before hydration)", async () => {
+    // Without ``onSlim`` flipping ``_loading=false``, ``render()``
+    // returns the spinner through both the slim and hydration
+    // awaits, so the "paint the picker immediately" intent never
+    // surfaces. Pin that the loading flag is cleared as soon as
+    // the slim list resolves, before bodies hydrate. Uses a
+    // non-empty trigger list so hydration actually needs to await
+    // ``getAutomationBodies``; an empty list resolves the inner
+    // ``Promise.allSettled`` synchronously and there's no "during
+    // hydration" state to observe.
+    const slim = {
+      triggers: [{ id: "on_boot", config_entries: [] }],
+      actions: [],
+      conditions: [],
+      scripts: [],
+      devices: [],
+    } as unknown as AvailableAutomations;
+    let resolveBodies!: (v: Record<string, unknown>) => void;
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slim);
+    const getAutomationBodies = vi.fn(
+      () =>
+        new Promise<Record<string, unknown>>((r) => {
+          resolveBodies = r;
+        })
+    );
+    const api = {
+      getAvailableAutomations,
+      getAutomationBodies,
+    } as unknown as ESPHomeAPI;
+
+    const editor = new ESPHomeAutomationEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._api = api;
+    editor.configuration = "device.yaml";
+    document.body.appendChild(editor);
+    await editor.updateComplete;
+    // Let the slim list resolve; hydration is still blocked on
+    // ``getAutomationBodies``.
+    await flushPending();
+
+    expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
+    expect(getAutomationBodies).toHaveBeenCalled();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any)._loading).toBe(false);
+
+    // Let hydration complete so the rest of the test cleans up.
+    resolveBodies({});
+    await flushPending();
+  });
+
   it("setting configuration after mount triggers the load", async () => {
     const getAvailableAutomations = vi.fn().mockResolvedValue(slimAvailable());
     const getAutomationBodies = vi.fn().mockResolvedValue({});

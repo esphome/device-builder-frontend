@@ -12,6 +12,7 @@ import {
   emptyHydrationResult,
   hydrateEntryConfigEntries,
   tallyOutcome,
+  type HydrationResult,
 } from "./automation-body-hydration.js";
 
 /**
@@ -184,8 +185,9 @@ export async function fetchLightEffects(
   // any entries whose body fetch previously failed —
   // ``_hydratedEntries`` short-circuits already-done ones, so the
   // happy path pays a no-op filter.
-  await _hydrateRegistryConfigEntries(api, "light_effects", list);
-  return list;
+  return _postHydrate("light_effects", platform, boardId, list, (l) =>
+    _hydrateRegistryConfigEntries(api, "light_effects", l)
+  );
 }
 
 export function getCachedFilters(
@@ -201,8 +203,33 @@ export async function fetchFilters(
   boardId?: string
 ): Promise<Filter[]> {
   const list = await _fetch("filters", (p, b) => api.getFilters(p, b), platform, boardId);
-  await _hydrateRegistryConfigEntries(api, "filters", list);
-  return list;
+  return _postHydrate("filters", platform, boardId, list, (l) =>
+    _hydrateRegistryConfigEntries(api, "filters", l)
+  );
+}
+
+/** After ``_fetch`` notifies subscribers with the slim list, hydrate
+ *  ``config_entries`` and — if any entry actually changed — replace
+ *  the cached array with a fresh identity and notify again so
+ *  identity-checking consumers (registry-list's
+ *  ``subscribeAutomationCatalogCache`` reread of ``cache()``) repaint
+ *  with the hydrated entries. Without the second notify + identity
+ *  swap, the slim entries the first ``_notify`` painted would never
+ *  refresh: in-place mutation of ``config_entries`` doesn't bump the
+ *  array reference Lit's ``hasChanged`` compares against. */
+async function _postHydrate<K extends "light_effects" | "filters">(
+  kind: K,
+  platform: string | undefined,
+  boardId: string | undefined,
+  list: CatalogValue[K],
+  hydrate: (list: CatalogValue[K]) => Promise<HydrationResult>
+): Promise<CatalogValue[K]> {
+  const result = await hydrate(list);
+  if (result.succeeded === 0) return list;
+  const fresh = [...list] as CatalogValue[K];
+  _cache[kind].set(_key(platform, boardId), fresh);
+  _notify();
+  return fresh;
 }
 
 /** Per-entry hydration flag. Membership = body landed and
@@ -233,10 +260,10 @@ async function _hydrateRegistryConfigEntries(
   api: ESPHomeAPI,
   type: AutomationCatalogBodyType,
   list: RegistryCatalogEntry[]
-): Promise<void> {
-  const targets = list.filter((e) => !_hydratedEntries.has(e));
-  if (targets.length === 0) return;
+): Promise<HydrationResult> {
   const result = emptyHydrationResult();
+  const targets = list.filter((e) => !_hydratedEntries.has(e));
+  if (targets.length === 0) return result;
   const settled = await Promise.allSettled(
     targets.map(async (entry) => {
       const outcome = await hydrateEntryConfigEntries(api, type, entry);
@@ -263,6 +290,7 @@ async function _hydrateRegistryConfigEntries(
         `(missingBody=${result.missingBody}, missingField=${result.missingField}, rejected=${result.rejected})`
     );
   }
+  return result;
 }
 
 /** Subscribe to cache updates. Returns an unsubscribe function.
