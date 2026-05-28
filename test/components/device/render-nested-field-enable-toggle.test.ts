@@ -17,7 +17,7 @@ import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
 import { renderNestedField } from "../../../src/components/device/config-entry-renderers.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import { getIn } from "../../../src/util/nested-values.js";
+import { getIn, setIn } from "../../../src/util/nested-values.js";
 
 function makeSensorEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
   return makeConfigEntry({
@@ -132,5 +132,39 @@ describe("renderNestedField enable toggle", () => {
     const handlers = collectHandlers(tpl.values);
     handlers[SWITCH_CHANGE_IDX]({ target: { checked: true } });
     expect(toggleNested).not.toHaveBeenCalled();
+  });
+
+  it("restores the stashed config on off/on so no work is lost", () => {
+    // One ctx (one stashOwner) reused across both renders; emitChange
+    // applies to a live values object so the second render sees the
+    // cleared group, exactly as the form's reducer would.
+    const configured = {
+      name: "Custom",
+      unit_of_measurement: "%",
+      accuracy_decimals: 2,
+    };
+    let values: Record<string, unknown> = { min_free: { ...configured } };
+    const emitChange = vi.fn((path: string[], value: unknown) => {
+      values = setIn(values, path, value);
+    });
+    const ctx: RenderCtx = {
+      ...makeCtx({}, ["min_free"]).ctx,
+      getAt: (path: string[]) => getIn(values, path),
+      emitChange,
+    };
+
+    // Toggle OFF: clears the YAML block but stashes the config.
+    const offHandlers = collectHandlers(
+      renderNestedField(makeSensorEntry(), ["min_free"], ctx).values
+    );
+    offHandlers[SWITCH_CHANGE_IDX]({ target: { checked: false } });
+    expect(getIn(values, ["min_free"])).toBeUndefined();
+
+    // Toggle ON again: the full configuration comes back, not just the name.
+    const onHandlers = collectHandlers(
+      renderNestedField(makeSensorEntry(), ["min_free"], ctx).values
+    );
+    onHandlers[SWITCH_CHANGE_IDX]({ target: { checked: true } });
+    expect(emitChange).toHaveBeenLastCalledWith(["min_free"], configured);
   });
 });

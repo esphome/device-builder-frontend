@@ -1,5 +1,6 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types.js";
+import { asRecord } from "../../../util/nested-values.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import {
@@ -8,6 +9,23 @@ import {
   renderHelpLink,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
+
+// Stash of the values a sub-reading held when its enable switch was
+// turned off, keyed by the form's ``stashOwner`` (the host element,
+// stable across re-renders) then the dotted path. Turning the switch
+// back on restores the stash so an accidental toggle doesn't wipe the
+// unit / accuracy / filters the user configured — only the next flip
+// back recovers it (mirrors the templatable literal/lambda stash).
+const _enableStashes = new WeakMap<object, Map<string, Record<string, unknown>>>();
+
+function _enableStash(ctx: RenderCtx): Map<string, Record<string, unknown>> {
+  let m = _enableStashes.get(ctx.stashOwner);
+  if (!m) {
+    m = new Map();
+    _enableStashes.set(ctx.stashOwner, m);
+  }
+  return m;
+}
 
 // In requiredOnly mode (add-component dialog) groups default open and the
 // set tracks groups the user explicitly *collapsed*. Otherwise groups default
@@ -79,10 +97,12 @@ export function renderNestedField(entry: ConfigEntry, path: string[], ctx: Rende
   `;
 }
 
-// Enabling seeds the entity's name (its label, editable) so the group
-// becomes non-empty and serializes, then expands it for editing.
-// Disabling clears the whole group — the serializer prunes the empty
-// object so the block leaves the YAML — and collapses it.
+// Enabling restores the values stashed by the last disable (so an
+// accidental off/on round-trip keeps the user's settings); with no
+// stash it seeds the entity's name (its label, editable) so the group
+// becomes non-empty and serializes. Either way it expands for editing.
+// Disabling stashes the current group, then clears it — the serializer
+// prunes the empty object so the block leaves the YAML — and collapses.
 function _onEnableToggle(
   path: string[],
   key: string,
@@ -91,10 +111,22 @@ function _onEnableToggle(
   label: string,
   ctx: RenderCtx
 ): void {
+  const stash = _enableStash(ctx);
+  const stashKey = key;
   if (checked) {
-    ctx.emitChange([...path, "name"], label);
+    const restored = stash.get(stashKey);
+    if (restored && hasSerializableValue(restored)) {
+      stash.delete(stashKey);
+      ctx.emitChange(path, restored);
+    } else {
+      ctx.emitChange([...path, "name"], label);
+    }
     if (!isOpen) ctx.toggleNested(key);
   } else {
+    const current = ctx.getAt(path);
+    if (hasSerializableValue(current)) {
+      stash.set(stashKey, asRecord(current));
+    }
     ctx.emitChange(path, undefined);
     if (isOpen) ctx.toggleNested(key);
   }
