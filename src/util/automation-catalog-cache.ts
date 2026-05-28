@@ -169,21 +169,23 @@ export function getCachedLightEffects(
   return _cache.light_effects.get(_key(platform, boardId));
 }
 
-export function fetchLightEffects(
+export async function fetchLightEffects(
   api: ESPHomeAPI,
   platform?: string,
   boardId?: string
 ): Promise<LightEffect[]> {
-  return _fetch(
+  const list = await _fetch(
     "light_effects",
-    async (p, b) => {
-      const list = await api.getLightEffects(p, b);
-      await _hydrateRegistryConfigEntries(api, "light_effects", list);
-      return list;
-    },
+    (p, b) => api.getLightEffects(p, b),
     platform,
     boardId
   );
+  // Hydration runs OUTSIDE ``_fetch`` so cache hits also retry
+  // any entries whose body fetch previously failed —
+  // ``_hydratedEntries`` short-circuits already-done ones, so the
+  // happy path pays a no-op filter.
+  await _hydrateRegistryConfigEntries(api, "light_effects", list);
+  return list;
 }
 
 export function getCachedFilters(
@@ -193,39 +195,44 @@ export function getCachedFilters(
   return _cache.filters.get(_key(platform, boardId));
 }
 
-export function fetchFilters(
+export async function fetchFilters(
   api: ESPHomeAPI,
   platform?: string,
   boardId?: string
 ): Promise<Filter[]> {
-  return _fetch(
-    "filters",
-    async (p, b) => {
-      const list = await api.getFilters(p, b);
-      await _hydrateRegistryConfigEntries(api, "filters", list);
-      return list;
-    },
-    platform,
-    boardId
-  );
+  const list = await _fetch("filters", (p, b) => api.getFilters(p, b), platform, boardId);
+  await _hydrateRegistryConfigEntries(api, "filters", list);
+  return list;
 }
 
-/** Populate ``config_entries`` on each entry by routing through the
- *  body cache. After backend #1016, ``automations/get_light_effects``
- *  and ``automations/get_filters`` ship slim shapes (no
- *  ``config_entries``); ``registry-list`` reads ``config_entries``
- *  off cached entries, so the list has to land already hydrated. The
- *  body cache coalesces the fan-out into one ``get_bodies`` round
- *  trip. */
+/** Per-entry hydration flag. Membership = body landed and
+ *  ``config_entries`` is the full schema; absence = either never
+ *  attempted or the previous attempt failed (null body / shapeless
+ *  body / rejection). Kept as a ``WeakSet`` so entries removed from
+ *  the catalog (e.g. via ``_clearAutomationCatalogCache``) GC
+ *  cleanly without us tracking removals separately. */
+const _hydratedEntries = new WeakSet<RegistryCatalogEntry>();
+
+/** Populate ``config_entries`` on un-hydrated entries via the body
+ *  cache. After backend #1016, the ``get_light_effects`` /
+ *  ``get_filters`` endpoints ship slim shapes; ``registry-list``
+ *  reads ``config_entries`` off cached entries. Filters to entries
+ *  not yet in ``_hydratedEntries`` so the happy-path retry is a
+ *  no-op walk — only entries whose previous attempt failed hit the
+ *  network, and the body cache coalesces those into one
+ *  ``get_bodies`` round trip. */
 async function _hydrateRegistryConfigEntries(
   api: ESPHomeAPI,
   type: AutomationCatalogBodyType,
   list: RegistryCatalogEntry[]
 ): Promise<void> {
+  const targets = list.filter((e) => !_hydratedEntries.has(e));
+  if (targets.length === 0) return;
   const result = emptyHydrationResult();
   const settled = await Promise.allSettled(
-    list.map(async (entry) => {
+    targets.map(async (entry) => {
       const outcome = await hydrateEntryConfigEntries(api, type, entry);
+      if (outcome === "ok") _hydratedEntries.add(entry);
       tallyOutcome(result, outcome);
     })
   );
@@ -240,7 +247,9 @@ async function _hydrateRegistryConfigEntries(
     // Aggregate breadcrumb — per-entry warns already landed via
     // ``hydrateEntryConfigEntries``. Registry-list callers don't
     // own a toast surface; this lets a maintainer triage from one
-    // log line without scrolling through per-id noise.
+    // log line without scrolling through per-id noise. Subsequent
+    // ``fetchLightEffects`` / ``fetchFilters`` calls (e.g. a
+    // form re-mount) retry the un-flagged entries.
     console.warn(
       `${type} hydration: ${result.succeeded} ok, ${failures} failed ` +
         `(missingBody=${result.missingBody}, missingField=${result.missingField}, rejected=${result.rejected})`

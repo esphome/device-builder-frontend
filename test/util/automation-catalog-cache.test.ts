@@ -311,6 +311,74 @@ describe("automation-catalog-cache", () => {
     ]);
   });
 
+  it("retries hydration on a cached list when the previous attempt failed", async () => {
+    // Pre-merge bug: the list cache pinned a partially-hydrated
+    // list so a one-off body-fetch failure stayed empty for the
+    // session. Per-entry WeakSet flag now lets the next call's
+    // post-fetch hydration pick up only the still-empty entries.
+    const getLightEffects = vi.fn(() =>
+      Promise.resolve([
+        { id: "pulse", name: "Pulse", config_entries: [], applies_to: [] } as LightEffect,
+      ])
+    );
+    let attempts = 0;
+    const getAutomationBodies = vi.fn(() => {
+      attempts++;
+      const out: Record<string, LightEffect> =
+        attempts === 1
+          ? {} // contract violation: list advertised "pulse" but get_bodies returns nothing.
+          : {
+              "light_effects/pulse": {
+                id: "pulse",
+                name: "Pulse",
+                config_entries: [{ key: "transition_length" }],
+                applies_to: [],
+              } as unknown as LightEffect,
+            };
+      return Promise.resolve(out);
+    });
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const first = await fetchLightEffects(api);
+    expect(first[0].config_entries).toEqual([]); // still slim after failure
+
+    const second = await fetchLightEffects(api);
+    // List cache returned cached array (same identity); retry
+    // hydration populated the entry in place.
+    expect(second).toBe(first);
+    expect(second[0].config_entries).toEqual([{ key: "transition_length" }]);
+    expect(getLightEffects).toHaveBeenCalledTimes(1); // list cache hit
+    expect(getAutomationBodies).toHaveBeenCalledTimes(2); // two body fetches (first failed, second recovered)
+  });
+
+  it("skips body fetches on a fully-hydrated cache hit", async () => {
+    const getLightEffects = vi.fn(() =>
+      Promise.resolve([
+        { id: "pulse", name: "Pulse", config_entries: [], applies_to: [] } as LightEffect,
+      ])
+    );
+    const getAutomationBodies = vi.fn(() =>
+      Promise.resolve({
+        "light_effects/pulse": {
+          id: "pulse",
+          name: "Pulse",
+          config_entries: [{ key: "transition_length" }],
+          applies_to: [],
+        } as unknown as LightEffect,
+      })
+    );
+    const api = { getLightEffects, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    await fetchLightEffects(api);
+    await fetchLightEffects(api);
+    await fetchLightEffects(api);
+
+    // First call fetched both list and body; second + third
+    // short-circuit both: list cache hit + WeakSet says hydrated.
+    expect(getLightEffects).toHaveBeenCalledTimes(1);
+    expect(getAutomationBodies).toHaveBeenCalledTimes(1);
+  });
+
   it("hydrates config_entries on fetchFilters via the body cache", async () => {
     const getFilters = vi.fn(() =>
       Promise.resolve([
