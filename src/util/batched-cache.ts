@@ -38,6 +38,13 @@ export class BatchedCache<V, Ctx> {
   private _inflight = new Map<string, Map<string, Promise<V | null>>>();
   private _listeners = new Set<() => void>();
   private _batches = new Map<string, _Bucket<V, Ctx>>();
+  // Bumped by ``clear()``; ``_flush`` snapshots it before the
+  // fetcher await and bails if it advanced during the network
+  // hop. Without this, a ``clear()`` overlapping an in-flight
+  // post-microtask fetch would neither reject the waiters nor
+  // stay cleared (the fetch would resolve, repopulate the cache,
+  // and silently outlive the clear).
+  private _clearGen = 0;
 
   constructor(private opts: BatchedCacheOptions<V, Ctx>) {}
 
@@ -81,6 +88,7 @@ export class BatchedCache<V, Ctx> {
   }
 
   clear(): void {
+    this._clearGen++;
     for (const bucket of this._inflight.values()) {
       for (const promise of bucket.values()) promise.catch(() => {});
     }
@@ -99,12 +107,23 @@ export class BatchedCache<V, Ctx> {
     const bucket = this._batches.get(bucketKey);
     if (bucket === undefined) return;
     this._batches.delete(bucketKey);
+    const gen = this._clearGen;
     const keys = Array.from(bucket.pending.keys());
     let entries: Record<string, V>;
     try {
       entries = await this.opts.fetch(bucket.api, keys, bucket.ctx);
     } catch (err) {
       for (const resolver of bucket.pending.values()) resolver.reject(err);
+      return;
+    }
+    if (gen !== this._clearGen) {
+      // ``clear()`` ran during the fetch. Reject the waiters (the
+      // bucket was already removed from ``_batches`` before
+      // ``clear`` ran, so it never saw them) and don't write the
+      // result into the freshly-cleared cache.
+      for (const resolver of bucket.pending.values()) {
+        resolver.reject(new Error(`${this.opts.name} cleared`));
+      }
       return;
     }
     let cacheBucket = this._cache.get(bucketKey);

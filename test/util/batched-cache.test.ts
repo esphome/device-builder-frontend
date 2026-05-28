@@ -9,6 +9,32 @@ interface Ctx {
 const makeApi = () => ({ getComponentBodies: vi.fn() }) as unknown as ESPHomeAPI;
 
 describe("BatchedCache", () => {
+  it("clear() during an in-flight fetch rejects waiters and doesn't repopulate the cache", async () => {
+    let resolveFetch!: (v: Record<string, string>) => void;
+    const fetcher = vi.fn(
+      (_api: ESPHomeAPI, _keys: string[]): Promise<Record<string, string>> =>
+        new Promise<Record<string, string>>((r) => (resolveFetch = r))
+    );
+    const cache = new BatchedCache<string, Ctx>({
+      name: "clear-race",
+      bucketKey: (ctx) => ctx.platform,
+      fetch: fetcher,
+    });
+    const api = makeApi();
+
+    const pending = cache.fetch(api, "wifi", { platform: "esp32" });
+    // Let the microtask flush so the fetcher is in-flight (past
+    // the await point, bucket already removed from ``_batches``).
+    await Promise.resolve();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+
+    cache.clear();
+    resolveFetch({ wifi: "would-be-stale" });
+
+    await expect(pending).rejects.toThrow("clear-race cleared");
+    expect(cache.getCached("wifi", { platform: "esp32" })).toBeUndefined();
+  });
+
   it("caches misses by default so unknown keys aren't re-fetched", async () => {
     const fetcher = vi.fn(
       (_api: ESPHomeAPI, _keys: string[]): Promise<Record<string, string>> =>

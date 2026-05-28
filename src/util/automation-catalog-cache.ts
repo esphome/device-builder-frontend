@@ -8,30 +8,29 @@ import type {
   LightEffect,
   RegistryCatalogEntry,
 } from "../api/types.js";
-import { fetchAutomationBody } from "./automation-body-cache.js";
+import {
+  emptyHydrationResult,
+  hydrateEntryConfigEntries,
+  tallyOutcome,
+} from "./automation-body-hydration.js";
 
 /**
- * Session-scoped cache of the four automation catalogues —
- * triggers, actions, conditions, light effects — keyed by
- * ``platform|boardId``.
+ * Session-scoped cache of the five slim automation catalogues
+ * (triggers, actions, conditions, light effects, filters), keyed
+ * by ``platform|boardId``. After backend #1016 the list endpoints
+ * ship slim shapes only; ``light_effects`` and ``filters`` get
+ * their ``config_entries`` hydrated below via the shared body
+ * cache so ``registry-list`` consumers (which read
+ * ``config_entries`` synchronously) keep working. Triggers /
+ * actions / conditions don't need hydration here — the navigator
+ * only reads picker fields, and the editor hydrates separately
+ * via :func:`hydrateAvailableBodies`.
  *
- * Each catalogue is loaded from a static JSON file on the backend
- * (``definitions/automations.json``, baked at release time) and is
- * immutable for the lifetime of the process, so cached lists never
- * need invalidation. ``platform`` / ``boardId`` participate in the
- * key because the backend resolves per-platform
- * ``cv.SplitDefault`` fields on trigger/action parameter schemas
- * server-side — the same list filtered for a different platform
- * has different default values and must be cached separately.
- *
- * Concurrent fetches for the same key share a single in-flight
- * promise (the automation editor mount typically issues all four
- * commands in parallel; nothing prevents two mounts from racing).
- *
- * Mirrors ``component-name-cache.ts``; the duplication is
- * deliberate — each cache has its own value shape and fetcher, and
- * a generic helper would obscure the call sites without saving any
- * meaningful code.
+ * ``platform`` / ``boardId`` are part of the cache key because the
+ * backend resolves per-platform ``cv.SplitDefault`` fields
+ * server-side, so the same catalogue for different platforms has
+ * different default values and must cache separately. Concurrent
+ * fetches for the same key share one in-flight promise.
  */
 
 type CatalogKind = "triggers" | "actions" | "conditions" | "light_effects" | "filters";
@@ -223,28 +222,29 @@ async function _hydrateRegistryConfigEntries(
   type: AutomationCatalogBodyType,
   list: RegistryCatalogEntry[]
 ): Promise<void> {
-  const results = await Promise.allSettled(
+  const result = emptyHydrationResult();
+  const settled = await Promise.allSettled(
     list.map(async (entry) => {
-      const body = await fetchAutomationBody(api, type, entry.id);
-      if (body && "config_entries" in body) {
-        // Deep-clone — see hydrate-available-bodies.ts.
-        entry.config_entries = structuredClone(body.config_entries);
-        return;
-      }
-      // Same backend contract violation we surface from
-      // ``hydrateAvailableBodies``: the list endpoint just
-      // advertised this id, so a null or shapeless body is a
-      // server bug. Log it so the registry-list empty form has a
-      // breadcrumb in the console.
-      const reason =
-        body === null ? "no body returned" : "body shape missing config_entries";
-      console.warn(`${type}/${entry.id} ${reason}; form will render empty`);
+      const outcome = await hydrateEntryConfigEntries(api, type, entry);
+      tallyOutcome(result, outcome);
     })
   );
-  for (const r of results) {
+  for (const r of settled) {
     if (r.status === "rejected") {
+      result.rejected++;
       console.warn(`${type} hydration failed`, r.reason);
     }
+  }
+  const failures = result.missingBody + result.missingField + result.rejected;
+  if (failures > 0) {
+    // Aggregate breadcrumb — per-entry warns already landed via
+    // ``hydrateEntryConfigEntries``. Registry-list callers don't
+    // own a toast surface; this lets a maintainer triage from one
+    // log line without scrolling through per-id noise.
+    console.warn(
+      `${type} hydration: ${result.succeeded} ok, ${failures} failed ` +
+        `(missingBody=${result.missingBody}, missingField=${result.missingField}, rejected=${result.rejected})`
+    );
   }
 }
 

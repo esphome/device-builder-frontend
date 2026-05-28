@@ -5,72 +5,37 @@ import type {
   AutomationTrigger,
   AvailableAutomations,
 } from "../../../api/types.js";
-import { fetchAutomationBody } from "../../../util/automation-body-cache.js";
+import {
+  emptyHydrationResult,
+  hydrateEntryConfigEntries,
+  tallyOutcome,
+  type AutomationBodyFetcher,
+  type HydrationResult,
+} from "../../../util/automation-body-hydration.js";
 
-/** Per-entry body fetcher — defaults to the shared cache but is
- *  swappable for unit tests. */
-export type AutomationBodyFetcher = typeof fetchAutomationBody;
+export type { AutomationBodyFetcher, HydrationResult };
 
 type _AutomationListType = "triggers" | "actions" | "conditions";
 type _AutomationEntry = AutomationTrigger | AutomationAction | AutomationCondition;
 
-/** Aggregate hydration outcome — caller can toast / set _error if
- *  any entries failed. */
-export interface HydrationResult {
-  /** Entries whose ``config_entries`` was successfully replaced. */
-  succeeded: number;
-  /** Body fetches that returned null. */
-  missingBody: number;
-  /** Body shapes lacking ``config_entries``. */
-  missingField: number;
-  /** Body fetches that threw (transport error, cache cleared, …). */
-  rejected: number;
-}
-
-/**
- * Hydrate ``config_entries`` for every entry in *available* by
- * fetching its body through the batched body cache. Mutates the
- * passed lists in place. ``allSettled`` so one fetch failure
- * doesn't abort the rest; the returned :class:`HydrationResult`
- * lets the caller decide whether to surface a partial failure
- * (the body cache's ``cacheMisses: false`` lets a re-mount
- * recover from contract-violation misses; transport rejections
- * are also retry-able).
- */
+/** Hydrate ``config_entries`` for every entry in *available* via the
+ *  shared per-entry helper. ``allSettled`` so a single rejection
+ *  doesn't abort the rest; the returned aggregate lets the caller
+ *  surface partial-failure UI (the body cache's
+ *  ``cacheMisses: false`` lets a re-mount retry contract-violation
+ *  misses, and transport rejections are also retry-able). */
 export async function hydrateAvailableBodies(
   api: ESPHomeAPI,
   available: AvailableAutomations,
-  fetchBody: AutomationBodyFetcher = fetchAutomationBody
+  fetchBody?: AutomationBodyFetcher
 ): Promise<HydrationResult> {
-  const result: HydrationResult = {
-    succeeded: 0,
-    missingBody: 0,
-    missingField: 0,
-    rejected: 0,
-  };
+  const result = emptyHydrationResult();
   const jobs: Promise<unknown>[] = [];
   const merge = (type: _AutomationListType, list: _AutomationEntry[]): void => {
     for (const entry of list) {
       jobs.push(
-        fetchBody(api, type, entry.id).then((body) => {
-          if (body && "config_entries" in body) {
-            // Deep-clone via ``structuredClone`` so the per-entry
-            // tree is structurally disjoint from the cached body —
-            // no add/remove/reorder OR entry-object mutation can
-            // leak back. JSON-shaped data only (primitives + arrays
-            // + plain objects from the wire), so structuredClone
-            // is faithful.
-            entry.config_entries = structuredClone(body.config_entries);
-            result.succeeded++;
-            return;
-          }
-          if (body === null) result.missingBody++;
-          else result.missingField++;
-          const reason =
-            body === null ? "no body returned" : "body shape missing config_entries";
-          console.warn(
-            `automation-editor: ${type}/${entry.id} ${reason}; form will render empty`
-          );
+        hydrateEntryConfigEntries(api, type, entry, fetchBody).then((outcome) => {
+          tallyOutcome(result, outcome);
         })
       );
     }
