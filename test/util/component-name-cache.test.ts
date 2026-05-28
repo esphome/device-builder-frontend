@@ -113,6 +113,18 @@ describe("component-name-cache", () => {
     expect(getComponentBodies).toHaveBeenCalledTimes(1);
   });
 
+  it("does not resolve prototype keys as cache hits", async () => {
+    // Reachable from yaml-completion when the user types a key
+    // whose name shadows an Object.prototype member (`toString`,
+    // `constructor`, etc.). A bare `entries[id]` lookup would
+    // resolve to the inherited function and cache it forever.
+    const { api } = mockApi(() => null);
+
+    const result = await fetchComponent(api, "toString");
+    expect(result).toBeNull();
+    expect(getCachedComponent("toString")).toBeNull();
+  });
+
   it("dedupes a same-id fetch that arrives after the batch has flushed", async () => {
     // After the microtask flush, a same-id call must join the
     // pending in-flight promise instead of triggering a second

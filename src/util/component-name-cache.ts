@@ -111,18 +111,9 @@ async function _flushBatch(bucketKey: string): Promise<void> {
   if (bucket === undefined) return;
   _batches.delete(bucketKey);
   const ids = Array.from(bucket.pending.keys());
+  let entries: Record<string, ComponentCatalogEntry>;
   try {
-    const entries = await bucket.api.getComponentBodies(
-      ids,
-      bucket.platform,
-      bucket.boardId
-    );
-    for (const [componentId, resolver] of bucket.pending) {
-      const entry = entries[componentId] ?? null;
-      _cache.set(_key(componentId, bucket.platform, bucket.boardId), entry);
-      resolver.resolve(entry);
-    }
-    _notify();
+    entries = await bucket.api.getComponentBodies(ids, bucket.platform, bucket.boardId);
   } catch (err) {
     // Surface the transport error to every waiter so callers can
     // retry; do NOT populate the cache, mirroring the singleton
@@ -130,7 +121,24 @@ async function _flushBatch(bucketKey: string): Promise<void> {
     for (const resolver of bucket.pending.values()) {
       resolver.reject(err);
     }
+    return;
   }
+  for (const [componentId, resolver] of bucket.pending) {
+    // Own-property check rather than `entries[id] ?? null`: the
+    // wire payload is a plain object, so a bare index lookup would
+    // resolve `toString`, `constructor`, etc. via the prototype
+    // chain and cache that garbage as a "found" entry. Reachable
+    // from user-typed yaml-completion ids.
+    const entry = Object.prototype.hasOwnProperty.call(entries, componentId)
+      ? entries[componentId]
+      : null;
+    _cache.set(_key(componentId, bucket.platform, bucket.boardId), entry);
+    resolver.resolve(entry);
+  }
+  // Notify outside the response try so a throwing subscriber
+  // surfaces via `_notify`'s own try/catch instead of getting
+  // turned into a rejection of already-settled resolvers.
+  _notify();
 }
 
 /**

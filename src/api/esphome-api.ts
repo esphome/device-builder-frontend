@@ -1249,15 +1249,14 @@ export class ESPHomeAPI {
     boardId?: string
   ): Promise<Record<string, ComponentCatalogEntry>> {
     if (componentIds.length === 0) return {};
-    const raw = await this.sendCommand<unknown>("components/get_component_bodies", {
-      component_ids: componentIds,
-      ...(platform ? { platform } : {}),
-      ...(boardId ? { board_id: boardId } : {}),
-    });
-    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-      return {};
-    }
-    return raw as Record<string, ComponentCatalogEntry>;
+    return this.sendCommand<Record<string, ComponentCatalogEntry>>(
+      "components/get_component_bodies",
+      {
+        component_ids: componentIds,
+        ...(platform ? { platform } : {}),
+        ...(boardId ? { board_id: boardId } : {}),
+      }
+    );
   }
 
   /**

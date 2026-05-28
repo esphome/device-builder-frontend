@@ -378,9 +378,50 @@ export class ESPHomeAddComponentDialog extends LitElement {
     `;
   }
 
-  private _onComponentSelected(e: CustomEvent<{ component: ComponentCatalogEntry }>) {
+  /** Hydrate a slim catalog id to its full body, going through the
+   *  cached + batched fetch path. Returns `null` and sets
+   *  `_submitError` on either a transport failure or a catalog
+   *  miss, so callers can bail uniformly. The WS layer can throw
+   *  on a transient disconnect / timeout; surfacing that via the
+   *  same banner as a missing-id keeps the dialog from
+   *  half-transitioning. */
+  private async _hydrateBody(
+    componentId: string,
+    boardId: string | undefined
+  ): Promise<ComponentCatalogEntry | null> {
+    try {
+      const entry = await fetchComponent(
+        this._api,
+        componentId,
+        this.platform || undefined,
+        boardId
+      );
+      if (!entry) {
+        this._submitError = this._localize("device.add_component_error");
+        return null;
+      }
+      return entry;
+    } catch (err) {
+      this._submitError =
+        err instanceof Error ? err.message : this._localize("device.add_component_error");
+      return null;
+    }
+  }
+
+  private async _onComponentSelected(
+    e: CustomEvent<{ component: ComponentCatalogEntry }>
+  ) {
     e.stopPropagation();
-    this._selected = e.detail.component;
+    // The catalog list endpoint returns slim index entries (no
+    // `config_entries`); the form needs the full body to render
+    // its fields. Hydrate through the cached + batched fetch path
+    // so a subsequent click on the same card is instant.
+    const full = await this._hydrateBody(
+      e.detail.component.id,
+      this.board?.id ?? undefined
+    );
+    if (!full) return;
+    this._selected = full;
     this._submitError = "";
   }
 
@@ -402,28 +443,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
       (localId) => `featured.${boardId}.${localId}`
     );
     const [first, ...rest] = fullIds;
-    // The WS layer can throw on a transient disconnect / timeout; an
-    // unhandled rejection here would leave the dialog half-transitioned
-    // (still on the catalog view but with bundle state about to be set
-    // by the rest of this handler). Catch and surface via the same
-    // banner the form submit uses, then bail.
-    let component: ComponentCatalogEntry | null;
-    try {
-      component = await fetchComponent(
-        this._api,
-        first,
-        this.platform || undefined,
-        boardId
-      );
-    } catch (err) {
-      this._submitError =
-        err instanceof Error ? err.message : this._localize("device.add_component_error");
-      return;
-    }
-    if (!component) {
-      this._submitError = this._localize("device.add_component_error");
-      return;
-    }
+    const component = await this._hydrateBody(first, boardId);
+    if (!component) return;
     // Picking a bundle is a fresh sequence — abandon any in-flight
     // dep-detour state from the previous component the user was filling.
     // Without this clear, the bundle's first submit would route through
@@ -540,16 +561,11 @@ export class ESPHomeAddComponentDialog extends LitElement {
         // it on re-render.
         const nextId = this._bundleQueue[0];
         const remaining = this._bundleQueue.slice(1);
-        const nextComponent = await fetchComponent(
-          this._api,
+        const nextComponent = await this._hydrateBody(
           nextId,
-          this.platform || undefined,
           this.board?.id ?? undefined
         );
-        if (!nextComponent) {
-          this._submitError = this._localize("device.add_component_error");
-          return;
-        }
+        if (!nextComponent) return;
         // Hand the just-added component's id to the next step's matching
         // `references_component` field. Bundles are designed to chain —
         // e.g. `Status LED (full setup)` adds an `output.gpio`, then a
