@@ -96,6 +96,34 @@ describe("automation-editor auto-apply / delete contract", () => {
     expect(slice).toMatch(/"yaml-updated"/);
   });
 
+  it("mount-time load: updated() fires _loadAvailable on configuration change", async () => {
+    const src = await readSource();
+    // ``_loadCatalogs`` was deleted in favor of the ``updated()``
+    // hook. Lit's first ``updated()`` fires with every initially-
+    // set property in ``_changedProperties``, so an editor mounted
+    // with ``configuration`` already populated still kicks off the
+    // load. Pin both halves: (1) connectedCallback no longer calls
+    // ``_loadAvailable`` / ``_loadCatalogs``, (2) ``updated()``
+    // does, gated on ``configuration`` having changed.
+    const ccIdx = src.indexOf("connectedCallback(): void");
+    expect(ccIdx).toBeGreaterThan(-1);
+    const ccAfter = src.slice(ccIdx);
+    const ccEnd = ccAfter.search(/\n\s\sdisconnectedCallback\(\)/);
+    const ccBody = ccEnd > 0 ? ccAfter.slice(0, ccEnd) : ccAfter;
+    expect(ccBody).not.toMatch(/_loadAvailable\s*\(/);
+    expect(ccBody).not.toMatch(/_loadCatalogs\s*\(/);
+
+    // ``updated()`` must fire ``_loadAvailable`` on
+    // ``changed.has("configuration")``. Without this, an editor
+    // mounted with ``configuration`` already present would render
+    // perpetually empty.
+    const updatedIdx = src.indexOf("protected updated(");
+    expect(updatedIdx).toBeGreaterThan(-1);
+    const updatedSlice = src.slice(updatedIdx, updatedIdx + 600);
+    expect(updatedSlice).toMatch(/changed\.has\("configuration"\)/);
+    expect(updatedSlice).toMatch(/this\._loadAvailable\(\)/);
+  });
+
   it("exposes an `inFlightWrite` getter for the parent's reconnect guard", async () => {
     const src = await readSource();
     expect(/get\s+inFlightWrite\s*\(\s*\)\s*:\s*boolean/.test(src)).toBe(true);

@@ -34,8 +34,6 @@ import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../../api/index.js";
 import type {
-  AutomationAction,
-  AutomationCondition,
   AutomationLocation,
   AutomationTree,
   AutomationTrigger,
