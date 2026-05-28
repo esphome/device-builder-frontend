@@ -23,6 +23,7 @@ import {
   activeJobsContext,
   apiContext,
   devicesContext,
+  devicesLoadedContext,
   localizeContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -62,6 +63,16 @@ export class ESPHomePageDevice extends LitElement {
   @consume({ context: devicesContext, subscribe: true })
   @state()
   private _devices: ConfiguredDevice[] = [];
+
+  /** Flips ``true`` after the initial devices-list fetch has
+   *  resolved, regardless of whether it returned any devices. The
+   *  ``_platformReady`` gate uses this to distinguish "context still
+   *  loading" from "context delivered, our id isn't here" — using
+   *  ``_devices.length > 0`` would miss the legitimate zero-device
+   *  state and strand the gate forever. */
+  @consume({ context: devicesLoadedContext, subscribe: true })
+  @state()
+  private _devicesLoaded = false;
 
   @consume({ context: apiContext })
   private _api!: ESPHomeAPI;
@@ -449,6 +460,11 @@ export class ESPHomePageDevice extends LitElement {
     const boardId = this._device?.board_id ?? null;
     if (boardId && boardId !== this._loadedBoardId) {
       this._loadedBoardId = boardId;
+      // Drop the previous board immediately so derived props
+      // (``.platform``, ``.boardName``) don't stay out of sync
+      // with the in-flight ``board_id``. Restored by the success
+      // branch of ``_loadBoard``; left null on failure.
+      this._board = null;
       this._platformReady = false;
       this._loadBoard(boardId);
     } else if (!boardId) {
@@ -458,20 +474,18 @@ export class ESPHomePageDevice extends LitElement {
       // (deleted / stale link). Both are signals that no manifest
       // fetch is coming; release the gate.
       //
-      // We gate on ``_devices.length > 0`` for the missing-id
-      // case rather than ``this._yaml`` — yaml can resolve
-      // independently of the devices context, and a yaml-fallback
-      // would prematurely flip the gate when the context is just
-      // late, then we'd refetch when the context arrives with a
-      // real board_id, reintroducing the double-fetch this PR
-      // removes. ``_devices.length > 0`` means the context has
-      // delivered at least once; if our id still isn't there,
-      // it's actually missing.
+      // We gate the missing-id branch on
+      // ``this._devicesLoaded`` (provided by ``app-shell`` via
+      // ``devicesLoadedContext``) rather than
+      // ``_devices.length > 0`` — the legitimate zero-device case
+      // still needs the gate to flip, and a yaml-fallback would
+      // reintroduce the double-fetch this PR removes when yaml
+      // beats the context.
       if (this._loadedBoardId !== null) {
         this._loadedBoardId = null;
         this._board = null;
       }
-      if (this._device !== null || this._devices.length > 0) {
+      if (this._device !== null || this._devicesLoaded) {
         this._platformReady = true;
       }
     }

@@ -15,14 +15,8 @@ vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import {
-  _clearAutomationCatalogCache,
-  fetchAutomationTriggers,
-} from "../../../src/util/automation-catalog-cache.js";
-import {
-  _clearComponentCache,
-  fetchComponent,
-} from "../../../src/util/component-name-cache.js";
+import { _clearAutomationCatalogCache } from "../../../src/util/automation-catalog-cache.js";
+import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 
 async function flushPending(times = 5): Promise<void> {
@@ -171,8 +165,3 @@ describe("device-navigator kickoff gating", () => {
     expect(getAutomationTriggers).toHaveBeenCalledTimes(1);
   });
 });
-
-// Touch the cache-exporters so this file doesn't carry unused
-// imports if happy-dom strips them.
-void fetchAutomationTriggers;
-void fetchComponent;

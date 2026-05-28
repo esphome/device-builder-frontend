@@ -64,18 +64,23 @@ const makeApi = (overrides: Partial<FakeApi> = {}): ESPHomeAPI =>
   }) as unknown as ESPHomeAPI;
 
 /** Construct a page element, plant the api + devices context, and
- *  let Lit settle the initial lifecycle. ``addedDevices`` populates
- *  the devices context as if it had landed. */
+ *  let Lit settle the initial lifecycle. ``devicesLoaded`` simulates
+ *  the parent ``devicesLoadedContext`` signal landing; pass
+ *  ``false`` to keep the page in the "context not yet delivered"
+ *  state. */
 async function mountPage(
   api: ESPHomeAPI,
   id: string,
-  devicesList: ConfiguredDevice[]
+  devicesList: ConfiguredDevice[],
+  devicesLoaded = true
 ): Promise<ESPHomePageDevice> {
   const page = new ESPHomePageDevice();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._api = api;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (page as any)._devices = devicesList;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (page as any)._devicesLoaded = devicesLoaded;
   page.id = id;
   document.body.appendChild(page);
   await page.updateComplete;
@@ -100,6 +105,7 @@ function readBoard(page: ESPHomePageDevice): BoardCatalogEntry | null {
 describe("device page _platformReady lifecycle", () => {
   afterEach(() => {
     document.body.innerHTML = "";
+    vi.restoreAllMocks();
   });
 
   it("flips true after a successful board fetch", async () => {
@@ -166,24 +172,38 @@ describe("device page _platformReady lifecycle", () => {
     expect(readPlatformReady(page)).toBe(true);
   });
 
-  it("stays false until devices context has landed (no premature flip on yaml)", async () => {
+  it("stays false until devicesLoaded fires (no premature flip on yaml)", async () => {
     // Pin suggestion #1 from the koan review: yaml landing before
-    // the devices context must not trip the gate, or we
+    // ``devicesLoadedContext`` must not trip the gate, or we
     // reintroduce the double-fetch this PR removes.
     const api = makeApi();
-    const page = await mountPage(api, "kitchen.yaml", []);
+    const page = await mountPage(api, "kitchen.yaml", [], false);
 
     expect(readPlatformReady(page)).toBe(false);
 
-    // Now the devices context arrives carrying a real board_id.
+    // Now the devices context delivers with a real board_id.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (page as any)._devices = [device()];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (page as any)._devicesLoaded = true;
     page.requestUpdate();
     await page.updateComplete;
     await flushPending();
 
     expect(readPlatformReady(page)).toBe(true);
     expect(readBoard(page)?.id).toBe("esp32cam");
+  });
+
+  it("flips true on devicesLoaded with an empty list (zero-device dashboard)", async () => {
+    // ``_devices.length > 0`` would miss this: a legitimate
+    // zero-device dashboard, where the context delivered but
+    // there's nothing in it. Using ``_devicesLoaded`` correctly
+    // releases the gate; the navigator resolves with
+    // ``platform=undefined``.
+    const api = makeApi();
+    const page = await mountPage(api, "ghost.yaml", [], true);
+
+    expect(readPlatformReady(page)).toBe(true);
   });
 
   it("resets to false on device id change", async () => {
