@@ -260,7 +260,7 @@ export class ESPHomeAddAutomationDialog extends LitElement {
         })
       : this._localize("device.add_automation");
     return html`<wa-dialog light-dismiss label=${title}>
-      ${this._loading
+      ${this._loading && !this._available
         ? html`<div style="text-align: center; padding: 32px;">
             <wa-spinner></wa-spinner>
           </div>`
