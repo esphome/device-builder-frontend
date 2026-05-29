@@ -156,6 +156,7 @@
     "logs_method_usb_local_desc": "适用于通过 USB 连接到此电脑的设备",
     "logs_method_usb_server": "插入运行 ESPHome Device Builder 的电脑",
     "logs_method_usb_server_desc": "适用于通过 USB 连接到服务器的设备",
+    "logs_method_network_address_submit": "通过网络查看日志",
     "logs_web_serial_unsupported": "此浏览器不支持 Web Serial",
     "install_method_title": "你想如何安装固件？",
     "install_method_network": "通过网络",

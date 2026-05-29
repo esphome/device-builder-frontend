@@ -156,6 +156,7 @@
     "logs_method_usb_local_desc": "USB-n keresztül ehhez a géphez csatlakoztatott eszközökhöz",
     "logs_method_usb_server": "Csatlakoztatva az ESPHome Device Buildert futtató géphez",
     "logs_method_usb_server_desc": "USB-n keresztül a szerverhez csatlakoztatott eszközökhöz",
+    "logs_method_network_address_submit": "Naplók megtekintése a hálózaton",
     "logs_web_serial_unsupported": "A Web Serial nem támogatott ebben a böngészőben",
     "install_method_title": "Hogyan szeretné telepíteni a firmware-t?",
     "install_method_network": "A hálózaton",
