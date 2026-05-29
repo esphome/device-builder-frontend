@@ -790,7 +790,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
                     ?disabled=${!canSubmit}
                     @click=${this._submitOtaAddress}
                   >
-                    ${this._localize("dashboard.install_method_network_address_submit")}
+                    ${this._localize(
+                      this.mode === "logs"
+                        ? "dashboard.logs_method_network_address_submit"
+                        : "dashboard.install_method_network_address_submit"
+                    )}
                   </button>
                 </div>
               </div>

@@ -112,6 +112,7 @@
     "logs_method_usb_local_desc": "Voor apparaten via USB verbonden met deze computer",
     "logs_method_usb_server": "Aansluiten op computer met ESPHome Device Builder",
     "logs_method_usb_server_desc": "Voor apparaten via USB verbonden met de server",
+    "logs_method_network_address_submit": "Logboeken bekijken via netwerk",
     "logs_web_serial_unsupported": "Web Serial wordt niet ondersteund in deze browser",
     "table_columns": "Kolommen",
     "table_toggle_columns": "Kolommen in-/uitschakelen",

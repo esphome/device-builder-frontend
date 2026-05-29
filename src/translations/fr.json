@@ -112,6 +112,7 @@
     "logs_method_usb_local_desc": "Pour les appareils connectés via USB à cet ordinateur",
     "logs_method_usb_server": "Brancher sur l'ordinateur exécutant ESPHome Device Builder",
     "logs_method_usb_server_desc": "Pour les appareils connectés via USB au serveur",
+    "logs_method_network_address_submit": "Voir les journaux via le réseau",
     "logs_web_serial_unsupported": "Web Serial n'est pas pris en charge dans ce navigateur",
     "table_columns": "Colonnes",
     "table_toggle_columns": "Afficher/masquer les colonnes",

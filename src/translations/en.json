@@ -156,6 +156,7 @@
     "logs_method_usb_local_desc": "For devices connected via USB to this computer",
     "logs_method_usb_server": "Plug into computer running ESPHome Device Builder",
     "logs_method_usb_server_desc": "For devices connected via USB to the server",
+    "logs_method_network_address_submit": "View logs over network",
     "logs_web_serial_unsupported": "Web Serial is not supported in this browser",
     "install_method_title": "How do you want to install the firmware?",
     "install_method_network": "On the network",
