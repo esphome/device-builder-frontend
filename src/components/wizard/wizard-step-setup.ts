@@ -8,6 +8,7 @@ import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { EnterController } from "../../util/enter-controller.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -43,8 +44,18 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _wifiPassword = "";
 
+  // Enter advances / finishes the current stage, mirroring the primary button.
+  private _enter = new EnterController(this, () => {
+    if (this._canAdvance()) this._onNext();
+  });
+
+  private _canAdvance(): boolean {
+    return this._stage === "name" ? !!this._deviceName.trim() : !!this._wifiSsid.trim();
+  }
+
   async connectedCallback() {
     super.connectedCallback();
+    this._enter.set(true);
     try {
       const yaml = await this._api.getConfig("secrets.yaml");
       const ssid = yaml.match(/^wifi_ssid\s*:\s*["']?(.+?)["']?\s*$/m);
@@ -253,9 +264,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <button
             class="btn btn-primary"
             type="button"
-            ?disabled=${this._stage === "name"
-              ? !this._deviceName.trim()
-              : !this._wifiSsid.trim()}
+            ?disabled=${!this._canAdvance()}
             @click=${this._onNext}
           >
             ${this._stage === "name" && !this._hasSecretWifi

@@ -5,6 +5,7 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { EnterController } from "../../util/enter-controller.js";
 
 @customElement("esphome-wizard-step-empty-config")
 export class ESPHomeWizardStepEmptyConfig extends LitElement {
@@ -14,6 +15,16 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
 
   @state()
   private _name = "";
+
+  // Enter finishes setup once a name is entered.
+  private _enter = new EnterController(this, () => {
+    if (this._name.trim()) this._next();
+  });
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._enter.set(true);
+  }
 
   static styles = [
     espHomeStyles,
