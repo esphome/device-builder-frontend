@@ -68,4 +68,20 @@ describe("onboarding-wifi-dialog password-length gate", () => {
 
     expect(setOnboardingWifi).not.toHaveBeenCalled();
   });
+
+  test("a second _save while one is in flight does not double-submit", async () => {
+    const dialog = makeDialog();
+    // Never resolves, so the first call stays in flight (``_saving`` true)
+    // while the second runs — exactly the held-Enter window the EnterController
+    // path opens by bypassing the disabled Save button.
+    const setOnboardingWifi = vi.fn(() => new Promise<void>(() => {}));
+    dialog._api = { setOnboardingWifi };
+    dialog._ssid = "MyNetwork";
+    dialog._password = "12345678";
+
+    void dialog._save();
+    await dialog._save();
+
+    expect(setOnboardingWifi).toHaveBeenCalledTimes(1);
+  });
 });

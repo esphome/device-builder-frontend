@@ -190,6 +190,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   }
 
   private _onSave() {
+    if (this._resolved) return; // a repeated Enter must not dispatch twice
     this._resolved = true;
     this.close();
     this.dispatchEvent(new CustomEvent("save", { bubbles: true, composed: true }));

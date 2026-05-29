@@ -160,6 +160,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   }
 
   private _goto() {
+    if (this._resolvedExit !== null) return; // a repeated Enter must not dispatch twice
     this._resolvedExit = "goto";
     this.close();
     this.dispatchEvent(

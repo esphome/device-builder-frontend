@@ -53,6 +53,16 @@ describe("confirm-dialog ENTER", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("fires confirm only once on a repeated Enter", async () => {
+    const el = await mount();
+    const onConfirm = vi.fn();
+    el.addEventListener("confirm", onConfirm);
+    el.open();
+    pressEnter();
+    pressEnter();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("does not confirm before the dialog is opened", async () => {
     const el = await mount();
     const onConfirm = vi.fn();

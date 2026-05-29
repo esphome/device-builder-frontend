@@ -163,6 +163,7 @@ export class ESPHomeConfirmDialog extends LitElement {
   }
 
   private _confirm() {
+    if (this._decided) return; // a repeated Enter must not dispatch twice
     this._decided = true;
     this.close();
     // composed:false (omitted) so wrappers like

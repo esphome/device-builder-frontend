@@ -42,6 +42,19 @@ describe("wizard-step-empty-config ENTER", () => {
     expect((onCreate.mock.calls[0][0] as CustomEvent).detail.name).toBe("kitchen");
   });
 
+  it("emits create-empty-config only once on a repeated Enter", async () => {
+    const el = await mount();
+    const onCreate = vi.fn();
+    el.addEventListener("create-empty-config", onCreate as EventListener);
+    const input = el.shadowRoot!.querySelector("input")!;
+    input.value = "kitchen";
+    input.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+    pressEnter();
+    pressEnter();
+    expect(onCreate).toHaveBeenCalledTimes(1);
+  });
+
   it("does nothing on Enter with an empty name", async () => {
     const el = await mount();
     const onCreate = vi.fn();

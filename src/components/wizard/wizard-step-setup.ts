@@ -44,6 +44,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
   @state()
   private _wifiPassword = "";
 
+  private _finished = false;
+
   // Enter advances / finishes the current stage, mirroring the primary button.
   private _enter = new EnterController(this, () => {
     if (this._canAdvance()) this._onNext();
@@ -384,6 +386,8 @@ export class ESPHomeWizardStepSetup extends LitElement {
   }
 
   private _finish(wifiSsid: string, wifiPassword: string) {
+    if (this._finished) return; // a repeated Enter must not finish twice
+    this._finished = true;
     this.dispatchEvent(
       new CustomEvent("finish-setup", {
         detail: {

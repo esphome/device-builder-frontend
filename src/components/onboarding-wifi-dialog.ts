@@ -277,6 +277,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   }
 
   private async _save() {
+    // The Enter path bypasses the disabled Save button, so guard re-entry
+    // here too or a held Enter double-submits during the await below.
+    if (this._saving) return;
     // IEEE 802.11 SSIDs may legally contain leading/trailing
     // whitespace, so don't ``trim()`` the value being sent —
     // mutating it would silently change the network name and
