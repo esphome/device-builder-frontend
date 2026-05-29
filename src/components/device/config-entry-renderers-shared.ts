@@ -10,15 +10,15 @@ import { html, nothing } from "lit";
 import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
 import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { PasswordInputValueChange } from "./password-input.js";
+import { inputStyles } from "../../styles/inputs.js";
+import { espHomeStyles } from "../../styles/shared.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { isPrimitiveOrNullish } from "../../util/nested-values.js";
-import { renderInlineError } from "../../util/render-error.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { inputStyles } from "../../styles/inputs.js";
-import { espHomeStyles } from "../../styles/shared.js";
+import { renderInlineError } from "../../util/render-error.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
+import type { PasswordInputValueChange } from "./password-input.js";
 
 /** Stylesheets every element that hosts ``ctx.renderEntry`` output
  *  needs in its shadow root: field shell, input styling, and the

@@ -2,17 +2,17 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose, mdiPackageVariantClosed } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import {
   type BoardCatalogEntry,
   type ComponentCatalogEntry,
   type FeaturedBundle,
 } from "../../api/types.js";
-import type { ESPHomeAPI } from "../../api/index.js";
-import { findAddedSection } from "../../util/yaml-sections.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext, apiContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { findAddedSection } from "../../util/yaml-sections.js";
 import { chooseExcludeCategories } from "./add-component-dialog-categories.js";
 import {
   matchesDepDomain,
@@ -27,8 +27,8 @@ import {
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "./component-catalog.js";
 import "./add-component-form.js";
+import "./component-catalog.js";
 import type { ESPHomeComponentCatalog } from "./component-catalog.js";
 
 registerMdiIcons({

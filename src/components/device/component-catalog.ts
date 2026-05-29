@@ -9,26 +9,26 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/index.js";
 import type {
   BoardCatalogEntry,
   ComponentCatalogEntry,
   FeaturedBundle,
 } from "../../api/types.js";
 import { ComponentCategory } from "../../api/types.js";
-import type { ESPHomeAPI } from "../../api/index.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext, apiContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { debounce } from "../../util/debounce.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { componentCatalogStyles } from "./component-catalog/styles.js";
 import {
   buildCategories,
   filteredBundles,
   visibleComponents,
 } from "./component-catalog/filters.js";
 import { renderBundleCard, renderCard } from "./component-catalog/renderers.js";
+import { componentCatalogStyles } from "./component-catalog/styles.js";
 
 import "@home-assistant/webawesome/dist/components/badge/badge.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

@@ -1,3 +1,6 @@
+import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import { consume } from "@lit/context";
 import {
   mdiBroom,
@@ -30,19 +33,16 @@ import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
+import "./command-dialog.js";
+import type { ESPHomeCommandDialog } from "./command-dialog.js";
+import "./confirm-dialog.js";
+import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import {
   compareJobs,
   renderEmpty,
   renderGroups,
 } from "./firmware-jobs-dialog/renderers.js";
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "./command-dialog.js";
-import type { ESPHomeCommandDialog } from "./command-dialog.js";
-import "./confirm-dialog.js";
-import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
 import "./logs-dialog.js";
 import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 

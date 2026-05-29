@@ -1,8 +1,8 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { JobSource, JobStatus, JobType, type FirmwareJob } from "../../api/types.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
-import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
+import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";
 import type { ESPHomeFirmwareJobsDialog } from "../firmware-jobs-dialog.js";
 
 const TYPE_ICONS: Record<JobType, string> = {

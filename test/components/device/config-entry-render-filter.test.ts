@@ -5,8 +5,8 @@ import {
   collectRenderablePaths,
   filterRenderable,
 } from "../../../src/components/device/config-entry-render-filter.js";
-import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
+import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
 
 describe("ALWAYS_SHOWN_KEYS", () => {
   it("contains 'name' (the friendly-name leaf)", () => {

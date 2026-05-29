@@ -16,10 +16,6 @@ import type { BoardCatalogEntry, SerialPort } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  WIZARD_BOARD_PLATFORMS,
-  chipNameToFilterLabel,
-} from "./wizard-step-board-platforms.js";
 import { withBase } from "../../util/base-path.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
@@ -31,6 +27,10 @@ import {
   isWebSerialSupported,
   readDeviceManifest,
 } from "../../util/web-serial.js";
+import {
+  WIZARD_BOARD_PLATFORMS,
+  chipNameToFilterLabel,
+} from "./wizard-step-board-platforms.js";
 
 import { inputStyles } from "../../styles/inputs.js";
 

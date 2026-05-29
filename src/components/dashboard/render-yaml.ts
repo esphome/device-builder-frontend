@@ -1,6 +1,8 @@
 import { html, type TemplateResult } from "lit";
 import type { ConfiguredDevice, YamlSearchHit } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { navigate } from "../../util/navigation.js";
 import {
   buildYamlSnippetBlocks,
   yamlEmptyMessageKey,
@@ -8,8 +10,6 @@ import {
   yamlSnippetBlockHref,
   type YamlSnippetBlock,
 } from "../../util/yaml-search-helpers.js";
-import { navigate } from "../../util/navigation.js";
-import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export function highlightMatch(text: string, needle: string): unknown {
   if (!needle) return text;

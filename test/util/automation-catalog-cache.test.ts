@@ -8,6 +8,7 @@ import type {
   Filter,
   LightEffect,
 } from "../../src/api/types.js";
+import { _clearAutomationBodyCache } from "../../src/util/automation-body-cache.js";
 import {
   _clearAutomationCatalogCache,
   fetchAutomationActions,
@@ -22,7 +23,6 @@ import {
   getCachedLightEffects,
   subscribeAutomationCatalogCache,
 } from "../../src/util/automation-catalog-cache.js";
-import { _clearAutomationBodyCache } from "../../src/util/automation-body-cache.js";
 
 const trigger = (id: string): AutomationTrigger => ({
   id,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DeviceState } from "../../src/api/types.js";
 import type { ConfiguredDevice } from "../../src/api/types.js";
+import { DeviceState } from "../../src/api/types.js";
 import { matchesDeviceName } from "../../src/util/device-search.js";
 
 function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {

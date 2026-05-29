@@ -19,8 +19,8 @@
  * would need a real Markdown parser. If that becomes a real problem
  * later, swap this util for `marked` or `micromark`.
  */
-import { html, nothing } from "lit";
 import type { TemplateResult } from "lit";
+import { html, nothing } from "lit";
 
 interface Segment {
   kind: "text" | "link" | "code" | "bold" | "italic";

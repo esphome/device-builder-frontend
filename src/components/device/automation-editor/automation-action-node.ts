@@ -12,8 +12,6 @@
  * every mutation.
  */
 import { consume } from "@lit/context";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
 import {
   mdiArrowDown,
   mdiArrowUp,
@@ -23,6 +21,8 @@ import {
   mdiDelete,
   mdiPencilOutline,
 } from "@mdi/js";
+import { html, LitElement, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type {
   ActionNode,
@@ -35,20 +35,20 @@ import type {
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
-import { applyParamChange } from "./serialise.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "./automation-condition-tree.js";
+import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
   ESPHomeCatalogPickerDialog,
 } from "./catalog-picker-dialog.js";
+import { applyParamChange } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";

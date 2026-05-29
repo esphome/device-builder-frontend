@@ -24,8 +24,6 @@ import type {
 } from "../../../api/types.js";
 import { ConfigEntryType, isLambdaValue } from "../../../api/types.js";
 import { apiContext } from "../../../context/index.js";
-import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
-import { looksLikeTimePeriodScalar } from "./primitives.js";
 import {
   fetchFilters,
   fetchLightEffects,
@@ -33,6 +31,7 @@ import {
   getCachedLightEffects,
   subscribeAutomationCatalogCache,
 } from "../../../util/automation-catalog-cache.js";
+import { makeConfigEntry } from "../../../util/config-entry-defaults.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
@@ -47,6 +46,7 @@ import {
   renderListEmptyHint,
   renderListRemoveButton,
 } from "./lists.js";
+import { looksLikeTimePeriodScalar } from "./primitives.js";
 
 /** Extract the single key from a polymorphic-list item. Items
  *  arriving from a freshly-pressed Add button can be ``{}`` until

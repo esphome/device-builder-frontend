@@ -7,8 +7,8 @@
  * variant / no-hint), so the localize stub and the assertion patterns
  * live here rather than getting copy-pasted across the two test files.
  */
-import { expect } from "vitest";
 import type { TemplateResult } from "lit";
+import { expect } from "vitest";
 import enMessages from "../../src/translations/en.json";
 import { findTemplatesByAnchor } from "../_lit-template-walker.js";
 

@@ -16,10 +16,10 @@ import {
 import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobSource, JobStatus, JobType } from "../api/types.js";
 import type { ConfiguredDevice, FirmwareJob, PairingSummary } from "../api/types.js";
+import { JobSource, JobStatus, JobType } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeAnsiLog } from "./ansi-log.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import {
   apiContext,
   buildOffloadJobsContext,
@@ -30,14 +30,12 @@ import {
   localizeContext,
   versionContext,
 } from "../context/index.js";
-import type { RemoteBuildJobState } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { commandDialogStyles } from "./command-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import {
   detachStream,
   followJob,
@@ -53,6 +51,8 @@ import {
   renderResetSuggestion,
   renderToolbar,
 } from "./command-dialog/renderers.js";
+import { commandDialogStyles } from "./command-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

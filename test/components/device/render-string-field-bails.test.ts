@@ -9,8 +9,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
-import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   renderBooleanField,
   renderFloatWithUnitField,

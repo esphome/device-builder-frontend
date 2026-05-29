@@ -52,7 +52,6 @@ import {
   fetchComponent,
   getCachedComponent,
 } from "../../../util/component-name-cache.js";
-import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
@@ -62,6 +61,7 @@ import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
+import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,

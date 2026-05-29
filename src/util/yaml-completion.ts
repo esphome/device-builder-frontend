@@ -34,7 +34,6 @@ import {
   type ConfigEntry,
 } from "../api/types.js";
 import { fetchComponent } from "./component-name-cache.js";
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   getActions,
   getConfigVarKeys,
@@ -48,6 +47,7 @@ import {
   type SchemaConfigVarKey,
   type SchemaRegistryEntry,
 } from "./esphome-schema.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   collectSubstitutionKeys,
   collectTopLevelKeys,

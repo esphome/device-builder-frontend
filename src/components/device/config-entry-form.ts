@@ -29,10 +29,10 @@ import { ConfigEntryType } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";
-import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
-import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
+import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -40,7 +40,6 @@ import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
-import "./password-input.js";
 import {
   fieldRendererStyles,
   labelFor,
@@ -53,8 +52,8 @@ import {
   renderNestedField,
   renderNestedListField,
   renderNumberField,
-  renderRegistryListField,
   renderPinField,
+  renderRegistryListField,
   renderSelectField,
   renderStringField,
   renderTextareaField,
@@ -63,6 +62,7 @@ import {
 } from "./config-entry-renderers.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
 import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
+import "./password-input.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,

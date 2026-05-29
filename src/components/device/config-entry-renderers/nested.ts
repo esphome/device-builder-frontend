@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import type { ConfigEntry } from "../../../api/types.js";
-import { isPlainObject } from "../../../util/nested-values.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { isPlainObject } from "../../../util/nested-values.js";
 import { hasSerializableValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,

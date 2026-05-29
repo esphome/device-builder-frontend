@@ -3,12 +3,6 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import {
-  CLEANUP_TTL_DEFAULT_SECONDS,
-  JobStatus,
-  Theme,
-  type VersionMatchPolicy,
-} from "../api/types.js";
 import type {
   AdoptableDevice,
   ConfiguredDevice,
@@ -22,40 +16,47 @@ import type {
   RemoteBuildSubmitTarget,
   ServerInfoMessage,
 } from "../api/types.js";
-import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import {
-  apiContext,
-  darkModeContext,
-  devicesContext,
-  devicesLoadedContext,
+  CLEANUP_TTL_DEFAULT_SECONDS,
+  JobStatus,
+  Theme,
+  type VersionMatchPolicy,
+} from "../api/types.js";
+import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
+import type { RemoteBuildJobState } from "../context/index.js";
+import {
   activeJobsContext,
+  apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
-  offloaderVersionMatchPolicyContext,
-  offloaderRemoteBuildsEnabledContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
-  recentJobsContext,
+  darkModeContext,
+  devicesContext,
+  devicesLoadedContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
   isHaIngressContext,
   labelsContext,
   localizeContext,
+  offloaderRemoteBuildsEnabledContext,
+  offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
   serverVersionContext,
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
-import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { BASE_PATH } from "../util/base-path.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
+import { onLoginSubmit } from "./app-shell/auth.js";
 import {
   loadIntegrationDocs,
   loadLabels,
@@ -69,16 +70,15 @@ import {
   onFirmwareHistoryCleared,
   subscribeToFollowJobs,
 } from "./app-shell/jobs.js";
-import { onLoginSubmit } from "./app-shell/auth.js";
 import { createRouter } from "./app-shell/router.js";
 import {
   onPairRequestSent,
   onRemoteBuildJobDismissed,
   onRemoteBuildJobSubmitted,
   onSetLanguage,
-  onSetOffloaderVersionMatchPolicy,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
+  onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
   onSetTheme,

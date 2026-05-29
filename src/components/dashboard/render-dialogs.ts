@@ -2,9 +2,9 @@ import { html, type TemplateResult } from "lit";
 import type { ArchivedDevice, ConfiguredDevice, Label } from "../../api/types.js";
 import { DeviceState } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
-import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";
+import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
 
 export type PendingConfirm =
   | { kind: "delete-single"; device: ConfiguredDevice }

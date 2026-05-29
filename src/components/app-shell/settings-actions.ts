@@ -13,8 +13,8 @@ import {
   type SupportedLocale,
   writeStoredLocale,
 } from "../../common/localize.js";
-import { patchOffloadPairing } from "./events.js";
 import type { ESPHomeApp } from "../app-shell.js";
+import { patchOffloadPairing } from "./events.js";
 
 export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   const theme = e.detail as Theme;

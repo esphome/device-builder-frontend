@@ -21,8 +21,8 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
-import { renderMapField } from "../../../src/components/device/config-entry-renderers.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { renderMapField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 
 function makeMapEntry(): ConfigEntry {

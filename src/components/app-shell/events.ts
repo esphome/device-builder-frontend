@@ -1,4 +1,3 @@
-import { DeviceEventType, DeviceState } from "../../api/types.js";
 import type {
   DeviceEventData,
   DeviceStateChangedEventData,
@@ -7,7 +6,6 @@ import type {
   InitialStateEventData,
   LabelDeletedEventData,
   LabelEventData,
-  OffloaderVersionMatchPolicyChangedEventData,
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
@@ -18,6 +16,7 @@ import type {
   OffloaderPeerLinkClosedEventData,
   OffloaderPeerLinkSessionEventData,
   OffloaderRemoteBuildsToggledEventData,
+  OffloaderVersionMatchPolicyChangedEventData,
   PairingSummary,
   PeerSummary,
   ReceiverPeerLinkSessionEventData,
@@ -27,6 +26,7 @@ import type {
   RemoteBuildPairRequestReceivedEventData,
   RemoteBuildPairStatusChangedEventData,
 } from "../../api/types.js";
+import { DeviceEventType, DeviceState } from "../../api/types.js";
 import {
   type RemoteBuildJobState,
   stubRemoteBuildJobState,

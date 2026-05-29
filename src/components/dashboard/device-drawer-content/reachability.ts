@@ -1,14 +1,14 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
-import type { ReachabilitySource, ReachabilityStateEvent } from "../../../api/types.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
+import type { ReachabilitySource, ReachabilityStateEvent } from "../../../api/types.js";
+import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
 import {
   ageOf,
   formatSecondsAgo,
   getNumberFormatter,
 } from "../../../util/relative-time.js";
-import { renderMdnsTxtRecords } from "../device-drawer-render.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
+import { renderMdnsTxtRecords } from "../device-drawer-render.js";
 
 interface ReachabilityRowSpec {
   source: "mdns" | "ping" | "mqtt";

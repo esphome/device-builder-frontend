@@ -1,24 +1,23 @@
-import { consume } from "@lit/context";
 import { autocompletion } from "@codemirror/autocomplete";
 import { indentWithTab } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
-import { StateEffect, StateField } from "@codemirror/state";
+import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
-import { vscodeDark, vscodeLight } from "../util/yaml-editor-theme.js";
-import { LitElement, css, html } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { consume } from "@lit/context";
 import { basicSetup, EditorView } from "codemirror";
-import { EditorState } from "@codemirror/state";
+import { css, html, LitElement } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import { apiContext, darkModeContext } from "../context/index.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
-import { createBackendYamlLinter } from "../util/yaml-lint-backend.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
+import { vscodeDark, vscodeLight } from "../util/yaml-editor-theme.js";
+import { createBackendYamlLinter } from "../util/yaml-lint-backend.js";
+import type { YamlSection } from "../util/yaml-sections.js";
 import {
   sensitiveValueMaskExtension,
   setRevealSensitiveEffect,
 } from "../util/yaml-sensitive-mask.js";
-import type { YamlSection } from "../util/yaml-sections.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
 

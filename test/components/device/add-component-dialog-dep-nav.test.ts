@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
+import type { ESPHomeAPI } from "../../../src/api/index.js";
+import { ComponentCategory, type ComponentCatalogEntry } from "../../../src/api/types.js";
 import {
   matchesDepDomain,
   navigateToDep,
   type DepNavHost,
 } from "../../../src/components/device/add-component-dialog-dep-nav.js";
-import { ComponentCategory, type ComponentCatalogEntry } from "../../../src/api/types.js";
-import type { ESPHomeAPI } from "../../../src/api/index.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
 import { makeComponentEntry } from "../../util/_make-component-entry.js";
 

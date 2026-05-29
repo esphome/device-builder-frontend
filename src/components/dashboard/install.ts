@@ -1,8 +1,8 @@
 import { DeviceState, type ConfiguredDevice } from "../../api/types.js";
-import type { CommandType } from "../command-dialog.js";
-import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
-import { openLogsWithMethod } from "./actions-ui.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
+import type { CommandType } from "../command-dialog.js";
+import { openLogsWithMethod } from "./actions-ui.js";
 
 export function openInstallMethod(
   host: ESPHomePageDashboard,

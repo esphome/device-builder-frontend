@@ -33,12 +33,12 @@ import type { ConfiguredDevice, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { labelChipStyleString } from "../../util/label-style.js";
 import {
   labelChipStyles,
   renderLabelChip,
   resolveLabelIds,
 } from "../../util/label-chip-template.js";
+import { labelChipStyleString } from "../../util/label-style.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import "./label-form.js";
 import type { ESPHomeLabelForm } from "./label-form.js";

@@ -32,8 +32,8 @@ import {
 } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
 import { LitElement, html, nothing } from "lit";
-import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
+import { classMap } from "lit/directives/class-map.js";
 import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";

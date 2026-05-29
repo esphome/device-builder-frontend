@@ -1,6 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompletionContext } from "@codemirror/autocomplete";
 import { EditorState } from "@codemirror/state";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ComponentCategory, type ComponentCatalogEntry } from "../../src/api/types.js";
 import { _resetSchemaCacheForTests } from "../../src/util/esphome-schema.js";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";

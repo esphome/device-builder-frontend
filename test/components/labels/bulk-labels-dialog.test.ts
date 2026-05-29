@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import toast from "sonner-js";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
 import type {

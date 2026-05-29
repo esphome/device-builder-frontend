@@ -1,7 +1,7 @@
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import { streamSerialToDialog } from "../components/dashboard/actions.js";
+import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 
 /**
  * Detail shape of the cancelable ``request-show-logs-after-install``

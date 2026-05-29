@@ -30,5 +30,5 @@ import { withBase } from "./util/base-path.js";
 const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
 if (favicon) favicon.href = withBase("/assets/logo/esphome.svg");
 
-import "./styles/apply-theme.js";
 import "./components/app-shell.js";
+import "./styles/apply-theme.js";

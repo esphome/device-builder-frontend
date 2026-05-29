@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { EditorState } from "@codemirror/state";
+import { describe, expect, it } from "vitest";
 import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 import {
   collectSubstitutionKeys,

@@ -11,8 +11,6 @@
  * ``conditions-change`` with the new list on every mutation.
  */
 import { consume } from "@lit/context";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
 import {
   mdiArrowDown,
   mdiArrowUp,
@@ -21,6 +19,8 @@ import {
   mdiPencilOutline,
   mdiPlus,
 } from "@mdi/js";
+import { html, LitElement, nothing } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type {
   AutomationCondition,
@@ -30,11 +30,18 @@ import type {
 } from "../../../api/types.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import "../config-entry-form.js";
+import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
+import "./catalog-picker-dialog.js";
+import type {
+  CatalogPickedDetail,
+  ESPHomeCatalogPickerDialog,
+} from "./catalog-picker-dialog.js";
 import {
   applyParamChange,
   emptyConditionNode,
@@ -42,13 +49,6 @@ import {
   replaceAt,
   swap,
 } from "./serialise.js";
-import "../config-entry-form.js";
-import type { ConfigEntryValueChange } from "../config-entry-form.js";
-import "./catalog-picker-dialog.js";
-import type {
-  CatalogPickedDetail,
-  ESPHomeCatalogPickerDialog,
-} from "./catalog-picker-dialog.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 

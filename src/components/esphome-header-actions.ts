@@ -14,12 +14,12 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
-import { JobStatus } from "../api/types.js";
 import type {
   AdoptableDevice,
   FirmwareJob,
   OffloaderAlertSnapshotEntry,
 } from "../api/types.js";
+import { JobStatus } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   buildOffloadAlertsContext,

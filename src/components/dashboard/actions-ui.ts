@@ -1,10 +1,10 @@
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../../api/types.js";
+import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
 import { streamSerialToDialog } from "./actions.js";
-import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,

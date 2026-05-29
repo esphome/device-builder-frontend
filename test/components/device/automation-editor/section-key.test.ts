@@ -5,11 +5,11 @@
  * automation editor with the right location.
  */
 import { describe, expect, it } from "vitest";
+import type { AutomationLocation } from "../../../../src/api/types.js";
 import {
   locationFromSectionKey,
   sectionKeyFromLocation,
 } from "../../../../src/components/device/automation-editor/serialise.js";
-import type { AutomationLocation } from "../../../../src/api/types.js";
 
 describe("sectionKeyFromLocation", () => {
   it("emits the same shape parseYamlAutomations uses", () => {

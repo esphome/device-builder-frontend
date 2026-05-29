@@ -1,8 +1,8 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { JobSource } from "../../api/types.js";
 import { splitTemplate } from "../../util/template-split.js";
-import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 
 // Matches the receiver-side _fail_locally "peer-link session lost" shape from
 // the backend's remote_runner. Substring match because the wire is free-form.

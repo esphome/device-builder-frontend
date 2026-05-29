@@ -1,5 +1,5 @@
-import { JobType } from "../api/types.js";
 import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import { JobType } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /**

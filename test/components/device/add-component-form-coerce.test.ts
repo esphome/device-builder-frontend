@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 
-import { coerceFields } from "../../../src/components/device/add-component-form-coerce.js";
 import { ConfigEntryType } from "../../../src/api/types.js";
+import { coerceFields } from "../../../src/components/device/add-component-form-coerce.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 
 const hexAddress = makeConfigEntry({

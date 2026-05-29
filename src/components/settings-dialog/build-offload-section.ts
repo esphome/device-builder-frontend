@@ -12,6 +12,7 @@ import type {
   VersionMatchPolicy,
 } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { RemoteBuildJobState } from "../../context/index.js";
 import {
   apiContext,
   buildOffloadAlertsContext,
@@ -23,7 +24,6 @@ import {
   offloaderVersionMatchPolicyContext,
   versionContext,
 } from "../../context/index.js";
-import type { RemoteBuildJobState } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -41,14 +41,14 @@ import {
   settingsSharedStyles,
 } from "./shared-styles.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/select/select.js";
 import "../confirm-dialog.js";
 import "../edit-pairing-endpoint-dialog.js";
 import "../pair-build-server-dialog.js";
 import "../reauth-wizard-dialog.js";
 import "../remote-build-job-dialog.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/option/option.js";
-import "@home-assistant/webawesome/dist/components/select/select.js";
 
 registerMdiIcons({
   delete: mdiDelete,

@@ -13,10 +13,10 @@ import type { DeviceLayoutMode } from "../components/device/device-editor.js";
 // page itself doesn't pass it down anymore now that the step CTAs
 // always render.
 import { DeviceInstallController } from "../components/device/device-install-controller.js";
+import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
 import type { ESPHomeUnsavedChangesDialog } from "../components/unsaved-changes-dialog.js";
-import type { ESPHomeDeviceSectionConfig } from "../components/device/device-section-config.js";
 import type { HighlightRange } from "../components/yaml-editor.js";
 import type { ESPHomeYamlValidationDialog } from "../components/yaml-validation-dialog.js";
 import {
@@ -31,11 +31,11 @@ import { withBase } from "../util/base-path.js";
 import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
-import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
+import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
 import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
+import { sectionAtLine, sectionKeyOf } from "../util/yaml-sections.js";
 import { summarizeValidation } from "../util/yaml-validation-summary.js";
 import { devicePageStyles } from "./device-styles.js";
 

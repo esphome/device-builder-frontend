@@ -13,12 +13,12 @@
  */
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
+import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
+import { validateEntries } from "../../src/util/config-validation.js";
 import {
   MAP_SECTIONS,
   resolveSectionEntries,
 } from "../../src/util/section-entry-overrides.js";
-import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
-import { validateEntries } from "../../src/util/config-validation.js";
 
 describe("MAP_SECTIONS", () => {
   it("contains 'substitutions'", () => {

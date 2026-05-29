@@ -14,15 +14,15 @@
  */
 import { describe, expect, it } from "vitest";
 import { ConfigEntryType } from "../../../src/api/types.js";
-import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
-import {
-  renderMapField,
-  renderSelectField,
-} from "../../../src/components/device/config-entry-renderers.js";
 import {
   parseFieldKey,
   type RenderCtx,
 } from "../../../src/components/device/config-entry-renderers-shared.js";
+import {
+  renderMapField,
+  renderSelectField,
+} from "../../../src/components/device/config-entry-renderers.js";
+import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 import { findElementBindings, makeRenderCtx } from "./_renderer-fixtures.js";
 
 const LOG_LEVELS = ["NONE", "ERROR", "WARN", "INFO", "DEBUG", "VERBOSE"].map((v) => ({

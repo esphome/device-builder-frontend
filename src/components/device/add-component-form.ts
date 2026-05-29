@@ -13,9 +13,9 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
 import { validateEntries, type ValidationError } from "../../util/config-validation.js";
-import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import {
   collectExistingIds,
   generateDefaultComponentId,

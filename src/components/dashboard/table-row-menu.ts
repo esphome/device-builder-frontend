@@ -16,14 +16,14 @@ import {
   mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { LocalizeFunc } from "../../common/localize.js";
 import type { ConfiguredDevice } from "../../api/types.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import { EscapeController } from "../../util/escape-controller.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

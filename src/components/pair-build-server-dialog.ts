@@ -3,8 +3,8 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/index.js";
-import type { LocalizeFunc } from "../common/localize.js";
 import type { PairingSummary } from "../api/types.js";
+import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
   buildOffloadPairingsContext,
@@ -16,18 +16,18 @@ import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { friendlyHostname } from "../util/hostname.js";
 import "./base-dialog.js";
-import "./pin-emoji-grid.js";
-import { pairBuildServerDialogStyles } from "./pair-build-server-dialog/styles.js";
-import {
-  renderConfirmStep,
-  renderInputStep,
-  renderSentStep,
-} from "./pair-build-server-dialog/renderers.js";
 import {
   onConfirmSubmit,
   onPreviewSubmit,
   watchPairingApproval,
 } from "./pair-build-server-dialog/actions.js";
+import {
+  renderConfirmStep,
+  renderInputStep,
+  renderSentStep,
+} from "./pair-build-server-dialog/renderers.js";
+import { pairBuildServerDialogStyles } from "./pair-build-server-dialog/styles.js";
+import "./pin-emoji-grid.js";
 
 // Wizard for pairing this dashboard with a build server (receiver) the user
 // types in by hand. Used when the receiver isn't reachable via mDNS

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { onSetOffloaderVersionMatchPolicy } from "../../../src/components/app-shell/settings-actions.js";
 import type { VersionMatchPolicy } from "../../../src/api/types.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
+import { onSetOffloaderVersionMatchPolicy } from "../../../src/components/app-shell/settings-actions.js";
 
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
 vi.mock("sonner-js", () => ({

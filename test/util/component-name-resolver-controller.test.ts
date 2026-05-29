@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ReactiveController, ReactiveControllerHost } from "lit";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import type { ComponentCatalogEntry } from "../../src/api/types.js";
 import {

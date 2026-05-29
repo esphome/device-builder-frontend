@@ -15,9 +15,9 @@ vi.mock("../../../src/components/device/add-script-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
+import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 import { _clearAutomationCatalogCache } from "../../../src/util/automation-catalog-cache.js";
 import { _clearComponentCache } from "../../../src/util/component-name-cache.js";
-import { ESPHomeDeviceNavigator } from "../../../src/components/device/device-navigator.js";
 
 async function flushPending(times = 5): Promise<void> {
   for (let i = 0; i < times; i++) await Promise.resolve();

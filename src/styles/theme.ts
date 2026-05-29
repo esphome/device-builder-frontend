@@ -23,10 +23,10 @@ import defaultPaletteStyles from "@home-assistant/webawesome/dist/styles/color/p
 
 // 3. Color variants — semantic mapping (brand→blue, neutral→gray, etc.)
 import brandVariantStyles from "@home-assistant/webawesome/dist/styles/color/variants/brand.css.js";
+import dangerVariantStyles from "@home-assistant/webawesome/dist/styles/color/variants/danger.css.js";
 import neutralVariantStyles from "@home-assistant/webawesome/dist/styles/color/variants/neutral.css.js";
 import successVariantStyles from "@home-assistant/webawesome/dist/styles/color/variants/success.css.js";
 import warningVariantStyles from "@home-assistant/webawesome/dist/styles/color/variants/warning.css.js";
-import dangerVariantStyles from "@home-assistant/webawesome/dist/styles/color/variants/danger.css.js";
 
 // 4. Theme — light/dark mode tokens, typography, spacing, forms, etc.
 import defaultThemeStyles from "@home-assistant/webawesome/dist/styles/themes/default.css.js";

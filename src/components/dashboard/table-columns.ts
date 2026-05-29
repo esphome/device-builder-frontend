@@ -1,7 +1,7 @@
-import { html, nothing } from "lit";
 import type { ColumnDef } from "@tanstack/lit-table";
-import { DeviceState, JobStatus } from "../../api/types.js";
+import { html, nothing } from "lit";
 import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
+import { DeviceState, JobStatus } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";

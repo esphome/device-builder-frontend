@@ -20,20 +20,20 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { DeviceState } from "../api/types.js";
 import type { FirmwareJob, Label } from "../api/types.js";
+import { DeviceState } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { deviceCardStyles } from "./device-card/styles.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
   renderEncryptionIcon,
   renderLabels,
   renderStatusBadge,
 } from "./device-card/render-bits.js";
+import { deviceCardStyles } from "./device-card/styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";

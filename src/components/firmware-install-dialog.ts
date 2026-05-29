@@ -1,8 +1,8 @@
 import { consume } from "@lit/context";
 import {
   mdiAlertCircle,
-  mdiArrowExpand,
   mdiArrowCollapse,
+  mdiArrowExpand,
   mdiCheckCircle,
   mdiChevronDown,
   mdiChevronUp,
@@ -18,20 +18,20 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
-import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
-import {
-  renderFooter,
-  renderLogs,
-  renderProgress,
-  renderStatus,
-} from "./firmware-install-dialog/renderers.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
   startDownload,
   startWebSerialInstall,
 } from "./firmware-install-dialog/install-flow.js";
+import {
+  renderFooter,
+  renderLogs,
+  renderProgress,
+  renderStatus,
+} from "./firmware-install-dialog/renderers.js";
+import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";

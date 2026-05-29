@@ -9,12 +9,12 @@
 import { html } from "lit";
 import type { ConfigEntry } from "../../../api/types.js";
 import { isLambdaValue } from "../../../api/types.js";
+import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   renderFieldShell,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
-import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import "./lambda-editor.js";
 
 /**

@@ -1,10 +1,10 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { formatPinSha256 } from "../../util/pin-format.js";
 import {
   friendlyHostname,
   parsePortInput,
   trimTrailingDot,
 } from "../../util/hostname.js";
+import { formatPinSha256 } from "../../util/pin-format.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
 
 export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateResult {

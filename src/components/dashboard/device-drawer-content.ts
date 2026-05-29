@@ -7,10 +7,10 @@ import {
   mdiCheckCircleOutline,
   mdiChevronDown,
   mdiChevronUp,
+  mdiEthernet,
   mdiFileDocumentOutline,
   mdiFingerprint,
   mdiHarddisk,
-  mdiEthernet,
   mdiInformationOutline,
   mdiIpNetworkOutline,
   mdiLan,
@@ -31,13 +31,13 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { LocalizeFunc } from "../../common/localize.js";
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type {
   ConfiguredDevice,
   ReachabilityStateEvent,
   ReachabilitySubscription,
 } from "../../api/types.js";
-import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,
   integrationDocsContext,
@@ -46,7 +46,12 @@ import {
 import { espHomeStyles } from "../../styles/shared.js";
 import { getEncryptionState } from "../../util/encryption-state.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { deviceDrawerContentStyles } from "./device-drawer-content/styles.js";
+import {
+  reconcileSubscription,
+  renderReachabilitySection,
+  syncTickInterval,
+  teardownSubscription,
+} from "./device-drawer-content/reachability.js";
 import {
   renderBluetoothMacRow,
   renderBuildSizeRow,
@@ -60,12 +65,7 @@ import {
   renderRow,
   renderVersionSection,
 } from "./device-drawer-content/render-sections.js";
-import {
-  reconcileSubscription,
-  renderReachabilitySection,
-  syncTickInterval,
-  teardownSubscription,
-} from "./device-drawer-content/reachability.js";
+import { deviceDrawerContentStyles } from "./device-drawer-content/styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../labels/device-labels-editor.js";

@@ -3,8 +3,8 @@ import { JobSource, JobStatus, type FirmwareJob } from "../../api/types.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { splitTemplate } from "../../util/template-split.js";
-import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
+import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
 // the locally-primed snapshot for the gap between followJob and the first

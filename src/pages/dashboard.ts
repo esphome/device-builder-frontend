@@ -17,7 +17,6 @@ import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { ErrorCode } from "../api/types.js";
 import type {
   AdoptableDevice,
   ArchivedDevice,
@@ -26,7 +25,7 @@ import type {
   Label,
   PairingSummary,
 } from "../api/types.js";
-import { DashboardView } from "../api/types.js";
+import { DashboardView, ErrorCode } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   deleteLabel,
@@ -101,10 +100,10 @@ import { matchesDeviceName } from "../util/device-search.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
-import { classifyNoCompatiblePeerReason } from "../util/version-mismatch.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { classifyNoCompatiblePeerReason } from "../util/version-mismatch.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/adopt-dialog.js";

@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { nothing } from "lit";
+import { describe, expect, it } from "vitest";
 
 import { renderErrorBanner, renderInlineError } from "../../src/util/render-error.js";
 
