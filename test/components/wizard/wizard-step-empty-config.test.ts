@@ -5,23 +5,13 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ESPHomeWizardStepEmptyConfig } from "../../../src/components/wizard/wizard-step-empty-config.js";
+import { pressEnter } from "../../_press-enter.js";
 
 async function mount(): Promise<ESPHomeWizardStepEmptyConfig> {
   const el = new ESPHomeWizardStepEmptyConfig();
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
-}
-
-function pressEnter(): void {
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key: "Enter",
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-    })
-  );
 }
 
 describe("wizard-step-empty-config ENTER", () => {

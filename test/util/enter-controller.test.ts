@@ -108,4 +108,17 @@ describe("EnterController", () => {
     press(target);
     expect(onEnter).not.toHaveBeenCalled();
   });
+
+  it("only the first active controller acts on a shared Enter (stacked modals)", () => {
+    target = document.createElement("div");
+    document.body.appendChild(target);
+    const first = vi.fn();
+    const second = vi.fn();
+    new EnterController(stubHost, first, { target }).set(true);
+    new EnterController(stubHost, second, { target }).set(true);
+    press(target);
+    // The first to act calls preventDefault; the second bails on its guard.
+    expect(first).toHaveBeenCalledTimes(1);
+    expect(second).not.toHaveBeenCalled();
+  });
 });

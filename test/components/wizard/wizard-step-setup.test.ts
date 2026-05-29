@@ -6,6 +6,7 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ESPHomeWizardStepSetup } from "../../../src/components/wizard/wizard-step-setup.js";
+import { pressEnter } from "../../_press-enter.js";
 
 async function mount(): Promise<ESPHomeWizardStepSetup> {
   const el = new ESPHomeWizardStepSetup();
@@ -23,17 +24,6 @@ function setName(el: ESPHomeWizardStepSetup, value: string): Promise<unknown> {
   input.value = value;
   input.dispatchEvent(new Event("input"));
   return el.updateComplete;
-}
-
-function pressEnter(): void {
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key: "Enter",
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-    })
-  );
 }
 
 describe("wizard-step-setup ENTER", () => {

@@ -49,8 +49,8 @@ export class EnterController implements ReactiveController {
     if (ke.key !== "Enter") return;
     if (ke.isComposing || ke.keyCode === 229) return; // mid-IME composition
     if (ke.ctrlKey || ke.metaKey || ke.altKey || ke.shiftKey) return;
-    // Assumes one active modal (like EscapeController); an onEnter may
-    // preventDefault to stop a co-active controller.
+    // First active controller to act claims the event (preventDefault below);
+    // a co-active one (stacked modal) then bails here. Mirrors EscapeController.
     if (ke.defaultPrevented) return;
     // composedPath()[0] is the real focused element across shadow roots.
     const el = ke.composedPath()[0] as HTMLElement | undefined;
@@ -58,6 +58,7 @@ export class EnterController implements ReactiveController {
       if (SELF_HANDLING.has(el.tagName)) return;
       if (el.isContentEditable) return;
     }
+    ke.preventDefault(); // claim it so a co-active controller bails (see above)
     this.onEnter(ke);
   };
 }

@@ -9,23 +9,13 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 
 import { ESPHomeConfirmDialog } from "../../src/components/confirm-dialog.js";
+import { pressEnter } from "../_press-enter.js";
 
 async function mount(): Promise<ESPHomeConfirmDialog> {
   const el = new ESPHomeConfirmDialog();
   document.body.appendChild(el);
   await el.updateComplete;
   return el;
-}
-
-function pressEnter(): void {
-  window.dispatchEvent(
-    new KeyboardEvent("keydown", {
-      key: "Enter",
-      bubbles: true,
-      cancelable: true,
-      composed: true,
-    })
-  );
 }
 
 describe("confirm-dialog ENTER", () => {
