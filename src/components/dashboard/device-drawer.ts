@@ -2,10 +2,10 @@ import { consume } from "@lit/context";
 import {
   mdiCheckNetworkOutline,
   mdiClose,
-  mdiTextBoxOutline,
   mdiHelpNetworkOutline,
   mdiNetworkOffOutline,
   mdiPencil,
+  mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";

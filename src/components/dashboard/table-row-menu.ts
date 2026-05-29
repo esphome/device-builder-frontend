@@ -4,7 +4,6 @@ import {
   mdiBroom,
   mdiCheckboxMultipleBlankOutline,
   mdiCheckDecagram,
-  mdiTextBoxOutline,
   mdiContentDuplicate,
   mdiDelete,
   mdiDownload,
@@ -14,6 +13,7 @@ import {
   mdiOpenInNew,
   mdiPencil,
   mdiRenameOutline,
+  mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";

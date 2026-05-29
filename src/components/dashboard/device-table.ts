@@ -7,7 +7,6 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiCloseCircle,
-  mdiTextBoxOutline,
   mdiDotsVertical,
   mdiLock,
   mdiLockAlert,
@@ -15,6 +14,7 @@ import {
   mdiLockOpenVariant,
   mdiOpenInNew,
   mdiPencil,
+  mdiTextBoxOutline,
   mdiUnfoldMoreHorizontal,
   mdiUpload,
 } from "@mdi/js";

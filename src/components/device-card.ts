@@ -6,7 +6,6 @@ import {
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
   mdiCloseCircle,
-  mdiTextBoxOutline,
   mdiDotsVertical,
   mdiHelpNetworkOutline,
   mdiLock,
@@ -16,6 +15,7 @@ import {
   mdiNetworkOffOutline,
   mdiOpenInNew,
   mdiPencil,
+  mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";

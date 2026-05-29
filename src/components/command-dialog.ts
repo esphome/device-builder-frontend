@@ -3,7 +3,6 @@ import {
   mdiAlertCircle,
   mdiCheckCircle,
   mdiClose,
-  mdiTextBoxOutline,
   mdiDownload,
   mdiKey,
   mdiKeyOutline,
@@ -11,6 +10,7 @@ import {
   mdiRefresh,
   mdiServerNetwork,
   mdiStop,
+  mdiTextBoxOutline,
   mdiTimerSand,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
