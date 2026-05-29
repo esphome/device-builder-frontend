@@ -57,7 +57,13 @@ export class EnterController implements ReactiveController {
     const ke = e as KeyboardEvent;
     if (ke.key !== "Enter") return;
     if (ke.isComposing || ke.keyCode === 229) return; // mid-IME composition
-    if (ke.ctrlKey || ke.metaKey || ke.altKey) return;
+    if (ke.ctrlKey || ke.metaKey || ke.altKey || ke.shiftKey) return;
+    // Like EscapeController, this assumes a single active modal: each open
+    // dialog binds its own window listener, so two simultaneously-open
+    // dialogs would both fire. The defaultPrevented guard lets an onEnter
+    // callback stop a co-active controller by preventing the event; today
+    // only one of these dialogs is ever open at a time (accept-peer wraps
+    // confirm-dialog, so only the inner controller is active).
     if (ke.defaultPrevented) return;
     // composedPath()[0] pierces shadow DOM to the real focused element,
     // which document.activeElement can't see across roots.

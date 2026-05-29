@@ -65,6 +65,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
   @query("wa-dialog")
   private _dialog!: HTMLElement & { open: boolean };
 
+  @query("#onboarding-ssid")
+  private _ssidInput?: HTMLInputElement;
+
   // WPA/WPA2 passphrases are 8-63 characters; the maxlength=64 cap
   // covers the 64-hex-digit PSK form. An empty password is a valid
   // open network (the placeholder invites it), so only a non-empty
@@ -91,6 +94,11 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._exitedExplicitly = false;
     this._dialog.open = true;
     this._enter.set(true);
+    // Focus the SSID field once the dialog has rendered. The attribute-based
+    // autofocus isn't reliable for a shadow-DOM input revealed by toggling
+    // ``open`` after first paint, so focus explicitly (matching
+    // edit-pairing-endpoint-dialog).
+    void this.updateComplete.then(() => this._ssidInput?.focus());
   }
 
   close() {
@@ -202,7 +210,6 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             <input
               id="onboarding-ssid"
               type="text"
-              autofocus
               .value=${this._ssid}
               maxlength="32"
               placeholder=${this._localize("onboarding.wifi.ssid_placeholder")}

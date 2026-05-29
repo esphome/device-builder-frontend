@@ -84,6 +84,7 @@ describe("EnterController", () => {
     ["ctrlKey", { ctrlKey: true }],
     ["metaKey", { metaKey: true }],
     ["altKey", { altKey: true }],
+    ["shiftKey", { shiftKey: true }],
     ["isComposing", { isComposing: true }],
   ])("ignores Enter with %s", (_label, init) => {
     const { onEnter } = setup();
