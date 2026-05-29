@@ -72,6 +72,32 @@ export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult
       </div>
     `;
   }
+  if (host._step === "choose-binary") {
+    return html`
+      <div class="status">
+        <span class="status-text">${host._localize("firmware.choose_binary_title")}</span>
+        <span class="status-detail"
+          >${host._localize("firmware.choose_binary_desc")}</span
+        >
+      </div>
+      <div class="binary-list">
+        ${host._binaries.map(
+          (binary) => html`
+            <button
+              type="button"
+              class="binary-option"
+              @click=${() => host._onChooseBinary(binary.file)}
+            >
+              <span class="title">${binary.title}</span>
+              ${binary.description
+                ? html`<span class="desc">${binary.description}</span>`
+                : nothing}
+            </button>
+          `
+        )}
+      </div>
+    `;
+  }
   if (host._step === "download-ready") {
     const filename = host._downloadedFilename;
     // Manual binary download: just acknowledge the file — no web.esphome.io checklist.
@@ -90,6 +116,15 @@ export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult
             >${host._localize("firmware.binary_download_done_body", { filename })}</span
           >
         </div>
+        ${host._binaries.length > 1
+          ? html`<button
+              type="button"
+              class="reset-suggestion-link"
+              @click=${() => (host._step = "choose-binary")}
+            >
+              ${host._localize("firmware.choose_binary_again")}
+            </button>`
+          : nothing}
       `;
     }
     return html`
@@ -184,6 +219,17 @@ export function renderLogs(
 }
 
 export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult {
+  if (host._step === "choose-binary" || host._step === "downloading") {
+    // Compile is done and the byte fetch can't be cancelled, so offer Close
+    // rather than a Stop that would target an already-finished job.
+    return html`
+      <div class="footer">
+        <button class="btn btn--ghost" @click=${host._close}>
+          ${host._localize("command.close")}
+        </button>
+      </div>
+    `;
+  }
   const isRunning =
     host._step !== "done" && host._step !== "error" && host._step !== "download-ready";
   if (isRunning) {

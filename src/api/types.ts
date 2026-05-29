@@ -1361,6 +1361,8 @@ export interface FirmwareJob {
 export interface FirmwareBinary {
   title: string;
   file: string;
+  // Optional subtext from ESPHome's get_download_types; not every platform supplies one.
+  description?: string;
 }
 
 export interface FirmwareDownload {

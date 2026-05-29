@@ -433,7 +433,10 @@
     "web_download_step_install": "选择 Install 并选择已下载的 {filename}",
     "web_download_open_button": "打开 web.esphome.io",
     "binary_download_done_title": "固件二进制文件已下载",
-    "binary_download_done_body": "已保存为 {filename}。请使用你喜欢的工具将其刷写到设备上。"
+    "binary_download_done_body": "已保存为 {filename}。请使用你喜欢的工具将其刷写到设备上。",
+    "choose_binary_title": "选择二进制格式",
+    "choose_binary_desc": "选择你需要的格式；每个选项都会说明其用途。",
+    "choose_binary_again": "下载其他格式"
   },
   "serial": {
     "title": "USB 设备",

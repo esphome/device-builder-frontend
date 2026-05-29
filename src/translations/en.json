@@ -433,7 +433,10 @@
     "web_download_step_install": "Choose Install and select the downloaded {filename}",
     "web_download_open_button": "Open web.esphome.io",
     "binary_download_done_title": "Firmware binary downloaded",
-    "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool."
+    "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool.",
+    "choose_binary_title": "Choose a binary format",
+    "choose_binary_desc": "Pick the format you need; each option explains what it's for.",
+    "choose_binary_again": "Download another format"
   },
   "serial": {
     "title": "USB Device",

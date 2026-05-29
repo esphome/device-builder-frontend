@@ -432,7 +432,10 @@
     "web_download_step_install": "Válassza a Telepítés lehetőséget, és jelölje ki a letöltött {filename} fájlt",
     "web_download_open_button": "web.esphome.io megnyitása",
     "binary_download_done_title": "Firmware-bináris letöltve",
-    "binary_download_done_body": "Mentve: {filename}. Telepítse az eszközre egyénileg."
+    "binary_download_done_body": "Mentve: {filename}. Telepítse az eszközre egyénileg.",
+    "choose_binary_title": "Válasszon bináris formátumot",
+    "choose_binary_desc": "Válassza ki a szükséges formátumot; minden lehetőség leírja, mire való.",
+    "choose_binary_again": "Másik formátum letöltése"
   },
   "serial": {
     "title": "USB-eszköz",

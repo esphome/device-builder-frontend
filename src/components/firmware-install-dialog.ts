@@ -12,7 +12,7 @@ import {
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobSource, type ConfiguredDevice } from "../api/types.js";
+import { JobSource, type ConfiguredDevice, type FirmwareBinary } from "../api/types.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
@@ -27,6 +27,7 @@ import {
   renderStatus,
 } from "./firmware-install-dialog/renderers.js";
 import {
+  downloadSelectedBinary,
   flipToLogs,
   startDownload,
   startWebSerialInstall,
@@ -55,6 +56,8 @@ export type InstallStep =
   | "compiling"
   | "flashing"
   | "done"
+  | "choose-binary"
+  | "downloading"
   | "download-ready"
   | "error";
 
@@ -95,6 +98,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _logsExpanded = false;
   @state() _flashPercent = 0;
   @state() _downloadedFilename = "";
+
+  // Formats offered by the manual download picker; populated only when a
+  // device produces more than one (e.g. ESP32 factory + OTA).
+  @state() _binaries: FirmwareBinary[] = [];
 
   // Reset per _init so an opt-out on one run doesn't persist. installWebDownload
   // doesn't connect to a device, so the toggle is install-only.
@@ -146,6 +153,11 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startDownload(this);
   }
 
+  // Picked a format in the choose-binary step.
+  _onChooseBinary(file: string) {
+    void downloadSelectedBinary(this, file);
+  }
+
   // Reopen without clearing state. Used by logs-dialog's "Back to install"
   // after the Web Serial post-install hand-off so users can review output.
   public reopen() {
@@ -170,6 +182,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsExpanded = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
+    this._binaries = [];
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failedDuringCompile = false;

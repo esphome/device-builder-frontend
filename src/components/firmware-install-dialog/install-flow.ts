@@ -1,4 +1,4 @@
-import { JobStatus } from "../../api/types.js";
+import { JobStatus, type FirmwareBinary } from "../../api/types.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { downloadBase64Binary } from "../../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
@@ -214,32 +214,62 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
   }
 
   host._statusMessage = host._localize("firmware.status_downloading");
+  let binaries: FirmwareBinary[];
   try {
-    const binaries = await host._api.firmwareGetBinaries(device.configuration);
-    // ESP32 → firmware.factory.bin (bootloader + partitions + app)
-    // ESP8266 → firmware.bin (full image, no bootloader split)
-    // web flasher requires one of those; manual falls back to first available.
-    const flashable =
-      binaries.find((b) => b.file === "firmware.factory.bin") ??
-      binaries.find((b) => b.file === "firmware.bin") ??
-      (isWebFlasher ? undefined : binaries[0]);
-    if (!flashable) {
-      // Web-flasher path with no match almost always = UF2 platform.
-      host._fail(
-        host._localize(
-          isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries"
-        )
-      );
-      return;
-    }
-    const result = await host._api.firmwareDownload(device.configuration, flashable.file);
+    binaries = await host._api.firmwareGetBinaries(device.configuration);
+  } catch {
+    host._fail(host._localize("firmware.download_failed"));
+    return;
+  }
+
+  // More than one format (e.g. ESP32 factory + OTA): let the user pick,
+  // since the OTA image is otherwise unreachable from the manual path.
+  if (!isWebFlasher && binaries.length > 1) {
+    host._binaries = binaries;
+    host._statusMessage = "";
+    host._step = "choose-binary";
+    return;
+  }
+
+  // ESP32 → firmware.factory.bin (bootloader + partitions + app)
+  // ESP8266 → firmware.bin (full image, no bootloader split)
+  // web flasher requires one of those; manual falls back to first available.
+  const flashable =
+    binaries.find((b) => b.file === "firmware.factory.bin") ??
+    binaries.find((b) => b.file === "firmware.bin") ??
+    (isWebFlasher ? undefined : binaries[0]);
+  if (!flashable) {
+    // Web-flasher path with no match almost always = UF2 platform.
+    host._fail(
+      host._localize(
+        isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries"
+      )
+    );
+    return;
+  }
+  await downloadSelectedBinary(host, flashable.file);
+}
+
+// Fetch one binary and hand it to the browser. Shared by the auto-select
+// paths and the picker; leaves _binaries intact for "download another format".
+export async function downloadSelectedBinary(
+  host: ESPHomeFirmwareInstallDialog,
+  file: string
+): Promise<void> {
+  const device = host._device;
+  if (!device) return;
+  host._statusMessage = host._localize("firmware.status_downloading");
+  // Distinct from the compile steps: the byte fetch isn't cancelable, so the
+  // footer must not offer Stop (see renderFooter).
+  host._step = "downloading";
+  try {
+    const result = await host._api.firmwareDownload(device.configuration, file);
     downloadBase64Binary(result.data, result.filename);
     host._downloadedFilename = result.filename;
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;
   }
-
   host._step = "download-ready";
   host._statusMessage = "";
 }

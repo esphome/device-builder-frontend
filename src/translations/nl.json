@@ -810,7 +810,10 @@
     "web_download_step_install": "Kies Install en selecteer het gedownloade bestand {filename}",
     "web_download_open_button": "Open web.esphome.io",
     "binary_download_done_title": "Firmware-binary gedownload",
-    "binary_download_done_body": "Opgeslagen als {filename}. Flash hem naar je apparaat met je eigen tool."
+    "binary_download_done_body": "Opgeslagen als {filename}. Flash hem naar je apparaat met je eigen tool.",
+    "choose_binary_title": "Kies een binary-formaat",
+    "choose_binary_desc": "Kies het formaat dat je nodig hebt; elke optie legt uit waarvoor het is.",
+    "choose_binary_again": "Een ander formaat downloaden"
   },
   "validation": {
     "required": "Dit veld is verplicht",

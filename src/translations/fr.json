@@ -810,7 +810,10 @@
     "web_download_step_install": "Choisissez Install et sélectionnez le fichier téléchargé {filename}",
     "web_download_open_button": "Ouvrir web.esphome.io",
     "binary_download_done_title": "Binaire du firmware téléchargé",
-    "binary_download_done_body": "Enregistré sous {filename}. Flashez-le sur votre appareil avec votre outil préféré."
+    "binary_download_done_body": "Enregistré sous {filename}. Flashez-le sur votre appareil avec votre outil préféré.",
+    "choose_binary_title": "Choisissez un format de binaire",
+    "choose_binary_desc": "Choisissez le format dont vous avez besoin ; chaque option explique son usage.",
+    "choose_binary_again": "Télécharger un autre format"
   },
   "validation": {
     "required": "Ce champ est requis",

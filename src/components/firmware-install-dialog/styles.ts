@@ -133,6 +133,45 @@ export const firmwareInstallDialogStyles = css`
     text-decoration: none;
   }
 
+  /* Manual binary-download format picker (factory / OTA / ...). */
+  .binary-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-xs);
+    margin-top: var(--wa-space-m);
+    text-align: left;
+  }
+  .binary-option {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-l);
+    background: none;
+    font: inherit;
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition:
+      background 0.12s,
+      border-color 0.12s;
+  }
+  .binary-option:hover,
+  .binary-option:focus-visible {
+    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    border-color: var(--esphome-primary);
+    outline: none;
+  }
+  .binary-option .title {
+    font-weight: var(--wa-font-weight-bold);
+    font-size: var(--wa-font-size-s);
+  }
+  .binary-option .desc {
+    font-size: var(--wa-font-size-xs);
+    color: var(--wa-color-text-quiet);
+  }
+
   .progress-bar {
     width: 100%;
     height: 6px;
