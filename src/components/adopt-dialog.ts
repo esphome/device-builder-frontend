@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types.js";
@@ -8,6 +8,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
+import { EnterController } from "../util/enter-controller.js";
 import { markJustCreated } from "../util/just-created.js";
 import { previewPackageImportUrl } from "../util/package-import-url.js";
 import { renderInlineError } from "../util/render-error.js";
@@ -229,6 +230,13 @@ export class ESPHomeAdoptDialog extends LitElement {
     `,
   ];
 
+  // Enter submits; _submit self-guards on name validity and re-entry.
+  private _enter = new EnterController(this, () => this._submit());
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("_open")) this._enter.set(this._open);
+  }
+
   open(device: AdoptableDevice) {
     this._device = device;
     /* Default to the discovered hostname verbatim — including the
@@ -307,9 +315,6 @@ export class ESPHomeAdoptDialog extends LitElement {
                   @input=${(e: Event) => {
                     this._name = (e.target as HTMLInputElement).value;
                   }}
-                  @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter" && canSubmit) this._submit();
-                  }}
                 />
                 ${renderInlineError(
                   nameErr ? this._localize(nameErr.code, nameErr.params) : undefined
@@ -327,9 +332,6 @@ export class ESPHomeAdoptDialog extends LitElement {
                   ?disabled=${this._busy}
                   @input=${(e: Event) => {
                     this._friendlyName = (e.target as HTMLInputElement).value;
-                  }}
-                  @keydown=${(e: KeyboardEvent) => {
-                    if (e.key === "Enter" && canSubmit) this._submit();
                   }}
                 />
               </div>
@@ -410,6 +412,7 @@ export class ESPHomeAdoptDialog extends LitElement {
   }
 
   private _submit = async () => {
+    if (this._busy) return; // Enter bypasses the disabled button; guard re-entry
     if (!this._device || !this._api) return;
     const name = this._name.trim();
     const friendlyName = this._friendlyName.trim();

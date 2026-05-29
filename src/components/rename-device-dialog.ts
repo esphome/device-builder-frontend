@@ -6,6 +6,7 @@ import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
+import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -129,15 +130,23 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     `,
   ];
 
+  // Enter confirms; _confirm self-guards on unchanged / invalid.
+  private _enter = new EnterController(this, () => this._confirm());
+
   open(name: string) {
     this.deviceName = name;
     this._value = name;
     this._dialog.open = true;
+    this._enter.set(true);
   }
 
   close() {
     this._dialog.open = false;
   }
+
+  private _onAfterHide = (): void => {
+    this._enter.set(false);
+  };
 
   protected render() {
     const trimmed = this._value.trim();
@@ -151,7 +160,11 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     const canSubmit = !unchanged && !err;
 
     return html`
-      <wa-dialog label=${this._localize("dashboard.action_rename_title")} light-dismiss>
+      <wa-dialog
+        label=${this._localize("dashboard.action_rename_title")}
+        light-dismiss
+        @wa-after-hide=${this._onAfterHide}
+      >
         <div class="field">
           <label>${this._localize("dashboard.action_rename_label")}</label>
           <input
@@ -160,9 +173,6 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
             .value=${this._value}
             @input=${(e: Event) => {
               this._value = (e.target as HTMLInputElement).value;
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" && canSubmit) this._confirm();
             }}
           />
           ${err

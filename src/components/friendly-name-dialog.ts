@@ -1,10 +1,11 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/checkbox/checkbox.js";
@@ -158,6 +159,13 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
     `,
   ];
 
+  // Enter confirms; _confirm self-guards on empty / unchanged.
+  private _enter = new EnterController(this, () => this._confirm());
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("_open")) this._enter.set(this._open);
+  }
+
   open(deviceName: string, currentFriendlyName: string) {
     this.deviceName = deviceName;
     this.currentFriendlyName = currentFriendlyName;
@@ -209,9 +217,6 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
             placeholder=${this.currentFriendlyName || this.deviceName}
             @input=${(e: Event) => {
               this._value = (e.target as HTMLInputElement).value;
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" && canSubmit) this._confirm();
             }}
           />
           ${err
