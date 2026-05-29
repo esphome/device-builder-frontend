@@ -30,5 +30,11 @@ import { withBase } from "./util/base-path.js";
 const favicon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
 if (favicon) favicon.href = withBase("/assets/logo/esphome.svg");
 
+import { installWaComboboxLeakFix } from "./util/wa-combobox-leak-fix.js";
+
+// Register the wa-combobox stub before any wa-select / wa-option renders
+// so webawesome's never-resolving whenDefined promise can't leak (#1031).
+installWaComboboxLeakFix();
+
 import "./components/app-shell.js";
 import "./styles/apply-theme.js";
