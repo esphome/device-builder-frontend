@@ -319,6 +319,7 @@ export class ESPHomePageDashboard extends LitElement {
     // state that would otherwise flash through on first paint.
     this._hydrateFromUrl();
     this.setAttribute("view", this._view);
+    this.toggleAttribute("yaml", this._yamlMode);
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
@@ -432,6 +433,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected willUpdate(changed: PropertyValues) {
     if (changed.has("_view")) this.setAttribute("view", this._view);
+    if (changed.has("_yamlMode")) this.toggleAttribute("yaml", this._yamlMode);
     // ``has-discovered`` is the hook that adds top padding for the
     // discovery banner. Track the same condition the banner renders
     // under so an all-ignored / hide-ignored state doesn't leave

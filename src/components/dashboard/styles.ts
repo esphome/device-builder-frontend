@@ -27,14 +27,13 @@ export const dashboardStyles = css`
     --select-bar-height: 64px;
   }
 
-  :host([view="cards"]) {
+  /* YAML mode renders over any underlying view, so it shares this
+     scroll override; without it, YAML search opened from table view
+     clips its hit list. Padding clears the fixed, opaque footer. */
+  :host([view="cards"]),
+  :host([yaml]) {
     height: auto;
     overflow: visible;
-    /* Body scrolls in cards view (incl. YAML mode), and the layout
-       footer is fixed and opaque — without this padding the trailing
-       row of yaml-hits / banner content can sit behind the version
-       line. The configured device grid has its own --fab-clearance,
-       so this only matters for the YAML / discovered content paths. */
     padding-bottom: var(--esphome-footer-height);
   }
 
