@@ -219,8 +219,8 @@ function renderShowLogsAfterInstallToggle(
   return renderToolbarToggle(host, {
     active: host._showLogsAfterInstall,
     onClick: host._toggleShowLogsAfterInstall,
-    iconActive: "console",
-    iconInactive: "console",
+    iconActive: "text-box-outline",
+    iconInactive: "text-box-outline",
     // Single label both ways — checkbox-style toggle, is-active carries on/off.
     labelKeyActive: "command.show_logs_after_install",
     labelKeyInactive: "command.show_logs_after_install",
@@ -277,7 +277,7 @@ function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof noth
       // the toolbar toggle "stayed on".
       return host._commandType === "install"
         ? html`<button class="term-btn term-btn--ghost" @click=${host._flipToLogs}>
-              <wa-icon library="mdi" name="console"></wa-icon>
+              <wa-icon library="mdi" name="text-box-outline"></wa-icon>
               ${host._localize("command.show_logs")}
             </button>
             <button class="term-btn term-btn--ghost" @click=${host.close}>

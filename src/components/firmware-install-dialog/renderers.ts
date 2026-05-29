@@ -244,7 +244,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
               aria-pressed=${host._showLogsAfterInstall ? "true" : "false"}
               title=${host._localize("command.show_logs_after_install_tooltip")}
             >
-              <wa-icon library="mdi" name="console"></wa-icon>
+              <wa-icon library="mdi" name="text-box-outline"></wa-icon>
               ${host._localize("command.show_logs_after_install")}
             </button>`
           : nothing}
@@ -290,7 +290,7 @@ export function renderFooter(host: ESPHomeFirmwareInstallDialog): TemplateResult
     <div class="footer">
       ${canShowLogs
         ? html`<button class="btn btn--primary" @click=${host._showLogsAgain}>
-              <wa-icon library="mdi" name="console"></wa-icon>
+              <wa-icon library="mdi" name="text-box-outline"></wa-icon>
               ${host._localize("command.show_logs")}
             </button>
             <button class="btn btn--ghost" @click=${host._close}>

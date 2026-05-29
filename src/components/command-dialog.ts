@@ -3,7 +3,7 @@ import {
   mdiAlertCircle,
   mdiCheckCircle,
   mdiClose,
-  mdiConsole,
+  mdiTextBoxOutline,
   mdiDownload,
   mdiKey,
   mdiKeyOutline,
@@ -60,7 +60,7 @@ import "./ansi-log.js";
 
 registerMdiIcons({
   close: mdiClose,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   download: mdiDownload,
   key: mdiKey,
   "key-outline": mdiKeyOutline,

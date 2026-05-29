@@ -4,7 +4,7 @@ import {
   mdiBroom,
   mdiCheckboxMultipleBlankOutline,
   mdiCheckDecagram,
-  mdiConsole,
+  mdiTextBoxOutline,
   mdiContentDuplicate,
   mdiDelete,
   mdiDownload,
@@ -33,7 +33,7 @@ registerMdiIcons({
   broom: mdiBroom,
   "checkbox-multiple-blank-outline": mdiCheckboxMultipleBlankOutline,
   "check-decagram": mdiCheckDecagram,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   "content-duplicate": mdiContentDuplicate,
   delete: mdiDelete,
   download: mdiDownload,
@@ -236,7 +236,7 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.action_install")}
         </div>
         <div class="menu-item menu-item--logs" @click=${() => this._emit("open-logs")}>
-          <wa-icon library="mdi" name="console"></wa-icon>
+          <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
         </div>
         ${this._renderVisitWebUi()}

@@ -7,7 +7,7 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
-  mdiConsole,
+  mdiTextBoxOutline,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
@@ -46,7 +46,7 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
 });
 
 export type InstallStep =

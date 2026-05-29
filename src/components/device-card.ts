@@ -6,7 +6,7 @@ import {
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
   mdiCloseCircle,
-  mdiConsole,
+  mdiTextBoxOutline,
   mdiDotsVertical,
   mdiHelpNetworkOutline,
   mdiLock,
@@ -44,7 +44,7 @@ registerMdiIcons({
   "checkbox-blank-outline": mdiCheckboxBlankOutline,
   "checkbox-marked": mdiCheckboxMarked,
   "close-circle": mdiCloseCircle,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   "dots-vertical": mdiDotsVertical,
   "check-network-outline": mdiCheckNetworkOutline,
   "help-network-outline": mdiHelpNetworkOutline,
@@ -207,7 +207,7 @@ export class ESPHomeDeviceCard extends LitElement {
                   aria-label=${this._localize("dashboard.drawer_logs")}
                   title=${this._localize("dashboard.drawer_logs")}
                 >
-                  <wa-icon library="mdi" name="console"></wa-icon>
+                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
                 </button>
                 ${this.webUrl
                   ? html`<a

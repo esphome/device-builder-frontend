@@ -339,7 +339,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             title=${localize("dashboard.table_action_logs")}
             @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
           >
-            <wa-icon library="mdi" name="console"></wa-icon>
+            <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           </button>
           ${showVisit
             ? html`<a
