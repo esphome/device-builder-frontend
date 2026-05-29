@@ -1,10 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * Behavioral tests for EnterController: it fires onEnter on a plain Enter
- * press while active, and stays out of the way for modifiers, IME
- * composition, already-handled events, and focus on elements that act on
- * Enter themselves (button/link/textarea/select/contenteditable).
+ * Pins EnterController: fires on a plain Enter, stays out of the way for
+ * modifiers, IME, already-handled events, and self-handling focus targets.
  */
 import type { ReactiveControllerHost } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";

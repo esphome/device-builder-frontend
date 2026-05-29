@@ -6,23 +6,14 @@ export interface EnterControllerOptions {
   target?: EventTarget;
 }
 
-// Elements that act on Enter themselves. When focus sits on one of these
-// we leave Enter alone: a focused button/link activates natively (so the
-// controller mustn't also fire the primary action and double-act), and a
-// textarea / select / editable region needs Enter for its own input.
+// Focus on one of these means Enter is already spoken for: a button/link
+// activates natively, a textarea/select needs Enter for its own input.
 const SELF_HANDLING = new Set(["BUTTON", "A", "TEXTAREA", "SELECT"]);
 
 /**
- * Reactive controller that runs ``onEnter`` when the user presses Enter
- * while the controller is "active". Dialogs call ``set(open)`` so the
- * listener attaches on open and detaches on close — the shared
- * counterpart to :class:`EscapeController` for confirming a dialog from
- * the keyboard instead of duplicating a keydown handler per dialog.
- *
- * Enter is ignored when a modifier is held, while an IME composition is
- * in flight, when a deeper handler already claimed it (``defaultPrevented``),
- * or when focus is on an element that handles Enter itself (button, link,
- * textarea, select, contenteditable). The callback receives the raw event.
+ * Runs ``onEnter`` on a plain Enter while active — the keyboard counterpart
+ * to :class:`EscapeController`, so dialogs confirm without duplicating a
+ * keydown handler. Toggle with ``set(open)``.
  */
 export class EnterController implements ReactiveController {
   private _bound = false;
@@ -58,15 +49,10 @@ export class EnterController implements ReactiveController {
     if (ke.key !== "Enter") return;
     if (ke.isComposing || ke.keyCode === 229) return; // mid-IME composition
     if (ke.ctrlKey || ke.metaKey || ke.altKey || ke.shiftKey) return;
-    // Like EscapeController, this assumes a single active modal: each open
-    // dialog binds its own window listener, so two simultaneously-open
-    // dialogs would both fire. The defaultPrevented guard lets an onEnter
-    // callback stop a co-active controller by preventing the event; today
-    // only one of these dialogs is ever open at a time (accept-peer wraps
-    // confirm-dialog, so only the inner controller is active).
+    // Assumes one active modal (like EscapeController); an onEnter may
+    // preventDefault to stop a co-active controller.
     if (ke.defaultPrevented) return;
-    // composedPath()[0] pierces shadow DOM to the real focused element,
-    // which document.activeElement can't see across roots.
+    // composedPath()[0] is the real focused element across shadow roots.
     const el = ke.composedPath()[0] as HTMLElement | undefined;
     if (el) {
       if (SELF_HANDLING.has(el.tagName)) return;

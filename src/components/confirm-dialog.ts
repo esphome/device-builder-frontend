@@ -112,8 +112,7 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   private _decided = false;
 
-  // Enter confirms, but never a destructive prompt — a stray Enter must
-  // not delete. Cancel stays on Escape / the Cancel button.
+  // Enter confirms, but never a destructive prompt (a stray Enter must not delete).
   private _enter = new EnterController(this, () => {
     if (!this.destructive) this._confirm();
   });

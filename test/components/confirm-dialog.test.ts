@@ -1,9 +1,7 @@
 /**
  * @vitest-environment happy-dom
  *
- * Behavioral proof for issue #1035 on the most-used dialog: ENTER confirms
- * a non-destructive confirm-dialog, but never a destructive one (a stray
- * ENTER must not delete).
+ * Pins that Enter confirms a non-destructive confirm-dialog, never a destructive one.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

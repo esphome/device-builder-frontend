@@ -94,10 +94,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._exitedExplicitly = false;
     this._dialog.open = true;
     this._enter.set(true);
-    // Focus the SSID field once the dialog has rendered. The attribute-based
-    // autofocus isn't reliable for a shadow-DOM input revealed by toggling
-    // ``open`` after first paint, so focus explicitly (matching
-    // edit-pairing-endpoint-dialog).
+    // autofocus is unreliable for a shadow-DOM input shown after first paint.
     void this.updateComplete.then(() => this._ssidInput?.focus());
   }
 

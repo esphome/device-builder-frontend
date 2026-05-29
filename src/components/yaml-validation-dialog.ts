@@ -103,8 +103,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   private _resolvedExit: "goto" | "save-anyway" | null = null;
 
-  // Enter jumps to the first error (the recommended fix), never the
-  // force-save path; no-op when there's no located error line.
+  // Enter goes to the first error (the safe path), never force-save.
   private _enter = new EnterController(this, () => {
     if (this.firstErrorLine > 0) this._goto();
   });
