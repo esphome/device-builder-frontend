@@ -7,6 +7,7 @@ import { localizeContext } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -111,9 +112,16 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   private _decided = false;
 
+  // Enter confirms, but never a destructive prompt — a stray Enter must
+  // not delete. Cancel stays on Escape / the Cancel button.
+  private _enter = new EnterController(this, () => {
+    if (!this.destructive) this._confirm();
+  });
+
   open() {
     this._decided = false;
     this._dialog.open = true;
+    this._enter.set(true);
   }
 
   close() {
@@ -174,6 +182,7 @@ export class ESPHomeConfirmDialog extends LitElement {
   }
 
   private _onAfterHide() {
+    this._enter.set(false);
     if (!this._decided) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
     }

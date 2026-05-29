@@ -7,6 +7,7 @@ import { localizeContext } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -102,9 +103,16 @@ export class ESPHomeYamlValidationDialog extends LitElement {
 
   private _resolvedExit: "goto" | "save-anyway" | null = null;
 
+  // Enter jumps to the first error (the recommended fix), never the
+  // force-save path; no-op when there's no located error line.
+  private _enter = new EnterController(this, () => {
+    if (this.firstErrorLine > 0) this._goto();
+  });
+
   open() {
     this._resolvedExit = null;
     this._dialog.open = true;
+    this._enter.set(true);
   }
 
   close() {
@@ -171,6 +179,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
   }
 
   private _onAfterHide() {
+    this._enter.set(false);
     if (this._resolvedExit === null) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
     }

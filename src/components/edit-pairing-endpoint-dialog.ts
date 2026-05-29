@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html, nothing } from "lit";
+import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 
 import { APIError } from "../api/api-error.js";
@@ -9,6 +9,7 @@ import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import {
   normalizeHostnameForCompare,
   parsePortInput,
@@ -69,6 +70,15 @@ export class ESPHomeEditPairingEndpointDialog extends LitElement {
   @state() private _errorMessage = "";
 
   @query("input[name='hostname']") private _hostInput?: HTMLInputElement;
+
+  // Enter saves while the dialog is open; mirrors the Save button's guard.
+  private _enter = new EnterController(this, () => {
+    if (!this._saveDisabled()) void this._onSave();
+  });
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("_open")) this._enter.set(this._open);
+  }
 
   /** Open the dialog targeting *pairing*. Hostname / port
    *  inputs pre-fill with the row's current coords; the user

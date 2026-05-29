@@ -10,6 +10,7 @@ import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import { type PasswordInputValueChange } from "./device/password-input-event.js";
 
@@ -79,6 +80,9 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
    *  ``onboarding-dismissed-session`` for the same close. */
   private _exitedExplicitly = false;
 
+  // Enter submits; _save() self-guards on a blank SSID / too-short password.
+  private _enter = new EnterController(this, () => this._save());
+
   open() {
     this._ssid = "";
     this._password = "";
@@ -86,6 +90,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
     this._error = null;
     this._exitedExplicitly = false;
     this._dialog.open = true;
+    this._enter.set(true);
   }
 
   close() {
@@ -197,6 +202,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
             <input
               id="onboarding-ssid"
               type="text"
+              autofocus
               .value=${this._ssid}
               maxlength="32"
               placeholder=${this._localize("onboarding.wifi.ssid_placeholder")}
@@ -343,6 +349,7 @@ export class ESPHomeOnboardingWifiDialog extends LitElement {
    * mid-session.
    */
   private _onAfterHide() {
+    this._enter.set(false);
     if (!this._exitedExplicitly) {
       this._dismissForSession();
     }
