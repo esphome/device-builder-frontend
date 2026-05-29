@@ -47,6 +47,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   @state()
   private _step: WizardStep = "method";
 
+  // Drives the step components' Enter listeners: the steps stay mounted in
+  // the wa-dialog while it's merely hidden (light-dismiss / Escape / close),
+  // so they must deactivate on hide, not just on unmount.
+  @state()
+  private _open = false;
+
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
 
@@ -235,6 +241,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._submitting = false;
     this._resetCreateErrors();
     this._dialog.open = true;
+    this._open = true;
   }
 
   /** Clear both error slots so a stale message from a prior
@@ -251,6 +258,13 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   public close() {
     this._dialog.open = false;
   }
+
+  // wa-dialog only hides on light-dismiss / Escape / close; the step
+  // components stay mounted, so flip _open to drop their Enter listeners.
+  private _onHide = (e: Event) => {
+    if (e.target !== this._dialog) return; // ignore bubbled child wa-* hides
+    this._open = false;
+  };
 
   private get _title(): string {
     switch (this._step) {
@@ -270,6 +284,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       <wa-dialog
         class=${this._step === "board" ? "wide" : ""}
         light-dismiss
+        @wa-after-hide=${this._onHide}
         @next-step=${this._onNextStep}
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
@@ -310,9 +325,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       case "setup":
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
+          ?active=${this._open}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
-        return html`<esphome-wizard-step-empty-config></esphome-wizard-step-empty-config>`;
+        return html`<esphome-wizard-step-empty-config
+          ?active=${this._open}
+        ></esphome-wizard-step-empty-config>`;
     }
   }
 

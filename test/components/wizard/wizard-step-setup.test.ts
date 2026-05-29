@@ -13,6 +13,7 @@ async function mount(): Promise<ESPHomeWizardStepSetup> {
   // No secrets file in the test; connectedCallback swallows the rejection.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (el as any)._api = { getConfig: vi.fn().mockRejectedValue(new Error("none")) };
+  el.active = true; // the parent dialog is open
   document.body.appendChild(el);
   await el.updateComplete;
   await Promise.resolve();

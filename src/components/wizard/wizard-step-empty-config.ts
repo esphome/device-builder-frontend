@@ -1,6 +1,6 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
-import { customElement, state } from "lit/decorators.js";
+import { LitElement, css, html, type PropertyValues } from "lit";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -13,6 +13,10 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
+  // Set by the parent dialog; the step stays mounted while the dialog is
+  // hidden, so the Enter listener follows this rather than connectedCallback.
+  @property({ type: Boolean }) active = false;
+
   @state()
   private _name = "";
 
@@ -23,9 +27,8 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
     if (this._name.trim()) this._next();
   });
 
-  connectedCallback() {
-    super.connectedCallback();
-    this._enter.set(true);
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("active")) this._enter.set(this.active);
   }
 
   static styles = [

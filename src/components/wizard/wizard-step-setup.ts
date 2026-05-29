@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types.js";
@@ -21,6 +21,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   @property({ attribute: false })
   public board: BoardCatalogEntry | null = null;
+
+  // Set by the parent dialog; the step stays mounted while the dialog is
+  // hidden, so the Enter listener follows this rather than connectedCallback.
+  @property({ type: Boolean }) active = false;
 
   @state()
   private _stage: "name" | "wifi" = "name";
@@ -55,9 +59,12 @@ export class ESPHomeWizardStepSetup extends LitElement {
     return this._stage === "name" ? !!this._deviceName.trim() : !!this._wifiSsid.trim();
   }
 
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("active")) this._enter.set(this.active);
+  }
+
   async connectedCallback() {
     super.connectedCallback();
-    this._enter.set(true);
     try {
       const yaml = await this._api.getConfig("secrets.yaml");
       const ssid = yaml.match(/^wifi_ssid\s*:\s*["']?(.+?)["']?\s*$/m);
