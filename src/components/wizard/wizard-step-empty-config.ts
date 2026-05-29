@@ -20,8 +20,6 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   @state()
   private _name = "";
 
-  private _done = false;
-
   // Enter finishes setup once a name is entered.
   private _enter = new EnterController(this, () => {
     if (this._name.trim()) this._next();
@@ -136,8 +134,6 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
   }
 
   private _next() {
-    if (this._done) return; // a repeated Enter must not create twice
-    this._done = true;
     this.dispatchEvent(
       new CustomEvent("create-empty-config", {
         detail: { name: this._name },

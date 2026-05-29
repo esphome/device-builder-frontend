@@ -33,7 +33,7 @@ describe("wizard-step-empty-config ENTER", () => {
     expect((onCreate.mock.calls[0][0] as CustomEvent).detail.name).toBe("kitchen");
   });
 
-  it("emits create-empty-config only once on a repeated Enter", async () => {
+  it("re-dispatches on a second Enter (no permanent latch — parent de-dupes / allows retry)", async () => {
     const el = await mount();
     const onCreate = vi.fn();
     el.addEventListener("create-empty-config", onCreate as EventListener);
@@ -43,7 +43,8 @@ describe("wizard-step-empty-config ENTER", () => {
     await el.updateComplete;
     pressEnter();
     pressEnter();
-    expect(onCreate).toHaveBeenCalledTimes(1);
+    // The step must not latch; create de-dupe / retry lives in the parent.
+    expect(onCreate).toHaveBeenCalledTimes(2);
   });
 
   it("ignores Enter once the dialog is no longer active (hidden but still mounted)", async () => {
