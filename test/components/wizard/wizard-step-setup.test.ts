@@ -66,4 +66,43 @@ describe("wizard-step-setup ENTER", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._stage).toBe("name");
   });
+
+  it("a held Enter does not skip the wifi stage (no auto-finish on key-repeat)", async () => {
+    const el = await mount();
+    // SSID-only secrets: the name-stage advance pre-fills the ssid, so the
+    // wifi stage's _canAdvance() is immediately satisfied — the dangerous case.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._secretWifiSsid = "ssid";
+    await setName(el, "kitchen");
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+
+    pressEnter(); // first keydown advances to the wifi stage
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
+
+    pressEnter({ repeat: true }); // the same held key auto-repeats
+    expect(onFinish).not.toHaveBeenCalled(); // must not blow past the review
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
+  });
+
+  it("a fresh Enter on the wifi stage still finishes", async () => {
+    const el = await mount();
+    await setName(el, "kitchen");
+    pressEnter(); // advance to wifi
+    await el.updateComplete; // let the wifi section render before querying it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._stage).toBe("wifi");
+    const input = el.shadowRoot!.querySelector<HTMLInputElement>("#wifi-ssid")!;
+    input.value = "home";
+    input.dispatchEvent(new Event("input"));
+    await el.updateComplete;
+
+    const onFinish = vi.fn();
+    el.addEventListener("finish-setup", onFinish as EventListener);
+    pressEnter(); // a distinct press (repeat=false) finishes
+    expect(onFinish).toHaveBeenCalledTimes(1);
+    expect((onFinish.mock.calls[0][0] as CustomEvent).detail.wifiSsid).toBe("home");
+  });
 });
