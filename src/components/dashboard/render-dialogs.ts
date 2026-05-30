@@ -171,6 +171,9 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     <esphome-bulk-labels-dialog></esphome-bulk-labels-dialog>
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
+    <esphome-download-firmware-dialog
+      @download-binary=${host._onDownloadBinary}
+    ></esphome-download-firmware-dialog>
     <esphome-create-config-dialog></esphome-create-config-dialog>
     <esphome-command-dialog
       @request-show-logs-after-install=${host._onPostInstallShowLogs}

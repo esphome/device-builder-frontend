@@ -117,6 +117,7 @@
     "action_clean_success": "Build files cleaned for \"{name}\"",
     "action_clean_failed": "Failed to clean build files for \"{name}\"",
     "action_download_yaml_failed": "Failed to download YAML for \"{name}\"",
+    "download_select_title": "Choose firmware format",
     "download_no_binaries": "No firmware binaries found for \"{name}\" — compile first",
     "download_firmware_failed": "Failed to download firmware for \"{name}\"",
     "action_rename_title": "Rename device",

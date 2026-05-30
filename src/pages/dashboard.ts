@@ -18,7 +18,7 @@ import toast from "sonner-js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
-import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import type { FirmwareBinary, FirmwareJob } from "../api/types/firmware-jobs.js";
 import { ErrorCode } from "../api/types/protocol.js";
 import type { PairingSummary } from "../api/types/remote-build.js";
 import type { ArchivedDevice } from "../api/types/system.js";
@@ -37,6 +37,7 @@ import {
   deleteArchivedDevice,
   detectAndOpenWizard,
   downloadFirmware,
+  downloadFirmwareBinary,
   fetchApiKey,
   unarchiveDevice,
 } from "../components/dashboard/actions.js";
@@ -120,6 +121,8 @@ import "../components/dashboard/device-table.js";
 import "../components/dashboard/table-row-menu.js";
 import "../components/device-card.js";
 import "../components/discovered-device-card.js";
+import "../components/download-firmware-dialog.js";
+import type { ESPHomeDownloadFirmwareDialog } from "../components/download-firmware-dialog.js";
 import "../components/firmware-install-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-install-dialog.js";
 import "../components/friendly-name-dialog.js";
@@ -246,6 +249,8 @@ export class ESPHomePageDashboard extends LitElement {
   );
 
   @query("esphome-api-key-dialog") _apiKeyDialog!: ESPHomeApiKeyDialog;
+  @query("esphome-download-firmware-dialog")
+  _downloadFirmwareDialog!: ESPHomeDownloadFirmwareDialog;
   @query("esphome-archived-devices-dialog")
   _archivedDialog?: ESPHomeArchivedDevicesDialog;
   @query("esphome-confirm-dialog") _confirmDialog!: ESPHomeConfirmDialog;
@@ -743,7 +748,12 @@ export class ESPHomePageDashboard extends LitElement {
     this._apiKeyDialog.open(key);
   };
   _downloadFirmware = (device: ConfiguredDevice) =>
-    downloadFirmware(device, this._api, this._localize);
+    downloadFirmware(device, this._api, this._localize, (d, binaries) =>
+      this._downloadFirmwareDialog.open(d, binaries)
+    );
+  _onDownloadBinary = (
+    e: CustomEvent<{ device: ConfiguredDevice; binary: FirmwareBinary }>
+  ) => downloadFirmwareBinary(e.detail.device, e.detail.binary, this._api, this._localize);
 
   _toggleDrawerForDevice(device: ConfiguredDevice) {
     if (this._drawerOpen && this._drawerDevice?.configuration === device.configuration) {

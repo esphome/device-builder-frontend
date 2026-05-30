@@ -2,6 +2,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfiguredDevice } from "../../api/types/devices.js";
+import type { FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
@@ -274,18 +275,42 @@ export async function downloadYaml(
 export async function downloadFirmware(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
+  localize: LocalizeFunc,
+  onMultiple?: (device: ConfiguredDevice, binaries: FirmwareBinary[]) => void
+): Promise<void> {
+  const name = device.friendly_name || device.name;
+  let binaries: FirmwareBinary[];
+  try {
+    binaries = await api.firmwareGetBinaries(device.configuration);
+  } catch {
+    toast.error(localize("dashboard.download_firmware_failed", { name }), {
+      richColors: true,
+    });
+    return;
+  }
+  if (binaries.length === 0) {
+    toast.error(localize("dashboard.download_no_binaries", { name }), {
+      richColors: true,
+    });
+    return;
+  }
+  // Platforms like ESP32 expose both a Factory and an OTA binary; let
+  // the user pick rather than silently handing them the first one.
+  if (binaries.length > 1 && onMultiple) {
+    onMultiple(device, binaries);
+    return;
+  }
+  await downloadFirmwareBinary(device, binaries[0], api, localize);
+}
+
+export async function downloadFirmwareBinary(
+  device: ConfiguredDevice,
+  binary: FirmwareBinary,
+  api: ESPHomeAPI,
   localize: LocalizeFunc
 ): Promise<void> {
   const name = device.friendly_name || device.name;
   try {
-    const binaries = await api.firmwareGetBinaries(device.configuration);
-    if (binaries.length === 0) {
-      toast.error(localize("dashboard.download_no_binaries", { name }), {
-        richColors: true,
-      });
-      return;
-    }
-    const binary = binaries[0];
     const result = await api.firmwareDownload(device.configuration, binary.file);
     downloadBase64Binary(result.data, result.filename);
   } catch {
