@@ -55,6 +55,7 @@ import {
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
@@ -70,7 +71,6 @@ import {
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   "arrow-decision-outline": mdiArrowDecisionOutline,
@@ -571,18 +571,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         @value-change=${this._onTriggerParamsValueChange}
       ></esphome-config-entry-form>
       ${hasAdvanced
-        ? html`<div class="advanced-toggle-row">
-            <wa-switch
-              .checked=${this._showAdvanced}
-              @change=${(e: Event) => {
-                this._showAdvanced = (
-                  e.target as HTMLInputElement & { checked: boolean }
-                ).checked;
-              }}
-            >
-              ${this._localize("device.show_advanced")}
-            </wa-switch>
-          </div>`
+        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
+            this._showAdvanced = show;
+          })
         : nothing}
     `;
   }

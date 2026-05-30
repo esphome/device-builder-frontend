@@ -37,8 +37,10 @@ import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
 import { espHomeStyles } from "../../../styles/shared.js";
+import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "./automation-condition-tree.js";
@@ -137,6 +139,11 @@ export class ESPHomeAutomationActionNode extends LitElement {
    * collapse cards manually once a chain gets long.
    */
   @state() private _collapsed = false;
+
+  /** "Show advanced settings" gate for the params form. Mirrors the
+   *  trigger-params and script-editor toggles; advanced optional
+   *  fields (e.g. ``logger.log``'s ``args``) stay hidden until flipped. */
+  @state() private _showAdvanced = false;
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
 
@@ -350,15 +357,25 @@ export class ESPHomeAutomationActionNode extends LitElement {
     if (!def) return nothing;
     if (def.id === "delay") return this._renderDelayParams();
     if (def.config_entries.length === 0) return nothing;
+    // ``allAdvanced`` force-opens the form when there's no non-advanced
+    // field to anchor it; the toggle only appears for the mixed case,
+    // where it's the user's only path to reach fields like ``args``.
+    const allAdvanced = this._defaultShowAdvanced(def);
+    const hasAdvanced = anyAdvancedEntry(def.config_entries);
     return html`<esphome-config-entry-form
-      .entries=${def.config_entries}
-      .values=${this.value.params}
-      .board=${this.board}
-      .yaml=${this.yaml}
-      ?disabled=${this.disabled}
-      ?show-advanced=${this._defaultShowAdvanced(def)}
-      @value-change=${this._onParamChange}
-    ></esphome-config-entry-form>`;
+        .entries=${def.config_entries}
+        .values=${this.value.params}
+        .board=${this.board}
+        .yaml=${this.yaml}
+        ?disabled=${this.disabled}
+        ?show-advanced=${allAdvanced || this._showAdvanced}
+        @value-change=${this._onParamChange}
+      ></esphome-config-entry-form>
+      ${hasAdvanced && !allAdvanced
+        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
+            this._showAdvanced = show;
+          })
+        : nothing}`;
   }
 
   /**

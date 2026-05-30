@@ -47,6 +47,7 @@ import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
@@ -67,7 +68,6 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   delete: mdiDelete,
@@ -451,18 +451,9 @@ export class ESPHomeScriptEditor extends LitElement {
     // gating the Parameters editor.
     const hasAdvanced = anyAdvancedEntry(entries) || this._hasParametersEntry();
     if (!hasAdvanced) return nothing;
-    return html`<div class="advanced-toggle-row">
-      <wa-switch
-        .checked=${this._showAdvanced}
-        @change=${(e: Event) => {
-          this._showAdvanced = (
-            e.target as HTMLInputElement & { checked: boolean }
-          ).checked;
-        }}
-      >
-        ${this._localize("device.show_advanced")}
-      </wa-switch>
-    </div>`;
+    return renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
+      this._showAdvanced = show;
+    });
   }
 
   /** Does the script catalog define a ``parameters`` entry? Used to
