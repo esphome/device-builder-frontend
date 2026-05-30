@@ -130,10 +130,9 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
     `,
   ];
 
-  // One-shot latch: ``close()`` only starts the hide animation, so the
-  // EnterController listener stays live until ``wa-after-hide``. A held
-  // Enter would otherwise re-enter ``_confirm`` during that window and
-  // dispatch ``rename-confirm`` twice. Mirrors confirm-dialog's _decided.
+  // One-shot latch: close() only starts the hide animation, so the
+  // EnterController listener stays live until wa-after-hide; without this a
+  // held Enter re-enters _confirm and dispatches rename-confirm twice.
   private _resolved = false;
 
   // Enter confirms; _confirm self-guards on unchanged / invalid.

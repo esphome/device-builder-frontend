@@ -39,10 +39,6 @@ describe("clone-device-dialog ENTER", () => {
   });
 
   it("fires clone-confirm only once on a repeated Enter", async () => {
-    // close() only starts the hide animation, so the EnterController
-    // listener stays live until wa-after-hide. A held Enter must not
-    // dispatch clone-confirm twice (the second clone collides on the
-    // name and surfaces a failure toast for a clone that succeeded).
     const el = await mount();
     el.open("source");
     await el.updateComplete;
@@ -58,14 +54,10 @@ describe("clone-device-dialog ENTER", () => {
   });
 
   it("keeps Enter reachable after close() until wa-after-hide", async () => {
-    // Proves the repeat window @bdraco questioned: the existing
-    // empty/same/invalid checks are not idempotency guards (they pass
-    // identically on the repeat), and close() only sets open=false to
-    // start the ~150-250ms wa hide animation. The EnterController
-    // listener detaches in _onAfterHide on wa-after-hide, NOT in
-    // close() — so a second Enter still reaches _confirm during the
-    // animation. The _resolved latch is the only thing stopping the
-    // second dispatch here; remove it and this test sees two.
+    // The empty/same/invalid checks are not idempotency guards (they pass
+    // identically on the repeat); the listener detaches in _onAfterHide, not
+    // close(), so the _resolved latch is the only thing stopping a second
+    // dispatch while the dialog is still hiding.
     const el = await mount();
     el.open("source");
     await el.updateComplete;
@@ -75,20 +67,15 @@ describe("clone-device-dialog ENTER", () => {
     input.value = "kitchen";
     input.dispatchEvent(new Event("input"));
     await el.updateComplete;
-    // First Enter confirms and runs close() (open=false) but does not
-    // fire wa-after-hide — i.e. mid hide-animation.
-    pressEnter();
+    pressEnter(); // confirms and runs close(), but wa-after-hide hasn't fired
     const dialog = el.shadowRoot!.querySelector<HTMLElement & { open: boolean }>(
       "wa-dialog"
     )!;
     expect(dialog.open).toBe(false);
-    // Listener still bound: the second Enter reaches _confirm and is
-    // stopped only by the latch.
-    pressEnter();
+    pressEnter(); // listener still bound; stopped only by the latch
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    // wa-after-hide finally unbinds it.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (el as any)._onAfterHide();
+    (el as any)._onAfterHide(); // unbinds the listener
     pressEnter();
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
