@@ -3,7 +3,6 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
-import type { ComponentCatalogEntry } from "./components.js";
 
 // ─── Config Entries ──────────────────────────────────────────
 

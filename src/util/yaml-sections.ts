@@ -399,17 +399,37 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
         eventKey: eventName,
       });
     } else if (ancestry.componentId) {
-      const labelHead = ancestry.parentName || ancestry.componentId;
-      automations.push({
-        key: `automation:component_on:${ancestry.componentId}:${eventName}`,
-        displayLabel: `${labelHead} → ${eventName}`,
-        fromLine,
-        toLine,
-        id: ancestry.componentId,
+      const componentId = ancestry.componentId;
+      const labelHead = ancestry.parentName || componentId;
+      const base = {
+        id: componentId,
         name: ancestry.parentName ?? undefined,
         parentKey: ancestry.parentKey ?? undefined,
         eventKey: eventName,
-      });
+      };
+      // List-shaped trigger (``time.on_time``): one row per cron entry,
+      // keyed with its index so each matches the backend's per-entry
+      // ``ParsedAutomation`` location. Anything else is one row.
+      const entries = _listTriggerEntries(lines, fromLine, toLine);
+      if (entries) {
+        entries.forEach((entry, idx) => {
+          automations.push({
+            ...base,
+            key: `automation:component_on:${componentId}:${eventName}:${idx}`,
+            displayLabel: `${labelHead} → ${eventName} #${idx + 1}`,
+            fromLine: entry.fromLine,
+            toLine: entry.toLine,
+          });
+        });
+      } else {
+        automations.push({
+          ...base,
+          key: `automation:component_on:${componentId}:${eventName}`,
+          displayLabel: `${labelHead} → ${eventName}`,
+          fromLine,
+          toLine,
+        });
+      }
     } else {
       // No clear ancestry — keep the event as the bare display
       // label and emit a non-namespaced key so it doesn't collide
@@ -641,22 +661,81 @@ function _enumerateListItems(
   return out;
 }
 
+/** Keys that mark a ``time.on_time`` list entry — ``then:`` plus the
+ *  cron fields. Used to tell a list-shaped trigger (split one row per
+ *  entry) from a bare action list (one row for the whole handler). */
+const _TRIGGER_ENTRY_KEYS =
+  "then|seconds|minutes|hours|days_of_week|days_of_month|months|at|cron";
+/** A trigger-entry key at the start of a line; group 1 captures its indent. */
+const _TRIGGER_ENTRY_KEY_RE = new RegExp(`^(\\s*)(?:${_TRIGGER_ENTRY_KEYS})\\s*:`);
+/** The same key sitting inline right after a list dash (``- seconds: 0``). */
+const _DASH_TRIGGER_ENTRY_KEY_RE = new RegExp(
+  `^\\s*-\\s+(?:${_TRIGGER_ENTRY_KEYS})\\s*:`
+);
+
+/**
+ * When an ``on_*:`` body is a YAML list of trigger entries (the
+ * ``time.on_time`` shape — each item carries its own cron params and a
+ * ``then:``), return one ``{fromLine, toLine}`` per entry; otherwise
+ * ``null``. A bare action list (``on_press: - switch.toggle: ...``) or
+ * the single-mapping form returns ``null`` so it stays one automation,
+ * matching the backend's list-form discriminator and its un-indexed
+ * ``component_on`` location.
+ */
+function _listTriggerEntries(
+  lines: string[],
+  keyFromLine: number,
+  blockToLine: number
+): Array<{ fromLine: number; toLine: number }> | null {
+  const items = _enumerateListItems(lines, keyFromLine, blockToLine);
+  if (items.length === 0) return null;
+  return items.every((item) => _isTriggerEntry(lines, item)) ? items : null;
+}
+
+/** True when a list item carries ``then:`` or a cron key at its own
+ *  content indent. Pinning to the item's indent keeps a nested
+ *  ``then:`` under an ``if`` action (a bare action list) from counting. */
+function _isTriggerEntry(
+  lines: string[],
+  item: { fromLine: number; toLine: number }
+): boolean {
+  const dashLine = lines[item.fromLine - 1] ?? "";
+  // The first key can sit inline on the dash: ``- seconds: 0``.
+  if (_DASH_TRIGGER_ENTRY_KEY_RE.test(dashLine)) return true;
+  // Otherwise a sibling key at the item's own content indent (``- `` is a
+  // dash plus one space, so two columns in). A deeper match — a ``then:``
+  // nested under an ``if`` action — is not the entry's own key.
+  const contentIndent = _dashIndent(dashLine) + 2;
+  for (let i = item.fromLine; i < item.toLine && i < lines.length; i++) {
+    const m = lines[i].match(_TRIGGER_ENTRY_KEY_RE);
+    if (m && m[1].length === contentIndent) return true;
+  }
+  return false;
+}
+
+/** Leading-whitespace width of a ``- `` list-item dash on *line*
+ *  (0 when the line isn't a dash item). */
+function _dashIndent(line: string): number {
+  return line.match(/^(\s*)-/)?.[1].length ?? 0;
+}
+
 /** Read a leading ``key: value`` line inside a list item — used to
  *  pull the script's ``id:`` for the stable section key. */
 function _readKeyOnLine(lines: string[], fromLine: number, key: string): string | null {
   const target = lines[fromLine - 1];
-  // The script id can be on the same line as the leading dash:
-  // ``- id: my_alarm`` — or on the next non-empty line.
-  const inlineRe = new RegExp(`^\\s*-\\s*${key}:\\s*["']?([^"'\\s]+)["']?`);
-  const m = target.match(inlineRe);
+  // ``<key>: value`` with the value's quotes peeled — shared between the
+  // dash-line form (``- id: my_alarm``) and the indented sibling form.
+  const value = `${key}:\\s*["']?([^"'\\s]+)["']?`;
+  const m = target.match(new RegExp(`^\\s*-\\s*${value}`));
   if (m) return m[1];
-  const dashIndent = target.match(/^(\s*)-/)?.[1].length ?? 0;
+  const dashIndent = _dashIndent(target);
+  const siblingRe = new RegExp(`^\\s+${value}`);
   for (let i = fromLine; i < lines.length; i++) {
     const line = lines[i];
     if (line.trim() === "") continue;
     const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
     if (lineIndent <= dashIndent) break;
-    const kv = line.match(new RegExp(`^\\s+${key}:\\s*["']?([^"'\\s]+)["']?`));
+    const kv = line.match(siblingRe);
     if (kv) return kv[1];
   }
   return null;

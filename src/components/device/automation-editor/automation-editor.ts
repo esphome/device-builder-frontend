@@ -55,6 +55,7 @@ import {
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
@@ -62,6 +63,7 @@ import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
 import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
+import { ParseErrorController } from "./parse-error-controller.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
@@ -70,7 +72,6 @@ import {
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   "arrow-decision-outline": mdiArrowDecisionOutline,
@@ -144,6 +145,9 @@ export class ESPHomeAutomationEditor extends LitElement {
   @state() private _loading = true;
   @state() private _deleting = false;
   @state() private _error = "";
+  /** Renders read-only + blocks auto-apply for a parse-errored
+   *  automation so its empty tree can't overwrite the real YAML. */
+  private readonly _parseError = new ParseErrorController(this);
 
   /** "Show advanced settings" toggle state for the params form.
    *  Mirrors ``device-section-config``'s same-named state but
@@ -342,14 +346,13 @@ export class ESPHomeAutomationEditor extends LitElement {
         this.configuration,
         this.yaml
       );
-      const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
-      if (match) {
-        this.value = match.automation;
-        // Re-pin location so the writer round-trips with the parser's
-        // canonical form (script id matched, light_effect index
-        // resolved against the actual YAML, …).
-        this.location = match.location;
+      // Re-pin location to the parser's canonical form (script id
+      // matched, light_effect index resolved against the actual YAML);
+      // the controller withholds a read-only automation's empty tree.
+      const m = this._parseError.resolve(parsed, this.location);
+      if (m) {
+        this.location = m.location;
+        this.value = m.tree;
       }
     } catch (err) {
       this._error =
@@ -433,6 +436,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         <wa-spinner></wa-spinner>
         ${this._localize("device.loading_automation_catalog")}
       </div>`;
+    }
+    if (this._parseError.active) {
+      return this._parseError.renderPanel(this._localize);
     }
     const automation = this.value ?? emptyAutomationTree();
     const target = this.location;
@@ -571,18 +577,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         @value-change=${this._onTriggerParamsValueChange}
       ></esphome-config-entry-form>
       ${hasAdvanced
-        ? html`<div class="advanced-toggle-row">
-            <wa-switch
-              .checked=${this._showAdvanced}
-              @change=${(e: Event) => {
-                this._showAdvanced = (
-                  e.target as HTMLInputElement & { checked: boolean }
-                ).checked;
-              }}
-            >
-              ${this._localize("device.show_advanced")}
-            </wa-switch>
-          </div>`
+        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
+            this._showAdvanced = show;
+          })
         : nothing}
     `;
   }
@@ -836,6 +833,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     // upserting partially-filled trees if someone instantiates
     // the editor in add-mode directly.
     if (this.addMode) return;
+    if (this._parseError.active) return;
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -853,6 +851,12 @@ export class ESPHomeAutomationEditor extends LitElement {
    */
   private async _autoApply(): Promise<void> {
     if (!this._api || !this.location || !this.value) return;
+    // Read-only: nothing to write, and drop any dirty a pre-error edit
+    // left so the section can't stay stuck dirty with an empty tree.
+    if (this._parseError.active) {
+      this._setDirty(false);
+      return;
+    }
     if (this._applyInFlight) {
       this._applyDirty = true;
       return;

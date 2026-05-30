@@ -5,7 +5,7 @@
  */
 import type { VersionMatchPolicy } from "./event-subscription.js";
 import { JobStatus, JobStream } from "./firmware-jobs.js";
-import type { PairingSummary, PairingWindowState, PeerSummary, RemoteBuildPeer } from "./remote-build.js";
+import type { PairingWindowState, RemoteBuildPeer } from "./remote-build.js";
 
 /**
  * Data payload for the ``remote_build_pair_request_received`` event.

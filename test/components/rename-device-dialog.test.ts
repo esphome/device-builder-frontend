@@ -52,6 +52,42 @@ describe("rename-device-dialog ENTER", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("fires rename-confirm only once on a repeated Enter", async () => {
+    const el = await mount();
+    el.open("oldname");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("rename-confirm", onConfirm as EventListener);
+    await setValue(el, "kitchen");
+    pressEnter();
+    pressEnter();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps Enter reachable after close() until wa-after-hide", async () => {
+    // The unchanged/invalid checks are not idempotency guards (they pass
+    // identically on the repeat); the listener detaches in _onAfterHide, not
+    // close(), so the _resolved latch is the only thing stopping a second
+    // dispatch while the dialog is still hiding.
+    const el = await mount();
+    el.open("oldname");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("rename-confirm", onConfirm as EventListener);
+    await setValue(el, "kitchen");
+    pressEnter(); // confirms and runs close(), but wa-after-hide hasn't fired
+    const dialog = el.shadowRoot!.querySelector<HTMLElement & { open: boolean }>(
+      "wa-dialog"
+    )!;
+    expect(dialog.open).toBe(false);
+    pressEnter(); // listener still bound; stopped only by the latch
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._onAfterHide(); // unbinds the listener
+    pressEnter();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores Enter after the dialog hides", async () => {
     const el = await mount();
     el.open("oldname");

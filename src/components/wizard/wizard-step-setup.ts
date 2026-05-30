@@ -49,7 +49,11 @@ export class ESPHomeWizardStepSetup extends LitElement {
   private _wifiPassword = "";
 
   // Enter advances / finishes the current stage, mirroring the primary button.
-  private _enter = new EnterController(this, () => {
+  // Ignore OS key-repeat so a held Enter can't cross a stage boundary and
+  // auto-finish past the unreviewed wifi screen (the step stays mounted across
+  // stages, so the latch idiom the dialogs use doesn't apply).
+  private _enter = new EnterController(this, (e) => {
+    if (e.repeat) return;
     if (this._canAdvance()) this._onNext();
   });
 

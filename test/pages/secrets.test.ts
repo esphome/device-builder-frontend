@@ -1,12 +1,18 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
 
+import toast from "sonner-js";
+
 import type { ESPHomeAPI } from "../../src/api/index.js";
 import { ESPHomePageSecrets } from "../../src/pages/secrets.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../_lit-template-walker.js";
+
+vi.mock("sonner-js", () => ({
+  default: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
 
 /**
  * Pin the secrets-page data-loss guards: don't render an editor
@@ -133,5 +139,124 @@ describe("esphome-page-secrets save-button disabled state", () => {
     expect(page._saving).toBe(false);
     // Post-success: dirty-check disables (yaml === savedYaml now).
     expect(saveDisabled(page)).toBe(true);
+  });
+});
+
+describe("esphome-page-secrets save toast ordering", () => {
+  test("_save() does not flash a success toast when the backend rejects the write", async () => {
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error("invalid secrets")),
+    } as unknown as ESPHomeAPI;
+
+    await page._save();
+
+    // A real failure surfaces one error toast and no success toast,
+    // and rolls the buffer back so the dirty indicator returns.
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(toast.error).toHaveBeenCalledTimes(1);
+    expect(page._savedYaml).toBe("wifi_password: old\n");
+  });
+
+  test("_save() toasts success and fires secrets-saved only after the write resolves", async () => {
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+    let resolveUpdate!: () => void;
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    page._api = {
+      updateConfig: vi.fn().mockReturnValue(
+        new Promise<void>((r) => {
+          resolveUpdate = r;
+        })
+      ),
+    } as unknown as ESPHomeAPI;
+    const onSaved = vi.fn();
+    window.addEventListener("secrets-saved", onSaved);
+
+    const savePromise = page._save();
+    // The write is still in flight: nothing has been toasted and no
+    // listener notified yet. A deferred promise pins the ordering an
+    // immediately-resolved mock can't — an optimistic toast fired
+    // before the await would show up here and fail the test.
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    resolveUpdate();
+    await savePromise;
+    window.removeEventListener("secrets-saved", onSaved);
+
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  test("_save() treats a WS timeout as success and keeps the buffer", async () => {
+    vi.mocked(toast.success).mockClear();
+    vi.mocked(toast.error).mockClear();
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error("command timed out")),
+    } as unknown as ESPHomeAPI;
+
+    await page._save();
+
+    // A timeout probably still wrote the file: keep the buffer and
+    // show success rather than claiming failure.
+    expect(toast.success).toHaveBeenCalledTimes(1);
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(page._savedYaml).toBe("wifi_password: new\n");
+  });
+
+  test("_save() fires secrets-saved on the timeout-as-success path", async () => {
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error("command timed out")),
+    } as unknown as ESPHomeAPI;
+    const onSaved = vi.fn();
+    window.addEventListener("secrets-saved", onSaved);
+
+    await page._save();
+    window.removeEventListener("secrets-saved", onSaved);
+
+    // A timeout is treated as success, so listeners (onboarding-state
+    // refresh, peer secrets pages) must be notified too; otherwise
+    // the UI claims success while they stay stale.
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  test("_save() does not fire secrets-saved on a real failure", async () => {
+    const page = makePage({
+      _loaded: true,
+      _yaml: "wifi_password: new\n",
+      _savedYaml: "wifi_password: old\n",
+    });
+    page._api = {
+      updateConfig: vi.fn().mockRejectedValue(new Error("invalid secrets")),
+    } as unknown as ESPHomeAPI;
+    const onSaved = vi.fn();
+    window.addEventListener("secrets-saved", onSaved);
+
+    await page._save();
+    window.removeEventListener("secrets-saved", onSaved);
+
+    expect(onSaved).not.toHaveBeenCalled();
   });
 });

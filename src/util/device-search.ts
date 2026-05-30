@@ -28,3 +28,29 @@ export function matchesDeviceName(
     device.configuration.toLowerCase().includes(loweredQuery)
   );
 }
+
+/**
+ * True when *mac* matches *loweredQuery* after stripping ``:`` /
+ * ``-`` / ``.`` from both sides, so a user finds a device by typing
+ * any of ``94:c9:60``, ``94-C9-60`` or the bare ``94c960`` — the
+ * canonical wire form is ``XX:XX:XX:XX:XX:XX`` but users copy-paste
+ * from router admin pages, vendor labels, etc.
+ *
+ * ``loweredQuery`` must already be lower-cased (matching
+ * ``matchesDeviceName``). An empty MAC, or a query that is empty
+ * once separators are stripped, never matches.
+ *
+ * Shared by the table's render-time global filter and the dashboard
+ * select-all scoping helper so the two agree on which rows a MAC
+ * search makes visible — see the module docstring's single-source-
+ * of-truth note.
+ */
+export function matchesMacAddress(
+  mac: string | null | undefined,
+  loweredQuery: string
+): boolean {
+  if (!mac) return false;
+  const strippedQuery = loweredQuery.replace(/[:.-]/g, "");
+  if (!strippedQuery) return false;
+  return mac.toLowerCase().replace(/[:.-]/g, "").includes(strippedQuery);
+}

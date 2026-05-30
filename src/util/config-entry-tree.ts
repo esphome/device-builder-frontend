@@ -8,6 +8,22 @@ import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
 import type { ValidationError } from "./config-validation.js";
 
+/**
+ * Show-advanced state for the action params form. An all-advanced
+ * action (e.g. `delay`) force-opens the form with no toggle; otherwise
+ * the toggle shows and follows the user's choice.
+ */
+export function actionAdvancedState(
+  entries: ConfigEntry[],
+  userShowAdvanced: boolean
+): { showAdvanced: boolean; showToggle: boolean } {
+  const allAdvanced = entries.length > 0 && entries.every((e) => e.advanced);
+  return {
+    showAdvanced: allAdvanced || userShowAdvanced,
+    showToggle: anyAdvancedEntry(entries) && !allAdvanced,
+  };
+}
+
 /** True when `entries` contains any advanced entry, recursively. */
 export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
   for (const entry of entries) {

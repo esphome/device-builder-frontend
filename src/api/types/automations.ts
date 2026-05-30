@@ -138,7 +138,7 @@ export type AutomationCatalogBodyType =
 export type AutomationLocation =
   | { kind: "script"; id: string }
   | { kind: "interval"; index: number }
-  | { kind: "component_on"; component_id: string; trigger: string }
+  | { kind: "component_on"; component_id: string; trigger: string; index?: number }
   | { kind: "device_on"; trigger: string }
   | { kind: "light_effect"; component_id: string; index: number }
   | { kind: "api_action"; action_name: string };
@@ -199,6 +199,10 @@ export interface ParsedAutomation {
    *  safety check and as a read-only fallback when the structured
    *  form is unrecoverable. */
   raw_yaml: string;
+  /** Set when this one automation failed to decompose (unknown
+   *  action / condition id). Siblings still parse; the editor renders
+   *  it read-only so its empty tree can't overwrite the real YAML. */
+  error?: string | null;
 }
 
 /** Splice instruction returned by ``automations/upsert`` and

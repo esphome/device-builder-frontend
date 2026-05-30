@@ -52,6 +52,18 @@ function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
   );
 }
 
+// Same shape for the basic-setup flow (board + WiFi + name).
+function emitFinish(el: ESPHomeCreateConfigDialog, name: string): void {
+  const wd = el.shadowRoot!.querySelector("wa-dialog")!;
+  wd.dispatchEvent(
+    new CustomEvent("finish-setup", {
+      detail: { board: { id: "esp32dev" }, name, wifiSsid: "net", wifiPassword: "pw" },
+      bubbles: true,
+      composed: true,
+    })
+  );
+}
+
 describe("create-config-dialog create de-dupe + retry", () => {
   afterEach(() => {
     document.body.innerHTML = "";
@@ -81,5 +93,42 @@ describe("create-config-dialog create de-dupe + retry", () => {
     await flush();
 
     expect(createDevice).toHaveBeenCalledTimes(2);
+  });
+
+  it("forwards the raw display name so the backend keeps it as friendly_name", async () => {
+    // The wizard must NOT slugify here; the backend derives the
+    // hostname slug and preserves the descriptive name as
+    // esphome.friendly_name (issue #1070).
+    const createDevice = vi
+      .fn()
+      .mockResolvedValue({ configuration: "living-room-2.yaml" });
+    const el = await mount({ createDevice });
+
+    emitCreate(el, "Living Room #2");
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Living Room #2" })
+    );
+  });
+
+  it("forwards the raw display name from the basic-setup flow too", async () => {
+    // Same slugify→raw change as the empty-config flow; the backend
+    // derives the hostname and keeps the descriptive friendly_name.
+    const createDevice = vi
+      .fn()
+      .mockResolvedValue({ configuration: "living-room-2.yaml" });
+    const el = await mount({ createDevice });
+
+    emitFinish(el, "Living Room #2");
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Living Room #2",
+        board_id: "esp32dev",
+        config_type: "basic",
+      })
+    );
   });
 });

@@ -560,6 +560,10 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _startStreaming() {
+    // Don't respawn onto a closed dialog: _toggleShowStates awaits stopStream
+    // before restarting, and a close during that await would otherwise spawn an
+    // orphaned stream with no Stop button. open() sets _open first.
+    if (!this._open) return;
     if (this._streaming) return;
     this._streaming = true;
 

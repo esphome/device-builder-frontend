@@ -128,7 +128,7 @@ export function executeConfirm(
       return;
     }
     case "delete-single":
-      deleteDevice(pending.device, host._api, host._devices, host._localize);
+      void deleteDevice(pending.device, host._api, host._localize);
       return;
     case "delete-archived":
       void host._deleteArchivedDevice(pending.device);

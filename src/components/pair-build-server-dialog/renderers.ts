@@ -7,6 +7,22 @@ import {
 import { formatPinSha256 } from "../../util/pin-format.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
 
+// Emoji icon row + collapsible hex bytes for a SHA-256 pin. Shared by the
+// confirm step (the receiver's fingerprint) and the sent step (this
+// dashboard's own fingerprint) so the two render identically.
+function renderFingerprint(
+  host: ESPHomePairBuildServerDialog,
+  pin: string
+): TemplateResult {
+  return html`
+    <esphome-pin-emoji-grid .pin=${pin}></esphome-pin-emoji-grid>
+    <details class="pin-hex">
+      <summary>${host._localize("settings.pair_build_server_pin_hex_summary")}</summary>
+      <code>${formatPinSha256(pin)}</code>
+    </details>
+  `;
+}
+
 export function renderInputStep(host: ESPHomePairBuildServerDialog): TemplateResult {
   const portValid = parsePortInput(host._port) !== null;
   const canSubmit = !host._busy && host._hostname.trim().length > 0 && portValid;
@@ -92,11 +108,7 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
       <span class="pin-card-label">
         ${host._localize("settings.pair_build_server_pin_label")}
       </span>
-      <esphome-pin-emoji-grid .pin=${host._previewedPin}></esphome-pin-emoji-grid>
-      <details class="pin-hex">
-        <summary>${host._localize("settings.pair_build_server_pin_hex_summary")}</summary>
-        <code>${formatPinSha256(host._previewedPin)}</code>
-      </details>
+      ${renderFingerprint(host, host._previewedPin)}
       <span class="pin-card-target">
         ${host._localize("settings.pair_build_server_target", {
           hostname: trimTrailingDot(host._hostname),
@@ -177,6 +189,7 @@ export function renderConfirmStep(host: ESPHomePairBuildServerDialog): TemplateR
 }
 
 export function renderSentStep(host: ESPHomePairBuildServerDialog): TemplateResult {
+  const identity = host._offloaderIdentity;
   return html`
     <div class="sent-body">
       ${host._localize("settings.pair_build_server_sent_desc", {
@@ -184,6 +197,20 @@ export function renderSentStep(host: ESPHomePairBuildServerDialog): TemplateResu
         port: host._port,
       })}
     </div>
+    ${identity
+      ? html`
+          <div class="pin-card">
+            <span class="pin-card-label">
+              ${host._localize("settings.pair_build_server_sent_dashboard_id_label")}
+            </span>
+            <code>${identity.dashboard_id}</code>
+            <span class="pin-card-label">
+              ${host._localize("settings.pair_build_server_sent_pin_label")}
+            </span>
+            ${renderFingerprint(host, identity.pin_sha256)}
+          </div>
+        `
+      : nothing}
     <div class="actions">
       <button class="btn btn--primary" @click=${host.close}>
         ${host._localize("layout.close")}

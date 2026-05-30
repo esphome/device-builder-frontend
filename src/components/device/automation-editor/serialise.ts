@@ -111,7 +111,9 @@ export function sectionKeyFromLocation(loc: AutomationLocation): string {
     case "device_on":
       return `automation:device_on:${loc.trigger}`;
     case "component_on":
-      return `automation:component_on:${loc.component_id}:${loc.trigger}`;
+      return loc.index === undefined
+        ? `automation:component_on:${loc.component_id}:${loc.trigger}`
+        : `automation:component_on:${loc.component_id}:${loc.trigger}:${loc.index}`;
     case "script":
       return `automation:script:${loc.id}`;
     case "interval":
@@ -176,10 +178,23 @@ export function locationFromSectionKey(key: string): AutomationLocation | null {
   switch (parts[1]) {
     case "device_on":
       return parts[2] ? { kind: "device_on", trigger: parts[2] } : null;
-    case "component_on":
-      return parts.length >= 4
-        ? { kind: "component_on", component_id: parts[2], trigger: parts[3] }
-        : null;
+    case "component_on": {
+      if (parts.length < 4) return null;
+      // A 5th part marks one entry of a list-shaped trigger (time.on_time).
+      // The index is a list position, so only a non-negative integer is valid.
+      if (parts.length >= 5) {
+        const idx = Number(parts[4]);
+        return Number.isInteger(idx) && idx >= 0
+          ? {
+              kind: "component_on",
+              component_id: parts[2],
+              trigger: parts[3],
+              index: idx,
+            }
+          : null;
+      }
+      return { kind: "component_on", component_id: parts[2], trigger: parts[3] };
+    }
     case "script":
       return parts[2] ? { kind: "script", id: parts[2] } : null;
     case "interval": {

@@ -1,11 +1,13 @@
 import { consume } from "@lit/context";
 import { mdiChevronLeft, mdiChevronRight, mdiPageFirst, mdiPageLast } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+
+import { ALL_PAGE_SIZE } from "./pagination.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
@@ -147,54 +149,60 @@ export class ESPHomeTablePagination extends LitElement {
           <div class="page-size">
             <span>${this._localize("dashboard.pagination_rows_per_page")}</span>
             <select @change=${this._onPageSizeChange}>
-              ${[10, 20, 25, 50, 100].map(
+              ${[10, 20, 25, 50, 100, ALL_PAGE_SIZE].map(
                 (size) =>
                   html`<option value=${size} ?selected=${this.pageSize === size}>
-                    ${size}
+                    ${size === ALL_PAGE_SIZE
+                      ? this._localize("dashboard.pagination_all")
+                      : size}
                   </option>`
               )}
             </select>
           </div>
-          <span class="page-info">
-            ${this._localize("dashboard.pagination_page_of", {
-              current: this.pageIndex + 1,
-              total: this.pageCount || 1,
-            })}
-          </span>
-          <div class="buttons">
-            <button
-              class="page-btn"
-              ?disabled=${!this.canPreviousPage}
-              @click=${() => this._emitPageChange(0)}
-              title=${this._localize("dashboard.pagination_first_page")}
-            >
-              <wa-icon library="mdi" name="page-first"></wa-icon>
-            </button>
-            <button
-              class="page-btn"
-              ?disabled=${!this.canPreviousPage}
-              @click=${() => this._emitPageChange(this.pageIndex - 1)}
-              title=${this._localize("dashboard.pagination_previous_page")}
-            >
-              <wa-icon library="mdi" name="chevron-left"></wa-icon>
-            </button>
-            <button
-              class="page-btn"
-              ?disabled=${!this.canNextPage}
-              @click=${() => this._emitPageChange(this.pageIndex + 1)}
-              title=${this._localize("dashboard.pagination_next_page")}
-            >
-              <wa-icon library="mdi" name="chevron-right"></wa-icon>
-            </button>
-            <button
-              class="page-btn"
-              ?disabled=${!this.canNextPage}
-              @click=${() => this._emitPageChange(this.pageCount - 1)}
-              title=${this._localize("dashboard.pagination_last_page")}
-            >
-              <wa-icon library="mdi" name="page-last"></wa-icon>
-            </button>
-          </div>
+          ${this.pageSize === ALL_PAGE_SIZE
+            ? nothing
+            : html`
+                <span class="page-info">
+                  ${this._localize("dashboard.pagination_page_of", {
+                    current: this.pageIndex + 1,
+                    total: this.pageCount || 1,
+                  })}
+                </span>
+                <div class="buttons">
+                  <button
+                    class="page-btn"
+                    ?disabled=${!this.canPreviousPage}
+                    @click=${() => this._emitPageChange(0)}
+                    title=${this._localize("dashboard.pagination_first_page")}
+                  >
+                    <wa-icon library="mdi" name="page-first"></wa-icon>
+                  </button>
+                  <button
+                    class="page-btn"
+                    ?disabled=${!this.canPreviousPage}
+                    @click=${() => this._emitPageChange(this.pageIndex - 1)}
+                    title=${this._localize("dashboard.pagination_previous_page")}
+                  >
+                    <wa-icon library="mdi" name="chevron-left"></wa-icon>
+                  </button>
+                  <button
+                    class="page-btn"
+                    ?disabled=${!this.canNextPage}
+                    @click=${() => this._emitPageChange(this.pageIndex + 1)}
+                    title=${this._localize("dashboard.pagination_next_page")}
+                  >
+                    <wa-icon library="mdi" name="chevron-right"></wa-icon>
+                  </button>
+                  <button
+                    class="page-btn"
+                    ?disabled=${!this.canNextPage}
+                    @click=${() => this._emitPageChange(this.pageCount - 1)}
+                    title=${this._localize("dashboard.pagination_last_page")}
+                  >
+                    <wa-icon library="mdi" name="page-last"></wa-icon>
+                  </button>
+                </div>
+              `}
         </div>
       </div>
     `;

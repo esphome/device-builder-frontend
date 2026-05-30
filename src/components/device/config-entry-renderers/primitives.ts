@@ -13,6 +13,7 @@ import { parseYamlBoolean, YamlRawValue } from "../../../util/yaml-serialize.js"
 import {
   effectiveDisabled,
   fieldKeyAttr,
+  labelFor,
   renderFieldError,
   renderFieldShell,
   renderHelpLink,
@@ -364,6 +365,7 @@ export function renderBooleanField(entry: ConfigEntry, path: string[], ctx: Rend
       <wa-switch
         ?checked=${checked}
         ?disabled=${effectiveDisabled(entry, ctx)}
+        aria-label=${labelFor(entry, ctx)}
         @change=${(e: Event) =>
           ctx.emitChange(
             path,

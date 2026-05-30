@@ -100,4 +100,42 @@ describe("renderBooleanField default-value fallback", () => {
       "checked must be computed from the fallback intermediate, not raw directly"
     ).toBe(false);
   });
+
+  it("gives the ``wa-switch`` an accessible name via ``aria-label``", async () => {
+    // Same node-only source-scan approach as above: the renderer
+    // can't mount without DOM globals, so pin the a11y contract by
+    // inspecting the carved-out function source. The visible label
+    // lives in a sibling ``.field-info`` div with no ``for``/wrapping
+    // association, so the switch has no accessible name unless one is
+    // set explicitly — a screen reader otherwise announces a bare
+    // "switch" with no context (see CLAUDE.md ARIA / a11y).
+    // @ts-ignore — node-only module
+    const fs = await import("node:fs");
+    // @ts-ignore — node-only module
+    const path = await import("node:path");
+    // @ts-ignore — node-only module
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const sourcePath = path.resolve(
+      here,
+      "../../../src/components/device/config-entry-renderers/primitives.ts"
+    );
+    const src = fs.readFileSync(sourcePath, "utf-8");
+
+    const startIdx = src.indexOf("export function renderBooleanField");
+    expect(startIdx).toBeGreaterThan(-1);
+    const nextExportIdx = src.indexOf("export function ", startIdx + 1);
+    const fnSrc = src.slice(startIdx, nextExportIdx > 0 ? nextExportIdx : src.length);
+
+    // The switch must carry an ``aria-label`` derived from the field's
+    // resolved label (``labelFor``), mirroring the proven pattern in
+    // ``nested.ts``. A bare ``aria-label`` constant, or none at all,
+    // would leave the toggle unnamed for assistive tech.
+    expect(
+      /aria-label=\$\{labelFor\(/.test(fnSrc),
+      "the boolean-field wa-switch must set aria-label=${labelFor(...)} " +
+        "so assistive tech announces the field name — the sibling " +
+        "label is not programmatically associated with the switch"
+    ).toBe(true);
+  });
 });

@@ -3,7 +3,7 @@
  *
  * Part of the src/api/types.ts barrel split.
  */
-import type { ConfigEntry, ConfigPrimitive } from "./config-entries.js";
+import type { ConfigPrimitive } from "./config-entries.js";
 import type { PagedResponse } from "./protocol.js";
 
 // ─── Boards ──────────────────────────────────────────────────
