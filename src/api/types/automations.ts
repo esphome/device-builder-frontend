@@ -31,6 +31,9 @@ export interface AutomationTrigger {
    *  components are configured. */
   applies_to: string[];
   is_device_level: boolean;
+  /** True for a component trigger the wizard can stack: it stays
+   *  offerable past the first handler and appends an indexed entry. */
+  repeatable: boolean;
   /** Parameter schema (e.g. ``on_click`` has ``min_length`` /
    *  ``max_length`` time-period fields). */
   config_entries: ConfigEntry[];

@@ -31,6 +31,7 @@ const trigger = (id: string): AutomationTrigger => ({
   docs_url: "",
   applies_to: [],
   is_device_level: true,
+  repeatable: false,
   config_entries: [],
 });
 

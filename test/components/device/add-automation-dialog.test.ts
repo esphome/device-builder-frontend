@@ -133,11 +133,18 @@ const ON_TIME_YAML = `time:
 const timeAvailable = (): AvailableAutomations =>
   ({
     triggers: [
-      { id: "time.on_time", name: "On time", applies_to: ["time"], config_entries: [] },
+      {
+        id: "time.on_time",
+        name: "On time",
+        applies_to: ["time"],
+        repeatable: true,
+        config_entries: [],
+      },
       {
         id: "time.on_time_sync",
         name: "On time sync",
         applies_to: ["time"],
+        repeatable: false,
         config_entries: [],
       },
     ],
