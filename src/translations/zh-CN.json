@@ -223,6 +223,7 @@
     "table_no_results": "未找到结果。",
     "pagination_total": "共 {count} 行",
     "pagination_rows_per_page": "每页行数",
+    "pagination_all": "全部",
     "pagination_page_of": "第 {current} 页，共 {total} 页",
     "pagination_first_page": "第一页",
     "pagination_previous_page": "上一页",

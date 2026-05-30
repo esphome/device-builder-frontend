@@ -134,6 +134,7 @@
     "table_no_results": "Geen resultaten gevonden.",
     "pagination_total": "{count} rij(en) totaal",
     "pagination_rows_per_page": "Rijen per pagina",
+    "pagination_all": "Alle",
     "pagination_page_of": "Pagina {current} van {total}",
     "pagination_first_page": "Eerste pagina",
     "pagination_previous_page": "Vorige pagina",

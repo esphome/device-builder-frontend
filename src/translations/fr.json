@@ -134,6 +134,7 @@
     "table_no_results": "Aucun résultat trouvé.",
     "pagination_total": "{count} ligne(s) au total",
     "pagination_rows_per_page": "Lignes par page",
+    "pagination_all": "Tout",
     "pagination_page_of": "Page {current} sur {total}",
     "pagination_first_page": "Première page",
     "pagination_previous_page": "Page précédente",

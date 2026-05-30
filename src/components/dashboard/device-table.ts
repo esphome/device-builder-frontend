@@ -308,6 +308,12 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Render ───
 
   protected render() {
+    // ``_pageSize === 0`` is the "All" sentinel — show every row on one page.
+    // TanStack can't take 0 (pageCount would be Infinity and the slice empty),
+    // so feed it the row count as the effective page size and pin page 0.
+    const effectivePageSize =
+      this._pageSize === 0 ? Math.max(this._rows.length, 1) : this._pageSize;
+    const effectivePageIndex = this._pageSize === 0 ? 0 : this._pageIndex;
     const table = this._tableController.table({
       data: this._rows,
       columns: this._columns,
@@ -315,7 +321,7 @@ export class ESPHomeDeviceTable extends LitElement {
         sorting: this._sorting,
         columnVisibility: this._columnVisibility,
         globalFilter: this.search,
-        pagination: { pageSize: this._pageSize, pageIndex: this._pageIndex },
+        pagination: { pageSize: effectivePageSize, pageIndex: effectivePageIndex },
       },
       onSortingChange: this._handleSortingChange as any,
       onColumnVisibilityChange: this._handleVisibilityChange as any,
@@ -351,7 +357,7 @@ export class ESPHomeDeviceTable extends LitElement {
         <esphome-table-pagination
           page-index=${pgState.pageIndex}
           page-count=${table.getPageCount()}
-          page-size=${pgState.pageSize}
+          page-size=${this._pageSize}
           total-rows=${table.getFilteredRowModel().rows.length}
           ?can-previous-page=${table.getCanPreviousPage()}
           ?can-next-page=${table.getCanNextPage()}
@@ -360,7 +366,19 @@ export class ESPHomeDeviceTable extends LitElement {
             this._scrollToTop();
           }}
           @page-size-change=${(e: CustomEvent<number>) => {
-            table.setPageSize(e.detail);
+            // Set our controlled state directly rather than
+            // ``table.setPageSize`` — the "All" sentinel (0) would make
+            // TanStack's setter divide by zero deriving the page index.
+            // The state we feed on the next render drives the slice.
+            this._pageSize = e.detail;
+            this._pageIndex = 0;
+            this.dispatchEvent(
+              new CustomEvent("table-page-size-change", {
+                detail: e.detail,
+                bubbles: true,
+                composed: true,
+              })
+            );
             this._scrollToTop();
           }}
         ></esphome-table-pagination>

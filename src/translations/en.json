@@ -223,6 +223,7 @@
     "table_no_results": "No results found.",
     "pagination_total": "{count} row(s) total",
     "pagination_rows_per_page": "Rows per page",
+    "pagination_all": "All",
     "pagination_page_of": "Page {current} of {total}",
     "pagination_first_page": "First page",
     "pagination_previous_page": "Previous page",

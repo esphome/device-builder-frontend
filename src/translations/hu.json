@@ -223,6 +223,7 @@
     "table_no_results": "Nem található eredmény.",
     "pagination_total": "{count} sor összesen",
     "pagination_rows_per_page": "Sorok oldalanként",
+    "pagination_all": "Összes",
     "pagination_page_of": "{current}. oldal / {total}",
     "pagination_first_page": "Első oldal",
     "pagination_previous_page": "Előző oldal",
