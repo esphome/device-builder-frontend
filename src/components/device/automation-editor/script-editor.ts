@@ -53,11 +53,8 @@ import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./callable-params-editor.js";
-import {
-  applyYamlDiff,
-  emptyAutomationTree,
-  sectionKeyFromLocation,
-} from "./serialise.js";
+import { ParseErrorController } from "./parse-error-controller.js";
+import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
 /** ``AutomationLocation`` variant for top-level ``script:`` blocks
  *  — pulled out as a separate type because the script editor only
@@ -114,6 +111,9 @@ export class ESPHomeScriptEditor extends LitElement {
   @state() private _loading = true;
   @state() private _deleting = false;
   @state() private _error = "";
+  /** Renders read-only + blocks auto-apply for a parse-errored
+   *  script so its empty tree can't overwrite the real YAML. */
+  private readonly _parseError = new ParseErrorController(this);
 
   /** Component catalog entry for the ``script`` component, lazily
    *  fetched on mount. Drives the header (name / description /
@@ -275,11 +275,10 @@ export class ESPHomeScriptEditor extends LitElement {
         this.configuration,
         this.yaml
       );
-      const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
-      if (match && match.location.kind === "script") {
-        this.value = match.automation;
-        this.location = match.location;
+      const m = this._parseError.resolve(parsed, this.location, "script");
+      if (m) {
+        this.location = m.location;
+        this.value = m.tree;
       }
     } catch (err) {
       this._error =
@@ -309,6 +308,9 @@ export class ESPHomeScriptEditor extends LitElement {
         <wa-spinner></wa-spinner>
         ${this._localize("device.loading_automation_catalog")}
       </div>`;
+    }
+    if (this._parseError.active) {
+      return this._parseError.renderPanel(this._localize);
     }
     const automation = this.value ?? emptyAutomationTree();
     const devices = this._available?.devices ?? [];
@@ -583,6 +585,7 @@ export class ESPHomeScriptEditor extends LitElement {
    */
   private _scheduleAutoApply() {
     if (this.addMode) return;
+    if (this._parseError.active) return;
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -593,6 +596,12 @@ export class ESPHomeScriptEditor extends LitElement {
 
   private async _autoApply(): Promise<void> {
     if (!this._api || !this.location || !this.value) return;
+    // Read-only: nothing to write, and drop any dirty a pre-error edit
+    // left so the section can't stay stuck dirty with an empty tree.
+    if (this._parseError.active) {
+      this._setDirty(false);
+      return;
+    }
     if (!this.location.id) return; // can't upsert a script with no id
     if (this._applyInFlight) {
       this._applyDirty = true;

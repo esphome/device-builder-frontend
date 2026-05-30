@@ -44,11 +44,8 @@ import { registerMdiIcons } from "../../../util/register-icons.js";
 import "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./callable-params-editor.js";
-import {
-  applyYamlDiff,
-  emptyAutomationTree,
-  sectionKeyFromLocation,
-} from "./serialise.js";
+import { ParseErrorController } from "./parse-error-controller.js";
+import { applyYamlDiff, emptyAutomationTree } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -105,6 +102,9 @@ export class ESPHomeApiActionEditor extends LitElement {
   @state() private _loading = true;
   @state() private _deleting = false;
   @state() private _error = "";
+  /** Renders read-only + blocks auto-apply for a parse-errored
+   *  action so its empty tree can't overwrite the real YAML. */
+  private readonly _parseError = new ParseErrorController(this);
 
   /** Debounce + in-flight machinery for the auto-apply path. Same
    *  shape as ``<esphome-script-editor>`` so the page-level save
@@ -204,6 +204,9 @@ export class ESPHomeApiActionEditor extends LitElement {
         <wa-spinner></wa-spinner>
         ${this._localize("device.loading_automation_catalog")}
       </div>`;
+    }
+    if (this._parseError.active) {
+      return this._parseError.renderPanel(this._localize);
     }
     const automation = this.value ?? emptyAutomationTree();
     const devices = this._available?.devices ?? [];
@@ -337,11 +340,10 @@ export class ESPHomeApiActionEditor extends LitElement {
         this.configuration,
         this.yaml
       );
-      const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
-      if (match && match.location.kind === "api_action") {
-        this.value = match.automation;
-        this.location = match.location;
+      const m = this._parseError.resolve(parsed, this.location, "api_action");
+      if (m) {
+        this.location = m.location;
+        this.value = m.tree;
       }
     } catch (err) {
       this._error =
@@ -421,6 +423,7 @@ export class ESPHomeApiActionEditor extends LitElement {
 
   private _scheduleAutoApply() {
     if (this.addMode) return;
+    if (this._parseError.active) return;
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -431,6 +434,12 @@ export class ESPHomeApiActionEditor extends LitElement {
 
   private async _autoApply(): Promise<void> {
     if (!this._api || !this.location || !this.value) return;
+    // Read-only: nothing to write, and drop any dirty a pre-error edit
+    // left so the section can't stay stuck dirty with an empty tree.
+    if (this._parseError.active) {
+      this._setDirty(false);
+      return;
+    }
     if (!this.location.action_name) return;
     if (this._applyInFlight) {
       this._applyDirty = true;
