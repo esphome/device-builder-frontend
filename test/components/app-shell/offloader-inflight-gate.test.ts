@@ -90,7 +90,11 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
 }
 
 function reconnect(host: StubHost, over: Partial<InitialStateEventData>): void {
-  handleEvent(host as unknown as ESPHomeApp, DeviceEventType.INITIAL_STATE, initialState(over));
+  handleEvent(
+    host as unknown as ESPHomeApp,
+    DeviceEventType.INITIAL_STATE,
+    initialState(over)
+  );
 }
 
 describe("offloader settings in-flight gate", () => {

@@ -89,6 +89,9 @@ export async function onSetRemoteBuildCleanupTtl(
   }
 }
 
+// Optimistic flip with revert-on-failure for the offloader permission
+// toggles. _offloaderSetInFlight gates the INITIAL_STATE reseed in events.ts
+// so a reconnect racing the write can't clobber the optimistic value.
 export async function onSetOffloaderRemoteBuildsEnabled(
   host: ESPHomeApp,
   e: CustomEvent<boolean>
@@ -96,6 +99,7 @@ export async function onSetOffloaderRemoteBuildsEnabled(
   const enabled = e.detail;
   const previous = host._offloaderRemoteBuildsEnabled;
   host._offloaderRemoteBuildsEnabled = enabled;
+  host._offloaderSetInFlight = true;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       remote_builds_enabled: enabled,
@@ -105,6 +109,8 @@ export async function onSetOffloaderRemoteBuildsEnabled(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderSetInFlight = false;
   }
 }
 
@@ -115,6 +121,7 @@ export async function onSetOffloaderPairingEnabled(
   const { pin_sha256, enabled } = e.detail;
   const previous = host._buildOffloadPairings?.get(pin_sha256)?.enabled;
   patchOffloadPairing(host, pin_sha256, { enabled });
+  host._offloaderSetInFlight = true;
   try {
     await host._api.setOffloaderPairingEnabled({ pin_sha256, enabled });
   } catch {
@@ -124,6 +131,8 @@ export async function onSetOffloaderPairingEnabled(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderSetInFlight = false;
   }
 }
 
@@ -134,6 +143,7 @@ export async function onSetOffloaderVersionMatchPolicy(
   const policy = e.detail;
   const previous = host._offloaderVersionMatchPolicy;
   host._offloaderVersionMatchPolicy = policy;
+  host._offloaderSetInFlight = true;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       version_match_policy: policy,
@@ -143,6 +153,8 @@ export async function onSetOffloaderVersionMatchPolicy(
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });
+  } finally {
+    host._offloaderSetInFlight = false;
   }
 }
 

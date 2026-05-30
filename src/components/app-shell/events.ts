@@ -69,7 +69,13 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       host._devicesLoaded = true;
       host._buildServerPeers = peers ?? null;
       host._buildOffloadDiscoveredHosts = seededMap(hosts, (h) => h.name);
-      host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
+      // _offloaderSetInFlight gates the offloader permission state (pairings
+      // enabled-flags, remote_builds_enabled, version_match_policy) so a
+      // reconnect racing an in-flight offloader write can't clobber the
+      // optimistic value with the pre-write server snapshot.
+      if (!host._offloaderSetInFlight) {
+        host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
+      }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
       // remote_jobs: backend snapshot is authoritative for which jobs exist,
       // but merge onto local entries so a reconnect doesn't wipe display fields
@@ -89,10 +95,10 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
-      if (remote_builds_enabled !== undefined) {
+      if (remote_builds_enabled !== undefined && !host._offloaderSetInFlight) {
         host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
       }
-      if (version_match_policy !== undefined) {
+      if (version_match_policy !== undefined && !host._offloaderSetInFlight) {
         host._offloaderVersionMatchPolicy = version_match_policy;
       }
       break;

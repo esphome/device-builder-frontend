@@ -177,6 +177,11 @@ export class ESPHomeApp extends LitElement {
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
+  // Gates the INITIAL_STATE reseed of the offloader permission state
+  // (_offloaderRemoteBuildsEnabled / _offloaderVersionMatchPolicy /
+  // _buildOffloadPairings) so a reconnect racing an in-flight offloader
+  // write can't clobber the optimistic value. Mirrors _remoteBuildSetInFlight.
+  _offloaderSetInFlight = false;
 
   private _router = createRouter(this);
 
