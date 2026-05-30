@@ -753,7 +753,8 @@ export class ESPHomePageDashboard extends LitElement {
     );
   _onDownloadBinary = (
     e: CustomEvent<{ device: ConfiguredDevice; binary: FirmwareBinary }>
-  ) => downloadFirmwareBinary(e.detail.device, e.detail.binary, this._api, this._localize);
+  ) =>
+    downloadFirmwareBinary(e.detail.device, e.detail.binary, this._api, this._localize);
 
   _toggleDrawerForDevice(device: ConfiguredDevice) {
     if (this._drawerOpen && this._drawerDevice?.configuration === device.configuration) {
