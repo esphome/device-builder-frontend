@@ -8,6 +8,27 @@ import type { ConfigEntry } from "../api/types.js";
 import { ConfigEntryType } from "../api/types.js";
 import type { ValidationError } from "./config-validation.js";
 
+/**
+ * Show-advanced decision for the automation action params form.
+ *
+ * When every entry is advanced (the `delay` action, for instance) the
+ * form has no plain field to anchor it, so it's force-opened and the
+ * toggle is suppressed. The mixed case shows the toggle and defers to
+ * the user's `userShowAdvanced` choice — that's the path that makes
+ * advanced fields like `logger.log`'s `args` reachable. With no
+ * advanced entry there's nothing to gate.
+ */
+export function actionAdvancedState(
+  entries: ConfigEntry[],
+  userShowAdvanced: boolean
+): { showAdvanced: boolean; showToggle: boolean } {
+  const allAdvanced = entries.length > 0 && entries.every((e) => e.advanced);
+  return {
+    showAdvanced: allAdvanced || userShowAdvanced,
+    showToggle: anyAdvancedEntry(entries) && !allAdvanced,
+  };
+}
+
 /** True when `entries` contains any advanced entry, recursively. */
 export function anyAdvancedEntry(entries: ConfigEntry[]): boolean {
   for (const entry of entries) {

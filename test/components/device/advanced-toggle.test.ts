@@ -1,34 +1,54 @@
 /**
- * Source-scan test for the shared ``renderAdvancedToggle`` helper —
- * the single home for the advanced-toggle-row markup and the
- * ``device.show_advanced`` label that four form hosts share.
+ * @vitest-environment happy-dom
+ *
+ * Behavior tests for the shared ``renderAdvancedToggle`` helper: the
+ * switch reflects the passed state, shows the localized label, and
+ * reports the new checked value back through ``onChange``.
  */
-import { describe, expect, it } from "vitest";
+import { render } from "lit";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-async function readSource(): Promise<string> {
-  // @ts-ignore — node-only module
-  const fs = await import("node:fs");
-  // @ts-ignore — node-only module
-  const path = await import("node:path");
-  // @ts-ignore — node-only module
-  const url = await import("node:url");
-  const here = path.dirname(url.fileURLToPath(import.meta.url));
-  return fs.readFileSync(
-    path.resolve(here, "../../../src/components/device/advanced-toggle.ts"),
-    "utf-8"
-  );
+vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}));
+
+import type { LocalizeFunc } from "../../../src/common/localize.js";
+import { renderAdvancedToggle } from "../../../src/components/device/advanced-toggle.js";
+
+const localize: LocalizeFunc = (key) =>
+  key === "device.show_advanced" ? "Show advanced settings" : key;
+
+type SwitchEl = HTMLElement & { checked: boolean };
+
+function mount(show: boolean, onChange: (show: boolean) => void): HTMLElement {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  render(renderAdvancedToggle(show, localize, onChange), container);
+  return container;
 }
 
 describe("renderAdvancedToggle", () => {
-  it("renders the advanced-toggle-row switch with the show_advanced label", async () => {
-    const src = await readSource();
-    expect(src).toContain('class="advanced-toggle-row"');
-    expect(src).toContain("<wa-switch");
-    expect(src).toContain('localize("device.show_advanced")');
+  afterEach(() => {
+    document.body.innerHTML = "";
   });
 
-  it("reports the switch state back through the onChange callback", async () => {
-    const src = await readSource();
-    expect(src).toMatch(/onChange\(\s*\(e\.target as[^)]*\)\.checked\s*\)/);
+  it("reflects the show state and renders the localized label", () => {
+    const container = mount(true, () => {});
+    const sw = container.querySelector<SwitchEl>("wa-switch");
+    expect(sw).not.toBeNull();
+    expect(sw!.checked).toBe(true);
+    expect(container.textContent).toContain("Show advanced settings");
+  });
+
+  it("reports the new checked value through onChange on change", () => {
+    const onChange = vi.fn();
+    const container = mount(false, onChange);
+    const sw = container.querySelector<SwitchEl>("wa-switch")!;
+
+    sw.checked = true;
+    sw.dispatchEvent(new Event("change"));
+    expect(onChange).toHaveBeenLastCalledWith(true);
+
+    sw.checked = false;
+    sw.dispatchEvent(new Event("change"));
+    expect(onChange).toHaveBeenLastCalledWith(false);
   });
 });
