@@ -910,6 +910,8 @@
     "pair_build_server_invalid_args": "Le destinataire a refusé la demande : {details}",
     "pair_build_server_sent_title": "Demande d'appairage envoyée",
     "pair_build_server_sent_desc": "Ouvrez Paramètres → Demandes d'appairage sur le tableau de bord destinataire à {hostname}:{port} et cliquez sur Accepter. L'appairage se terminera lorsque l'administrateur l'aura approuvé.",
+    "pair_build_server_sent_dashboard_id_label": "Identifiant du tableau de bord",
+    "pair_build_server_sent_pin_label": "Votre empreinte (le destinataire l'affiche sur son écran Demandes d'appairage)",
     "pair_build_server_sent_toast": "Demande d'appairage envoyée à {hostname}:{port}. En attente de l'acceptation par l'administrateur du destinataire.",
     "pair_build_server_approved_toast": "Appairage avec {hostname}:{port} accepté.",
     "pair_build_server_rejected_toast": "La demande d'appairage avec {hostname}:{port} a été refusée ou supprimée.",

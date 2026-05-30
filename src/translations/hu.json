@@ -962,6 +962,8 @@
     "pair_build_server_invalid_args": "A fogadó elutasította a kérelmet: {details}",
     "pair_build_server_sent_title": "Párosítási kérelem elküldve",
     "pair_build_server_sent_desc": "Nyissa meg a Beállítások → Párosítási kérelmek oldalt a fogadó irányítópultján itt: {hostname}:{port}, és Kattintson az Elfogadás gombra. A párosítás az ottani admin jóváhagyása után fejeződik be.",
+    "pair_build_server_sent_dashboard_id_label": "Irányítópult azonosítója",
+    "pair_build_server_sent_pin_label": "Az Ön ujjlenyomata (a fogadó megjeleníti a Párosítási kérelmek képernyőn)",
     "pair_build_server_sent_toast": "Párosítási kérelem elküldve ide: {hostname}:{port}. Várakozás a fogadó adminisztrátorának elfogadására.",
     "pair_build_server_approved_toast": "Párosítás elfogadva: {hostname}:{port}.",
     "pair_build_server_rejected_toast": "A párosítási kérelem elutasítva vagy eltávolítva: {hostname}:{port}.",

@@ -910,6 +910,8 @@
     "pair_build_server_invalid_args": "De ontvanger heeft het verzoek geweigerd: {details}",
     "pair_build_server_sent_title": "Koppelingsverzoek verzonden",
     "pair_build_server_sent_desc": "Open Instellingen → Koppelingsverzoeken op het dashboard van de ontvanger op {hostname}:{port} en klik op Accepteren. De koppeling wordt voltooid zodra de beheerder daar het verzoek goedkeurt.",
+    "pair_build_server_sent_dashboard_id_label": "Dashboard-ID",
+    "pair_build_server_sent_pin_label": "Jouw vingerafdruk (de ontvanger toont deze op het scherm Koppelingsverzoeken)",
     "pair_build_server_sent_toast": "Koppelingsverzoek verzonden naar {hostname}:{port}. In afwachting van goedkeuring door de beheerder van de ontvanger.",
     "pair_build_server_approved_toast": "Koppeling met {hostname}:{port} geaccepteerd.",
     "pair_build_server_rejected_toast": "Het koppelingsverzoek aan {hostname}:{port} is geweigerd of verwijderd.",

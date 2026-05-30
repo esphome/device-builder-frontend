@@ -970,6 +970,8 @@
     "pair_build_server_invalid_args": "接收端拒绝了请求：{details}",
     "pair_build_server_sent_title": "配对请求已发送",
     "pair_build_server_sent_desc": "请在接收端仪表板 {hostname}:{port} 上打开“设置 → 配对请求”，然后点击“接受”。当那边的管理员批准后，配对才会完成。",
+    "pair_build_server_sent_dashboard_id_label": "仪表板 ID",
+    "pair_build_server_sent_pin_label": "您的指纹（接收端会在其“配对请求”界面中显示）",
     "pair_build_server_sent_toast": "配对请求已发送到 {hostname}:{port}。正在等待接收端管理员接受。",
     "pair_build_server_approved_toast": "与 {hostname}:{port} 的配对已被接受。",
     "pair_build_server_rejected_toast": "发送到 {hostname}:{port} 的配对请求已被拒绝或移除。",
