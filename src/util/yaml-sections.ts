@@ -681,9 +681,7 @@ const _DASH_TRIGGER_ENTRY_KEY_RE = new RegExp(
  *  the block. Mirrors the body-shape discriminator above
  *  (``_TRIGGER_ENTRY_KEYS``) and the backend's per-entry
  *  ``upsert_component_on_entry`` splice path. */
-export const LIST_SHAPED_TRIGGER_IDS: ReadonlySet<string> = new Set([
-  "time.on_time",
-]);
+export const LIST_SHAPED_TRIGGER_IDS: ReadonlySet<string> = new Set(["time.on_time"]);
 
 /**
  * When an ``on_*:`` body is a YAML list of trigger entries (the
