@@ -21,7 +21,7 @@ import {
   mdiDelete,
   mdiPencilOutline,
 } from "@mdi/js";
-import { html, LitElement, nothing } from "lit";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 
 import type {
@@ -144,6 +144,35 @@ export class ESPHomeAutomationActionNode extends LitElement {
   @state() private _showAdvanced = false;
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+
+  /**
+   * Reset the per-row view-state when this element is rebound to a
+   * *different* action.
+   *
+   * The parent ``<esphome-automation-action-list>`` renders rows with
+   * a plain ``actions.map(...)`` (no keyed ``repeat()``), so Lit reuses
+   * each node element by DOM position. Reordering (or deleting) only
+   * swaps the ``.value`` the element is bound to — ``_collapsed`` and
+   * ``_showAdvanced`` are ``@state`` and would otherwise stick to the
+   * slot, leaking the previous action's collapsed / advanced view onto
+   * whichever action lands at that position.
+   *
+   * We key the reset off ``action_id`` rather than object identity:
+   * an in-place param edit re-emits a fresh ``ActionNode`` with the
+   * SAME ``action_id`` every keystroke, and resetting on that would
+   * snap the card shut mid-edit. Different ``action_id`` means a
+   * genuinely different action (reorder, delete-shift, or a type
+   * change via the picker) — show its default expanded / advanced-off
+   * view.
+   */
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (!changed.has("value")) return;
+    const previous = changed.get("value") as ActionNode | undefined;
+    if (previous && previous.action_id !== this.value.action_id) {
+      this._collapsed = false;
+      this._showAdvanced = false;
+    }
+  }
 
   protected render() {
     const def = this.catalog.find((a) => a.id === this.value.action_id);
