@@ -35,18 +35,26 @@ describe("deleteDevice", () => {
   });
 
   it("fires the success toast only after the backend confirms the delete", async () => {
-    let resolved = false;
+    let resolveDelete!: () => void;
     const api = {
-      deleteDevice: vi.fn(async () => {
-        // Success toast must not fire until this resolves.
-        expect(toastSuccess).not.toHaveBeenCalled();
-        resolved = true;
-      }),
+      deleteDevice: vi.fn(
+        () =>
+          new Promise<void>((r) => {
+            resolveDelete = r;
+          })
+      ),
     } as unknown as ESPHomeAPI;
 
-    const ok = await deleteDevice(makeDevice(), api, localize);
+    const pending = deleteDevice(makeDevice(), api, localize);
+    // The delete is still in flight: nothing toasted yet. A deferred
+    // promise pins the ordering an immediately-resolved mock can't —
+    // an optimistic toast fired before the await would show up here
+    // and fail the test.
+    expect(toastSuccess).not.toHaveBeenCalled();
 
-    expect(resolved).toBe(true);
+    resolveDelete();
+    const ok = await pending;
+
     expect(ok).toBe(true);
     expect(toastSuccess).toHaveBeenCalledTimes(1);
     expect(toastError).not.toHaveBeenCalled();
