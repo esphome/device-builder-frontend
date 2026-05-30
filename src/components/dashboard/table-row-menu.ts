@@ -71,15 +71,21 @@ export class ESPHomeTableRowMenu extends LitElement {
 
   /** When true, the menu is being shown for a card view where every
    *  inline action button is always rendered. The duplicate menu items
-   *  (Logs, Visit Web UI) are hidden via CSS so the kebab only carries
-   *  what isn't already on the card. The host attribute drives the CSS
-   *  selector — keep it in sync.
+   *  (Edit, Logs, Visit Web UI) are hidden via CSS so the kebab only
+   *  carries what isn't already on the card. The host attribute drives
+   *  the CSS selector — keep it in sync.
    *
-   *  ``Install`` is intentionally NOT deduped: it always shows in the
-   *  kebab (whether the inline button is "Install", "Update", or
-   *  absent) and opens the install-method dialog where the user picks
-   *  OTA / serial / web-flasher / custom-address. The inline buttons
-   *  are convenience shortcuts; the kebab entry is the consistent
+   *  In table view the kebab carries the *complete* action list
+   *  unconditionally: the Actions column can scroll off the right edge
+   *  when many/wide columns are shown (#1073), so an inline button being
+   *  present at the current viewport width doesn't guarantee it's
+   *  reachable. The kebab opens at the cursor and always is.
+   *
+   *  ``Install`` is intentionally NOT deduped even in card mode: it
+   *  always shows in the kebab (whether the inline button is "Install",
+   *  "Update", or absent) and opens the install-method dialog where the
+   *  user picks OTA / serial / web-flasher / custom-address. The inline
+   *  buttons are convenience shortcuts; the kebab entry is the consistent
    *  entry point that doesn't change shape with device state. */
   @property({ type: Boolean, attribute: "card-mode", reflect: true })
   cardMode = false;
@@ -181,35 +187,25 @@ export class ESPHomeTableRowMenu extends LitElement {
         color: var(--esphome-error);
       }
 
-      /* Dedupe with the inline action buttons. The card always shows
-         every inline action when applicable, so card-mode hides the
-         duplicate kebab entries unconditionally. The table only shows
-         the inline buttons above each priority breakpoint, so for the
-         table the kebab entries hide only above those same widths.
-         Class names match the inline cell-action-btn modifiers so the
-         pairing is obvious at a glance; breakpoints are off-by-one
-         from the inline rules so the transition pixel never has both
-         copies hidden:
-           menu-item--logs                              inline > 920px
-           menu-item--visit-web                         inline > 1024px
+      /* Dedupe with the inline action buttons — card view only. The
+         card always renders Edit / Logs / Visit Web UI inline and never
+         scrolls a column off-screen, so card-mode hides those duplicate
+         kebab entries unconditionally. Class names match the inline
+         action modifiers so the pairing is obvious at a glance.
 
-         The kebab Install entry is intentionally NOT deduped — it
-         always shows as the consistent "open the install-method
-         picker" entry point regardless of whether the inline button
-         is also currently rendering Install / Update. */
+         Table view does NOT dedupe: the Actions column can scroll past
+         the right edge with many/wide columns (#1073), so the kebab is
+         the only position-independent entry point and must carry every
+         action regardless of viewport width.
+
+         The kebab Install entry is intentionally NOT deduped even in
+         card mode — it always shows as the consistent "open the
+         install-method picker" entry point regardless of whether the
+         inline button is also currently rendering Install / Update. */
+      :host([card-mode]) .menu-item--edit,
       :host([card-mode]) .menu-item--logs,
       :host([card-mode]) .menu-item--visit-web {
         display: none;
-      }
-      @media (min-width: 921px) {
-        :host(:not([card-mode])) .menu-item--logs {
-          display: none;
-        }
-      }
-      @media (min-width: 1025px) {
-        :host(:not([card-mode])) .menu-item--visit-web {
-          display: none;
-        }
       }
     `,
   ];
@@ -224,6 +220,13 @@ export class ESPHomeTableRowMenu extends LitElement {
         @contextmenu=${this._preventAndClose}
       ></div>
       <div class="menu" style=${this._initialStyle()}>
+        <div
+          class="menu-item menu-item--edit ${this.busy ? "menu-item--disabled" : ""}"
+          @click=${this.busy ? undefined : () => this._emit("edit-device")}
+        >
+          <wa-icon library="mdi" name="pencil"></wa-icon>
+          ${this._localize("dashboard.table_action_edit")}
+        </div>
         <div class="menu-item" @click=${() => this._emit("validate-device")}>
           <wa-icon library="mdi" name="check-decagram"></wa-icon>
           ${this._localize("dashboard.action_validate")}
