@@ -17,15 +17,12 @@ import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type {
-  AdoptableDevice,
-  ArchivedDevice,
-  ConfiguredDevice,
-  FirmwareJob,
-  Label,
-  PairingSummary,
-} from "../api/types.js";
-import { DashboardView, ErrorCode } from "../api/types.js";
+import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
+import type { ArchivedDevice } from "../api/types/system.js";
+import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   deleteLabel,

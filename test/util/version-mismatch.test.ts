@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PairingSummary } from "../../src/api/types.js";
+import type { PairingSummary } from "../../src/api/types/remote-build.js";
 import {
   classifyNoCompatiblePeerReason,
   classifyVersionMismatch,

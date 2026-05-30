@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
 import {
   parsePinGpio,
   renderPinField,

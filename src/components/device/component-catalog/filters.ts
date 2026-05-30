@@ -1,8 +1,8 @@
+import type { FeaturedBundle } from "../../../api/types/boards.js";
 import {
-  ComponentCategory,
   type ComponentCatalogEntry,
-  type FeaturedBundle,
-} from "../../../api/types.js";
+  ComponentCategory,
+} from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import {
   parseConfiguredPlatforms,

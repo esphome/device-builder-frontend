@@ -11,7 +11,10 @@
  * (loaded from YAML), so it round-trips.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
 import { renderNestedField } from "../../../src/components/device/config-entry-renderers.js";
 import { onEnableToggle } from "../../../src/components/device/config-entry-renderers/nested.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";

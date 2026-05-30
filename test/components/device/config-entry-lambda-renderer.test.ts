@@ -15,7 +15,7 @@
  */
 import type { TemplateResult } from "lit";
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType } from "../../../src/api/types.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderLambdaField } from "../../../src/components/device/config-entry-renderers/lambda.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
 import { findTemplatesByAnchor, isTemplateResult } from "../../_lit-template-walker.js";

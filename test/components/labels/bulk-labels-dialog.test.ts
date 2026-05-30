@@ -3,11 +3,8 @@ import toast from "sonner-js";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import type {
-  BulkActionResult,
-  ConfiguredDevice,
-  Label,
-} from "../../../src/api/types.js";
+import type { ConfiguredDevice, Label } from "../../../src/api/types/devices.js";
+import type { BulkActionResult } from "../../../src/api/types/system.js";
 import { ESPHomeBulkLabelsDialog } from "../../../src/components/labels/bulk-labels-dialog.js";
 import { makeConfiguredDevice } from "../../_make-configured-device.js";
 

@@ -21,8 +21,8 @@
  * locally.
  */
 
-import type { ConfigEntry } from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { isEntryVisible } from "../../util/config-validation.js";
 import { asMappingList, asRecord, isPlainObject } from "../../util/nested-values.js";
 import { YamlRawValue } from "../../util/yaml-serialize.js";

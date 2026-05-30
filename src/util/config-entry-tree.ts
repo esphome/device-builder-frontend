@@ -4,8 +4,8 @@
  * (b) locate the first entry referenced by a validation-error map.
  */
 
-import type { ConfigEntry } from "../api/types.js";
-import { ConfigEntryType } from "../api/types.js";
+import type { ConfigEntry } from "../api/types/config-entries.js";
+import { ConfigEntryType } from "../api/types/config-entries.js";
 import type { ValidationError } from "./config-validation.js";
 
 /**

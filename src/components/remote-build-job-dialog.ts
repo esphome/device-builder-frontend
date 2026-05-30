@@ -4,12 +4,9 @@ import { customElement, state } from "lit/decorators.js";
 
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import {
-  ErrorCode,
-  JobType,
-  type ConfiguredDevice,
-  type RemoteBuildSubmitTarget,
-} from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import { JobType, type RemoteBuildSubmitTarget } from "../api/types/firmware-jobs.js";
+import { ErrorCode } from "../api/types/protocol.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,

@@ -29,7 +29,7 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { Label } from "../../api/types.js";
+import type { Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

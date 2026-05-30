@@ -7,8 +7,8 @@
  * lives at serialisation, never in the user-visible text.
  */
 import { html } from "lit";
-import type { ConfigEntry } from "../../../api/types.js";
-import { isLambdaValue } from "../../../api/types.js";
+import { isLambdaValue } from "../../../api/types/automations.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,

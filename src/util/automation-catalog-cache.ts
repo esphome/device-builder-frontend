@@ -7,7 +7,7 @@ import type {
   Filter,
   LightEffect,
   RegistryCatalogEntry,
-} from "../api/types.js";
+} from "../api/types/automations.js";
 import {
   emptyHydrationResult,
   hydrateEntryConfigEntries,

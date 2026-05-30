@@ -5,7 +5,7 @@
  * annotation; only leaf-shaped types are templatable.
  */
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType } from "../../../src/api/types.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { _isStructuralType } from "../../../src/components/device/config-entry-render-filter.js";
 
 describe("_isStructuralType", () => {

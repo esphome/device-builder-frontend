@@ -18,7 +18,7 @@
  * options/range/etc.) — every callsite that needs a different shape
  * passes the relevant overrides.
  */
-import { ConfigEntryType, type ConfigEntry } from "../api/types.js";
+import { type ConfigEntry, ConfigEntryType } from "../api/types/config-entries.js";
 
 export function makeConfigEntry(overrides: Partial<ConfigEntry> = {}): ConfigEntry {
   return {

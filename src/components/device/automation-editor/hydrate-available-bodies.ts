@@ -4,7 +4,7 @@ import type {
   AutomationCondition,
   AutomationTrigger,
   AvailableAutomations,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
 import {
   emptyHydrationResult,
   hydrateEntryConfigEntries,

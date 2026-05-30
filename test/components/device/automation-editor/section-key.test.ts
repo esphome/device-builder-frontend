@@ -5,7 +5,7 @@
  * automation editor with the right location.
  */
 import { describe, expect, it } from "vitest";
-import type { AutomationLocation } from "../../../../src/api/types.js";
+import type { AutomationLocation } from "../../../../src/api/types/automations.js";
 import {
   locationFromSectionKey,
   sectionKeyFromLocation,

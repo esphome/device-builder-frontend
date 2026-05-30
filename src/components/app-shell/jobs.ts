@@ -1,4 +1,4 @@
-import { JobStatus, JobType, type FirmwareJob } from "../../api/types.js";
+import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import type { ESPHomeApp } from "../app-shell.js";
 

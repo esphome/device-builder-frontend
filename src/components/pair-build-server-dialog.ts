@@ -3,7 +3,7 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/index.js";
-import type { IdentityView, PairingSummary } from "../api/types.js";
+import type { IdentityView, PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,

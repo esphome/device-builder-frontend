@@ -141,7 +141,7 @@ export function parseHexInt(raw: string): string | null {
  * crafted ``__proto__`` key on the source can't trigger
  * prototype mutation on the target.
  */
-import type { ConfigEntry } from "../api/types.js";
+import type { ConfigEntry } from "../api/types/config-entries.js";
 
 export function normalizeHexValues(
   values: Record<string, unknown>,

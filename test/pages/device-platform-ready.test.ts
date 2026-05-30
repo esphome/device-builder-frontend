@@ -30,7 +30,8 @@ vi.mock("../../src/components/device/device-install-controller.js", () => ({
 }));
 
 import type { ESPHomeAPI } from "../../src/api/index.js";
-import type { BoardCatalogEntry, ConfiguredDevice } from "../../src/api/types.js";
+import type { BoardCatalogEntry } from "../../src/api/types/boards.js";
+import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import { ESPHomePageDevice } from "../../src/pages/device.js";
 
 const board = (overrides: Partial<BoardCatalogEntry> = {}): BoardCatalogEntry =>

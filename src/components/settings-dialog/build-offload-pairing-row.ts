@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
 
-import type { PairingSummary } from "../../api/types.js";
+import type { PairingSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import { trimTrailingDot } from "../../util/hostname.js";

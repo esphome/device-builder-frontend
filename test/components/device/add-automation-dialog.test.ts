@@ -19,7 +19,7 @@ vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => (
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import type { AvailableAutomations } from "../../../src/api/types.js";
+import type { AvailableAutomations } from "../../../src/api/types/automations.js";
 import { ESPHomeAddAutomationDialog } from "../../../src/components/device/add-automation-dialog.js";
 
 async function flushPending(times = 5): Promise<void> {

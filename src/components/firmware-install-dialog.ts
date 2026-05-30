@@ -12,7 +12,8 @@ import {
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobSource, type ConfiguredDevice, type FirmwareBinary } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";

@@ -4,7 +4,8 @@ import { customElement, query, state } from "lit/decorators.js";
 
 import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { ErrorCode, type PairingSummary } from "../api/types.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";

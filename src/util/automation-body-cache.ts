@@ -1,5 +1,8 @@
 import type { ESPHomeAPI } from "../api/index.js";
-import type { AutomationCatalogBody, AutomationCatalogBodyType } from "../api/types.js";
+import type {
+  AutomationCatalogBody,
+  AutomationCatalogBodyType,
+} from "../api/types/automations.js";
 import { BatchedCache } from "./batched-cache.js";
 
 /** Session-scoped cache of full automation bodies, keyed by

@@ -10,8 +10,8 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { ConfiguredDevice } from "../../api/types.js";
-import { DeviceState } from "../../api/types.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
+import { DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

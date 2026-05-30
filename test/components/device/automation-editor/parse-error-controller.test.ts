@@ -5,7 +5,10 @@
 import type { ReactiveControllerHost } from "lit";
 import { describe, expect, it, vi } from "vitest";
 
-import type { AutomationLocation, ParsedAutomation } from "../../../../src/api/types.js";
+import type {
+  AutomationLocation,
+  ParsedAutomation,
+} from "../../../../src/api/types/automations.js";
 import { ParseErrorController } from "../../../../src/components/device/automation-editor/parse-error-controller.js";
 
 const fakeHost = (): ReactiveControllerHost =>

@@ -7,8 +7,8 @@ import type {
   AutomationCondition,
   AutomationTrigger,
   AvailableAutomations,
-  ConfigEntry,
-} from "../../../../src/api/types.js";
+} from "../../../../src/api/types/automations.js";
+import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import {
   hydrateAvailableBodies,
   loadAndHydrateAvailable,

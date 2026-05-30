@@ -1,5 +1,5 @@
-import type { FirmwareJob } from "../api/types.js";
-import { JobStatus } from "../api/types.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { JobStatus } from "../api/types/firmware-jobs.js";
 
 /**
  * The set of ``JobStatus`` values the backend treats as terminal —

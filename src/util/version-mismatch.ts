@@ -1,4 +1,4 @@
-import type { PairingSummary, PeerStatus } from "../api/types.js";
+import type { PairingSummary, PeerStatus } from "../api/types/remote-build.js";
 
 /**
  * Compare the local dashboard's bundled ESPHome version against

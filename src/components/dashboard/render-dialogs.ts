@@ -1,6 +1,7 @@
 import { html, type TemplateResult } from "lit";
-import type { ArchivedDevice, ConfiguredDevice, Label } from "../../api/types.js";
-import { DeviceState } from "../../api/types.js";
+import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
+import { DeviceState } from "../../api/types/devices.js";
+import type { ArchivedDevice } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";

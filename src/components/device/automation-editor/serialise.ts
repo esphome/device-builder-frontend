@@ -13,7 +13,7 @@ import type {
   AutomationTree,
   ConditionNode,
   YamlDiff,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
 
 /** Build a fresh empty automation tree (add-mode initial state). */
 export function emptyAutomationTree(): AutomationTree {

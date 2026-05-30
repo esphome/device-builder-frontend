@@ -3,7 +3,8 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { OffloaderPinMismatchAlert, PairingSummary } from "../api/types.js";
+import type { OffloaderPinMismatchAlert } from "../api/types/remote-build-events.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { dialogActionButtonStyles } from "../styles/dialog-action-buttons.js";

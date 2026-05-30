@@ -11,8 +11,6 @@ import { BASE_PATH } from "../util/base-path.js";
 import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
 import { APIError } from "./api-error.js";
 import type {
-  AddComponentResponse,
-  ArchivedDevice,
   AutomationAction,
   AutomationCatalogBody,
   AutomationCatalogBodyType,
@@ -21,46 +19,63 @@ import type {
   AutomationTree,
   AutomationTrigger,
   AvailableAutomations,
-  BoardCatalogEntry,
-  BulkActionResult,
-  CommandMessage,
-  ComponentCatalogEntry,
-  ConfiguredDevice,
-  DetectChipResult,
-  DevicesResponse,
-  EditorValidateResponse,
-  ErrorMessage,
-  EventMessage,
-  EventSubscriptionCallback,
   Filter,
+  LightEffect,
+  ParsedAutomation,
+  YamlDiff,
+} from "./types/automations.js";
+import type { BoardCatalogEntry, PagedBoardsResponse } from "./types/boards.js";
+import type {
+  ComponentCatalogEntry,
+  PagedComponentsResponse,
+} from "./types/components.js";
+import type {
+  AddComponentResponse,
+  ConfiguredDevice,
+  DevicesResponse,
+  Label,
+  UpdateDeviceResponse,
+  WizardResponse,
+  YamlSearchHit,
+} from "./types/devices.js";
+import type { EditorValidateResponse } from "./types/editor.js";
+import type {
+  EventSubscriptionCallback,
+  VersionMatchPolicy,
+} from "./types/event-subscription.js";
+import type {
   FirmwareBinary,
   FirmwareDownload,
   FirmwareJob,
-  IdentityView,
-  Label,
-  LightEffect,
-  OffloaderRemoteBuildSettings,
-  OnboardingState,
-  PagedBoardsResponse,
-  PagedComponentsResponse,
-  PairingSummary,
-  PairingWindowState,
-  ParsedAutomation,
+  RemoteBuildSubmitTarget,
+} from "./types/firmware-jobs.js";
+import type {
+  CommandMessage,
+  ErrorMessage,
+  EventMessage,
+  ResultMessage,
+  ServerInfoMessage,
+} from "./types/protocol.js";
+import type {
   ReachabilityStateEvent,
   ReachabilitySubscription,
+} from "./types/reachability.js";
+import type {
+  IdentityView,
+  OffloaderRemoteBuildSettings,
+  PairingSummary,
+  PairingWindowState,
   RemoteBuildSettings,
-  RemoteBuildSubmitTarget,
-  ResultMessage,
+} from "./types/remote-build.js";
+import type { StreamCallbacks } from "./types/streaming.js";
+import type {
+  ArchivedDevice,
+  BulkActionResult,
+  DetectChipResult,
+  OnboardingState,
   SerialPort,
-  ServerInfoMessage,
-  StreamCallbacks,
-  UpdateDeviceResponse,
   UserPreferences,
-  VersionMatchPolicy,
-  WizardResponse,
-  YamlDiff,
-  YamlSearchHit,
-} from "./types.js";
+} from "./types/system.js";
 
 interface AuthLoginResult {
   token: string;

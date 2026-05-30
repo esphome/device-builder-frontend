@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { JobSource, JobStatus, type FirmwareJob } from "../../api/types.js";
+import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { splitTemplate } from "../../util/template-split.js";

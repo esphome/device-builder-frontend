@@ -1,5 +1,10 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { JobSource, JobStatus, JobType, type FirmwareJob } from "../../api/types.js";
+import {
+  type FirmwareJob,
+  JobSource,
+  JobStatus,
+  JobType,
+} from "../../api/types/firmware-jobs.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import { isTerminalJob as isTerminal } from "../../util/firmware-job-status.js";
 import { formatAbsoluteTime, formatRelativeTime } from "../../util/format-job-time.js";

@@ -13,7 +13,7 @@
  * dependency checks against the user's current configuration.
  */
 
-import { isLambdaValue } from "../api/types.js";
+import { isLambdaValue } from "../api/types/automations.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
 

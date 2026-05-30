@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
-import type { AutomationCatalogBody } from "../../src/api/types.js";
+import type { AutomationCatalogBody } from "../../src/api/types/automations.js";
 import {
   _clearAutomationBodyCache,
   fetchAutomationBody,

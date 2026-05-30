@@ -12,7 +12,7 @@
  * their own template.
  */
 import { css, html, nothing, type CSSResult, type TemplateResult } from "lit";
-import type { Label } from "../api/types.js";
+import type { Label } from "../api/types/devices.js";
 import { labelChipStyleString } from "./label-style.js";
 
 export const labelChipStyles: CSSResult = css`

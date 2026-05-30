@@ -17,7 +17,11 @@ vi.mock("../../src/util/web-serial.js", () => ({
   resetAndDisconnect: vi.fn(),
 }));
 
-import { JobSource, JobStatus, type FirmwareBinary } from "../../src/api/types.js";
+import {
+  type FirmwareBinary,
+  JobSource,
+  JobStatus,
+} from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import {
   downloadSelectedBinary,

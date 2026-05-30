@@ -12,7 +12,7 @@
  * standing up a Lit shadow root.
  */
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../src/api/types.js";
+import { type ConfigEntry, ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 import {

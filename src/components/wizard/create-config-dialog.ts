@@ -4,7 +4,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

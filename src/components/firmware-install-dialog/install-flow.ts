@@ -1,4 +1,4 @@
-import { JobStatus, type FirmwareBinary } from "../../api/types.js";
+import { JobStatus, type FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
 import { downloadBase64Binary } from "../../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";

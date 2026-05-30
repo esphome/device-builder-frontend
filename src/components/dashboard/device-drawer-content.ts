@@ -32,11 +32,11 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type {
-  ConfiguredDevice,
   ReachabilityStateEvent,
   ReachabilitySubscription,
-} from "../../api/types.js";
+} from "../../api/types/reachability.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,

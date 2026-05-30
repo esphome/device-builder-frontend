@@ -12,7 +12,7 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext, yamlDiffButtonContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

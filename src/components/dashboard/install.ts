@@ -1,4 +1,4 @@
-import { DeviceState, type ConfiguredDevice } from "../../api/types.js";
+import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import type { CommandType } from "../command-dialog.js";

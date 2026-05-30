@@ -1,6 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
-import type { ReachabilitySource, ReachabilityStateEvent } from "../../../api/types.js";
+import type {
+  ReachabilitySource,
+  ReachabilityStateEvent,
+} from "../../../api/types/reachability.js";
 import { activeLocale, type LocalizeFunc } from "../../../common/localize.js";
 import {
   ageOf,

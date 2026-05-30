@@ -28,7 +28,7 @@ vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}
 vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
 
 import type { ESPHomeAPI } from "../../../../src/api/index.js";
-import type { AvailableAutomations } from "../../../../src/api/types.js";
+import type { AvailableAutomations } from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
 
 const slimAvailable = (): AvailableAutomations =>

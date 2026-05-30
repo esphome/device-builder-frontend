@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FirmwareJob } from "../../src/api/types.js";
-import { JobSource, JobStatus, JobType } from "../../src/api/types.js";
+import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
+import { JobSource, JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import {
   TERMINAL_JOB_STATUSES,
   isTerminalJob,

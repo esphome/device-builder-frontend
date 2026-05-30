@@ -3,25 +3,20 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
+import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
+import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
+import type { FirmwareJob, RemoteBuildSubmitTarget } from "../api/types/firmware-jobs.js";
+import { JobStatus } from "../api/types/firmware-jobs.js";
+import type { ServerInfoMessage } from "../api/types/protocol.js";
+import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type {
-  AdoptableDevice,
-  ConfiguredDevice,
-  FirmwareJob,
-  Label,
-  OffloaderAlertSnapshotEntry,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
   RemoteBuildPeer,
-  RemoteBuildSubmitTarget,
-  ServerInfoMessage,
-} from "../api/types.js";
-import {
-  CLEANUP_TTL_DEFAULT_SECONDS,
-  JobStatus,
-  Theme,
-  type VersionMatchPolicy,
-} from "../api/types.js";
+} from "../api/types/remote-build.js";
+import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
+import { Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {

@@ -3,7 +3,7 @@
  * header-actions, broken out so it can be unit-tested without
  * dragging in the WebSocket client + Lit lifecycle.
  */
-import { type OnboardingState, OnboardingStepStatus } from "../api/types.js";
+import { type OnboardingState, OnboardingStepStatus } from "../api/types/system.js";
 
 /** True when any onboarding step is data-derived ``pending``.
  *  Drives the ``Set up Wi-Fi…`` kebab entry's visibility. */

@@ -1,5 +1,6 @@
 import { APIError } from "../api/api-error.js";
-import { ErrorCode, type OffloaderPinMismatchAlert } from "../api/types.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { OffloaderPinMismatchAlert } from "../api/types/remote-build-events.js";
 
 /** Args shape of {@link ESPHomeAPI.requestRemoteBuildPair}.
  *  Mirrored locally rather than imported because the API

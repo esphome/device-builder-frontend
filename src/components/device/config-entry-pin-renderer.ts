@@ -6,8 +6,9 @@
  */
 
 import { html, nothing, type TemplateResult } from "lit";
-import type { BoardPin, ConfigEntry } from "../../api/types.js";
-import { PinFeature, PinMode } from "../../api/types.js";
+import type { BoardPin } from "../../api/types/boards.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import {

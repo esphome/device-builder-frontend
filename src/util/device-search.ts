@@ -8,7 +8,7 @@
  * friendly-name priority, accent-stripping) lands in one place.
  */
 
-import type { ConfiguredDevice } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
 
 /**
  * True when *device*'s friendly_name (or name) or configuration

@@ -19,7 +19,10 @@
  * ``TemplateResult``'s interpolated values.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderNestedListField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";

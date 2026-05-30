@@ -1,5 +1,5 @@
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { ComponentCatalogEntry } from "../../api/types.js";
+import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { fetchComponent } from "../../util/component-name-cache.js";
 

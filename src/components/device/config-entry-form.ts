@@ -24,8 +24,9 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";

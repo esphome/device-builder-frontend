@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { EditorValidateResponse } from "../../src/api/types.js";
+import type { EditorValidateResponse } from "../../src/api/types/editor.js";
 import { summarizeValidation } from "../../src/util/yaml-validation-summary.js";
 
 function res(

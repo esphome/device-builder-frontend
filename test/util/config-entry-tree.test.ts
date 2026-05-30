@@ -1,8 +1,8 @@
 /** Unit tests for `actionAdvancedState`. */
 import { describe, expect, it } from "vitest";
 
-import type { ConfigEntry } from "../../src/api/types.js";
-import { ConfigEntryType } from "../../src/api/types.js";
+import type { ConfigEntry } from "../../src/api/types/config-entries.js";
+import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { actionAdvancedState } from "../../src/util/config-entry-tree.js";
 
 function entry(key: string, advanced: boolean): ConfigEntry {

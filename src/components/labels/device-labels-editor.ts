@@ -29,7 +29,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { ConfiguredDevice, Label } from "../../api/types.js";
+import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

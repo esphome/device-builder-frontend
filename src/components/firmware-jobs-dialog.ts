@@ -20,7 +20,8 @@ import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,

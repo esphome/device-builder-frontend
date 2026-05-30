@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { APIError } from "../../src/api/api-error.js";
-import { ErrorCode, type OffloaderPinMismatchAlert } from "../../src/api/types.js";
+import { ErrorCode } from "../../src/api/types/protocol.js";
+import type { OffloaderPinMismatchAlert } from "../../src/api/types/remote-build-events.js";
 import {
   buildReauthPairRequest,
   classifyReauthError,

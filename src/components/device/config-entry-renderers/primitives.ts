@@ -1,7 +1,7 @@
 import { html } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
-import type { ConfigEntry } from "../../../api/types.js";
-import { ConfigEntryType } from "../../../api/types.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import {
   chooseDisplayUnit,
   parseFloatWithUnit,

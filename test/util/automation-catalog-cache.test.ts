@@ -4,10 +4,10 @@ import type {
   AutomationAction,
   AutomationCondition,
   AutomationTrigger,
-  ConfigEntry,
   Filter,
   LightEffect,
-} from "../../src/api/types.js";
+} from "../../src/api/types/automations.js";
+import type { ConfigEntry } from "../../src/api/types/config-entries.js";
 import { _clearAutomationBodyCache } from "../../src/util/automation-body-cache.js";
 import {
   _clearAutomationCatalogCache,

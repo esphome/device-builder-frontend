@@ -2,7 +2,7 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { AdoptableDevice } from "../api/types.js";
+import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";

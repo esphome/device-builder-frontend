@@ -2,8 +2,8 @@ import type { ESPHomeAPI } from "../api/index.js";
 import type {
   AutomationCatalogBody,
   AutomationCatalogBodyType,
-  ConfigEntry,
-} from "../api/types.js";
+} from "../api/types/automations.js";
+import type { ConfigEntry } from "../api/types/config-entries.js";
 import { fetchAutomationBody } from "./automation-body-cache.js";
 
 /** Single source of truth for the per-entry hydration shape. Both

@@ -20,8 +20,9 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { FirmwareJob, Label } from "../api/types.js";
-import { DeviceState } from "../api/types.js";
+import type { Label } from "../api/types/devices.js";
+import { DeviceState } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";

@@ -1,12 +1,12 @@
 import toast from "sonner-js";
+import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
+import type { RemoteBuildSubmitTarget } from "../../api/types/firmware-jobs.js";
 import {
   CLEANUP_TTL_MAX_SECONDS,
   CLEANUP_TTL_MIN_SECONDS,
   type PairingSummary,
-  type RemoteBuildSubmitTarget,
-  type Theme,
-  type VersionMatchPolicy,
-} from "../../api/types.js";
+} from "../../api/types/remote-build.js";
+import type { Theme } from "../../api/types/system.js";
 import {
   clearStoredLocale,
   loadLocalize,

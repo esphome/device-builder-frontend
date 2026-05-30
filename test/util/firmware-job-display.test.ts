@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { ConfiguredDevice, FirmwareJob } from "../../src/api/types.js";
-import { JobSource, JobStatus, JobType } from "../../src/api/types.js";
+import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
+import { JobSource, JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { firmwareJobDisplayName } from "../../src/util/firmware-job-display.js";
 

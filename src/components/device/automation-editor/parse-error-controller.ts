@@ -5,7 +5,7 @@ import type {
   AutomationLocation,
   AutomationTree,
   ParsedAutomation,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { sectionKeyFromLocation } from "./serialise.js";
 

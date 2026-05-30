@@ -14,8 +14,8 @@
  * care about a particular value pass it via *overrides*; the rest
  * fall through.
  */
-import type { ConfiguredDevice } from "../src/api/types.js";
-import { DeviceState } from "../src/api/types.js";
+import type { ConfiguredDevice } from "../src/api/types/devices.js";
+import { DeviceState } from "../src/api/types/devices.js";
 
 const _BASE = {
   name: "kitchen",

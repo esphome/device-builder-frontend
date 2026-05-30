@@ -6,7 +6,7 @@
  */
 
 import { html } from "lit";
-import type { ConfigEntry } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { findReferencedComponents } from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,

@@ -7,7 +7,7 @@ import type {
   FeaturedComponent,
   FieldPreset,
   PagedBoardsResponse,
-} from "../api/types.js";
+} from "../api/types/boards.js";
 
 /**
  * Re-default fields the backend stripped from the wire payload.

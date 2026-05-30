@@ -1,11 +1,8 @@
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type {
-  ArchivedDevice,
-  BoardCatalogEntry,
-  BulkActionResult,
-  ConfiguredDevice,
-} from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
+import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
 import { downloadBase64Binary } from "../../util/download-text.js";

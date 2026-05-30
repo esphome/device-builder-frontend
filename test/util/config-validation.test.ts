@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType } from "../../src/api/types.js";
+import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
   getDeviceNameWarning,
   validateDeviceName,

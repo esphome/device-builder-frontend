@@ -1,5 +1,5 @@
 import { type ReactiveController, type ReactiveControllerHost } from "lit";
-import { DeviceState, type ConfiguredDevice } from "../../api/types.js";
+import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
 import type { CommandType, ESPHomeCommandDialog } from "../command-dialog.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 

@@ -25,7 +25,7 @@
  * attribute order in the renderer source isn't load-bearing.
  */
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType } from "../../../src/api/types.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
 import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
 

@@ -1,5 +1,6 @@
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
-import { JobType } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { JobType } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /**

@@ -36,8 +36,8 @@ vi.mock("@home-assistant/webawesome/dist/components/switch/switch.js", () => ({}
 import type {
   ActionNode,
   AutomationAction,
-  ConfigEntry,
-} from "../../../../src/api/types.js";
+} from "../../../../src/api/types/automations.js";
+import type { ConfigEntry } from "../../../../src/api/types/config-entries.js";
 import { ESPHomeAutomationActionNode } from "../../../../src/components/device/automation-editor/automation-action-node.js";
 
 /** Minimal ConfigEntry; only ``key`` and ``advanced`` are read by the

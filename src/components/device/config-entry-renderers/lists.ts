@@ -1,5 +1,5 @@
 import { html, nothing } from "lit";
-import type { ConfigEntry } from "../../../api/types.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {

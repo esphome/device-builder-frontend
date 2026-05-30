@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { BoardCatalogEntry, PagedBoardsResponse } from "../../src/api/types.js";
+import type {
+  BoardCatalogEntry,
+  PagedBoardsResponse,
+} from "../../src/api/types/boards.js";
 import {
   hydrateBoard,
   hydratePagedBoardsResponse,

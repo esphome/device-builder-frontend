@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { JobSource } from "../../api/types.js";
+import { JobSource } from "../../api/types/firmware-jobs.js";
 import { splitTemplate } from "../../util/template-split.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";

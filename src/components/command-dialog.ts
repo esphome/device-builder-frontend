@@ -16,8 +16,10 @@ import {
 import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice, FirmwareJob, PairingSummary } from "../api/types.js";
-import { JobSource, JobStatus, JobType } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { JobSource, JobStatus, JobType } from "../api/types/firmware-jobs.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { RemoteBuildJobState } from "../context/index.js";
 import {

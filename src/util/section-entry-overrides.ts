@@ -17,7 +17,7 @@
  * to ``this._config.entries``, leaving the section silently empty.
  * ``resolveSectionEntries`` is the seam the test asserts against.
  */
-import { ConfigEntryType, type ConfigEntry } from "../api/types.js";
+import { type ConfigEntry, ConfigEntryType } from "../api/types/config-entries.js";
 import { makeConfigEntry } from "./config-entry-defaults.js";
 
 /** Top-level YAML keys whose entire body is a user-keyed map.

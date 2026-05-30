@@ -14,8 +14,8 @@ import {
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { SerialPort } from "../api/types.js";
-import { DeviceState } from "../api/types.js";
+import { DeviceState } from "../api/types/devices.js";
+import type { SerialPort } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";

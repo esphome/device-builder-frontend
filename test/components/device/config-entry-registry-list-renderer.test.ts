@@ -12,7 +12,8 @@
  * ``renderRegistryListField`` is exercised via the same path.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, type LightEffect } from "../../../src/api/types.js";
+import type { LightEffect } from "../../../src/api/types/automations.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import "../../../src/components/device/config-entry-renderers/registry-list.js";
 import { type ESPHomeRegistryList } from "../../../src/components/device/config-entry-renderers/registry-list.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";

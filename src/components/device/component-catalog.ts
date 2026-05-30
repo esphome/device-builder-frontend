@@ -10,12 +10,9 @@ import {
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type {
-  BoardCatalogEntry,
-  ComponentCatalogEntry,
-  FeaturedBundle,
-} from "../../api/types.js";
-import { ComponentCategory } from "../../api/types.js";
+import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
+import type { ComponentCatalogEntry } from "../../api/types/components.js";
+import { ComponentCategory } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";

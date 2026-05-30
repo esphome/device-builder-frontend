@@ -15,8 +15,9 @@
  * to ``components/device``).
  */
 import { vi } from "vitest";
-import type { BoardCatalogEntry, BoardPin, ConfigEntry } from "../../../src/api/types.js";
-import { ConfigEntryType } from "../../../src/api/types.js";
+import type { BoardCatalogEntry, BoardPin } from "../../../src/api/types/boards.js";
+import type { ConfigEntry } from "../../../src/api/types/config-entries.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {
   extractAttributeBindings,

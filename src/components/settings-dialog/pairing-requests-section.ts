@@ -5,7 +5,8 @@ import toast from "sonner-js";
 
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
-import { ErrorCode, type PairingWindowState, type PeerSummary } from "../../api/types.js";
+import { ErrorCode } from "../../api/types/protocol.js";
+import type { PairingWindowState, PeerSummary } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,

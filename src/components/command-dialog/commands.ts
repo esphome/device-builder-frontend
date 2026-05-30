@@ -1,5 +1,6 @@
 import { APIError } from "../../api/api-error.js";
-import { ErrorCode, JobStatus, type FirmwareJob } from "../../api/types.js";
+import { type FirmwareJob, JobStatus } from "../../api/types/firmware-jobs.js";
+import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";

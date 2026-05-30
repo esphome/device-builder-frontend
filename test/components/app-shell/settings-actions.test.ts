@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { VersionMatchPolicy } from "../../../src/api/types.js";
+import type { VersionMatchPolicy } from "../../../src/api/types/event-subscription.js";
 import type { ESPHomeApp } from "../../../src/components/app-shell.js";
 import { onSetOffloaderVersionMatchPolicy } from "../../../src/components/app-shell/settings-actions.js";
 

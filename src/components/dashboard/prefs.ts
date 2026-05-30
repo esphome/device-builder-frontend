@@ -1,5 +1,5 @@
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
-import { SortDirection } from "../../api/types.js";
+import { SortDirection } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export async function loadPreferences(host: ESPHomePageDashboard): Promise<void> {

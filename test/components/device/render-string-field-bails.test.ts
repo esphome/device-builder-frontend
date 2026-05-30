@@ -8,7 +8,10 @@
  * that string back and clobbered the user's list.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
 import { renderStringField } from "../../../src/components/device/config-entry-renderers-shared.js";
 import {

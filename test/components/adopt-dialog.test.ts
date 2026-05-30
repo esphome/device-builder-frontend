@@ -8,7 +8,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
-import type { AdoptableDevice } from "../../src/api/types.js";
+import type { AdoptableDevice } from "../../src/api/types/devices.js";
 import { ESPHomeAdoptDialog } from "../../src/components/adopt-dialog.js";
 
 const DEVICE = {

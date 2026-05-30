@@ -18,7 +18,7 @@ import {
 } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { ConfiguredDevice } from "../../api/types.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

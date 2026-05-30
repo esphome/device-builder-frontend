@@ -26,7 +26,7 @@ import { repeat } from "lit/directives/repeat.js";
 import memoizeOne from "memoize-one";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { ConfiguredDevice, Label } from "../../api/types.js";
+import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,

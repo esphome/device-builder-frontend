@@ -3,11 +3,8 @@ import { mdiArrowLeft, mdiClose, mdiPackageVariantClosed } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import {
-  type BoardCatalogEntry,
-  type ComponentCatalogEntry,
-  type FeaturedBundle,
-} from "../../api/types.js";
+import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.js";
+import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";

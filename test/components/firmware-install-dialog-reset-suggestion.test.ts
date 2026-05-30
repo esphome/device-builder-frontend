@@ -8,7 +8,7 @@
  * tests drive it through that.
  */
 import { describe, it } from "vitest";
-import { JobSource } from "../../src/api/types.js";
+import { JobSource } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
 import { renderStatus } from "../../src/components/firmware-install-dialog/renderers.js";
 import {

@@ -15,7 +15,7 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
-import type { OffloaderAlertSnapshotEntry } from "../api/types.js";
+import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";

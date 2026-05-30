@@ -18,11 +18,12 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../../api/esphome-api.js";
 import type {
-  ConfigEntry,
   RegistryCatalogEntry,
   RegistryValueType,
-} from "../../../api/types.js";
-import { ConfigEntryType, isLambdaValue } from "../../../api/types.js";
+} from "../../../api/types/automations.js";
+import { isLambdaValue } from "../../../api/types/automations.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../../api/types/config-entries.js";
 import { apiContext } from "../../../context/index.js";
 import {
   fetchFilters,

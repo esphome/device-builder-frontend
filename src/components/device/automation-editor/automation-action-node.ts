@@ -30,9 +30,9 @@ import type {
   AutomationCondition,
   AvailableComponentInstance,
   AvailableScript,
-  BoardCatalogEntry,
   ConditionNode,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
+import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";

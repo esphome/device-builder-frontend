@@ -1,6 +1,6 @@
 import { html, type TemplateResult } from "lit";
 
-import type { OffloaderAlertSnapshotEntry } from "../../api/types.js";
+import type { OffloaderAlertSnapshotEntry } from "../../api/types/remote-build-events.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 
 interface AlertContext {

@@ -1,4 +1,4 @@
-import { CORE_CATEGORIES, type ComponentCategory } from "../../api/types.js";
+import { type ComponentCategory, CORE_CATEGORIES } from "../../api/types/components.js";
 
 /**
  * Decide which categories to *exclude* from the catalog query

@@ -14,7 +14,7 @@
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
-import type { IdentityView } from "../../../src/api/types.js";
+import type { IdentityView } from "../../../src/api/types/remote-build.js";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { renderSentStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
 import {

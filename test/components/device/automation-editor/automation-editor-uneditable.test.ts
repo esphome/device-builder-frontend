@@ -30,7 +30,7 @@ import type {
   AutomationLocation,
   AvailableAutomations,
   ParsedAutomation,
-} from "../../../../src/api/types.js";
+} from "../../../../src/api/types/automations.js";
 import { ESPHomeAutomationEditor } from "../../../../src/components/device/automation-editor/automation-editor.js";
 
 const ON_BOOT: AutomationLocation = {

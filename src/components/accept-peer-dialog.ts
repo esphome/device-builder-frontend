@@ -2,7 +2,7 @@ import { consume } from "@lit/context";
 import { mdiShieldAlertOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { PeerSummary } from "../api/types.js";
+import type { PeerSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { pinHexStyles } from "../styles/pin-hex.js";

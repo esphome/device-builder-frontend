@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 
 import type { ESPHomeAPI } from "../../../src/api/index.js";
-import type { ComponentCatalogEntry } from "../../../src/api/types.js";
+import type { ComponentCatalogEntry } from "../../../src/api/types/components.js";
 import {
   hydrateForSelection,
   type SelectionHost,

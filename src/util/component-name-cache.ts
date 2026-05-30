@@ -1,5 +1,5 @@
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ComponentCatalogEntry } from "../api/types.js";
+import type { ComponentCatalogEntry } from "../api/types/components.js";
 import { BatchedCache } from "./batched-cache.js";
 
 /** Session-scoped cache of component catalog entries, keyed by

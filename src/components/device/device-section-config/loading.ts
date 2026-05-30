@@ -1,4 +1,4 @@
-import type { ConfigEntry } from "../../../api/types.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { fetchComponent } from "../../../util/component-name-cache.js";
 import { normalizeHexValues } from "../../../util/hex-int.js";
 import { parseYamlSectionValues } from "../../../util/yaml-section-values.js";

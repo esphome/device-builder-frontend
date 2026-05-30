@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { DashboardView, type Label } from "../../api/types.js";
+import type { Label } from "../../api/types/devices.js";
+import { DashboardView } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import {
   computeAreaFacet,

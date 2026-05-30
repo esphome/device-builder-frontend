@@ -12,7 +12,7 @@ vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/spinner/spinner.js", () => ({}));
 
-import { DeviceState } from "../../src/api/types.js";
+import { DeviceState } from "../../src/api/types/devices.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import { ESPHomeInstallMethodDialog } from "../../src/components/install-method-dialog.js";
 

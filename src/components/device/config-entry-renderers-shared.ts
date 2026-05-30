@@ -7,8 +7,9 @@
 
 import { mdiKeyVariant, mdiLockOutline } from "@mdi/js";
 import { html, nothing } from "lit";
-import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";

@@ -20,8 +20,8 @@
  * back recovers it.
  */
 import { html } from "lit";
-import type { ConfigEntry } from "../../../api/types.js";
-import { isLambdaValue } from "../../../api/types.js";
+import { isLambdaValue } from "../../../api/types/automations.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { fieldKeyAttr, type RenderCtx } from "../config-entry-renderers-shared.js";
 import { renderLambdaField } from "./lambda.js";
 

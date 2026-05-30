@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 
-import { ConfigEntryType } from "../../../src/api/types.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import { coerceFields } from "../../../src/components/device/add-component-form-coerce.js";
 import { makeConfigEntry } from "../../util/_make-config-entry.js";
 

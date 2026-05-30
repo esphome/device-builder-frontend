@@ -1,6 +1,6 @@
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { html, type TemplateResult } from "lit";
-import type { AdoptableDevice, ConfiguredDevice } from "../../api/types.js";
+import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";

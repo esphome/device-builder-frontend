@@ -1,5 +1,5 @@
 import { html, type TemplateResult } from "lit";
-import type { ConfiguredDevice, YamlSearchHit } from "../../api/types.js";
+import type { ConfiguredDevice, YamlSearchHit } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { navigate } from "../../util/navigation.js";

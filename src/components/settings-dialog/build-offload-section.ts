@@ -5,12 +5,9 @@ import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
-import type {
-  OffloaderAlertSnapshotEntry,
-  PairingSummary,
-  RemoteBuildPeer,
-  VersionMatchPolicy,
-} from "../../api/types.js";
+import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
+import type { OffloaderAlertSnapshotEntry } from "../../api/types/remote-build-events.js";
+import type { PairingSummary, RemoteBuildPeer } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import type { RemoteBuildJobState } from "../../context/index.js";
 import {
