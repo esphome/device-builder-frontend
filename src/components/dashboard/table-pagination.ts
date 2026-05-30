@@ -16,6 +16,9 @@ registerMdiIcons({
   "page-last": mdiPageLast,
 });
 
+/** Page-size sentinel for the "All" (no pagination) choice. */
+export const ALL_PAGE_SIZE = 0;
+
 @customElement("esphome-table-pagination")
 export class ESPHomeTablePagination extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
@@ -147,15 +150,17 @@ export class ESPHomeTablePagination extends LitElement {
           <div class="page-size">
             <span>${this._localize("dashboard.pagination_rows_per_page")}</span>
             <select @change=${this._onPageSizeChange}>
-              ${[10, 20, 25, 50, 100, 0].map(
+              ${[10, 20, 25, 50, 100, ALL_PAGE_SIZE].map(
                 (size) =>
                   html`<option value=${size} ?selected=${this.pageSize === size}>
-                    ${size === 0 ? this._localize("dashboard.pagination_all") : size}
+                    ${size === ALL_PAGE_SIZE
+                      ? this._localize("dashboard.pagination_all")
+                      : size}
                   </option>`
               )}
             </select>
           </div>
-          ${this.pageSize === 0
+          ${this.pageSize === ALL_PAGE_SIZE
             ? nothing
             : html`
                 <span class="page-info">
