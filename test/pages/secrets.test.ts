@@ -164,22 +164,40 @@ describe("esphome-page-secrets save toast ordering", () => {
     expect(page._savedYaml).toBe("wifi_password: old\n");
   });
 
-  test("_save() shows a single success toast after the write resolves", async () => {
+  test("_save() toasts success and fires secrets-saved only after the write resolves", async () => {
     vi.mocked(toast.success).mockClear();
     vi.mocked(toast.error).mockClear();
+    let resolveUpdate!: () => void;
     const page = makePage({
       _loaded: true,
       _yaml: "wifi_password: new\n",
       _savedYaml: "wifi_password: old\n",
     });
     page._api = {
-      updateConfig: vi.fn().mockResolvedValue(undefined),
+      updateConfig: vi.fn().mockReturnValue(
+        new Promise<void>((r) => {
+          resolveUpdate = r;
+        })
+      ),
     } as unknown as ESPHomeAPI;
+    const onSaved = vi.fn();
+    window.addEventListener("secrets-saved", onSaved);
 
-    await page._save();
+    const savePromise = page._save();
+    // The write is still in flight: nothing has been toasted and no
+    // listener notified yet. A deferred promise pins the ordering an
+    // immediately-resolved mock can't — an optimistic toast fired
+    // before the await would show up here and fail the test.
+    expect(toast.success).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+
+    resolveUpdate();
+    await savePromise;
+    window.removeEventListener("secrets-saved", onSaved);
 
     expect(toast.success).toHaveBeenCalledTimes(1);
     expect(toast.error).not.toHaveBeenCalled();
+    expect(onSaved).toHaveBeenCalledTimes(1);
   });
 
   test("_save() treats a WS timeout as success and keeps the buffer", async () => {
