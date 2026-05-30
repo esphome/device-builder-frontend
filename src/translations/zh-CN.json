@@ -117,6 +117,7 @@
     "action_clean_success": "“{name}”的构建文件已清理",
     "action_clean_failed": "清理“{name}”的构建文件失败",
     "action_download_yaml_failed": "下载“{name}”的 YAML 失败",
+    "download_select_title": "选择固件格式",
     "download_no_binaries": "未找到“{name}”的固件二进制文件，请先编译",
     "download_firmware_failed": "下载“{name}”的固件失败",
     "action_rename_title": "重命名设备",

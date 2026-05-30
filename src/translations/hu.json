@@ -117,6 +117,7 @@
     "action_clean_success": "\"{name}\" összeállító fájljai törölve",
     "action_clean_failed": "Nem sikerült törölni \"{name}\" összeállító fájljait",
     "action_download_yaml_failed": "Nem sikerült letölteni \"{name}\" YAML-ját",
+    "download_select_title": "Firmware-formátum kiválasztása",
     "download_no_binaries": "Nem találhatók firmware-binárisok \"{name}\"-hez – előbb kérem fordítsa le",
     "download_firmware_failed": "Nem sikerült letölteni \"{name}\" firmware-ét",
     "action_rename_title": "Eszköz átnevezése",
