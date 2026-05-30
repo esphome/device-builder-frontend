@@ -1,8 +1,6 @@
 /**
- * The "Show advanced settings" switch row that gates a
- * config-entry-form's advanced fields. Shared by every form host —
- * device sections, automation triggers, scripts, and actions — so
- * the markup and the ``device.show_advanced`` label stay in one place.
+ * Shared "Show advanced settings" switch row that gates a
+ * config-entry-form's advanced fields. Used by every form host.
  */
 import { html } from "lit";
 

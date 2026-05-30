@@ -1,9 +1,7 @@
 /**
  * @vitest-environment happy-dom
  *
- * Behavior tests for the shared ``renderAdvancedToggle`` helper: the
- * switch reflects the passed state, shows the localized label, and
- * reports the new checked value back through ``onChange``.
+ * Behavior tests for the shared `renderAdvancedToggle` helper.
  */
 import { render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";

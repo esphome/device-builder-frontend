@@ -1,9 +1,4 @@
-/**
- * Unit tests for ``actionAdvancedState`` — the show-advanced / toggle
- * decision behind the automation action params form. The mixed case
- * is what makes advanced fields like ``logger.log``'s ``args``
- * reachable from the form.
- */
+/** Unit tests for `actionAdvancedState`. */
 import { describe, expect, it } from "vitest";
 
 import type { ConfigEntry } from "../../src/api/types.js";

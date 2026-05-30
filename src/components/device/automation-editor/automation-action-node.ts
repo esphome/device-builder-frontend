@@ -140,9 +140,7 @@ export class ESPHomeAutomationActionNode extends LitElement {
    */
   @state() private _collapsed = false;
 
-  /** "Show advanced settings" gate for the params form. Mirrors the
-   *  trigger-params and script-editor toggles; advanced optional
-   *  fields (e.g. ``logger.log``'s ``args``) stay hidden until flipped. */
+  /** "Show advanced settings" gate for the action params form. */
   @state() private _showAdvanced = false;
 
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
