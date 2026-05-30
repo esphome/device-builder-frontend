@@ -38,6 +38,7 @@ import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { matchesMacAddress } from "../../util/device-search.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { tableCellStyles } from "./table-cell-styles.js";
@@ -230,17 +231,10 @@ export class ESPHomeDeviceTable extends LitElement {
     ) {
       return true;
     }
-    // MAC search: strip ``:`` / ``-`` / ``.`` from both haystack
-    // and needle so a user can find a device by typing any of
-    // ``94:c9:60``, ``94-C9-60``, or the bare ``94c960`` —
-    // the canonical wire form is ``XX:XX:XX:XX:XX:XX`` but users
-    // copy-paste from router admin pages, vendor labels, etc.
-    if (d.mac_address) {
-      const macStripped = d.mac_address.toLowerCase().replace(/[:.-]/g, "");
-      const qStripped = q.replace(/[:.-]/g, "");
-      if (qStripped && macStripped.includes(qStripped)) return true;
-    }
-    return false;
+    // MAC search via the shared predicate so the dashboard's
+    // select-all scoping helper matches the same rows this filter
+    // makes visible (see util/device-search.ts).
+    return matchesMacAddress(d.mac_address, q);
   };
 
   // ─── Lifecycle ───

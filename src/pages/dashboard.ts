@@ -96,7 +96,7 @@ import {
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
-import { matchesDeviceName } from "../util/device-search.js";
+import { matchesDeviceName, matchesMacAddress } from "../util/device-search.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
@@ -623,8 +623,9 @@ export class ESPHomePageDashboard extends LitElement {
     );
   }
 
-  // Card view: name match. Table view: also matches address/IP/platform so
-  // "Select all" tracks the table's global filter.
+  // Card view: name match. Table view: also matches address/IP/platform/MAC
+  // so "Select all" tracks the table's global filter (device-table.ts
+  // _globalFilterFn). The MAC predicate is shared so the two can't drift.
   _currentlyVisibleConfigurations(): string[] {
     const q = this._search.trim().toLowerCase();
     const sorted = this._applyFacetFilters(this._sortedDevices);
@@ -637,7 +638,8 @@ export class ESPHomePageDashboard extends LitElement {
         return (
           d.address.toLowerCase().includes(q) ||
           d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
-          d.target_platform.toLowerCase().includes(q)
+          d.target_platform.toLowerCase().includes(q) ||
+          matchesMacAddress(d.mac_address, q)
         );
       })
       .map((d) => d.configuration);

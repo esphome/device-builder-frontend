@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types.js";
 import { DeviceState } from "../../src/api/types.js";
-import { matchesDeviceName } from "../../src/util/device-search.js";
+import { matchesDeviceName, matchesMacAddress } from "../../src/util/device-search.js";
 
 function _device(overrides: Partial<ConfiguredDevice> = {}): ConfiguredDevice {
   return {
@@ -63,5 +63,48 @@ describe("matchesDeviceName", () => {
     // empty queries themselves (no filter) so this isn't a problem
     // in practice; pin the predicate's actual behaviour.
     expect(matchesDeviceName(_device(), "")).toBe(true);
+  });
+});
+
+describe("matchesMacAddress", () => {
+  const MAC = "94:c9:60:12:34:56";
+
+  it("matches the canonical colon-separated form (caller pre-lowers)", () => {
+    expect(matchesMacAddress(MAC, "94:c9:60")).toBe(true);
+  });
+
+  it("matches regardless of which separators the query uses", () => {
+    // Users copy-paste from router pages / vendor labels with `-`,
+    // `.`, or no separators at all — all should find the device.
+    expect(matchesMacAddress(MAC, "94-c9-60")).toBe(true);
+    expect(matchesMacAddress(MAC, "94.c9.60")).toBe(true);
+    expect(matchesMacAddress(MAC, "94c960")).toBe(true);
+  });
+
+  it("matches a stored MAC that itself uses non-colon separators", () => {
+    expect(matchesMacAddress("94-C9-60-12-34-56".toLowerCase(), "94c9")).toBe(true);
+  });
+
+  it("matches an interior substring of the address", () => {
+    expect(matchesMacAddress(MAC, "123456")).toBe(true);
+  });
+
+  it("returns false when the stripped query is not a substring", () => {
+    expect(matchesMacAddress(MAC, "aabbcc")).toBe(false);
+  });
+
+  it("returns false for an empty / missing MAC", () => {
+    expect(matchesMacAddress("", "94c960")).toBe(false);
+    expect(matchesMacAddress(null, "94c960")).toBe(false);
+    expect(matchesMacAddress(undefined, "94c960")).toBe(false);
+  });
+
+  it("returns false when the query is empty once separators are stripped", () => {
+    // A bare separator query (":", "-", "::") must not match every
+    // device — otherwise it would behave like an empty (match-all)
+    // needle against the stripped haystack.
+    expect(matchesMacAddress(MAC, "")).toBe(false);
+    expect(matchesMacAddress(MAC, ":")).toBe(false);
+    expect(matchesMacAddress(MAC, "-:.")).toBe(false);
   });
 });
