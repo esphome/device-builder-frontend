@@ -8,15 +8,20 @@
  * graceful-degradation path when the identity load is in flight or
  * failed).
  *
- * Runs in vitest's default ``node`` environment, so we inspect the
- * returned ``TemplateResult`` tree rather than rendering to a DOM
- * (mirrors ``device/render-nested-list-field.test.ts``).
+ * Runs in vitest's default ``node`` environment, inspecting the
+ * returned ``TemplateResult`` tree via the shared
+ * ``test/_lit-template-walker.ts`` helpers rather than mounting a DOM.
  */
 import { nothing } from "lit";
 import { describe, expect, it } from "vitest";
 import type { IdentityView } from "../../../src/api/types.js";
 import type { ESPHomePairBuildServerDialog } from "../../../src/components/pair-build-server-dialog.js";
 import { renderSentStep } from "../../../src/components/pair-build-server-dialog/renderers.js";
+import {
+  extractAttributeBindings,
+  findTemplatesByAnchor,
+  visitTemplates,
+} from "../../_lit-template-walker.js";
 
 const IDENTITY: IdentityView = {
   dashboard_id: "7f3c1a9e-2b04-4d6a-9c17-8e5f0a2b3c4d",
@@ -36,52 +41,30 @@ function makeHost(identity: IdentityView | null): ESPHomePairBuildServerDialog {
   } as unknown as ESPHomePairBuildServerDialog;
 }
 
-interface TemplateResultLike {
-  strings: ReadonlyArray<string>;
-  values: ReadonlyArray<unknown>;
-}
-
-function isTemplateResult(v: unknown): v is TemplateResultLike {
-  return !!v && typeof v === "object" && "strings" in v && "values" in v;
-}
-
-// Flatten a (possibly nested) TemplateResult tree into its static markup
-// fragments and its interpolated values so we can assert against both.
-function flatten(node: unknown, markup: string[], values: unknown[]): void {
-  if (isTemplateResult(node)) {
-    markup.push(...node.strings);
-    node.values.forEach((v) => flatten(v, markup, values));
-  } else if (Array.isArray(node)) {
-    node.forEach((v) => flatten(v, markup, values));
-  } else {
-    values.push(node);
-  }
-}
-
-function flattenSentStep(identity: IdentityView | null) {
-  const markup: string[] = [];
-  const values: unknown[] = [];
-  flatten(renderSentStep(makeHost(identity)), markup, values);
-  return { markup: markup.join(""), values };
+/** Every interpolated value across the template tree, in render order. */
+function allValues(root: unknown): unknown[] {
+  const out: unknown[] = [];
+  visitTemplates(root, (t) => out.push(...t.values));
+  return out;
 }
 
 describe("renderSentStep", () => {
   it("renders the identity card once the offloader identity has loaded", () => {
-    const { markup, values } = flattenSentStep(IDENTITY);
+    const tree = renderSentStep(makeHost(IDENTITY));
 
-    expect(markup).toContain("esphome-pin-emoji-grid");
-    expect(markup).toContain("pin-hex");
-    // Dashboard ID and the raw pin are interpolated into the card; the
-    // emoji grid binds the raw pin via ``.pin``.
-    expect(values).toContain(IDENTITY.dashboard_id);
-    expect(values).toContain(IDENTITY.pin_sha256);
+    const grids = findTemplatesByAnchor(tree, "<esphome-pin-emoji-grid");
+    expect(grids).toHaveLength(1);
+    // The emoji grid binds the raw pin via ``.pin``.
+    expect(extractAttributeBindings(grids[0])[".pin"]).toBe(IDENTITY.pin_sha256);
+    // The Dashboard ID is interpolated into the card body.
+    expect(allValues(tree)).toContain(IDENTITY.dashboard_id);
   });
 
-  it("renders no identity card while the identity is still null", () => {
-    const { markup, values } = flattenSentStep(null);
+  it("renders no identity card while the offloader identity is still null", () => {
+    const tree = renderSentStep(makeHost(null));
 
-    expect(values).toContain(nothing);
-    expect(markup).not.toContain("esphome-pin-emoji-grid");
-    expect(values).not.toContain(IDENTITY.dashboard_id);
+    expect(findTemplatesByAnchor(tree, "<esphome-pin-emoji-grid")).toHaveLength(0);
+    expect(allValues(tree)).toContain(nothing);
+    expect(allValues(tree)).not.toContain(IDENTITY.dashboard_id);
   });
 });

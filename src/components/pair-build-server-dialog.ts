@@ -75,7 +75,8 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // This dashboard's own stable identity (dashboard_id + pin_sha256). Shown on
   // the sent step so the operator can match it against what the receiver's
   // "Pairing request" dialog displays for this offloader. Loaded on open();
-  // null until it lands (the emoji grid renders nothing for an empty pin).
+  // renderSentStep hides the whole identity card while this is null (load
+  // still in flight or failed).
   @state() _offloaderIdentity: IdentityView | null = null;
 
   static styles = [
