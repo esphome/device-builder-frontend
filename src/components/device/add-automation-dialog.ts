@@ -38,7 +38,10 @@ import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
-import { parseYamlAutomations } from "../../util/yaml-sections.js";
+import {
+  LIST_SHAPED_TRIGGER_IDS,
+  parseYamlAutomations,
+} from "../../util/yaml-sections.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
 
 /** Kinds the wizard can produce. Mirrors a subset of
@@ -443,13 +446,16 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       const [domain] = device.component_id.split(".");
       // Same rule for component-bound triggers: an inline ``on_*:``
       // block under a component only fires once, so don't offer
-      // triggers that already have a handler on this instance.
+      // triggers that already have a handler on this instance — except
+      // list-shaped triggers (``time.on_time``), which ESPHome accepts
+      // as a repeatable list, so they stay offerable for a second entry.
       const takenComponentTriggers = this._existingComponentTriggers(this._componentId);
       return all.filter(
         (t) =>
           !t.is_device_level &&
           (t.applies_to.includes(device.component_id) || t.applies_to.includes(domain)) &&
-          !takenComponentTriggers.has(this._bareTrigger(t.id))
+          (!takenComponentTriggers.has(this._bareTrigger(t.id)) ||
+            LIST_SHAPED_TRIGGER_IDS.has(t.id))
       );
     }
     return [];
@@ -569,6 +575,22 @@ export class ESPHomeAddAutomationDialog extends LitElement {
       // triggers.
       const dotIdx = this._triggerId!.indexOf(".");
       const bare = dotIdx >= 0 ? this._triggerId!.slice(dotIdx + 1) : this._triggerId!;
+      // List-shaped triggers (``time.on_time``) append as a new indexed
+      // list entry; an un-indexed location would hit the backend's
+      // single-handler path and overwrite the existing block. Mirror the
+      // interval path: count existing entries on this instance for the
+      // append index.
+      if (LIST_SHAPED_TRIGGER_IDS.has(this._triggerId!)) {
+        const index = parseYamlAutomations(this.yaml).filter(
+          (s) => s.id === this._componentId && s.eventKey === bare
+        ).length;
+        return {
+          kind: "component_on",
+          component_id: this._componentId,
+          trigger: bare,
+          index,
+        };
+      }
       return {
         kind: "component_on",
         component_id: this._componentId,

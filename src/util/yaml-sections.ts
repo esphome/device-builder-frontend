@@ -673,6 +673,18 @@ const _DASH_TRIGGER_ENTRY_KEY_RE = new RegExp(
   `^\\s*-\\s+(?:${_TRIGGER_ENTRY_KEYS})\\s*:`
 );
 
+/** Catalog trigger ids ESPHome accepts as a repeatable *list* of
+ *  entries — each entry carries its own params (``time.on_time``'s
+ *  cron fields) under one ``on_*:`` key. These stay offerable in the
+ *  add-automation wizard even when one already exists, and the wizard
+ *  appends a new indexed ``component_on`` entry instead of replacing
+ *  the block. Mirrors the body-shape discriminator above
+ *  (``_TRIGGER_ENTRY_KEYS``) and the backend's per-entry
+ *  ``upsert_component_on_entry`` splice path. */
+export const LIST_SHAPED_TRIGGER_IDS: ReadonlySet<string> = new Set([
+  "time.on_time",
+]);
+
 /**
  * When an ``on_*:`` body is a YAML list of trigger entries (the
  * ``time.on_time`` shape — each item carries its own cron params and a

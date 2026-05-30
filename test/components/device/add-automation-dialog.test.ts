@@ -120,3 +120,86 @@ describe("add-automation-dialog render gate (behavioral)", () => {
     await flushPending();
   });
 });
+
+const ON_TIME_YAML = `time:
+  - platform: sntp
+    id: my_time
+    on_time:
+      - seconds: 0
+        then:
+          - logger.log: tick
+`;
+
+const timeAvailable = (): AvailableAutomations =>
+  ({
+    triggers: [
+      { id: "time.on_time", name: "On time", applies_to: ["time"], config_entries: [] },
+      {
+        id: "time.on_time_sync",
+        name: "On time sync",
+        applies_to: ["time"],
+        config_entries: [],
+      },
+    ],
+    actions: [],
+    conditions: [],
+    scripts: [],
+    devices: [{ id: "my_time", name: "Time", component_id: "time.sntp" }],
+  }) as unknown as AvailableAutomations;
+
+describe("add-automation-dialog list-shaped triggers (#1080)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  async function mountForComponent(): Promise<ESPHomeAddAutomationDialog> {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(timeAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open();
+    await dialog.updateComplete;
+    await flushPending();
+    dialog.yaml = ON_TIME_YAML;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._kind = "component_on";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._componentId = "my_time";
+    await dialog.updateComplete;
+    return dialog;
+  }
+
+  it("still offers time.on_time when one already exists on the component", async () => {
+    const dialog = await mountForComponent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const offered = (dialog as any)._filteredTriggers() as Array<{ id: string }>;
+    expect(offered.map((t) => t.id)).toContain("time.on_time");
+  });
+
+  it("appends a second on_time as an indexed component_on entry", async () => {
+    const dialog = await mountForComponent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._triggerId = "time.on_time";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const loc = (dialog as any)._buildLocation();
+    expect(loc).toEqual({
+      kind: "component_on",
+      component_id: "my_time",
+      trigger: "on_time",
+      index: 1,
+    });
+  });
+
+  it("leaves single-instance component triggers un-indexed", async () => {
+    const dialog = await mountForComponent();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (dialog as any)._triggerId = "time.on_time_sync";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const loc = (dialog as any)._buildLocation();
+    expect(loc).toEqual({
+      kind: "component_on",
+      component_id: "my_time",
+      trigger: "on_time_sync",
+    });
+  });
+});
