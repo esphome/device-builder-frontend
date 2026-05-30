@@ -34,6 +34,7 @@ import type { PropertyValues } from "lit";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import { classMap } from "lit/directives/class-map.js";
+import { repeat } from "lit/directives/repeat.js";
 import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
@@ -537,7 +538,12 @@ export class ESPHomeDeviceTable extends LitElement {
     return html`
       <tbody>
         ${rows.length > 0
-          ? rows.map(
+          ? repeat(
+              rows,
+              // Key on the device config so Lit reuses each row's DOM
+              // across re-renders (job-progress ticks, selection) instead
+              // of re-diffing every row — matters most with "All" selected.
+              (row) => row.original.config,
               (row) => html`
                 <tr
                   role="row"
