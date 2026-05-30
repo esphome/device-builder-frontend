@@ -6,7 +6,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { FirmwareBinary } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
-import { espHomeStyles } from "../styles/shared.js";
+import { dialogOptionStyles, espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -37,85 +37,11 @@ export class ESPHomeDownloadFirmwareDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    dialogOptionStyles,
     css`
-      esphome-base-dialog {
-        --width: 460px;
-      }
-
-      esphome-base-dialog::part(header) {
-        background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
-        height: 40px;
-        box-sizing: border-box;
-      }
-
-      esphome-base-dialog::part(title) {
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      esphome-base-dialog::part(body) {
-        padding: var(--wa-space-l);
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
-      }
-
-      .list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-      }
-
-      .option {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-m);
-        padding: var(--wa-space-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
-        cursor: pointer;
-        transition:
-          background 0.12s,
-          border-color 0.12s;
-      }
-
-      .option:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
-        border-color: var(--esphome-primary);
-      }
-
-      .info {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-      }
-
-      .title {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      .desc {
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
-      }
-
-      .option-chevron {
-        margin-left: auto;
-        font-size: 20px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-        transition: color 0.12s;
-      }
-
-      .option:hover .option-chevron {
-        color: var(--esphome-primary);
+      .option:focus-visible {
+        outline: 2px solid var(--esphome-primary);
+        outline-offset: 2px;
       }
     `,
   ];
@@ -144,7 +70,13 @@ export class ESPHomeDownloadFirmwareDialog extends LitElement {
         <div class="list">
           ${this._binaries.map(
             (binary) => html`
-              <div class="option" @click=${() => this._select(binary)}>
+              <div
+                class="option"
+                role="button"
+                tabindex="0"
+                @click=${() => this._select(binary)}
+                @keydown=${(e: KeyboardEvent) => this._onOptionKeydown(e, binary)}
+              >
                 <div class="info">
                   <span class="title">${binary.title}</span>
                   ${binary.description
@@ -162,6 +94,13 @@ export class ESPHomeDownloadFirmwareDialog extends LitElement {
         </div>
       </esphome-base-dialog>
     `;
+  }
+
+  private _onOptionKeydown(e: KeyboardEvent, binary: FirmwareBinary) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      this._select(binary);
+    }
   }
 
   private _select(binary: FirmwareBinary) {

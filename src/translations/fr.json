@@ -82,6 +82,7 @@
     "action_clean_success": "Fichiers de compilation nettoyés pour \"{name}\"",
     "action_clean_failed": "Échec du nettoyage des fichiers pour \"{name}\"",
     "action_download_yaml_failed": "Échec du téléchargement YAML pour \"{name}\"",
+    "download_select_title": "Choisir le format du firmware",
     "download_no_binaries": "Aucun firmware trouvé pour \"{name}\" — compilez d'abord",
     "download_firmware_failed": "Échec du téléchargement du firmware pour \"{name}\"",
     "action_rename_title": "Renommer l'appareil",

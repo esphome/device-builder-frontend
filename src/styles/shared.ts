@@ -82,6 +82,101 @@ export const espHomeStyles = css`
   }
 `;
 
+/**
+ * Selection-dialog option cards.
+ *
+ * Shared by the dialogs that present a vertical list of clickable
+ * option rows (icon? + title + description + trailing chevron) inside
+ * an <esphome-base-dialog> with the compact primary header — currently
+ * the install-method picker and the firmware-format picker. Lives here
+ * so the card chrome is defined once; each dialog keeps only its own
+ * extras (leading-icon sizing, disabled/collapsible variants, forms)
+ * local. The hover rule excludes ``.option--disabled`` so disabled rows
+ * (install dialog) don't light up; the download dialog has none, so the
+ * exclusion is a no-op there.
+ */
+export const dialogOptionStyles = css`
+  esphome-base-dialog {
+    --width: 460px;
+  }
+
+  esphome-base-dialog::part(header) {
+    background: var(--esphome-primary);
+    padding: 0 var(--wa-space-m);
+    height: 40px;
+    box-sizing: border-box;
+  }
+
+  esphome-base-dialog::part(title) {
+    color: var(--esphome-on-primary);
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
+  }
+
+  esphome-base-dialog::part(body) {
+    padding: var(--wa-space-l);
+  }
+
+  esphome-base-dialog::part(footer) {
+    display: none;
+  }
+
+  .list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--wa-space-s);
+  }
+
+  .option {
+    display: flex;
+    align-items: center;
+    gap: var(--wa-space-m);
+    padding: var(--wa-space-m);
+    border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    border-radius: var(--wa-border-radius-l);
+    cursor: pointer;
+    transition:
+      background 0.12s,
+      border-color 0.12s;
+  }
+
+  .option:hover:not(.option--disabled) {
+    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    border-color: var(--esphome-primary);
+  }
+
+  .info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .title {
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-bold);
+    color: var(--wa-color-text-normal);
+  }
+
+  .desc {
+    font-size: var(--wa-font-size-2xs);
+    color: var(--wa-color-text-quiet);
+    line-height: 1.4;
+  }
+
+  .option-chevron {
+    margin-left: auto;
+    font-size: 20px;
+    color: var(--wa-color-text-quiet);
+    flex-shrink: 0;
+    transition: color 0.12s;
+  }
+
+  .option:hover .option-chevron {
+    color: var(--esphome-primary);
+  }
+`;
+
 /** Common layout helpers. */
 export const layoutStyles = css`
   .page-content {

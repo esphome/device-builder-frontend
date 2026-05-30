@@ -19,7 +19,7 @@ import type { SerialPort } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
-import { espHomeStyles } from "../styles/shared.js";
+import { dialogOptionStyles, espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -131,59 +131,11 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    dialogOptionStyles,
     css`
-      esphome-base-dialog {
-        --width: 460px;
-      }
-
-      esphome-base-dialog::part(header) {
-        background: var(--esphome-primary);
-        padding: 0 var(--wa-space-m);
-        height: 40px;
-        box-sizing: border-box;
-      }
-
-      esphome-base-dialog::part(title) {
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
       /* Close-button styling is bundled in
          <esphome-base-dialog> via dialogCloseButtonStyles,
          no per-dialog override needed. */
-
-      esphome-base-dialog::part(body) {
-        padding: var(--wa-space-l);
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
-      }
-
-      .list {
-        display: flex;
-        flex-direction: column;
-        gap: var(--wa-space-s);
-      }
-
-      .option {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-m);
-        padding: var(--wa-space-m);
-        border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-        border-radius: var(--wa-border-radius-l);
-        cursor: pointer;
-        transition:
-          background 0.12s,
-          border-color 0.12s;
-      }
-
-      .option:hover:not(.option--disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
-        border-color: var(--esphome-primary);
-      }
 
       .option--disabled {
         cursor: not-allowed;
@@ -250,20 +202,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         margin-top: var(--wa-space-s);
       }
 
-      /* Trailing chevron on option cards. chevron-right on
-         direct-action rows (e.g. "Download firmware binary")
-         signals "click to proceed"; chevron-down on the IP /
-         hostname row signals an expandable card whose form opens
-         inline inside the same card. */
-      .option-chevron {
-        margin-left: auto;
-        font-size: 20px;
-        color: var(--wa-color-text-quiet);
-        flex-shrink: 0;
-        transition: color 0.12s;
-      }
-
-      .option:hover .option-chevron,
+      /* The base .option-chevron card chevron lives in
+         dialogOptionStyles. chevron-right on direct-action rows
+         (e.g. "Download firmware binary") signals "click to
+         proceed"; chevron-down on the IP / hostname row signals an
+         expandable card whose form opens inline inside the same
+         card. The collapsible card reuses the chevron-hover tint. */
       .option-collapsible:hover .option-chevron {
         color: var(--esphome-primary);
       }
@@ -357,18 +301,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
         cursor: not-allowed;
       }
 
-      .info {
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-        min-width: 0;
-      }
-
-      .title {
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
+      /* .info, .title and .desc card text live in dialogOptionStyles. */
 
       /* Inline link inside an option's title (used by the web.esphome.io
          row to render the host name as a clickable link). stopPropagation
@@ -383,12 +316,6 @@ export class ESPHomeInstallMethodDialog extends LitElement {
       .title .inline-link:focus-visible {
         text-decoration-thickness: 2px;
         outline: none;
-      }
-
-      .desc {
-        font-size: var(--wa-font-size-2xs);
-        color: var(--wa-color-text-quiet);
-        line-height: 1.4;
       }
 
       .back-btn {

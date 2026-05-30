@@ -82,6 +82,7 @@
     "action_clean_success": "Bouwbestanden opgeschoond voor \"{name}\"",
     "action_clean_failed": "Opschonen van bouwbestanden mislukt voor \"{name}\"",
     "action_download_yaml_failed": "YAML-download mislukt voor \"{name}\"",
+    "download_select_title": "Firmwareformaat kiezen",
     "download_no_binaries": "Geen firmware gevonden voor \"{name}\" — compileer eerst",
     "download_firmware_failed": "Firmware-download mislukt voor \"{name}\"",
     "action_rename_title": "Apparaat hernoemen",
