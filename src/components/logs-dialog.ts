@@ -560,14 +560,9 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _startStreaming() {
-    // Never spawn a backend log subscription on a closed dialog. The states
-    // toggle tears down and respawns the stream across an awaited stopStream
-    // round-trip (see _toggleShowStates); if the user closes the dialog during
-    // that await, _onDialogHide flips _open false but the toggle's continuation
-    // still calls _startStreaming. Without this guard that respawns an orphaned
-    // esphome-logs subprocess that buffers into _lines with no visible Stop
-    // button to tear it down. open() sets _open before calling us, so the
-    // normal start path is unaffected.
+    // Don't respawn onto a closed dialog: _toggleShowStates awaits stopStream
+    // before restarting, and a close during that await would otherwise spawn an
+    // orphaned stream with no Stop button. open() sets _open first.
     if (!this._open) return;
     if (this._streaming) return;
     this._streaming = true;

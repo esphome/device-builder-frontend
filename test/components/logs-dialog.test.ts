@@ -1,10 +1,8 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the states-toggle restart against a close landing mid-await: the
- * toggle tears down the live stream and awaits the backend stopStream
- * round-trip before respawning. If the dialog is closed during that await,
- * the respawn must NOT spawn a fresh backend subscription on a closed dialog.
+ * The states-toggle restart awaits stopStream before respawning; a close
+ * during that await must not spawn a stream onto the closed dialog.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ESPHomeLogsDialog } from "../../src/components/logs-dialog.js";
@@ -44,8 +42,7 @@ describe("logs-dialog states-toggle restart", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._open).toBe(true);
 
-    // Flip the states toggle: tears down the stream and awaits the backend
-    // stopStream cancel before respawning.
+    // Flip the states toggle: awaits the stopStream cancel before respawning.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const restart = (el as any)._toggleShowStates();
 
