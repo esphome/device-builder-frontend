@@ -9,7 +9,6 @@ import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
-import { friendlyNameSlugify } from "../../util/friendly-name-slugify.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -406,7 +405,10 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const { name } = e.detail;
     await this._runCreate(
       {
-        name: friendlyNameSlugify(name),
+        // Send the raw display name: the backend slugifies it for the
+        // hostname and keeps the original as esphome.friendly_name.
+        // Slugifying here would strip the friendly name down to the slug.
+        name,
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       },
@@ -480,7 +482,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (!board) return;
     await this._runCreate(
       {
-        name: friendlyNameSlugify(name),
+        // Raw display name — backend slugifies for the hostname and
+        // preserves the original as esphome.friendly_name (see above).
+        name,
         board_id: board.id,
         config_type: "basic",
         ssid: wifiSsid,

@@ -82,4 +82,16 @@ describe("create-config-dialog create de-dupe + retry", () => {
 
     expect(createDevice).toHaveBeenCalledTimes(2);
   });
+
+  it("forwards the raw display name so the backend keeps it as friendly_name", async () => {
+    const createDevice = vi.fn().mockResolvedValue({ configuration: "living-room-2.yaml" });
+    const el = await mount({ createDevice });
+
+    emitCreate(el, "Living Room #2");
+    await flush();
+
+    expect(createDevice).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Living Room #2" })
+    );
+  });
 });
