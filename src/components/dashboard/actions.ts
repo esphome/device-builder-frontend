@@ -121,19 +121,20 @@ export async function deleteArchivedDevice(
   return true;
 }
 
-export function deleteDevice(
+export async function deleteDevice(
   device: ConfiguredDevice,
   api: ESPHomeAPI,
-  devices: ConfiguredDevice[],
   localize: LocalizeFunc
-) {
+): Promise<boolean> {
   const name = device.friendly_name || device.name;
+  try {
+    await api.deleteDevice(device.configuration);
+  } catch {
+    toast.error(localize("dashboard.delete_failed", { name }), { richColors: true });
+    return false;
+  }
   toast.success(localize("dashboard.deleted", { name }), { richColors: true });
-  api.deleteDevice(device.configuration).catch(() => {
-    if (devices.some((d) => d.configuration === device.configuration)) {
-      toast.error(localize("dashboard.delete_failed", { name }), { richColors: true });
-    }
-  });
+  return true;
 }
 
 /**
