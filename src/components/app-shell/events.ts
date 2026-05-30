@@ -69,10 +69,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       host._devicesLoaded = true;
       host._buildServerPeers = peers ?? null;
       host._buildOffloadDiscoveredHosts = seededMap(hosts, (h) => h.name);
-      // _offloaderSetInFlight gates the offloader permission state (pairings
-      // enabled-flags, remote_builds_enabled, version_match_policy) so a
-      // reconnect racing an in-flight offloader write can't clobber the
-      // optimistic value with the pre-write server snapshot.
+      // Skip reseeding the offloader permission state while an optimistic
+      // write is outstanding, so a reconnect can't clobber it with the
+      // pre-write snapshot (the scalar toggles below gate the same way).
       if (host._offloaderSetInFlight === 0) {
         host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
       }

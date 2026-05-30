@@ -177,13 +177,11 @@ export class ESPHomeApp extends LitElement {
 
   _recentJobTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
   _remoteBuildSetInFlight = false;
-  // Gates the INITIAL_STATE reseed of the offloader permission state
-  // (_offloaderRemoteBuildsEnabled / _offloaderVersionMatchPolicy /
-  // _buildOffloadPairings) so a reconnect racing an in-flight offloader
-  // write can't clobber the optimistic value. A ref-count (not a boolean)
-  // so overlapping writes — e.g. a remote-builds toggle and a version-policy
-  // change both outstanding — keep the gate closed until the LAST one
-  // settles; a boolean's first `finally` would reopen it mid-flight.
+  // Held while an optimistic offloader-permission write is outstanding; gates
+  // the INITIAL_STATE reseed of _offloaderRemoteBuildsEnabled,
+  // _offloaderVersionMatchPolicy, and _buildOffloadPairings. A ref-count, not
+  // a boolean, so overlapping writes keep it closed until the last settles
+  // (a boolean's first finally would reopen it mid-flight).
   _offloaderSetInFlight = 0;
 
   private _router = createRouter(this);

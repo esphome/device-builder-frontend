@@ -149,7 +149,7 @@ describe("offloader settings in-flight gate", () => {
 
     expect(host._offloaderSetInFlight).toBe(2);
 
-    // First write settles — gate must stay closed (count still 1).
+    // First write settles; gate must stay closed (count still 1).
     dRemote.resolve();
     await writeRemote;
     expect(host._offloaderSetInFlight).toBe(1);
