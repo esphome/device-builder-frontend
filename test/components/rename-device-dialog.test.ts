@@ -52,6 +52,22 @@ describe("rename-device-dialog ENTER", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("fires rename-confirm only once on a repeated Enter", async () => {
+    // close() only starts the hide animation, so the EnterController
+    // listener stays live until wa-after-hide. A held Enter must not
+    // dispatch rename-confirm twice (stale second rename against the
+    // already-renamed config).
+    const el = await mount();
+    el.open("oldname");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("rename-confirm", onConfirm as EventListener);
+    await setValue(el, "kitchen");
+    pressEnter();
+    pressEnter();
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores Enter after the dialog hides", async () => {
     const el = await mount();
     el.open("oldname");

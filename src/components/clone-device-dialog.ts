@@ -154,6 +154,12 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     `,
   ];
 
+  // One-shot latch: ``close()`` only starts the hide animation, so the
+  // EnterController listener stays live until ``wa-after-hide``. A held
+  // Enter would otherwise re-enter ``_confirm`` during that window and
+  // dispatch ``clone-confirm`` twice. Mirrors confirm-dialog's _decided.
+  private _resolved = false;
+
   // Enter confirms; _confirm self-guards on empty / same / invalid.
   private _enter = new EnterController(this, () => this._confirm());
 
@@ -161,6 +167,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     this.sourceName = sourceName;
     this._name = "";
     this._friendlyName = "";
+    this._resolved = false;
     this._dialog.open = true;
     this._enter.set(true);
   }
@@ -254,9 +261,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   }
 
   private _confirm = () => {
+    if (this._resolved) return;
     const newName = this._name.trim();
     if (!newName || newName === this.sourceName) return;
     if (validateDeviceName(newName)) return;
+    this._resolved = true;
     this.close();
     this.dispatchEvent(
       new CustomEvent<{ newName: string; newFriendlyName: string }>("clone-confirm", {
