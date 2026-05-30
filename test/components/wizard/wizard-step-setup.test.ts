@@ -69,20 +69,20 @@ describe("wizard-step-setup ENTER", () => {
 
   it("a held Enter does not skip the wifi stage (no auto-finish on key-repeat)", async () => {
     const el = await mount();
-    // SSID-only secrets: the name-stage advance pre-fills the ssid, so the
-    // wifi stage's _canAdvance() is immediately satisfied — the dangerous case.
+    // SSID-only secrets pre-fill the ssid on advance, satisfying the wifi
+    // stage's _canAdvance() immediately; the dangerous case for a held Enter.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._secretWifiSsid = "ssid";
     await setName(el, "kitchen");
     const onFinish = vi.fn();
     el.addEventListener("finish-setup", onFinish as EventListener);
 
-    pressEnter(); // first keydown advances to the wifi stage
+    pressEnter(); // first keydown advances to wifi
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._stage).toBe("wifi");
 
-    pressEnter({ repeat: true }); // the same held key auto-repeats
-    expect(onFinish).not.toHaveBeenCalled(); // must not blow past the review
+    pressEnter({ repeat: true }); // same held key auto-repeats; ignored
+    expect(onFinish).not.toHaveBeenCalled();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect((el as any)._stage).toBe("wifi");
   });
