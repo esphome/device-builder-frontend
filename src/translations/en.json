@@ -970,6 +970,8 @@
     "pair_build_server_invalid_args": "The receiver rejected the request: {details}",
     "pair_build_server_sent_title": "Pair request sent",
     "pair_build_server_sent_desc": "Open Settings → Pairing requests on the receiver dashboard at {hostname}:{port} and click Accept. The pair will complete once the admin there approves it.",
+    "pair_build_server_sent_dashboard_id_label": "Dashboard ID",
+    "pair_build_server_sent_pin_label": "Your fingerprint (the receiver shows this on its Pairing request screen)",
     "pair_build_server_sent_toast": "Pair request sent to {hostname}:{port}. Waiting for the receiver's admin to accept.",
     "pair_build_server_approved_toast": "Pairing with {hostname}:{port} accepted.",
     "pair_build_server_rejected_toast": "Pair request to {hostname}:{port} was declined or removed.",
