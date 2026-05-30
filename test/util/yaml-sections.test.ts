@@ -510,6 +510,64 @@ describe("parseYamlAutomations", () => {
     );
     expect(items.map((s) => s.key)).toEqual(["automation:api_action:legacy_name"]);
   });
+
+  it("splits a list-shaped time.on_time into one indexed row per entry", () => {
+    const yaml = `time:
+  - platform: sntp
+    id: my_time
+    on_time:
+      - seconds: 0
+        minutes: 30
+        hours: 8
+        then:
+          - logger.log: "morning"
+      - cron: "0 0 12 * * *"
+        then:
+          - logger.log: "noon"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_time:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:my_time:on_time:0",
+      "automation:component_on:my_time:on_time:1",
+    ]);
+    expect(items[0].displayLabel).toBe("my_time → on_time #1");
+    // Each row spans only its own entry, not the whole on_time block.
+    expect(items[0].fromLine).toBe(5); // ``- seconds: 0``
+    expect(items[1].fromLine).toBe(10); // ``- cron: ...``
+  });
+
+  it("keeps a single-mapping on_time as one un-indexed row", () => {
+    const yaml = `time:
+  - platform: sntp
+    id: my_time
+    on_time:
+      seconds: 0
+      then:
+        - logger.log: "tick"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_time:")
+    );
+    expect(items.map((s) => s.key)).toEqual(["automation:component_on:my_time:on_time"]);
+  });
+
+  it("does not split a bare action list into per-action rows", () => {
+    const yaml = `binary_sensor:
+  - platform: gpio
+    id: my_button
+    on_press:
+      - switch.toggle: relay
+      - delay: 1s
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_button:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:my_button:on_press",
+    ]);
+  });
 });
 
 describe("resolveCurrentFromLine", () => {
