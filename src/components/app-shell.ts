@@ -180,8 +180,11 @@ export class ESPHomeApp extends LitElement {
   // Gates the INITIAL_STATE reseed of the offloader permission state
   // (_offloaderRemoteBuildsEnabled / _offloaderVersionMatchPolicy /
   // _buildOffloadPairings) so a reconnect racing an in-flight offloader
-  // write can't clobber the optimistic value. Mirrors _remoteBuildSetInFlight.
-  _offloaderSetInFlight = false;
+  // write can't clobber the optimistic value. A ref-count (not a boolean)
+  // so overlapping writes — e.g. a remote-builds toggle and a version-policy
+  // change both outstanding — keep the gate closed until the LAST one
+  // settles; a boolean's first `finally` would reopen it mid-flight.
+  _offloaderSetInFlight = 0;
 
   private _router = createRouter(this);
 

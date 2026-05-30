@@ -25,7 +25,7 @@ vi.mock("sonner-js", () => ({
 interface StubHost {
   _offloaderRemoteBuildsEnabled: boolean | null;
   _offloaderVersionMatchPolicy: VersionMatchPolicy | null;
-  _offloaderSetInFlight: boolean;
+  _offloaderSetInFlight: number;
   _buildOffloadPairings: Map<string, PairingSummary> | null;
   _buildOffloadDiscoveredHosts: unknown;
   _buildOffloadAlerts: unknown;
@@ -45,7 +45,7 @@ function makeHost(api: StubHost["_api"]): StubHost {
   return {
     _offloaderRemoteBuildsEnabled: false,
     _offloaderVersionMatchPolicy: "any",
-    _offloaderSetInFlight: false,
+    _offloaderSetInFlight: 0,
     _buildOffloadPairings: null,
     _buildOffloadDiscoveredHosts: null,
     _buildOffloadAlerts: null,
@@ -119,11 +119,52 @@ describe("offloader settings in-flight gate", () => {
     );
 
     expect(host._offloaderRemoteBuildsEnabled).toBe(true);
-    expect(host._offloaderSetInFlight).toBe(true);
+    expect(host._offloaderSetInFlight).toBe(1);
 
     d.resolve();
     await write;
-    expect(host._offloaderSetInFlight).toBe(false);
+    expect(host._offloaderSetInFlight).toBe(0);
+  });
+
+  it("keeps the gate closed until the last of two overlapping writes settles", async () => {
+    const dRemote = deferred();
+    const dPolicy = deferred();
+    const host = makeHost({
+      setOffloaderRemoteBuildSettings: vi
+        .fn()
+        .mockReturnValueOnce(dRemote.promise)
+        .mockReturnValueOnce(dPolicy.promise),
+      setOffloaderPairingEnabled: vi.fn(),
+    });
+
+    // Two offloader writes outstanding at once.
+    const writeRemote = onSetOffloaderRemoteBuildsEnabled(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: true })
+    );
+    const writePolicy = onSetOffloaderVersionMatchPolicy(
+      host as unknown as ESPHomeApp,
+      new CustomEvent("x", { detail: "exact_required" as VersionMatchPolicy })
+    );
+
+    expect(host._offloaderSetInFlight).toBe(2);
+
+    // First write settles — gate must stay closed (count still 1).
+    dRemote.resolve();
+    await writeRemote;
+    expect(host._offloaderSetInFlight).toBe(1);
+
+    // A reconnect now must NOT clobber the second still-in-flight value.
+    reconnect(host, {
+      remote_builds_enabled: false,
+      version_match_policy: "any",
+    });
+    expect(host._offloaderRemoteBuildsEnabled).toBe(true);
+    expect(host._offloaderVersionMatchPolicy).toBe("exact_required");
+
+    dPolicy.resolve();
+    await writePolicy;
+    expect(host._offloaderSetInFlight).toBe(0);
   });
 
   it("does not clobber an in-flight remote-builds flip on reconnect", async () => {

@@ -99,7 +99,7 @@ export async function onSetOffloaderRemoteBuildsEnabled(
   const enabled = e.detail;
   const previous = host._offloaderRemoteBuildsEnabled;
   host._offloaderRemoteBuildsEnabled = enabled;
-  host._offloaderSetInFlight = true;
+  host._offloaderSetInFlight += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       remote_builds_enabled: enabled,
@@ -110,7 +110,7 @@ export async function onSetOffloaderRemoteBuildsEnabled(
       richColors: true,
     });
   } finally {
-    host._offloaderSetInFlight = false;
+    host._offloaderSetInFlight -= 1;
   }
 }
 
@@ -121,7 +121,7 @@ export async function onSetOffloaderPairingEnabled(
   const { pin_sha256, enabled } = e.detail;
   const previous = host._buildOffloadPairings?.get(pin_sha256)?.enabled;
   patchOffloadPairing(host, pin_sha256, { enabled });
-  host._offloaderSetInFlight = true;
+  host._offloaderSetInFlight += 1;
   try {
     await host._api.setOffloaderPairingEnabled({ pin_sha256, enabled });
   } catch {
@@ -132,7 +132,7 @@ export async function onSetOffloaderPairingEnabled(
       richColors: true,
     });
   } finally {
-    host._offloaderSetInFlight = false;
+    host._offloaderSetInFlight -= 1;
   }
 }
 
@@ -143,7 +143,7 @@ export async function onSetOffloaderVersionMatchPolicy(
   const policy = e.detail;
   const previous = host._offloaderVersionMatchPolicy;
   host._offloaderVersionMatchPolicy = policy;
-  host._offloaderSetInFlight = true;
+  host._offloaderSetInFlight += 1;
   try {
     await host._api.setOffloaderRemoteBuildSettings({
       version_match_policy: policy,
@@ -154,7 +154,7 @@ export async function onSetOffloaderVersionMatchPolicy(
       richColors: true,
     });
   } finally {
-    host._offloaderSetInFlight = false;
+    host._offloaderSetInFlight -= 1;
   }
 }
 

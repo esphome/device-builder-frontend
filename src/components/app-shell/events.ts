@@ -73,7 +73,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       // enabled-flags, remote_builds_enabled, version_match_policy) so a
       // reconnect racing an in-flight offloader write can't clobber the
       // optimistic value with the pre-write server snapshot.
-      if (!host._offloaderSetInFlight) {
+      if (host._offloaderSetInFlight === 0) {
         host._buildOffloadPairings = seededMap(pairings, (p) => p.pin_sha256);
       }
       host._buildOffloadAlerts = seededMap(offloader_alerts, (a) => a.pin_sha256);
@@ -95,10 +95,10 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         }
         host._buildOffloadJobs = seeded;
       }
-      if (remote_builds_enabled !== undefined && !host._offloaderSetInFlight) {
+      if (remote_builds_enabled !== undefined && host._offloaderSetInFlight === 0) {
         host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
       }
-      if (version_match_policy !== undefined && !host._offloaderSetInFlight) {
+      if (version_match_policy !== undefined && host._offloaderSetInFlight === 0) {
         host._offloaderVersionMatchPolicy = version_match_policy;
       }
       break;
