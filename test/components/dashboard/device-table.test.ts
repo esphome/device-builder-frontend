@@ -13,11 +13,11 @@ vi.mock("../../../src/components/dashboard/table-column-toggle.js", () => ({}));
 vi.mock("../../../src/components/dashboard/table-row-menu.js", () => ({}));
 
 import type { ConfiguredDevice } from "../../../src/api/types.js";
+import { ESPHomeDeviceTable } from "../../../src/components/dashboard/device-table.js";
 import {
-  ESPHomeDeviceTable,
+  ALL_PAGE_SIZE,
   effectiveTablePageSize,
-} from "../../../src/components/dashboard/device-table.js";
-import { ALL_PAGE_SIZE } from "../../../src/components/dashboard/table-pagination.js";
+} from "../../../src/components/dashboard/pagination.js";
 
 describe("effectiveTablePageSize", () => {
   it("passes a normal page size through unchanged", () => {

@@ -7,6 +7,8 @@ import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
+import { ALL_PAGE_SIZE } from "./pagination.js";
+
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
 registerMdiIcons({
@@ -15,9 +17,6 @@ registerMdiIcons({
   "page-first": mdiPageFirst,
   "page-last": mdiPageLast,
 });
-
-/** Page-size sentinel for the "All" (no pagination) choice. */
-export const ALL_PAGE_SIZE = 0;
 
 @customElement("esphome-table-pagination")
 export class ESPHomeTablePagination extends LitElement {
