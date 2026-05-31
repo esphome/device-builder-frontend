@@ -56,6 +56,22 @@ describe("renderFacets responsive layout", () => {
     expect(container.querySelector(".filter-clear")).toBeNull();
   });
 
+  // _localize is stubbed to echo its key, so the count-label attribute
+  // reveals which singular/plural key was chosen.
+  it("uses the singular count label for exactly one active facet", () => {
+    const host = makeHost({ _collapseFilters: true, _activeFacetCount: 1 });
+    const menu = renderInto(host).querySelector("esphome-filters-menu");
+    expect(menu?.getAttribute("count-label")).toBe(
+      "dashboard.filter_menu_active_singular"
+    );
+  });
+
+  it("uses the plural count label for multiple active facets", () => {
+    const host = makeHost({ _collapseFilters: true, _activeFacetCount: 3 });
+    const menu = renderInto(host).querySelector("esphome-filters-menu");
+    expect(menu?.getAttribute("count-label")).toBe("dashboard.filter_menu_active_plural");
+  });
+
   it("renders inline pills with no clear button when nothing is filtered", () => {
     const host = makeHost({ _collapseFilters: false, _hasActiveFilters: false });
     const container = renderInto(host);
