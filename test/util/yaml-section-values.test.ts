@@ -1748,6 +1748,17 @@ describe("parseYamlSectionValues - is_list section round-trip", () => {
     expect(reparsed[1].id).toBe("my_flag");
   });
 
+  it("quotes a numeric initial_value so it round-trips as a string", () => {
+    const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
+    (values.globals as Record<string, unknown>[])[0].initial_value = "0";
+    const next = updateSectionInYaml(globalsYaml, "globals", values, undefined, {}, true);
+    expect(next).toContain('initial_value: "0"');
+    const reparsed = parseYamlSectionValues(next, "globals", undefined, true)
+      .globals as Record<string, unknown>[];
+    expect(typeof reparsed[0].initial_value).toBe("string");
+    expect(reparsed[0].initial_value).toBe("0");
+  });
+
   it("round-trips an added item, keeping the existing ones", () => {
     const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
     (values.globals as Record<string, unknown>[]).push({ id: "added", type: "bool" });

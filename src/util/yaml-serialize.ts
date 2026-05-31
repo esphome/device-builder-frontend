@@ -422,26 +422,75 @@ export function parseConfiguredPlatforms(yaml: string): Set<string> {
   return out;
 }
 
-/** Format a single scalar value, quoting when needed. */
-export function formatYamlScalar(v: unknown): string {
-  if (typeof v === "boolean") return String(v);
-  if (typeof v === "number") return String(v);
-  const s = String(v);
+// Scalar shapes a YAML 1.1 loader resolves to a non-string, so the bare
+// form would change type on reload. ESPHome loads configs with PyYAML
+// (yaml.safe_load); a typed-string field such as globals initial_value
+// emitted bare as 0 reloads as an int and fails ESPHome with an EInt
+// error, so any value the loader would re-type must be quoted to stay a
+// string. Mirrored from the YAML 1.1 type repository, narrowed to
+// PyYAML's resolver where it deviates from the spec (no single-letter
+// y/Y/n/N bool; float exponent must carry an explicit sign):
+//   bool      https://yaml.org/type/bool.html
+//   int       https://yaml.org/type/int.html
+//   float     https://yaml.org/type/float.html
+//   null      https://yaml.org/type/null.html
+//   timestamp https://yaml.org/type/timestamp.html
+//   resolver  https://github.com/yaml/pyyaml/blob/6.0.3/lib/yaml/resolver.py
+const YAML_BOOL =
+  /^(?:yes|Yes|YES|no|No|NO|true|True|TRUE|false|False|FALSE|on|On|ON|off|Off|OFF)$/;
+// Base 16 (0x...) is intentionally omitted so i2c addresses and other
+// hand-written hex literals stay bare and readable; base 60 is omitted
+// because its colon is already caught by the structural check below.
+const YAML_INT = /^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(?:0|[1-9][0-9_]*))$/;
+const YAML_FLOAT =
+  /^(?:[-+]?[0-9][0-9_]*\.[0-9_]*(?:[eE][-+][0-9]+)?|[-+]?\.[0-9_]+(?:[eE][-+][0-9]+)?|[-+]?\.(?:inf|Inf|INF)|\.(?:nan|NaN|NAN))$/;
+const YAML_NULL = /^(?:~|null|Null|NULL)$/;
+const YAML_TIMESTAMP =
+  /^(?:[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}(?:[Tt]|[ \t]+)[0-9]{1,2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]*)?(?:[ \t]*(?:Z|[-+][0-9]{1,2}(?::[0-9]{2})?))?)$/;
+
+/**
+ * True when *s* must be quoted to survive a YAML round-trip as a string.
+ * Beyond the structurally-unsafe characters (delimiters, leading
+ * indicators, surrounding whitespace), a value the loader would re-read
+ * as bool / int / float / null / timestamp also needs quoting.
+ */
+function yamlNeedsQuoting(s: string): boolean {
   // Empty string must be quoted: a bare ``key: `` round-trips as
   // YAML ``null``, not as the empty string we started with. Only
   // matters when the caller has opted into keep-empty-strings
   // (default is to drop the key entirely), but the formatter is
   // shared so we get it right at the source.
-  if (
+  return (
     s === "" ||
     /[:#]/.test(s) ||
     /^[-\s'"]/.test(s) ||
     /\s$/.test(s) ||
-    /[\n\r\t]/.test(s)
-  ) {
-    return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
-  }
-  return s;
+    /[\n\r\t]/.test(s) ||
+    YAML_BOOL.test(s) ||
+    YAML_INT.test(s) ||
+    YAML_FLOAT.test(s) ||
+    YAML_NULL.test(s) ||
+    YAML_TIMESTAMP.test(s)
+  );
+}
+
+/** Wrap *s* in double quotes, escaping backslashes and control chars. */
+function yamlDoubleQuote(s: string): string {
+  const escaped = s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
+  return `"${escaped}"`;
+}
+
+/** Format a single scalar value, quoting when needed. */
+export function formatYamlScalar(v: unknown): string {
+  if (typeof v === "boolean") return String(v);
+  if (typeof v === "number") return String(v);
+  const s = String(v);
+  return yamlNeedsQuoting(s) ? yamlDoubleQuote(s) : s;
 }
 
 // ESPHome's YAML loader accepts the YAML 1.1 truthy/falsy spellings
