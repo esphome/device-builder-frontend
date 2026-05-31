@@ -1211,16 +1211,6 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareBinary[]>("firmware/get_binaries", { configuration });
   }
 
-  /** Download a compiled firmware binary as base64. */
-  /**
-   * Fetch a build artifact over HTTP (not the WS) for saving to disk.
-   *
-   * The WS ``firmware/download`` returns the whole file as one base64
-   * message; a ~14 MB ``firmware.elf`` exceeds a proxy's WebSocket
-   * ``max_msg_size`` and is dropped. This streams it over HTTP instead
-   * (same-origin, base-path aware), authenticating with the same bearer
-   * token the WS uses. Returns the blob plus the server-suggested filename.
-   */
   /** Mint a single-use token authorizing the HTTP download of one artifact. */
   async firmwareDownloadToken(configuration: string, file: string): Promise<string> {
     const result = await this.sendCommand<{ token: string }>("firmware/download_token", {
