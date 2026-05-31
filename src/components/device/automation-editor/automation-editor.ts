@@ -346,6 +346,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         this.configuration,
         this.yaml
       );
+      // A successful parse clears any prior parse error, so the banner
+      // doesn't stick after the user fixes invalid YAML in the pane.
+      this._error = "";
       // Re-pin location to the parser's canonical form (script id
       // matched, light_effect index resolved against the actual YAML);
       // the controller withholds a read-only automation's empty tree.
