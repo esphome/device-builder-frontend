@@ -45,6 +45,16 @@ describe("YAML_ONLY_SECTIONS", () => {
     expect(MAP_SECTIONS.has("packages")).toBe(false);
   });
 
+  it("contains globals — list-of-mappings shape would corrupt", () => {
+    // ``globals`` is a multi_conf list of typed-variable mappings.
+    // The flat catalog ``config_entries`` route it through the
+    // single-instance form, which reads the list body back as
+    // ``{}`` and overwrites every global on save. YAML-only avoids
+    // the data loss until a repeatable-list control exists.
+    expect(YAML_ONLY_SECTIONS.has("globals")).toBe(true);
+    expect(MAP_SECTIONS.has("globals")).toBe(false);
+  });
+
   it("YAML_ONLY_SECTIONS and MAP_SECTIONS are mutually exclusive", () => {
     // YAML-only takes precedence — an entry in both would silently
     // demote a MAP section to a YAML notice.

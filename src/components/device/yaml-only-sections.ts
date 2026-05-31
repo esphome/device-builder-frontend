@@ -24,12 +24,24 @@
  * so route the whole section to YAML-only — both shapes round-
  * trip cleanly through the YAML pane.
  *
+ * `globals` is a multi_conf component whose body is a *list* of
+ * typed-variable mappings (`globals:\n  - id:\n    type:\n    ...`).
+ * The catalog ships its `config_entries` flat (one variable's
+ * fields), so the form renderer draws a single-instance mapping and
+ * `parseYamlSectionValues` reads the list body back as `{}` (it skips
+ * the list-item dashes). The result is a blank form that, on save,
+ * overwrites every existing global with an empty (or single-mapping,
+ * schema-invalid) block — the same list-shape data loss `packages`
+ * hit in #361. Route to YAML-only until the form grows a repeatable
+ * list control for top-level multi_conf sections.
+ *
  * Lives in its own module so the unit test can import without
  * dragging Lit / DOM into the vitest Node environment.
  */
 export const YAML_ONLY_SECTIONS: ReadonlySet<string> = new Set([
   "external_components",
   "packages",
+  "globals",
 ]);
 
 /** True when the section should fall back to the YAML notice — either
