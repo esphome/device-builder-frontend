@@ -4,11 +4,15 @@
  * route to the choose-binary picker (so the OTA image is reachable)
  * instead of silently auto-downloading the factory image; web-flasher
  * paths still auto-select the self-contained factory image.
+ *
+ * Downloads go over HTTP: api.firmwareDownloadUrl mints a tokenized URL and
+ * triggerDownload navigates to it (native, streamed, mobile-friendly) so a
+ * large firmware.elf isn't capped by a proxy's WebSocket max_msg_size.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { downloadBase64Binary } = vi.hoisted(() => ({ downloadBase64Binary: vi.fn() }));
-vi.mock("../../src/util/download-text.js", () => ({ downloadBase64Binary }));
+const { triggerDownload } = vi.hoisted(() => ({ triggerDownload: vi.fn() }));
+vi.mock("../../src/util/download-text.js", () => ({ triggerDownload }));
 vi.mock("../../src/util/web-serial.js", () => ({
   connectToPort: vi.fn(),
   detectChip: vi.fn(),
@@ -48,12 +52,7 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
       return "s1";
     }),
     firmwareGetBinaries: vi.fn().mockResolvedValue(binaries),
-    firmwareDownload: vi.fn().mockResolvedValue({
-      filename: "device-firmware.bin",
-      data: "QUJD",
-      size: 3,
-      compressed: false,
-    }),
+    firmwareDownloadUrl: vi.fn().mockResolvedValue("/api/firmware/download?token=tok"),
   };
   const host = {
     _device: { configuration: "device.yaml" },
@@ -92,21 +91,21 @@ describe("manual firmware-binary download flow", () => {
     await run(host);
     expect(host._step).toBe("choose-binary");
     expect(host._binaries).toEqual([FACTORY, OTA]);
-    expect(api.firmwareDownload).not.toHaveBeenCalled();
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
   it("downloads directly when the device produces a single format", async () => {
     const single: FirmwareBinary = { title: "Standard format", file: "firmware.bin" };
     const { host, api } = makeHost("binary-download", [single]);
     await run(host);
-    expect(api.firmwareDownload).toHaveBeenCalledWith("device.yaml", "firmware.bin");
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith("device.yaml", "firmware.bin");
     expect(host._step).toBe("download-ready");
   });
 
   it("web flasher auto-selects the factory image even with multiple formats", async () => {
     const { host, api } = makeHost("web-download", [FACTORY, OTA]);
     await run(host);
-    expect(api.firmwareDownload).toHaveBeenCalledWith(
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
       "device.yaml",
       "firmware.factory.bin"
     );
@@ -120,8 +119,14 @@ describe("manual firmware-binary download flow", () => {
       host as unknown as ESPHomeFirmwareInstallDialog,
       "firmware.ota.bin"
     );
-    expect(api.firmwareDownload).toHaveBeenCalledWith("device.yaml", "firmware.ota.bin");
-    expect(downloadBase64Binary).toHaveBeenCalledWith("QUJD", "device-firmware.bin");
+    expect(api.firmwareDownloadUrl).toHaveBeenCalledWith(
+      "device.yaml",
+      "firmware.ota.bin"
+    );
+    expect(triggerDownload).toHaveBeenCalledWith(
+      "/api/firmware/download?token=tok",
+      "firmware.ota.bin"
+    );
     expect(host._step).toBe("download-ready");
     // Kept so the done screen can offer "download another format".
     expect(host._binaries).toHaveLength(2);
@@ -132,7 +137,7 @@ describe("manual firmware-binary download flow", () => {
     api.firmwareGetBinaries.mockRejectedValueOnce(new Error("boom"));
     await run(host);
     expect(host._fail).toHaveBeenCalledWith("firmware.download_failed");
-    expect(api.firmwareDownload).not.toHaveBeenCalled();
+    expect(api.firmwareDownloadUrl).not.toHaveBeenCalled();
   });
 
   it("re-picking after a download grabs the other format and keeps the list", async () => {
@@ -148,7 +153,7 @@ describe("manual firmware-binary download flow", () => {
       host as unknown as ESPHomeFirmwareInstallDialog,
       "firmware.factory.bin"
     );
-    expect(api.firmwareDownload).toHaveBeenLastCalledWith(
+    expect(api.firmwareDownloadUrl).toHaveBeenLastCalledWith(
       "device.yaml",
       "firmware.factory.bin"
     );

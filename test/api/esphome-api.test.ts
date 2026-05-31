@@ -1886,3 +1886,71 @@ describe("ESPHomeAPI — setDeviceLabelsBulk", () => {
     ]);
   });
 });
+
+describe("ESPHomeAPI — firmware download (HTTP)", () => {
+  afterEach(() => {
+    uninstallMockWebSocket();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("mints a download token over the WebSocket", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.firmwareDownloadToken("kitchen.yaml", "firmware.elf");
+    const sent = ws.sentAs<{ command: string; message_id: string; args: unknown }>(0);
+    expect(sent.command).toBe("firmware/download_token");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml", file: "firmware.elf" });
+    ws.receive({ message_id: sent.message_id, result: { token: "tok-123" } });
+
+    await expect(pending).resolves.toBe("tok-123");
+  });
+
+  it("builds a base-path-aware, token-encoded download URL", async () => {
+    const api = new ESPHomeAPI();
+    vi.spyOn(api, "firmwareDownloadToken").mockResolvedValue("a b/c+d");
+
+    const url = await api.firmwareDownloadUrl("kitchen.yaml", "firmware.elf");
+
+    expect(api.firmwareDownloadToken).toHaveBeenCalledWith(
+      "kitchen.yaml",
+      "firmware.elf"
+    );
+    expect(url).toBe("/api/firmware/download?token=a%20b%2Fc%2Bd");
+  });
+
+  it("fetches the bytes for Web Serial flashing", async () => {
+    const api = new ESPHomeAPI();
+    vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue(
+      "/api/firmware/download?token=t"
+    );
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    const fetchFn = vi.fn(async () => ({ ok: true, arrayBuffer: async () => bytes }));
+    vi.stubGlobal("fetch", fetchFn);
+
+    const result = await api.firmwareDownloadBytes(
+      "kitchen.yaml",
+      "firmware.factory.bin"
+    );
+
+    expect(fetchFn).toHaveBeenCalledWith("/api/firmware/download?token=t");
+    expect(result).toBe(bytes);
+  });
+
+  it("throws when the byte fetch responds non-ok", async () => {
+    const api = new ESPHomeAPI();
+    vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue(
+      "/api/firmware/download?token=t"
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404 }))
+    );
+
+    await expect(
+      api.firmwareDownloadBytes("kitchen.yaml", "missing.bin")
+    ).rejects.toThrow(/404/);
+  });
+});

@@ -1,6 +1,6 @@
 import { JobStatus, type FirmwareBinary } from "../../api/types/firmware-jobs.js";
 import { chipNameToVariant } from "../../util/chip-variant.js";
-import { downloadBase64Binary } from "../../util/download-text.js";
+import { triggerDownload } from "../../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../../util/post-install-logs.js";
 import {
   connectToPort,
@@ -113,8 +113,9 @@ export async function startWebSerialInstall(
       return;
     }
     if (factory) flashAddress = 0x0;
-    const result = await host._api.firmwareDownload(device.configuration, binary.file);
-    firmwareBytes = Uint8Array.from(atob(result.data), (c) => c.charCodeAt(0));
+    firmwareBytes = new Uint8Array(
+      await host._api.firmwareDownloadBytes(device.configuration, binary.file)
+    );
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;
@@ -300,9 +301,9 @@ export async function downloadSelectedBinary(
   // footer must not offer Stop (see renderFooter).
   host._step = "downloading";
   try {
-    const result = await host._api.firmwareDownload(device.configuration, file);
-    downloadBase64Binary(result.data, result.filename);
-    host._downloadedFilename = result.filename;
+    const url = await host._api.firmwareDownloadUrl(device.configuration, file);
+    triggerDownload(url, file);
+    host._downloadedFilename = file;
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;

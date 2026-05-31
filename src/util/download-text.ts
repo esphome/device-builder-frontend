@@ -21,9 +21,9 @@ import { stripAnsi } from "./strip-ansi.js";
  *   reads. Holding the URL around would leak the underlying
  *   ``Blob`` for the page's lifetime.
  *
- * Private helper — call sites use the typed wrappers below
- * (:func:`downloadAnsiText`, :func:`downloadBase64Binary`)
- * rather than touching this directly.
+ * Private helper — call sites use :func:`downloadAnsiText` rather than
+ * touching this directly. (Binary artifacts download natively via
+ * :func:`triggerDownload`, which streams from a URL and skips this.)
  */
 function _downloadBlob(bytes: BlobPart, filename: string, mimeType: string): void {
   const blob = new Blob([bytes], { type: mimeType });
@@ -36,27 +36,19 @@ function _downloadBlob(bytes: BlobPart, filename: string, mimeType: string): voi
 }
 
 /**
- * Save a base64-encoded binary payload to the user's disk.
+ * Trigger a native browser download of a (same-origin) URL.
  *
- * Used by every install-related save path that hands the user
- * a firmware binary to flash with their own tooling:
- *
- * - :class:`ESPHomeFirmwareInstallDialog`'s manual-download
- *   install flow (post-compile save of the local-build output);
- * - :class:`ESPHomeDashboard`'s per-device "Download firmware"
- *   button on configured-device rows.
- *
- * ``b64`` is standard (not URL-safe) base64 — decoded via
- * ``atob`` + ``Uint8Array.from`` in one pass. Saves as
- * ``application/octet-stream`` so browsers don't sniff the
- * bytes as an executable / text / image. ``filename`` is
- * offered to the save dialog as-is; callers own extension
- * shaping (``.bin`` for firmware images, ``.uf2`` for
- * mass-storage flashes, etc.).
+ * Unlike the blob helpers this doesn't buffer the file in memory — the browser
+ * streams the response straight to disk, so it scales to large artifacts (the
+ * ~14 MB firmware.elf) and works on mobile where programmatic blob downloads
+ * are unreliable. The server's ``Content-Disposition`` names the saved file;
+ * ``filename`` is only a same-origin hint.
  */
-export function downloadBase64Binary(b64: string, filename: string): void {
-  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  _downloadBlob(bytes, filename, "application/octet-stream");
+export function triggerDownload(url: string, filename: string): void {
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
 }
 
 /**

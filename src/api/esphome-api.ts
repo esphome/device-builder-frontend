@@ -45,7 +45,6 @@ import type {
 } from "./types/event-subscription.js";
 import type {
   FirmwareBinary,
-  FirmwareDownload,
   FirmwareJob,
   RemoteBuildSubmitTarget,
 } from "./types/firmware-jobs.js";
@@ -1213,16 +1212,43 @@ export class ESPHomeAPI {
   }
 
   /** Download a compiled firmware binary as base64. */
-  async firmwareDownload(
-    configuration: string,
-    file: string,
-    compressed = false
-  ): Promise<FirmwareDownload> {
-    return this.sendCommand<FirmwareDownload>("firmware/download", {
+  /**
+   * Fetch a build artifact over HTTP (not the WS) for saving to disk.
+   *
+   * The WS ``firmware/download`` returns the whole file as one base64
+   * message; a ~14 MB ``firmware.elf`` exceeds a proxy's WebSocket
+   * ``max_msg_size`` and is dropped. This streams it over HTTP instead
+   * (same-origin, base-path aware), authenticating with the same bearer
+   * token the WS uses. Returns the blob plus the server-suggested filename.
+   */
+  /** Mint a single-use token authorizing the HTTP download of one artifact. */
+  async firmwareDownloadToken(configuration: string, file: string): Promise<string> {
+    const result = await this.sendCommand<{ token: string }>("firmware/download_token", {
       configuration,
       file,
-      compressed,
     });
+    return result.token;
+  }
+
+  /**
+   * Build the HTTP download URL for an artifact (mints a token first).
+   *
+   * Save-to-disk callers point an ``<a href>`` at this so the browser streams
+   * the file straight to disk — no in-memory buffering, works on mobile. The
+   * token is the route's auth, so the URL needs no ``Authorization`` header.
+   */
+  async firmwareDownloadUrl(configuration: string, file: string): Promise<string> {
+    const token = await this.firmwareDownloadToken(configuration, file);
+    return `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`;
+  }
+
+  /** Fetch an artifact's bytes (for in-browser Web Serial flashing). */
+  async firmwareDownloadBytes(configuration: string, file: string): Promise<ArrayBuffer> {
+    const response = await fetch(await this.firmwareDownloadUrl(configuration, file));
+    if (!response.ok) {
+      throw new Error(`Firmware download failed: ${response.status}`);
+    }
+    return response.arrayBuffer();
   }
 
   // ─── Board Commands ───────────────────────────────────────
