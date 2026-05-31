@@ -358,6 +358,20 @@ export class ESPHomeLogsDialog extends LitElement {
         .term-btn.expand-btn {
           display: none;
         }
+
+        /* The desktop toolbar is a single non-wrapping row that pushes the
+           controls right with a flex:1 spacer. On a phone the labelled
+           buttons (States / Clear / Stop) ran off the right edge, so the
+           Stop text was unreachable. Let the row wrap and drop the spacer
+           so the buttons flow left-to-right onto a second line, keeping
+           every label on-screen and tappable. */
+        .terminal-toolbar {
+          flex-wrap: wrap;
+        }
+
+        .terminal-toolbar .spacer {
+          display: none;
+        }
       }
     `,
   ];
