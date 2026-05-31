@@ -103,6 +103,10 @@ export interface ComponentCatalogEntry {
   dependencies: string[];
   /** Whether the same component can be added multiple times. */
   multi_conf: boolean;
+  /** True when the body is a YAML list of mappings (globals), one item
+   *  per entry, not a single mapping. The section editor renders these
+   *  as a repeatable list; config_entries describe one item's fields. */
+  is_list: boolean;
   /** Empty list = works on every target platform. Non-empty = restricted to those. */
   supported_platforms: string[];
   /** The component's configuration schema. May contain `nested` entries

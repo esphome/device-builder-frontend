@@ -1708,3 +1708,87 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     expect(values.hint).toBe("enable");
   });
 });
+
+describe("parseYamlSectionValues - is_list section round-trip", () => {
+  const globalsYaml = [
+    "globals:",
+    "  - id: my_int",
+    "    type: int",
+    "    initial_value: '0'",
+    "  - id: my_flag",
+    "    type: bool",
+    "    restore_value: true",
+  ].join("\n");
+
+  it("parses a list body into an array keyed under the section name", () => {
+    const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
+    const items = values.globals as Record<string, unknown>[];
+    expect(Array.isArray(items)).toBe(true);
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    expect(items[0].type).toBe("int");
+    expect(items[1].id).toBe("my_flag");
+    expect(items[1].restore_value).toBe(true);
+  });
+
+  it("returns an empty record when the is_list flag is off (the #1097 bug)", () => {
+    // Without the flag the map parser can't read the dash-rooted body,
+    // so the form would render empty and a save would drop every item.
+    expect(parseYamlSectionValues(globalsYaml, "globals", undefined, false)).toEqual({});
+  });
+
+  it("round-trips an edit to one item without dropping its siblings", () => {
+    const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
+    (values.globals as Record<string, unknown>[])[0].initial_value = "5";
+    const next = updateSectionInYaml(globalsYaml, "globals", values, undefined, {}, true);
+    const reparsed = parseYamlSectionValues(next, "globals", undefined, true)
+      .globals as Record<string, unknown>[];
+    expect(reparsed).toHaveLength(2);
+    expect(reparsed[0].initial_value).toBe("5");
+    expect(reparsed[1].id).toBe("my_flag");
+  });
+
+  it("round-trips an added item, keeping the existing ones", () => {
+    const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
+    (values.globals as Record<string, unknown>[]).push({ id: "added", type: "bool" });
+    const next = updateSectionInYaml(globalsYaml, "globals", values, undefined, {}, true);
+    const reparsed = parseYamlSectionValues(next, "globals", undefined, true)
+      .globals as Record<string, unknown>[];
+    expect(reparsed).toHaveLength(3);
+    expect(reparsed.map((i) => i.id)).toEqual(["my_int", "my_flag", "added"]);
+  });
+
+  it("round-trips a removed item, keeping the remainder", () => {
+    const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
+    values.globals = (values.globals as Record<string, unknown>[]).slice(1);
+    const next = updateSectionInYaml(globalsYaml, "globals", values, undefined, {}, true);
+    const reparsed = parseYamlSectionValues(next, "globals", undefined, true)
+      .globals as Record<string, unknown>[];
+    expect(reparsed).toHaveLength(1);
+    expect(reparsed[0].id).toBe("my_flag");
+  });
+
+  it("leaves a following sibling section intact on save", () => {
+    const yaml = [globalsYaml, "", "wifi:", "  ssid: home"].join("\n");
+    const values = parseYamlSectionValues(yaml, "globals", undefined, true);
+    (values.globals as Record<string, unknown>[])[0].initial_value = "9";
+    const next = updateSectionInYaml(yaml, "globals", values, undefined, {}, true);
+    expect(next).toContain("wifi:");
+    expect(next).toContain("  ssid: home");
+  });
+
+  it("never clobbers a body that did not parse to an array", () => {
+    // A complex body (font glyphs, lambdas) parses to a YamlRawValue,
+    // not an array; the save must return the YAML untouched.
+    const yaml = globalsYaml;
+    const out = updateSectionInYaml(
+      yaml,
+      "globals",
+      { globals: new YamlRawValue(["  - opaque"]) },
+      undefined,
+      {},
+      true
+    );
+    expect(out).toBe(yaml);
+  });
+});

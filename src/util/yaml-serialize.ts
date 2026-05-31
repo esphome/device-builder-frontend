@@ -213,7 +213,7 @@ export interface SerializeYamlOptions {
  * ``YamlRawValue`` values inside an item are emitted with the
  * same inline-header / body shape as the top-level branch.
  */
-function serializeListItem(
+export function serializeListItem(
   item: unknown,
   indent: string,
   options: SerializeYamlOptions

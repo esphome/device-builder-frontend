@@ -77,22 +77,42 @@ const MAP_SECTION_ENTRIES: ConfigEntry[] = [
   }),
 ];
 
+/** Singular noun for each list item's card header; the nested-list
+ *  renderer shows '<label> <n>' (Global variable 1). Falls back to a
+ *  generic 'Item' for sections without a curated label. */
+const LIST_SECTION_ITEM_LABELS: Readonly<Record<string, string>> = {
+  globals: "Global variable",
+};
+
 /**
  * Pick the right ``ConfigEntry[]`` to render for *sectionKey*.
  *
- * For sections in ``MAP_SECTIONS`` returns the synthesised MAP
- * shape; otherwise hands back the catalog entries unchanged. Pure
- * function — same input, same output, no side effects — so the
- * render path's correctness is testable without standing up a
- * shadow root. (Previously the override variable existed but the
- * form's ``.entries`` prop bound to the wrong source, leaving the
- * section silently empty; pinning the resolution as a function the
- * tests call directly closes that loophole.)
+ * Sections in ``MAP_SECTIONS`` get the synthesised MAP shape.
+ * ``isList`` sections (whose body is a YAML list of mappings, flagged
+ * by the catalog's component-level ``is_list``) get a single keyed
+ * ``NESTED + multi_value`` entry wrapping the catalog fields, so they
+ * render through the same repeatable-list machinery as
+ * ``esphome.areas``; the section value is the normal Record
+ * ``{ [sectionKey]: [...] }``. Everything else hands back the catalog
+ * entries unchanged. Pure function so the render path's correctness is
+ * testable without standing up a shadow root.
  */
 export function resolveSectionEntries(
   sectionKey: string,
-  catalogEntries: ConfigEntry[]
+  catalogEntries: ConfigEntry[],
+  isList = false
 ): ConfigEntry[] {
   if (MAP_SECTIONS.has(sectionKey)) return MAP_SECTION_ENTRIES;
+  if (isList) {
+    return [
+      makeConfigEntry({
+        key: sectionKey,
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        label: LIST_SECTION_ITEM_LABELS[sectionKey] ?? "Item",
+        config_entries: catalogEntries,
+      }),
+    ];
+  }
   return catalogEntries;
 }

@@ -21,7 +21,12 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
   host._draftTimer = null;
   if (!host._config) return;
 
-  const renderEntries = resolveSectionEntries(host.sectionKey, host._config.entries);
+  const isList = host._config.is_list;
+  const renderEntries = resolveSectionEntries(
+    host.sectionKey,
+    host._config.entries,
+    isList
+  );
   host._fieldErrors = validateEntries(
     renderEntries,
     host._values,
@@ -47,7 +52,8 @@ export function flushDraft(host: ESPHomeDeviceSectionConfig): void {
     // and must round-trip. Other MAP sections (packages) treat empty value
     // as an unfilled placeholder — packages schema validator rejects
     // empty-string definitions, so dropping placeholders keeps it loadable.
-    { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey) }
+    { keepEmptyStrings: KEEP_EMPTY_STRING_SECTIONS.has(host.sectionKey) },
+    isList
   );
 
   host._setDirty(false);

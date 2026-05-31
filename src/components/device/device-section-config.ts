@@ -301,13 +301,27 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     const showAdvanced = this._showAdvanced;
     // Handles overrides for sections whose backend schema doesn't match the
     // actual user-keyed shape (currently just substitutions).
-    const renderEntries = resolveSectionEntries(this.sectionKey, this._config.entries);
+    const isList = this._config.is_list;
+    const renderEntries = resolveSectionEntries(
+      this.sectionKey,
+      this._config.entries,
+      isList
+    );
     const hasAdvanced = anyAdvancedEntry(renderEntries);
+    // A list-bodied section whose parsed body isn't an array means the
+    // items carry shapes the list form can't round-trip (font glyphs,
+    // lambdas); fall back to YAML-only so a save can't wipe them. An
+    // absent body (undefined) still renders the form so the user can Add.
+    const listBodyUnrenderable =
+      isList &&
+      this._values[this.sectionKey] !== undefined &&
+      !Array.isArray(this._values[this.sectionKey]);
     // Free-form / structural sections: show "edit via YAML" instead of the
     // form. external_components and packages are always-YAML (discriminated
     // unions don't fit the catalog — see #361 for the packages data-loss
     // regression). Zero-entries sections also fall back here.
-    const yamlOnly = isYamlOnlySection(this.sectionKey, renderEntries.length);
+    const yamlOnly =
+      isYamlOnlySection(this.sectionKey, renderEntries.length) || listBodyUnrenderable;
 
     const canDelete = !UNDELETABLE_SECTIONS.has(this.sectionKey);
 

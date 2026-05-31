@@ -12,6 +12,7 @@ import {
   YamlRawValue,
   formatYamlScalar,
   parseYamlBoolean,
+  serializeListItem,
   serializeYamlValues,
   type SerializeYamlOptions,
 } from "./yaml-serialize.js";
@@ -720,7 +721,8 @@ export function findSectionStart(
 export function parseYamlSectionValues(
   yaml: string,
   sectionKey: string,
-  fromLine?: number
+  fromLine?: number,
+  isList = false
 ): Record<string, unknown> {
   const lines = yaml.split("\n");
   // Null-prototype map so a YAML key like `__proto__` /
@@ -739,6 +741,22 @@ export function parseYamlSectionValues(
   const values: Record<string, unknown> = Object.create(null);
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) return values;
+
+  // List-bodied section (``globals:`` → ``- id: …`` items): the body
+  // IS the list, keyed under the section name so the wrapped
+  // ``nested + multi_value`` entry reads it at path ``[sectionKey]``,
+  // exactly like ``esphome.areas``. ``parseListBlock`` returns a
+  // structured array for clean mappings and a ``YamlRawValue`` for
+  // shapes it can't model (font glyphs, lambdas); the render path
+  // falls back to YAML-only for the latter.
+  if (isList) {
+    const headIndent = _leadingIndent(lines[startIdx]);
+    const bodyStart = _skipBlankAndCommentLines(lines, startIdx + 1);
+    if (bodyStart < lines.length && isChildListItemLine(lines[bodyStart], headIndent)) {
+      values[sectionKey] = parseListBlock(lines, bodyStart, headIndent).value;
+    }
+    return values;
+  }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[startIdx]);
   // Detect the indent the user actually picked for this
@@ -978,11 +996,30 @@ export function updateSectionInYaml(
   sectionKey: string,
   values: Record<string, unknown>,
   fromLine?: number,
-  options: SerializeYamlOptions = {}
+  options: SerializeYamlOptions = {},
+  isList = false
 ): string {
   const lines = yaml.split("\n");
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
+
+  // List-bodied section: re-emit the section header followed by the
+  // list items straight under it (``globals:`` → ``  - id: …``).
+  // A non-array value means the body parsed to a YamlRawValue the
+  // form can't represent — leave the YAML untouched rather than
+  // overwrite it.
+  if (isList) {
+    const items = values[sectionKey];
+    if (!Array.isArray(items)) return yaml;
+    const headIndent = _leadingIndent(lines[start]);
+    const step = options.indentStep ?? _detectSectionChildIndent(lines, start, false);
+    const body: string[] = [];
+    for (const item of items) {
+      body.push(...serializeListItem(item, headIndent, { ...options, indentStep: step }));
+    }
+    lines.splice(start, end - start, lines[start], ...body);
+    return lines.join("\n");
+  }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
   // Match the user's existing indent step on save so 4-space (or

@@ -244,3 +244,40 @@ describe("save validation contract", () => {
     expect(errors.has("ssid")).toBe(true);
   });
 });
+
+describe("resolveSectionEntries — is_list sections", () => {
+  const globalsCatalog: ConfigEntry[] = [
+    makeConfigEntry({ key: "id", type: ConfigEntryType.STRING, required: true }),
+    makeConfigEntry({ key: "type", type: ConfigEntryType.STRING, required: true }),
+    makeConfigEntry({ key: "initial_value", type: ConfigEntryType.STRING }),
+  ];
+
+  it("wraps the catalog fields in one keyed nested, multi_value entry", () => {
+    // The single wrapping entry keyed on the section name is what
+    // routes the section through the esphome.areas repeatable-list
+    // machinery; its value lives at path [sectionKey].
+    const entries = resolveSectionEntries("globals", globalsCatalog, true);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].key).toBe("globals");
+    expect(entries[0].type).toBe(ConfigEntryType.NESTED);
+    expect(entries[0].multi_value).toBe(true);
+    expect(entries[0].config_entries).toBe(globalsCatalog);
+  });
+
+  it("labels globals items 'Global variable' and others 'Item'", () => {
+    expect(resolveSectionEntries("globals", globalsCatalog, true)[0].label).toBe(
+      "Global variable"
+    );
+    expect(resolveSectionEntries("i2c", globalsCatalog, true)[0].label).toBe("Item");
+  });
+
+  it("returns the catalog entries unchanged when isList is false or omitted", () => {
+    expect(resolveSectionEntries("globals", globalsCatalog, false)).toBe(globalsCatalog);
+    expect(resolveSectionEntries("globals", globalsCatalog)).toBe(globalsCatalog);
+  });
+
+  it("MAP_SECTIONS still win even if isList is somehow true", () => {
+    const result = resolveSectionEntries("substitutions", globalsCatalog, true);
+    expect(result[0].type).toBe(ConfigEntryType.MAP);
+  });
+});
