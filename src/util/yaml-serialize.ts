@@ -432,8 +432,14 @@ export function formatYamlScalar(v: unknown): string {
   // matters when the caller has opted into keep-empty-strings
   // (default is to drop the key entirely), but the formatter is
   // shared so we get it right at the source.
-  if (s === "" || /[:#]/.test(s) || /^[-\s'"]/.test(s) || /\s$/.test(s)) {
-    return `"${s.replace(/"/g, '\\"')}"`;
+  if (
+    s === "" ||
+    /[:#]/.test(s) ||
+    /^[-\s'"]/.test(s) ||
+    /\s$/.test(s) ||
+    /[\n\r\t]/.test(s)
+  ) {
+    return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
   }
   return s;
 }
