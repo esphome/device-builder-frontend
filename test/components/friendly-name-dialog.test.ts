@@ -45,6 +45,26 @@ describe("friendly-name-dialog ENTER", () => {
     );
   });
 
+  it("fires friendly-name-confirm once on a held (auto-repeat) Enter", async () => {
+    // No one-shot latch here (unlike the sibling dialogs) because the
+    // EnterController detaches in willUpdate on the _open flip that
+    // _confirm's close() triggers — a microtask that drains within the
+    // same event-loop turn. Real OS auto-repeat delivers each keydown as
+    // a separate task, so by the second keydown the listener is already
+    // gone. Modelled here as keydown -> microtask checkpoint (updateComplete)
+    // -> keydown, the faithful shape of a held key.
+    const el = await mount();
+    el.open("kitchen", "Kitchen");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("friendly-name-confirm", onConfirm as EventListener);
+    await setValue(el, "Living Room");
+    pressEnter({ repeat: true }); // confirms + runs close(), schedules the detaching update
+    await el.updateComplete; // the inter-keystroke turn: willUpdate unbinds the listener
+    pressEnter({ repeat: true }); // listener already gone — no second dispatch
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores Enter once closed (inactive)", async () => {
     const el = await mount();
     el.open("kitchen", "Kitchen");

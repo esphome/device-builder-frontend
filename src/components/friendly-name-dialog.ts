@@ -160,6 +160,21 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
   ];
 
   // Enter confirms; _confirm self-guards on empty / unchanged.
+  //
+  // Unlike the sibling dialogs that consume this controller
+  // (rename / clone / confirm / unsaved-changes / yaml-validation),
+  // this one needs NO one-shot ``_resolved`` latch against held
+  // Enter. The difference is *where* the listener detaches: those
+  // siblings unbind on ``wa-after-hide`` (after the ~150-250ms hide
+  // animation, many event-loop turns later), so a held Enter keeps
+  // re-entering ``_confirm`` through the whole animation. Here the
+  // listener unbinds in ``willUpdate`` on the ``_open`` flip that
+  // ``close()`` triggers — a Lit microtask that drains within the
+  // same turn, before the next OS auto-repeat keydown (a separate
+  // task) can arrive. So the repeat finds the listener already gone.
+  // If this dialog ever moves teardown to ``wa-after-hide``, add the
+  // ``_resolved`` latch the siblings carry, or held Enter will
+  // dispatch ``friendly-name-confirm`` twice.
   private _enter = new EnterController(this, () => this._confirm());
 
   protected willUpdate(changed: PropertyValues): void {
