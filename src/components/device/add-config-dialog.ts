@@ -1,6 +1,7 @@
 import { html, LitElement } from "lit";
 import { customElement, property, query } from "lit/decorators.js";
-import { CORE_CATEGORIES, type BoardCatalogEntry } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import { CORE_CATEGORIES } from "../../api/types/components.js";
 
 import "./add-component-dialog.js";
 import type { ESPHomeAddComponentDialog } from "./add-component-dialog.js";

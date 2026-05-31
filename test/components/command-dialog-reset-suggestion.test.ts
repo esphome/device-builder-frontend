@@ -10,9 +10,14 @@
  * the receiver label inlined.
  */
 import { describe, it } from "vitest";
-import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
-import { JobSource, JobStatus, JobType, type FirmwareJob } from "../../src/api/types.js";
+import {
+  type FirmwareJob,
+  JobSource,
+  JobStatus,
+  JobType,
+} from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
+import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
 import {
   expectFallbackToLocal,
   expectLocalSuggestion,

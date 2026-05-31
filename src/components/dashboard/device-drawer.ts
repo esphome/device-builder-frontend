@@ -2,17 +2,17 @@ import { consume } from "@lit/context";
 import {
   mdiCheckNetworkOutline,
   mdiClose,
-  mdiConsole,
   mdiHelpNetworkOutline,
   mdiNetworkOffOutline,
   mdiPencil,
+  mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
+import { DeviceState } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { DeviceState } from "../../api/types.js";
-import type { ConfiguredDevice } from "../../api/types.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
@@ -24,7 +24,7 @@ import "./device-drawer-content.js";
 registerMdiIcons({
   "check-network-outline": mdiCheckNetworkOutline,
   close: mdiClose,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   "help-network-outline": mdiHelpNetworkOutline,
   "network-off-outline": mdiNetworkOffOutline,
   pencil: mdiPencil,
@@ -381,7 +381,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
             class="action action--ghost"
             @click=${() => this._emitAction("open-logs")}
           >
-            <wa-icon library="mdi" name="console"></wa-icon>
+            <wa-icon library="mdi" name="text-box-outline"></wa-icon>
             ${this._localize("dashboard.drawer_logs")}
           </button>
         </div>

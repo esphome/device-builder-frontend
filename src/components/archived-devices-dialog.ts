@@ -3,7 +3,7 @@ import { mdiArchiveArrowUpOutline, mdiArchiveOutline, mdiTrashCanOutline } from 
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ArchivedDevice } from "../api/types.js";
+import type { ArchivedDevice } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";

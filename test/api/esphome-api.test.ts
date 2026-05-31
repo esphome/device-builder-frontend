@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APIError } from "../../src/api/api-error.js";
 import { ESPHomeAPI } from "../../src/api/esphome-api.js";
-import { JobType } from "../../src/api/types.js";
+import { JobType } from "../../src/api/types/firmware-jobs.js";
 import {
   MockWebSocket,
   installMockWebSocket,
@@ -286,6 +286,75 @@ describe("ESPHomeAPI — cloneDevice", () => {
       new_name: "bedroom-bulb",
       new_friendly_name: "",
     });
+  });
+});
+
+describe("ESPHomeAPI — getAvailableAutomations", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("backfills missing config_entries on triggers/actions/conditions", async () => {
+    // Backend's slim ``*Index`` shapes drop ``config_entries`` from
+    // the wire payload entirely. Renderers
+    // (``automation-action-node._renderActionParams`` and similar)
+    // read ``def.config_entries.length`` synchronously, so the
+    // client must normalize undefined to ``[]`` before any consumer
+    // touches the result. Pin the normalization at the client
+    // boundary so every caller is safe by construction (avoids
+    // duplicating the backfill in ``loadAndHydrateAvailable``,
+    // ``api-action-editor``, ``script-editor``, etc.).
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAvailableAutomations("device.yaml");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        // Wire shape: no ``config_entries`` field at all.
+        triggers: [{ id: "on_boot", name: "On Boot" }],
+        actions: [{ id: "delay", name: "Delay" }],
+        conditions: [{ id: "lambda", name: "Lambda" }],
+        scripts: [],
+        devices: [],
+      },
+    });
+    const result = await pending;
+
+    expect(result.triggers[0].config_entries).toEqual([]);
+    expect(result.actions[0].config_entries).toEqual([]);
+    expect(result.conditions[0].config_entries).toEqual([]);
+  });
+
+  it("preserves config_entries when the wire payload already carries them", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getAvailableAutomations("device.yaml");
+    const sent = ws.sentAs<{ message_id: string }>(0);
+    ws.receive({
+      message_id: sent.message_id,
+      result: {
+        triggers: [
+          {
+            id: "on_boot",
+            name: "On Boot",
+            config_entries: [{ key: "trigger_id" }],
+          },
+        ],
+        actions: [],
+        conditions: [],
+        scripts: [],
+        devices: [],
+      },
+    });
+    const result = await pending;
+
+    expect(result.triggers[0].config_entries).toEqual([{ key: "trigger_id" }]);
   });
 });
 
@@ -763,6 +832,28 @@ describe("ESPHomeAPI — typed command wrappers", () => {
       last_connect_error: "",
       esphome_version: "2026.5.0",
       enabled: false,
+    };
+    ws.receive({ message_id: sent.message_id, result });
+    await expect(pending).resolves.toEqual(result);
+  });
+
+  it("setOffloaderRemoteBuildSettings forwards version_match_policy", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.setOffloaderRemoteBuildSettings({
+      version_match_policy: "exact_required",
+    });
+    const sent = ws.sentAs<{
+      command: string;
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.command).toBe("remote_build/set_offloader_settings");
+    expect(sent.args).toEqual({ version_match_policy: "exact_required" });
+    const result = {
+      remote_builds_enabled: true,
+      version_match_policy: "exact_required",
+      pairings: [],
     };
     ws.receive({ message_id: sent.message_id, result });
     await expect(pending).resolves.toEqual(result);
@@ -1539,6 +1630,69 @@ describe("ESPHomeAPI — automations catalog", () => {
   });
 });
 
+describe("ESPHomeAPI — getComponentBodies", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``components/get_component_bodies`` with the requested ids", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.getComponentBodies(["wifi", "api"]);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("components/get_component_bodies");
+    expect(sent.args).toEqual({ component_ids: ["wifi", "api"] });
+
+    const payload = {
+      wifi: { id: "wifi", name: "Wi-Fi" },
+      api: { id: "api", name: "API" },
+    };
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: payload,
+    });
+    await expect(pending).resolves.toEqual(payload);
+  });
+
+  it("forwards platform / board_id as snake_case when provided", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.getComponentBodies(["wifi"], "esp32", "esp32-s3-devkitc-1");
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({
+      component_ids: ["wifi"],
+      platform: "esp32",
+      board_id: "esp32-s3-devkitc-1",
+    });
+  });
+
+  it("omits platform / board_id when not provided so the backend's default path runs", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    api.getComponentBodies(["wifi"]);
+    const sent = ws.sentAs<{ args: Record<string, unknown> }>(0);
+    expect(sent.args).toEqual({ component_ids: ["wifi"] });
+    expect("platform" in sent.args).toBe(false);
+    expect("board_id" in sent.args).toBe(false);
+  });
+
+  it("short-circuits on an empty id list without touching the socket", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const result = await api.getComponentBodies([]);
+    expect(result).toEqual({});
+    expect(ws.sent).toHaveLength(0);
+  });
+});
+
 describe("ESPHomeAPI — automations parse / upsert / delete", () => {
   beforeEach(() => {
     installMockWebSocket();
@@ -1663,5 +1817,154 @@ describe("ESPHomeAPI — automations parse / upsert / delete", () => {
       details: "unknown action: switch.not_a_real_action",
     });
     await expect(pending).rejects.toBeInstanceOf(APIError);
+  });
+});
+
+describe("ESPHomeAPI — setDeviceLabelsBulk", () => {
+  beforeEach(() => {
+    installMockWebSocket();
+  });
+  afterEach(() => {
+    uninstallMockWebSocket();
+  });
+
+  it("sends ``devices/set_labels_bulk`` and maps labelIds to label_ids", async () => {
+    // Pin the camelCase → snake_case key transform inside
+    // ``updates.map(...)``. A future refactor that drops the map
+    // and spreads ``updates`` straight through would break the
+    // backend contract silently because the dialog-side tests
+    // only exercise ``computeUpdates()``'s in-memory shape.
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.setDeviceLabelsBulk([
+      { configuration: "kitchen.yaml", labelIds: ["lbl-a"] },
+      { configuration: "garage.yaml", labelIds: [] },
+    ]);
+    const sent = ws.sentAs<{ command: string; args: Record<string, unknown> }>(0);
+
+    expect(sent.command).toBe("devices/set_labels_bulk");
+    expect(sent.args).toEqual({
+      updates: [
+        { configuration: "kitchen.yaml", label_ids: ["lbl-a"] },
+        { configuration: "garage.yaml", label_ids: [] },
+      ],
+    });
+
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [
+        { configuration: "kitchen.yaml", success: true },
+        { configuration: "garage.yaml", success: true },
+      ],
+    });
+    await expect(pending).resolves.toEqual([
+      { configuration: "kitchen.yaml", success: true },
+      { configuration: "garage.yaml", success: true },
+    ]);
+  });
+
+  it("forwards per-entry failures from the backend response", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.setDeviceLabelsBulk([
+      { configuration: "kitchen.yaml", labelIds: ["lbl-a"] },
+    ]);
+    ws.receive({
+      message_id: ws.sentAs<{ message_id: string }>(0).message_id,
+      result: [
+        {
+          configuration: "kitchen.yaml",
+          success: false,
+          error: "unknown label id: lbl-a",
+        },
+      ],
+    });
+    await expect(pending).resolves.toEqual([
+      { configuration: "kitchen.yaml", success: false, error: "unknown label id: lbl-a" },
+    ]);
+  });
+});
+
+describe("ESPHomeAPI — firmware download (HTTP)", () => {
+  afterEach(() => {
+    uninstallMockWebSocket();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("mints a download token over the WebSocket", async () => {
+    installMockWebSocket();
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+
+    const pending = api.firmwareDownloadToken("kitchen.yaml", "firmware.elf");
+    const sent = ws.sentAs<{ command: string; message_id: string; args: unknown }>(0);
+    expect(sent.command).toBe("firmware/download_token");
+    expect(sent.args).toEqual({ configuration: "kitchen.yaml", file: "firmware.elf" });
+    ws.receive({
+      message_id: sent.message_id,
+      result: { token: "tok-123", filename: "kitchen-firmware.elf" },
+    });
+
+    await expect(pending).resolves.toEqual({
+      token: "tok-123",
+      filename: "kitchen-firmware.elf",
+    });
+  });
+
+  it("builds a base-path-aware, token-encoded URL and passes the filename through", async () => {
+    const api = new ESPHomeAPI();
+    vi.spyOn(api, "firmwareDownloadToken").mockResolvedValue({
+      token: "a b/c+d",
+      filename: "kitchen-firmware.elf",
+    });
+
+    const result = await api.firmwareDownloadUrl("kitchen.yaml", "firmware.elf");
+
+    expect(api.firmwareDownloadToken).toHaveBeenCalledWith(
+      "kitchen.yaml",
+      "firmware.elf"
+    );
+    expect(result).toEqual({
+      url: "/api/firmware/download?token=a%20b%2Fc%2Bd",
+      filename: "kitchen-firmware.elf",
+    });
+  });
+
+  it("fetches the bytes for Web Serial flashing", async () => {
+    const api = new ESPHomeAPI();
+    vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue({
+      url: "/api/firmware/download?token=t",
+      filename: "kitchen-firmware.factory.bin",
+    });
+    const bytes = new Uint8Array([1, 2, 3]).buffer;
+    const fetchFn = vi.fn(async () => ({ ok: true, arrayBuffer: async () => bytes }));
+    vi.stubGlobal("fetch", fetchFn);
+
+    const result = await api.firmwareDownloadBytes(
+      "kitchen.yaml",
+      "firmware.factory.bin"
+    );
+
+    expect(fetchFn).toHaveBeenCalledWith("/api/firmware/download?token=t");
+    expect(result).toBe(bytes);
+  });
+
+  it("throws when the byte fetch responds non-ok", async () => {
+    const api = new ESPHomeAPI();
+    vi.spyOn(api, "firmwareDownloadUrl").mockResolvedValue({
+      url: "/api/firmware/download?token=t",
+      filename: "kitchen-missing.bin",
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 404 }))
+    );
+
+    await expect(
+      api.firmwareDownloadBytes("kitchen.yaml", "missing.bin")
+    ).rejects.toThrow(/404/);
   });
 });

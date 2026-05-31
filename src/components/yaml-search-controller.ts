@@ -30,7 +30,7 @@
 
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { YamlSearchHit } from "../api/types.js";
+import type { YamlSearchHit } from "../api/types/devices.js";
 import { TrailingEdgeDispatcher } from "../util/trailing-edge-dispatcher.js";
 
 /** Time between the last keystroke and the WS request firing. */

@@ -1,7 +1,9 @@
-import { html, nothing } from "lit";
 import type { ColumnDef } from "@tanstack/lit-table";
-import { DeviceState, JobStatus } from "../../api/types.js";
-import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
+import { html, nothing } from "lit";
+import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
+import { DeviceState } from "../../api/types/devices.js";
+import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
+import { JobStatus } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
@@ -68,6 +70,18 @@ const dispatchRowEvent = (e: Event, name: string, device: ConfiguredDevice) => {
     new CustomEvent(name, { detail: device, bubbles: true, composed: true })
   );
 };
+
+// One "no data" placeholder for every column. Rendered in the muted
+// proportional style rather than a column's value font so the em dash is
+// the same width everywhere — embedding it in cell-mono made it render as
+// a narrow monospace glyph that read as a hyphen next to the wide dashes
+// in the proportional columns (#1038).
+const EMPTY_CELL = html`<span class="cell-muted">—</span>`;
+
+// Populated cells keep their column's value font; empty cells fall back to
+// the shared placeholder so the "no data" dash is identical everywhere.
+const valueCell = (cls: string, val: string) =>
+  val ? html`<span class=${cls}>${val}</span>` : EMPTY_CELL;
 
 export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow>[] {
   return [
@@ -179,59 +193,49 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
     {
       accessorKey: "address",
       header: localize("dashboard.table_col_address"),
-      cell: (info) => html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
+      cell: (info) => valueCell("cell-mono", info.getValue() as string),
       size: 180,
       enableHiding: true,
     },
     {
       accessorKey: "ip",
       header: localize("dashboard.table_col_ip"),
-      cell: (info) => html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
+      cell: (info) => valueCell("cell-mono", info.getValue() as string),
       size: 140,
       enableHiding: true,
     },
     {
       accessorKey: "mac_address",
       header: localize("dashboard.table_col_mac"),
-      cell: (info) => {
-        const raw = info.getValue() as string;
-        return raw
-          ? html`<span class="cell-mono">${raw}</span>`
-          : html`<span class="cell-muted">—</span>`;
-      },
+      cell: (info) => valueCell("cell-mono", info.getValue() as string),
       size: 160,
       enableHiding: true,
     },
     {
       accessorKey: "platform",
       header: localize("dashboard.table_col_platform"),
-      cell: (info) => {
-        const val = info.getValue() as string;
-        return val
-          ? html`<span class="cell-badge">${val}</span>`
-          : html`<span class="cell-muted">—</span>`;
-      },
+      cell: (info) => valueCell("cell-badge", info.getValue() as string),
       size: 120,
       enableHiding: true,
     },
     {
       accessorKey: "version",
       header: localize("dashboard.table_col_version"),
-      cell: (info) => html`<span class="cell-mono">${info.getValue() || "—"}</span>`,
+      cell: (info) => valueCell("cell-mono", info.getValue() as string),
       size: 150,
       enableHiding: true,
     },
     {
       accessorKey: "comment",
       header: localize("dashboard.table_col_comment"),
-      cell: (info) => html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
+      cell: (info) => valueCell("cell-comment", info.getValue() as string),
       size: 180,
       enableHiding: true,
     },
     {
       accessorKey: "area",
       header: localize("dashboard.table_col_area"),
-      cell: (info) => html`<span class="cell-comment">${info.getValue() || "—"}</span>`,
+      cell: (info) => valueCell("cell-comment", info.getValue() as string),
       size: 160,
       enableHiding: true,
     },
@@ -240,8 +244,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
       header: localize("dashboard.table_col_labels"),
       cell: (info) => {
         const labels = info.getValue() as Label[];
-        if (!labels || labels.length === 0)
-          return html`<span class="cell-muted">—</span>`;
+        if (!labels || labels.length === 0) return EMPTY_CELL;
         return renderLabelChips(labels, { max: 3 });
       },
       sortingFn: (rowA, rowB) => {
@@ -266,7 +269,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
         const bytes = info.getValue() as number;
         return bytes
           ? html`<span class="cell-mono">${formatFileSize(bytes)}</span>`
-          : html`<span class="cell-muted">—</span>`;
+          : EMPTY_CELL;
       },
       // Compare the raw byte counts directly. ``"basic"`` /
       // ``"alphanumeric"`` would sort by the accessor value too
@@ -339,7 +342,7 @@ export function createDeviceColumns(localize: LocalizeFunc): ColumnDef<DeviceRow
             title=${localize("dashboard.table_action_logs")}
             @click=${(e: Event) => dispatchRowEvent(e, "open-logs", device)}
           >
-            <wa-icon library="mdi" name="console"></wa-icon>
+            <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           </button>
           ${showVisit
             ? html`<a

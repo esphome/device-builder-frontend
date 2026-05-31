@@ -1,19 +1,20 @@
 import toast from "sonner-js";
+import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
+import type { RemoteBuildSubmitTarget } from "../../api/types/firmware-jobs.js";
 import {
   CLEANUP_TTL_MAX_SECONDS,
   CLEANUP_TTL_MIN_SECONDS,
   type PairingSummary,
-  type RemoteBuildSubmitTarget,
-  type Theme,
-} from "../../api/types.js";
+} from "../../api/types/remote-build.js";
+import type { Theme } from "../../api/types/system.js";
 import {
   clearStoredLocale,
   loadLocalize,
   type SupportedLocale,
   writeStoredLocale,
 } from "../../common/localize.js";
-import { patchOffloadPairing } from "./events.js";
 import type { ESPHomeApp } from "../app-shell.js";
+import { patchOffloadPairing } from "./events.js";
 
 export function onSetTheme(host: ESPHomeApp, e: CustomEvent<string>): void {
   const theme = e.detail as Theme;
@@ -120,6 +121,25 @@ export async function onSetOffloaderPairingEnabled(
     if (previous !== undefined) {
       patchOffloadPairing(host, pin_sha256, { enabled: previous });
     }
+    toast.error(host._localize("settings.remote_build_save_failed"), {
+      richColors: true,
+    });
+  }
+}
+
+export async function onSetOffloaderVersionMatchPolicy(
+  host: ESPHomeApp,
+  e: CustomEvent<VersionMatchPolicy>
+): Promise<void> {
+  const policy = e.detail;
+  const previous = host._offloaderVersionMatchPolicy;
+  host._offloaderVersionMatchPolicy = policy;
+  try {
+    await host._api.setOffloaderRemoteBuildSettings({
+      version_match_policy: policy,
+    });
+  } catch {
+    host._offloaderVersionMatchPolicy = previous;
     toast.error(host._localize("settings.remote_build_save_failed"), {
       richColors: true,
     });

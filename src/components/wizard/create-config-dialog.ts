@@ -3,13 +3,12 @@ import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import { APIError } from "../../api/api-error.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
 import type { ESPHomeAPI } from "../../api/index.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext, apiContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
-import { friendlyNameSlugify } from "../../util/friendly-name-slugify.js";
 import { markJustCreated } from "../../util/just-created.js";
 import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -46,6 +45,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   @state()
   private _step: WizardStep = "method";
+
+  // Drives the step components' Enter listeners: the steps stay mounted in
+  // the wa-dialog while it's merely hidden (light-dismiss / Escape / close),
+  // so they must deactivate on hide, not just on unmount.
+  @state()
+  private _open = false;
 
   @state()
   private _selectedBoard: BoardCatalogEntry | null = null;
@@ -94,6 +99,31 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
       wa-dialog.wide {
         --width: 750px;
+      }
+
+      /* Mobile: drop both width variants to fullscreen so the
+         wizard's board picker and per-step bodies have room to
+         breathe instead of getting boxed into a 520px column
+         flanked by black gutters. Mirrors the same shape the
+         logs-dialog uses — the --width custom property alone
+         doesn't work because wa-dialog's internal dialog part
+         carries a max-width calc(100% - …) and a UA max-height
+         that keep the dialog at its desktop size unless we
+         override them on the part directly. The dvh fallback
+         after vh lets modern browsers shrink the dialog as iOS
+         Safari's URL bar collapses. #41 */
+      @media (max-width: 600px) {
+        wa-dialog::part(dialog) {
+          position: fixed;
+          inset: 0;
+          width: 100vw;
+          height: 100vh;
+          height: 100dvh;
+          max-width: none;
+          max-height: none;
+          margin: 0;
+          border-radius: 0;
+        }
       }
 
       wa-dialog::part(header) {
@@ -210,6 +240,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._submitting = false;
     this._resetCreateErrors();
     this._dialog.open = true;
+    this._open = true;
   }
 
   /** Clear both error slots so a stale message from a prior
@@ -226,6 +257,13 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   public close() {
     this._dialog.open = false;
   }
+
+  // wa-dialog only hides on light-dismiss / Escape / close; the step
+  // components stay mounted, so flip _open to drop their Enter listeners.
+  private _onHide = (e: Event) => {
+    if (e.target !== this._dialog) return; // ignore bubbled child wa-* hides
+    this._open = false;
+  };
 
   private get _title(): string {
     switch (this._step) {
@@ -245,6 +283,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       <wa-dialog
         class=${this._step === "board" ? "wide" : ""}
         light-dismiss
+        @wa-after-hide=${this._onHide}
         @next-step=${this._onNextStep}
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
@@ -285,9 +324,12 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       case "setup":
         return html`<esphome-wizard-step-setup
           .board=${this._selectedBoard}
+          ?active=${this._open}
         ></esphome-wizard-step-setup>`;
       case "empty-config":
-        return html`<esphome-wizard-step-empty-config></esphome-wizard-step-empty-config>`;
+        return html`<esphome-wizard-step-empty-config
+          ?active=${this._open}
+        ></esphome-wizard-step-empty-config>`;
     }
   }
 
@@ -363,7 +405,11 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     const { name } = e.detail;
     await this._runCreate(
       {
-        name: friendlyNameSlugify(name),
+        // Send the raw display name: the backend slugifies it for the
+        // hostname and keeps the cleaned original as
+        // esphome.friendly_name. Slugifying here would strip the
+        // friendly name down to the slug (issue #1070).
+        name,
         board_id: this._selectedBoard?.id ?? "",
         config_type: "empty",
       },
@@ -437,7 +483,10 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     if (!board) return;
     await this._runCreate(
       {
-        name: friendlyNameSlugify(name),
+        // Raw display name; backend slugifies for the hostname and
+        // preserves the cleaned original as esphome.friendly_name
+        // (issue #1070).
+        name,
         board_id: board.id,
         config_type: "basic",
         ssid: wifiSsid,

@@ -1,9 +1,10 @@
 import { html, nothing } from "lit";
-import type { ConfigEntry } from "../../../api/types.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { asMappingList, isPrimitiveOrNullish } from "../../../util/nested-values.js";
 import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   labelFor,
   renderFieldError,
   renderLabel,
@@ -34,13 +35,17 @@ function arrayItemHandlers(
   return { addItem, removeAt };
 }
 
-function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
+export function renderListEmptyHint(items: readonly unknown[], ctx: RenderCtx) {
   return items.length === 0
     ? html`<p class="field-description">${ctx.localize("device.multi_value_empty")}</p>`
     : nothing;
 }
 
-function renderListRemoveButton(ctx: RenderCtx, disabled: boolean, onClick: () => void) {
+export function renderListRemoveButton(
+  ctx: RenderCtx,
+  disabled: boolean,
+  onClick: () => void
+) {
   return html`
     <button
       type="button"
@@ -54,7 +59,11 @@ function renderListRemoveButton(ctx: RenderCtx, disabled: boolean, onClick: () =
   `;
 }
 
-function renderListAddButton(ctx: RenderCtx, disabled: boolean, onClick: () => void) {
+export function renderListAddButton(
+  ctx: RenderCtx,
+  disabled: boolean,
+  onClick: () => void
+) {
   return html`
     <button
       type="button"
@@ -84,7 +93,7 @@ export function renderMultiValueField(
   };
 
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
       ${items.map(
         (item, i) => html`
@@ -203,7 +212,7 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
   };
 
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       ${keys.length === 0
         ? html`<p class="field-description">${ctx.localize("device.map_empty")}</p>`
@@ -240,7 +249,7 @@ export function renderNestedListField(
   const raw = ctx.getAt(path);
   if (raw instanceof YamlRawValue) {
     return html`
-      <div class="nested-list" data-field-key=${path.join(".")}>
+      <div class="nested-list" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <p class="field-description">${ctx.localize("device.multi_value_yaml_only")}</p>
         ${renderFieldError(path, ctx)}
@@ -255,13 +264,13 @@ export function renderNestedListField(
   const childrenSchema = entry.config_entries ?? [];
 
   return html`
-    <div class="nested-list" data-field-key=${path.join(".")}>
+    <div class="nested-list" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${renderListEmptyHint(items, ctx)}
       ${items.map((item, i) => {
         const itemPath = [...path, String(i)];
         const renderableChildren = ctx.filterRenderable(childrenSchema, item);
         return html`
-          <div class="nested-list-item" data-field-key=${itemPath.join(".")}>
+          <div class="nested-list-item" data-field-key=${fieldKeyAttr(itemPath)}>
             <div class="nested-list-item-header">
               <span class="nested-list-item-title"> ${itemTitle} ${i + 1} </span>
               ${renderListRemoveButton(ctx, disabled, () => removeAt(i))}

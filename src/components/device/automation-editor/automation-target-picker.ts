@@ -33,11 +33,11 @@ import type {
   AutomationLocation,
   AvailableComponentInstance,
   AvailableScript,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 
 import "@home-assistant/webawesome/dist/components/option/option.js";

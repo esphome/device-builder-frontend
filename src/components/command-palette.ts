@@ -13,7 +13,7 @@ import {
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
 import type { LanguageChoice, LocalizeFunc } from "../common/localize.js";
 import { LANGUAGES } from "../common/localize.js";
 import {

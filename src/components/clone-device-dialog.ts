@@ -6,6 +6,7 @@ import { localizeContext } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
+import { EnterController } from "../util/enter-controller.js";
 import { renderInlineError } from "../util/render-error.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -153,16 +154,30 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
     `,
   ];
 
+  // One-shot latch: close() only starts the hide animation, so the
+  // EnterController listener stays live until wa-after-hide; without this a
+  // held Enter re-enters _confirm and dispatches clone-confirm twice.
+  private _resolved = false;
+
+  // Enter confirms; _confirm self-guards on empty / same / invalid.
+  private _enter = new EnterController(this, () => this._confirm());
+
   open(sourceName: string) {
     this.sourceName = sourceName;
     this._name = "";
     this._friendlyName = "";
+    this._resolved = false;
     this._dialog.open = true;
+    this._enter.set(true);
   }
 
   close() {
     this._dialog.open = false;
   }
+
+  private _onAfterHide = (): void => {
+    this._enter.set(false);
+  };
 
   protected render() {
     const trimmedName = this._name.trim();
@@ -185,6 +200,7 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
       <wa-dialog
         label=${this._localize("dashboard.action_clone_title", { name: this.sourceName })}
         light-dismiss
+        @wa-after-hide=${this._onAfterHide}
       >
         <div class="field">
           <label for="clone-new-name"
@@ -198,9 +214,6 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
             placeholder=${this.sourceName}
             @input=${(e: Event) => {
               this._name = (e.target as HTMLInputElement).value;
-            }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" && canSubmit) this._confirm();
             }}
           />
           ${err
@@ -225,9 +238,6 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
             @input=${(e: Event) => {
               this._friendlyName = (e.target as HTMLInputElement).value;
             }}
-            @keydown=${(e: KeyboardEvent) => {
-              if (e.key === "Enter" && canSubmit) this._confirm();
-            }}
           />
           <span class="helper"
             >${this._localize("dashboard.action_clone_friendly_name_helper")}</span
@@ -250,9 +260,11 @@ export class ESPHomeCloneDeviceDialog extends LitElement {
   }
 
   private _confirm = () => {
+    if (this._resolved) return;
     const newName = this._name.trim();
     if (!newName || newName === this.sourceName) return;
     if (validateDeviceName(newName)) return;
+    this._resolved = true;
     this.close();
     this.dispatchEvent(
       new CustomEvent<{ newName: string; newFriendlyName: string }>("clone-confirm", {

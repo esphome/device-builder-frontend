@@ -286,6 +286,23 @@ export const deviceEditorStyles = css`
     overflow-y: auto;
   }
 
+  /* The floating Install / Validate / Save row overlays the
+     bottom-right of the card body. Reserve room below the
+     content so the last lines sit a header-matching
+     var(--wa-space-m) above the buttons (button bottom inset +
+     button height + the same top-of-pane gap the editor already
+     has via .editor-pane's padding).
+     Applied to:
+     - .editor-pane--right always (the row sits over its bottom-right
+       in both-pane + right-only layouts).
+     - .editor-layout--left .editor-pane--left (board-info-only
+       layout, where the right pane is hidden and the buttons now
+       overlap the full-width left pane). */
+  .editor-pane--right,
+  .editor-layout--left .editor-pane--left {
+    padding-bottom: calc(var(--wa-space-m) * 2 + 2.25rem);
+  }
+
   .editor-pane-title {
     margin: 0;
     font-size: var(--wa-font-size-s);

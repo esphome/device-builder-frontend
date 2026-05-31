@@ -9,6 +9,15 @@ export const tableLayoutStyles = css`
     min-height: 0;
   }
 
+  /* Slotted content uses content-driven height — flex-shrink:0
+     prevents the .table-device-count-row from collapsing below
+     its intrinsic height when the column is tight, so the row's
+     count + toggle stay legible while .table-wrap absorbs the
+     remaining space. */
+  ::slotted([slot="below-controls"]) {
+    flex-shrink: 0;
+  }
+
   /* When the dashboard's floating multi-select bar is visible, reserve
      space at the bottom of the table host so the pagination row sits
      above it rather than behind it. The bar pins itself to exactly
@@ -21,10 +30,19 @@ export const tableLayoutStyles = css`
 
   .controls {
     display: flex;
-    align-items: center;
+    /* Top-align the right-cluster (Columns + Create device) with
+       the toolbar-stack's first row (search + view-toggle +
+       facets). The slotted toolbar's right edge sits at the same
+       y as Columns / Create. */
+    align-items: flex-start;
     gap: var(--wa-space-s);
     padding: var(--wa-space-l) var(--wa-space-l) 0;
-    margin-bottom: var(--wa-space-l);
+    /* No bottom margin: the below-controls slot now carries the
+       device-count + Select-multiple row, and its own bottom
+       padding handles spacing to the .table-wrap. Keeping the
+       old --wa-space-l here would stack with the count row's
+       padding into ~32px of dead space. */
+    margin-bottom: 0;
     flex-shrink: 0;
   }
 
@@ -51,6 +69,33 @@ export const tableLayoutStyles = css`
 
     .controls-right {
       margin-left: auto;
+    }
+  }
+
+  /* Mobile content-padding trim. The controls strip and the
+     table-wrap claim --wa-space-l (24px) of horizontal padding /
+     margin on each side; on a 375px phone viewport that's ~13% of
+     the width per side gone to chrome. Match the dashboard's
+     .toolbar / .devices-grid trim so all three views share the
+     same tight gutters at narrow widths. #41 */
+  @media (max-width: 600px) {
+    .controls {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
+
+    /* Mirrors the dashboard's :host([has-discovered]) .toolbar
+       trim: when the banner is present the dashboard already
+       provides padding-top equal to the banner's height, so the
+       controls' own padding-top stacks as dead space. Drop one
+       step so the table view matches the card / YAML views. #41 */
+    :host([has-discovered]) .controls {
+      padding-top: var(--wa-space-s);
+    }
+
+    .table-wrap {
+      margin-left: var(--wa-space-s);
+      margin-right: var(--wa-space-s);
     }
   }
 
@@ -282,5 +327,16 @@ export const tableLayoutStyles = css`
     padding: var(--wa-space-4xl) var(--wa-space-l);
     color: var(--wa-color-text-quiet);
     font-size: var(--wa-font-size-s);
+  }
+
+  /* Mobile margin trim for the table outline. Placed at the end
+     of the stylesheet so source-order beats the default
+     .table-wrap shorthand above (which would otherwise reset
+     margin-left / margin-right when the @media block fires).
+     Matches the card grid's mobile side padding. #41 */
+  @media (max-width: 600px) {
+    .table-wrap {
+      margin: 0 var(--wa-space-s) var(--wa-space-s);
+    }
   }
 `;

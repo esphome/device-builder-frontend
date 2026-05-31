@@ -5,11 +5,11 @@
  * automation editor with the right location.
  */
 import { describe, expect, it } from "vitest";
+import type { AutomationLocation } from "../../../../src/api/types/automations.js";
 import {
   locationFromSectionKey,
   sectionKeyFromLocation,
 } from "../../../../src/components/device/automation-editor/serialise.js";
-import type { AutomationLocation } from "../../../../src/api/types.js";
 
 describe("sectionKeyFromLocation", () => {
   it("emits the same shape parseYamlAutomations uses", () => {
@@ -23,6 +23,22 @@ describe("sectionKeyFromLocation", () => {
         trigger: "on_press",
       })
     ).toBe("automation:component_on:my_button:on_press");
+    expect(
+      sectionKeyFromLocation({
+        kind: "component_on",
+        component_id: "my_time",
+        trigger: "on_time",
+        index: 0,
+      })
+    ).toBe("automation:component_on:my_time:on_time:0");
+    expect(
+      sectionKeyFromLocation({
+        kind: "component_on",
+        component_id: "my_time",
+        trigger: "on_time",
+        index: 1,
+      })
+    ).toBe("automation:component_on:my_time:on_time:1");
     expect(sectionKeyFromLocation({ kind: "script", id: "my_alarm" })).toBe(
       "automation:script:my_alarm"
     );
@@ -63,11 +79,31 @@ describe("locationFromSectionKey", () => {
     expect(locationFromSectionKey("automation:api_action:")).toBeNull();
   });
 
+  it("rejects a component_on index that is not a non-negative integer", () => {
+    expect(
+      locationFromSectionKey("automation:component_on:my_time:on_time:-1")
+    ).toBeNull();
+    expect(
+      locationFromSectionKey("automation:component_on:my_time:on_time:1.5")
+    ).toBeNull();
+    expect(
+      locationFromSectionKey("automation:component_on:my_time:on_time:x")
+    ).toBeNull();
+  });
+
   const cases: [string, AutomationLocation][] = [
     ["automation:device_on:on_boot", { kind: "device_on", trigger: "on_boot" }],
     [
       "automation:component_on:my_button:on_press",
       { kind: "component_on", component_id: "my_button", trigger: "on_press" },
+    ],
+    [
+      "automation:component_on:my_time:on_time:0",
+      { kind: "component_on", component_id: "my_time", trigger: "on_time", index: 0 },
+    ],
+    [
+      "automation:component_on:my_time:on_time:1",
+      { kind: "component_on", component_id: "my_time", trigger: "on_time", index: 1 },
     ],
     ["automation:script:my_alarm", { kind: "script", id: "my_alarm" }],
     ["automation:interval:2", { kind: "interval", index: 2 }],

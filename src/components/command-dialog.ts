@@ -3,7 +3,6 @@ import {
   mdiAlertCircle,
   mdiCheckCircle,
   mdiClose,
-  mdiConsole,
   mdiDownload,
   mdiKey,
   mdiKeyOutline,
@@ -11,31 +10,34 @@ import {
   mdiRefresh,
   mdiServerNetwork,
   mdiStop,
+  mdiTextBoxOutline,
   mdiTimerSand,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobSource, JobStatus, JobType } from "../api/types.js";
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { JobSource, JobStatus, JobType } from "../api/types/firmware-jobs.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeAnsiLog } from "./ansi-log.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import {
   apiContext,
   buildOffloadJobsContext,
+  buildOffloadPairingsContext,
   darkModeContext,
   devicesContext,
   firmwareJobsContext,
   localizeContext,
+  versionContext,
 } from "../context/index.js";
-import type { RemoteBuildJobState } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { commandDialogStyles } from "./command-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import {
   detachStream,
   followJob,
@@ -51,6 +53,8 @@ import {
   renderResetSuggestion,
   renderToolbar,
 } from "./command-dialog/renderers.js";
+import { commandDialogStyles } from "./command-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -58,7 +62,7 @@ import "./ansi-log.js";
 
 registerMdiIcons({
   close: mdiClose,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   download: mdiDownload,
   key: mdiKey,
   "key-outline": mdiKeyOutline,
@@ -116,6 +120,18 @@ export class ESPHomeCommandDialog extends LitElement {
   @consume({ context: buildOffloadJobsContext, subscribe: true })
   @state()
   _offloadJobs: Map<string, RemoteBuildJobState> | null = null;
+
+  // Pairings + offloader version drive the per-reason NO_COMPATIBLE_PEER
+  // toast — frontend classifies "all offline" vs "all wrong version"
+  // from the local snapshot so the wording matches the operator's
+  // actual remediation step.
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  _appVersion = "";
 
   @property() configuration = "";
   @property() name = "";

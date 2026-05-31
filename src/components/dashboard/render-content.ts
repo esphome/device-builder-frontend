@@ -1,18 +1,18 @@
-import { html, type TemplateResult } from "lit";
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
-import type { AdoptableDevice, ConfiguredDevice } from "../../api/types.js";
+import { html, type TemplateResult } from "lit";
+import type { AdoptableDevice, ConfiguredDevice } from "../../api/types/devices.js";
+import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
+import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { downloadYaml, editDevice } from "./actions.js";
 import {
   renderAddDeviceCard,
+  renderDeviceCountRow,
   renderFacets,
   renderNoResultsExtras,
   renderSearchInput,
-  renderSelectToggle,
   renderViewToggle,
 } from "./render-toolbar.js";
-import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
-import { buildWebUiUrl } from "../../util/web-ui-url.js";
-import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 
 export function renderDiscoveredSection(
   host: ESPHomePageDashboard
@@ -146,6 +146,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
       .initialSorting=${host._tableSorting}
       .initialColumnVisibility=${host._tableColumnVisibility}
       ?select-mode=${host._selectMode}
+      ?has-discovered=${host._visibleImportableDevices.length > 0}
       .selectedDevices=${host._selectedDevices}
       .highlightConfiguration=${host._recentlyAdopted}
       @table-sort-change=${(e: CustomEvent<SortingState>) => host._saveTablePreference(e)}
@@ -176,8 +177,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
-      @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._downloadFirmware(e.detail)}
+      @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -189,7 +189,9 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
           ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
         </div>
       </div>
-      <div slot="before-columns">${renderSelectToggle(host)}</div>
+      <div slot="below-controls" class="table-device-count-row">
+        ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
+      </div>
       <button
         slot="actions"
         class="table-create-btn"
@@ -270,8 +272,7 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
-      @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._downloadFirmware(e.detail)}
+      @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>

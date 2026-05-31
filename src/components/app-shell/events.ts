@@ -1,4 +1,4 @@
-import { DeviceEventType, DeviceState } from "../../api/types.js";
+import { DeviceState } from "../../api/types/devices.js";
 import type {
   DeviceEventData,
   DeviceStateChangedEventData,
@@ -7,6 +7,9 @@ import type {
   InitialStateEventData,
   LabelDeletedEventData,
   LabelEventData,
+} from "../../api/types/event-subscription.js";
+import { DeviceEventType } from "../../api/types/event-subscription.js";
+import type {
   OffloaderJobOutputEventData,
   OffloaderJobStateChangedEventData,
   OffloaderPairAlertDismissedEventData,
@@ -17,15 +20,15 @@ import type {
   OffloaderPeerLinkClosedEventData,
   OffloaderPeerLinkSessionEventData,
   OffloaderRemoteBuildsToggledEventData,
-  PairingSummary,
-  PeerSummary,
+  OffloaderVersionMatchPolicyChangedEventData,
   ReceiverPeerLinkSessionEventData,
   RemoteBuildHostAddedEventData,
   RemoteBuildHostRemovedEventData,
   RemoteBuildPairingWindowChangedEventData,
   RemoteBuildPairRequestReceivedEventData,
   RemoteBuildPairStatusChangedEventData,
-} from "../../api/types.js";
+} from "../../api/types/remote-build-events.js";
+import type { PairingSummary, PeerSummary } from "../../api/types/remote-build.js";
 import {
   type RemoteBuildJobState,
   stubRemoteBuildJobState,
@@ -61,6 +64,7 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
         offloader_alerts,
         remote_jobs,
         remote_builds_enabled,
+        version_match_policy,
       } = data as InitialStateEventData;
       host._devices = devices;
       host._importableDevices = importable;
@@ -89,6 +93,9 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
       }
       if (remote_builds_enabled !== undefined) {
         host._offloaderRemoteBuildsEnabled = remote_builds_enabled;
+      }
+      if (version_match_policy !== undefined) {
+        host._offloaderVersionMatchPolicy = version_match_policy;
       }
       break;
     }
@@ -320,6 +327,11 @@ export function handleEvent(host: ESPHomeApp, event: string, data: unknown): voi
     case DeviceEventType.OFFLOADER_PAIRING_ENABLED_CHANGED: {
       const evt = data as OffloaderPairingEnabledChangedEventData;
       patchOffloadPairing(host, evt.pin_sha256, { enabled: evt.enabled });
+      break;
+    }
+    case DeviceEventType.OFFLOADER_VERSION_MATCH_POLICY_CHANGED: {
+      const evt = data as OffloaderVersionMatchPolicyChangedEventData;
+      host._offloaderVersionMatchPolicy = evt.version_match_policy;
       break;
     }
     case DeviceEventType.OFFLOADER_JOB_STATE_CHANGED: {

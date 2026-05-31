@@ -1,7 +1,7 @@
 import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ESPHomeAPI } from "../../src/api/index.js";
-import type { YamlSearchHit } from "../../src/api/types.js";
+import type { YamlSearchHit } from "../../src/api/types/devices.js";
 import { YamlSearchController } from "../../src/components/yaml-search-controller.js";
 
 class FakeHost implements ReactiveControllerHost {

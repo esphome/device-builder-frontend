@@ -25,8 +25,9 @@
  * board-pin seeding rules without rendering a Lit component.
  */
 
-import type { BoardCatalogEntry, ConfigEntry } from "../api/types.js";
-import { ConfigEntryType } from "../api/types.js";
+import type { BoardCatalogEntry } from "../api/types/boards.js";
+import type { ConfigEntry } from "../api/types/config-entries.js";
+import { ConfigEntryType } from "../api/types/config-entries.js";
 
 export function seedBoardPinDefaults(
   componentId: string,

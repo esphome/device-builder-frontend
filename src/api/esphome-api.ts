@@ -6,58 +6,75 @@
  * Streaming commands (compile, upload, logs, validate, clean) receive
  * EventMessages with "output" and "result" events.
  */
-import { APIError } from "./api-error.js";
-import { BASE_PATH } from "../util/base-path.js";
 import { clearStoredToken, getStoredToken, setStoredToken } from "../util/auth-token.js";
+import { BASE_PATH } from "../util/base-path.js";
+import { hydrateBoard, hydratePagedBoardsResponse } from "../util/board-hydrate.js";
+import { APIError } from "./api-error.js";
 import type {
-  AddComponentResponse,
-  ArchivedDevice,
   AutomationAction,
+  AutomationCatalogBody,
+  AutomationCatalogBodyType,
   AutomationCondition,
+  AutomationLocation,
   AutomationTree,
   AutomationTrigger,
-  AutomationLocation,
   AvailableAutomations,
-  BoardCatalogEntry,
-  BulkActionResult,
-  CommandMessage,
-  ComponentCatalogEntry,
-  ConfiguredDevice,
-  DevicesResponse,
-  EditorValidateResponse,
-  ErrorMessage,
-  EventMessage,
-  EventSubscriptionCallback,
-  FirmwareBinary,
-  Label,
+  Filter,
   LightEffect,
   ParsedAutomation,
+  YamlDiff,
+} from "./types/automations.js";
+import type { BoardCatalogEntry, PagedBoardsResponse } from "./types/boards.js";
+import type {
+  ComponentCatalogEntry,
+  PagedComponentsResponse,
+} from "./types/components.js";
+import type {
+  AddComponentResponse,
+  ConfiguredDevice,
+  DevicesResponse,
+  Label,
+  UpdateDeviceResponse,
+  WizardResponse,
+  YamlSearchHit,
+} from "./types/devices.js";
+import type { EditorValidateResponse } from "./types/editor.js";
+import type {
+  EventSubscriptionCallback,
+  VersionMatchPolicy,
+} from "./types/event-subscription.js";
+import type {
+  FirmwareBinary,
+  FirmwareJob,
+  RemoteBuildSubmitTarget,
+} from "./types/firmware-jobs.js";
+import type {
+  CommandMessage,
+  ErrorMessage,
+  EventMessage,
+  ResultMessage,
+  ServerInfoMessage,
+} from "./types/protocol.js";
+import type {
   ReachabilityStateEvent,
   ReachabilitySubscription,
-  FirmwareDownload,
-  FirmwareJob,
+} from "./types/reachability.js";
+import type {
   IdentityView,
-  PagedBoardsResponse,
-  PagedComponentsResponse,
   OffloaderRemoteBuildSettings,
   PairingSummary,
   PairingWindowState,
-  PeerSummary,
-  RemoteBuildPeer,
   RemoteBuildSettings,
-  RemoteBuildSubmitTarget,
-  ResultMessage,
+} from "./types/remote-build.js";
+import type { StreamCallbacks } from "./types/streaming.js";
+import type {
+  ArchivedDevice,
+  BulkActionResult,
   DetectChipResult,
-  SerialPort,
-  ServerInfoMessage,
   OnboardingState,
-  StreamCallbacks,
-  UpdateDeviceResponse,
+  SerialPort,
   UserPreferences,
-  WizardResponse,
-  YamlDiff,
-  YamlSearchHit,
-} from "./types.js";
+} from "./types/system.js";
 
 interface AuthLoginResult {
   token: string;
@@ -967,6 +984,25 @@ export class ESPHomeAPI {
     });
   }
 
+  /** Bulk-assign labels across multiple devices.
+   *
+   * Each update is a ``{configuration, labelIds}`` pair, where
+   * ``labelIds`` is the full replacement list for that device.
+   * Returns one ``BulkActionResult`` per entry. Per-entry failures
+   * (unknown label id, missing device) don't block the rest, so the
+   * caller can surface partial-success toasts.
+   */
+  async setDeviceLabelsBulk(
+    updates: Array<{ configuration: string; labelIds: string[] }>
+  ): Promise<BulkActionResult[]> {
+    return this.sendCommand<BulkActionResult[]>("devices/set_labels_bulk", {
+      updates: updates.map((u) => ({
+        configuration: u.configuration,
+        label_ids: u.labelIds,
+      })),
+    });
+  }
+
   // ─── Labels Commands ──────────────────────────────────────
 
   /** Return every label in the global catalog. */
@@ -1175,24 +1211,53 @@ export class ESPHomeAPI {
     return this.sendCommand<FirmwareBinary[]>("firmware/get_binaries", { configuration });
   }
 
-  /** Download a compiled firmware binary as base64. */
-  async firmwareDownload(
+  /** Mint a single-use token authorizing the HTTP download of one artifact. */
+  async firmwareDownloadToken(
     configuration: string,
-    file: string,
-    compressed = false
-  ): Promise<FirmwareDownload> {
-    return this.sendCommand<FirmwareDownload>("firmware/download", {
-      configuration,
-      file,
-      compressed,
-    });
+    file: string
+  ): Promise<{ token: string; filename: string }> {
+    return this.sendCommand<{ token: string; filename: string }>(
+      "firmware/download_token",
+      { configuration, file }
+    );
+  }
+
+  /**
+   * Build the HTTP download URL for an artifact (mints a token first).
+   *
+   * Save-to-disk callers point an ``<a href>`` at this so the browser streams
+   * the file straight to disk — no in-memory buffering, works on mobile. The
+   * token is the route's auth, so the URL needs no ``Authorization`` header.
+   */
+  async firmwareDownloadUrl(
+    configuration: string,
+    file: string
+  ): Promise<{ url: string; filename: string }> {
+    const { token, filename } = await this.firmwareDownloadToken(configuration, file);
+    return {
+      url: `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`,
+      filename,
+    };
+  }
+
+  /** Fetch an artifact's bytes (for in-browser Web Serial flashing). */
+  async firmwareDownloadBytes(configuration: string, file: string): Promise<ArrayBuffer> {
+    const { url } = await this.firmwareDownloadUrl(configuration, file);
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Firmware download failed: ${response.status}`);
+    }
+    return response.arrayBuffer();
   }
 
   // ─── Board Commands ───────────────────────────────────────
 
   /** Get a single board by ID. */
   async getBoard(boardId: string): Promise<BoardCatalogEntry | null> {
-    return this.sendCommand("boards/get_board", { board_id: boardId });
+    const board = await this.sendCommand<BoardCatalogEntry | null>("boards/get_board", {
+      board_id: boardId,
+    });
+    return board === null ? null : hydrateBoard(board);
   }
 
   /** Get boards with optional filtering, search, and pagination. */
@@ -1204,37 +1269,50 @@ export class ESPHomeAPI {
     offset?: number;
     limit?: number;
   }): Promise<PagedBoardsResponse> {
-    return this.sendCommand<PagedBoardsResponse>("boards/get_boards", args);
+    const response = await this.sendCommand<PagedBoardsResponse>(
+      "boards/get_boards",
+      args
+    );
+    return hydratePagedBoardsResponse(response);
   }
 
   // ─── Component Commands ───────────────────────────────────
 
   /**
-   * Get a single component by ID.
+   * Fetch component bodies in one round trip.
    *
-   * Pass `platform` (the device's target platform, e.g. "esp32",
-   * "esp8266") to have the backend resolve any per-platform
-   * `cv.SplitDefault` fields into a single `default_value`. Pass
-   * `boardId` to additionally narrow board-level constraints. Omit
-   * both when querying the generic catalog.
+   * Returns a map keyed by the requested id; missing ids are absent
+   * from the result. Pass `platform` (the device's target platform,
+   * e.g. "esp32", "esp8266") to have the backend resolve any
+   * per-platform `cv.SplitDefault` fields into a single
+   * `default_value`; `boardId` additionally narrows board-level
+   * constraints. Omit both when querying the generic catalog. Most
+   * callers go through `fetchComponent` in
+   * `component-name-cache.ts`, which caches results and
+   * microtask-coalesces concurrent fetches into one call.
    */
-  async getComponent(
-    componentId: string,
+  async getComponentBodies(
+    componentIds: string[],
     platform?: string,
     boardId?: string
-  ): Promise<ComponentCatalogEntry | null> {
-    return this.sendCommand("components/get_component", {
-      component_id: componentId,
-      ...(platform ? { platform } : {}),
-      ...(boardId ? { board_id: boardId } : {}),
-    });
+  ): Promise<Record<string, ComponentCatalogEntry>> {
+    if (componentIds.length === 0) return {};
+    return this.sendCommand<Record<string, ComponentCatalogEntry>>(
+      "components/get_component_bodies",
+      {
+        component_ids: componentIds,
+        ...(platform ? { platform } : {}),
+        ...(boardId ? { board_id: boardId } : {}),
+      }
+    );
   }
 
   /**
    * Get components with optional filtering, search, and pagination.
    *
-   * `platform` works the same as in `getComponent` — pass the device's
-   * target platform to have per-platform defaults pre-resolved.
+   * `platform` works the same as in `getComponentBodies`; pass the
+   * device's target platform to have per-platform defaults
+   * pre-resolved.
    */
   async getComponents(args?: {
     query?: string;
@@ -1339,6 +1417,38 @@ export class ESPHomeAPI {
     });
   }
 
+  /** Catalog of every sensor / binary_sensor / text_sensor filter.
+   *  Mirrors getLightEffects: one flat list, deduped across the
+   *  three domains; ``applies_to`` on each entry says which domains
+   *  the filter is valid on. The frontend's REGISTRY_LIST renderer
+   *  filters this list by parent-component domain. #941. */
+  async getFilters(platform?: string, boardId?: string): Promise<Filter[]> {
+    return this.sendCommand<Filter[]>("automations/get_filters", {
+      ...(platform ? { platform } : {}),
+      ...(boardId ? { board_id: boardId } : {}),
+    });
+  }
+
+  /**
+   * Hydrate full automation bodies (config_entries trees) in one
+   * round trip. Each ref is ``{type, id}`` where ``type`` is one of
+   * ``triggers`` / ``actions`` / ``conditions`` / ``light_effects``
+   * / ``filters``. The response is keyed by ``"<type>/<id>"`` and
+   * carries the full body. Missing / unknown refs are absent.
+   * Callers should go through ``automation-body-cache.ts`` rather
+   * than calling this directly; it caches results and coalesces
+   * concurrent fetches into one batched call.
+   */
+  async getAutomationBodies(
+    refs: { type: AutomationCatalogBodyType; id: string }[]
+  ): Promise<Record<string, AutomationCatalogBody>> {
+    if (refs.length === 0) return {};
+    return this.sendCommand<Record<string, AutomationCatalogBody>>(
+      "automations/get_bodies",
+      { refs }
+    );
+  }
+
   /**
    * Context-aware automation catalog for a single device's YAML.
    * Triggers are scoped to component types actually present in the
@@ -1353,9 +1463,24 @@ export class ESPHomeAPI {
    * than caching across edits.
    */
   async getAvailableAutomations(configuration: string): Promise<AvailableAutomations> {
-    return this.sendCommand<AvailableAutomations>("automations/get_available", {
-      configuration,
-    });
+    const raw = await this.sendCommand<AvailableAutomations>(
+      "automations/get_available",
+      { configuration }
+    );
+    // Backend ships slim ``*Index`` shapes that drop ``config_entries``
+    // entirely. Renderers (``automation-action-node``,
+    // ``automation-trigger-picker``, ``automation-condition-tree``)
+    // read ``def.config_entries.length`` synchronously, so a missing
+    // field crashes on the first paint before per-form hydration
+    // fills the schema in. Backfill once at the API boundary so every
+    // ``getAvailableAutomations`` consumer is safe by construction;
+    // mirrors the precedent set by #432 (boards-client default
+    // backfill). Mutates in place — these objects belong to the call
+    // site and have no other readers yet.
+    for (const e of raw.triggers) e.config_entries ??= [];
+    for (const e of raw.actions) e.config_entries ??= [];
+    for (const e of raw.conditions) e.config_entries ??= [];
+    return raw;
   }
 
   /**
@@ -1567,21 +1692,22 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Flip the offloader-side master "Remote builds enabled"
-   * toggle (7b).
+   * Flip one or both offloader-side master settings.
    *
-   * When set to `false`, the backend's ``pick_build_path``
-   * short-circuits every install to LOCAL; paired peer-link
-   * sessions stay open and the Send-builds power-user dialog
-   * still works — only the implicit auto-route is gated.
-   * Strict boolean validation on the backend rejects truthy
-   * non-booleans (the string ``"false"`` would otherwise
-   * coerce to `true` and persist the opposite of operator
-   * intent on a security-relevant switch).
+   * ``remote_builds_enabled=false`` short-circuits every install
+   * to LOCAL; paired peer-link sessions stay open and the
+   * Send-builds power-user dialog still works.
+   * ``version_match_policy`` selects how strictly the scheduler
+   * filters paired peers by ESPHome version — see
+   * :type:`VersionMatchPolicy` for the per-value contract.
+   * The arg type requires at least one of the two; an
+   * all-undefined call is rejected as INVALID_ARGS.
    */
-  async setOffloaderRemoteBuildSettings(args: {
-    remote_builds_enabled: boolean;
-  }): Promise<OffloaderRemoteBuildSettings> {
+  async setOffloaderRemoteBuildSettings(
+    args:
+      | { remote_builds_enabled: boolean; version_match_policy?: VersionMatchPolicy }
+      | { remote_builds_enabled?: boolean; version_match_policy: VersionMatchPolicy }
+  ): Promise<OffloaderRemoteBuildSettings> {
     return this.sendCommand<OffloaderRemoteBuildSettings>(
       "remote_build/set_offloader_settings",
       args

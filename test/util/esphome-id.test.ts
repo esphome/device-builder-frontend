@@ -32,7 +32,7 @@ describe("normalizeEspHomeId", () => {
   });
 
   it("collapses non-ASCII characters", () => {
-    // No diacritic-folding (unlike friendlyNameSlugify) — non-ASCII
+    // No diacritic-folding (unlike the friendly_name slug) — non-ASCII
     // letters aren't valid YAML keys in ESPHome's grammar, so they
     // collapse to underscore alongside other invalid chars.
     expect(normalizeEspHomeId("Café")).toBe("Caf_");

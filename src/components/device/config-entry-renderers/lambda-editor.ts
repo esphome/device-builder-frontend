@@ -10,15 +10,15 @@
  *
  * Emits ``lambda-change`` with ``{ value: string }`` on every doc edit.
  */
-import { consume } from "@lit/context";
+import { indentWithTab } from "@codemirror/commands";
 import { cpp } from "@codemirror/lang-cpp";
 import { indentUnit } from "@codemirror/language";
+import { Compartment, EditorState } from "@codemirror/state";
 import { keymap } from "@codemirror/view";
-import { indentWithTab } from "@codemirror/commands";
-import { LitElement, css, html } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { consume } from "@lit/context";
 import { basicSetup, EditorView } from "codemirror";
-import { EditorState, Compartment } from "@codemirror/state";
+import { css, html, LitElement } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import { darkModeContext } from "../../../context/index.js";
 import { vscodeDark, vscodeLight } from "../../../util/yaml-editor-theme.js";

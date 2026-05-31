@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType } from "../../src/api/types.js";
+import { ConfigEntryType } from "../../src/api/types/config-entries.js";
 import {
   getDeviceNameWarning,
   validateDeviceName,
   validateEntries,
   validateEntry,
 } from "../../src/util/config-validation.js";
-import { makeConfigEntry as makeEntry } from "./_make-config-entry.js";
 import { YamlRawValue } from "../../src/util/yaml-serialize.js";
+import { makeConfigEntry as makeEntry } from "./_make-config-entry.js";
 
 describe("validateDeviceName", () => {
   it("accepts valid slug", () => {

@@ -14,7 +14,7 @@ import { linter, type Diagnostic } from "@codemirror/lint";
 import type { Extension } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import type { EditorValidateResponse } from "../api/types.js";
+import type { EditorValidateResponse } from "../api/types/editor.js";
 
 interface BackendLinterOptions {
   api: ESPHomeAPI;

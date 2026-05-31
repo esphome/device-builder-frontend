@@ -1,13 +1,14 @@
 import { consume } from "@lit/context";
-import { LitElement, css, html } from "lit";
+import { LitElement, css, html, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
+import { EnterController } from "../../util/enter-controller.js";
 
 @customElement("esphome-wizard-step-setup")
 export class ESPHomeWizardStepSetup extends LitElement {
@@ -20,6 +21,10 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   @property({ attribute: false })
   public board: BoardCatalogEntry | null = null;
+
+  // Set by the parent dialog; the step stays mounted while the dialog is
+  // hidden, so the Enter listener follows this rather than connectedCallback.
+  @property({ type: Boolean }) active = false;
 
   @state()
   private _stage: "name" | "wifi" = "name";
@@ -42,6 +47,23 @@ export class ESPHomeWizardStepSetup extends LitElement {
 
   @state()
   private _wifiPassword = "";
+
+  // Enter advances / finishes the current stage, mirroring the primary button.
+  // Ignore OS key-repeat so a held Enter can't cross a stage boundary and
+  // auto-finish past the unreviewed wifi screen (the step stays mounted across
+  // stages, so the latch idiom the dialogs use doesn't apply).
+  private _enter = new EnterController(this, (e) => {
+    if (e.repeat) return;
+    if (this._canAdvance()) this._onNext();
+  });
+
+  private _canAdvance(): boolean {
+    return this._stage === "name" ? !!this._deviceName.trim() : !!this._wifiSsid.trim();
+  }
+
+  protected willUpdate(changed: PropertyValues): void {
+    if (changed.has("active")) this._enter.set(this.active);
+  }
 
   async connectedCallback() {
     super.connectedCallback();
@@ -253,9 +275,7 @@ export class ESPHomeWizardStepSetup extends LitElement {
           <button
             class="btn btn-primary"
             type="button"
-            ?disabled=${this._stage === "name"
-              ? !this._deviceName.trim()
-              : !this._wifiSsid.trim()}
+            ?disabled=${!this._canAdvance()}
             @click=${this._onNext}
           >
             ${this._stage === "name" && !this._hasSecretWifi

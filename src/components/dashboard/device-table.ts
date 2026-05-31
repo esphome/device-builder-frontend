@@ -7,7 +7,6 @@ import {
   mdiChevronDown,
   mdiChevronUp,
   mdiCloseCircle,
-  mdiConsole,
   mdiDotsVertical,
   mdiLock,
   mdiLockAlert,
@@ -15,6 +14,7 @@ import {
   mdiLockOpenVariant,
   mdiOpenInNew,
   mdiPencil,
+  mdiTextBoxOutline,
   mdiUnfoldMoreHorizontal,
   mdiUpload,
 } from "@mdi/js";
@@ -32,12 +32,15 @@ import {
 } from "@tanstack/lit-table";
 import type { PropertyValues } from "lit";
 import { LitElement, html, nothing } from "lit";
-import { classMap } from "lit/directives/class-map.js";
 import { customElement, property, query, state } from "lit/decorators.js";
-import type { ConfiguredDevice, FirmwareJob, Label } from "../../api/types.js";
+import { classMap } from "lit/directives/class-map.js";
+import { repeat } from "lit/directives/repeat.js";
+import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
+import type { FirmwareJob } from "../../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { matchesMacAddress } from "../../util/device-search.js";
 import { labelChipStyles, resolveLabelIds } from "../../util/label-chip-template.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { tableCellStyles } from "./table-cell-styles.js";
@@ -47,6 +50,7 @@ import { tableLayoutStyles } from "./table-styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import { ALL_PAGE_SIZE, effectiveTablePageSize } from "./pagination.js";
 import "./table-column-toggle.js";
 import "./table-pagination.js";
 import "./table-row-menu.js";
@@ -59,7 +63,7 @@ registerMdiIcons({
   "chevron-up": mdiChevronUp,
   "chevron-down": mdiChevronDown,
   "close-circle": mdiCloseCircle,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   "dots-vertical": mdiDotsVertical,
   lock: mdiLock,
   "lock-alert": mdiLockAlert,
@@ -230,17 +234,10 @@ export class ESPHomeDeviceTable extends LitElement {
     ) {
       return true;
     }
-    // MAC search: strip ``:`` / ``-`` / ``.`` from both haystack
-    // and needle so a user can find a device by typing any of
-    // ``94:c9:60``, ``94-C9-60``, or the bare ``94c960`` —
-    // the canonical wire form is ``XX:XX:XX:XX:XX:XX`` but users
-    // copy-paste from router admin pages, vendor labels, etc.
-    if (d.mac_address) {
-      const macStripped = d.mac_address.toLowerCase().replace(/[:.-]/g, "");
-      const qStripped = q.replace(/[:.-]/g, "");
-      if (qStripped && macStripped.includes(qStripped)) return true;
-    }
-    return false;
+    // MAC search via the shared predicate so the dashboard's
+    // select-all scoping helper matches the same rows this filter
+    // makes visible (see util/device-search.ts).
+    return matchesMacAddress(d.mac_address, q);
   };
 
   // ─── Lifecycle ───
@@ -314,6 +311,8 @@ export class ESPHomeDeviceTable extends LitElement {
   // ─── Render ───
 
   protected render() {
+    const effectivePageSize = effectiveTablePageSize(this._pageSize, this._rows.length);
+    const effectivePageIndex = this._pageSize === ALL_PAGE_SIZE ? 0 : this._pageIndex;
     const table = this._tableController.table({
       data: this._rows,
       columns: this._columns,
@@ -321,7 +320,7 @@ export class ESPHomeDeviceTable extends LitElement {
         sorting: this._sorting,
         columnVisibility: this._columnVisibility,
         globalFilter: this.search,
-        pagination: { pageSize: this._pageSize, pageIndex: this._pageIndex },
+        pagination: { pageSize: effectivePageSize, pageIndex: effectivePageIndex },
       },
       onSortingChange: this._handleSortingChange as any,
       onColumnVisibilityChange: this._handleVisibilityChange as any,
@@ -347,6 +346,7 @@ export class ESPHomeDeviceTable extends LitElement {
 
     return html`
       ${this._renderControls(table, toggleCols)}
+      <slot name="below-controls"></slot>
       <div class="table-wrap">
         <div class="table-scroll">
           <table role="grid">
@@ -356,7 +356,7 @@ export class ESPHomeDeviceTable extends LitElement {
         <esphome-table-pagination
           page-index=${pgState.pageIndex}
           page-count=${table.getPageCount()}
-          page-size=${pgState.pageSize}
+          page-size=${this._pageSize}
           total-rows=${table.getFilteredRowModel().rows.length}
           ?can-previous-page=${table.getCanPreviousPage()}
           ?can-next-page=${table.getCanNextPage()}
@@ -365,7 +365,19 @@ export class ESPHomeDeviceTable extends LitElement {
             this._scrollToTop();
           }}
           @page-size-change=${(e: CustomEvent<number>) => {
-            table.setPageSize(e.detail);
+            // Set our controlled state directly rather than
+            // ``table.setPageSize`` — the "All" sentinel (0) would make
+            // TanStack's setter divide by zero deriving the page index.
+            // The state we feed on the next render drives the slice.
+            this._pageSize = e.detail;
+            this._pageIndex = 0;
+            this.dispatchEvent(
+              new CustomEvent("table-page-size-change", {
+                detail: e.detail,
+                bubbles: true,
+                composed: true,
+              })
+            );
             this._scrollToTop();
           }}
         ></esphome-table-pagination>
@@ -426,9 +438,9 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("clean-build", e.detail);
         }}
-        @download-elf=${(e: CustomEvent) => {
+        @download=${(e: CustomEvent) => {
           e.stopPropagation();
-          this._forwardEvent("download-elf", e.detail);
+          this._forwardEvent("download", e.detail);
         }}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => {
           e.stopPropagation();
@@ -524,7 +536,12 @@ export class ESPHomeDeviceTable extends LitElement {
     return html`
       <tbody>
         ${rows.length > 0
-          ? rows.map(
+          ? repeat(
+              rows,
+              // Key on the device config so Lit reuses each row's DOM
+              // across re-renders (job-progress ticks, selection) instead
+              // of re-diffing every row — matters most with "All" selected.
+              (row) => row.original.config,
               (row) => html`
                 <tr
                   role="row"

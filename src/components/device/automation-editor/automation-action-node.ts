@@ -12,8 +12,6 @@
  * every mutation.
  */
 import { consume } from "@lit/context";
-import { html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
 import {
   mdiArrowDown,
   mdiArrowUp,
@@ -23,6 +21,8 @@ import {
   mdiDelete,
   mdiPencilOutline,
 } from "@mdi/js";
+import { html, LitElement, nothing, type PropertyValues } from "lit";
+import { customElement, property, query, state } from "lit/decorators.js";
 
 import type {
   ActionNode,
@@ -30,25 +30,27 @@ import type {
   AutomationCondition,
   AvailableComponentInstance,
   AvailableScript,
-  BoardCatalogEntry,
   ConditionNode,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
+import type { BoardCatalogEntry } from "../../../api/types/boards.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
+import { actionAdvancedState } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
-import { automationEditorStyles } from "./automation-editor.styles.js";
-import { applyParamChange } from "./serialise.js";
+import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import type { ConfigEntryValueChange } from "../config-entry-form.js";
 import "./automation-condition-tree.js";
+import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./catalog-picker-dialog.js";
 import type {
   CatalogPickedDetail,
   ESPHomeCatalogPickerDialog,
 } from "./catalog-picker-dialog.js";
+import { applyParamChange } from "./serialise.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/option/option.js";
@@ -138,7 +140,27 @@ export class ESPHomeAutomationActionNode extends LitElement {
    */
   @state() private _collapsed = false;
 
+  /** "Show advanced settings" gate for the action params form. */
+  @state() private _showAdvanced = false;
+
   static styles = [espHomeStyles, inputStyles, automationEditorStyles];
+
+  /**
+   * The list reuses nodes by DOM position (plain actions.map, no keyed
+   * repeat), so a reorder/delete only rebinds .value and the @state
+   * view-flags would otherwise leak onto whichever action lands here.
+   * Key the reset off action_id, not object identity: a same-action
+   * param edit re-emits a fresh ActionNode every keystroke and resetting
+   * on that would snap the card shut mid-edit.
+   */
+  protected willUpdate(changed: PropertyValues<this>): void {
+    if (!changed.has("value")) return;
+    const previous = changed.get("value") as ActionNode | undefined;
+    if (previous && previous.action_id !== this.value.action_id) {
+      this._collapsed = false;
+      this._showAdvanced = false;
+    }
+  }
 
   protected render() {
     const def = this.catalog.find((a) => a.id === this.value.action_id);
@@ -350,15 +372,24 @@ export class ESPHomeAutomationActionNode extends LitElement {
     if (!def) return nothing;
     if (def.id === "delay") return this._renderDelayParams();
     if (def.config_entries.length === 0) return nothing;
+    const { showAdvanced, showToggle } = actionAdvancedState(
+      def.config_entries,
+      this._showAdvanced
+    );
     return html`<esphome-config-entry-form
-      .entries=${def.config_entries}
-      .values=${this.value.params}
-      .board=${this.board}
-      .yaml=${this.yaml}
-      ?disabled=${this.disabled}
-      ?show-advanced=${this._defaultShowAdvanced(def)}
-      @value-change=${this._onParamChange}
-    ></esphome-config-entry-form>`;
+        .entries=${def.config_entries}
+        .values=${this.value.params}
+        .board=${this.board}
+        .yaml=${this.yaml}
+        ?disabled=${this.disabled}
+        ?show-advanced=${showAdvanced}
+        @value-change=${this._onParamChange}
+      ></esphome-config-entry-form>
+      ${showToggle
+        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
+            this._showAdvanced = show;
+          })
+        : nothing}`;
   }
 
   /**
@@ -461,26 +492,6 @@ export class ESPHomeAutomationActionNode extends LitElement {
     delete next.id;
     if (trimmed) next[DELAY_UNIT_TO_KEY[unit]] = trimmed;
     this._emit({ ...this.value, params: next });
-  }
-
-  /**
-   * Default ``show-advanced`` for the action's param form.
-   *
-   * The catalog occasionally marks every entry of an action as
-   * ``advanced: true`` (the ``delay`` action, for instance, has
-   * ``days`` / ``hours`` / ``minutes`` / ``seconds`` / … all
-   * tagged advanced). With our usual ``showAdvanced=false``
-   * default the form would render zero rows and the user would be
-   * staring at a Delay box with no inputs. Pop the advanced gate
-   * open here when no non-advanced field exists, so the user can
-   * actually configure the action they just picked. Actions that
-   * mix required + advanced (the common case) still hide the
-   * advanced tail until the user explicitly opens it via the
-   * form's own toggle (when one is rendered higher up).
-   */
-  private _defaultShowAdvanced(def: AutomationAction): boolean {
-    const entries = def.config_entries ?? [];
-    return entries.length > 0 && entries.every((e) => e.advanced);
   }
 
   private _openPicker = () => {

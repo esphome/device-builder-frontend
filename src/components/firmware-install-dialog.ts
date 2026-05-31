@@ -1,36 +1,39 @@
 import { consume } from "@lit/context";
 import {
   mdiAlertCircle,
-  mdiArrowExpand,
   mdiArrowCollapse,
+  mdiArrowExpand,
   mdiCheckCircle,
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
-  mdiConsole,
+  mdiTextBoxOutline,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import { JobSource, type ConfiguredDevice } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
-import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
-import { remoteBuildHintStyles } from "./remote-build-hint.js";
+import {
+  downloadSelectedBinary,
+  flipToLogs,
+  startArtifactDownload,
+  startDownload,
+  startWebSerialInstall,
+} from "./firmware-install-dialog/install-flow.js";
 import {
   renderFooter,
   renderLogs,
   renderProgress,
   renderStatus,
 } from "./firmware-install-dialog/renderers.js";
-import {
-  flipToLogs,
-  startDownload,
-  startWebSerialInstall,
-} from "./firmware-install-dialog/install-flow.js";
+import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
+import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -45,7 +48,7 @@ registerMdiIcons({
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
 });
 
 export type InstallStep =
@@ -55,6 +58,8 @@ export type InstallStep =
   | "compiling"
   | "flashing"
   | "done"
+  | "choose-binary"
+  | "downloading"
   | "download-ready"
   | "error";
 
@@ -95,6 +100,10 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   @state() _logsExpanded = false;
   @state() _flashPercent = 0;
   @state() _downloadedFilename = "";
+
+  // Formats offered by the manual download picker; populated only when a
+  // device produces more than one (e.g. ESP32 factory + OTA).
+  @state() _binaries: FirmwareBinary[] = [];
 
   // Reset per _init so an opt-out on one run doesn't persist. installWebDownload
   // doesn't connect to a device, so the toggle is install-only.
@@ -146,6 +155,23 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     void startDownload(this);
   }
 
+  // Three-dot "Download" entry; compiles only when nothing is built.
+  downloadArtifacts(device: ConfiguredDevice) {
+    this._init(device);
+    this._installer = "binary-download";
+    this._title = this._localize("firmware.download_title", {
+      name: device.friendly_name || device.name,
+    });
+    this._step = "queued";
+    this._statusMessage = this._localize("firmware.status_queued");
+    void startArtifactDownload(this);
+  }
+
+  // Picked a format in the choose-binary step.
+  _onChooseBinary(file: string) {
+    void downloadSelectedBinary(this, file);
+  }
+
   // Reopen without clearing state. Used by logs-dialog's "Back to install"
   // after the Web Serial post-install hand-off so users can review output.
   public reopen() {
@@ -170,6 +196,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._logsExpanded = false;
     this._flashPercent = 0;
     this._downloadedFilename = "";
+    this._binaries = [];
     this._showLogsAfterInstall = true;
     this._installer = null;
     this._failedDuringCompile = false;

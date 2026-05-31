@@ -1,5 +1,5 @@
-import type { ConfigEntry } from "../api/types.js";
-import { ConfigEntryType } from "../api/types.js";
+import type { ConfigEntry } from "../api/types/config-entries.js";
+import { ConfigEntryType } from "../api/types/config-entries.js";
 import { parseFloatWithUnit } from "./float-with-unit.js";
 import { parseHexInt } from "./hex-int.js";
 import { asMappingList, asRecord } from "./nested-values.js";

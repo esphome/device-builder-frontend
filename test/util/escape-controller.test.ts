@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
 import type { ReactiveController, ReactiveControllerHost } from "lit";
+import { describe, expect, it, vi } from "vitest";
 import { EscapeController } from "../../src/util/escape-controller.js";
 
 class FakeHost implements ReactiveControllerHost {

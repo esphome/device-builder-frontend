@@ -13,7 +13,7 @@ import {
   type OnboardingState,
   OnboardingStepId,
   OnboardingStepStatus,
-} from "../../src/api/types.js";
+} from "../../src/api/types/system.js";
 import {
   isOnboardingPending,
   shouldAutoShowOnboarding,

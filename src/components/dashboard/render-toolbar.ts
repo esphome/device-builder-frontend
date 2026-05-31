@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { DashboardView, type Label } from "../../api/types.js";
+import type { Label } from "../../api/types/devices.js";
+import { DashboardView } from "../../api/types/system.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import {
   computeAreaFacet,
@@ -201,7 +202,10 @@ export function renderSearchInput(host: ESPHomePageDashboard): TemplateResult {
   </div>`;
 }
 
-export function renderToolbar(
+/** Pairs the device-count with Select-multiple on one row. Used
+ *  by both the card-view toolbar and the table-view toolbar so the
+ *  toggle's position doesn't shift when the user flips the view. */
+export function renderDeviceCountRow(
   host: ESPHomePageDashboard,
   matchCount: number,
   total: number
@@ -212,19 +216,31 @@ export function renderToolbar(
       ? host._localize("dashboard.device_singular")
       : host._localize("dashboard.device_plural");
   const suffix = q ? " " + host._localize("dashboard.search_of", { total }) : "";
-  // Layout: [search] [view-toggle] [facets…] <spacer> [Select multiple]
-  //         [X devices]
-  // The spacer between the facet cluster and the select-mode
-  // toggle visually separates "filter the list" from "operate on
-  // the list" so the toggle no longer reads as another facet.
+  return html`
+    <div class="device-count-row">
+      <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+      ${renderSelectToggle(host)}
+    </div>
+  `;
+}
+
+export function renderToolbar(
+  host: ESPHomePageDashboard,
+  matchCount: number,
+  total: number
+): TemplateResult {
+  // Layout: [search] [view-toggle] [facets…]
+  //         [X devices]                 [Select multiple]
+  // Select-multiple sits paired with the device-count on its own
+  // row — both reference the device list ("operate on these N
+  // devices") so semantically they belong together. Frees the
+  // toolbar-row above for filter-related controls only.
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
         ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
-        <span class="toolbar-spacer"></span>
-        ${renderSelectToggle(host)}
       </div>
-      <span class="device-count"><strong>${matchCount}</strong> ${unit}${suffix}</span>
+      ${renderDeviceCountRow(host, matchCount, total)}
     </div>
   `;
 }
@@ -326,6 +342,7 @@ export function renderSelectBarOrFab(
         @update-selected=${host._updateSelected}
         @archive-selected=${host._archiveSelected}
         @delete-selected=${host._deleteSelected}
+        @labels-selected=${host._labelsSelected}
       ></esphome-select-bar>
     `;
   }

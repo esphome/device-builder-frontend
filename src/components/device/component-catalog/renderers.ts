@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
-import type { ComponentCatalogEntry, FeaturedBundle } from "../../../api/types.js";
+import type { FeaturedBundle } from "../../../api/types/boards.js";
+import type { ComponentCatalogEntry } from "../../../api/types/components.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import {

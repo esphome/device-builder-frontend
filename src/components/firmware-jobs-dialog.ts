@@ -1,3 +1,6 @@
+import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import { consume } from "@lit/context";
 import {
   mdiBroom,
@@ -15,8 +18,10 @@ import {
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import type { ESPHomeAPI } from "../api/index.js";
-import type { ConfiguredDevice, FirmwareJob } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
@@ -29,19 +34,16 @@ import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
+import "./command-dialog.js";
+import type { ESPHomeCommandDialog } from "./command-dialog.js";
+import "./confirm-dialog.js";
+import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
 import {
   compareJobs,
   renderEmpty,
   renderGroups,
 } from "./firmware-jobs-dialog/renderers.js";
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "./command-dialog.js";
-import type { ESPHomeCommandDialog } from "./command-dialog.js";
-import "./confirm-dialog.js";
-import type { ESPHomeConfirmDialog } from "./confirm-dialog.js";
+import { firmwareJobsDialogStyles } from "./firmware-jobs-dialog/styles.js";
 import "./logs-dialog.js";
 import type { ESPHomeLogsDialog } from "./logs-dialog.js";
 
@@ -125,10 +127,22 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   static styles = [espHomeStyles, firmwareJobsDialogStyles];
 
+  /** Bucket the live jobs Map into sorted / active / terminal lists.
+   *  Memoised on the upstream Map reference; the context provider
+   *  hands out a new Map identity on every job-lifecycle push, so
+   *  the cache invalidates exactly when the lists would change. One
+   *  sort + two filter passes per push, not per render. */
+  private _bucketJobs = memoizeOne((jobs: Map<string, FirmwareJob>) => {
+    const sorted = [...jobs.values()].sort(compareJobs);
+    return {
+      sorted,
+      active: sorted.filter((j) => !isTerminal(j)),
+      terminal: sorted.filter((j) => isTerminal(j)),
+    };
+  });
+
   protected render() {
-    const sorted = [...this._jobs.values()].sort(compareJobs);
-    const active = sorted.filter((j) => !isTerminal(j));
-    const terminal = sorted.filter((j) => isTerminal(j));
+    const { sorted, active, terminal } = this._bucketJobs(this._jobs);
     const hasJobs = sorted.length > 0;
 
     return html`

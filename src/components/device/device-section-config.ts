@@ -10,7 +10,8 @@ import { html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { AutomationLocation, BoardCatalogEntry } from "../../api/types.js";
+import type { AutomationLocation } from "../../api/types/automations.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
@@ -26,12 +27,12 @@ import {
   parseYamlTopLevelSections,
   sectionKeyOf,
 } from "../../util/yaml-sections.js";
+import { renderAdvancedToggle } from "./advanced-toggle.js";
 import { applyYamlDiff } from "./automation-editor/serialise.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../confirm-dialog.js";
 import type { ESPHomeConfirmDialog } from "../confirm-dialog.js";
 import "./add-api-action-dialog.js";
@@ -366,22 +367,15 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .board=${this.board}
               .yaml=${this.yaml}
               .fromLine=${this._resolvedFromLine}
+              .sectionKey=${this.sectionKey}
               .presentComponents=${this._presentComponents}
               ?show-advanced=${showAdvanced}
               @value-change=${this._onValueChange}
             ></esphome-config-entry-form>
             ${hasAdvanced
-              ? html`<div class="advanced-toggle-row">
-                  <wa-switch
-                    .checked=${showAdvanced}
-                    @change=${(e: Event) =>
-                      this._setShowAdvanced(
-                        (e.target as HTMLInputElement & { checked: boolean }).checked
-                      )}
-                  >
-                    ${this._localize("device.show_advanced")}
-                  </wa-switch>
-                </div>`
+              ? renderAdvancedToggle(showAdvanced, this._localize, (show) =>
+                  this._setShowAdvanced(show)
+                )
               : nothing}
             ${this._error ? html`<p class="error">${this._error}</p>` : nothing}
             ${this._renderApiActionsTable()} ${this._renderTriggersTable()}

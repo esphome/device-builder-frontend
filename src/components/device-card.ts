@@ -6,7 +6,6 @@ import {
   mdiCheckboxBlankOutline,
   mdiCheckboxMarked,
   mdiCloseCircle,
-  mdiConsole,
   mdiDotsVertical,
   mdiHelpNetworkOutline,
   mdiLock,
@@ -16,24 +15,26 @@ import {
   mdiNetworkOffOutline,
   mdiOpenInNew,
   mdiPencil,
+  mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
 import { LitElement, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { DeviceState } from "../api/types.js";
-import type { FirmwareJob, Label } from "../api/types.js";
+import type { Label } from "../api/types/devices.js";
+import { DeviceState } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { labelsContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { labelChipStyles } from "../util/label-chip-template.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { deviceCardStyles } from "./device-card/styles.js";
 import { navigateCards, onHostContextMenu } from "./device-card/keyboard-nav.js";
 import {
   renderEncryptionIcon,
   renderLabels,
   renderStatusBadge,
 } from "./device-card/render-bits.js";
+import { deviceCardStyles } from "./device-card/styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
@@ -44,7 +45,7 @@ registerMdiIcons({
   "checkbox-blank-outline": mdiCheckboxBlankOutline,
   "checkbox-marked": mdiCheckboxMarked,
   "close-circle": mdiCloseCircle,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   "dots-vertical": mdiDotsVertical,
   "check-network-outline": mdiCheckNetworkOutline,
   "help-network-outline": mdiHelpNetworkOutline,
@@ -207,7 +208,7 @@ export class ESPHomeDeviceCard extends LitElement {
                   aria-label=${this._localize("dashboard.drawer_logs")}
                   title=${this._localize("dashboard.drawer_logs")}
                 >
-                  <wa-icon library="mdi" name="console"></wa-icon>
+                  <wa-icon library="mdi" name="text-box-outline"></wa-icon>
                 </button>
                 ${this.webUrl
                   ? html`<a

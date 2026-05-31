@@ -17,7 +17,7 @@
  * rendering, so these helpers return raw arrays without further
  * trimming.
  */
-import { DeviceState, type ConfiguredDevice } from "../api/types.js";
+import { type ConfiguredDevice, DeviceState } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import type { FacetOption } from "../components/facets/facet-filter.js";
 

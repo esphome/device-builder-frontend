@@ -2,15 +2,12 @@ import { consume } from "@lit/context";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
-import type { ESPHomeAPI } from "../api/index.js";
 import { APIError } from "../api/api-error.js";
-import {
-  ErrorCode,
-  JobStatus,
-  JobType,
-  type ConfiguredDevice,
-  type RemoteBuildSubmitTarget,
-} from "../api/types.js";
+import type { ESPHomeAPI } from "../api/index.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
+import { JobType, type RemoteBuildSubmitTarget } from "../api/types/firmware-jobs.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { LocalizeFunc } from "../common/localize.js";
 import {
   apiContext,
   buildOffloadJobsContext,
@@ -19,7 +16,6 @@ import {
   localizeContext,
   type RemoteBuildJobState,
 } from "../context/index.js";
-import type { LocalizeFunc } from "../common/localize.js";
 import { inputStyles } from "../styles/inputs.js";
 import { jobStatusPillStyles } from "../styles/job-status-pill.js";
 import { espHomeStyles } from "../styles/shared.js";

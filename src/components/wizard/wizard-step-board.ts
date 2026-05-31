@@ -9,16 +9,14 @@ import {
 } from "@mdi/js";
 import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type { BoardCatalogEntry, SerialPort } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import {
-  WIZARD_BOARD_PLATFORMS,
-  chipNameToFilterLabel,
-} from "./wizard-step-board-platforms.js";
 import { withBase } from "../../util/base-path.js";
 import { debounce } from "../../util/debounce.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../../util/environment.js";
@@ -30,6 +28,10 @@ import {
   isWebSerialSupported,
   readDeviceManifest,
 } from "../../util/web-serial.js";
+import {
+  WIZARD_BOARD_PLATFORMS,
+  chipNameToFilterLabel,
+} from "./wizard-step-board-platforms.js";
 
 import { inputStyles } from "../../styles/inputs.js";
 
@@ -64,6 +66,16 @@ export class ESPHomeWizardStepBoard extends LitElement {
 
   @state()
   private _boards: BoardCatalogEntry[] = [];
+
+  /** Split the live board catalog into the single featured tile +
+   *  the rest. Memoised on the ``_boards`` reference so the find +
+   *  filter pair shares one walk per catalog change (each search
+   *  keystroke replaces ``_boards`` with a freshly-filtered list,
+   *  so the cache invalidates exactly when the split needs to). */
+  private _splitBoards = memoizeOne((boards: BoardCatalogEntry[]) => ({
+    featured: boards.find((b) => b.featured),
+    regular: boards.filter((b) => !b.featured),
+  }));
 
   @state()
   private _loading = true;
@@ -468,6 +480,47 @@ export class ESPHomeWizardStepBoard extends LitElement {
         text-align: center;
         padding: var(--wa-space-xl);
       }
+
+      /* Mobile overrides — placed at the end of the stylesheet so
+         they win the same-specificity source-order fight against
+         the base .featured-card / .featured-image /
+         .board-card-header / .board-image rules above. Caught by
+         Copilot review on PR #400 — the prior placement inline
+         with the base rules left align-items / width / height
+         silently overridden. #41 */
+      @media (max-width: 480px) {
+        .boards-grid {
+          grid-template-columns: 1fr;
+        }
+
+        /* Featured (Apollo Starter Kit) card: image-left +
+           text-right wraps to one word per line at phone width.
+           Stack vertically so the description has the full card
+           width. */
+        .featured-card {
+          flex-direction: column;
+          gap: var(--wa-space-s);
+        }
+
+        .featured-image {
+          width: 100%;
+          height: 160px;
+        }
+
+        /* Regular board cards: header row was image-on-left +
+           title-on-the-right; at narrow widths the right column
+           shrinks to ~140px and titles wrap awkwardly. Stack
+           image above title so each row gets the full card width. */
+        .board-card-header {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .board-image {
+          width: 100%;
+          height: 100px;
+        }
+      }
     `,
   ];
 
@@ -490,8 +543,7 @@ export class ESPHomeWizardStepBoard extends LitElement {
       return html`<p class="loading">${this._localize("wizard.loading_boards")}</p>`;
     }
 
-    const featured = this._boards.find((b) => b.featured);
-    const regular = this._boards.filter((b) => !b.featured);
+    const { featured, regular } = this._splitBoards(this._boards);
 
     return html`
       <input

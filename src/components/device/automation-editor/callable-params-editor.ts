@@ -14,17 +14,17 @@
  * typing.
  */
 import { consume } from "@lit/context";
+import { mdiClose, mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import { mdiClose, mdiPlus } from "@mdi/js";
 
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
-import { espHomeStyles } from "../../../styles/shared.js";
 import { inputStyles } from "../../../styles/inputs.js";
+import { espHomeStyles } from "../../../styles/shared.js";
 import { normalizeEspHomeId } from "../../../util/esphome-id.js";
-import { registerMdiIcons } from "../../../util/register-icons.js";
 import { renderMarkdown } from "../../../util/markdown.js";
+import { registerMdiIcons } from "../../../util/register-icons.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";

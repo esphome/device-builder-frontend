@@ -1,9 +1,14 @@
-import { describe, expect, it } from "vitest";
-import { defaultLocalize } from "../../src/common/localize.js";
+// @vitest-environment happy-dom
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import {
+  activeLocale,
+  clearStoredLocale,
+  defaultLocalize,
+} from "../../src/common/localize.js";
 
 describe("defaultLocalize", () => {
   it("resolves a top-level string key", () => {
-    expect(defaultLocalize("dashboard.title")).toBe("ESPHome - Device Builder");
+    expect(defaultLocalize("dashboard.title")).toBe("ESPHome Device Builder");
   });
 
   it("resolves a deeply nested key", () => {
@@ -43,7 +48,76 @@ describe("defaultLocalize", () => {
   });
 
   it("coerces numeric values to strings", () => {
-    const out = defaultLocalize("dashboard.update_selected", { count: 5 });
-    expect(out).toBe("Update 5 device(s)");
+    const out = defaultLocalize("dashboard.update_selected_aria", { count: 5 });
+    expect(out).toBe("Update 5 selected");
+  });
+});
+
+describe("activeLocale (browser detection fallback)", () => {
+  let originalLanguage: PropertyDescriptor | undefined;
+
+  beforeEach(() => {
+    clearStoredLocale();
+    originalLanguage = Object.getOwnPropertyDescriptor(navigator, "language");
+  });
+
+  afterEach(() => {
+    clearStoredLocale();
+    if (originalLanguage !== undefined) {
+      Object.defineProperty(navigator, "language", originalLanguage);
+    } else {
+      // ``navigator.language`` lives on the prototype by default,
+      // so the previous descriptor was ``undefined``. Drop the
+      // own-property override we installed via ``setLanguage`` so
+      // the next test reads through to the prototype again and
+      // doesn't observe the previous stub.
+      delete (navigator as { language?: string }).language;
+    }
+  });
+
+  const setLanguage = (value: string): void => {
+    Object.defineProperty(navigator, "language", {
+      configurable: true,
+      get: () => value,
+    });
+  };
+
+  it("matches exact supported locale codes (zh-CN)", () => {
+    setLanguage("zh-CN");
+    expect(activeLocale()).toBe("zh-CN");
+  });
+
+  it("matches case-insensitive variants of the locale tag", () => {
+    // BCP 47 tags are case-insensitive; a browser may report any
+    // casing. The canonical ``zh-CN`` is still what we return.
+    setLanguage("zh-cn");
+    expect(activeLocale()).toBe("zh-CN");
+  });
+
+  it("falls back to language prefix for regional variants (fr-CA)", () => {
+    setLanguage("fr-CA");
+    expect(activeLocale()).toBe("fr");
+  });
+
+  it("falls back to language prefix for nl-BE", () => {
+    setLanguage("nl-BE");
+    expect(activeLocale()).toBe("nl");
+  });
+
+  it("falls back to en for zh-TW since zh is not a supported prefix", () => {
+    // Regression guard: zh-CN must not capture zh-TW / zh-HK / zh-MO /
+    // zh-SG via a bare `zh` prefix entry that doesn't exist.
+    setLanguage("zh-TW");
+    expect(activeLocale()).toBe("en");
+  });
+
+  it("falls back to en for unsupported languages", () => {
+    setLanguage("de-DE");
+    expect(activeLocale()).toBe("en");
+  });
+
+  it("matches exact base language (fr)", () => {
+    setLanguage("fr");
+    expect(activeLocale()).toBe("fr");
   });
 });

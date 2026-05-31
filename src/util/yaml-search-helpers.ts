@@ -16,8 +16,8 @@
  * each component.
  */
 
+import type { YamlSearchHit, YamlSearchMatch } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { YamlSearchHit, YamlSearchMatch } from "../api/types.js";
 import {
   ALWAYS_SENSITIVE_KEYS,
   findSensitiveValueRanges,

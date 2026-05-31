@@ -1,10 +1,11 @@
 import { html, type TemplateResult } from "lit";
-import type { ArchivedDevice, ConfiguredDevice, Label } from "../../api/types.js";
-import { DeviceState } from "../../api/types.js";
+import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
+import { DeviceState } from "../../api/types/devices.js";
+import type { ArchivedDevice } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
-import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { computeLabelUsage, deleteConfirmKey } from "../../util/label-usage.js";
+import { archiveBulkDevices, deleteBulkDevices, deleteDevice } from "./actions.js";
 
 export type PendingConfirm =
   | { kind: "delete-single"; device: ConfiguredDevice }
@@ -128,7 +129,7 @@ export function executeConfirm(
       return;
     }
     case "delete-single":
-      deleteDevice(pending.device, host._api, host._devices, host._localize);
+      void deleteDevice(pending.device, host._api, host._localize);
       return;
     case "delete-archived":
       void host._deleteArchivedDevice(pending.device);
@@ -167,6 +168,7 @@ export function renderDialogs(host: ESPHomePageDashboard): TemplateResult {
     <esphome-rename-device-dialog
       @rename-confirm=${host._executeRename}
     ></esphome-rename-device-dialog>
+    <esphome-bulk-labels-dialog></esphome-bulk-labels-dialog>
     <esphome-adopt-dialog @adopted=${host._onAdopted}></esphome-adopt-dialog>
     <esphome-api-key-dialog></esphome-api-key-dialog>
     <esphome-create-config-dialog></esphome-create-config-dialog>

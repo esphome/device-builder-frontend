@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
-import {
-  ConfigEntryType,
-  type BoardCatalogEntry,
-  type BoardPin,
-  type ConfigEntry,
-} from "../../src/api/types.js";
+import type { BoardCatalogEntry, BoardPin } from "../../src/api/types/boards.js";
+import { type ConfigEntry, ConfigEntryType } from "../../src/api/types/config-entries.js";
 import { seedBoardPinDefaults } from "../../src/util/board-pin-defaults.js";
 import { makeConfigEntry } from "./_make-config-entry.js";
 

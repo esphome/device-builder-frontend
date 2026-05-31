@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
-import { EditorState } from "@codemirror/state";
 import { getIndentation, indentUnit } from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
+import { describe, expect, it } from "vitest";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
 
 /**

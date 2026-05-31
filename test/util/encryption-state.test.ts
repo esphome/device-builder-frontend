@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { EncryptionInputs } from "../../src/util/encryption-state.js";
 import {
   getCompactEncryptionVisual,
   getEncryptionState,
   getEncryptionVisual,
 } from "../../src/util/encryption-state.js";
-import type { EncryptionInputs } from "../../src/util/encryption-state.js";
 
 function inputs(overrides: Partial<EncryptionInputs> = {}): EncryptionInputs {
   return {

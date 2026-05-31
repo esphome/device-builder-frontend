@@ -5,6 +5,7 @@ import { customElement, query, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
+import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
@@ -26,9 +27,13 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
 
   private _resolved = false;
 
+  // Enter saves and leaves (the primary action); never Discard.
+  private _enter = new EnterController(this, () => this._onSave());
+
   open() {
     this._resolved = false;
     this._dialog.open = true;
+    this._enter.set(true);
   }
 
   close() {
@@ -185,12 +190,14 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   }
 
   private _onSave() {
+    if (this._resolved) return; // a repeated Enter must not dispatch twice
     this._resolved = true;
     this.close();
     this.dispatchEvent(new CustomEvent("save", { bubbles: true, composed: true }));
   }
 
   private _onAfterHide() {
+    this._enter.set(false);
     if (!this._resolved) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));
     }

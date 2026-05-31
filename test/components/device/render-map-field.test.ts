@@ -20,9 +20,12 @@
  * ``TemplateResult``'s interpolated values.
  */
 import { describe, expect, it, vi } from "vitest";
-import { ConfigEntryType, type ConfigEntry } from "../../../src/api/types.js";
-import { renderMapField } from "../../../src/components/device/config-entry-renderers.js";
+import {
+  type ConfigEntry,
+  ConfigEntryType,
+} from "../../../src/api/types/config-entries.js";
 import type { RenderCtx } from "../../../src/components/device/config-entry-renderers-shared.js";
+import { renderMapField } from "../../../src/components/device/config-entry-renderers.js";
 import { makeConfigEntry } from "../../../src/util/config-entry-defaults.js";
 
 function makeMapEntry(): ConfigEntry {
@@ -65,6 +68,7 @@ function makeCtx(values: Record<string, unknown>): CtxStub {
     disabled: false,
     yaml: "",
     fromLine: undefined,
+    sectionKey: "",
     board: null,
     requiredOnly: false,
     nestedOpenSections: new Set(),

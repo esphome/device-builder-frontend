@@ -1,11 +1,11 @@
 import { html, nothing, type TemplateResult } from "lit";
-import type { ConfiguredDevice } from "../../../api/types.js";
+import type { ConfiguredDevice } from "../../../api/types/devices.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { formatFileSize } from "../../../util/format-file-size.js";
 import { splitIntegrations } from "../../../util/integration-split.js";
 import { buildWebUiUrl } from "../../../util/web-ui-url.js";
-import { renderIpValue } from "../device-drawer-render.js";
 import type { ESPHomeDeviceDrawerContent } from "../device-drawer-content.js";
+import { renderIpValue } from "../device-drawer-render.js";
 
 // Whitelist docs URLs to https://esphome.io. The map is backend-populated;
 // a compromised entry interpolating a javascript: / data: scheme would run

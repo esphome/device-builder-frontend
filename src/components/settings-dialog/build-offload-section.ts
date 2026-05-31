@@ -1,16 +1,15 @@
 import { consume } from "@lit/context";
-import { mdiLanConnect, mdiPencil } from "@mdi/js";
-import { LitElement, html, nothing } from "lit";
+import { mdiDelete, mdiLanConnect, mdiPencil } from "@mdi/js";
+import { LitElement, css, html, nothing } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
-import type {
-  OffloaderAlertSnapshotEntry,
-  PairingSummary,
-  RemoteBuildPeer,
-} from "../../api/types.js";
+import type { VersionMatchPolicy } from "../../api/types/event-subscription.js";
+import type { OffloaderAlertSnapshotEntry } from "../../api/types/remote-build-events.js";
+import type { PairingSummary, RemoteBuildPeer } from "../../api/types/remote-build.js";
 import type { LocalizeFunc } from "../../common/localize.js";
+import type { RemoteBuildJobState } from "../../context/index.js";
 import {
   apiContext,
   buildOffloadAlertsContext,
@@ -19,9 +18,9 @@ import {
   buildOffloadPairingsContext,
   localizeContext,
   offloaderRemoteBuildsEnabledContext,
+  offloaderVersionMatchPolicyContext,
   versionContext,
 } from "../../context/index.js";
-import type { RemoteBuildJobState } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { normalizeHostnameForCompare, trimTrailingDot } from "../../util/hostname.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
@@ -39,14 +38,29 @@ import {
   settingsSharedStyles,
 } from "./shared-styles.js";
 
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "@home-assistant/webawesome/dist/components/option/option.js";
+import "@home-assistant/webawesome/dist/components/select/select.js";
 import "../confirm-dialog.js";
 import "../edit-pairing-endpoint-dialog.js";
 import "../pair-build-server-dialog.js";
 import "../reauth-wizard-dialog.js";
 import "../remote-build-job-dialog.js";
-import "@home-assistant/webawesome/dist/components/icon/icon.js";
 
-registerMdiIcons({ "lan-connect": mdiLanConnect, pencil: mdiPencil });
+registerMdiIcons({
+  delete: mdiDelete,
+  "lan-connect": mdiLanConnect,
+  pencil: mdiPencil,
+});
+
+/** Canonical order of :type:`VersionMatchPolicy` values, lenient to strict.
+ *  Drives the wa-option render and the change-handler narrowing. */
+const _VERSION_MATCH_POLICIES: readonly VersionMatchPolicy[] = [
+  "any",
+  "release",
+  "exact",
+  "exact_required",
+];
 
 @customElement("esphome-settings-build-offload")
 export class ESPHomeSettingsBuildOffload extends LitElement {
@@ -72,6 +86,13 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
   @consume({ context: offloaderRemoteBuildsEnabledContext, subscribe: true })
   @state()
   private _remoteBuildsEnabled: boolean | null = null;
+
+  @consume({
+    context: offloaderVersionMatchPolicyContext,
+    subscribe: true,
+  })
+  @state()
+  private _versionMatchPolicy: VersionMatchPolicy | null = null;
 
   @consume({ context: buildOffloadAlertsContext, subscribe: true })
   @state()
@@ -111,11 +132,21 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
     peerRowStyles,
     offloaderAlertStyles,
     pairingRowStyles,
+    css`
+      .policy-row wa-select {
+        width: 100%;
+        max-width: none;
+      }
+      .policy-selected-desc {
+        margin-top: var(--wa-space-2xs);
+      }
+    `,
   ];
 
   protected render() {
     return html`
       ${this._renderAlerts()} ${this._renderRemoteBuildsToggle()}
+      ${this._renderVersionMatchPolicyPicker()}
 
       <div class="section-heading">
         ${this._localize("settings.paired_build_servers_heading")}
@@ -201,6 +232,36 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
           aria-checked=${this._remoteBuildsEnabled}
           @click=${this._onToggleRemoteBuilds}
         ></button>
+      </div>
+    `;
+  }
+
+  private _renderVersionMatchPolicyPicker() {
+    const selected = this._versionMatchPolicy ?? "any";
+    return html`
+      <div class="row row--stacked policy-row">
+        <div class="row-label">
+          <span id="offloader-version-match-policy-title" class="row-title">
+            ${this._localize("settings.offloader_version_match_policy_heading")}
+          </span>
+        </div>
+        <wa-select
+          aria-labelledby="offloader-version-match-policy-title"
+          value=${selected}
+          ?disabled=${this._versionMatchPolicy === null}
+          @change=${this._onVersionMatchPolicyChange}
+        >
+          ${_VERSION_MATCH_POLICIES.map(
+            (p) => html`
+              <wa-option value=${p}>
+                ${this._localize(`settings.offloader_version_match_policy_${p}`)}
+              </wa-option>
+            `
+          )}
+        </wa-select>
+        <span class="row-desc policy-selected-desc">
+          ${this._localize(`settings.offloader_version_match_policy_${selected}_desc`)}
+        </span>
       </div>
     `;
   }
@@ -311,6 +372,26 @@ export class ESPHomeSettingsBuildOffload extends LitElement {
       port: String(this._pendingUnpair.port),
     });
   }
+
+  private _onVersionMatchPolicyChange = (e: Event) => {
+    if (this._versionMatchPolicy === null) return;
+    // wa-select isn't a native ``<select>`` — typing the cast as
+    // ``HTMLSelectElement`` reads correct but is misleading. WA's
+    // value property is string | number | null; narrow against
+    // the policy union before dispatching.
+    const raw = (e.target as HTMLElement & { value: string | number | null }).value;
+    if (typeof raw !== "string") return;
+    if (!_VERSION_MATCH_POLICIES.includes(raw as VersionMatchPolicy)) return;
+    const policy = raw as VersionMatchPolicy;
+    if (policy === this._versionMatchPolicy) return;
+    this.dispatchEvent(
+      new CustomEvent("set-offloader-version-match-policy", {
+        detail: policy,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  };
 
   private _onToggleRemoteBuilds = () => {
     if (this._remoteBuildsEnabled === null) return;

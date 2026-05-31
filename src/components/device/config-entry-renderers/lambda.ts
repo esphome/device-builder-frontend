@@ -7,14 +7,14 @@
  * lives at serialisation, never in the user-visible text.
  */
 import { html } from "lit";
-import type { ConfigEntry } from "../../../api/types.js";
-import { isLambdaValue } from "../../../api/types.js";
+import { isLambdaValue } from "../../../api/types/automations.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
+import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import {
   effectiveDisabled,
   renderFieldShell,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
-import { YamlRawValue } from "../../../util/yaml-serialize.js";
 import "./lambda-editor.js";
 
 /**
@@ -28,7 +28,14 @@ import "./lambda-editor.js";
  *   byte-for-byte.
  * - plain string — fall back for hand-edited values.
  */
-function bodyOf(raw: unknown): string {
+/** Registry id used for the ``lambda`` filter / effect across the
+ *  light_effects and filter registries. Co-located with the other
+ *  lambda helpers so the coupling between the registry-list
+ *  renderer's special-case and the lambda editor is searchable in
+ *  one grep. */
+export const LAMBDA_REGISTRY_ID = "lambda";
+
+export function lambdaBodyOf(raw: unknown): string {
   if (isLambdaValue(raw)) return raw._lambda;
   if (raw instanceof YamlRawValue) return raw.body;
   if (raw == null) return "";
@@ -37,7 +44,7 @@ function bodyOf(raw: unknown): string {
 
 export function renderLambdaField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   const raw = ctx.getAt(path);
-  const value = bodyOf(raw);
+  const value = lambdaBodyOf(raw);
   const invalid = ctx.errorAt(path) !== null;
   const disabled = effectiveDisabled(entry, ctx);
   return renderFieldShell(

@@ -112,6 +112,10 @@ export const configEntryFormStyles = css`
     gap: var(--wa-space-2xs);
   }
 
+  .nested-enable {
+    flex-shrink: 0;
+  }
+
   .nested-toggle {
     display: flex;
     flex: 1;

@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowCollapseRight } from "@mdi/js";
+import { mdiArrowCollapseRight, mdiArrowLeft } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -10,7 +10,7 @@ import {
   versionContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { withBase } from "../util/base-path.js";
+import { stripBase, withBase } from "../util/base-path.js";
 import { navigate } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -20,6 +20,7 @@ import "./esphome-header-actions.js";
 
 registerMdiIcons({
   "arrow-collapse-right": mdiArrowCollapseRight,
+  "arrow-left": mdiArrowLeft,
 });
 
 @customElement("esphome-layout")
@@ -39,6 +40,27 @@ export class ESPHomeLayout extends LitElement {
   @consume({ context: serverVersionContext, subscribe: true })
   @state()
   private _serverVersion = "";
+
+  @state()
+  private _path = stripBase(window.location.pathname);
+
+  private _onPopState = () => {
+    this._path = stripBase(window.location.pathname);
+  };
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener("popstate", this._onPopState);
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    window.removeEventListener("popstate", this._onPopState);
+  }
+
+  private get _showBack(): boolean {
+    return this._path !== "/" && this._path !== "";
+  }
 
   static styles = [
     espHomeStyles,
@@ -83,6 +105,32 @@ export class ESPHomeLayout extends LitElement {
         flex-shrink: 0;
       }
 
+      .header-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: none;
+        background: none;
+        color: var(--esphome-on-primary);
+        padding: 6px;
+        border-radius: var(--wa-border-radius-m);
+        opacity: 0.85;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition:
+          opacity 0.12s,
+          background 0.12s;
+      }
+
+      .header-back:hover {
+        opacity: 1;
+        background: color-mix(in srgb, var(--esphome-on-primary), transparent 85%);
+      }
+
+      .header-back wa-icon {
+        font-size: 20px;
+      }
+
       .header-logo {
         width: 44px;
         height: 44px;
@@ -114,6 +162,18 @@ export class ESPHomeLayout extends LitElement {
         display: flex;
         align-items: center;
         gap: var(--wa-space-xs);
+      }
+
+      /* The title span is a flex item and needs its own min-width:0
+         + overflow handling for text-overflow:ellipsis to apply —
+         flex items default to min-width:auto, which keeps them at
+         intrinsic width and pushes later siblings (the
+         .preview-badge) past the h1's overflow:hidden. Without this
+         the badge clipped to just "P|" on phone-width viewports. */
+      .header-title-text {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
       .preview-badge {
@@ -149,6 +209,35 @@ export class ESPHomeLayout extends LitElement {
       @media (max-width: 700px) {
         .header-text p {
           display: none;
+        }
+
+        /* The spacer's flex:1 was eating the slack between the title
+           and the kebab actions — desktop's intentional layout but on
+           a phone that's where the title needs room to fit "ESPHome
+           Device Builder" alongside the PREVIEW badge without
+           truncating. Drop the spacer and grow the header-text into
+           the freed space instead. */
+        .header-spacer {
+          display: none;
+        }
+
+        .header-text {
+          flex: 1;
+        }
+
+        /* Tighten the chrome around the logo: the 44px button sized
+           for a desktop touch target carries more whitespace than a
+           phone needs, and the app-header's --wa-space-m gap claims
+           extra room the title could use to fit "Builder" before
+           the PREVIEW badge. Keep the horizontal padding at the
+           desktop value so the logo doesn't hug the viewport edge. */
+        .app-header {
+          gap: var(--wa-space-s);
+        }
+
+        .header-logo {
+          width: 36px;
+          height: 36px;
         }
       }
 
@@ -207,13 +296,25 @@ export class ESPHomeLayout extends LitElement {
                 <div class="header-separator"></div>
               `
             : nothing}
+          ${this._showBack
+            ? html`
+                <button
+                  class="header-back"
+                  @click=${this._goHome}
+                  title=${this._localize("layout.back")}
+                  aria-label=${this._localize("layout.back")}
+                >
+                  <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                </button>
+              `
+            : nothing}
           <button class="header-logo" @click=${this._goHome}>
             <img src=${withBase("/assets/logo/esphome.svg")} alt="ESPHome" />
           </button>
         </div>
         <div class="header-text">
           <h1>
-            <span>${this._localize("dashboard.title")}</span>
+            <span class="header-title-text">${this._localize("dashboard.title")}</span>
             <span class="preview-badge">${this._localize("layout.preview_badge")}</span>
           </h1>
           <p>${this._localize("dashboard.subtitle")}</p>

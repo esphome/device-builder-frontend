@@ -8,11 +8,11 @@
  * - Quoted:  `value: !lambda 'return x;'`
  * - Block:   `value: !lambda |-\n  return x;`
  */
-import { parser as yamlParser } from "@lezer/yaml";
 import { cppLanguage } from "@codemirror/lang-cpp";
 import { LRLanguage, LanguageSupport, indentService } from "@codemirror/language";
+import type { Input, SyntaxNodeRef } from "@lezer/common";
 import { parseMixed } from "@lezer/common";
-import type { SyntaxNodeRef, Input } from "@lezer/common";
+import { parser as yamlParser } from "@lezer/yaml";
 
 const LAMBDA_TAG = "!lambda";
 

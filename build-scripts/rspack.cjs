@@ -104,10 +104,7 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
     new rspack.HtmlRspackPlugin({
       templateContent: fs
         .readFileSync(path.resolve(PUBLIC_DIR, "index.html"), "utf-8")
-        .replace(
-          /__ESPHOME_BASE_HREF__/g,
-          isProdBuild ? "__ESPHOME_BASE_HREF__" : "/",
-        ),
+        .replace(/__ESPHOME_BASE_HREF__/g, isProdBuild ? "__ESPHOME_BASE_HREF__" : "/"),
       inject: "body",
     }),
     new rspack.CopyRspackPlugin({
@@ -200,6 +197,13 @@ const createRspackConfig = ({ isProdBuild = false } = {}) => ({
       {
         // Backend-served static files (board images, etc.)
         context: ["/boards"],
+        target: "http://localhost:6052",
+        changeOrigin: true,
+      },
+      {
+        // REST endpoints, incl. the firmware artifact download
+        // (GET /api/firmware/download — too large for the WS).
+        context: ["/api"],
         target: "http://localhost:6052",
         changeOrigin: true,
       },

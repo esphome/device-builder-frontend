@@ -40,10 +40,10 @@ import type {
   AvailableAutomations,
   AvailableComponentInstance,
   AvailableScript,
-  BoardCatalogEntry,
-  ComponentCatalogEntry,
-  ConfigEntry,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
+import type { BoardCatalogEntry } from "../../../api/types/boards.js";
+import type { ComponentCatalogEntry } from "../../../api/types/components.js";
+import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { apiContext, localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";
@@ -55,12 +55,15 @@ import {
 import { anyAdvancedEntry } from "../../../util/config-entry-tree.js";
 import { renderMarkdown } from "../../../util/markdown.js";
 import { registerMdiIcons } from "../../../util/register-icons.js";
+import { renderAdvancedToggle } from "../advanced-toggle.js";
 import "../config-entry-form.js";
 import "./automation-action-list.js";
 import type { ESPHomeAutomationActionList } from "./automation-action-list.js";
 import { automationEditorStyles } from "./automation-editor.styles.js";
 import "./automation-target-picker.js";
 import "./automation-trigger-picker.js";
+import { loadAndHydrateAvailable } from "./hydrate-available-bodies.js";
+import { ParseErrorController } from "./parse-error-controller.js";
 import {
   applyYamlDiff,
   emptyAutomationTree,
@@ -69,7 +72,6 @@ import {
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
-import "@home-assistant/webawesome/dist/components/switch/switch.js";
 
 registerMdiIcons({
   "arrow-decision-outline": mdiArrowDecisionOutline,
@@ -126,6 +128,13 @@ export class ESPHomeAutomationEditor extends LitElement {
    *  device's YAML) so the dropdowns only show what's usable. */
   @state() private _available: AvailableAutomations | null = null;
 
+  /** Monotonic generation token for ``_loadAvailable``. Two
+   *  overlapping reconnect-driven loads can otherwise have the
+   *  earlier one's stale assignment land after the later one's
+   *  fresh assignment; this lets each invocation drop its results
+   *  if the seq has moved on while it awaited. */
+  private _loadAvailableSeq = 0;
+
   /** Component catalog entry for the ``interval`` component, lazily
    *  fetched the first time we render an interval automation. Drives
    *  the header (name / description / docs / image) and the inline
@@ -136,6 +145,9 @@ export class ESPHomeAutomationEditor extends LitElement {
   @state() private _loading = true;
   @state() private _deleting = false;
   @state() private _error = "";
+  /** Renders read-only + blocks auto-apply for a parse-errored
+   *  automation so its empty tree can't overwrite the real YAML. */
+  private readonly _parseError = new ParseErrorController(this);
 
   /** "Show advanced settings" toggle state for the params form.
    *  Mirrors ``device-section-config``'s same-named state but
@@ -209,7 +221,10 @@ export class ESPHomeAutomationEditor extends LitElement {
     // and re-pins location) don't accidentally unlock the picker
     // after it should stay locked.
     this._editMode = !this.addMode;
-    void this._loadCatalogs();
+    // ``_loadAvailable`` fires from ``updated()`` on the first
+    // render once ``configuration`` lands — no separate kickoff
+    // here, otherwise we'd send two ``automations/get_available``
+    // calls per mount.
     // Announce so the page-level save guard (device.ts) can hold a
     // direct ref and call flushPending() before its global save.
     // Mirrors device-section-config's section-mount event.
@@ -331,33 +346,22 @@ export class ESPHomeAutomationEditor extends LitElement {
         this.configuration,
         this.yaml
       );
-      const wantKey = sectionKeyFromLocation(this.location);
-      const match = parsed.find((p) => sectionKeyFromLocation(p.location) === wantKey);
-      if (match) {
-        this.value = match.automation;
-        // Re-pin location so the writer round-trips with the parser's
-        // canonical form (script id matched, light_effect index
-        // resolved against the actual YAML, …).
-        this.location = match.location;
+      // A successful parse clears any prior parse error, so the banner
+      // doesn't stick after the user fixes invalid YAML in the pane.
+      this._error = "";
+      // Re-pin location to the parser's canonical form (script id
+      // matched, light_effect index resolved against the actual YAML);
+      // the controller withholds a read-only automation's empty tree.
+      const m = this._parseError.resolve(parsed, this.location);
+      if (m) {
+        this.location = m.location;
+        this.value = m.tree;
       }
     } catch (err) {
       this._error =
         err instanceof Error
           ? err.message
           : this._localize("device.automation_parse_error");
-    }
-  }
-
-  private async _loadCatalogs() {
-    if (!this._api) return;
-    this._loading = true;
-    this._error = "";
-    try {
-      if (this.configuration) await this._loadAvailable();
-    } catch (err) {
-      this._error = err instanceof Error ? err.message : String(err);
-    } finally {
-      this._loading = false;
     }
   }
 
@@ -383,10 +387,49 @@ export class ESPHomeAutomationEditor extends LitElement {
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
+    const seq = ++this._loadAvailableSeq;
+    this._loading = true;
+    this._error = "";
     try {
-      this._available = await this._api.getAvailableAutomations(this.configuration);
-    } catch (err) {
-      this._error = err instanceof Error ? err.message : String(err);
+      const outcome = await loadAndHydrateAvailable(this._api, this.configuration, {
+        // Paint the picker with the slim list AND drop the loading
+        // spinner so the dropdowns mount while hydration runs in
+        // the background. The post-hydration ``_available``
+        // reassignment below carries fresh array refs to force a
+        // re-render with the hydrated ``config_entries``.
+        onPaint: (painted) => {
+          if (seq !== this._loadAvailableSeq) return;
+          this._available = painted;
+          this._loading = false;
+        },
+        isStale: () => seq !== this._loadAvailableSeq,
+      });
+      if (outcome.status === "stale") return;
+      if (outcome.status === "error") {
+        this._error =
+          outcome.error instanceof Error ? outcome.error.message : String(outcome.error);
+        return;
+      }
+      // Fresh array refs so identity-based ``hasChanged`` consumers
+      // (trigger picker, condition tree, action node) re-render
+      // with the hydrated entries.
+      this._available = outcome.available;
+      const { missingBody, missingField, rejected } = outcome.hydration;
+      const failures = missingBody + missingField + rejected;
+      if (failures > 0) {
+        // Soft surface: non-blocking toast. Don't set ``_error``
+        // since the picker is still usable for the entries that
+        // hydrated; ``cacheMisses: false`` lets a re-mount retry
+        // the missing ones.
+        toast.error(
+          this._localize("device.automation_partial_hydration", {
+            count: String(failures),
+          }),
+          { richColors: true }
+        );
+      }
+    } finally {
+      if (seq === this._loadAvailableSeq) this._loading = false;
     }
   }
 
@@ -396,6 +439,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         <wa-spinner></wa-spinner>
         ${this._localize("device.loading_automation_catalog")}
       </div>`;
+    }
+    if (this._parseError.active) {
+      return this._parseError.renderPanel(this._localize);
     }
     const automation = this.value ?? emptyAutomationTree();
     const target = this.location;
@@ -534,18 +580,9 @@ export class ESPHomeAutomationEditor extends LitElement {
         @value-change=${this._onTriggerParamsValueChange}
       ></esphome-config-entry-form>
       ${hasAdvanced
-        ? html`<div class="advanced-toggle-row">
-            <wa-switch
-              .checked=${this._showAdvanced}
-              @change=${(e: Event) => {
-                this._showAdvanced = (
-                  e.target as HTMLInputElement & { checked: boolean }
-                ).checked;
-              }}
-            >
-              ${this._localize("device.show_advanced")}
-            </wa-switch>
-          </div>`
+        ? renderAdvancedToggle(this._showAdvanced, this._localize, (show) => {
+            this._showAdvanced = show;
+          })
         : nothing}
     `;
   }
@@ -799,6 +836,7 @@ export class ESPHomeAutomationEditor extends LitElement {
     // upserting partially-filled trees if someone instantiates
     // the editor in add-mode directly.
     if (this.addMode) return;
+    if (this._parseError.active) return;
     this._setDirty(true);
     if (this._applyTimer) clearTimeout(this._applyTimer);
     this._applyTimer = setTimeout(() => {
@@ -816,6 +854,12 @@ export class ESPHomeAutomationEditor extends LitElement {
    */
   private async _autoApply(): Promise<void> {
     if (!this._api || !this.location || !this.value) return;
+    // Read-only: nothing to write, and drop any dirty a pre-error edit
+    // left so the section can't stay stuck dirty with an empty tree.
+    if (this._parseError.active) {
+      this._setDirty(false);
+      return;
+    }
     if (this._applyInFlight) {
       this._applyDirty = true;
       return;

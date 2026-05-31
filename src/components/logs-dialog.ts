@@ -14,11 +14,11 @@ import { LitElement, css, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import type { ESPHomeAnsiLog } from "./ansi-log.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./ansi-log.js";
@@ -358,6 +358,20 @@ export class ESPHomeLogsDialog extends LitElement {
         .term-btn.expand-btn {
           display: none;
         }
+
+        /* The desktop toolbar is a single non-wrapping row that pushes the
+           controls right with a flex:1 spacer. On a phone the labelled
+           buttons (States / Clear / Stop) ran off the right edge, so the
+           Stop text was unreachable. Let the row wrap and drop the spacer
+           so the buttons flow left-to-right onto a second line, keeping
+           every label on-screen and tappable. */
+        .terminal-toolbar {
+          flex-wrap: wrap;
+        }
+
+        .terminal-toolbar .spacer {
+          display: none;
+        }
       }
     `,
   ];
@@ -560,6 +574,10 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _startStreaming() {
+    // Don't respawn onto a closed dialog: _toggleShowStates awaits stopStream
+    // before restarting, and a close during that await would otherwise spawn an
+    // orphaned stream with no Stop button. open() sets _open first.
+    if (!this._open) return;
     if (this._streaming) return;
     this._streaming = true;
 

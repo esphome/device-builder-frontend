@@ -3,8 +3,8 @@ import { LitElement, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 
 import type { ESPHomeAPI } from "../api/index.js";
+import type { IdentityView, PairingSummary } from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
-import type { PairingSummary } from "../api/types.js";
 import {
   apiContext,
   buildOffloadPairingsContext,
@@ -16,18 +16,18 @@ import { pinHexStyles } from "../styles/pin-hex.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { friendlyHostname } from "../util/hostname.js";
 import "./base-dialog.js";
-import "./pin-emoji-grid.js";
-import { pairBuildServerDialogStyles } from "./pair-build-server-dialog/styles.js";
-import {
-  renderConfirmStep,
-  renderInputStep,
-  renderSentStep,
-} from "./pair-build-server-dialog/renderers.js";
 import {
   onConfirmSubmit,
   onPreviewSubmit,
   watchPairingApproval,
 } from "./pair-build-server-dialog/actions.js";
+import {
+  renderConfirmStep,
+  renderInputStep,
+  renderSentStep,
+} from "./pair-build-server-dialog/renderers.js";
+import { pairBuildServerDialogStyles } from "./pair-build-server-dialog/styles.js";
+import "./pin-emoji-grid.js";
 
 // Wizard for pairing this dashboard with a build server (receiver) the user
 // types in by hand. Used when the receiver isn't reachable via mDNS
@@ -72,6 +72,13 @@ export class ESPHomePairBuildServerDialog extends LitElement {
   // ${hostname}:${port} of the submitted request — null outside the sent step.
   @state() _sentKey: string | null = null;
 
+  // This dashboard's own stable identity (dashboard_id + pin_sha256). Shown on
+  // the sent step so the operator can match it against what the receiver's
+  // "Pairing request" dialog displays for this offloader. Loaded on open();
+  // renderSentStep hides the whole identity card while this is null (load
+  // still in flight or failed).
+  @state() _offloaderIdentity: IdentityView | null = null;
+
   static styles = [
     espHomeStyles,
     inputStyles,
@@ -95,7 +102,21 @@ export class ESPHomePairBuildServerDialog extends LitElement {
     this._offloaderLabel = friendlyHostname(window.location.hostname);
     this._error = null;
     this._sentKey = null;
+    this._offloaderIdentity = null;
+    void this._loadOffloaderIdentity();
     this._open = true;
+  }
+
+  // Read this dashboard's own identity for the sent-step fingerprint. The
+  // call is idempotent and lazy-creates the peer-link keypair on first use;
+  // failures leave the card hidden rather than blocking the pair flow.
+  private async _loadOffloaderIdentity(): Promise<void> {
+    if (!this._api) return;
+    try {
+      this._offloaderIdentity = await this._api.getRemoteBuildIdentity();
+    } catch {
+      this._offloaderIdentity = null;
+    }
   }
 
   close = (): void => {

@@ -4,6 +4,7 @@
 
 export {
   effectiveDisabled,
+  fieldRendererStyles,
   labelFor,
   renderLabel,
   renderStringField,
@@ -34,3 +35,5 @@ export {
 } from "./config-entry-renderers/lists.js";
 
 export { renderNestedField } from "./config-entry-renderers/nested.js";
+
+export { renderRegistryListField } from "./config-entry-renderers/registry-list.js";

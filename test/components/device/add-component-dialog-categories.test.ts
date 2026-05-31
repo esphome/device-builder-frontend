@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CORE_CATEGORIES } from "../../../src/api/types.js";
+import { CORE_CATEGORIES } from "../../../src/api/types/components.js";
 import { chooseExcludeCategories } from "../../../src/components/device/add-component-dialog-categories.js";
 
 describe("chooseExcludeCategories", () => {

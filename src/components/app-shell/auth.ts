@@ -1,5 +1,5 @@
 import { APIError } from "../../api/index.js";
-import { ErrorCode } from "../../api/types.js";
+import { ErrorCode } from "../../api/types/protocol.js";
 import type { ESPHomeApp } from "../app-shell.js";
 
 // Parse the "try again in Xs" hint out of the backend's rate-limit details.

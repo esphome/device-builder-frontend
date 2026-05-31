@@ -6,20 +6,21 @@
  */
 import { createContext } from "@lit/context";
 import { ESPHomeAPI } from "../api/index.js";
+import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
+import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
 import {
+  type FirmwareJob,
   JobStatus,
   JobType,
-  type AdoptableDevice,
-  type ConfiguredDevice,
-  type FirmwareJob,
-  type Label,
-  type OffloaderAlertSnapshotEntry,
-  type PairingSummary,
-  type PairingWindowState,
-  type PeerSummary,
-  type RemoteBuildPeer,
   type RemoteBuildSubmitTarget,
-} from "../api/types.js";
+} from "../api/types/firmware-jobs.js";
+import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
+import type {
+  PairingSummary,
+  PairingWindowState,
+  PeerSummary,
+  RemoteBuildPeer,
+} from "../api/types/remote-build.js";
 import type { LocalizeFunc } from "../common/localize.js";
 
 /** Context for the ESPHome API client instance. */
@@ -303,6 +304,19 @@ export const buildOffloadPairingsContext = createContext<Map<
 export const offloaderRemoteBuildsEnabledContext = createContext<boolean | null>(
   Symbol("esphome-offloader-remote-builds-enabled")
 );
+
+/**
+ * Offloader-side master version-match policy.
+ *
+ * See :type:`VersionMatchPolicy` for the per-value contract.
+ * `null` until ``subscribe_events.initial_state`` lands; the
+ * Settings picker falls back to the backend default (`"any"`)
+ * while the seed is in flight so the row is always rendered.
+ */
+export const offloaderVersionMatchPolicyContext =
+  createContext<VersionMatchPolicy | null>(
+    Symbol("esphome-offloader-version-match-policy")
+  );
 
 /**
  * Offloader-side pair alerts (pin_mismatch / peer_revoked).

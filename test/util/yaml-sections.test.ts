@@ -51,6 +51,58 @@ wifi:
     expect(sections[1].name).toBe("bedroom");
   });
 
+  it("ignores nested sub-reading name:/id: when extracting the item label (#1015)", () => {
+    // A platform with no top-level name: but nested temperature/humidity
+    // sub-sensors must not adopt a child's name as its label.
+    const yaml = `sensor:
+  - platform: sht4x
+    id: sht4x_1
+    temperature:
+      id: sensor_sht4x_1_temperature
+      name: Temperature
+    humidity:
+      id: sensor_sht4x_1_humidity
+      filters:
+        - round:
+            accuracy_decimals: 2
+      name: Humidity
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].platform).toBe("sht4x");
+    expect(sections[0].id).toBe("sht4x_1");
+    expect(sections[0].name).toBeUndefined();
+  });
+
+  it("leaves name and id undefined when an item has neither at top level (#1015)", () => {
+    // id is optional: a debug-shaped platform with only nested
+    // sub-sensors has no own label, so the subtitle stays empty.
+    const yaml = `sensor:
+  - platform: debug
+    free:
+      name: Free
+    min_free:
+      name: Min Free
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].platform).toBe("debug");
+    expect(sections[0].name).toBeUndefined();
+    expect(sections[0].id).toBeUndefined();
+  });
+
+  it("extracts top-level name and id together", () => {
+    const yaml = `switch:
+  - platform: gpio
+    name: Relay
+    id: relay_1
+    pin: 4
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections[0].name).toBe("Relay");
+    expect(sections[0].id).toBe("relay_1");
+  });
+
   it("trims trailing blank lines from the final section", () => {
     const yaml = `esphome:
   name: test
@@ -457,6 +509,64 @@ describe("parseYamlAutomations", () => {
       s.key.startsWith("automation:api_action:")
     );
     expect(items.map((s) => s.key)).toEqual(["automation:api_action:legacy_name"]);
+  });
+
+  it("splits a list-shaped time.on_time into one indexed row per entry", () => {
+    const yaml = `time:
+  - platform: sntp
+    id: my_time
+    on_time:
+      - seconds: 0
+        minutes: 30
+        hours: 8
+        then:
+          - logger.log: "morning"
+      - cron: "0 0 12 * * *"
+        then:
+          - logger.log: "noon"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_time:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:my_time:on_time:0",
+      "automation:component_on:my_time:on_time:1",
+    ]);
+    expect(items[0].displayLabel).toBe("my_time → on_time #1");
+    // Each row spans only its own entry, not the whole on_time block.
+    expect(items[0].fromLine).toBe(5); // ``- seconds: 0``
+    expect(items[1].fromLine).toBe(10); // ``- cron: ...``
+  });
+
+  it("keeps a single-mapping on_time as one un-indexed row", () => {
+    const yaml = `time:
+  - platform: sntp
+    id: my_time
+    on_time:
+      seconds: 0
+      then:
+        - logger.log: "tick"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_time:")
+    );
+    expect(items.map((s) => s.key)).toEqual(["automation:component_on:my_time:on_time"]);
+  });
+
+  it("does not split a bare action list into per-action rows", () => {
+    const yaml = `binary_sensor:
+  - platform: gpio
+    id: my_button
+    on_press:
+      - switch.toggle: relay
+      - delay: 1s
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_button:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:my_button:on_press",
+    ]);
   });
 });
 

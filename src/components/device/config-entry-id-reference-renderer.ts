@@ -6,12 +6,14 @@
  */
 
 import { html } from "lit";
-import type { ConfigEntry } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { findReferencedComponents } from "../../util/config-entry-yaml-scan.js";
 import {
   effectiveDisabled,
+  fieldKeyAttr,
   renderFieldError,
   renderLabel,
+  renderYamlOnlyFallbackIfNonPrimitive,
   type RenderCtx,
 } from "./config-entry-renderers-shared.js";
 
@@ -24,7 +26,10 @@ export function renderIdReferenceField(
 ) {
   const domain = entry.references_component || "";
   const candidates = findReferencedComponents(ctx.yaml, domain);
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const empty = candidates.length === 0;
 
@@ -61,7 +66,7 @@ export function renderIdReferenceField(
 
   if (empty) {
     return html`
-      <div class="field" data-field-key=${path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <wa-select
           class=${invalid ? "invalid" : ""}
@@ -77,7 +82,7 @@ export function renderIdReferenceField(
   }
 
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}

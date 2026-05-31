@@ -1,6 +1,8 @@
 import { APIError } from "../../api/api-error.js";
-import { ErrorCode, JobStatus, type FirmwareJob } from "../../api/types.js";
+import { type FirmwareJob, JobStatus } from "../../api/types/firmware-jobs.js";
+import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
+import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
 
 // Dashboard mode pins escaped form (\033[…m); raw form (\x1b[…m) is defensive.
@@ -128,7 +130,7 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
     }
   } catch (err) {
     host._state = "error";
-    host._statusMessage = err instanceof Error ? err.message : String(err);
+    host._statusMessage = _installErrorMessage(host, err);
     return;
   }
 
@@ -208,6 +210,28 @@ function isCancelAlreadyTerminal(err: unknown): boolean {
 
 function formatForceLocalError(err: unknown): string {
   if (err instanceof APIError) return err.details || err.errorCode;
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function _installErrorMessage(host: ESPHomeCommandDialog, err: unknown): string {
+  if (
+    err instanceof APIError &&
+    err.errorCode === ErrorCode.NO_COMPATIBLE_PEER &&
+    host._appVersion
+  ) {
+    // ``_appVersion`` empty during a reconnect race would leak ``""``
+    // into the ``{local}`` placeholder and misattribute the bucket;
+    // fall through to the raw backend message until the version
+    // snapshot lands.
+    const reason = classifyNoCompatiblePeerReason(
+      host._pairings?.values() ?? [],
+      host._appVersion
+    );
+    return host._localize(`command.install_no_compatible_peer_${reason}`, {
+      local: host._appVersion,
+    });
+  }
   if (err instanceof Error) return err.message;
   return String(err);
 }

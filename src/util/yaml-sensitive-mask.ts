@@ -24,12 +24,12 @@
  *     whole editor at once.
  */
 
-import { type Range } from "@codemirror/state";
 import {
   StateEffect,
   StateField,
   type EditorState,
   type Extension,
+  type Range,
 } from "@codemirror/state";
 import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
 import { findSensitiveValueRanges } from "./yaml-sensitive-scan.js";

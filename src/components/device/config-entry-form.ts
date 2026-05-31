@@ -24,16 +24,16 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
-import { inputStyles } from "../../styles/inputs.js";
-import { espHomeStyles } from "../../styles/shared.js";
 import { type ValidationError } from "../../util/config-validation.js";
-import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
+import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -41,9 +41,8 @@ import "@home-assistant/webawesome/dist/components/option/option.js";
 import "@home-assistant/webawesome/dist/components/select/select.js";
 import "@home-assistant/webawesome/dist/components/switch/switch.js";
 import "../mdi-icon-picker.js";
-import "./password-input.js";
-import { configEntryFormStyles } from "./config-entry-form.styles.js";
 import {
+  fieldRendererStyles,
   labelFor,
   renderBooleanField,
   renderFloatWithUnitField,
@@ -55,6 +54,7 @@ import {
   renderNestedListField,
   renderNumberField,
   renderPinField,
+  renderRegistryListField,
   renderSelectField,
   renderStringField,
   renderTextareaField,
@@ -63,6 +63,7 @@ import {
 } from "./config-entry-renderers.js";
 import { renderLambdaField } from "./config-entry-renderers/lambda.js";
 import { renderTemplatableField } from "./config-entry-renderers/templatable.js";
+import "./password-input.js";
 
 registerMdiIcons({
   "alert-circle-outline": mdiAlertCircleOutline,
@@ -128,6 +129,18 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ type: Number, attribute: "from-line" })
   fromLine?: number;
 
+  /** Section key being edited (``light.esp32_rmt_led_strip`` /
+   *  ``sensor.template`` / etc.). Threaded through ``ctx`` so
+   *  ``REGISTRY_LIST`` renderers can scope their per-row picker
+   *  against the parent component's domain — without it a
+   *  binary_sensor's filter picker offers sensor-only filters
+   *  and a non-addressable light's effects picker offers
+   *  addressable-only effects. Empty when the form is mounted
+   *  outside a section context (the add-component dialog's
+   *  preview, etc.). */
+  @property({ attribute: "section-key" })
+  sectionKey = "";
+
   /** Top-level component keys present in the YAML — drives the
    *  `depends_on_component` visibility predicate. */
   @property({ attribute: false })
@@ -164,7 +177,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    */
   private _editingMagnitudes: Map<string, string> = new Map();
 
-  static styles = [espHomeStyles, inputStyles, configEntryFormStyles];
+  static styles = fieldRendererStyles;
 
   /**
    * Filter `entries` for rendering. Delegates to the shared
@@ -201,8 +214,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * the value/selected wiring through Lit's template doesn't always
    * land — especially on the first paint, when wa-select reads its
    * value before the slotted options are connected. Each field div
-   * carries a `data-field-key` (the dotted path) so we can look up
-   * the right value for its select.
+   * carries a `data-field-key` (the JSON-encoded path) so we can look
+   * up the right value for its select. Encoding the path as JSON
+   * rather than a dotted string keeps user-supplied map keys that
+   * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
    *
    * We wait for each select's `updateComplete` (and one frame after
    * that) to make sure wa-select's own first-render bookkeeping —
@@ -260,7 +275,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       }
       const key = field.getAttribute("data-field-key");
       if (!key) continue;
-      const path = key.split(".");
+      const path = parseFieldKey(key);
       const value = getIn(this.values, path);
       // ``wa-select`` only carries primitive values; if the YAML
       // path resolves to an object (transient state from a partial
@@ -422,6 +437,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (entry.type === ConfigEntryType.MAP) {
       return renderMapField(entry, path, ctx);
     }
+    if (entry.type === ConfigEntryType.REGISTRY_LIST) {
+      return renderRegistryListField(entry, path, ctx);
+    }
     if (entry.multi_value) {
       return renderMultiValueField(entry, path, ctx);
     }
@@ -469,7 +487,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         // be edited via the automation editor tree, not as a form
         // field. Render a disabled placeholder so the user is told
         // why the field is inert.
-        return html`<div class="field" data-field-key=${path.join(".")}>
+        return html`<div class="field" data-field-key=${fieldKeyAttr(path)}>
           ${labelFor(entry, ctx)}
           <p class="trigger-placeholder" role="status">
             ${ctx.localize("device.automation_trigger_field_placeholder")}
@@ -492,6 +510,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       disabled: this.disabled,
       yaml: this.yaml,
       fromLine: this.fromLine,
+      sectionKey: this.sectionKey,
       board: this.board,
       requiredOnly: this.requiredOnly,
       nestedOpenSections: this._nestedOpenSections,

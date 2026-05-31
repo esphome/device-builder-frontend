@@ -27,7 +27,7 @@
  * the user's Back button still leaves the dashboard cleanly.
  */
 
-import { DashboardView } from "../api/types.js";
+import { DashboardView } from "../api/types/system.js";
 
 export interface DashboardUrlState {
   search?: string;

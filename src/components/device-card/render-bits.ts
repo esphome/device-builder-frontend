@@ -1,5 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { DeviceState, JobStatus, JobType } from "../../api/types.js";
+import { DeviceState } from "../../api/types/devices.js";
+import { JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { getCompactEncryptionVisual } from "../../util/encryption-state.js";
 import { renderLabelChips, resolveLabelIds } from "../../util/label-chip-template.js";
 import type { ESPHomeDeviceCard } from "../device-card.js";

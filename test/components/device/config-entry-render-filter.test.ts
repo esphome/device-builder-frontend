@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType } from "../../../src/api/types.js";
+import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
 import {
   ALWAYS_SHOWN_KEYS,
   collectRenderablePaths,
   filterRenderable,
 } from "../../../src/components/device/config-entry-render-filter.js";
-import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
 import { YamlRawValue } from "../../../src/util/yaml-serialize.js";
+import { makeConfigEntry as makeEntry } from "../../util/_make-config-entry.js";
 
 describe("ALWAYS_SHOWN_KEYS", () => {
   it("contains 'name' (the friendly-name leaf)", () => {

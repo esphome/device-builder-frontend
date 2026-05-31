@@ -7,14 +7,25 @@
 
 import { mdiKeyVariant, mdiLockOutline } from "@mdi/js";
 import { html, nothing } from "lit";
-import type { BoardCatalogEntry, ConfigEntry } from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { PasswordInputValueChange } from "./password-input.js";
+import { inputStyles } from "../../styles/inputs.js";
+import { espHomeStyles } from "../../styles/shared.js";
 import type { ValidationError } from "../../util/config-validation.js";
 import { renderMarkdown } from "../../util/markdown.js";
-import { renderInlineError } from "../../util/render-error.js";
+import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
+import { renderInlineError } from "../../util/render-error.js";
+import { configEntryFormStyles } from "./config-entry-form.styles.js";
+import type { PasswordInputValueChange } from "./password-input.js";
+
+/** Stylesheets every element that hosts ``ctx.renderEntry`` output
+ *  needs in its shadow root: field shell, input styling, and the
+ *  layout rules for compound widgets (``.time-period-inputs``,
+ *  ``.nested-fields``, …) the per-field renderers emit. */
+export const fieldRendererStyles = [espHomeStyles, inputStyles, configEntryFormStyles];
 
 registerMdiIcons({
   "key-variant": mdiKeyVariant,
@@ -30,6 +41,24 @@ registerMdiIcons({
 export function effectiveDisabled(entry: ConfigEntry, ctx: RenderCtx): boolean {
   return ctx.disabled || entry.locked;
 }
+
+/** Serialize a field path into the ``data-field-key`` attribute. JSON
+ *  (not ``path.join(".")``) so a user-supplied map key that itself
+ *  contains a dot (a ``logger.logs`` row keyed ``i2c.idf``) survives
+ *  the round-trip back to a path in ``parseFieldKey``. */
+export const fieldKeyAttr = (path: string[]): string => JSON.stringify(path);
+
+/** Recover a field path from a ``data-field-key`` attribute. Non-JSON
+ *  values (the pin-advanced toggle key) fall back to dot-splitting. */
+export const parseFieldKey = (attr: string): string[] => {
+  try {
+    const parsed: unknown = JSON.parse(attr);
+    if (Array.isArray(parsed)) return parsed.map(String);
+  } catch {
+    // not JSON — legacy / non-path attribute, fall through
+  }
+  return attr ? attr.split(".") : [];
+};
 
 /** ESPHome stores secret references as `!secret <key>` literal strings
  *  in the YAML — match that shape so any string-shaped field can flag
@@ -54,6 +83,12 @@ export interface RenderCtx {
   disabled: boolean;
   yaml: string;
   fromLine?: number;
+  /** Section being edited (``light.esp32_rmt_led_strip``,
+   *  ``sensor.template``, …). Empty when the form runs outside a
+   *  section context. The REGISTRY_LIST renderer reads this to
+   *  scope its picker against ``applies_to`` so a sensor's filter
+   *  dropdown doesn't offer binary_sensor filters. */
+  sectionKey: string;
   board: BoardCatalogEntry | null;
   requiredOnly: boolean;
   nestedOpenSections: Set<string>;
@@ -207,8 +242,31 @@ export function renderFieldShell(
   trailing: unknown = nothing
 ) {
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)} ${input} ${trailing} ${renderFieldError(path, ctx)}
+    </div>
+  `;
+}
+
+/** Defensive bail for scalar field renderers: when the value at *path*
+ *  isn't a primitive (a YAML list or mapping that landed under a
+ *  scalar-shaped catalog field because the upstream schema bundle
+ *  missed ``is_list`` or a similar shape marker), refuse to render an
+ *  editable input. ``String([...])`` would silently coerce the list
+ *  to a comma-joined string and a save would clobber the user's value.
+ *  Returns the bail template, or ``null`` when *raw* is safe to coerce. */
+export function renderYamlOnlyFallbackIfNonPrimitive(
+  entry: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx,
+  raw: unknown
+) {
+  if (isPrimitiveOrNullish(raw)) return null;
+  return html`
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
+      ${renderLabel(entry, ctx)}
+      <p class="field-description">${ctx.localize("device.value_yaml_only")}</p>
+      ${renderFieldError(path, ctx)}
     </div>
   `;
 }
@@ -222,7 +280,10 @@ export function renderStringField(
   path: string[],
   ctx: RenderCtx
 ) {
-  const value = String(ctx.getAt(path) ?? "");
+  const raw = ctx.getAt(path);
+  const bail = renderYamlOnlyFallbackIfNonPrimitive(entry, path, ctx, raw);
+  if (bail) return bail;
+  const value = String(raw ?? "");
   const invalid = ctx.errorAt(path) !== null;
   const placeholder = String(entry.default_value ?? "");
   const disabled = effectiveDisabled(entry, ctx);
@@ -238,7 +299,7 @@ export function renderStringField(
   // means the form's re-renders don't blow it away.
   if (inputType === "password") {
     return html`
-      <div class="field" data-field-key=${path.join(".")}>
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
         ${renderLabel(entry, ctx)}
         <esphome-password-input
           .value=${value}
@@ -253,7 +314,7 @@ export function renderStringField(
     `;
   }
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <input
         type=${inputType}
@@ -298,7 +359,7 @@ function renderSuggestionSelect(
     return Number.isFinite(n) ? n : raw;
   };
   return html`
-    <div class="field" data-field-key=${path.join(".")}>
+    <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}

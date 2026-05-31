@@ -1,5 +1,5 @@
-import type { ConfigEntry } from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import { parseYamlBoolean } from "../../util/yaml-serialize.js";
 
 /**

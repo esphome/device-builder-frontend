@@ -3,19 +3,17 @@ import { mdiAlertCircleOutline } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../../api/index.js";
-import type {
-  BoardCatalogEntry,
-  ComponentCatalogEntry,
-  ConfigEntry,
-} from "../../api/types.js";
-import { ConfigEntryType } from "../../api/types.js";
+import type { BoardCatalogEntry } from "../../api/types/boards.js";
+import type { ComponentCatalogEntry } from "../../api/types/components.js";
+import type { ConfigEntry } from "../../api/types/config-entries.js";
+import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";
 import { espHomeStyles } from "../../styles/shared.js";
+import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import { ComponentNameResolverController } from "../../util/component-name-resolver-controller.js";
 import { validateEntries, type ValidationError } from "../../util/config-validation.js";
-import { seedBoardPinDefaults } from "../../util/board-pin-defaults.js";
 import {
   collectExistingIds,
   generateDefaultComponentId,

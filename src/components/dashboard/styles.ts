@@ -5,6 +5,7 @@ export const dashboardStyles = css`
     display: flex;
     flex-direction: column;
     position: relative;
+    box-sizing: border-box;
     height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
@@ -26,14 +27,13 @@ export const dashboardStyles = css`
     --select-bar-height: 64px;
   }
 
-  :host([view="cards"]) {
+  /* YAML mode renders over any underlying view, so it shares this
+     scroll override; without it, YAML search opened from table view
+     clips its hit list. Padding clears the fixed, opaque footer. */
+  :host([view="cards"]),
+  :host([yaml]) {
     height: auto;
     overflow: visible;
-    /* Body scrolls in cards view (incl. YAML mode), and the layout
-       footer is fixed and opaque — without this padding the trailing
-       row of yaml-hits / banner content can sit behind the version
-       line. The configured device grid has its own --fab-clearance,
-       so this only matters for the YAML / discovered content paths. */
     padding-bottom: var(--esphome-footer-height);
   }
 
@@ -41,7 +41,16 @@ export const dashboardStyles = css`
      down so the collapsed pill doesn't sit on top of the view-toggle
      buttons.*/
   :host([has-discovered]) {
-    padding-top: var(--wa-space-2xl);
+    padding-top: var(--wa-space-xl);
+  }
+
+  /* Mobile compacts the pill further (see .discovered-section-header
+     @media block below), so the gutter tightens one more step to
+     match the smaller pill. #41 */
+  @media (max-width: 600px) {
+    :host([has-discovered]) {
+      padding-top: var(--wa-space-l);
+    }
   }
 
   /* ─── Discovered Banner ─── */
@@ -91,7 +100,7 @@ export const dashboardStyles = css`
     display: flex;
     align-items: center;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-s) var(--wa-space-l);
+    padding: var(--wa-space-xs) var(--wa-space-m);
     background: var(--esphome-primary-light);
     color: var(--esphome-primary);
     border: var(--wa-border-width-s) solid var(--esphome-primary);
@@ -111,7 +120,7 @@ export const dashboardStyles = css`
   }
 
   .discovered-section-header wa-icon {
-    font-size: var(--wa-font-size-l);
+    font-size: var(--wa-font-size-m);
     color: var(--esphome-primary);
   }
 
@@ -170,6 +179,26 @@ export const dashboardStyles = css`
     display: none;
   }
 
+  /* Mobile: shrink the floating pill so it stops eating ~70px of
+     viewport above the first device card. Same horizontal shape
+     (icon + count + Show), just denser padding and smaller text /
+     icon. The expandable grid below keeps its existing sizing —
+     this only compacts the collapsed-state header. #41 */
+  @media (max-width: 600px) {
+    .discovered-section-header {
+      padding: var(--wa-space-2xs) var(--wa-space-s);
+      gap: var(--wa-space-xs);
+    }
+
+    .discovered-section-header wa-icon {
+      font-size: var(--wa-font-size-s);
+    }
+
+    .discovered-section-count {
+      font-size: var(--wa-font-size-xs);
+    }
+  }
+
   /* ─── Card Grid ─── */
 
   .devices-grid {
@@ -177,6 +206,15 @@ export const dashboardStyles = css`
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: var(--wa-space-l);
     padding: var(--wa-space-l);
+  }
+
+  /* When the grid follows the toolbar's count row (whether directly
+     or with the empty-search pivot wedged between), the count row
+     already provides spacing above the first card. Tighten the
+     grid's top padding so the two rows don't double up. */
+  .toolbar + .devices-grid,
+  .toolbar + .empty-search + .devices-grid {
+    padding-top: var(--wa-space-xs);
   }
 
   /* Only the configured-device grid needs FAB clearance: it's the
@@ -207,6 +245,19 @@ export const dashboardStyles = css`
     padding: var(--wa-space-l) var(--wa-space-l) 0;
     flex-shrink: 0;
   }
+
+  /* Table-view counterpart to .toolbar (sits inside the
+     device-table's named toolbar slot, where the slotted rule on
+     .controls handles the outer padding). Without this rule the
+     inner rows stacked at 0px gap while card view stacked at 2px,
+     so flipping the view-toggle made the X-devices row jump 2px
+     vertically. */
+  .toolbar-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
   .toolbar-row {
     display: flex;
     align-items: center;
@@ -460,6 +511,37 @@ export const dashboardStyles = css`
   .device-count strong {
     color: var(--wa-color-text-normal);
     font-weight: var(--wa-font-weight-bold);
+  }
+
+  /* Pairs the count with the Select-multiple toggle on a row of
+     their own — both reference the device list, so they belong
+     side-by-side. justify-content:space-between puts the count on
+     the left and the toggle on the right at every width. */
+  .device-count-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--wa-space-m);
+  }
+
+  /* Table view slots the device-count-row through esphome-device-
+     table's below-controls slot so the row spans the full table
+     width and Select-multiple right-aligns with Columns / Create
+     device in the row above. Horizontal padding matches .controls
+     and .table-wrap above/below so the count and toggle line up
+     with the column headers on the right. 2px top padding mirrors
+     card view's .toolbar gap:2px so the inter-row spacing reads
+     identically between views. */
+  .table-device-count-row {
+    padding: 2px var(--wa-space-l) var(--wa-space-xs);
+  }
+
+  /* Mobile: tighten the table-view count-row gutter to match the
+     .controls / .table-wrap trim in PR-H (see table-styles.ts). */
+  @media (max-width: 600px) {
+    .table-device-count-row {
+      padding: 2px var(--wa-space-s) var(--wa-space-xs);
+    }
   }
 
   /* ─── View Toggle ─── */
@@ -850,5 +932,39 @@ export const dashboardStyles = css`
   }
   .fab-btn wa-icon {
     font-size: 18px;
+  }
+
+  /* Mobile content-padding trim. The card grid, toolbar, and YAML
+     hit list all sit at --wa-space-l (24px) horizontal padding;
+     on a 375px phone viewport that's ~13% of the width per side
+     gone to chrome. Tighten to --wa-space-s (8px) so device cards
+     and the toolbar row claim the available width. Placed last in
+     the stylesheet so source-order wins against the base
+     declarations above. #41 */
+  @media (max-width: 600px) {
+    .devices-grid {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+      gap: var(--wa-space-s);
+    }
+
+    .toolbar {
+      padding: var(--wa-space-s) var(--wa-space-s) 0;
+    }
+
+    /* When the discovered banner is present, the host already
+       provides padding-top equal to the banner height; the
+       toolbar's own padding-top stacks on top of that and reads
+       as dead space between the banner bottom and the search
+       input. Shrink to one step so the two rows breathe without
+       the doubled gutter. #41 */
+    :host([has-discovered]) .toolbar {
+      padding-top: var(--wa-space-s);
+    }
+
+    .yaml-hits {
+      padding-left: var(--wa-space-s);
+      padding-right: var(--wa-space-s);
+    }
   }
 `;

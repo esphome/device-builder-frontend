@@ -17,7 +17,7 @@
  * ``range``.
  */
 
-import type { EditorValidateResponse } from "../api/types.js";
+import type { EditorValidateResponse } from "../api/types/editor.js";
 
 const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/i;
 const YAML_LINE_RE = /line\s+(\d+)/i;

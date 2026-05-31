@@ -6,14 +6,14 @@ import toast from "sonner-js";
 
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/esphome-api.js";
+import { ErrorCode } from "../../api/types/protocol.js";
 import {
   CLEANUP_TTL_DEFAULT_SECONDS,
   CLEANUP_TTL_MAX_SECONDS,
   CLEANUP_TTL_MIN_SECONDS,
-  ErrorCode,
   type IdentityView,
   type PeerSummary,
-} from "../../api/types.js";
+} from "../../api/types/remote-build.js";
 import { activeLocale, type LocalizeFunc } from "../../common/localize.js";
 import {
   apiContext,

@@ -17,11 +17,11 @@
  * placeholder text — without a DOM.
  */
 import { describe, expect, it } from "vitest";
+import { renderIpValue } from "../../../src/components/dashboard/device-drawer-render.js";
 import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
-import { renderIpValue } from "../../../src/components/dashboard/device-drawer-render.js";
 
 const _identityLocalize: (key: string) => string = (key) => key;
 

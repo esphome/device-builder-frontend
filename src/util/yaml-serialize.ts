@@ -13,7 +13,7 @@
  * dependency checks against the user's current configuration.
  */
 
-import { isLambdaValue } from "../api/types.js";
+import { isLambdaValue } from "../api/types/automations.js";
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { isPlainObject } from "./nested-values.js";
 
@@ -222,7 +222,17 @@ function serializeListItem(
   const step = options.indentStep ?? ESPHOME_YAML_INDENT;
   const dashIndent = `${indent}${step}`;
   if (isPlainObject(item)) {
-    const entries = Object.entries(item).filter(
+    const allEntries = Object.entries(item);
+    // Polymorphic single-key items with a null value (light
+    // ``effects:`` defaults, sensor ``filters:`` defaults — #941)
+    // round-trip as ``- effect_id:`` with no value. Multi-key items
+    // continue to drop null fields under the existing "user cleared
+    // the field" semantic; this carve-out only fires when the entire
+    // item collapses to a single null-valued key.
+    if (allEntries.length === 1 && allEntries[0][1] === null) {
+      return [`${dashIndent}- ${allEntries[0][0]}:`];
+    }
+    const entries = allEntries.filter(
       ([, v]) => v !== undefined && v !== null && (v !== "" || keepEmpty)
     );
     if (entries.length === 0) return [`${dashIndent}-`];
@@ -247,11 +257,51 @@ function serializeListItem(
         lines.push(...emitYamlRawValueLines(k, prefix, raw));
         return;
       }
+      if (isPlainObject(v)) {
+        // Polymorphic single-key item with nested params (effects
+        // with overrides, filters with overrides — #941). Emit the
+        // key header then recurse for the body lines at one canonical
+        // step deeper. ``serializeYamlValues`` already handles every
+        // value type, so the recursion picks up scalars, arrays,
+        // YamlRawValue, lambdas without duplicating dispatch here.
+        lines.push(`${prefix}${k}:`);
+        const sub = serializeYamlValues(
+          v as Record<string, unknown>,
+          `${childIndent}${ESPHOME_YAML_INDENT}`,
+          options
+        );
+        lines.push(...sub);
+        return;
+      }
       lines.push(`${prefix}${k}: ${formatYamlScalar(v)}`);
     });
     return lines;
   }
   return [`${dashIndent}- ${formatYamlScalar(item)}`];
+}
+
+/**
+ * True when *value* would emit at least one line through
+ * ``serializeYamlValues`` under its *default* options.
+ *
+ * Mirrors the default per-value skip rules below so a caller asking
+ * "does this group hold anything?" agrees with what lands in the
+ * YAML. ``""`` / null / undefined / empty array / a mapping whose
+ * every descendant is itself empty all count as no value. This
+ * disagrees with ``serializeYamlValues(..., {keepEmptyStrings:
+ * true})``, which keeps ``""`` — don't use this helper to predict
+ * output for that mode.
+ */
+export function hasSerializableValue(value: unknown): boolean {
+  if (value === undefined || value === null || value === "") return false;
+  if (value instanceof YamlRawValue) return true;
+  // A non-empty list always emits: ``serializeListItem`` renders a
+  // bare ``-`` dash even for ``{}`` / ``null`` items, so length alone
+  // decides (no per-item recursion needed to agree with the output).
+  if (Array.isArray(value)) return value.length > 0;
+  if (isLambdaValue(value)) return true;
+  if (isPlainObject(value)) return Object.values(value).some(hasSerializableValue);
+  return true;
 }
 
 /**

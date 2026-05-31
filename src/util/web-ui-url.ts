@@ -1,4 +1,4 @@
-import type { ConfiguredDevice } from "../api/types.js";
+import type { ConfiguredDevice } from "../api/types/devices.js";
 
 /**
  * Return *url* if it parses cleanly and uses ``http:`` or ``https:``;

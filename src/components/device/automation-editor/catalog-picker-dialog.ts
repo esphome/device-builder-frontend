@@ -42,7 +42,7 @@ import type {
   AutomationAction,
   AutomationCondition,
   AvailableComponentInstance,
-} from "../../../api/types.js";
+} from "../../../api/types/automations.js";
 import type { LocalizeFunc } from "../../../common/localize.js";
 import { localizeContext } from "../../../context/index.js";
 import { inputStyles } from "../../../styles/inputs.js";

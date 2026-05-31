@@ -1,6 +1,6 @@
 import type { PropertyValues } from "lit";
-import { matchesDeviceName } from "../../util/device-search.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
+import { matchesDeviceName } from "../../util/device-search.js";
 
 export function onSearchKeyDown(host: ESPHomePageDashboard, e: KeyboardEvent): void {
   if (e.key === "Escape" && host._yamlMode) {

@@ -11,7 +11,6 @@
  * palette so the chip still reads as "a chip" (and not as accidentally-
  * themed default text).
  */
-import type { Label } from "../api/types.js";
 
 export interface LabelChipStyle {
   background: string;

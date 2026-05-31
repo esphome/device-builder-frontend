@@ -4,7 +4,6 @@ import {
   mdiBroom,
   mdiCheckboxMultipleBlankOutline,
   mdiCheckDecagram,
-  mdiConsole,
   mdiContentDuplicate,
   mdiDelete,
   mdiDownload,
@@ -14,16 +13,17 @@ import {
   mdiOpenInNew,
   mdiPencil,
   mdiRenameOutline,
+  mdiTextBoxOutline,
   mdiUpload,
 } from "@mdi/js";
-import { LitElement, css, html, nothing } from "lit";
+import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import type { ConfiguredDevice } from "../../api/types.js";
 import { localizeContext } from "../../context/index.js";
 import { espHomeStyles } from "../../styles/shared.js";
-import { registerMdiIcons } from "../../util/register-icons.js";
 import { EscapeController } from "../../util/escape-controller.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -33,7 +33,7 @@ registerMdiIcons({
   broom: mdiBroom,
   "checkbox-multiple-blank-outline": mdiCheckboxMultipleBlankOutline,
   "check-decagram": mdiCheckDecagram,
-  console: mdiConsole,
+  "text-box-outline": mdiTextBoxOutline,
   "content-duplicate": mdiContentDuplicate,
   delete: mdiDelete,
   download: mdiDownload,
@@ -236,7 +236,7 @@ export class ESPHomeTableRowMenu extends LitElement {
           ${this._localize("dashboard.action_install")}
         </div>
         <div class="menu-item menu-item--logs" @click=${() => this._emit("open-logs")}>
-          <wa-icon library="mdi" name="console"></wa-icon>
+          <wa-icon library="mdi" name="text-box-outline"></wa-icon>
           ${this._localize("dashboard.drawer_logs")}
         </div>
         ${this._renderVisitWebUi()}
@@ -279,9 +279,9 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="broom"></wa-icon>
           ${this._localize("dashboard.action_clean_build")}
         </div>
-        <div class="menu-item" @click=${() => this._emit("download-elf")}>
+        <div class="menu-item" @click=${() => this._emit("download")}>
           <wa-icon library="mdi" name="file-download-outline"></wa-icon>
-          ${this._localize("dashboard.action_download_elf")}
+          ${this._localize("dashboard.action_download")}
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item" @click=${() => this._emit("enter-select")}>

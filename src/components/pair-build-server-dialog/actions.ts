@@ -1,5 +1,6 @@
 import { APIError } from "../../api/api-error.js";
-import { ErrorCode, type PairingSummary } from "../../api/types.js";
+import { ErrorCode } from "../../api/types/protocol.js";
+import type { PairingSummary } from "../../api/types/remote-build.js";
 import { parsePortInput } from "../../util/hostname.js";
 import type { ESPHomePairBuildServerDialog } from "../pair-build-server-dialog.js";
 

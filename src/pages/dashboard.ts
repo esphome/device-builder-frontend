@@ -13,16 +13,16 @@ import {
 import type { SortingState, VisibilityState } from "@tanstack/lit-table";
 import { LitElement, html, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
+import memoizeOne from "memoize-one";
 import toast from "sonner-js";
+import { APIError } from "../api/api-error.js";
 import type { ESPHomeAPI } from "../api/index.js";
-import type {
-  AdoptableDevice,
-  ArchivedDevice,
-  ConfiguredDevice,
-  FirmwareJob,
-  Label,
-} from "../api/types.js";
-import { DashboardView } from "../api/types.js";
+import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
+import type { FirmwareJob } from "../api/types/firmware-jobs.js";
+import { ErrorCode } from "../api/types/protocol.js";
+import type { PairingSummary } from "../api/types/remote-build.js";
+import type { ArchivedDevice } from "../api/types/system.js";
+import { DashboardView } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import {
   deleteLabel,
@@ -36,7 +36,6 @@ import {
   archiveDevice,
   deleteArchivedDevice,
   detectAndOpenWizard,
-  downloadFirmware,
   fetchApiKey,
   unarchiveDevice,
 } from "../components/dashboard/actions.js";
@@ -81,23 +80,26 @@ import { YamlSearchController } from "../components/yaml-search-controller.js";
 import {
   activeJobsContext,
   apiContext,
+  buildOffloadPairingsContext,
   devicesContext,
   devicesLoadedContext,
   importableDevicesContext,
   labelsContext,
   localizeContext,
   recentJobsContext,
+  versionContext,
 } from "../context/index.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
-import { matchesDeviceName } from "../util/device-search.js";
+import { matchesDeviceName, matchesMacAddress } from "../util/device-search.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { classifyNoCompatiblePeerReason } from "../util/version-mismatch.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "../components/adopt-dialog.js";
@@ -122,6 +124,8 @@ import type { ESPHomeFirmwareInstallDialog } from "../components/firmware-instal
 import "../components/friendly-name-dialog.js";
 import type { ESPHomeFriendlyNameDialog } from "../components/friendly-name-dialog.js";
 import "../components/install-method-dialog.js";
+import "../components/labels/bulk-labels-dialog.js";
+import type { ESPHomeBulkLabelsDialog } from "../components/labels/bulk-labels-dialog.js";
 import "../components/labels/labels-filter.js";
 import "../components/logs-dialog.js";
 import type { ESPHomeLogsDialog } from "../components/logs-dialog.js";
@@ -172,6 +176,17 @@ export class ESPHomePageDashboard extends LitElement {
     [];
   @consume({ context: apiContext }) _api!: ESPHomeAPI;
 
+  // Used by the NO_COMPATIBLE_PEER toast classifier — see
+  // classifyNoCompatiblePeerReason. Same context the settings
+  // dialog reads; null until the subscribe_events seed lands.
+  @consume({ context: buildOffloadPairingsContext, subscribe: true })
+  @state()
+  _pairings: Map<string, PairingSummary> | null = null;
+
+  @consume({ context: versionContext, subscribe: true })
+  @state()
+  _appVersion = "";
+
   @state() _showDiscovered = false;
   @state() _search = "";
   @state() _selectedLabels: string[] = [];
@@ -215,14 +230,19 @@ export class ESPHomePageDashboard extends LitElement {
   _pendingAdoptScroll: string | null = null;
   _actionDevice: ConfiguredDevice | null = null;
 
-  private _sortedDevicesCache: {
-    source: ConfiguredDevice[];
-    sorted: ConfiguredDevice[];
-  } | null = null;
-  private _labelUsageCache: {
-    source: ConfiguredDevice[];
-    map: Record<string, number>;
-  } | null = null;
+  private _sortDevices = memoizeOne((source: ConfiguredDevice[]) =>
+    [...source].sort((a, b) =>
+      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
+    )
+  );
+  private _computeLabelUsageMemo = memoizeOne(computeLabelUsage);
+  /** id → name map rebuilt once per labels-catalog reference change.
+   *  ``_syncUrl`` looks up the names for every selected label id; the
+   *  prior shape was a linear search per id, which is O(N×M) over the
+   *  full catalog on every search keystroke / facet click. */
+  private _labelNamesById = memoizeOne(
+    (catalog: Label[]) => new Map(catalog.map((l) => [l.id, l.name]))
+  );
 
   @query("esphome-api-key-dialog") _apiKeyDialog!: ESPHomeApiKeyDialog;
   @query("esphome-archived-devices-dialog")
@@ -231,6 +251,7 @@ export class ESPHomePageDashboard extends LitElement {
   @query("esphome-create-config-dialog") _createDialog!: ESPHomeCreateConfigDialog;
   @query("esphome-clone-device-dialog") _cloneDialog!: ESPHomeCloneDeviceDialog;
   @query("esphome-friendly-name-dialog") _friendlyNameDialog!: ESPHomeFriendlyNameDialog;
+  @query("esphome-bulk-labels-dialog") _bulkLabelsDialog!: ESPHomeBulkLabelsDialog;
   @query("esphome-rename-device-dialog") _renameDialog!: ESPHomeRenameDeviceDialog;
   @query("esphome-adopt-dialog") _adoptDialog!: ESPHomeAdoptDialog;
   @query("esphome-command-dialog") _commandDialog!: ESPHomeCommandDialog;
@@ -293,6 +314,7 @@ export class ESPHomePageDashboard extends LitElement {
     // state that would otherwise flash through on first paint.
     this._hydrateFromUrl();
     this.setAttribute("view", this._view);
+    this.toggleAttribute("yaml", this._yamlMode);
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
@@ -367,12 +389,11 @@ export class ESPHomePageDashboard extends LitElement {
     // refresh during that window doesn't drop the param. Once the
     // catalog arrives and we resolve to ids, the catalog → name
     // mapping kicks in below.
+    const byId = this._labelNamesById(this._labelsCatalog);
     const labelNames =
       this._pendingLabelNames !== null
         ? this._pendingLabelNames
-        : this._selectedLabels
-            .map((id) => this._labelsCatalog.find((l) => l.id === id)?.name)
-            .filter((n): n is string => !!n);
+        : this._selectedLabels.map((id) => byId.get(id)).filter((n): n is string => !!n);
     writeDashboardUrl({
       search: this._search,
       labels: labelNames,
@@ -407,6 +428,7 @@ export class ESPHomePageDashboard extends LitElement {
 
   protected willUpdate(changed: PropertyValues) {
     if (changed.has("_view")) this.setAttribute("view", this._view);
+    if (changed.has("_yamlMode")) this.toggleAttribute("yaml", this._yamlMode);
     // ``has-discovered`` is the hook that adds top padding for the
     // discovery banner. Track the same condition the banner renders
     // under so an all-ignored / hide-ignored state doesn't leave
@@ -510,14 +532,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   get _sortedDevices(): ConfiguredDevice[] {
-    const source = this._devices;
-    if (this._sortedDevicesCache?.source === source)
-      return this._sortedDevicesCache.sorted;
-    const sorted = [...source].sort((a, b) =>
-      DEVICE_SORT_COLLATOR.compare(deviceSortKey(a), deviceSortKey(b))
-    );
-    this._sortedDevicesCache = { source, sorted };
-    return sorted;
+    return this._sortDevices(this._devices);
   }
 
   /** True when any facet or text search would currently narrow the
@@ -548,39 +563,65 @@ export class ESPHomePageDashboard extends LitElement {
   };
 
   /** Apply every active facet filter to the device list. Labels
-   *  use AND semantics (a device must carry every selected label
-   *  — the original "drill down by tag stack" behaviour we shipped
+   *  use AND semantics (a device must carry every selected label,
+   *  the original "drill down by tag stack" behaviour we shipped
    *  with the labels filter); area, platform, and status use OR
    *  within the facet and AND across facets, the conventional
-   *  faceted-search shape. */
+   *  faceted-search shape.
+   *
+   *  Memoised on the five upstream references (``devices`` plus
+   *  the four selection arrays) so the two callers inside one
+   *  render cycle (``render()`` and ``_currentlyVisibleConfigurations``)
+   *  share a single filter pass. Lit's reactive @state pattern
+   *  hands out new array references on every selection change,
+   *  so the cache invalidates exactly when the user changes a
+   *  facet or the upstream device list shifts. */
+  private _applyFacetFiltersMemo = memoizeOne(
+    (
+      devices: ConfiguredDevice[],
+      selectedLabels: string[],
+      selectedAreas: string[],
+      selectedPlatforms: string[],
+      selectedStates: string[]
+    ): ConfiguredDevice[] => {
+      let out = devices;
+      if (selectedLabels.length > 0) {
+        out = out.filter((d) => {
+          const ids = d.labels;
+          if (!ids || ids.length === 0) return false;
+          const set = new Set(ids);
+          return selectedLabels.every((id) => set.has(id));
+        });
+      }
+      if (selectedAreas.length > 0) {
+        const set = new Set(selectedAreas);
+        out = out.filter((d) => !!d.area && set.has(d.area));
+      }
+      if (selectedPlatforms.length > 0) {
+        const set = new Set(selectedPlatforms);
+        out = out.filter((d) => set.has(d.target_platform));
+      }
+      if (selectedStates.length > 0) {
+        const set = new Set(selectedStates);
+        out = out.filter((d) => set.has(d.state));
+      }
+      return out;
+    }
+  );
+
   _applyFacetFilters(devices: ConfiguredDevice[]): ConfiguredDevice[] {
-    let out = devices;
-    if (this._selectedLabels.length > 0) {
-      const required = this._selectedLabels;
-      out = out.filter((d) => {
-        const ids = d.labels;
-        if (!ids || ids.length === 0) return false;
-        const set = new Set(ids);
-        return required.every((id) => set.has(id));
-      });
-    }
-    if (this._selectedAreas.length > 0) {
-      const set = new Set(this._selectedAreas);
-      out = out.filter((d) => !!d.area && set.has(d.area));
-    }
-    if (this._selectedPlatforms.length > 0) {
-      const set = new Set(this._selectedPlatforms);
-      out = out.filter((d) => set.has(d.target_platform));
-    }
-    if (this._selectedStates.length > 0) {
-      const set = new Set(this._selectedStates);
-      out = out.filter((d) => set.has(d.state));
-    }
-    return out;
+    return this._applyFacetFiltersMemo(
+      devices,
+      this._selectedLabels,
+      this._selectedAreas,
+      this._selectedPlatforms,
+      this._selectedStates
+    );
   }
 
-  // Card view: name match. Table view: also matches address/IP/platform so
-  // "Select all" tracks the table's global filter.
+  // Card view: name match. Table view: also matches address/IP/platform/MAC
+  // so "Select all" tracks the table's global filter (device-table.ts
+  // _globalFilterFn). The MAC predicate is shared so the two can't drift.
   _currentlyVisibleConfigurations(): string[] {
     const q = this._search.trim().toLowerCase();
     const sorted = this._applyFacetFilters(this._sortedDevices);
@@ -593,7 +634,8 @@ export class ESPHomePageDashboard extends LitElement {
         return (
           d.address.toLowerCase().includes(q) ||
           d.ip_addresses.some((ip) => ip.toLowerCase().includes(q)) ||
-          d.target_platform.toLowerCase().includes(q)
+          d.target_platform.toLowerCase().includes(q) ||
+          matchesMacAddress(d.mac_address, q)
         );
       })
       .map((d) => d.configuration);
@@ -625,11 +667,7 @@ export class ESPHomePageDashboard extends LitElement {
   }
 
   _computeLabelUsage(): Record<string, number> {
-    const source = this._devices;
-    if (this._labelUsageCache?.source === source) return this._labelUsageCache.map;
-    const map = computeLabelUsage(source);
-    this._labelUsageCache = { source, map };
-    return map;
+    return this._computeLabelUsageMemo(this._devices);
   }
 
   _enterDeviceView = (view: DashboardView) => {
@@ -704,7 +742,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._apiKeyDialog.open(key);
   };
   _downloadFirmware = (device: ConfiguredDevice) =>
-    downloadFirmware(device, this._api, this._localize);
+    this._firmwareDialog.downloadArtifacts(device);
 
   _toggleDrawerForDevice(device: ConfiguredDevice) {
     if (this._drawerOpen && this._drawerDevice?.configuration === device.configuration) {
@@ -750,8 +788,28 @@ export class ESPHomePageDashboard extends LitElement {
     });
     try {
       await this._api.firmwareInstallBulk(selected);
-    } catch {
-      toast.error(this._localize("layout.update_all_error"), { richColors: true });
+    } catch (err) {
+      if (
+        err instanceof APIError &&
+        err.errorCode === ErrorCode.NO_COMPATIBLE_PEER &&
+        this._appVersion
+      ) {
+        // ``_appVersion`` empty during a reconnect race would leak
+        // into the ``{local}`` placeholder and misattribute the
+        // bucket; fall through to the generic toast.
+        const reason = classifyNoCompatiblePeerReason(
+          this._pairings?.values() ?? [],
+          this._appVersion
+        );
+        toast.error(
+          this._localize(`layout.update_all_no_compatible_peer_${reason}`, {
+            local: this._appVersion,
+          }),
+          { richColors: true }
+        );
+      } else {
+        toast.error(this._localize("layout.update_all_error"), { richColors: true });
+      }
     }
   };
 
@@ -774,6 +832,16 @@ export class ESPHomePageDashboard extends LitElement {
       return;
     }
     this._openConfirm({ kind: "archive-bulk" });
+  };
+
+  _labelsSelected = () => {
+    if (this._selectedDevices.size === 0) return;
+    // Pass configurations (ids) rather than ``Device`` objects; the
+    // dialog consumes ``devicesContext`` to resolve them on each
+    // render so they stay fresh through any DEVICE_UPDATED events
+    // that arrive while the dialog is open.
+    this._bulkLabelsDialog.configurations = [...this._selectedDevices];
+    this._bulkLabelsDialog.open();
   };
 
   _confirmDeleteSingle = (device: ConfiguredDevice) =>

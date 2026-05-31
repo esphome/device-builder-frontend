@@ -16,7 +16,7 @@ export type LocalizeFunc = (
   values?: Record<string, string | number>
 ) => string;
 
-export const SUPPORTED_LOCALES = ["en", "fr", "nl", "hu"] as const;
+export const SUPPORTED_LOCALES = ["en", "fr", "nl", "hu", "zh-CN"] as const;
 export type SupportedLocale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Language picker choice — every supported locale plus the
@@ -42,15 +42,35 @@ export const LANGUAGES: {
   { value: "fr", labelKey: "settings.language_fr", flag: "🇫🇷" },
   { value: "nl", labelKey: "settings.language_nl", flag: "🇳🇱" },
   { value: "hu", labelKey: "settings.language_hu", flag: "🇭🇺" },
+  { value: "zh-CN", labelKey: "settings.language_zh_cn", flag: "🇨🇳" },
 ];
 
 const LOCALE_STORAGE_KEY = "esphome-locale";
 
+// BCP 47 tags are case-insensitive so a browser may report
+// ``zh-CN``, ``zh-cn``, or ``ZH-CN`` interchangeably. Index the
+// supported locales by their lowercased form and map back to
+// the canonical casing on lookup.
+const SUPPORTED_LOCALE_BY_LOWERCASE = new Map<string, SupportedLocale>(
+  SUPPORTED_LOCALES.map((l) => [l.toLowerCase(), l])
+);
+
 function detectLocale(): SupportedLocale {
-  const lang = navigator.language.split("-")[0];
-  return (SUPPORTED_LOCALES as readonly string[]).includes(lang)
-    ? (lang as SupportedLocale)
-    : "en";
+  const lang = navigator.language.toLowerCase();
+  // Try the full code first so regional variants we ship as
+  // distinct locales (zh-CN vs zh-TW / zh-HK / zh-MO / zh-SG)
+  // stay disambiguated, then fall back to the language prefix
+  // so fr-CA / fr-BE / fr-CH still resolve to fr, nl-BE to nl,
+  // etc.
+  const exact = SUPPORTED_LOCALE_BY_LOWERCASE.get(lang);
+  if (exact !== undefined) {
+    return exact;
+  }
+  const prefix = SUPPORTED_LOCALE_BY_LOWERCASE.get(lang.split("-", 1)[0]);
+  if (prefix !== undefined) {
+    return prefix;
+  }
+  return "en";
 }
 
 /** Read the user's explicit locale choice from localStorage, if any. */
@@ -86,6 +106,11 @@ async function loadLocaleMessages(
       return (await import("../translations/nl.json")).default as Record<string, unknown>;
     case "hu":
       return (await import("../translations/hu.json")).default as Record<string, unknown>;
+    case "zh-CN":
+      return (await import("../translations/zh-CN.json")).default as Record<
+        string,
+        unknown
+      >;
   }
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { YamlSearchHit, YamlSearchMatch } from "../../src/api/types.js";
+import type { YamlSearchHit, YamlSearchMatch } from "../../src/api/types/devices.js";
 import {
   buildYamlSnippetBlocks,
   forEachYamlMatch,

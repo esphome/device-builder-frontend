@@ -3,53 +3,55 @@ import { css, html, LitElement, type PropertyValues } from "lit";
 import { customElement, query, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import { ESPHomeAPI } from "../api/index.js";
-import { CLEANUP_TTL_DEFAULT_SECONDS, JobStatus, Theme } from "../api/types.js";
+import type { AdoptableDevice, ConfiguredDevice, Label } from "../api/types/devices.js";
+import type { VersionMatchPolicy } from "../api/types/event-subscription.js";
+import type { FirmwareJob, RemoteBuildSubmitTarget } from "../api/types/firmware-jobs.js";
+import { JobStatus } from "../api/types/firmware-jobs.js";
+import type { ServerInfoMessage } from "../api/types/protocol.js";
+import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type {
-  AdoptableDevice,
-  ConfiguredDevice,
-  FirmwareJob,
-  Label,
-  OffloaderAlertSnapshotEntry,
   PairingSummary,
   PairingWindowState,
   PeerSummary,
   RemoteBuildPeer,
-  RemoteBuildSubmitTarget,
-  ServerInfoMessage,
-} from "../api/types.js";
+} from "../api/types/remote-build.js";
+import { CLEANUP_TTL_DEFAULT_SECONDS } from "../api/types/remote-build.js";
+import { Theme } from "../api/types/system.js";
 import { defaultLocalize, loadLocalize, type LocalizeFunc } from "../common/localize.js";
+import type { RemoteBuildJobState } from "../context/index.js";
 import {
-  apiContext,
-  darkModeContext,
-  devicesContext,
-  devicesLoadedContext,
   activeJobsContext,
+  apiContext,
   buildOffloadAlertsContext,
   buildOffloadDiscoveredHostsContext,
   buildOffloadJobsContext,
   buildOffloadPairingsContext,
-  offloaderRemoteBuildsEnabledContext,
   buildServerIdentityRotationCounterContext,
   buildServerPairingWindowStateContext,
   buildServerPeersContext,
-  recentJobsContext,
+  darkModeContext,
+  devicesContext,
+  devicesLoadedContext,
   firmwareJobsContext,
   importableDevicesContext,
   integrationDocsContext,
   isHaIngressContext,
   labelsContext,
   localizeContext,
+  offloaderRemoteBuildsEnabledContext,
+  offloaderVersionMatchPolicyContext,
   onboardingPendingContext,
+  recentJobsContext,
   remoteBuildCleanupTtlContext,
   remoteBuildEnabledContext,
   serverVersionContext,
   versionContext,
   yamlDiffButtonContext,
 } from "../context/index.js";
-import type { RemoteBuildJobState } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { BASE_PATH } from "../util/base-path.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
+import { onLoginSubmit } from "./app-shell/auth.js";
 import {
   loadIntegrationDocs,
   loadLabels,
@@ -63,7 +65,6 @@ import {
   onFirmwareHistoryCleared,
   subscribeToFollowJobs,
 } from "./app-shell/jobs.js";
-import { onLoginSubmit } from "./app-shell/auth.js";
 import { createRouter } from "./app-shell/router.js";
 import {
   onPairRequestSent,
@@ -72,6 +73,7 @@ import {
   onSetLanguage,
   onSetOffloaderPairingEnabled,
   onSetOffloaderRemoteBuildsEnabled,
+  onSetOffloaderVersionMatchPolicy,
   onSetRemoteBuildCleanupTtl,
   onSetRemoteBuildEnabled,
   onSetTheme,
@@ -147,6 +149,9 @@ export class ESPHomeApp extends LitElement {
   @provide({ context: offloaderRemoteBuildsEnabledContext })
   @state()
   _offloaderRemoteBuildsEnabled: boolean | null = null;
+  @provide({ context: offloaderVersionMatchPolicyContext })
+  @state()
+  _offloaderVersionMatchPolicy: VersionMatchPolicy | null = null;
   @provide({ context: buildOffloadAlertsContext }) @state() _buildOffloadAlerts: Map<
     string,
     OffloaderAlertSnapshotEntry
@@ -516,6 +521,8 @@ export class ESPHomeApp extends LitElement {
         @set-offloader-pairing-enabled=${(
           e: CustomEvent<{ pin_sha256: string; enabled: boolean }>
         ) => onSetOffloaderPairingEnabled(this, e)}
+        @set-offloader-version-match-policy=${(e: CustomEvent<VersionMatchPolicy>) =>
+          onSetOffloaderVersionMatchPolicy(this, e)}
         @set-language=${(e: CustomEvent<Parameters<typeof onSetLanguage>[1]["detail"]>) =>
           onSetLanguage(this, e as Parameters<typeof onSetLanguage>[1])}
         @pair-request-sent=${(e: CustomEvent<{ summary: PairingSummary }>) =>

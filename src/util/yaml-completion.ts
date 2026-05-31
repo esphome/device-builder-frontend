@@ -28,13 +28,9 @@ import {
 import type { EditorState } from "@codemirror/state";
 import type { EditorView } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import {
-  ConfigEntryType,
-  type ComponentCatalogEntry,
-  type ConfigEntry,
-} from "../api/types.js";
+import type { ComponentCatalogEntry } from "../api/types/components.js";
+import { ConfigEntryType, type ConfigEntry } from "../api/types/config-entries.js";
 import { fetchComponent } from "./component-name-cache.js";
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   getActions,
   getConfigVarKeys,
@@ -48,6 +44,7 @@ import {
   type SchemaConfigVarKey,
   type SchemaRegistryEntry,
 } from "./esphome-schema.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   collectSubstitutionKeys,
   collectTopLevelKeys,

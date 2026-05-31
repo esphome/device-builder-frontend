@@ -2,7 +2,7 @@ import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiSerialPort } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
-import type { SerialPort } from "../../api/types.js";
+import type { SerialPort } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
 import { inputStyles } from "../../styles/inputs.js";

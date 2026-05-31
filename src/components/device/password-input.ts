@@ -9,8 +9,8 @@
  * input on the right and inherits standard form-control padding.
  */
 
-import { mdiEye, mdiEyeOff } from "@mdi/js";
 import { consume } from "@lit/context";
+import { mdiEye, mdiEyeOff } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
@@ -30,13 +30,13 @@ registerMdiIcons({
 // import the builder without pulling in the webawesome
 // CSSStyleSheet polyfill (which fails in Node).
 import {
-  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   buildPasswordValueChangeEvent,
+  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   type PasswordInputValueChange,
 } from "./password-input-event.js";
 export {
-  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   buildPasswordValueChangeEvent,
+  PASSWORD_INPUT_VALUE_CHANGE_EVENT,
   type PasswordInputValueChange,
 };
 
@@ -75,6 +75,15 @@ export class ESPHomePasswordInput extends LitElement {
    *  unchanged. */
   @property()
   label = "";
+
+  /** Optional ``aria-describedby`` forwarded to the inner ``<input>``.
+   *  The error/help text it points at lives in the consumer's shadow
+   *  root, not this one, so the consumer owns the id; we only relay
+   *  it onto the real focusable control. Default empty (no
+   *  ``aria-describedby`` attribute) so existing call sites are
+   *  unchanged. */
+  @property()
+  describedby = "";
 
   @state()
   private _revealed = false;
@@ -150,6 +159,8 @@ export class ESPHomePasswordInput extends LitElement {
           autocomplete="off"
           maxlength=${this.maxlength > 0 ? this.maxlength : nothing}
           aria-label=${this.label || nothing}
+          aria-invalid=${this.invalid ? "true" : nothing}
+          aria-describedby=${this.describedby || nothing}
           @input=${this._onInput}
         />
         <button
