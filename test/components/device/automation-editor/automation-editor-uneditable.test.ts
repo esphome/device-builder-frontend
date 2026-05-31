@@ -50,6 +50,17 @@ const erroredParse = (): ParsedAutomation[] => [
   } as unknown as ParsedAutomation,
 ];
 
+const validParse = (): ParsedAutomation[] => [
+  {
+    location: ON_BOOT,
+    label: "On Boot",
+    automation: { trigger_id: "on_boot", trigger_params: {}, actions: [] },
+    from_line: 1,
+    to_line: 2,
+    raw_yaml: "on_boot:\n  then: []\n",
+  } as unknown as ParsedAutomation,
+];
+
 const slimAvailable = (): AvailableAutomations =>
   ({
     triggers: [],
@@ -124,5 +135,46 @@ describe("automation-editor uneditable (errored parse)", () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await (editor as any)._autoApply();
     expect(upsertAutomation).not.toHaveBeenCalled();
+  });
+});
+
+describe("automation-editor parse-error banner", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("clears a stale parse error once the YAML parses again", async () => {
+    const parseDeviceAutomations = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("invalid_args: Failed to parse device YAML"))
+      .mockResolvedValue(validParse());
+    const api = {
+      getAvailableAutomations: vi.fn().mockResolvedValue(slimAvailable()),
+      getAutomationBodies: vi.fn().mockResolvedValue({}),
+      parseDeviceAutomations,
+      upsertAutomation: vi.fn(),
+    } as unknown as ESPHomeAPI;
+
+    const editor = new ESPHomeAutomationEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._api = api;
+    editor.configuration = "device.yaml";
+    editor.location = ON_BOOT;
+    editor.yaml = "broken: [";
+    document.body.appendChild(editor);
+    await editor.updateComplete;
+    await flushPending();
+    // The failed parse surfaced an error banner.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any)._error).toContain("Failed to parse");
+
+    // The user fixes the YAML in the pane; the parent re-hydrates.
+    editor.yaml = "on_boot:\n  then: []\n";
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any).reload();
+    await flushPending();
+    // A successful parse clears the stale error.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((editor as any)._error).toBe("");
   });
 });
