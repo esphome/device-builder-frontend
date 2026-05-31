@@ -422,34 +422,53 @@ export function parseConfiguredPlatforms(yaml: string): Set<string> {
   return out;
 }
 
+// Characters / shapes that make a plain scalar ambiguous to a YAML
+// loader: a ``:`` or ``#`` (key / comment delimiters), a leading
+// indicator char, or surrounding whitespace it would trim.
+const YAML_UNSAFE_CHARS = /[:#\n\r\t]/;
+const YAML_LEADING_INDICATOR = /^[-\s'"]/;
+const YAML_TRAILING_SPACE = /\s$/;
+// A decimal int / float (incl. exponent) the loader would read as a
+// number. Hex / octal (``0x76``) are intentionally excluded — they
+// preserve value bare and the i2c-address path (#410) expects them.
+const YAML_NUMERIC = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+const YAML_NULL = /^(null|~)$/i;
+
+/**
+ * True when *s* must be quoted to survive as a string. Beyond the
+ * structurally-unsafe characters, a string the loader would re-read as
+ * a number / boolean / null also needs quoting: a typed-string field
+ * like globals' ``initial_value`` fails ESPHome as ``EInt`` when ``0``
+ * is emitted bare.
+ */
+function _yamlNeedsQuoting(s: string): boolean {
+  return (
+    s === "" ||
+    YAML_UNSAFE_CHARS.test(s) ||
+    YAML_LEADING_INDICATOR.test(s) ||
+    YAML_TRAILING_SPACE.test(s) ||
+    parseYamlBoolean(s) !== null ||
+    YAML_NUMERIC.test(s) ||
+    YAML_NULL.test(s)
+  );
+}
+
+function _yamlDoubleQuote(s: string): string {
+  const escaped = s
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "\\r")
+    .replace(/\t/g, "\\t");
+  return `"${escaped}"`;
+}
+
 /** Format a single scalar value, quoting when needed. */
 export function formatYamlScalar(v: unknown): string {
   if (typeof v === "boolean") return String(v);
   if (typeof v === "number") return String(v);
   const s = String(v);
-  // Empty string must be quoted: a bare ``key: `` round-trips as
-  // YAML ``null``, not as the empty string we started with. Only
-  // matters when the caller has opted into keep-empty-strings
-  // (default is to drop the key entirely), but the formatter is
-  // shared so we get it right at the source.
-  if (
-    s === "" ||
-    /[:#]/.test(s) ||
-    /^[-\s'"]/.test(s) ||
-    /\s$/.test(s) ||
-    /[\n\r\t]/.test(s) ||
-    // A string a YAML loader would re-read as a number / boolean / null
-    // must be quoted to stay a string; globals' initial_value is typed
-    // string, so bare ``0`` fails ESPHome as EInt. Hex / octal (``0x``)
-    // are left bare; they preserve value and the i2c-address path (#410)
-    // expects them unquoted.
-    parseYamlBoolean(s) !== null ||
-    /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s) ||
-    /^(null|~)$/i.test(s)
-  ) {
-    return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
-  }
-  return s;
+  return _yamlNeedsQuoting(s) ? _yamlDoubleQuote(s) : s;
 }
 
 // ESPHome's YAML loader accepts the YAML 1.1 truthy/falsy spellings
