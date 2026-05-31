@@ -46,13 +46,10 @@ describe("friendly-name-dialog ENTER", () => {
   });
 
   it("fires friendly-name-confirm once on a held (auto-repeat) Enter", async () => {
-    // No one-shot latch here (unlike the sibling dialogs) because the
-    // EnterController detaches in willUpdate on the _open flip that
-    // _confirm's close() triggers — a microtask that drains within the
-    // same event-loop turn. Real OS auto-repeat delivers each keydown as
-    // a separate task, so by the second keydown the listener is already
-    // gone. Modelled here as keydown -> microtask checkpoint (updateComplete)
-    // -> keydown, the faithful shape of a held key.
+    // Models OS auto-repeat as separate tasks with a microtask drain
+    // between (keydown -> updateComplete -> keydown). The listener
+    // detaches in willUpdate on the first keydown's close(), so the
+    // second finds it gone — no latch needed.
     const el = await mount();
     el.open("kitchen", "Kitchen");
     await el.updateComplete;
