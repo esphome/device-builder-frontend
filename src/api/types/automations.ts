@@ -141,7 +141,7 @@ export type AutomationCatalogBodyType =
 export type AutomationLocation =
   | { kind: "script"; id: string }
   | { kind: "interval"; index: number }
-  | { kind: "component_on"; component_id: string; trigger: string; index?: number }
+  | { kind: "component_on"; component_id: string; trigger: string; index?: number | null }
   | { kind: "device_on"; trigger: string }
   | { kind: "light_effect"; component_id: string; index: number }
   | { kind: "api_action"; action_name: string };

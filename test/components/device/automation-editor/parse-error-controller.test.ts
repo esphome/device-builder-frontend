@@ -74,6 +74,38 @@ describe("ParseErrorController.resolve", () => {
     expect(c.active).toBe(false);
   });
 
+  it("matches a backend index:null component_on against an index-less location", () => {
+    // #1094: the parser emits ``index: null`` for a single (non-list)
+    // component_on handler, while the navigator routes the click with
+    // no ``index`` at all. Both must resolve to the same automation so
+    // re-selecting an automation rehydrates its actions instead of an
+    // empty tree.
+    const c = new ParseErrorController(fakeHost());
+    const navLoc = {
+      kind: "component_on",
+      component_id: "binary_sensor_0",
+      trigger: "on_state",
+    } as unknown as AutomationLocation;
+    const tree = {
+      trigger_id: "binary_sensor.on_state",
+      trigger_params: {},
+      actions: [{ action_id: "logger.log", params: {}, children: {}, conditions: [] }],
+    };
+    const parserLoc = {
+      kind: "component_on",
+      component_id: "binary_sensor_0",
+      trigger: "on_state",
+      index: null,
+    } as unknown as AutomationLocation;
+    const m = c.resolve(
+      [parsed({ location: parserLoc, automation: tree })],
+      navLoc,
+      "component_on"
+    );
+    expect(m?.tree).toBe(tree);
+    expect(c.active).toBe(false);
+  });
+
   it("rejects a same-key entry of the wrong kind", () => {
     const c = new ParseErrorController(fakeHost());
     expect(c.resolve([parsed({})], SCRIPT, "api_action")).toBeNull();

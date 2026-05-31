@@ -39,6 +39,17 @@ describe("sectionKeyFromLocation", () => {
         index: 1,
       })
     ).toBe("automation:component_on:my_time:on_time:1");
+    // The backend wire delivers ``index: null`` for a single
+    // (non-list) component_on handler; it must key identically to
+    // the navigator's un-indexed key, with no ``:null`` segment.
+    expect(
+      sectionKeyFromLocation({
+        kind: "component_on",
+        component_id: "my_button",
+        trigger: "on_press",
+        index: null,
+      })
+    ).toBe("automation:component_on:my_button:on_press");
     expect(sectionKeyFromLocation({ kind: "script", id: "my_alarm" })).toBe(
       "automation:script:my_alarm"
     );

@@ -111,7 +111,11 @@ export function sectionKeyFromLocation(loc: AutomationLocation): string {
     case "device_on":
       return `automation:device_on:${loc.trigger}`;
     case "component_on":
-      return loc.index === undefined
+      // The wire delivers ``index: null`` for a single (non-list)
+      // handler, not ``undefined`` — match both so the key has no
+      // trailing ``:null`` segment that the navigator's un-indexed
+      // key (and ``locationFromSectionKey``) would never produce.
+      return loc.index == null
         ? `automation:component_on:${loc.component_id}:${loc.trigger}`
         : `automation:component_on:${loc.component_id}:${loc.trigger}:${loc.index}`;
     case "script":
