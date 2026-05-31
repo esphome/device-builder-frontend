@@ -107,12 +107,7 @@ export class ESPHomeLabelsFilter extends LitElement {
     this._close();
   });
 
-  static styles = [
-    espHomeStyles,
-    facetStyles,
-    labelChipStyles,
-    labelsFilterStyles,
-  ];
+  static styles = [espHomeStyles, facetStyles, labelChipStyles, labelsFilterStyles];
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);
