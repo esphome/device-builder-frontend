@@ -46,11 +46,7 @@ describe("YAML_ONLY_SECTIONS", () => {
   });
 
   it("contains globals — list-of-mappings shape would corrupt", () => {
-    // ``globals`` is a multi_conf list of typed-variable mappings.
-    // The flat catalog ``config_entries`` route it through the
-    // single-instance form, which reads the list body back as
-    // ``{}`` and overwrites every global on save. YAML-only avoids
-    // the data loss until a repeatable-list control exists.
+    // multi_conf list body would be read back as {} by the single-instance form.
     expect(YAML_ONLY_SECTIONS.has("globals")).toBe(true);
     expect(MAP_SECTIONS.has("globals")).toBe(false);
   });
