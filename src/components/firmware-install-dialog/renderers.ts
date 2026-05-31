@@ -1,8 +1,44 @@
 import { html, nothing, type TemplateResult } from "lit";
-import { JobSource } from "../../api/types/firmware-jobs.js";
+import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
 import { splitTemplate } from "../../util/template-split.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
 import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
+
+// Map the backend's stable artifact `type` to a localized label, falling back
+// to the platform-supplied text when there's no translation — an unknown type
+// or an untranslated key. _localize returns the key unchanged when it misses,
+// so a result equal to the key means "no translation, use the backend text".
+function localizedOrBackend(
+  host: ESPHomeFirmwareInstallDialog,
+  key: string,
+  fallback: string | undefined
+): string | undefined {
+  const value = host._localize(key);
+  return value === key ? fallback : value;
+}
+
+function artifactTitle(
+  host: ESPHomeFirmwareInstallDialog,
+  binary: FirmwareBinary
+): string {
+  if (!binary.type) return binary.title;
+  return (
+    localizedOrBackend(host, `firmware.download_type_${binary.type}`, binary.title) ??
+    binary.title
+  );
+}
+
+function artifactDescription(
+  host: ESPHomeFirmwareInstallDialog,
+  binary: FirmwareBinary
+): string | undefined {
+  if (!binary.type) return binary.description;
+  return localizedOrBackend(
+    host,
+    `firmware.download_type_${binary.type}_desc`,
+    binary.description
+  );
+}
 
 // Matches the receiver-side _fail_locally "peer-link session lost" shape from
 // the backend's remote_runner. Substring match because the wire is free-form.
@@ -81,20 +117,19 @@ export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult
         >
       </div>
       <div class="binary-list">
-        ${host._binaries.map(
-          (binary) => html`
+        ${host._binaries.map((binary) => {
+          const desc = artifactDescription(host, binary);
+          return html`
             <button
               type="button"
               class="binary-option"
               @click=${() => host._onChooseBinary(binary.file)}
             >
-              <span class="title">${binary.title}</span>
-              ${binary.description
-                ? html`<span class="desc">${binary.description}</span>`
-                : nothing}
+              <span class="title">${artifactTitle(host, binary)}</span>
+              ${desc ? html`<span class="desc">${desc}</span>` : nothing}
             </button>
-          `
-        )}
+          `;
+        })}
       </div>
     `;
   }

@@ -403,6 +403,16 @@
   "firmware": {
     "install_title": "Telepítés – {name}",
     "download_title": "Letöltés – {name}",
+    "download_type_factory": "Gyári image",
+    "download_type_factory_desc": "Teljes image az ESPHome Webhez és más flashelő eszközökhöz.",
+    "download_type_ota": "OTA frissítés",
+    "download_type_ota_desc": "Eszköz frissítése hálózaton keresztül.",
+    "download_type_elf": "ELF (hibakeresési szimbólumok)",
+    "download_type_elf_desc": "Összeomlási visszakövetések dekódolásához az ESP veremnyom-dekódolóval.",
+    "download_type_bin": "Firmware image",
+    "download_type_bin_desc": "Egyetlen image-es firmware flasheléshez.",
+    "download_type_uf2": "UF2 csomag",
+    "download_type_uf2_desc": "Húzd-és-ejtsd flashelés USB háttértárként.",
     "status_connecting": "Csatlakozás az eszközhöz…",
     "status_verifying": "Chip ellenőrzése…",
     "status_compiling": "Firmware fordítása…",
@@ -436,8 +446,8 @@
     "binary_download_done_body": "Mentve: {filename}. Telepítse az eszközre egyénileg.",
     "elf_download_done_title": "Hibakeresési szimbólumok letöltve",
     "elf_download_done_body": "Mentve: {filename}. Használja az ESP veremnyom-dekódolóval az összeomlások visszakövetéséhez.",
-    "choose_binary_title": "Válasszon bináris formátumot",
-    "choose_binary_desc": "Válassza ki a szükséges formátumot; minden lehetőség leírja, mire való.",
+    "choose_binary_title": "Mit szeretne letölteni?",
+    "choose_binary_desc": "Minden lehetőség leírja, mire való.",
     "choose_binary_again": "Másik formátum letöltése"
   },
   "serial": {

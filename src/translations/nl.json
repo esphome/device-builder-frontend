@@ -883,6 +883,16 @@
   "firmware": {
     "install_title": "Installeren — {name}",
     "download_title": "Downloaden — {name}",
+    "download_type_factory": "Fabrieksimage",
+    "download_type_factory_desc": "Volledige image voor ESPHome Web en andere flashtools.",
+    "download_type_ota": "OTA-update",
+    "download_type_ota_desc": "Voor het bijwerken van een apparaat via het netwerk.",
+    "download_type_elf": "ELF (debugsymbolen)",
+    "download_type_elf_desc": "Voor het decoderen van crash-backtraces met de ESP stack trace decoder.",
+    "download_type_bin": "Firmware-image",
+    "download_type_bin_desc": "Firmware in één image om te flashen.",
+    "download_type_uf2": "UF2-pakket",
+    "download_type_uf2_desc": "Slepen-en-neerzetten flashen via USB-massaopslag.",
     "status_connecting": "Verbinden met apparaat…",
     "status_verifying": "Chip verifiëren…",
     "status_compiling": "Firmware compileren…",
@@ -916,8 +926,8 @@
     "binary_download_done_body": "Opgeslagen als {filename}. Flash hem naar je apparaat met je eigen tool.",
     "elf_download_done_title": "Debugsymbolen gedownload",
     "elf_download_done_body": "Opgeslagen als {filename}. Gebruik het met de ESP stack trace decoder om crash-backtraces te decoderen.",
-    "choose_binary_title": "Kies een binary-formaat",
-    "choose_binary_desc": "Kies het formaat dat je nodig hebt; elke optie legt uit waarvoor het is.",
+    "choose_binary_title": "Wat wil je downloaden?",
+    "choose_binary_desc": "Elke optie legt uit waarvoor het is.",
     "choose_binary_again": "Een ander formaat downloaden"
   },
   "validation": {

@@ -404,6 +404,16 @@
   "firmware": {
     "install_title": "Install — {name}",
     "download_title": "Download — {name}",
+    "download_type_factory": "Factory image",
+    "download_type_factory_desc": "Full image for ESPHome Web and other flashing tools.",
+    "download_type_ota": "OTA update",
+    "download_type_ota_desc": "For updating a device over the network.",
+    "download_type_elf": "ELF (debug symbols)",
+    "download_type_elf_desc": "For decoding crash backtraces with the ESP stack trace decoder.",
+    "download_type_bin": "Firmware image",
+    "download_type_bin_desc": "Single-image firmware for flashing.",
+    "download_type_uf2": "UF2 package",
+    "download_type_uf2_desc": "Drag-and-drop flashing over USB mass storage.",
     "status_connecting": "Connecting to device…",
     "status_verifying": "Verifying chip…",
     "status_compiling": "Compiling firmware…",
@@ -437,8 +447,8 @@
     "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool.",
     "elf_download_done_title": "Debug symbols downloaded",
     "elf_download_done_body": "Saved as {filename}. Use it with the ESP stack trace decoder to decode crash backtraces.",
-    "choose_binary_title": "Choose a binary format",
-    "choose_binary_desc": "Pick the format you need; each option explains what it's for.",
+    "choose_binary_title": "Choose what to download",
+    "choose_binary_desc": "Each option explains what it's for.",
     "choose_binary_again": "Download another format"
   },
   "serial": {

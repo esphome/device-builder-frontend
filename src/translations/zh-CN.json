@@ -404,6 +404,16 @@
   "firmware": {
     "install_title": "安装 — {name}",
     "download_title": "下载 — {name}",
+    "download_type_factory": "工厂镜像",
+    "download_type_factory_desc": "完整镜像，用于 ESPHome Web 和其他刷写工具。",
+    "download_type_ota": "OTA 更新",
+    "download_type_ota_desc": "用于通过网络更新设备。",
+    "download_type_elf": "ELF（调试符号）",
+    "download_type_elf_desc": "用于通过 ESP 堆栈跟踪解码器解码崩溃回溯。",
+    "download_type_bin": "固件镜像",
+    "download_type_bin_desc": "用于刷写的单一镜像固件。",
+    "download_type_uf2": "UF2 包",
+    "download_type_uf2_desc": "通过 USB 大容量存储拖放刷写。",
     "status_connecting": "正在连接设备…",
     "status_verifying": "正在校验芯片…",
     "status_compiling": "正在编译固件…",
@@ -437,8 +447,8 @@
     "binary_download_done_body": "已保存为 {filename}。请使用你喜欢的工具将其刷写到设备上。",
     "elf_download_done_title": "调试符号已下载",
     "elf_download_done_body": "已保存为 {filename}。请配合 ESP 堆栈跟踪解码器使用，以解码崩溃回溯。",
-    "choose_binary_title": "选择二进制格式",
-    "choose_binary_desc": "选择你需要的格式；每个选项都会说明其用途。",
+    "choose_binary_title": "选择要下载的内容",
+    "choose_binary_desc": "每个选项都会说明其用途。",
     "choose_binary_again": "下载其他格式"
   },
   "serial": {
