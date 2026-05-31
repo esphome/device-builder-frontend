@@ -182,7 +182,9 @@ export class ESPHomeTableColumnToggle extends LitElement {
                     class="menu-item"
                     role="menuitemcheckbox"
                     aria-checked=${col.visible}
+                    tabindex="0"
                     @click=${() => this._onToggle(col.id, !col.visible)}
+                    @keydown=${this._onItemKeydown}
                   >
                     <span class="checkbox ${col.visible ? "checked" : ""}">
                       <wa-icon library="mdi" name="check"></wa-icon>
@@ -204,6 +206,18 @@ export class ESPHomeTableColumnToggle extends LitElement {
   private _close() {
     this._open = false;
   }
+
+  /* The menu items are ``<div role="menuitemcheckbox">`` rather than
+     <button>s so they sit flush with the checkbox styling. role +
+     tabindex make them focusable; this maps Enter / Space to the same
+     click the mouse would dispatch, reusing the @click handler bound
+     on the element (mirrors esphome-header-actions). */
+  private _onItemKeydown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).click();
+    }
+  };
 
   private _onToggle(id: string, visible: boolean) {
     this.dispatchEvent(
