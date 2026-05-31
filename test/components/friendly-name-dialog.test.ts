@@ -45,6 +45,23 @@ describe("friendly-name-dialog ENTER", () => {
     );
   });
 
+  it("fires friendly-name-confirm once on a held (auto-repeat) Enter", async () => {
+    // Models OS auto-repeat as separate tasks with a microtask drain
+    // between (keydown -> updateComplete -> keydown). The listener
+    // detaches in willUpdate on the first keydown's close(), so the
+    // second finds it gone — no latch needed.
+    const el = await mount();
+    el.open("kitchen", "Kitchen");
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    el.addEventListener("friendly-name-confirm", onConfirm as EventListener);
+    await setValue(el, "Living Room");
+    pressEnter({ repeat: true }); // confirms + runs close(), schedules the detaching update
+    await el.updateComplete; // the inter-keystroke turn: willUpdate unbinds the listener
+    pressEnter({ repeat: true }); // listener already gone — no second dispatch
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores Enter once closed (inactive)", async () => {
     const el = await mount();
     el.open("kitchen", "Kitchen");
