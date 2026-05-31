@@ -126,6 +126,9 @@ export interface FirmwareBinary {
   file: string;
   // Optional subtext from ESPHome's get_download_types; not every platform supplies one.
   description?: string;
+  // Stable artifact tag (``factory`` / ``ota`` / ``elf`` / ``bin`` / ``uf2``)
+  // the UI maps to a localized label, falling back to ``title`` when absent.
+  type?: string;
 }
 
 export interface FirmwareDownload {

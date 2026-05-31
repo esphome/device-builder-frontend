@@ -438,9 +438,9 @@ export class ESPHomeDeviceTable extends LitElement {
           e.stopPropagation();
           this._forwardEvent("clean-build", e.detail);
         }}
-        @download-elf=${(e: CustomEvent) => {
+        @download=${(e: CustomEvent) => {
           e.stopPropagation();
-          this._forwardEvent("download-elf", e.detail);
+          this._forwardEvent("download", e.detail);
         }}
         @enter-select=${(e: CustomEvent<ConfiguredDevice>) => {
           e.stopPropagation();

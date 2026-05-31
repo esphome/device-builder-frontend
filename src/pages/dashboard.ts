@@ -36,7 +36,6 @@ import {
   archiveDevice,
   deleteArchivedDevice,
   detectAndOpenWizard,
-  downloadFirmware,
   fetchApiKey,
   unarchiveDevice,
 } from "../components/dashboard/actions.js";
@@ -743,7 +742,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._apiKeyDialog.open(key);
   };
   _downloadFirmware = (device: ConfiguredDevice) =>
-    downloadFirmware(device, this._api, this._localize);
+    this._firmwareDialog.downloadArtifacts(device);
 
   _toggleDrawerForDevice(device: ConfiguredDevice) {
     if (this._drawerOpen && this._drawerDevice?.configuration === device.configuration) {

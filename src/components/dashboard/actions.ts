@@ -5,7 +5,6 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
-import { downloadBase64Binary } from "../../util/download-text.js";
 import {
   connectToPort,
   detectChip,
@@ -268,30 +267,6 @@ export async function downloadYaml(
     if (url) {
       URL.revokeObjectURL(url);
     }
-  }
-}
-
-export async function downloadFirmware(
-  device: ConfiguredDevice,
-  api: ESPHomeAPI,
-  localize: LocalizeFunc
-): Promise<void> {
-  const name = device.friendly_name || device.name;
-  try {
-    const binaries = await api.firmwareGetBinaries(device.configuration);
-    if (binaries.length === 0) {
-      toast.error(localize("dashboard.download_no_binaries", { name }), {
-        richColors: true,
-      });
-      return;
-    }
-    const binary = binaries[0];
-    const result = await api.firmwareDownload(device.configuration, binary.file);
-    downloadBase64Binary(result.data, result.filename);
-  } catch {
-    toast.error(localize("dashboard.download_firmware_failed", { name }), {
-      richColors: true,
-    });
   }
 }
 

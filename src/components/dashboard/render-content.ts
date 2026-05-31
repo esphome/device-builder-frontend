@@ -177,8 +177,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
-      @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._downloadFirmware(e.detail)}
+      @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>
@@ -273,8 +272,7 @@ export function renderCardContextMenu(host: ESPHomePageDashboard): TemplateResul
         host._openFriendlyName(e.detail)}
       @clean-build=${(e: CustomEvent<ConfiguredDevice>) =>
         host._openCommand(e.detail, "clean")}
-      @download-elf=${(e: CustomEvent<ConfiguredDevice>) =>
-        host._downloadFirmware(e.detail)}
+      @download=${(e: CustomEvent<ConfiguredDevice>) => host._downloadFirmware(e.detail)}
       @archive-device=${(e: CustomEvent<ConfiguredDevice>) =>
         host._confirmArchive(e.detail)}
       @delete-device=${(e: CustomEvent<ConfiguredDevice>) =>

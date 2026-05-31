@@ -1,0 +1,142 @@
+/**
+ * Tests for the three-dot "Download" flow (startArtifactDownload). It lists
+ * the device's existing build artefacts (firmware images + the ELF) so the
+ * user can pick one, and compiles ONLY when nothing is built yet — an existing
+ * build is served as-is, with no recompile, so the ELF's debug symbols keep
+ * matching the firmware currently flashed on the device.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { downloadBase64Binary } = vi.hoisted(() => ({ downloadBase64Binary: vi.fn() }));
+vi.mock("../../src/util/download-text.js", () => ({ downloadBase64Binary }));
+vi.mock("../../src/util/web-serial.js", () => ({
+  connectToPort: vi.fn(),
+  detectChip: vi.fn(),
+  disconnect: vi.fn(),
+  flashFirmware: vi.fn(),
+  resetAndDisconnect: vi.fn(),
+}));
+
+import {
+  type FirmwareBinary,
+  JobSource,
+  JobStatus,
+} from "../../src/api/types/firmware-jobs.js";
+import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
+import {
+  downloadSelectedBinary,
+  startArtifactDownload,
+} from "../../src/components/firmware-install-dialog/install-flow.js";
+
+const FACTORY: FirmwareBinary = { title: "Factory format", file: "firmware.factory.bin" };
+const OTA: FirmwareBinary = { title: "OTA format", file: "firmware.ota.bin" };
+const ELF: FirmwareBinary = {
+  title: "ELF (for debugging)",
+  file: "firmware.elf",
+  description: "Debug symbols for the ESP stack trace decoder.",
+};
+
+// get_binaries can return a different list on each call (empty before a
+// compile, populated after), so accept a queue of results.
+function makeHost(getBinariesResults: FirmwareBinary[][]) {
+  const firmwareGetBinaries = vi.fn();
+  for (const result of getBinariesResults) {
+    firmwareGetBinaries.mockResolvedValueOnce(result);
+  }
+  const api = {
+    firmwareCompile: vi
+      .fn()
+      .mockResolvedValue({ job_id: "j1", source: JobSource.LOCAL, source_label: "" }),
+    firmwareFollowJob: vi.fn((_id: string, cbs: { onResult: (d: unknown) => void }) => {
+      cbs.onResult({ status: JobStatus.COMPLETED });
+      return "s1";
+    }),
+    firmwareGetBinaries,
+    firmwareDownload: vi.fn().mockResolvedValue({
+      filename: "device-firmware.elf",
+      data: "RUxG",
+      size: 3,
+      compressed: false,
+    }),
+  };
+  const host = {
+    _device: { configuration: "device.yaml" },
+    _installer: "binary-download",
+    _api: api,
+    _step: "queued",
+    _statusMessage: "",
+    _binaries: [] as FirmwareBinary[],
+    _downloadedFilename: "",
+    _logLines: [] as string[],
+    _failedDuringCompile: false,
+    _jobId: "",
+    _streamId: "",
+    _jobSource: JobSource.LOCAL,
+    _jobSourceLabel: "",
+    _compileReject: null as null | ((e: unknown) => void),
+    _localize: (key: string) => key,
+    _fail: vi.fn(),
+  };
+  host._fail = vi.fn((msg: string) => {
+    host._step = "error";
+    host._statusMessage = msg;
+  });
+  return { host, api };
+}
+
+const run = (host: ReturnType<typeof makeHost>["host"]) =>
+  startArtifactDownload(host as unknown as ESPHomeFirmwareInstallDialog);
+
+afterEach(() => vi.clearAllMocks());
+
+describe("download flow (startArtifactDownload)", () => {
+  it("shows the picker without compiling when a build already exists", async () => {
+    const { host, api } = makeHost([[FACTORY, OTA, ELF]]);
+    await run(host);
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(host._step).toBe("choose-binary");
+    expect(host._binaries).toEqual([FACTORY, OTA, ELF]);
+    expect(api.firmwareDownload).not.toHaveBeenCalled();
+  });
+
+  it("downloads directly without compiling when one artefact exists", async () => {
+    const { host, api } = makeHost([[FACTORY]]);
+    await run(host);
+    expect(api.firmwareCompile).not.toHaveBeenCalled();
+    expect(api.firmwareDownload).toHaveBeenCalledWith(
+      "device.yaml",
+      "firmware.factory.bin"
+    );
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("compiles once when nothing is built, then shows the picker", async () => {
+    // First list empty (not built); after compile the artefacts appear.
+    const { host, api } = makeHost([[], [FACTORY, OTA, ELF]]);
+    await run(host);
+    expect(api.firmwareCompile).toHaveBeenCalledTimes(1);
+    expect(api.firmwareGetBinaries).toHaveBeenCalledTimes(2);
+    expect(host._step).toBe("choose-binary");
+    expect(host._binaries).toEqual([FACTORY, OTA, ELF]);
+  });
+
+  it("picking the ELF downloads firmware.elf and hands it to the browser", async () => {
+    const { host, api } = makeHost([[FACTORY, OTA, ELF]]);
+    await run(host); // lands on choose-binary
+    await downloadSelectedBinary(
+      host as unknown as ESPHomeFirmwareInstallDialog,
+      "firmware.elf"
+    );
+    expect(api.firmwareDownload).toHaveBeenCalledWith("device.yaml", "firmware.elf");
+    expect(downloadBase64Binary).toHaveBeenCalledWith("RUxG", "device-firmware.elf");
+    expect(host._step).toBe("download-ready");
+  });
+
+  it("fails when the compile produces no artefacts", async () => {
+    const { host, api } = makeHost([[], []]);
+    await run(host);
+    expect(api.firmwareCompile).toHaveBeenCalledTimes(1);
+    expect(host._step).toBe("error");
+    expect(api.firmwareDownload).not.toHaveBeenCalled();
+  });
+});
