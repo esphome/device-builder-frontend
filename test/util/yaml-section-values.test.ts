@@ -1777,6 +1777,45 @@ describe("parseYamlSectionValues - is_list section round-trip", () => {
     expect(next).toContain("  ssid: home");
   });
 
+  it("round-trips a four-space-indented body to a valid aligned block", () => {
+    // Non-canonical indent must parse, and the save must re-emit a block
+    // whose follow-up keys all share the inline key's column; a strict
+    // YAML loader rejects an item whose keys sit at mixed columns.
+    const y4 = [
+      "globals:",
+      "    - id: my_int",
+      "      type: int",
+      "      initial_value: '0'",
+      "    - id: my_flag",
+      "      type: bool",
+    ].join("\n");
+    const values = parseYamlSectionValues(y4, "globals", undefined, true);
+    const items = values.globals as Record<string, unknown>[];
+    expect(items).toHaveLength(2);
+    expect(items[0]).toEqual({ id: "my_int", type: "int", initial_value: "0" });
+
+    const out = updateSectionInYaml(y4, "globals", values, undefined, {}, true);
+    // First item's inline key and its follow-up keys must align.
+    const lines = out.split("\n");
+    const inlineCol = lines[1].indexOf("id:");
+    const followCol = lines[2].search(/\S/);
+    expect(followCol).toBe(inlineCol);
+    // Lossless: the emitted block reparses to the same items.
+    const reparsed = parseYamlSectionValues(out, "globals", undefined, true);
+    expect(reparsed.globals).toEqual(items);
+  });
+
+  it("removes the section when the last item is deleted (1 to 0)", () => {
+    // Emptying the list must not leave a bare ``globals:`` header, which
+    // ESPHome rejects as a null mapping. The array path emits nothing for
+    // an empty list, so the splice drops the header too.
+    const yaml = ["globals:", "  - id: only", "    type: int", ""].join("\n");
+    const values = parseYamlSectionValues(yaml, "globals", undefined, true);
+    values.globals = [];
+    const out = updateSectionInYaml(yaml, "globals", values, undefined, {}, true);
+    expect(out).not.toMatch(/^globals:/m);
+  });
+
   it("never clobbers a body that did not parse to an array", () => {
     // A complex body (font glyphs, lambdas) parses to a YamlRawValue,
     // not an array; the save must return the YAML untouched.

@@ -12,7 +12,6 @@ import {
   YamlRawValue,
   formatYamlScalar,
   parseYamlBoolean,
-  serializeListItem,
   serializeYamlValues,
   type SerializeYamlOptions,
 } from "./yaml-serialize.js";
@@ -1000,19 +999,19 @@ export function updateSectionInYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
-  // List-bodied section: re-emit the header then the items under it. A
-  // non-array value (a YamlRawValue the form can't represent) leaves the
-  // YAML untouched rather than overwriting it.
+  // List-bodied section: re-emit it through the same array path as a
+  // nested multi_value field (esphome.areas), so the header and items
+  // get canonical aligned indentation. A non-array value (a YamlRawValue
+  // the form can't represent) leaves the YAML untouched.
   if (isList) {
-    const items = values[sectionKey];
-    if (!Array.isArray(items)) return yaml;
+    if (!Array.isArray(values[sectionKey])) return yaml;
     const headIndent = _leadingIndent(lines[start]);
-    const step = options.indentStep ?? _detectSectionChildIndent(lines, start, false);
-    const body: string[] = [];
-    for (const item of items) {
-      body.push(...serializeListItem(item, headIndent, { ...options, indentStep: step }));
-    }
-    lines.splice(start, end - start, lines[start], ...body);
+    const block = serializeYamlValues(
+      { [sectionKey]: values[sectionKey] },
+      headIndent,
+      options
+    );
+    lines.splice(start, end - start, ...block);
     return lines.join("\n");
   }
 
