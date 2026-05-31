@@ -206,6 +206,8 @@
     "filter_labels": "Labels",
     "filter_clear": "Filter wissen",
     "filter_clear_all": "Filters wissen",
+    "filter_menu_button": "Filters",
+    "filter_menu_active": "{count} actieve filters",
     "filter_area": "Gebied",
     "filter_platform": "Platform",
     "filter_status": "Status",

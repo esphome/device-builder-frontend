@@ -304,6 +304,8 @@
     "filter_labels": "Címkék",
     "filter_clear": "Szűrő törlése",
     "filter_clear_all": "Szűrők törlése",
+    "filter_menu_button": "Szűrők",
+    "filter_menu_active": "{count} aktív szűrő",
     "filter_area": "Terület",
     "filter_platform": "Platform",
     "filter_status": "Állapot",

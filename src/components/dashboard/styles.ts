@@ -290,6 +290,43 @@ export const dashboardStyles = css`
     min-width: 0;
   }
 
+  /* Trailing "Clear filters" action on the desktop facet row. Matches
+     the 36px pill height so the strip stays aligned, but stays quiet
+     (borderless, muted) so it doesn't read as another facet pill. */
+  .filter-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 36px;
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--wa-border-radius-m);
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    font-family: inherit;
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold, 600);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+      background-color 0.12s,
+      color 0.12s;
+  }
+
+  .filter-clear wa-icon {
+    font-size: 16px;
+  }
+
+  .filter-clear:hover {
+    color: var(--esphome-primary);
+    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+  }
+
+  .filter-clear:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+  }
+
   /* The <form role="search"> wrapper is what suppresses Chrome's
      credential autofill on the search input; display: contents keeps
      it out of the layout so the absolute-positioned leading icon

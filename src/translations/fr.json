@@ -206,6 +206,8 @@
     "filter_labels": "Étiquettes",
     "filter_clear": "Effacer le filtre",
     "filter_clear_all": "Effacer les filtres",
+    "filter_menu_button": "Filtres",
+    "filter_menu_active": "{count} filtres actifs",
     "filter_area": "Zone",
     "filter_platform": "Plateforme",
     "filter_status": "Statut",

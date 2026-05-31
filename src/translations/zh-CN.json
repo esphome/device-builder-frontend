@@ -305,6 +305,8 @@
     "filter_labels": "标签",
     "filter_clear": "清除筛选",
     "filter_clear_all": "清除筛选",
+    "filter_menu_button": "筛选",
+    "filter_menu_active": "{count} 个活动筛选",
     "filter_area": "区域",
     "filter_platform": "平台",
     "filter_status": "状态",

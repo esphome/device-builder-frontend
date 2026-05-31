@@ -5,10 +5,10 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { downloadYaml, editDevice } from "./actions.js";
+import { renderFacets } from "./render-facets.js";
 import {
   renderAddDeviceCard,
   renderDeviceCountRow,
-  renderFacets,
   renderNoResultsExtras,
   renderSearchInput,
   renderViewToggle,
