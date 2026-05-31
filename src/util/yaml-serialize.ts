@@ -437,15 +437,7 @@ export function formatYamlScalar(v: unknown): string {
     /[:#]/.test(s) ||
     /^[-\s'"]/.test(s) ||
     /\s$/.test(s) ||
-    /[\n\r\t]/.test(s) ||
-    // A string a YAML loader would re-read as a number / boolean / null
-    // must be quoted to stay a string; globals' initial_value is typed
-    // string, so bare ``0`` fails ESPHome as EInt. Hex / octal (``0x``)
-    // are left bare; they preserve value and the i2c-address path (#410)
-    // expects them unquoted.
-    parseYamlBoolean(s) !== null ||
-    /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s) ||
-    /^(null|~)$/i.test(s)
+    /[\n\r\t]/.test(s)
   ) {
     return `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
   }
