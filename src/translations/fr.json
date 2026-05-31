@@ -914,6 +914,8 @@
     "web_download_open_button": "Ouvrir web.esphome.io",
     "binary_download_done_title": "Binaire du firmware téléchargé",
     "binary_download_done_body": "Enregistré sous {filename}. Flashez-le sur votre appareil avec votre outil préféré.",
+    "elf_download_done_title": "Symboles de débogage téléchargés",
+    "elf_download_done_body": "Enregistré sous {filename}. Utilisez-le avec le décodeur de trace de pile ESP pour décoder les traces de plantage.",
     "choose_binary_title": "Choisissez un format de binaire",
     "choose_binary_desc": "Choisissez le format dont vous avez besoin ; chaque option explique son usage.",
     "choose_binary_again": "Télécharger un autre format"

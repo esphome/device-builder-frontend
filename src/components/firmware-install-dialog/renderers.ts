@@ -100,8 +100,11 @@ export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult
   }
   if (host._step === "download-ready") {
     const filename = host._downloadedFilename;
-    // Manual binary download: just acknowledge the file — no web.esphome.io checklist.
+    // Manual binary download: just acknowledge the file — no web.esphome.io
+    // checklist. The ELF is debug symbols, not a flashable image, so it gets
+    // its own copy (decoder, not "flash it").
     if (host._installer === "binary-download") {
+      const isElf = filename.endsWith(".elf");
       return html`
         <div class="status">
           <wa-icon
@@ -110,10 +113,19 @@ export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult
             name="check-circle"
           ></wa-icon>
           <span class="status-text"
-            >${host._localize("firmware.binary_download_done_title")}</span
+            >${host._localize(
+              isElf
+                ? "firmware.elf_download_done_title"
+                : "firmware.binary_download_done_title"
+            )}</span
           >
           <span class="status-detail"
-            >${host._localize("firmware.binary_download_done_body", { filename })}</span
+            >${host._localize(
+              isElf
+                ? "firmware.elf_download_done_body"
+                : "firmware.binary_download_done_body",
+              { filename }
+            )}</span
           >
         </div>
         ${host._binaries.length > 1

@@ -435,6 +435,8 @@
     "web_download_open_button": "Open web.esphome.io",
     "binary_download_done_title": "Firmware binary downloaded",
     "binary_download_done_body": "Saved as {filename}. Flash it to your device with your preferred tool.",
+    "elf_download_done_title": "Debug symbols downloaded",
+    "elf_download_done_body": "Saved as {filename}. Use it with the ESP stack trace decoder to decode crash backtraces.",
     "choose_binary_title": "Choose a binary format",
     "choose_binary_desc": "Pick the format you need; each option explains what it's for.",
     "choose_binary_again": "Download another format"
