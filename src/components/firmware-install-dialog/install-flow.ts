@@ -301,9 +301,12 @@ export async function downloadSelectedBinary(
   // footer must not offer Stop (see renderFooter).
   host._step = "downloading";
   try {
-    const url = await host._api.firmwareDownloadUrl(device.configuration, file);
-    triggerDownload(url, file);
-    host._downloadedFilename = file;
+    const { url, filename } = await host._api.firmwareDownloadUrl(
+      device.configuration,
+      file
+    );
+    triggerDownload(url, filename);
+    host._downloadedFilename = filename;
   } catch {
     host._fail(host._localize("firmware.download_failed"));
     return;

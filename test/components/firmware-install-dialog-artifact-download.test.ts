@@ -52,7 +52,10 @@ function makeHost(getBinariesResults: FirmwareBinary[][]) {
       return "s1";
     }),
     firmwareGetBinaries,
-    firmwareDownloadUrl: vi.fn().mockResolvedValue("/api/firmware/download?token=tok"),
+    firmwareDownloadUrl: vi.fn().mockResolvedValue({
+      url: "/api/firmware/download?token=tok",
+      filename: "device-firmware.elf",
+    }),
   };
   const host = {
     _device: { configuration: "device.yaml" },
@@ -123,9 +126,10 @@ describe("download flow (startArtifactDownload)", () => {
       "firmware.elf"
     );
     expect(api.firmwareDownloadUrl).toHaveBeenCalledWith("device.yaml", "firmware.elf");
+    // Saved under the server-chosen filename (from firmware/download_token).
     expect(triggerDownload).toHaveBeenCalledWith(
       "/api/firmware/download?token=tok",
-      "firmware.elf"
+      "device-firmware.elf"
     );
     expect(host._step).toBe("download-ready");
   });

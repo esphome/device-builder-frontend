@@ -1212,12 +1212,14 @@ export class ESPHomeAPI {
   }
 
   /** Mint a single-use token authorizing the HTTP download of one artifact. */
-  async firmwareDownloadToken(configuration: string, file: string): Promise<string> {
-    const result = await this.sendCommand<{ token: string }>("firmware/download_token", {
-      configuration,
-      file,
-    });
-    return result.token;
+  async firmwareDownloadToken(
+    configuration: string,
+    file: string
+  ): Promise<{ token: string; filename: string }> {
+    return this.sendCommand<{ token: string; filename: string }>(
+      "firmware/download_token",
+      { configuration, file }
+    );
   }
 
   /**
@@ -1227,14 +1229,21 @@ export class ESPHomeAPI {
    * the file straight to disk — no in-memory buffering, works on mobile. The
    * token is the route's auth, so the URL needs no ``Authorization`` header.
    */
-  async firmwareDownloadUrl(configuration: string, file: string): Promise<string> {
-    const token = await this.firmwareDownloadToken(configuration, file);
-    return `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`;
+  async firmwareDownloadUrl(
+    configuration: string,
+    file: string
+  ): Promise<{ url: string; filename: string }> {
+    const { token, filename } = await this.firmwareDownloadToken(configuration, file);
+    return {
+      url: `${BASE_PATH}api/firmware/download?token=${encodeURIComponent(token)}`,
+      filename,
+    };
   }
 
   /** Fetch an artifact's bytes (for in-browser Web Serial flashing). */
   async firmwareDownloadBytes(configuration: string, file: string): Promise<ArrayBuffer> {
-    const response = await fetch(await this.firmwareDownloadUrl(configuration, file));
+    const { url } = await this.firmwareDownloadUrl(configuration, file);
+    const response = await fetch(url);
     if (!response.ok) {
       throw new Error(`Firmware download failed: ${response.status}`);
     }

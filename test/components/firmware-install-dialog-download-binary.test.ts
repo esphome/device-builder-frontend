@@ -52,7 +52,10 @@ function makeHost(installer: Installer, binaries: FirmwareBinary[]) {
       return "s1";
     }),
     firmwareGetBinaries: vi.fn().mockResolvedValue(binaries),
-    firmwareDownloadUrl: vi.fn().mockResolvedValue("/api/firmware/download?token=tok"),
+    firmwareDownloadUrl: vi.fn().mockResolvedValue({
+      url: "/api/firmware/download?token=tok",
+      filename: "device-firmware.bin",
+    }),
   };
   const host = {
     _device: { configuration: "device.yaml" },
@@ -123,9 +126,10 @@ describe("manual firmware-binary download flow", () => {
       "device.yaml",
       "firmware.ota.bin"
     );
+    // Saved under the server-chosen filename (from firmware/download_token).
     expect(triggerDownload).toHaveBeenCalledWith(
       "/api/firmware/download?token=tok",
-      "firmware.ota.bin"
+      "device-firmware.bin"
     );
     expect(host._step).toBe("download-ready");
     // Kept so the done screen can offer "download another format".
