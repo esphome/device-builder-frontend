@@ -1748,6 +1748,18 @@ describe("parseYamlSectionValues - is_list section round-trip", () => {
     expect(reparsed[1].id).toBe("my_flag");
   });
 
+  it("quotes a numeric-string initial_value so it stays a string", () => {
+    // globals' initial_value is a typed string; emitting bare 0 makes
+    // ESPHome read it as an int and reject the config (EInt error).
+    const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
+    const next = updateSectionInYaml(globalsYaml, "globals", values, undefined, {}, true);
+    expect(next).toContain('initial_value: "0"');
+    const reparsed = parseYamlSectionValues(next, "globals", undefined, true)
+      .globals as Record<string, unknown>[];
+    expect(typeof reparsed[0].initial_value).toBe("string");
+    expect(reparsed[0].initial_value).toBe("0");
+  });
+
   it("round-trips an added item, keeping the existing ones", () => {
     const values = parseYamlSectionValues(globalsYaml, "globals", undefined, true);
     (values.globals as Record<string, unknown>[]).push({ id: "added", type: "bool" });
