@@ -110,11 +110,7 @@ export const labelsFilterStyles = css`
 
   .row-action--danger:hover {
     background: color-mix(in srgb, var(--wa-color-danger-fill-loud), transparent 88%);
-    border-color: color-mix(
-      in srgb,
-      var(--wa-color-danger-fill-loud),
-      transparent 70%
-    );
+    border-color: color-mix(in srgb, var(--wa-color-danger-fill-loud), transparent 70%);
     color: var(--wa-color-danger-fill-loud);
   }
 
