@@ -22,6 +22,7 @@ import type { DetectedChip } from "../util/web-serial.js";
 import {
   downloadSelectedBinary,
   flipToLogs,
+  startArtifactDownload,
   startDownload,
   startWebSerialInstall,
 } from "./firmware-install-dialog/install-flow.js";
@@ -152,6 +153,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this._step = "queued";
     this._statusMessage = this._localize("firmware.status_queued");
     void startDownload(this);
+  }
+
+  // Three-dot "Download" entry; compiles only when nothing is built.
+  downloadArtifacts(device: ConfiguredDevice) {
+    this._init(device);
+    this._installer = "binary-download";
+    this._title = this._localize("firmware.download_title", {
+      name: device.friendly_name || device.name,
+    });
+    this._step = "queued";
+    this._statusMessage = this._localize("firmware.status_queued");
+    void startArtifactDownload(this);
   }
 
   // Picked a format in the choose-binary step.

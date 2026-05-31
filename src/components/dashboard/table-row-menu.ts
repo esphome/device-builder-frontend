@@ -279,9 +279,9 @@ export class ESPHomeTableRowMenu extends LitElement {
           <wa-icon library="mdi" name="broom"></wa-icon>
           ${this._localize("dashboard.action_clean_build")}
         </div>
-        <div class="menu-item" @click=${() => this._emit("download-elf")}>
+        <div class="menu-item" @click=${() => this._emit("download")}>
           <wa-icon library="mdi" name="file-download-outline"></wa-icon>
-          ${this._localize("dashboard.action_download_elf")}
+          ${this._localize("dashboard.action_download")}
         </div>
         <div class="menu-divider"></div>
         <div class="menu-item" @click=${() => this._emit("enter-select")}>

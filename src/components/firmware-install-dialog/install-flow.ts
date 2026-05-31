@@ -97,13 +97,7 @@ export async function startWebSerialInstall(
   // 3. Compile
   host._step = "queued";
   host._statusMessage = host._localize("firmware.status_queued");
-  try {
-    await compileAndWait(host, device.configuration);
-  } catch (err) {
-    host._failedDuringCompile = true;
-    host._fail(host._localize("firmware.compile_failed"), compileFailureDetail(err));
-    return;
-  }
+  if (!(await compileOrFail(host, device.configuration))) return;
 
   // 4. Download binary
   host._statusMessage = host._localize("firmware.status_downloading");
@@ -196,50 +190,65 @@ export function flipToLogs(
   if (handled) host._open = false;
 }
 
-// Shared compile + save for web.esphome.io and manual binary download. Differ
-// in which binaries are eligible — web.esphome.io needs a self-contained image
-// (factory.bin / firmware.bin); manual gives whatever artefact was produced
-// (including .uf2 for RP2040 / nrf52 / libretiny).
+// Compile, surfacing a failure on the dialog. Returns false so the caller bails.
+async function compileOrFail(
+  host: ESPHomeFirmwareInstallDialog,
+  configuration: string
+): Promise<boolean> {
+  try {
+    await compileAndWait(host, configuration);
+    return true;
+  } catch (err) {
+    host._failedDuringCompile = true;
+    host._fail(host._localize("firmware.compile_failed"), compileFailureDetail(err));
+    return false;
+  }
+}
+
+// List build artefacts, surfacing a failure on the dialog. Returns null so the
+// caller bails.
+async function fetchBinaries(
+  host: ESPHomeFirmwareInstallDialog,
+  configuration: string
+): Promise<FirmwareBinary[] | null> {
+  try {
+    return await host._api.firmwareGetBinaries(configuration);
+  } catch {
+    host._fail(host._localize("firmware.download_failed"));
+    return null;
+  }
+}
+
+function showBinaryPicker(
+  host: ESPHomeFirmwareInstallDialog,
+  binaries: FirmwareBinary[]
+): void {
+  host._binaries = binaries;
+  host._statusMessage = "";
+  host._step = "choose-binary";
+}
+
+// web.esphome.io needs a self-contained image (factory.bin / firmware.bin);
+// manual download takes whatever the build produced (incl. .uf2).
 export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise<void> {
   const device = host._device;
   if (!device) return;
   const isWebFlasher = host._installer === "web-download";
 
-  try {
-    await compileAndWait(host, device.configuration);
-  } catch (err) {
-    host._failedDuringCompile = true;
-    host._fail(host._localize("firmware.compile_failed"), compileFailureDetail(err));
-    return;
-  }
-
+  if (!(await compileOrFail(host, device.configuration))) return;
   host._statusMessage = host._localize("firmware.status_downloading");
-  let binaries: FirmwareBinary[];
-  try {
-    binaries = await host._api.firmwareGetBinaries(device.configuration);
-  } catch {
-    host._fail(host._localize("firmware.download_failed"));
-    return;
-  }
+  const binaries = await fetchBinaries(host, device.configuration);
+  if (!binaries) return;
 
-  // More than one format (e.g. ESP32 factory + OTA): let the user pick,
-  // since the OTA image is otherwise unreachable from the manual path.
   if (!isWebFlasher && binaries.length > 1) {
-    host._binaries = binaries;
-    host._statusMessage = "";
-    host._step = "choose-binary";
+    showBinaryPicker(host, binaries);
     return;
   }
-
-  // ESP32 → firmware.factory.bin (bootloader + partitions + app)
-  // ESP8266 → firmware.bin (full image, no bootloader split)
-  // web flasher requires one of those; manual falls back to first available.
   const flashable =
     binaries.find((b) => b.file === "firmware.factory.bin") ??
     binaries.find((b) => b.file === "firmware.bin") ??
     (isWebFlasher ? undefined : binaries[0]);
   if (!flashable) {
-    // Web-flasher path with no match almost always = UF2 platform.
     host._fail(
       host._localize(
         isWebFlasher ? "firmware.no_flashable_binary" : "firmware.no_binaries"
@@ -248,6 +257,34 @@ export async function startDownload(host: ESPHomeFirmwareInstallDialog): Promise
     return;
   }
   await downloadSelectedBinary(host, flashable.file);
+}
+
+// Three-dot "Download". Compiles only when nothing is built, so an existing
+// build's ELF still matches the firmware flashed on the device.
+export async function startArtifactDownload(
+  host: ESPHomeFirmwareInstallDialog
+): Promise<void> {
+  const device = host._device;
+  if (!device) return;
+
+  let binaries = await fetchBinaries(host, device.configuration);
+  if (!binaries) return;
+  if (binaries.length === 0) {
+    if (!(await compileOrFail(host, device.configuration))) return;
+    host._statusMessage = host._localize("firmware.status_downloading");
+    binaries = await fetchBinaries(host, device.configuration);
+    if (!binaries) return;
+  }
+
+  if (binaries.length === 0) {
+    host._fail(host._localize("firmware.no_binaries"));
+    return;
+  }
+  if (binaries.length === 1) {
+    await downloadSelectedBinary(host, binaries[0].file);
+    return;
+  }
+  showBinaryPicker(host, binaries);
 }
 
 // Fetch one binary and hand it to the browser. Shared by the auto-select
