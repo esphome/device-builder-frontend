@@ -742,13 +742,10 @@ export function parseYamlSectionValues(
   const startIdx = findSectionStart(lines, sectionKey, fromLine);
   if (startIdx < 0) return values;
 
-  // List-bodied section (``globals:`` → ``- id: …`` items): the body
-  // IS the list, keyed under the section name so the wrapped
-  // ``nested + multi_value`` entry reads it at path ``[sectionKey]``,
-  // exactly like ``esphome.areas``. ``parseListBlock`` returns a
-  // structured array for clean mappings and a ``YamlRawValue`` for
-  // shapes it can't model (font glyphs, lambdas); the render path
-  // falls back to YAML-only for the latter.
+  // List-bodied section (globals): the body is the list, keyed under the
+  // section name so the wrapper reads it at [sectionKey] like esphome.areas.
+  // parseListBlock returns an array, or a YamlRawValue for shapes it can't
+  // model (the render path falls back to YAML-only for those).
   if (isList) {
     const headIndent = _leadingIndent(lines[startIdx]);
     const bodyStart = _skipBlankAndCommentLines(lines, startIdx + 1);
@@ -1003,11 +1000,9 @@ export function updateSectionInYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
-  // List-bodied section: re-emit the section header followed by the
-  // list items straight under it (``globals:`` → ``  - id: …``).
-  // A non-array value means the body parsed to a YamlRawValue the
-  // form can't represent — leave the YAML untouched rather than
-  // overwrite it.
+  // List-bodied section: re-emit the header then the items under it. A
+  // non-array value (a YamlRawValue the form can't represent) leaves the
+  // YAML untouched rather than overwriting it.
   if (isList) {
     const items = values[sectionKey];
     if (!Array.isArray(items)) return yaml;

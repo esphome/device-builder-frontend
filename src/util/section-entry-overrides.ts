@@ -77,25 +77,17 @@ const MAP_SECTION_ENTRIES: ConfigEntry[] = [
   }),
 ];
 
-/** Singular noun for each list item's card header; the nested-list
- *  renderer shows '<label> <n>' (Global variable 1). Falls back to a
- *  generic 'Item' for sections without a curated label. */
+/** Singular card-header noun per list section; falls back to 'Item'. */
 const LIST_SECTION_ITEM_LABELS: Readonly<Record<string, string>> = {
   globals: "Global variable",
 };
 
 /**
- * Pick the right ``ConfigEntry[]`` to render for *sectionKey*.
+ * Resolve the entries to render for a section.
  *
- * Sections in ``MAP_SECTIONS`` get the synthesised MAP shape.
- * ``isList`` sections (whose body is a YAML list of mappings, flagged
- * by the catalog's component-level ``is_list``) get a single keyed
- * ``NESTED + multi_value`` entry wrapping the catalog fields, so they
- * render through the same repeatable-list machinery as
- * ``esphome.areas``; the section value is the normal Record
- * ``{ [sectionKey]: [...] }``. Everything else hands back the catalog
- * entries unchanged. Pure function so the render path's correctness is
- * testable without standing up a shadow root.
+ * MAP_SECTIONS get the synthesised map; isList sections get one keyed
+ * nested multi_value entry wrapping the catalog fields (value at
+ * [sectionKey], like esphome.areas); others pass through unchanged.
  */
 export function resolveSectionEntries(
   sectionKey: string,

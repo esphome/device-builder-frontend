@@ -308,10 +308,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       isList
     );
     const hasAdvanced = anyAdvancedEntry(renderEntries);
-    // A list-bodied section whose parsed body isn't an array means the
-    // items carry shapes the list form can't round-trip (font glyphs,
-    // lambdas); fall back to YAML-only so a save can't wipe them. An
-    // absent body (undefined) still renders the form so the user can Add.
+    // A list body that didn't parse to an array carries shapes the form
+    // can't round-trip; fall back to YAML-only so a save can't wipe it.
+    // Undefined (absent body) still renders the form so the user can Add.
     const listBodyUnrenderable =
       isList &&
       this._values[this.sectionKey] !== undefined &&

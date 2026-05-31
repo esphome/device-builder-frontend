@@ -15,8 +15,7 @@ export interface SectionConfigResponse {
   icon: string;
   image_url: string;
   entries: ConfigEntry[];
-  /** Body is a YAML list of mappings (globals); rendered as a
-   *  repeatable list. Carried from the catalog's component-level flag. */
+  /** Body is a YAML list of mappings; rendered as a repeatable list. */
   is_list: boolean;
 }
 
