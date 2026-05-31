@@ -62,9 +62,7 @@ describe("esphome-table-column-toggle keyboard operability", () => {
     );
 
     const [first] = await openMenu(el);
-    first.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Enter", bubbles: true })
-    );
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
 
     // First column starts visible; Enter toggles it off.
     expect(events).toEqual([{ id: "ip", visible: false }]);
@@ -78,9 +76,7 @@ describe("esphome-table-column-toggle keyboard operability", () => {
     );
 
     const items = await openMenu(el);
-    items[1].dispatchEvent(
-      new KeyboardEvent("keydown", { key: " ", bubbles: true })
-    );
+    items[1].dispatchEvent(new KeyboardEvent("keydown", { key: " ", bubbles: true }));
 
     // Second column starts hidden; Space toggles it on.
     expect(events).toEqual([{ id: "mac", visible: true }]);
@@ -92,12 +88,8 @@ describe("esphome-table-column-toggle keyboard operability", () => {
     el.addEventListener("column-visibility-change", (e) => events.push(e));
 
     const [first] = await openMenu(el);
-    first.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "a", bubbles: true })
-    );
-    first.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "Tab", bubbles: true })
-    );
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+    first.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true }));
 
     expect(events).toHaveLength(0);
   });
