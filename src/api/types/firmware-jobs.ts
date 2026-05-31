@@ -130,10 +130,3 @@ export interface FirmwareBinary {
   // the UI maps to a localized label, falling back to ``title`` when absent.
   type?: string;
 }
-
-export interface FirmwareDownload {
-  filename: string;
-  data: string;
-  size: number;
-  compressed: boolean;
-}
