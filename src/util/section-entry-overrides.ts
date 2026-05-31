@@ -77,34 +77,22 @@ const MAP_SECTION_ENTRIES: ConfigEntry[] = [
   }),
 ];
 
-/** Singular card-header noun per list section; falls back to 'Item'. */
-const LIST_SECTION_ITEM_LABELS: Readonly<Record<string, string>> = {
-  globals: "Global variable",
-};
-
 /**
- * Resolve the entries to render for a section.
+ * Pick the right ``ConfigEntry[]`` to render for *sectionKey*.
  *
- * MAP_SECTIONS get the synthesised map; isList sections get one keyed
- * nested multi_value entry wrapping the catalog fields (value at
- * [sectionKey], like esphome.areas); others pass through unchanged.
+ * For sections in ``MAP_SECTIONS`` returns the synthesised MAP
+ * shape; otherwise hands back the catalog entries unchanged. Pure
+ * function — same input, same output, no side effects — so the
+ * render path's correctness is testable without standing up a
+ * shadow root. (Previously the override variable existed but the
+ * form's ``.entries`` prop bound to the wrong source, leaving the
+ * section silently empty; pinning the resolution as a function the
+ * tests call directly closes that loophole.)
  */
 export function resolveSectionEntries(
   sectionKey: string,
-  catalogEntries: ConfigEntry[],
-  isList = false
+  catalogEntries: ConfigEntry[]
 ): ConfigEntry[] {
   if (MAP_SECTIONS.has(sectionKey)) return MAP_SECTION_ENTRIES;
-  if (isList) {
-    return [
-      makeConfigEntry({
-        key: sectionKey,
-        type: ConfigEntryType.NESTED,
-        multi_value: true,
-        label: LIST_SECTION_ITEM_LABELS[sectionKey] ?? "Item",
-        config_entries: catalogEntries,
-      }),
-    ];
-  }
   return catalogEntries;
 }

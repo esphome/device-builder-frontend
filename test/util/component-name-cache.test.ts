@@ -18,7 +18,6 @@ const entry = (id: string, name: string): ComponentCatalogEntry =>
     image_url: "",
     dependencies: [],
     multi_conf: false,
-    is_list: false,
     supported_platforms: [],
     config_entries: [],
   }) as ComponentCatalogEntry;

@@ -25,7 +25,6 @@ export function makeComponentEntry(
     image_url: "",
     dependencies: [],
     multi_conf: false,
-    is_list: false,
     supported_platforms: [],
     config_entries: [],
     ...overrides,

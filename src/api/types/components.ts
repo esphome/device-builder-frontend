@@ -103,8 +103,6 @@ export interface ComponentCatalogEntry {
   dependencies: string[];
   /** Whether the same component can be added multiple times. */
   multi_conf: boolean;
-  /** Body is a YAML list of mappings (globals); rendered as a repeatable list. */
-  is_list: boolean;
   /** Empty list = works on every target platform. Non-empty = restricted to those. */
   supported_platforms: string[];
   /** The component's configuration schema. May contain `nested` entries

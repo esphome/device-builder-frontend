@@ -15,8 +15,6 @@ export interface SectionConfigResponse {
   icon: string;
   image_url: string;
   entries: ConfigEntry[];
-  /** Body is a YAML list of mappings; rendered as a repeatable list. */
-  is_list: boolean;
 }
 
 export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void> {
@@ -61,7 +59,6 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         icon: "",
         image_url: "",
         entries: [],
-        is_list: false,
       };
       host._isUnknown = true;
     } else {
@@ -74,19 +71,13 @@ export async function loadConfig(host: ESPHomeDeviceSectionConfig): Promise<void
         icon: "",
         image_url: component.image_url,
         entries: component.config_entries,
-        is_list: component.is_list,
       };
     }
     // Asymmetric with save/delete paths: undefined here means "section
     // not in live yaml" — surface an empty form (silent), since this load
     // is reactive to external mutations, not explicit user intent.
     const resolvedFromLine = resolveCurrentFromLine(yaml, host.sectionKey, host.fromLine);
-    const parsedValues = parseYamlSectionValues(
-      yaml,
-      host.sectionKey,
-      resolvedFromLine,
-      host._config.is_list
-    );
+    const parsedValues = parseYamlSectionValues(yaml, host.sectionKey, resolvedFromLine);
     // Pre-format hex values to canonical "0x…" string form (#410) so a
     // save preserves the user's hex notation even when they only edited
     // an unrelated field. Without this, i2c addresses round-trip from
