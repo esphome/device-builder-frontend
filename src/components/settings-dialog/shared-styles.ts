@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+
 export const settingsSharedStyles = css`
   esphome-base-dialog {
     --width: min(800px, 95vw);
@@ -119,10 +121,12 @@ export const settingsSharedStyles = css`
     overflow-y: auto;
   }
 
-  @media (max-width: 700px) {
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    /* The dialog is full-screen here (fullscreenMobileDialog), so the
+       layout fills it and the content body scrolls; nav stacks on top. */
     .layout {
       flex-direction: column;
-      height: auto;
+      height: 100%;
     }
     .sidebar {
       width: auto;
