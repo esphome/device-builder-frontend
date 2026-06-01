@@ -43,7 +43,7 @@ export const inputStyles = css`
 
   input:focus {
     border-color: var(--esphome-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    box-shadow: var(--esphome-focus-ring);
   }
 
   input:disabled {
@@ -82,7 +82,7 @@ export const inputStyles = css`
   wa-select:focus-within::part(combobox) {
     border-color: var(--esphome-primary);
     outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    box-shadow: var(--esphome-focus-ring);
   }
 
   wa-select[disabled]::part(combobox) {

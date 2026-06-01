@@ -65,7 +65,7 @@ export const facetStyles = css`
 
   .facet-trigger:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   /* Leading + icon — sits before the facet name in every state. */
@@ -154,7 +154,7 @@ export const facetStyles = css`
   .facet-trigger-badge-remove:focus-visible {
     outline: none;
     opacity: 1;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .facet-trigger-badge-remove wa-icon {
