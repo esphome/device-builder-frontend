@@ -33,7 +33,7 @@ export const mdiIconPickerStyles = css`
   .trigger:focus,
   :host([open]) .trigger {
     border-color: var(--esphome-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    box-shadow: var(--esphome-focus-ring);
   }
 
   .trigger.invalid {

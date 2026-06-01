@@ -83,7 +83,7 @@ export const pairingRowStyles = css`
 
   .btn-pair-build-server:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring);
   }
 
   .btn-pair-build-server:disabled {

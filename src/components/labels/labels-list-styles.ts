@@ -67,7 +67,7 @@ export const labelsListStyles = css`
   .option:focus-visible {
     outline: none;
     background: var(--wa-color-surface-lowered);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .option-check {

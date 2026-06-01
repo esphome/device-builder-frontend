@@ -132,11 +132,11 @@ export class ESPHomeAddScriptDialog extends LitElement {
       .actions .primary {
         background: var(--esphome-primary);
         color: var(--esphome-on-primary);
-        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+        box-shadow: var(--esphome-primary-shadow);
       }
       .actions .primary:hover:not(:disabled) {
         background: var(--esphome-primary-hover);
-        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        box-shadow: var(--esphome-primary-shadow-hover);
         transform: translateY(-1px);
       }
       .actions .primary:active:not(:disabled) {

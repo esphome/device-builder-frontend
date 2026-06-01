@@ -168,7 +168,7 @@ export class ESPHomePageSecrets extends LitElement {
         font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
-        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+        box-shadow: var(--esphome-primary-shadow);
         transition:
           background 0.12s,
           box-shadow 0.12s,
@@ -177,7 +177,7 @@ export class ESPHomePageSecrets extends LitElement {
 
       .save-button:hover:not(:disabled) {
         background: var(--esphome-primary-hover);
-        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        box-shadow: var(--esphome-primary-shadow-hover);
         transform: translateY(-1px);
       }
 

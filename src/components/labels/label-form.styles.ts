@@ -91,7 +91,7 @@ export const labelFormStyles = css`
 
   .suggestion-chip:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .suggestion-chip wa-icon {
@@ -181,7 +181,7 @@ export const labelFormStyles = css`
     outline: none;
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, #000, transparent 88%),
-      0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+      var(--esphome-focus-ring);
   }
 
   .swatch--selected {
@@ -211,7 +211,7 @@ export const labelFormStyles = css`
     border-style: solid;
     border-color: var(--esphome-primary);
     color: var(--esphome-primary);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 75%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .create-actions {
