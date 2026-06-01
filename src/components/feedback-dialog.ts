@@ -8,14 +8,14 @@ import {
   mdiOpenInNew,
 } from "@mdi/js";
 import { LitElement, css, html } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext, serverVersionContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "bug-outline": mdiBugOutline,
@@ -72,8 +72,8 @@ export class ESPHomeFeedbackDialog extends LitElement {
   @state()
   private _serverVersion = "";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   private _hrefFor(link: (typeof LINKS)[number]): string {
     if (link.labelKey !== NEW_ISSUE_LABEL_KEY || !this._serverVersion) {
@@ -87,31 +87,26 @@ export class ESPHomeFeedbackDialog extends LitElement {
   static styles = [
     espHomeStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 460px;
       }
 
-      wa-dialog::part(header) {
+      /* Close-button styling comes from esphome-base-dialog (dialogCloseButtonStyles). */
+      esphome-base-dialog::part(header) {
         padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
       }
 
-      wa-dialog::part(title) {
+      esphome-base-dialog::part(title) {
         font-size: var(--wa-font-size-m);
         font-weight: var(--wa-font-weight-bold);
         color: var(--wa-color-text-normal);
       }
 
-      wa-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
       }
 
-      wa-dialog::part(footer) {
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
@@ -194,16 +189,31 @@ export class ESPHomeFeedbackDialog extends LitElement {
   ];
 
   open() {
-    this._dialog.open = true;
+    this._open = true;
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  // Flip the reactive flag on the initiating close (X / Esc / outside-click)
+  // before the hide animation, then let after-hide settle it.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
+
+  private _onAfterHide = (): void => {
+    this._open = false;
+  };
 
   protected render() {
     return html`
-      <wa-dialog label=${this._localize("feedback.title")} light-dismiss>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("feedback.title")}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
+      >
         <p class="description">${this._localize("feedback.description")}</p>
         <div class="links">
           <a
@@ -233,7 +243,7 @@ export class ESPHomeFeedbackDialog extends LitElement {
             `
           )}
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 }
