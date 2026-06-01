@@ -1,7 +1,5 @@
 import { consume } from "@lit/context";
 import {
-  mdiAlertCircle,
-  mdiCheckCircle,
   mdiClose,
   mdiDownload,
   mdiKey,
@@ -70,8 +68,6 @@ registerMdiIcons({
   "key-outline": mdiKeyOutline,
   stop: mdiStop,
   refresh: mdiRefresh,
-  "check-circle": mdiCheckCircle,
-  "alert-circle": mdiAlertCircle,
   "playlist-check": mdiPlaylistCheck,
   "server-network": mdiServerNetwork,
   "timer-sand": mdiTimerSand,

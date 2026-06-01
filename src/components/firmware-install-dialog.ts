@@ -1,9 +1,7 @@
 import { consume } from "@lit/context";
 import {
-  mdiAlertCircle,
   mdiArrowCollapse,
   mdiArrowExpand,
-  mdiCheckCircle,
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
@@ -43,10 +41,8 @@ import "./base-dialog.js";
 import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
-  "alert-circle": mdiAlertCircle,
   "arrow-expand": mdiArrowExpand,
   "arrow-collapse": mdiArrowCollapse,
-  "check-circle": mdiCheckCircle,
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
