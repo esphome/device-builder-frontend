@@ -50,4 +50,15 @@ export const pairingWindowStyles = css`
   .pairing-window-extend:focus-visible {
     background: var(--wa-color-surface-border);
   }
+
+  /* On a narrow dialog the heading wraps and the auto margin pins the
+     Extend button alone against the far right edge, reading as
+     detached. Drop the auto margin at the mobile breakpoint (matching
+     the settings dialog's 700px layout switch) so the button packs
+     left with the status pill and countdown instead. */
+  @media (max-width: 700px) {
+    .pairing-window-extend {
+      margin-inline-start: 0;
+    }
+  }
 `;
