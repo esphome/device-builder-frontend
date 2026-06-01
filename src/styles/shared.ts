@@ -52,6 +52,24 @@ export const espHomeStyles = css`
     --esphome-primary-shadow-hover: 0 4px 14px
       color-mix(in srgb, var(--esphome-primary), transparent 35%);
 
+    /* Translucent primary tints for hover / selected / active state
+       backgrounds and borders, defined once so the dozens of these
+       across the app stop drifting between 80–96% opacity. Three fill
+       intensities (faint hover wash → standard hover/selected → strong
+       hover-on-active) and two border weights. Specials that aren't
+       generic state tints (the table highlight-glow, the yaml mark,
+       the mixed-checkbox fill, muted primary text) keep their own
+       inline values. */
+    --esphome-tint-faint: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+    --esphome-tint: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    --esphome-tint-strong: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+    --esphome-tint-border: color-mix(in srgb, var(--esphome-primary), transparent 65%);
+    --esphome-tint-border-strong: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 45%
+    );
+
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
     --esphome-footer-height: 20px;

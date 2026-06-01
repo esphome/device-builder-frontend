@@ -185,7 +185,7 @@ export const tableLayoutStyles = css`
     border-bottom: none;
   }
   tbody tr:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+    background: var(--esphome-tint-faint);
   }
   tbody tr:focus-visible {
     outline: 2px solid var(--esphome-primary);
@@ -233,7 +233,7 @@ export const tableLayoutStyles = css`
   }
 
   tbody tr.selected {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    background: var(--esphome-tint);
   }
 
   tbody tr.selected .row-checkbox {
@@ -257,7 +257,7 @@ export const tableLayoutStyles = css`
   @media (prefers-reduced-motion: reduce) {
     tbody tr.highlight {
       animation: none;
-      background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+      background: var(--esphome-tint);
     }
   }
 

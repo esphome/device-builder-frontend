@@ -191,7 +191,7 @@ export class ESPHomeHeaderActions extends LitElement {
       }
 
       .menu-item:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+        background: var(--esphome-tint);
       }
 
       .menu-item wa-icon {

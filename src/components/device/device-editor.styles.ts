@@ -151,7 +151,7 @@ export const deviceEditorStyles = css`
       var(--wa-color-surface-default)
     );
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    border-color: var(--esphome-tint-border);
   }
 
   .install-fab:hover:not(:disabled) {

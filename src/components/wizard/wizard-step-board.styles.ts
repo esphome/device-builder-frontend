@@ -276,7 +276,7 @@ export const wizardStepBoardStyles = css`
     gap: var(--wa-space-s);
     padding: var(--wa-space-s) var(--wa-space-m);
     border-radius: var(--wa-border-radius-m);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border: var(--wa-border-width-s) solid
       color-mix(in srgb, var(--esphome-primary), transparent 70%);
     color: var(--wa-color-text);
@@ -304,7 +304,7 @@ export const wizardStepBoardStyles = css`
   }
 
   .platform-chip--active {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     border-color: var(--esphome-primary);
     color: var(--esphome-primary);
   }

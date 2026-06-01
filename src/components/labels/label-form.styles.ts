@@ -103,7 +103,7 @@ export const labelFormStyles = css`
     align-items: center;
     gap: 6px;
     padding: 8px 12px;
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border: var(--wa-border-width-s) dashed
       color-mix(in srgb, var(--esphome-primary), transparent 60%);
     border-radius: var(--wa-border-radius-m);
@@ -120,8 +120,8 @@ export const labelFormStyles = css`
   }
 
   .create-toggle:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 40%);
+    background: var(--esphome-tint-strong);
+    border-color: var(--esphome-tint-border-strong);
   }
 
   .create-toggle wa-icon {

@@ -159,7 +159,7 @@ export const firmwareInstallDialogStyles = css`
   }
   .binary-option:hover,
   .binary-option:focus-visible {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border-color: var(--esphome-primary);
     outline: none;
   }
@@ -263,9 +263,9 @@ export const firmwareInstallDialogStyles = css`
   /* Active state for ghost toggle buttons — mirrors the command-dialog
      and logs-dialog "is-active" treatment so visual language stays consistent. */
   .btn--ghost.is-active {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+    background: var(--esphome-tint-strong);
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    border-color: var(--esphome-tint-border);
   }
   .btn--ghost wa-icon {
     font-size: 14px;

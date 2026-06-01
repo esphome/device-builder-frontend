@@ -51,7 +51,7 @@ export const deviceCardStyles = [
 
     .device-card--selected {
       border-color: var(--esphome-primary);
-      background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+      background: var(--esphome-tint-faint);
     }
 
     /* Brief accent flash for a just-adopted card — dashboard sets the
@@ -192,7 +192,7 @@ export const deviceCardStyles = [
     }
 
     .device-status.busy {
-      background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+      background: var(--esphome-tint-strong);
       color: var(--esphome-primary);
       cursor: pointer;
     }
@@ -295,13 +295,13 @@ export const deviceCardStyles = [
     }
 
     .action-btn--accent {
-      background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+      background: var(--esphome-tint);
       color: var(--esphome-primary);
-      border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+      border-color: var(--esphome-tint-border);
     }
 
     .action-btn--accent:hover {
-      background: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+      background: var(--esphome-tint-strong);
       border-color: var(--esphome-primary);
     }
 

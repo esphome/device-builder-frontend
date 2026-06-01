@@ -121,7 +121,7 @@ export const deviceBoardInfoStyles = css`
   }
 
   .welcome-banner-close:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    background: var(--esphome-tint-strong);
     color: var(--wa-color-text-normal);
   }
 

@@ -114,7 +114,7 @@ export const inputStyles = css`
 
   wa-option:state(current),
   wa-option[disabled]:state(current) {
-    background-color: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background-color: var(--esphome-tint);
     color: var(--wa-color-text-normal);
   }
 `;

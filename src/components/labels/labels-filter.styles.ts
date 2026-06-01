@@ -189,7 +189,7 @@ export const labelsFilterStyles = css`
     border: var(--wa-border-width-s) solid
       color-mix(in srgb, var(--esphome-primary), transparent 70%);
     border-radius: var(--wa-border-radius-m);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
     font-family: inherit;
     font-size: var(--wa-font-size-s);
@@ -201,8 +201,8 @@ export const labelsFilterStyles = css`
   }
 
   .create-trigger:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    background: var(--esphome-tint-strong);
+    border-color: var(--esphome-tint-border-strong);
   }
 
   .create-trigger:focus-visible {

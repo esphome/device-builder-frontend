@@ -145,8 +145,8 @@ export class ESPHomeFeedbackDialog extends LitElement {
       }
 
       .link:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
-        border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+        background: var(--esphome-tint);
+        border-color: var(--esphome-tint-border);
       }
 
       .link:hover .link-icon {

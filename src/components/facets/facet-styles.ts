@@ -110,7 +110,7 @@ export const facetStyles = css`
     max-width: 140px;
     padding: 2px 4px 2px 8px;
     border-radius: 6px;
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--wa-color-text-normal);
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-semibold, 600);
@@ -228,7 +228,7 @@ export const facetStyles = css`
 
   .facet-search-input:focus {
     outline: none;
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    border-color: var(--esphome-tint-border);
   }
 
   /* Scrollable list of rows. min-height: 0 lets it shrink inside

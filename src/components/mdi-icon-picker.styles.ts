@@ -57,7 +57,7 @@ export const mdiIconPickerStyles = css`
     align-items: center;
     justify-content: center;
     border-radius: var(--wa-border-radius-s);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
   }
 
@@ -208,9 +208,9 @@ export const mdiIconPickerStyles = css`
   }
 
   .icon-cell:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    border-color: var(--esphome-tint-border);
     transform: scale(1.06);
   }
 

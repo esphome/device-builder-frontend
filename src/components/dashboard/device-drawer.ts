@@ -270,12 +270,12 @@ export class ESPHomeDeviceDrawer extends LitElement {
       }
 
       .action--accent {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+        background: var(--esphome-tint);
         color: var(--esphome-primary);
-        border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+        border-color: var(--esphome-tint-border);
       }
       .action--accent:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+        background: var(--esphome-tint-strong);
         border-color: var(--esphome-primary);
       }
 

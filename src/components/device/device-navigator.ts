@@ -302,12 +302,12 @@ export class ESPHomeDeviceNavigator extends LitElement {
 
       .nav-item:hover,
       .nav-item--hovered {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        background: var(--esphome-tint);
         border-color: var(--esphome-primary);
       }
 
       .nav-item--selected {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        background: var(--esphome-tint);
         border-color: var(--esphome-primary);
       }
 

@@ -85,7 +85,7 @@ export const addComponentDialogStyles = css`
     gap: var(--wa-space-2xs);
     margin-bottom: var(--wa-space-m);
     padding: var(--wa-space-2xs) var(--wa-space-s);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border-left: 3px solid var(--esphome-primary);
     border-radius: var(--wa-border-radius-s);
     font-size: var(--wa-font-size-xs);
@@ -103,7 +103,7 @@ export const addComponentDialogStyles = css`
     gap: var(--wa-space-xs);
     margin-bottom: var(--wa-space-m);
     padding: var(--wa-space-xs) var(--wa-space-s);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border-left: 3px solid var(--esphome-primary);
     border-radius: var(--wa-border-radius-s);
     font-size: var(--wa-font-size-xs);

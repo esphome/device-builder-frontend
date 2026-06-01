@@ -136,7 +136,7 @@ export class ESPHomeTableRowMenu extends LitElement {
       }
 
       .menu-item:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+        background: var(--esphome-tint);
       }
 
       /* The Visit-web-UI item renders as an <a> so the browser

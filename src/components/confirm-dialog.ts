@@ -73,7 +73,7 @@ export class ESPHomeConfirmDialog extends LitElement {
       }
 
       .icon-wrap:not(.destructive) {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+        background: var(--esphome-tint);
         color: var(--esphome-primary);
       }
 

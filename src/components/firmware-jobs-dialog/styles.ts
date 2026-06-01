@@ -167,7 +167,7 @@ export const firmwareJobsDialogStyles = css`
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
   }
 

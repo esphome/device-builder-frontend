@@ -197,7 +197,7 @@ export class ESPHomePageSecrets extends LitElement {
 
       .reveal-toggle {
         border: var(--wa-border-width-s) solid var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+        background: var(--esphome-tint);
         color: var(--esphome-primary);
         padding: 6px 12px;
         border-radius: var(--wa-border-radius-m);
@@ -212,7 +212,7 @@ export class ESPHomePageSecrets extends LitElement {
       }
 
       .reveal-toggle:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
+        background: var(--esphome-tint-strong);
       }
 
       .reveal-toggle wa-icon {

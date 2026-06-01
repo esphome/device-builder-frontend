@@ -105,7 +105,7 @@ export class ESPHomeSelectBar extends LitElement {
       }
 
       .toggle:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+        background: var(--esphome-tint);
       }
 
       .right {

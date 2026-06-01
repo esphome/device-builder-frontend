@@ -125,7 +125,7 @@ export class ESPHomeTableColumnToggle extends LitElement {
       }
 
       .menu-item:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+        background: var(--esphome-tint);
       }
 
       .checkbox {
