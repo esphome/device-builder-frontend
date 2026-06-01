@@ -61,6 +61,17 @@ export const commandDialogStyles = css`
     max-height: 70vh;
     overflow: hidden;
   }
+
+  /* On the mobile full-screen sheet (fullscreenMobileDialog) the dialog
+     fills the viewport, so the log fills it too instead of staying at a
+     fixed 60vh with dead space below. #41 */
+  @media (max-width: 600px) {
+    .content {
+      height: 100%;
+      min-height: 0;
+      max-height: none;
+    }
+  }
   /* Anchor the queued overlay's positioning context on .log-area (not
      .content) so the overlay covers only the log — toolbar/banner stay
      interactive regardless of viewport height. */

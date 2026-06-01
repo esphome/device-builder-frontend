@@ -232,25 +232,9 @@ export const logsDialogStyles = css`
   }
 
   @media (max-width: 700px) {
-    :host esphome-base-dialog::part(dialog) {
-      position: fixed;
-      inset: 0;
-      /* width/height are explicit because wa-dialog's
-         width: var(--width) and the UA's
-         max-height: calc(100% - ...) would otherwise keep the
-         dialog at its desktop size. The vh declaration is the
-         fallback for pre-2022 Safari / Chrome / Firefox that
-         don't recognise dvh; modern browsers pick the dvh line
-         which adjusts as iOS Safari's URL bar collapses. */
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      max-width: none;
-      max-height: none;
-      margin: 0;
-      border-radius: 0;
-    }
-
+    /* The full-screen ::part(dialog) rule comes from
+       fullscreenMobileDialog("esphome-base-dialog", "700px") in the
+       component's static styles; these are the logs-specific companions. */
     .logs-content {
       height: 100%;
       max-height: none;
