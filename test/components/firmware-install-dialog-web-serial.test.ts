@@ -99,6 +99,30 @@ describe("Web Serial install — HTTP byte download", () => {
     expect(host._step).toBe("done");
   });
 
+  it("streams esptool detect + flash output into the log (#346)", async () => {
+    const { host } = makeHost();
+    wsSerial.detectChip.mockImplementation(async (onLog?: (l: string) => void) => {
+      onLog?.("Detecting chip type... ESP32");
+      return CHIP;
+    });
+    wsSerial.connectToPort.mockImplementation(
+      async (_port: unknown, onLog?: (l: string) => void) => {
+        onLog?.("Writing at 0x00010000...");
+        return CHIP;
+      }
+    );
+    wsSerial.disconnect.mockResolvedValue(undefined);
+    wsSerial.flashFirmware.mockResolvedValue(undefined);
+    wsSerial.resetAndDisconnect.mockResolvedValue(undefined);
+
+    await startWebSerialInstall(host as unknown as ESPHomeFirmwareInstallDialog);
+
+    // Before the fix detectChip/connectToPort were called with no onLog, so
+    // esptool output never reached the log buffer.
+    expect(host._logLines).toContain("Detecting chip type... ESP32");
+    expect(host._logLines).toContain("Writing at 0x00010000...");
+  });
+
   it("fails cleanly when the HTTP byte fetch errors", async () => {
     const { host, api } = makeHost();
     wsSerial.detectChip.mockResolvedValue(CHIP);
