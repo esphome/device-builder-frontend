@@ -28,12 +28,11 @@ function applyWaTheme(): void {
 
 /**
  * Document-level theme bridges so the custom properties cascade into
- * every shadow root. `--esphome-svg-filter` inverts monochrome SVG
- * icons in dark mode (hue-rotate keeps tinted strokes). The
- * `--wa-color-brand-*` overrides point WebAwesome's brand palette at
- * HA's `--primary-color`, which HA injects (even under ingress) so the
- * panel adopts the user's theme; `--esphome-brand-default` is the
- * fallback where there's no HA (esphome-desktop / standalone).
+ * every shadow root: `--esphome-svg-filter` inverts monochrome SVG
+ * icons in dark mode (hue-rotate keeps tinted strokes), and the
+ * `.wa-light` / `.wa-dark` blocks map WebAwesome's surface/text tokens
+ * onto HA's (with fallbacks for esphome-desktop). The colour palette
+ * and the brand `--wa-color-*` tokens live in index.html.
  */
 function applyEspHomeTokens(): void {
   const style = document.createElement("style");
@@ -41,13 +40,6 @@ function applyEspHomeTokens(): void {
   style.textContent = `
     :root {
       --esphome-svg-filter: none;
-      --wa-color-brand-fill-loud: var(--primary-color, var(--esphome-brand-default));
-      --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
-      --wa-color-brand-fill-quiet: var(
-        --state-active-color,
-        color-mix(in srgb, var(--esphome-brand-default), transparent 88%)
-      );
-      --wa-color-brand-on-quiet: var(--primary-color, var(--esphome-brand-default));
     }
 
     /* Surfaces and text — remap WebAwesome's surface/text tokens to

@@ -11,32 +11,14 @@ import { css } from "lit";
 /** ESPHome brand colors and design tokens. */
 export const espHomeStyles = css`
   :host {
-    /* ─── Brand colors ─── */
-    --esphome-primary: var(--primary-color, var(--esphome-brand-default));
-    /* Hover / active background for hand-rolled primary <button>s
-       (the FAB, dialog confirm buttons, etc. that don't use
-       wa-button[variant="primary"]). Defined once so the brand
-       hover can't drift across the ~two dozen buttons that share
-       it. wa-button has its own hover in the variant rules below. */
+    /* ─── Brand colors ───
+       The raw palette (--esphome-primary, --esphome-on-primary, and the
+       --esphome-success/warning/error/offline status colors) is the single
+       source in index.html — each is an HA theme var with a fallback. Here we
+       derive the brand variants from --esphome-primary so they track it. */
     --esphome-primary-hover: color-mix(in srgb, var(--esphome-primary), black 10%);
-    --esphome-primary-light: color-mix(
-      in srgb,
-      var(--primary-color, var(--esphome-brand-default)) 12%,
-      transparent
-    );
-    --esphome-secondary: color-mix(
-      in srgb,
-      var(--primary-color, var(--esphome-brand-default)),
-      black 8%
-    );
-    /* Hook HA's semantic vars; the hex is the esphome-desktop fallback. */
-    --esphome-success: var(--success-color, #2ecc71);
-    --esphome-warning: var(--warning-color, #f39c12);
-    --esphome-error: var(--error-color, #e74c3c);
-    --esphome-offline: var(--disabled-text-color, #95a5a6);
-
-    /* Text color for use on primary / dark / colored backgrounds — white in both light and dark modes */
-    --esphome-on-primary: var(--text-primary-color, #ffffff);
+    --esphome-primary-light: color-mix(in srgb, var(--esphome-primary) 12%, transparent);
+    --esphome-secondary: color-mix(in srgb, var(--esphome-primary), black 8%);
 
     /* Keyboard focus ring, defined once so every :focus-visible glow
        stays consistent. Two sizes: the default 3px ring for inputs /
