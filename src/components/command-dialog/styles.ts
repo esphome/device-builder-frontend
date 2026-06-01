@@ -1,7 +1,5 @@
 import { css } from "lit";
 
-import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
-
 /**
  * Styles for <esphome-command-dialog>. The terminal surface (log output,
  * success/error banner, toolbar layout, term buttons, streaming dot) is
@@ -38,18 +36,6 @@ export const commandDialogStyles = css`
   }
   esphome-base-dialog::part(footer) {
     display: none;
-  }
-
-  /* The log surface (.content / .log-area / ansi-log) lives in
-     <esphome-process-terminal> now; on the mobile full-screen sheet
-     (fullscreenMobileDialog, #41) make that component fill the dialog body. */
-  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
-    esphome-process-terminal {
-      height: 100%;
-      --process-terminal-height: 100%;
-      --process-terminal-min-height: 0;
-      --process-terminal-max-height: none;
-    }
   }
 
   .queued-overlay {

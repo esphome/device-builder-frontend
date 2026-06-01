@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+
 /**
  * Terminal color tokens. Shared by ``<esphome-process-terminal>`` and its
  * driver dialogs (command / logs / firmware-install) so slotted controls —
@@ -255,5 +257,35 @@ export const processTerminalStyles = css`
     border-radius: 3px;
     background: var(--esphome-primary);
     transition: width 0.2s;
+  }
+`;
+
+// Declarations that stretch the stream terminal to fill its dialog body.
+const fillTerminalDecls = css`
+  height: 100%;
+  --process-terminal-height: 100%;
+  --process-terminal-min-height: 0;
+  --process-terminal-max-height: none;
+`;
+
+/**
+ * Make ``<esphome-process-terminal>`` fill its dialog body. A consumer drops
+ * this where the dialog goes full-bleed — e.g. ``:host([expanded]) ${fillTerminal}``
+ * for an expand toggle.
+ */
+export const fillTerminal = css`
+  esphome-process-terminal {
+    ${fillTerminalDecls}
+  }
+`;
+
+/**
+ * Mobile companion to ``fullscreenMobileDialog``: the content-heavy stream
+ * terminal fills the full-screen sheet the dialog opens at the shared mobile
+ * breakpoint. Add to a stream dialog's ``static styles``.
+ */
+export const fillTerminalOnMobile = css`
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    ${fillTerminal}
   }
 `;

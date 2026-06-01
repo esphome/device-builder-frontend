@@ -22,6 +22,7 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
 import {
+  fillTerminalOnMobile,
   termButtonStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
@@ -117,8 +118,9 @@ export class ESPHomeLogsDialog extends LitElement {
     termTokens,
     termButtonStyles,
     logsDialogStyles,
-    // Full-screen on mobile.
+    // Full-screen on mobile, terminal fills it.
     fullscreenMobileDialog("esphome-base-dialog"),
+    fillTerminalOnMobile,
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {

@@ -52,6 +52,7 @@ import {
 import { commandDialogStyles } from "./command-dialog/styles.js";
 import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
 import {
+  fillTerminalOnMobile,
   termButtonStyles,
   termTokens,
 } from "./process-terminal/process-terminal.styles.js";
@@ -197,8 +198,9 @@ export class ESPHomeCommandDialog extends LitElement {
     termButtonStyles,
     commandDialogStyles,
     remoteBuildHintStyles,
-    // Log output is content-heavy: full-screen on mobile. #41
+    // Log output is content-heavy: full-screen on mobile, terminal fills it. #41
     fullscreenMobileDialog("esphome-base-dialog"),
+    fillTerminalOnMobile,
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {

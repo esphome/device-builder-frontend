@@ -1,6 +1,7 @@
 import { css } from "lit";
 
 import { MOBILE_DIALOG_BREAKPOINT } from "../styles/dialog-mobile.js";
+import { fillTerminal } from "./process-terminal/process-terminal.styles.js";
 
 /**
  * Styles for <esphome-logs-dialog>. The terminal surface itself (log output,
@@ -54,12 +55,7 @@ export const logsDialogStyles = css`
   esphome-process-terminal {
     display: block;
   }
-  :host([expanded]) esphome-process-terminal {
-    height: 100%;
-    --process-terminal-height: 100%;
-    --process-terminal-min-height: 0;
-    --process-terminal-max-height: none;
-  }
+  :host([expanded]) ${fillTerminal}
 
   /* Full-viewport rules — same shape on desktop expand AND any mobile width.
      Placed last so same-specificity rules win source-order. The
@@ -77,16 +73,10 @@ export const logsDialogStyles = css`
     border-radius: 0;
   }
 
+  /* Full-screen sheet + terminal-fill on mobile come from
+     fullscreenMobileDialog + fillTerminalOnMobile in the static styles; only
+     the logs-specific expand-button hide remains here. */
   @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
-    /* Full-screen ::part(dialog) comes from fullscreenMobileDialog in the
-       static styles; this fills the component into that sheet. */
-    esphome-process-terminal {
-      height: 100%;
-      --process-terminal-height: 100%;
-      --process-terminal-min-height: 0;
-      --process-terminal-max-height: none;
-    }
-
     .expand-btn {
       display: none;
     }
