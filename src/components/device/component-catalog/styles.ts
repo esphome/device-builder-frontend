@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../../styles/breakpoints.js";
+
 export const componentCatalogStyles = css`
   :host {
     display: flex;
@@ -124,9 +126,9 @@ export const componentCatalogStyles = css`
     align-content: start;
   }
 
-  /* Below ~600px (modal viewport on phones) collapse sidebar into a
+  /* Below the shared phone breakpoint (modal viewport on phones) collapse sidebar into a
      horizontal chip row above the grid. */
-  @media (max-width: 600px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     :host {
       flex-direction: column;
       height: auto;

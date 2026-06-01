@@ -1,7 +1,6 @@
 import { css } from "lit";
 
-/** Width at/below which the table reflows into stacked cards on phones. */
-const TABLE_STACK_BREAKPOINT = 600;
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 
 /** Layout, header, body, scroll, select, and actions styles for the device table. */
 export const tableLayoutStyles = css`
@@ -361,7 +360,7 @@ export const tableLayoutStyles = css`
      row is hidden, so column sorting isn't available on mobile; the
      default sort applies, and a row tap still opens the drawer with
      full detail. #41 */
-  @media (max-width: ${TABLE_STACK_BREAKPOINT}px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     .table-wrap {
       margin-bottom: var(--wa-space-s);
     }
@@ -408,6 +407,20 @@ export const tableLayoutStyles = css`
       white-space: normal;
       overflow: visible;
       text-overflow: clip;
+    }
+
+    /* The empty-state cell is excluded from the reset above so it stays
+       centered, but the base td's nowrap / max-width / ellipsis would otherwise
+       crop the slotted YAML-pivot banner against the card edge on mobile
+       (the cell leaves the table formatting context here, so max-width
+       finally bites). Let it wrap and fill the card. #518 */
+    td.no-results {
+      max-width: none;
+      white-space: normal;
+      overflow: visible;
+      /* The desktop var(--wa-space-4xl) vertical pad is oversized inside a
+         phone card; trim to a card-appropriate step. */
+      padding: var(--wa-space-xl) var(--wa-space-m);
     }
     .cell-stack-label {
       display: inline;

@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
+
 export const dashboardStyles = css`
   :host {
     display: flex;
@@ -65,7 +67,7 @@ export const dashboardStyles = css`
   /* Mobile compacts the pill further (see .discovered-section-header
      @media block below), so the gutter tightens one more step to
      match the smaller pill. #41 */
-  @media (max-width: 600px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     :host([has-discovered]) {
       padding-top: var(--wa-space-l);
     }
@@ -210,7 +212,7 @@ export const dashboardStyles = css`
      (icon + count + Show), just denser padding and smaller text /
      icon. The expandable grid below keeps its existing sizing —
      this only compacts the collapsed-state header. #41 */
-  @media (max-width: 600px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     .discovered-section-header {
       padding: var(--wa-space-2xs) var(--wa-space-s);
       gap: var(--wa-space-xs);

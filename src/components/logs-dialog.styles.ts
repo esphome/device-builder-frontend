@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { MOBILE_DIALOG_BREAKPOINT } from "../styles/dialog-mobile.js";
+import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
 import { fillTerminal } from "./process-terminal/process-terminal.styles.js";
 
 /**
@@ -76,7 +76,7 @@ export const logsDialogStyles = css`
   /* Full-screen sheet + terminal-fill on mobile come from
      fullscreenMobileDialog + fillTerminalOnMobile in the static styles; only
      the logs-specific expand-button hide remains here. */
-  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     .expand-btn {
       display: none;
     }
