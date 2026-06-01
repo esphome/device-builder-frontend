@@ -16,8 +16,8 @@ import { type CSSResult, css, unsafeCSS } from "lit";
  *
  * `::part()` only pierces a single shadow level, so the rule must live in
  * the stylesheet of whichever component hosts the `<wa-dialog>`. Pass the
- * matching host selector: `"wa-dialog"` from a component that renders
- * `<wa-dialog>` directly (raw dialogs, and `base-dialog` itself), or
+ * matching host: `"wa-dialog"` from a component that renders `<wa-dialog>`
+ * directly (raw dialogs, and `base-dialog` itself), or
  * `"esphome-base-dialog"` from a consumer of `<esphome-base-dialog>` (the
  * part is re-exposed via `exportparts`). The outer tree wins the parts
  * cascade, so a consumer's `esphome-base-dialog::part(dialog)` override
@@ -27,18 +27,21 @@ import { type CSSResult, css, unsafeCSS } from "lit";
  * lockstep across dialogs; pass a custom one only where a dialog already
  * shipped with a different threshold (e.g. logs-dialog at 700px).
  */
-const MOBILE_DIALOG_BREAKPOINT = "600px";
+type DialogHost = "wa-dialog" | "esphome-base-dialog";
+
+/** Default mobile breakpoint in px. */
+const MOBILE_DIALOG_BREAKPOINT = 600;
 
 /** Full-screen sheet on mobile. Mirrors the pattern logs-dialog and the
  *  create-config wizard used inline before this was shared. */
 export function fullscreenMobileDialog(
-  hostSelector: string,
-  breakpoint: string = MOBILE_DIALOG_BREAKPOINT
+  host: DialogHost,
+  breakpoint: number = MOBILE_DIALOG_BREAKPOINT
 ): CSSResult {
-  const host = unsafeCSS(hostSelector);
+  const sel = unsafeCSS(host);
   return css`
-    @media (max-width: ${unsafeCSS(breakpoint)}) {
-      ${host}::part(dialog) {
+    @media (max-width: ${breakpoint}px) {
+      ${sel}::part(dialog) {
         position: fixed;
         inset: 0;
         width: 100vw;
@@ -52,8 +55,8 @@ export function fullscreenMobileDialog(
 
       /* Keep the last action / log line clear of the home indicator on
          notched phones (no-op where the inset is 0). */
-      ${host}::part(body),
-      ${host}::part(footer) {
+      ${sel}::part(body),
+      ${sel}::part(footer) {
         padding-bottom: max(var(--wa-space-l), env(safe-area-inset-bottom));
       }
     }
@@ -65,16 +68,23 @@ export function fullscreenMobileDialog(
  *  scrolls internally instead of running off-screen. Does not touch
  *  `inset` / `margin`, so the native centering is preserved. */
 export function centeredMobileDialog(
-  hostSelector: string,
-  breakpoint: string = MOBILE_DIALOG_BREAKPOINT
+  host: DialogHost,
+  breakpoint: number = MOBILE_DIALOG_BREAKPOINT
 ): CSSResult {
-  const host = unsafeCSS(hostSelector);
+  const sel = unsafeCSS(host);
   return css`
-    @media (max-width: ${unsafeCSS(breakpoint)}) {
-      ${host}::part(dialog) {
+    @media (max-width: ${breakpoint}px) {
+      ${sel}::part(dialog) {
         max-width: calc(
           100vw - var(--wa-space-l) - env(safe-area-inset-left) - env(
               safe-area-inset-right
+            )
+        );
+        /* vh first as the fallback; browsers without dvh keep a working
+           cap, modern ones use the dvh line (tracks the URL bar). */
+        max-height: calc(
+          100vh - var(--wa-space-l) - env(safe-area-inset-top) - env(
+              safe-area-inset-bottom
             )
         );
         max-height: calc(
