@@ -874,7 +874,6 @@
     "feedback_menu": "发现 Bug？有新想法？",
     "back": "返回",
     "close": "关闭",
-    "home_assistant": "Home Assistant",
     "editor": "编辑器",
     "yaml_diff_button": "YAML 差异按钮",
     "more_options_with_count": "更多选项（{count} 个固件任务正在运行）",

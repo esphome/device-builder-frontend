@@ -874,7 +874,6 @@
     "feedback_menu": "Hibát talált? Van új ötlete?",
     "back": "Vissza",
     "close": "Bezárás",
-    "home_assistant": "Home Assistant",
     "editor": "Szerkesztő",
     "yaml_diff_button": "YAML-különbség gomb",
     "more_options_with_count": "További lehetőségek ({count} aktív firmware-feladat)",

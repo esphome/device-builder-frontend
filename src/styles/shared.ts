@@ -77,6 +77,18 @@ export const espHomeStyles = css`
     font-family: var(--wa-font-family-body);
   }
 
+  /* Compact the header on narrow viewports. 870px is HA's
+     sidebar-collapse breakpoint, so embedded in the HA panel this
+     fires exactly when HA swaps to its own 40px top bar — matching
+     its height avoids a chunky doubled-up bar. Defined on the shared
+     token so the header element, the content-area height calcs, and
+     the actions-menu top offset all shrink together. */
+  @media (max-width: 870px) {
+    :host {
+      --esphome-header-height: 40px;
+    }
+  }
+
   /* ─── Custom wa-button variants ─── */
 
   /* variant="primary": solid --esphome-secondary background, white text */

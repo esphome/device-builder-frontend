@@ -874,7 +874,6 @@
     "feedback_menu": "Found a bug? Have an idea?",
     "back": "Back",
     "close": "Close",
-    "home_assistant": "Home Assistant",
     "editor": "Editor",
     "yaml_diff_button": "YAML diff button",
     "more_options_with_count": "More options ({count} firmware task(s) active)",

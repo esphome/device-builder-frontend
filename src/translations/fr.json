@@ -811,7 +811,6 @@
     "feedback_menu": "Un bug ? Une idée ?",
     "back": "Retour",
     "close": "Fermer",
-    "home_assistant": "Home Assistant",
     "editor": "Éditeur",
     "yaml_diff_button": "Bouton de diff YAML",
     "more_options_with_count": "Plus d'options ({count} tâche(s) active(s))",

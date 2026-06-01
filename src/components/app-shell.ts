@@ -49,7 +49,6 @@ import {
   yamlDiffButtonContext,
 } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
-import { BASE_PATH } from "../util/base-path.js";
 import { isRecentSerialActivity, markSerialActivity } from "../util/web-serial.js";
 import { onLoginSubmit } from "./app-shell/auth.js";
 import {
@@ -368,7 +367,7 @@ export class ESPHomeApp extends LitElement {
     this._api.onConnected = (info: ServerInfoMessage) => {
       this._version = info.esphome_version;
       this._serverVersion = info.server_version;
-      this._isHaIngress = info.ha_addon && BASE_PATH.includes("/ingress");
+      this._isHaIngress = info.ha_ingress;
       this._apiConnected = true;
       void this._api.ready.then(() => this._afterAuthenticated());
     };
