@@ -74,17 +74,24 @@ export class ESPHomeLogParser {
 
   /** Parse a single raw line (without trailing newline). */
   parseLine(line: string): string {
-    // A continuation line is one ESPHome indented under the previous
-    // entry — it starts with whitespace. Everything else is a new entry.
-    if (line === "" || !/^\s/.test(line)) {
+    // Blank lines (empty or whitespace-only) carry nothing and must NOT
+    // disturb the carried entry context — a bare line inside a multi-line
+    // record (or a ``\n\n`` that splits to "") would otherwise clear the
+    // prefix/color and leave the rest of the block uncolored.
+    if (line.trim() === "") return line;
+
+    // Continuation detection keys off leading whitespace rather than
+    // aioesphomeapi's "doesn't match the [X][tag]: entry regex" test. This
+    // is a deliberate adaptation for the raw UART stream, which interleaves
+    // non-ESPHome output (esptool / PlatformIO) at column 0: that output
+    // must pass through as plain new-entry lines, not be re-colored as
+    // continuations of a preceding ESPHome record.
+    if (!/^\s/.test(line)) {
       const { prefix, color } = extractPrefixAndColor(line);
       this._prefix = prefix;
       this._color = color;
       return needsReset(line) ? line + ANSI_RESET : line;
     }
-
-    // Continuation line. Blank ones carry nothing; pass through.
-    if (line.trim() === "") return line;
 
     // No entry seen yet (stream joined mid-record): just close any color.
     if (!this._prefix && !this._color) {

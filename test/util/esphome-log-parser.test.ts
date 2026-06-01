@@ -79,4 +79,15 @@ describe("ESPHomeLogParser", () => {
     p.parseLine(`${MAGENTA}[C][wifi:1248]: WiFi:`);
     expect(p.parseLine("   ")).toBe("   ");
   });
+
+  it("preserves carried color across an empty line within a block", () => {
+    const p = new ESPHomeLogParser();
+    p.parseLine(`${MAGENTA}[C][wifi:1248]: WiFi:`);
+    // A fully empty line must pass through without clearing state, so the
+    // continuation after it still inherits the entry's color/prefix.
+    expect(p.parseLine("")).toBe("");
+    expect(p.parseLine("  Hostname: 'ol'")).toBe(
+      `${MAGENTA}[C][wifi:1248]:   Hostname: 'ol'${RESET}`
+    );
+  });
 });
