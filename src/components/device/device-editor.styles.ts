@@ -97,12 +97,12 @@ export const deviceEditorStyles = css`
   .save-button {
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
-    box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    box-shadow: var(--esphome-primary-shadow);
   }
 
   .save-button:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
-    box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+    background: var(--esphome-primary-hover);
+    box-shadow: var(--esphome-primary-shadow-hover);
     transform: translateY(-1px);
   }
 
@@ -151,7 +151,7 @@ export const deviceEditorStyles = css`
       var(--wa-color-surface-default)
     );
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    border-color: var(--esphome-tint-border);
   }
 
   .install-fab:hover:not(:disabled) {

@@ -31,9 +31,9 @@ export const facetStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    /* Matches the 36px view-toggle / select-toggle squares so the
+    /* Shared with the search input / view-toggle / clear-filters so the
        toolbar row reads as one consistent control strip. */
-    height: 36px;
+    height: var(--esphome-control-height);
     padding: 0 10px 0 12px;
     border-radius: var(--wa-border-radius-m);
     /* 2px dashes — the default 1px-thick dashed border renders as
@@ -65,7 +65,7 @@ export const facetStyles = css`
 
   .facet-trigger:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   /* Leading + icon — sits before the facet name in every state. */
@@ -110,7 +110,7 @@ export const facetStyles = css`
     max-width: 140px;
     padding: 2px 4px 2px 8px;
     border-radius: 6px;
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--wa-color-text-normal);
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-semibold, 600);
@@ -154,7 +154,7 @@ export const facetStyles = css`
   .facet-trigger-badge-remove:focus-visible {
     outline: none;
     opacity: 1;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .facet-trigger-badge-remove wa-icon {
@@ -228,7 +228,7 @@ export const facetStyles = css`
 
   .facet-search-input:focus {
     outline: none;
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    border-color: var(--esphome-tint-border);
   }
 
   /* Scrollable list of rows. min-height: 0 lets it shrink inside

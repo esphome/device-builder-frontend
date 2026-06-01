@@ -59,7 +59,7 @@ export const installMethodDialogStyles = css`
   }
 
   .option:hover:not(.option--disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border-color: var(--esphome-primary);
   }
 
@@ -164,7 +164,7 @@ export const installMethodDialogStyles = css`
 
   .option-collapsible:hover {
     border-color: var(--esphome-primary);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
   }
 
   .option-collapsible__header {
@@ -227,7 +227,7 @@ export const installMethodDialogStyles = css`
   }
 
   .ota-form-actions .btn--primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .ota-form-actions .btn--primary:disabled {

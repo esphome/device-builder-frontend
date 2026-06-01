@@ -2,9 +2,15 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
-import { splitTemplate } from "../../util/template-split.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
-import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
+import {
+  renderBuildFailureSuggestion,
+  renderValidationFailureSuggestion,
+} from "../process-terminal/reset-suggestion.js";
+import {
+  renderTermButton,
+  renderTermToggle,
+} from "../process-terminal/toolbar-button.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
 // the locally-primed snapshot for the gap between followJob and the first
@@ -31,7 +37,7 @@ export function renderRemoteBuilderSubLine(
   // mid-compile is a power-user shape without a UI today.
   const canOverride = host._commandType === "install";
   return html`
-    <div class="remote-builder-sub-line" role="status">
+    <div class="remote-builder-sub-line" role="status" slot="sub-line">
       <wa-icon library="mdi" name="server-network"></wa-icon>
       <span
         >${host._localize("command.remote_builder_sub_line", {
@@ -79,7 +85,7 @@ export function renderQueuedOverlay(
       ? host._localize("command.queued_waiting_for_build_server")
       : host._localize("command.queued_message");
   return html`
-    <div class="queued-overlay" role="status" aria-live="polite">
+    <div class="queued-overlay" role="status" aria-live="polite" slot="overlay">
       <wa-icon library="mdi" name="timer-sand"></wa-icon>
       <div class="queued-title">${host._localize("command.queued_title")}</div>
       <div class="queued-message">${message}</div>
@@ -91,23 +97,10 @@ export function renderQueuedOverlay(
   `;
 }
 
-export function renderBanner(
-  host: ESPHomeCommandDialog
-): TemplateResult | typeof nothing {
-  if (host._state !== "success" && host._state !== "error") return nothing;
-  const isSuccess = host._state === "success";
-  const icon = isSuccess ? "check-circle" : "alert-circle";
-  const modifier = isSuccess ? "success" : "error";
-  return html`
-    <div class="status-banner status-banner--${modifier}">
-      <wa-icon library="mdi" name=${icon}></wa-icon>
-      <span>${host._statusMessage}</span>
-    </div>
-  `;
-}
-
 // YAML validation failure → "open in editor". Build failure → clean → reset
 // staircase. _userStopped is shared — a user-cancel isn't a build problem.
+// The success / error status banner itself is rendered by
+// <esphome-process-terminal> from the dialog's state + status message.
 export function renderResetSuggestion(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
@@ -119,76 +112,17 @@ export function renderResetSuggestion(
   if (host._commandType !== "install" && host._commandType !== "compile") {
     return nothing;
   }
-  return renderBuildFailureSuggestion(host);
-}
-
-function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
-  const text = host._localize("command.validation_failed_suggestion");
-  const [before, after] = splitTemplate(text, "{editor_action}");
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
-        ${host._localize("command.try_open_editor_button")}</button
-      >${after}
-    </div>
-  `;
+  return renderBuildFailureSuggestion(host, remotePeerLabel(host));
 }
 
 // Resolve the receiver label for a REMOTE-sourced job. Returns null for
 // LOCAL builds (or when the live + primed snapshots both lack a label) so
-// the caller falls back to the local reset-build-env link.
+// the shared renderer falls back to the local reset-build-env link.
 function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
   const primed = host._primedSource;
   if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
   return live?.source_label || primed?.source_label || null;
-}
-
-function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
-  const remoteLabel = remotePeerLabel(host);
-  if (remoteLabel !== null) {
-    return renderRemoteBuildFailureSuggestion(host, remoteLabel);
-  }
-  const text = host._localize("command.try_reset_suggestion");
-  const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
-        ${host._localize("command.try_clean_button")}</button
-      >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
-        ${host._localize("command.try_reset_button")}</button
-      >${after}
-    </div>
-  `;
-}
-
-interface ToolbarToggleOpts {
-  active: boolean;
-  onClick: () => void;
-  iconActive: string;
-  iconInactive: string;
-  labelKeyActive: string;
-  labelKeyInactive: string;
-  tooltipKeyActive: string;
-  tooltipKeyInactive: string;
-}
-
-function renderToolbarToggle(
-  host: ESPHomeCommandDialog,
-  opts: ToolbarToggleOpts
-): TemplateResult {
-  const labelKey = opts.active ? opts.labelKeyActive : opts.labelKeyInactive;
-  const tooltipKey = opts.active ? opts.tooltipKeyActive : opts.tooltipKeyInactive;
-  const icon = opts.active ? opts.iconActive : opts.iconInactive;
-  return html`<button
-    class="term-btn term-btn--ghost ${opts.active ? "is-active" : ""}"
-    @click=${opts.onClick}
-    title=${host._localize(tooltipKey)}
-    aria-pressed=${opts.active ? "true" : "false"}
-  >
-    <wa-icon library="mdi" name=${icon}></wa-icon>
-    ${host._localize(labelKey)}
-  </button>`;
 }
 
 // --show-secrets is an `esphome config` flag — hide the toggle on every other
@@ -197,15 +131,16 @@ function renderShowSecretsToggle(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
   if (host._commandType !== "validate") return nothing;
-  return renderToolbarToggle(host, {
+  return renderTermToggle({
     active: host._showSecrets,
     onClick: host._toggleShowSecrets,
     iconActive: "key",
     iconInactive: "key-outline",
-    labelKeyActive: "command.hide_secrets",
-    labelKeyInactive: "command.show_secrets",
-    tooltipKeyActive: "command.hide_secrets_tooltip",
-    tooltipKeyInactive: "command.show_secrets_tooltip",
+    labelActive: host._localize("command.hide_secrets"),
+    labelInactive: host._localize("command.show_secrets"),
+    title: host._localize(
+      host._showSecrets ? "command.hide_secrets_tooltip" : "command.show_secrets_tooltip"
+    ),
   });
 }
 
@@ -216,37 +151,30 @@ function renderShowLogsAfterInstallToggle(
 ): TemplateResult | typeof nothing {
   if (host._commandType !== "install") return nothing;
   if (host._state === "success" || host._state === "error") return nothing;
-  return renderToolbarToggle(host, {
+  // Single label both ways — checkbox-style toggle, is-active carries on/off.
+  return renderTermToggle({
     active: host._showLogsAfterInstall,
     onClick: host._toggleShowLogsAfterInstall,
-    iconActive: "text-box-outline",
-    iconInactive: "text-box-outline",
-    // Single label both ways — checkbox-style toggle, is-active carries on/off.
-    labelKeyActive: "command.show_logs_after_install",
-    labelKeyInactive: "command.show_logs_after_install",
-    tooltipKeyActive: "command.show_logs_after_install_tooltip",
-    tooltipKeyInactive: "command.show_logs_after_install_tooltip",
+    icon: "text-box-outline",
+    label: host._localize("command.show_logs_after_install"),
+    title: host._localize("command.show_logs_after_install_tooltip"),
   });
 }
 
+// Right-aligned toolbar controls slotted into <esphome-process-terminal>'s
+// toolbar; the component renders the toolbar container, the streaming dot, and
+// the spacer.
 export function renderToolbar(host: ESPHomeCommandDialog): TemplateResult {
   return html`
-    <div class="terminal-toolbar">
-      ${host._state === "running" ? html`<span class="streaming-dot"></span>` : nothing}
-      <span class="spacer"></span>
-      ${renderShowSecretsToggle(host)} ${renderShowLogsAfterInstallToggle(host)}
-      ${host._lines.length > 0
-        ? html`<button
-            class="term-btn term-btn--ghost"
-            @click=${host._downloadOutput}
-            title=${host._localize("command.download")}
-            aria-label=${host._localize("command.download")}
-          >
-            <wa-icon library="mdi" name="download"></wa-icon>
-          </button>`
-        : nothing}
-      ${renderActions(host)}
-    </div>
+    ${renderShowSecretsToggle(host)} ${renderShowLogsAfterInstallToggle(host)}
+    ${host._lines.length > 0
+      ? renderTermButton({
+          icon: "download",
+          title: host._localize("command.download"),
+          onClick: host._downloadOutput,
+        })
+      : nothing}
+    ${renderActions(host)}
   `;
 }
 
@@ -254,38 +182,39 @@ export function renderToolbar(host: ESPHomeCommandDialog): TemplateResult {
 // RENAME jobs come in via followJob — the user originally launched from the
 // rename dialog; surfacing Retry would no-op.
 function renderActions(host: ESPHomeCommandDialog): TemplateResult | typeof nothing {
+  const close = renderTermButton({
+    label: host._localize("command.close"),
+    onClick: host.close,
+  });
   switch (host._state) {
     case "running":
-      return html`<button class="term-btn term-btn--stop" @click=${host._stop}>
-        <wa-icon library="mdi" name="stop"></wa-icon>
-        ${host._localize("command.stop")}
-      </button>`;
+      return renderTermButton({
+        icon: "stop",
+        label: host._localize("command.stop"),
+        variant: "stop",
+        onClick: host._stop,
+      });
     case "error":
       return host._commandType === "rename"
-        ? html`<button class="term-btn term-btn--ghost" @click=${host.close}>
-            ${host._localize("command.close")}
-          </button>`
-        : html` <button class="term-btn term-btn--start" @click=${host._start}>
-              <wa-icon library="mdi" name="refresh"></wa-icon>
-              ${host._localize("command.retry")}
-            </button>
-            <button class="term-btn term-btn--ghost" @click=${host.close}>
-              ${host._localize("command.close")}
-            </button>`;
+        ? close
+        : html`${renderTermButton({
+            icon: "refresh",
+            label: host._localize("command.retry"),
+            variant: "start",
+            onClick: host._start,
+          })}
+          ${close}`;
     case "success":
       // Show-logs is a ghost (not term-btn--start) so it doesn't look like
       // the toolbar toggle "stayed on".
       return host._commandType === "install"
-        ? html`<button class="term-btn term-btn--ghost" @click=${host._flipToLogs}>
-              <wa-icon library="mdi" name="text-box-outline"></wa-icon>
-              ${host._localize("command.show_logs")}
-            </button>
-            <button class="term-btn term-btn--ghost" @click=${host.close}>
-              ${host._localize("command.close")}
-            </button>`
-        : html`<button class="term-btn term-btn--ghost" @click=${host.close}>
-            ${host._localize("command.close")}
-          </button>`;
+        ? html`${renderTermButton({
+            icon: "text-box-outline",
+            label: host._localize("command.show_logs"),
+            onClick: host._flipToLogs,
+          })}
+          ${close}`
+        : close;
     default:
       return nothing;
   }

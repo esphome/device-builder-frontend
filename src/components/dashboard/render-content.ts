@@ -5,10 +5,10 @@ import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../../util/device-sort.js";
 import { buildWebUiUrl } from "../../util/web-ui-url.js";
 import { downloadYaml, editDevice } from "./actions.js";
+import { renderFacets } from "./render-facets.js";
 import {
   renderAddDeviceCard,
   renderDeviceCountRow,
-  renderFacets,
   renderNoResultsExtras,
   renderSearchInput,
   renderViewToggle,
@@ -186,9 +186,16 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
     >
       <div slot="toolbar" class="toolbar-stack">
         <div class="toolbar-row">
-          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
+          ${renderSearchInput(host)} ${renderViewToggle(host)}
         </div>
       </div>
+      <!-- Facets live in the controls-right cluster (with Columns +
+           Create) at every width, not just mobile. At <=1100px this is
+           the single collapsed Filters button; above 1100px it expands
+           to the full facet pills, which then sit in the right cluster
+           and let the search box absorb the horizontal squeeze. That
+           wide-screen expansion is intentional, not a regression. -->
+      <div slot="before-columns" class="table-facets">${renderFacets(host)}</div>
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
@@ -198,7 +205,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         @click=${() => host._createDialog.open()}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
-        ${host._localize("dashboard.create_device")}
+        <span class="label">${host._localize("dashboard.create_device")}</span>
       </button>
       <div slot="no-results-extra" class="yaml-preview-banner">
         ${renderNoResultsExtras(host)}

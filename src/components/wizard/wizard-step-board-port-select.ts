@@ -109,7 +109,7 @@ export class ESPHomeWizardStepBoardPortSelect extends LitElement {
       }
 
       .option:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+        background: var(--esphome-tint);
         border-color: var(--esphome-primary);
       }
 

@@ -25,7 +25,7 @@ export const jobStatusPillStyles = css`
 
   .status-pill.status-queued,
   .status-pill.status-running {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    background: var(--esphome-tint-strong);
     color: var(--esphome-primary);
   }
 

@@ -8,7 +8,7 @@ import type {
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { clearJustCreated } from "../../util/just-created.js";
-import { streamSerialToDialog } from "./actions.js";
+import { attachSerialLogStream } from "../../util/post-install-logs.js";
 
 export async function executeFriendlyName(
   host: ESPHomePageDashboard,
@@ -170,26 +170,42 @@ export async function openLogsWithMethod(
       });
       return;
     }
+    let serialPort: SerialPort;
     try {
-      const serialPort = await (
+      serialPort = await (
         navigator as unknown as {
-          serial: { requestPort: () => Promise<SerialPortLike> };
+          serial: { requestPort: () => Promise<SerialPort> };
         }
       ).serial.requestPort();
-      await serialPort.open({ baudRate: 115200 });
-      host._logsDialog.configuration = device.configuration;
-      host._logsDialog.name = device.friendly_name || device.name;
-      host._logsDialog.openPassive();
-      const cancelSerial = streamSerialToDialog(serialPort, host._logsDialog);
-      host._logsDialog.setSerialCancel(cancelSerial);
     } catch {
-      /* User cancelled */
+      return; // User dismissed the port picker.
+    }
+    try {
+      await serialPort.open({ baudRate: 115200 });
+    } catch {
+      // The user picked a port but it couldn't open (claimed by another tab,
+      // driver error); unlike a picker dismissal this needs feedback.
+      toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
+        richColors: true,
+      });
+      return;
+    }
+    host._logsDialog.configuration = device.configuration;
+    host._logsDialog.name = device.friendly_name || device.name;
+    // Reconnect hook drives the dialog's "click Start to reconnect" path.
+    const reconnect = () =>
+      attachSerialLogStream(serialPort, host._logsDialog, host._localize);
+    host._logsDialog.openPassive({ onReconnect: reconnect });
+    // attach toasts the reopen-retry failure itself; cover any other rejection
+    // so it can't escape this fire-and-forget call as an unhandled rejection.
+    try {
+      await reconnect();
+    } catch {
+      toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
+        richColors: true,
+      });
     }
   }
-}
-
-interface SerialPortLike {
-  open(options: { baudRate: number }): Promise<void>;
 }
 
 export function scheduleScrollIntoView(

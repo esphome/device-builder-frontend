@@ -126,6 +126,37 @@ async function openSerialWithRetry(
   }
 }
 
+/**
+ * Start a Web Serial read loop and hand the dialog its port + loop-cancel.
+ * Begins a passive session (user-initiated logs, post-install hand-off, or
+ * the dialog's reconnect-after-failure). A closed port is reopened through
+ * the re-enumeration window (the ``requestPort()`` grant persists, so no
+ * re-prompt) with DTR/RTS cleared; an already-open port skips the reopen.
+ */
+export async function attachSerialLogStream(
+  port: SerialPort,
+  logsDialog: ESPHomeLogsDialog,
+  localize: LocalizeFunc
+): Promise<void> {
+  if (!port.readable) {
+    const opened = await openSerialWithRetry(port, 115200, 5000);
+    if (!opened) {
+      const message = localize("dashboard.logs_port_reopen_failed");
+      logsDialog.setSerialOpenFailed(message);
+      toast.error(message, { richColors: true });
+      return;
+    }
+    try {
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch {
+      /* setSignals failures are recoverable; the chip might be in a
+         fine state already. Continue. */
+    }
+  }
+  const cancel = streamSerialToDialog(port, logsDialog);
+  logsDialog.setSerialStream(port, cancel);
+}
+
 export async function handlePostInstallShowLogs(
   e: CustomEvent<PostInstallShowLogsDetail>,
   logsDialog: ESPHomeLogsDialog,
@@ -136,7 +167,11 @@ export async function handlePostInstallShowLogs(
   logsDialog.configuration = configuration;
   logsDialog.name = name;
   if (webSerialPort) {
-    logsDialog.openPassive({ onBackToInstall: reopenInstall });
+    logsDialog.openPassive({
+      onBackToInstall: reopenInstall,
+      // "click Start to reconnect" after a reopen failure (#636).
+      onReconnect: () => attachSerialLogStream(webSerialPort, logsDialog, localize),
+    });
     /* Settling delay — some USB-UART bridges (notably the CH9102F on
        M5Stamp boards) don't resync their internal CDC state cleanly
        when port.open() lands immediately after a port.close() within
@@ -144,33 +179,10 @@ export async function handlePostInstallShowLogs(
        the chip is booting and outputting on UART. A few hundred ms is
        enough for the bridge to settle. */
     await new Promise((r) => setTimeout(r, 500));
-    /* Reopen the port at the logs baud — the install just left it
-       closed via ``resetAndDisconnect``. The grant from the
-       original ``requestPort()`` is still in effect for this
-       origin, so this doesn't re-prompt the user. Retry through
-       the native-USB re-enumeration window. */
-    const opened = await openSerialWithRetry(webSerialPort, 115200, 5000);
-    if (!opened) {
-      const message = localize("dashboard.logs_port_reopen_failed");
-      logsDialog.setSerialOpenFailed(message);
-      toast.error(message, { richColors: true });
-      return;
-    }
-    /* Explicitly clear DTR/RTS — on some bridges (CH9102F again)
-       these can stick at unexpected values across a close/reopen,
-       and a residual asserted DTR can hold the strap pin / EN line
-       low and keep the chip mute. */
-    try {
-      await webSerialPort.setSignals({
-        dataTerminalReady: false,
-        requestToSend: false,
-      });
-    } catch {
-      /* setSignals failures are recoverable; the chip might be in
-         a fine state already. Continue. */
-    }
-    const cancel = streamSerialToDialog(webSerialPort, logsDialog);
-    logsDialog.setSerialCancel(cancel);
+    /* The install just left the port closed via ``resetAndDisconnect``;
+       the attach reopens the still-granted port (retrying the native-USB
+       re-enumeration window) and starts reading. */
+    await attachSerialLogStream(webSerialPort, logsDialog, localize);
   } else {
     logsDialog.open(port ?? "OTA", { onBackToInstall: reopenInstall });
   }

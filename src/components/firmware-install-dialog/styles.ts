@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
+
 export const firmwareInstallDialogStyles = css`
   :host {
     --term-bg: #1e1e1e;
@@ -47,43 +49,9 @@ export const firmwareInstallDialogStyles = css`
     display: none;
   }
 
-  .status {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: var(--wa-space-m);
-    padding: var(--wa-space-l) 0;
-  }
-
-  .status wa-spinner {
-    font-size: 36px;
-    --indicator-color: var(--esphome-primary);
-    --track-color: color-mix(in srgb, var(--esphome-primary), transparent 80%);
-  }
-
-  .status-icon {
-    font-size: 42px;
-  }
-  .status-icon--success {
-    color: var(--esphome-success);
-  }
-  .status-icon--error {
-    color: var(--esphome-error);
-  }
-
-  .status-text {
-    font-size: var(--wa-font-size-m);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
-
-  .status-detail {
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
-    max-width: 380px;
-    line-height: 1.5;
-  }
+  /* The status block (spinner / success / error icon + message + detail) and
+     the progress bar are rendered by <esphome-process-terminal variant="card">
+     now; only the install-specific bodies below remain here. */
 
   /* Reset-build-env suggestion — secondary hint, quieter than the red error. */
   .reset-suggestion {
@@ -159,7 +127,7 @@ export const firmwareInstallDialogStyles = css`
   }
   .binary-option:hover,
   .binary-option:focus-visible {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     border-color: var(--esphome-primary);
     outline: none;
   }
@@ -170,22 +138,6 @@ export const firmwareInstallDialogStyles = css`
   .binary-option .desc {
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
-  }
-
-  .progress-bar {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--wa-color-surface-lowered);
-    overflow: hidden;
-    margin-top: var(--wa-space-xs);
-  }
-
-  .progress-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    background: var(--esphome-primary);
-    transition: width 0.2s;
   }
 
   .logs-toggle {
@@ -263,11 +215,33 @@ export const firmwareInstallDialogStyles = css`
   /* Active state for ghost toggle buttons — mirrors the command-dialog
      and logs-dialog "is-active" treatment so visual language stays consistent. */
   .btn--ghost.is-active {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+    background: var(--esphome-tint-strong);
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    border-color: var(--esphome-tint-border);
   }
   .btn--ghost wa-icon {
     font-size: 14px;
+  }
+
+  /* #516 — expanded log on the full-screen mobile sheet: fill the dialog body
+     so the log scrolls internally and the footer stays on-screen, instead of
+     the whole card growing past the viewport and pushing the buttons below the
+     fold. Desktop keeps the 50vh log (this block doesn't apply there). */
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    :host([expanded]) esphome-process-terminal {
+      height: 100%;
+    }
+    :host([expanded]) [slot="status-extra"] {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    :host([expanded]) .logs-container {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    :host([expanded]) esphome-ansi-log {
+      --log-height: 100%;
+    }
   }
 `;

@@ -4,6 +4,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
+import { centeredMobileDialog } from "../styles/dialog-mobile.js";
 
 /**
  * Thin shared wrapper around ``<wa-dialog>``.
@@ -81,6 +82,12 @@ import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
  *   plain ``<div class="actions">`` at the end of the
  *   body, and forcing them to migrate to a slotted footer
  *   would balloon the diff for no behaviour change.
+ * - ``header-suffix`` slot: inline content after the title
+ *   (e.g. a status chip). Empty by default, so other dialogs
+ *   are unchanged. The row and title are exposed as the
+ *   ``label-row`` / ``title-text`` parts so a consumer that
+ *   slots a suffix can flex the row and ellipsize the title
+ *   to keep the suffix legible when space is tight.
  *
  * **Part forwarding**. The inner ``<wa-dialog>`` is wrapped
  * in this element's shadow DOM, so consumer styles that
@@ -169,7 +176,9 @@ export class ESPHomeBaseDialog extends LitElement {
         @wa-request-close=${this._onWaRequestClose}
         @wa-after-hide=${this._onWaAfterHide}
       >
-        <header slot="label">${this.label}</header>
+        <header slot="label" part="label-row">
+          <span part="title-text">${this.label}</span><slot name="header-suffix"></slot>
+        </header>
         <slot></slot>
       </wa-dialog>
     `;
@@ -177,6 +186,9 @@ export class ESPHomeBaseDialog extends LitElement {
 
   static styles = [
     dialogCloseButtonStyles,
+    // Mobile default: centered, dvh-capped. Heavy dialogs override with
+    // fullscreenMobileDialog (their outer-tree ::part rule wins).
+    centeredMobileDialog("wa-dialog"),
     css`
       :host {
         display: contents;

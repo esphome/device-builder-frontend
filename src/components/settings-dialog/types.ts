@@ -19,7 +19,6 @@ export interface SectionDef {
    *  MDI). */
   iconActive?: string;
   labelKey: string;
-  group?: "experimental";
 }
 
 export const SECTIONS: SectionDef[] = [
@@ -36,20 +35,17 @@ export const SECTIONS: SectionDef[] = [
     icon: "server-network-outline",
     iconActive: "server-network",
     labelKey: "settings.build_server",
-    group: "experimental",
   },
   {
     id: "pairing_requests",
     icon: "handshake-outline",
     iconActive: "handshake",
     labelKey: "settings.pairing_requests",
-    group: "experimental",
   },
   {
     id: "build_offload",
     icon: "send-outline",
     iconActive: "send",
     labelKey: "settings.build_offload",
-    group: "experimental",
   },
 ];

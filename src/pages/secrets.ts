@@ -168,7 +168,7 @@ export class ESPHomePageSecrets extends LitElement {
         font-size: var(--wa-font-size-xs);
         font-weight: var(--wa-font-weight-bold);
         font-family: inherit;
-        box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
+        box-shadow: var(--esphome-primary-shadow);
         transition:
           background 0.12s,
           box-shadow 0.12s,
@@ -176,8 +176,8 @@ export class ESPHomePageSecrets extends LitElement {
       }
 
       .save-button:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
-        box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
+        background: var(--esphome-primary-hover);
+        box-shadow: var(--esphome-primary-shadow-hover);
         transform: translateY(-1px);
       }
 
@@ -197,7 +197,7 @@ export class ESPHomePageSecrets extends LitElement {
 
       .reveal-toggle {
         border: var(--wa-border-width-s) solid var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+        background: var(--esphome-tint);
         color: var(--esphome-primary);
         padding: 6px 12px;
         border-radius: var(--wa-border-radius-m);
@@ -212,7 +212,7 @@ export class ESPHomePageSecrets extends LitElement {
       }
 
       .reveal-toggle:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
+        background: var(--esphome-tint-strong);
       }
 
       .reveal-toggle wa-icon {

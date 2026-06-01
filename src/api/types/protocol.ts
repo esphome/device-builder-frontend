@@ -39,6 +39,10 @@ export interface ServerInfoMessage {
   esphome_version: string;
   port: number;
   ha_addon: boolean;
+  /** True only when served through HA Supervisor ingress (the panel
+   * iframe). Distinct from ha_addon, which is also true when the add-on
+   * is reached directly on its exposed port. Drives the slim header. */
+  ha_ingress: boolean;
   requires_auth: boolean;
 }
 

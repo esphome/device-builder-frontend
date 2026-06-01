@@ -27,7 +27,7 @@ export const tableCellStyles = css`
   }
   .cell-status-busy:hover,
   .cell-status-busy:focus-visible {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     outline: none;
   }
 
@@ -155,7 +155,7 @@ export const tableCellStyles = css`
     border-radius: 999px;
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
     letter-spacing: 0.02em;
   }
@@ -224,9 +224,9 @@ export const tableCellStyles = css`
   }
 
   .cell-action-btn--accent:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    border-color: var(--esphome-tint-border);
   }
 
   /* Progressive overflow into the row-end kebab: as the viewport

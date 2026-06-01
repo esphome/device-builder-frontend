@@ -91,7 +91,7 @@ export class ESPHomeWizardStepEmptyConfig extends LitElement {
       }
 
       .btn-next:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        background: var(--esphome-primary-hover);
       }
 
       .btn-next:disabled {

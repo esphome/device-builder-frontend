@@ -39,7 +39,7 @@ export const deviceDrawerContentStyles = css`
     width: 32px;
     height: 32px;
     border-radius: var(--wa-border-radius-m);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    background: var(--esphome-tint);
     flex-shrink: 0;
     margin-top: 2px;
   }
@@ -154,7 +154,7 @@ export const deviceDrawerContentStyles = css`
   }
   .build-size-clean:hover {
     color: var(--wa-color-text-normal);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
   }
   /* aria-disabled instead of disabled so the title tooltip stays discoverable;
      the click handler is gated separately on the busy property. */
@@ -198,8 +198,8 @@ export const deviceDrawerContentStyles = css`
 
   .tag--link:hover,
   .tag--link:focus-visible {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    background: var(--esphome-tint);
+    border-color: var(--esphome-tint-border);
   }
 
   .tag--link:focus-visible {
@@ -285,7 +285,7 @@ export const deviceDrawerContentStyles = css`
   }
 
   .status-badge--update {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
   }
 
@@ -300,7 +300,7 @@ export const deviceDrawerContentStyles = css`
   }
 
   .status-badge--encryption-pending {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
   }
 

@@ -11,27 +11,73 @@ import { css } from "lit";
 /** ESPHome brand colors and design tokens. */
 export const espHomeStyles = css`
   :host {
-    /* ─── Brand colors ─── */
-    --esphome-primary: var(--primary-color, #009fee);
-    --esphome-primary-light: color-mix(
-      in srgb,
-      var(--primary-color, #009fee) 12%,
-      transparent
-    );
-    --esphome-secondary: color-mix(in srgb, var(--primary-color, #009fee), black 8%);
-    --esphome-success: #2ecc71;
-    --esphome-warning: #f39c12;
-    --esphome-error: #e74c3c;
-    --esphome-offline: #95a5a6;
+    /* ─── Brand colors ───
+       The raw palette (--esphome-primary, --esphome-on-primary, and the
+       --esphome-success/warning/error/offline status colors) is the single
+       source in index.html — each is an HA theme var with a fallback. Here we
+       derive the brand variants from --esphome-primary so they track it. */
+    --esphome-primary-hover: color-mix(in srgb, var(--esphome-primary), black 10%);
+    --esphome-primary-light: color-mix(in srgb, var(--esphome-primary) 12%, transparent);
+    --esphome-secondary: color-mix(in srgb, var(--esphome-primary), black 8%);
 
-    /* Text color for use on primary / dark / colored backgrounds — white in both light and dark modes */
-    --esphome-on-primary: var(--text-primary-color, #ffffff);
+    /* Keyboard focus ring, defined once so every :focus-visible glow
+       stays consistent. Two sizes: the default 3px ring for inputs /
+       fields, and a 2px "tight" ring for compact controls (chips,
+       pills, icon buttons). Used as the full box-shadow value. */
+    --esphome-focus-ring: 0 0 0 3px
+      color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    --esphome-focus-ring-tight: 0 0 0 2px
+      color-mix(in srgb, var(--esphome-primary), transparent 70%);
+
+    /* Elevation glow for raised primary action buttons (save, add,
+       etc.); rest + hover pair so the lift on hover stays consistent.
+       Bigger floating surfaces (the FAB, the round add-device badge)
+       keep their own larger, multi-layer shadows. Used as the full
+       box-shadow value. */
+    --esphome-primary-shadow: 0 2px 8px
+      color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    --esphome-primary-shadow-hover: 0 4px 14px
+      color-mix(in srgb, var(--esphome-primary), transparent 35%);
+
+    /* Translucent primary tints for hover / selected / active state
+       backgrounds and borders, defined once so the dozens of these
+       across the app stop drifting between 80–96% opacity. Three fill
+       intensities (faint hover wash → standard hover/selected → strong
+       hover-on-active) and two border weights. Specials that aren't
+       generic state tints (the table highlight-glow, the yaml mark,
+       the mixed-checkbox fill, muted primary text) keep their own
+       inline values. */
+    --esphome-tint-faint: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+    --esphome-tint: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    --esphome-tint-strong: color-mix(in srgb, var(--esphome-primary), transparent 82%);
+    --esphome-tint-border: color-mix(in srgb, var(--esphome-primary), transparent 65%);
+    --esphome-tint-border-strong: color-mix(
+      in srgb,
+      var(--esphome-primary),
+      transparent 45%
+    );
 
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
     --esphome-footer-height: 20px;
+    /* Height shared by the toolbar's interactive controls (search input,
+       view-toggle, facet pills, clear-filters) so the search row stays
+       pixel-aligned from one source. */
+    --esphome-control-height: 36px;
 
     font-family: var(--wa-font-family-body);
+  }
+
+  /* Compact the header on narrow viewports. 870px is HA's
+     sidebar-collapse breakpoint, so embedded in the HA panel this
+     fires exactly when HA swaps to its own 40px top bar — matching
+     its height avoids a chunky doubled-up bar. Defined on the shared
+     token so the header element, the content-area height calcs, and
+     the actions-menu top offset all shrink together. */
+  @media (max-width: 870px) {
+    :host {
+      --esphome-header-height: 40px;
+    }
   }
 
   /* ─── Custom wa-button variants ─── */

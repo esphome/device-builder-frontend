@@ -26,9 +26,11 @@ import {
   parseYamlAutomations,
   parseYamlTopLevelSections,
   sectionKeyOf,
+  type YamlSection,
 } from "../../util/yaml-sections.js";
 import { renderAdvancedToggle } from "./advanced-toggle.js";
 import { applyYamlDiff } from "./automation-editor/serialise.js";
+import { TriggerCatalogController } from "./trigger-catalog-controller.js";
 import { isYamlOnlySection } from "./yaml-only-sections.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -151,6 +153,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   // the live yaml matches this snapshot.
   _lastSelfWrittenYaml: string | null = null;
 
+  // Resolves the automations-list rows' pretty trigger names; shared
+  // with the device navigator.
+  private readonly _triggerCatalog = new TriggerCatalogController(this, () => ({
+    api: this._api,
+    platform: this.board?.esphome.platform || undefined,
+    boardId: this.board?.id,
+  }));
+
   // 200ms is short enough that the YAML pane feels live as the user moves
   // between fields, long enough to coalesce typing into one splice.
   private static readonly DRAFT_DEBOUNCE_MS = 200;
@@ -178,6 +188,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     ) {
       void loadConfig(this);
     }
+    this._triggerCatalog.ensure();
   }
 
   connectedCallback() {
@@ -620,7 +631,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             ${items.map(
               (item) =>
                 html`<li class="api-actions-row">
-                  <span class="api-actions-name">${item.eventKey}</span>
+                  <span class="api-actions-name">${this._triggerLabel(item)}</span>
                   <div class="api-actions-row-buttons">
                     <button
                       type="button"
@@ -648,6 +659,19 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
             )}
           </ul>`}
     </div>`;
+  }
+
+  /** Pretty trigger label for an automations-list row, resolved from
+   *  the trigger catalog ("Binary Sensor → On State"). Falls back to
+   *  ``displayLabel`` / the raw event key until the catalog loads. */
+  private _triggerLabel(item: YamlSection): string {
+    const fallback = item.displayLabel || item.eventKey || "";
+    if (!item.eventKey) return fallback;
+    return this._triggerCatalog.resolveName(
+      item.parentKey ?? "esphome",
+      item.eventKey,
+      fallback
+    );
   }
 
   private _renderAddAutomationDialog() {

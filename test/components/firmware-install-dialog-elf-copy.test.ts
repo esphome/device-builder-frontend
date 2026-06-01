@@ -1,14 +1,16 @@
 /**
- * @vitest-environment happy-dom
- *
  * The download-ready success copy must match the artefact: the ELF is debug
  * symbols for the stack trace decoder, not a flashable image, so it gets its
  * own title/body instead of the firmware "flash it to your device" wording.
+ * The copy now flows through the card status message/detail the dialog feeds
+ * to <esphome-process-terminal>.
  */
-import { render } from "lit";
 import { describe, expect, it } from "vitest";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { renderStatus } from "../../src/components/firmware-install-dialog/renderers.js";
+import {
+  cardStatusDetail,
+  cardStatusMessage,
+} from "../../src/components/firmware-install-dialog/renderers.js";
 
 function textFor(filename: string): string {
   const host = {
@@ -17,10 +19,8 @@ function textFor(filename: string): string {
     _downloadedFilename: filename,
     _binaries: [],
     _localize: (key: string) => key,
-  };
-  const container = document.createElement("div");
-  render(renderStatus(host as unknown as ESPHomeFirmwareInstallDialog), container);
-  return container.textContent ?? "";
+  } as unknown as ESPHomeFirmwareInstallDialog;
+  return `${cardStatusMessage(host)} ${cardStatusDetail(host)}`;
 }
 
 describe("download-ready success copy", () => {

@@ -51,6 +51,23 @@ wifi:
     expect(sections[1].name).toBe("bedroom");
   });
 
+  it("keeps a LIST_SECTIONS member (globals) as one un-expanded section", () => {
+    // A plain list section (sensor above) expands per item; a
+    // LIST_SECTIONS member stays a single header entry so the nav
+    // shows one "Global Variables" row, not one per variable.
+    const yaml = `globals:
+  - id: my_int
+    type: int
+  - id: my_bool
+    type: bool
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    expect(sections).toHaveLength(1);
+    expect(sections[0].key).toBe("globals");
+    expect(sections[0].fromLine).toBe(1);
+    expect(sections[0].parentKey).toBeUndefined();
+  });
+
   it("ignores nested sub-reading name:/id: when extracting the item label (#1015)", () => {
     // A platform with no top-level name: but nested temperature/humidity
     // sub-sensors must not adopt a child's name as its label.

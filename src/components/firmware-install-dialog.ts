@@ -1,9 +1,7 @@
 import { consume } from "@lit/context";
 import {
-  mdiAlertCircle,
   mdiArrowCollapse,
   mdiArrowExpand,
-  mdiCheckCircle,
   mdiChevronDown,
   mdiChevronUp,
   mdiClose,
@@ -16,6 +14,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -27,24 +26,24 @@ import {
   startWebSerialInstall,
 } from "./firmware-install-dialog/install-flow.js";
 import {
+  cardState,
+  cardStatusDetail,
+  cardStatusMessage,
   renderFooter,
-  renderLogs,
-  renderProgress,
-  renderStatus,
+  renderResetSuggestion,
+  renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
 import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./ansi-log.js";
 import "./base-dialog.js";
+import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
-  "alert-circle": mdiAlertCircle,
   "arrow-expand": mdiArrowExpand,
   "arrow-collapse": mdiArrowCollapse,
-  "check-circle": mdiCheckCircle,
   "chevron-down": mdiChevronDown,
   "chevron-up": mdiChevronUp,
   close: mdiClose,
@@ -124,7 +123,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  static styles = [espHomeStyles, firmwareInstallDialogStyles, remoteBuildHintStyles];
+  static styles = [
+    espHomeStyles,
+    firmwareInstallDialogStyles,
+    remoteBuildHintStyles,
+    // Content-heavy (build status + expandable log): full-screen on mobile
+    // so it doesn't overflow a centered box. #41
+    fullscreenMobileDialog("esphome-base-dialog"),
+  ];
 
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
@@ -309,9 +315,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   };
 
-  // wa-dialog's close button (header X) and Escape both fire wa-after-hide.
-  // Same stream teardown as _close — otherwise a header-X-then-reopen leaves
-  // the prior followJob attached and lines duplicate into the new session.
+  // Flip _open the moment a close is requested (X / Escape / outside-click) so
+  // streamed log lines re-rendering with ?open can't re-assert open=true and
+  // cancel the in-flight hide (the race logs / command dialogs also guard).
+  // Teardown stays in _onClose (after-hide).
+  _onRequestClose = () => {
+    this._open = false;
+  };
+
+  // base-dialog's after-hide fires once the dialog has fully hidden (header X,
+  // Escape, or a programmatic close). Same stream teardown as _close —
+  // otherwise a header-X-then-reopen leaves the prior followJob attached and
+  // lines duplicate into the new session.
   _onClose = () => {
     this._open = false;
     this._detachStream();
@@ -322,10 +337,20 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._open}
         .label=${this._title}
+        @request-close=${this._onRequestClose}
         @after-hide=${this._onClose}
       >
-        ${renderStatus(this)} ${renderProgress(this)} ${renderLogs(this)}
-        ${renderFooter(this)}
+        <esphome-process-terminal
+          variant="card"
+          ?light=${!this._darkMode}
+          .state=${cardState(this)}
+          .statusMessage=${cardStatusMessage(this)}
+          .statusDetail=${cardStatusDetail(this)}
+          .progress=${this._step === "flashing" ? this._flashPercent : null}
+        >
+          ${renderResetSuggestion(this)} ${renderStatusExtra(this)}
+          <div slot="toolbar-right">${renderFooter(this)}</div>
+        </esphome-process-terminal>
       </esphome-base-dialog>
     `;
   }

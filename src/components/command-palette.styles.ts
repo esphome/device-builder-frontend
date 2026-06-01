@@ -123,9 +123,9 @@ export const commandPaletteStyles = css`
      (the icon already swaps to magnify as the "switch to"
      destination). */
   .mode-toggle--yaml {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 85%);
+    background: var(--esphome-tint-strong);
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    border-color: var(--esphome-tint-border);
   }
 
   .list {

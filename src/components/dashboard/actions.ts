@@ -5,6 +5,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
+import { ESPHomeLogParser } from "../../util/esphome-log-parser.js";
 import {
   connectToPort,
   detectChip,
@@ -406,12 +407,11 @@ function formatSerialTimestamp(now: Date): string {
  * closes and bled output from a previous serial port into the
  * next session — a Copilot find on PR #68.
  *
- * The cancel:
- *   * ``reader.cancel()`` releases the pending ``read()`` so the
- *     loop's ``await`` settles and the loop exits via ``done``.
- *   * ``reader.releaseLock()`` lets the decoder pipeline tear down
- *     cleanly; otherwise a future getReader() call on the same
- *     readable would throw.
+ * The returned cancel stops the read loop AND closes the port (releasing the
+ * reader lock first — closing a locked port fails). A Stop *pause* never calls
+ * cancel; it only flips ``dialog._serialPaused``, keeping the reader + port
+ * open so resuming needn't reopen and pulse DTR/RTS, which reboots the device
+ * (#526).
  */
 export function streamSerialToDialog(port: any, dialog: any): () => void {
   /* Read directly from ``port.readable.getReader()`` and decode in
@@ -424,6 +424,11 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
   const decoder = new TextDecoder();
   let buffer = "";
   let cancelled = false;
+  // Raw UART logs skip the backend's per-line formatting, so a multi-line
+  // ESPHome record (color opened once, continuation lines indented) loses
+  // its color/header when split on \n. Re-apply them per line, exactly like
+  // the backend's esphome-logs CLI does via aioesphomeapi's LogParser.
+  const parser = new ESPHomeLogParser();
   const readLoop = async () => {
     try {
       while (true) {
@@ -448,8 +453,12 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
                unconditionally (the line break is preserved before
                stamping), so we match that behaviour here for parity
                between the two web serial paths. */
-            const stamped = `${formatSerialTimestamp(new Date())}${cleaned}`;
-            dialog._lines = [...dialog._lines, stamped];
+            const stamped = `${formatSerialTimestamp(new Date())}${parser.parseLine(cleaned)}`;
+            // Keep draining while paused (Stop) but don't display, so resume
+            // needs no port reopen / device reset (#526).
+            if (!dialog._serialPaused) {
+              dialog._lines = [...dialog._lines, stamped];
+            }
           }
         }
       }
@@ -467,12 +476,10 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
   return () => {
     if (cancelled) return;
     cancelled = true;
-    // Cancel the reader first so its lock is released, then close
-    // the port. Without ``port.close()`` the browser keeps the OS
-    // handle open: every reopen of the passive logs viewer leaks
-    // another open port and eventually trips the per-tab Web Serial
-    // ceiling so the user can't reconnect to the same device until
-    // they refresh the page.
+    // Stop the loop, then close the port once the reader lock is released
+    // (closing a still-locked port fails, leaving it open and blocking the
+    // next open()). A Stop pause keeps the port open by not calling cancel at
+    // all — it only flips the display-only `_serialPaused` gate (#526).
     reader
       .cancel()
       .catch(() => {

@@ -228,7 +228,7 @@ export const configEntryFormStyles = css`
 
   .multi-row .multi-input:focus {
     border-color: var(--esphome-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    box-shadow: var(--esphome-focus-ring);
   }
 
   .multi-row .multi-input.invalid {
@@ -257,7 +257,7 @@ export const configEntryFormStyles = css`
 
   .combobox-input:focus {
     border-color: var(--esphome-primary);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    box-shadow: var(--esphome-focus-ring);
   }
 
   .combobox-input.invalid {

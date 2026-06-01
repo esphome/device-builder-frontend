@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { LIST_SECTIONS } from "../../src/util/section-entry-overrides.js";
 import {
   findSectionStart,
   LIST_ITEM_START_RE,
@@ -1706,5 +1707,166 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     expect(values.state).toBe("yes");
     expect(values.fallback).toBe("True");
     expect(values.hint).toBe("enable");
+  });
+});
+
+describe("globals list section (LIST_SECTIONS)", () => {
+  const TWO_ENTRY =
+    "globals:\n" +
+    "  - id: my_int\n" +
+    "    type: int\n" +
+    "    initial_value: '0'\n" +
+    "  - id: my_bool\n" +
+    "    type: bool\n" +
+    "    restore_value: true\n";
+
+  it("parses a 2-entry globals block into an item array at [sectionKey]", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed.globals as Record<string, unknown>[];
+    expect(Array.isArray(items)).toBe(true);
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    expect(items[0].type).toBe("int");
+    expect(items[0].initial_value).toBe("0");
+    expect(items[1].id).toBe("my_bool");
+    expect(items[1].type).toBe("bool");
+    expect(items[1].restore_value).toBe(true);
+  });
+
+  it("round-trips editing one item's initial_value, keeping every entry", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed.globals as Record<string, unknown>[];
+    items[0].initial_value = "42";
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", { globals: items });
+    expect(out.startsWith("globals:")).toBe(true);
+    const reparsed = parseYamlSectionValues(out + "\n", "globals");
+    const ritems = reparsed.globals as Record<string, unknown>[];
+    expect(ritems).toHaveLength(2);
+    expect(ritems[0].id).toBe("my_int");
+    expect(ritems[0].initial_value).toBe("42");
+    expect(ritems[1].id).toBe("my_bool");
+  });
+
+  it("round-trips adding a third item", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed.globals as Record<string, unknown>[];
+    items.push({ id: "my_str", type: "std::string" });
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", { globals: items });
+    const ritems = parseYamlSectionValues(out + "\n", "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(ritems.map((i) => i.id)).toEqual(["my_int", "my_bool", "my_str"]);
+  });
+
+  it("round-trips removing the first item", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed.globals as Record<string, unknown>[];
+    items.splice(0, 1);
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", { globals: items });
+    const ritems = parseYamlSectionValues(out + "\n", "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(ritems).toHaveLength(1);
+    expect(ritems[0].id).toBe("my_bool");
+  });
+
+  it("round-trips a 4-space-indented globals fixture", () => {
+    const FOUR_SPACE =
+      "globals:\n" +
+      "    - id: my_int\n" +
+      "      type: int\n" +
+      "    - id: my_bool\n" +
+      "      type: bool\n";
+    const parsed = parseYamlSectionValues(FOUR_SPACE, "globals");
+    const items = parsed.globals as Record<string, unknown>[];
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    items[0].type = "int64_t";
+    const out = updateSectionInYaml(FOUR_SPACE, "globals", { globals: items });
+    const ritems = parseYamlSectionValues(out + "\n", "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    expect(ritems).toHaveLength(2);
+    expect(ritems[0].type).toBe("int64_t");
+    expect(ritems[1].id).toBe("my_bool");
+  });
+
+  it("preserves sibling sections after globals on round-trip", () => {
+    const WITH_SIBLING = TWO_ENTRY + "wifi:\n  ssid: home\n";
+    const items = parseYamlSectionValues(WITH_SIBLING, "globals").globals as Record<
+      string,
+      unknown
+    >[];
+    items[0].initial_value = "7";
+    const out = updateSectionInYaml(WITH_SIBLING, "globals", { globals: items });
+    expect(out).toContain("wifi:");
+    expect(out).toContain("ssid: home");
+  });
+
+  it("leaves the YAML untouched when the list value is not an array (no wipe)", () => {
+    // A missing/garbled value must not collapse the block to an empty
+    // mapping.
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", { globals: undefined });
+    expect(out).toBe(TWO_ENTRY);
+  });
+
+  it("falls through to mapping parse when the body is not a dash-list", () => {
+    // Guard branch: a member whose body isn't `- ` items must not
+    // stash an array — it degrades to the empty-list editor, not a wipe.
+    const parsed = parseYamlSectionValues("globals:\n  foo: bar\n", "globals");
+    expect(Array.isArray(parsed.globals)).toBe(false);
+    expect(parsed.foo).toBe("bar");
+  });
+
+  it("removes the whole block when every item is deleted, keeping siblings", () => {
+    const out = updateSectionInYaml(TWO_ENTRY + "wifi:\n  ssid: home\n", "globals", {
+      globals: [],
+    });
+    expect(out).not.toContain("globals:");
+    expect(out).toContain("wifi:");
+    expect(out).toContain("ssid: home");
+  });
+
+  it("emptying the only section yields an empty document", () => {
+    expect(updateSectionInYaml(TWO_ENTRY, "globals", { globals: [] })).toBe("");
+  });
+});
+
+describe("LIST_SECTIONS is membership-driven, not hardcoded to globals", () => {
+  // Pins genericity: parse/serialize key off membership, so a future
+  // top-level list section is one allowlist edit.
+  const KEY = "future_list_section";
+  const FIXTURE = `${KEY}:\n  - id: a\n    type: int\n  - id: b\n    type: bool\n`;
+
+  it("parses and round-trips an arbitrary LIST_SECTIONS member", () => {
+    const mutable = LIST_SECTIONS as Set<string>;
+    mutable.add(KEY);
+    try {
+      const items = parseYamlSectionValues(FIXTURE, KEY)[KEY] as Record<
+        string,
+        unknown
+      >[];
+      expect(items).toHaveLength(2);
+      expect(items[0].id).toBe("a");
+
+      items.push({ id: "c", type: "float" });
+      const out = updateSectionInYaml(FIXTURE, KEY, { [KEY]: items });
+      expect(out.startsWith(`${KEY}:`)).toBe(true);
+      const ritems = parseYamlSectionValues(out + "\n", KEY)[KEY] as Record<
+        string,
+        unknown
+      >[];
+      expect(ritems.map((i) => i.id)).toEqual(["a", "b", "c"]);
+    } finally {
+      mutable.delete(KEY);
+    }
+  });
+
+  it("parses as a flat mapping (no item array) when NOT a member", () => {
+    const parsed = parseYamlSectionValues(FIXTURE, KEY);
+    expect(parsed[KEY]).toBeUndefined();
   });
 });

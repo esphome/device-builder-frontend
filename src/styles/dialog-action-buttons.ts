@@ -58,7 +58,7 @@ export const dialogActionButtonStyles = css`
   }
 
   .btn--primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .btn--primary:disabled {

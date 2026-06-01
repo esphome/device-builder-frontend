@@ -13,9 +13,11 @@
  */
 import { describe, expect, it } from "vitest";
 import { type ConfigEntry, ConfigEntryType } from "../../src/api/types/config-entries.js";
+import { YAML_ONLY_SECTIONS } from "../../src/components/device/yaml-only-sections.js";
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 import {
+  LIST_SECTIONS,
   MAP_SECTIONS,
   resolveSectionEntries,
 } from "../../src/util/section-entry-overrides.js";
@@ -32,6 +34,56 @@ describe("MAP_SECTIONS", () => {
     // Routed through ``YAML_ONLY_SECTIONS`` instead so both
     // shapes round-trip cleanly via the YAML pane.
     expect(MAP_SECTIONS.has("packages")).toBe(false);
+  });
+});
+
+describe("LIST_SECTIONS", () => {
+  it("contains 'globals' (top-level list of variable mappings)", () => {
+    expect(LIST_SECTIONS.has("globals")).toBe(true);
+  });
+
+  it("'globals' is NOT YAML-only and NOT a MAP section", () => {
+    expect(YAML_ONLY_SECTIONS.has("globals")).toBe(false);
+    expect(MAP_SECTIONS.has("globals")).toBe(false);
+  });
+});
+
+describe("resolveSectionEntries (LIST section shape)", () => {
+  it("globals resolves to one multi_value NESTED entry wrapping the catalog", () => {
+    const catalog: ConfigEntry[] = [
+      makeConfigEntry({ key: "id", type: ConfigEntryType.STRING }),
+      makeConfigEntry({ key: "type", type: ConfigEntryType.STRING }),
+    ];
+    const entries = resolveSectionEntries("globals", catalog);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].key).toBe("globals");
+    expect(entries[0].type).toBe(ConfigEntryType.NESTED);
+    expect(entries[0].multi_value).toBe(true);
+    expect(entries[0].config_entries).toBe(catalog);
+  });
+
+  it("each item card titles read 'Global variable <n>'", () => {
+    // labelFor reads entry.label directly, and the nested-list
+    // renderer shows ``<label> <n>``.
+    const entries = resolveSectionEntries("globals", []);
+    expect(entries[0].label).toBe("Global variable");
+  });
+
+  it("wraps any LIST_SECTIONS member, defaulting the item label to 'Item'", () => {
+    // Genericity pin: the wrap keys off membership, and a member with
+    // no LIST_SECTION_ITEM_LABELS entry falls back to "Item".
+    const mutable = LIST_SECTIONS as Set<string>;
+    mutable.add("future_list_section");
+    try {
+      const entries = resolveSectionEntries("future_list_section", []);
+      expect(entries).toHaveLength(1);
+      expect(entries[0].type).toBe(ConfigEntryType.NESTED);
+      expect(entries[0].multi_value).toBe(true);
+      expect(entries[0].key).toBe("future_list_section");
+      expect(entries[0].label).toBe("Item");
+    } finally {
+      mutable.delete("future_list_section");
+    }
   });
 });
 
@@ -77,6 +129,11 @@ describe("resolveSectionEntries", () => {
       makeConfigEntry({ key: "name", required: true }),
       makeConfigEntry({ key: "ssid", required: true }),
     ];
+    expect(resolveSectionEntries("wifi", catalogEntries)).toBe(catalogEntries);
+  });
+
+  it("returns the catalog entries unchanged for a non-list section", () => {
+    const catalogEntries: ConfigEntry[] = [makeConfigEntry({ key: "ssid" })];
     expect(resolveSectionEntries("wifi", catalogEntries)).toBe(catalogEntries);
   });
 

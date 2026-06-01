@@ -60,7 +60,7 @@ export class ESPHomeSelectBar extends LitElement {
         align-items: center;
         justify-content: space-between;
         padding: var(--wa-space-m) var(--wa-space-xl);
-        height: var(--select-bar-height, 64px);
+        height: var(--select-bar-height);
         box-sizing: border-box;
         /* Locked at exactly --select-bar-height so the table host's
            padding-bottom reservation can never be undershot by a
@@ -105,7 +105,7 @@ export class ESPHomeSelectBar extends LitElement {
       }
 
       .toggle:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+        background: var(--esphome-tint);
       }
 
       .right {
@@ -151,7 +151,7 @@ export class ESPHomeSelectBar extends LitElement {
       }
 
       .btn--primary:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        background: var(--esphome-primary-hover);
       }
 
       .btn--danger {

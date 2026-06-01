@@ -1,5 +1,5 @@
 import { consume } from "@lit/context";
-import { mdiArrowCollapseRight, mdiArrowLeft } from "@mdi/js";
+import { mdiArrowLeft } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
@@ -19,7 +19,6 @@ import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "./esphome-header-actions.js";
 
 registerMdiIcons({
-  "arrow-collapse-right": mdiArrowCollapseRight,
   "arrow-left": mdiArrowLeft,
 });
 
@@ -62,6 +61,12 @@ export class ESPHomeLayout extends LitElement {
     return this._path !== "/" && this._path !== "";
   }
 
+  protected updated() {
+    // Reflect the consumed context to a host attribute so the slim-header
+    // CSS (`:host([ingress])`) can key off it.
+    this.toggleAttribute("ingress", this._isHaIngress);
+  }
+
   static styles = [
     espHomeStyles,
     css`
@@ -84,25 +89,11 @@ export class ESPHomeLayout extends LitElement {
       .header-logos {
         display: flex;
         align-items: center;
-        gap: var(--wa-space-m);
-      }
-
-      .ha-btn::part(base) {
-        padding: 6px 6px;
-        gap: 6px;
-      }
-
-      .ha-btn::part(label) {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-      }
-
-      .header-separator {
-        width: 1px;
-        align-self: stretch;
-        background: var(--esphome-primary-light);
-        flex-shrink: 0;
+        /* Smaller than the logo→title gap (--wa-space-m on .app-header)
+           because the back button carries ~8px of its own padding on
+           the logo side; this makes the arrow sit the same visual
+           distance from the logo as the title does on the other side. */
+        gap: var(--wa-space-xs);
       }
 
       .header-back {
@@ -204,19 +195,19 @@ export class ESPHomeLayout extends LitElement {
         flex: 1;
       }
 
-      /* Mobile: drop the subtitle so the title isn't squashed against
-         the top of the viewport, and keep header height compact. */
-      @media (max-width: 700px) {
+      /* Compact header on narrow viewports. 870px is HA's
+         sidebar-collapse breakpoint, so this fires exactly when HA
+         shows its own 40px top bar; we apply it everywhere (HA or not)
+         so the standalone phone layout is compact too. The 40px height
+         comes from the --esphome-header-height token (espHomeStyles).
+         Shrink the logo to fit the shorter bar and drop the subtitle. */
+      @media (max-width: 870px) {
         .header-text p {
           display: none;
         }
 
-        /* The spacer's flex:1 was eating the slack between the title
-           and the kebab actions — desktop's intentional layout but on
-           a phone that's where the title needs room to fit "ESPHome
-           Device Builder" alongside the PREVIEW badge without
-           truncating. Drop the spacer and grow the header-text into
-           the freed space instead. */
+        /* Drop the spacer and let the title grow into the freed width
+           so "ESPHome Device Builder" + PREVIEW fit without truncating. */
         .header-spacer {
           display: none;
         }
@@ -225,19 +216,43 @@ export class ESPHomeLayout extends LitElement {
           flex: 1;
         }
 
-        /* Tighten the chrome around the logo: the 44px button sized
-           for a desktop touch target carries more whitespace than a
-           phone needs, and the app-header's --wa-space-m gap claims
-           extra room the title could use to fit "Builder" before
-           the PREVIEW badge. Keep the horizontal padding at the
-           desktop value so the logo doesn't hug the viewport edge. */
         .app-header {
           gap: var(--wa-space-s);
         }
 
+        /* Pull the back arrow and logo close together — the desktop
+           --wa-space-m gap reads as a big void next to the small logo
+           in the 40px bar. */
+        .header-logos {
+          gap: var(--wa-space-2xs);
+        }
+
+        /* Shrink the logo and give it a 3px top/bottom inset so it
+           doesn't crowd the 40px bar's edges. box-sizing keeps the
+           padding inside the 32px box; the img fills what's left. */
         .header-logo {
-          width: 36px;
-          height: 36px;
+          width: 32px;
+          height: 32px;
+          padding: 3px 0;
+          box-sizing: border-box;
+        }
+
+        .header-logo img {
+          width: 100%;
+          height: 100%;
+          object-fit: contain;
+        }
+
+        /* Embedded in HA, its narrow bar already shows the title, so
+           hide our (duplicated) title text. The smaller logo and the
+           actions menu stay. */
+        :host([ingress]) .header-text {
+          display: none;
+        }
+
+        /* Title hidden, so bring the spacer back to pin the menu right. */
+        :host([ingress]) .header-spacer {
+          display: block;
         }
       }
 
@@ -282,20 +297,6 @@ export class ESPHomeLayout extends LitElement {
     return html`
       <div class="app-header">
         <div class="header-logos">
-          ${this._isHaIngress
-            ? html`
-                <wa-button
-                  class="ha-btn"
-                  variant="light"
-                  size="small"
-                  title=${this._localize("layout.home_assistant")}
-                >
-                  <wa-icon library="mdi" name="arrow-collapse-right"></wa-icon>
-                  <img src=${withBase("/assets/logo/ha.svg")} alt="Home Assistant" />
-                </wa-button>
-                <div class="header-separator"></div>
-              `
-            : nothing}
           ${this._showBack
             ? html`
                 <button

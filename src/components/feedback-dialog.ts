@@ -145,8 +145,8 @@ export class ESPHomeFeedbackDialog extends LitElement {
       }
 
       .link:hover {
-        background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
-        border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+        background: var(--esphome-tint);
+        border-color: var(--esphome-tint-border);
       }
 
       .link:hover .link-icon {
@@ -177,8 +177,8 @@ export class ESPHomeFeedbackDialog extends LitElement {
       }
 
       .link.featured:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 12%);
-        border-color: color-mix(in srgb, var(--esphome-primary), black 12%);
+        background: var(--esphome-primary-hover);
+        border-color: var(--esphome-primary-hover);
       }
 
       .link.featured .link-icon,

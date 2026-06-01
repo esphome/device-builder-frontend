@@ -1,8 +1,11 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareBinary, JobSource } from "../../api/types/firmware-jobs.js";
-import { splitTemplate } from "../../util/template-split.js";
 import type { ESPHomeFirmwareInstallDialog } from "../firmware-install-dialog.js";
-import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
+import type { ProcessTerminalState } from "../process-terminal/process-terminal.js";
+import {
+  renderBuildFailureSuggestion,
+  renderValidationFailureSuggestion,
+} from "../process-terminal/reset-suggestion.js";
 
 // Map the backend's stable artifact `type` to a localized label, falling back
 // to the platform-supplied text when there's no translation — an unknown type
@@ -46,191 +49,161 @@ function isPeerLinkSessionLostError(message: string): boolean {
   return message.includes("peer-link session lost");
 }
 
-function renderValidationFailureSuggestion(
-  host: ESPHomeFirmwareInstallDialog
-): TemplateResult {
-  const text = host._localize("command.validation_failed_suggestion");
-  const [before, after] = splitTemplate(text, "{editor_action}");
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
-        ${host._localize("command.try_open_editor_button")}</button
-      >${after}
-    </div>
-  `;
-}
-
-// C++ build failure → clean (surgical) → reset (nuclear) staircase.
-// REMOTE-sourced jobs drop the link half — firmware/reset_build_env wipes
-// the LOCAL toolchain cache, which doesn't help when the broken cache is
-// on the paired receiver. Per esphome/device-builder#608 we deliberately
-// don't fan reset out to receivers; the operator-action model handles it.
-function renderBuildFailureSuggestion(
-  host: ESPHomeFirmwareInstallDialog
-): TemplateResult {
-  if (host._jobSource === JobSource.REMOTE && host._jobSourceLabel) {
-    return renderRemoteBuildFailureSuggestion(host, host._jobSourceLabel);
-  }
-  const text = host._localize("command.try_reset_suggestion");
-  const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
-        ${host._localize("command.try_clean_button")}</button
-      >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
-        ${host._localize("command.try_reset_button")}</button
-      >${after}
-    </div>
-  `;
-}
-
 // Compile-step failure hint. Validation → editor. Receiver-session-lost →
-// skip (build env was fine, connection wasn't). C++ build → clean/reset.
-function renderResetSuggestion(
+// skip (build env was fine, connection wasn't). C++ build → clean/reset, or
+// the remote variant when the failed compile ran on a paired receiver. The
+// markup lives in the shared reset-suggestion module so command-dialog and
+// this dialog stay in lockstep.
+export function renderResetSuggestion(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
   if (!host._failedDuringCompile) return nothing;
   if (host._failedDuringValidate) return renderValidationFailureSuggestion(host);
   if (isPeerLinkSessionLostError(host._errorMessage)) return nothing;
-  return renderBuildFailureSuggestion(host);
+  const remoteLabel =
+    host._jobSource === JobSource.REMOTE && host._jobSourceLabel
+      ? host._jobSourceLabel
+      : null;
+  return renderBuildFailureSuggestion(host, remoteLabel);
 }
 
-export function renderStatus(host: ESPHomeFirmwareInstallDialog): TemplateResult {
-  if (host._step === "done") {
-    return html`
-      <div class="status">
-        <wa-icon
-          class="status-icon status-icon--success"
-          library="mdi"
-          name="check-circle"
-        ></wa-icon>
-        <span class="status-text">${host._statusMessage}</span>
-      </div>
-    `;
+// ── card status mapping ──────────────────────────────────────────────
+// The <esphome-process-terminal> card renders the spinner / success / error
+// icon from `state` plus the bold message and quiet detail; these helpers
+// resolve those three values for each install step. The choose-binary and
+// download-ready screens have no status icon — their bespoke bodies render in
+// the status-extra slot below.
+
+export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalState {
+  switch (host._step) {
+    case "choose-binary":
+      return null;
+    case "download-ready":
+    case "done":
+      return "success";
+    case "error":
+      return "error";
+    case "connecting":
+    case "queued":
+    case "installing":
+    case "compiling":
+    case "flashing":
+    case "downloading":
+      return "running";
+    default:
+      // Exhaustive: adding an InstallStep without mapping it here is a
+      // compile error (host._step is no longer narrowed to never).
+      return host._step satisfies never;
   }
+}
+
+function downloadReadyTitle(host: ESPHomeFirmwareInstallDialog): string {
+  if (host._installer === "binary-download") {
+    const isElf = host._downloadedFilename.endsWith(".elf");
+    return host._localize(
+      isElf ? "firmware.elf_download_done_title" : "firmware.binary_download_done_title"
+    );
+  }
+  return host._localize("firmware.web_download_done_title");
+}
+
+function downloadReadyDetail(host: ESPHomeFirmwareInstallDialog): string {
+  const filename = host._downloadedFilename;
+  if (host._installer === "binary-download") {
+    const isElf = filename.endsWith(".elf");
+    return host._localize(
+      isElf ? "firmware.elf_download_done_body" : "firmware.binary_download_done_body",
+      { filename }
+    );
+  }
+  return host._localize("firmware.web_download_done_body", { filename });
+}
+
+export function cardStatusMessage(host: ESPHomeFirmwareInstallDialog): string {
   if (host._step === "choose-binary") {
-    return html`
-      <div class="status">
-        <span class="status-text">${host._localize("firmware.choose_binary_title")}</span>
-        <span class="status-detail"
-          >${host._localize("firmware.choose_binary_desc")}</span
-        >
-      </div>
-      <div class="binary-list">
-        ${host._binaries.map((binary) => {
-          const desc = artifactDescription(host, binary);
-          return html`
-            <button
-              type="button"
-              class="binary-option"
-              @click=${() => host._onChooseBinary(binary.file)}
-            >
-              <span class="title">${artifactTitle(host, binary)}</span>
-              ${desc ? html`<span class="desc">${desc}</span>` : nothing}
-            </button>
-          `;
-        })}
-      </div>
-    `;
+    return host._localize("firmware.choose_binary_title");
   }
-  if (host._step === "download-ready") {
-    const filename = host._downloadedFilename;
-    // Manual binary download: just acknowledge the file — no web.esphome.io
-    // checklist. The ELF is debug symbols, not a flashable image, so it gets
-    // its own copy (decoder, not "flash it").
-    if (host._installer === "binary-download") {
-      const isElf = filename.endsWith(".elf");
-      return html`
-        <div class="status">
-          <wa-icon
-            class="status-icon status-icon--success"
-            library="mdi"
-            name="check-circle"
-          ></wa-icon>
-          <span class="status-text"
-            >${host._localize(
-              isElf
-                ? "firmware.elf_download_done_title"
-                : "firmware.binary_download_done_title"
-            )}</span
-          >
-          <span class="status-detail"
-            >${host._localize(
-              isElf
-                ? "firmware.elf_download_done_body"
-                : "firmware.binary_download_done_body",
-              { filename }
-            )}</span
-          >
-        </div>
-        ${host._binaries.length > 1
-          ? html`<button
-              type="button"
-              class="reset-suggestion-link"
-              @click=${() => (host._step = "choose-binary")}
-            >
-              ${host._localize("firmware.choose_binary_again")}
-            </button>`
-          : nothing}
-      `;
-    }
-    return html`
-      <div class="status">
-        <wa-icon
-          class="status-icon status-icon--success"
-          library="mdi"
-          name="check-circle"
-        ></wa-icon>
-        <span class="status-text"
-          >${host._localize("firmware.web_download_done_title")}</span
-        >
-        <span class="status-detail"
-          >${host._localize("firmware.web_download_done_body", { filename })}</span
-        >
-      </div>
-      <ol class="instructions">
-        <li>${host._localize("firmware.web_download_step_open")}</li>
-        <li>${host._localize("firmware.web_download_step_connect")}</li>
-        <li>${host._localize("firmware.web_download_step_install", { filename })}</li>
-      </ol>
-      <p class="instructions-note">
-        ${host._localize("dashboard.install_method_web_download_desc")}
-      </p>
-    `;
+  if (host._step === "download-ready") return downloadReadyTitle(host);
+  return host._statusMessage;
+}
+
+export function cardStatusDetail(host: ESPHomeFirmwareInstallDialog): string {
+  if (host._step === "choose-binary") {
+    return host._localize("firmware.choose_binary_desc");
   }
-  if (host._step === "error") {
-    return html`
-      <div class="status">
-        <wa-icon
-          class="status-icon status-icon--error"
-          library="mdi"
-          name="alert-circle"
-        ></wa-icon>
-        <span class="status-text">${host._statusMessage}</span>
-        ${host._errorMessage
-          ? html`<span class="status-detail">${host._errorMessage}</span>`
-          : nothing}
-      </div>
-      ${renderResetSuggestion(host)}
-    `;
-  }
+  if (host._step === "download-ready") return downloadReadyDetail(host);
+  if (host._step === "error") return host._errorMessage;
+  return "";
+}
+
+// ── status-extra slot ────────────────────────────────────────────────
+// Bespoke bodies that don't fit the standard status block: the binary-format
+// picker (choose-binary), the web-flasher instructions / "choose another
+// format" link (download-ready), and the collapsible compile / esptool log.
+
+function renderBinaryList(host: ESPHomeFirmwareInstallDialog): TemplateResult {
   return html`
-    <div class="status">
-      <wa-spinner></wa-spinner>
-      <span class="status-text">${host._statusMessage}</span>
+    <div class="binary-list">
+      ${host._binaries.map((binary) => {
+        const desc = artifactDescription(host, binary);
+        return html`
+          <button
+            type="button"
+            class="binary-option"
+            @click=${() => host._onChooseBinary(binary.file)}
+          >
+            <span class="title">${artifactTitle(host, binary)}</span>
+            ${desc ? html`<span class="desc">${desc}</span>` : nothing}
+          </button>
+        `;
+      })}
     </div>
   `;
 }
 
-export function renderProgress(
+function renderDownloadReadyExtra(
   host: ESPHomeFirmwareInstallDialog
 ): TemplateResult | typeof nothing {
-  if (host._step !== "flashing") return nothing;
+  // Manual binary download: offer to pick a different format when more than
+  // one was produced. The ELF is debug symbols, not a flashable image, so no
+  // web.esphome.io checklist here.
+  if (host._installer === "binary-download") {
+    return host._binaries.length > 1
+      ? html`<button
+          type="button"
+          class="reset-suggestion-link"
+          @click=${() => (host._step = "choose-binary")}
+        >
+          ${host._localize("firmware.choose_binary_again")}
+        </button>`
+      : nothing;
+  }
+  const filename = host._downloadedFilename;
   return html`
-    <div class="progress-bar">
-      <div class="progress-bar-fill" style="width:${host._flashPercent}%"></div>
-    </div>
+    <ol class="instructions">
+      <li>${host._localize("firmware.web_download_step_open")}</li>
+      <li>${host._localize("firmware.web_download_step_connect")}</li>
+      <li>${host._localize("firmware.web_download_step_install", { filename })}</li>
+    </ol>
+    <p class="instructions-note">
+      ${host._localize("dashboard.install_method_web_download_desc")}
+    </p>
   `;
+}
+
+export function renderStatusExtra(
+  host: ESPHomeFirmwareInstallDialog
+): TemplateResult | typeof nothing {
+  const binaryList = host._step === "choose-binary" ? renderBinaryList(host) : nothing;
+  const downloadExtra =
+    host._step === "download-ready" ? renderDownloadReadyExtra(host) : nothing;
+  const logs = renderLogs(host);
+  // Skip the slotted wrapper entirely when there's nothing to show, so the
+  // card doesn't carry an empty element.
+  if (binaryList === nothing && downloadExtra === nothing && logs === nothing) {
+    return nothing;
+  }
+  return html`<div slot="status-extra">${binaryList} ${downloadExtra} ${logs}</div>`;
 }
 
 export function renderLogs(

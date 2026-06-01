@@ -8,21 +8,37 @@ import {
   mdiDownload,
   mdiPlay,
   mdiPulse,
+  mdiRestart,
   mdiStop,
 } from "@mdi/js";
-import { LitElement, css, html } from "lit";
+import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import type { ESPHomeAnsiLog } from "./ansi-log.js";
+import { logsDialogStyles } from "./logs-dialog.styles.js";
+import {
+  type LogsSession,
+  hasSerialPort,
+  isPassive,
+  isStreaming,
+} from "./logs-session.js";
+import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
+import {
+  fillTerminalOnMobile,
+  termButtonStyles,
+  termTokens,
+} from "./process-terminal/process-terminal.styles.js";
+import { renderTermButton, renderTermToggle } from "./process-terminal/toolbar-button.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./ansi-log.js";
 import "./base-dialog.js";
+import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
   "arrow-collapse": mdiArrowCollapse,
@@ -34,6 +50,7 @@ registerMdiIcons({
   stop: mdiStop,
   "delete-sweep": mdiDeleteSweep,
   pulse: mdiPulse,
+  restart: mdiRestart,
 });
 
 @customElement("esphome-logs-dialog")
@@ -55,17 +72,16 @@ export class ESPHomeLogsDialog extends LitElement {
   @property()
   name = "";
 
-  @state()
-  private _streaming = false;
+  // The active log source + its lifecycle. Single source of truth; the toolbar
+  // (streaming dot, Stop/Start, Reset enablement, source chip) all derive from
+  // it. See logs-session.ts for the states and why they're a union.
+  @state() private _session: LogsSession = { kind: "idle" };
 
   @state()
   private _expanded = false;
 
   @state()
   private _showStates = true;
-
-  @state()
-  private _passive = false;
 
   /**
    * Set when this session was launched as the post-install logs
@@ -76,14 +92,14 @@ export class ESPHomeLogsDialog extends LitElement {
    * re-show itself with its preserved state. Reset on every fresh
    * ``open`` / ``openPassive`` so the affordance only appears for
    * the run that asked for it.
-   *
-   * Callback in the field, boolean in the state — the boolean
-   * drives the toolbar render and updates trigger Lit reactivity;
-   * the callback closure isn't render-relevant on its own.
    */
   @state()
   private _backToInstall = false;
   private _backToInstallHandler: (() => void) | null = null;
+
+  // Reconnect hook for a Web Serial session whose reader is gone (a reopen
+  // failed -> `dead`); the "click Start to reconnect" recovery (#636).
+  private _reconnect: (() => Promise<void>) | null = null;
 
   @state()
   _lines: string[] = [];
@@ -91,289 +107,24 @@ export class ESPHomeLogsDialog extends LitElement {
   @state()
   private _open = false;
 
-  private _streamId = "";
+  @query("esphome-process-terminal")
+  private _terminal?: ESPHomeProcessTerminal;
 
-  /**
-   * Cancel handle for an active Web Serial read loop. ``openPassive``
-   * runs the loop outside the WS-stream world, so it isn't covered by
-   * ``_streamId`` / ``stopStream`` — without an explicit hook the loop
-   * survived dialog closes and bled the previous device's output into
-   * the next session.
-   */
-  private _serialCancel: (() => void) | null = null;
-
-  @query("esphome-ansi-log")
-  private _ansiLog?: ESPHomeAnsiLog;
+  // Read by `streamSerialToDialog` to gate appends while the log is paused (the
+  // reader keeps draining the open port; we just stop displaying).
+  get _serialPaused(): boolean {
+    const s = this._session;
+    return (s.kind === "serial" || s.kind === "reconnecting") && s.paused;
+  }
 
   static styles = [
     espHomeStyles,
-    css`
-      :host {
-        --term-bg: #1e1e1e;
-        --term-bg-alt: #252526;
-        --term-fg: #d4d4d4;
-        --term-fg-muted: #808080;
-        --term-border: #3c3c3c;
-        --term-hover: #2a2d2e;
-        --term-accent: #4ec9b0;
-        --term-error: #f44747;
-      }
-
-      :host([light]) {
-        --term-bg: #f5f5f5;
-        --term-bg-alt: #e8e8e8;
-        --term-fg: #1e1e1e;
-        --term-fg-muted: #6e6e6e;
-        --term-border: #d0d0d0;
-        --term-hover: #dcdcdc;
-        --term-accent: #0d8a6f;
-        --term-error: #c02020;
-      }
-
-      esphome-base-dialog {
-        /* Width history: 900 wrapped, 1100 still ~100px short, 1200
-           still wrapped on retina / HiDPI screens where ESPHome's
-           ANSI-coloured output reads at a slightly larger glyph and
-           the timestamp + [C][module:NNN] prefix eats more
-           horizontal real estate than expected. 1300 fits the
-           common case end-to-end on a 13-inch laptop and leaves the
-           expand button as the answer for long-tail lines
-           (multi-component config dumps, stack traces) past ~150
-           columns. min(..., 94vw) keeps the dialog from kissing the
-           viewport edges on smaller screens. */
-        --width: min(1300px, 94vw);
-      }
-
-      /* Expanded → "just give me logs": full viewport, the body fills
-         the space between the slim title bar and the streaming/stop
-         toolbar. height: 100% (with min-height: 0 so flex children
-         can shrink) lets the dialog's intrinsic header/body/footer
-         flex layout do the math, which avoids the calc(100dvh - X)
-         guesswork that left ~200px of empty space under the toolbar.
-         Same shape the mobile rule below already uses. */
-      :host([expanded]) .logs-content {
-        height: 100%;
-        max-height: none;
-        min-height: 0;
-      }
-
-      /* Match the device-editor's title bar (--esphome-primary
-         background with --esphome-on-primary text) so the dialog
-         reads as part of the dashboard chrome. The body stays
-         terminal-themed — header colour was the only thing that
-         looked unintentional against the dashboard's blue header
-         bar. */
-      esphome-base-dialog::part(header) {
-        background: var(--esphome-primary);
-        /* Right padding is 0 so the close button sits flush with the
-           dialog's corner — the button is explicitly sized to a 40x40
-           square below to give the X a comfortable hit target right
-           where the user reaches for it. */
-        padding: 0 0 0 var(--wa-space-m);
-        height: 40px;
-        box-sizing: border-box;
-      }
-
-      esphome-base-dialog::part(title) {
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-        font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
-      }
-
-      /* Close-button styling is bundled by
-         <esphome-base-dialog>; the shared
-         dialogCloseButtonStyles sheet lives in
-         src/styles/dialog-close-button.ts. */
-
-      esphome-base-dialog::part(body) {
-        padding: 0;
-        background: var(--term-bg);
-        overflow: hidden;
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
-      }
-
-      .logs-content {
-        display: flex;
-        flex-direction: column;
-        height: 60vh;
-        min-height: 300px;
-        max-height: 70vh;
-        overflow: hidden;
-      }
-
-      esphome-ansi-log {
-        flex: 1;
-        min-height: 0;
-        --log-height: 100%;
-      }
-
-      /* Override ansi-log border-radius inside the dialog */
-      esphome-ansi-log::part(container) {
-        border-radius: 0;
-      }
-
-      .terminal-toolbar {
-        flex-shrink: 0;
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
-        padding: 6px var(--wa-space-m);
-        background: var(--term-bg-alt);
-        border-top: 1px solid var(--term-border);
-      }
-
-      .terminal-toolbar .spacer {
-        flex: 1;
-      }
-
-      .term-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        padding: 4px 12px;
-        border-radius: 4px;
-        font-size: 12px;
-        font-weight: 600;
-        font-family: "SF Mono", "Fira Code", monospace;
-        cursor: pointer;
-        border: 1px solid var(--term-border);
-        transition:
-          background 0.1s,
-          border-color 0.1s;
-      }
-
-      .term-btn wa-icon {
-        font-size: 14px;
-      }
-
-      .term-btn--ghost {
-        background: transparent;
-        color: var(--term-fg-muted);
-      }
-
-      .term-btn--ghost:hover {
-        background: var(--term-hover);
-        color: var(--term-fg);
-        border-color: var(--term-fg-muted);
-      }
-
-      /* Tint the states toggle with the accent palette while the
-         "show states" mode is on so the user can tell at a glance
-         whether component state lines are flowing. Same palette as
-         --start so it visually reads as "this is active". */
-      .term-btn--ghost.is-active {
-        background: color-mix(in srgb, var(--term-accent), transparent 85%);
-        color: var(--term-accent);
-        border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
-      }
-
-      .term-btn--start {
-        background: color-mix(in srgb, var(--term-accent), transparent 85%);
-        color: var(--term-accent);
-        border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
-      }
-
-      .term-btn--start:hover {
-        background: color-mix(in srgb, var(--term-accent), transparent 75%);
-      }
-
-      .term-btn--stop {
-        background: color-mix(in srgb, var(--term-error), transparent 85%);
-        color: var(--term-error);
-        border-color: color-mix(in srgb, var(--term-error), transparent 60%);
-      }
-
-      .term-btn--stop:hover {
-        background: color-mix(in srgb, var(--term-error), transparent 75%);
-      }
-
-      .streaming-dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--term-accent);
-        animation: pulse 1.5s infinite;
-      }
-
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.3;
-        }
-      }
-
-      /* Full-viewport rules — the same shape applies when the user
-         hits expand on desktop AND on any mobile width. Placed last
-         so same-specificity rules in this file win source-order
-         against the desktop defaults. The :host esphome-base-dialog::part(dialog)
-         selector lands at (0,1,2), beating both wa-dialog's internal
-         .dialog (0,1,0) and the user-agent's dialog:modal (0,1,1)
-         without needing !important. */
-      :host([expanded]) esphome-base-dialog::part(dialog) {
-        position: fixed;
-        inset: 0;
-        width: 100vw;
-        height: 100vh;
-        height: 100dvh;
-        max-width: none;
-        max-height: none;
-        margin: 0;
-        border-radius: 0;
-      }
-
-      @media (max-width: 700px) {
-        :host esphome-base-dialog::part(dialog) {
-          position: fixed;
-          inset: 0;
-          /* width/height are explicit because wa-dialog's
-             width: var(--width) and the UA's
-             max-height: calc(100% - ...) would otherwise keep the
-             dialog at its desktop size. The vh declaration is the
-             fallback for pre-2022 Safari / Chrome / Firefox that
-             don't recognise dvh; modern browsers pick the dvh line
-             which adjusts as iOS Safari's URL bar collapses. */
-          width: 100vw;
-          height: 100vh;
-          height: 100dvh;
-          max-width: none;
-          max-height: none;
-          margin: 0;
-          border-radius: 0;
-        }
-
-        .logs-content {
-          height: 100%;
-          max-height: none;
-          min-height: 0;
-        }
-
-        .term-btn.expand-btn {
-          display: none;
-        }
-
-        /* The desktop toolbar is a single non-wrapping row that pushes the
-           controls right with a flex:1 spacer. On a phone the labelled
-           buttons (States / Clear / Stop) ran off the right edge, so the
-           Stop text was unreachable. Let the row wrap and drop the spacer
-           so the buttons flow left-to-right onto a second line, keeping
-           every label on-screen and tappable. */
-        .terminal-toolbar {
-          flex-wrap: wrap;
-        }
-
-        .terminal-toolbar .spacer {
-          display: none;
-        }
-      }
-    `,
+    termTokens,
+    termButtonStyles,
+    logsDialogStyles,
+    // Full-screen on mobile, terminal fills it.
+    fullscreenMobileDialog("esphome-base-dialog"),
+    fillTerminalOnMobile,
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
@@ -385,25 +136,43 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  private _port = "OTA";
-
   public open(port = "OTA", options: { onBackToInstall?: () => void } = {}) {
-    this._port = port;
-    this._lines = [];
-    this._streaming = false;
-    this._expanded = false;
-    /* Reset to the default each open. Persisting "hide states" across
-       a close/reopen would surprise the user — the dialog is supposed
-       to behave the same way every time it pops up unless the user
-       explicitly flips the toggle this session. */
-    this._showStates = true;
-    this._passive = false;
-    this._backToInstallHandler = options.onBackToInstall ?? null;
-    this._backToInstall = this._backToInstallHandler !== null;
-    this._streamId = "";
+    this._beginSession(options.onBackToInstall);
+    this._reconnect = null;
+    this._session = { kind: "ota", port, streamId: null };
     this._open = true;
     this._resetAnsiLogScroll();
-    this._startStreaming();
+    // Not awaiting the teardown in _beginSession (unlike _toggleShowStates):
+    // open() is only reached after a close, so any prior session is already
+    // idle and the teardown is a no-op — there's no live stream to overlap.
+    this._startOtaStream();
+  }
+
+  public openPassive(options: {
+    // Required so the `dead` state (a reopen failure) always has a recovery
+    // path — Start re-runs it; otherwise the Start button would be a dead end.
+    onReconnect: () => Promise<void>;
+    onBackToInstall?: () => void;
+  }) {
+    this._beginSession(options.onBackToInstall);
+    this._reconnect = options.onReconnect;
+    // The attach (`attachSerialLogStream` -> `setSerialStream`) follows
+    // immediately; show it as connecting/streaming until the reader lands.
+    this._session = { kind: "reconnecting", paused: false };
+    this._open = true;
+    this._resetAnsiLogScroll();
+  }
+
+  /** Shared open/openPassive prologue: tear down any prior session and reset
+   *  the per-session view state. ``_showStates`` resets each open so the dialog
+   *  behaves the same way every time unless the user flips it this session. */
+  private _beginSession(onBackToInstall?: () => void) {
+    void this._teardownSession();
+    this._lines = [];
+    this._expanded = false;
+    this._showStates = true;
+    this._backToInstallHandler = onBackToInstall ?? null;
+    this._backToInstall = this._backToInstallHandler !== null;
   }
 
   private _resetAnsiLogScroll() {
@@ -414,81 +183,94 @@ export class ESPHomeLogsDialog extends LitElement {
        back to the bottom themselves. ``scrollToBottom()`` clears the
        flag and forces a scroll. updateComplete makes sure the @query
        has resolved on first open. */
-    this.updateComplete.then(() => this._ansiLog?.scrollToBottom());
+    this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
-  /** Open dialog without auto-starting streaming (for Web Serial feed). */
-  /**
-   * Register a cancel for the active Web Serial reader so the dialog
-   * can tear it down on close or when ``openPassive`` starts a new
-   * session. Caller (``streamSerialToDialog``) returns one cancel
-   * fn per loop; the dialog only ever holds one at a time and
-   * disposes the prior one when a new one is registered.
-   */
-  public setSerialCancel(cancel: () => void) {
-    this._stopSerial();
-    this._serialCancel = cancel;
+  /** Register the Web Serial reader (its loop-cancel) + port. Called by
+   *  `attachSerialLogStream` once a port is open and streaming. */
+  public setSerialStream(port: SerialPort, cancel: () => void) {
+    // The attach is async (the reopen path retries for up to 5s). If the dialog
+    // closed or switched to a non-passive session while it was in flight, don't
+    // register — tear it down (cancel stops the reader and closes the port) so
+    // the handle isn't leaked, leaving the next open() to fail "already open".
+    if (!this._open || !isPassive(this._session)) {
+      cancel();
+      return;
+    }
+    // Honor a Stop pressed during the in-flight attach; replace any prior
+    // reader (defensive — `reconnecting` holds none).
+    const paused = this._session.kind === "reconnecting" ? this._session.paused : false;
+    if (this._session.kind === "serial") this._session.cancel();
+    this._session = { kind: "serial", port, cancel, paused };
   }
 
   /**
-   * Surface a failure to reopen the Web Serial port for post-install
-   * logs. Appends the message into the log pane (so a user who looked
-   * away during the install still sees the cause) and flips
-   * ``_streaming`` off so the toolbar shows "Start" — the right
-   * affordance for "this is broken, try again" — instead of "Stop".
-   * The caller pairs this with a ``toast.error`` for at-a-glance
-   * surfacing.
+   * Surface a failure to reopen the Web Serial port for post-install logs.
+   * Appends the message into the log pane (so a user who looked away during the
+   * install still sees the cause) and drops to ``dead`` so the toolbar shows
+   * "Start" — clicking it re-runs the reconnect hook. The caller pairs this
+   * with a ``toast.error``.
    */
   public setSerialOpenFailed(message: string) {
-    this._stopSerial();
+    // Same guard as setSerialStream: the reopen retries for ~5s, so a late
+    // failure can land after the dialog closed or switched to an OTA session —
+    // don't tear that unrelated session down or flip it into a passive `dead`.
+    if (!this._open || !isPassive(this._session)) return;
+    void this._teardownSession();
     this._lines = [...this._lines, message];
-    this._streaming = false;
+    this._session = { kind: "dead" };
   }
 
-  private _stopSerial() {
-    if (this._serialCancel) {
-      const cancel = this._serialCancel;
-      this._serialCancel = null;
-      cancel();
+  /** Stop whatever the session is running (Web Serial reader -> closes the
+   *  port; backend WS -> kills the subprocess) and return to ``idle``. The
+   *  cancel from `streamSerialToDialog` releases the reader lock before closing
+   *  so the next open() isn't blocked by a still-open port. A Stop *pause*
+   *  doesn't call this — it keeps the reader + port alive (#526). */
+  private _teardownSession(): Promise<void> {
+    const s = this._session;
+    this._session = { kind: "idle" };
+    if (s.kind === "serial") {
+      s.cancel();
+      return Promise.resolve();
     }
+    if (s.kind === "ota" && s.streamId !== null) {
+      return this._stopBackendStream(s.streamId);
+    }
+    return Promise.resolve();
   }
 
-  public openPassive(options: { onBackToInstall?: () => void } = {}) {
-    // Tear down any previous Web Serial read loop before kicking off
-    // the new session — without this the prior reader keeps shoving
-    // bytes into ``_lines`` and the new device's output is mixed
-    // with the old one's. Same shape as ``_detachStream`` in
-    // command-dialog.ts; different stream type, identical bug.
-    this._stopSerial();
-    // _port is only consulted if the user hits Stop and then Start
-    // after the serial reader is gone — default to OTA so the
-    // restart targets the freshly flashed device, not "" (#636).
-    this._port = "OTA";
-    this._lines = [];
-    this._streaming = true;
-    this._expanded = false;
-    this._showStates = true;
-    /* Web Serial drives output directly into ``_lines`` via
-       ``streamSerialToDialog`` — there's no backend ``esphome logs``
-       subprocess to pass ``--no-states`` to, so the toggle is hidden
-       in passive mode to avoid implying state filtering is available. */
-    this._passive = true;
-    this._backToInstallHandler = options.onBackToInstall ?? null;
-    this._backToInstall = this._backToInstallHandler !== null;
-    this._streamId = "";
-    this._open = true;
-    this._resetAnsiLogScroll();
+  private _stopBackendStream(streamId: string): Promise<void> {
+    // Swallow errors: if the WS is already gone there's nothing to cancel
+    // server-side. Returns a promise so callers that immediately respawn (the
+    // states toggle) can await the cancel landing first.
+    return this._api
+      .stopStream(streamId)
+      .catch(() => undefined)
+      .then(() => undefined);
   }
 
   public close() {
-    this._stopStreaming();
+    void this._teardownSession();
     this._open = false;
   }
 
   protected render() {
+    const s = this._session;
+    const streaming = isStreaming(s);
+    const passive = isPassive(s);
     const title = this._localize("dashboard.logs_title", { name: this.name });
+    // Web Serial's source label keys off the passive states; OTA / server-serial
+    // show the target port.
+    const source = passive
+      ? this._localize("dashboard.logs_source_web_serial")
+      : s.kind === "ota"
+        ? s.port
+        : "";
     const toggleLabel = this._localize(
       this._showStates ? "dashboard.logs_hide_states" : "dashboard.logs_show_states"
+    );
+    const expandLabel = this._localize(
+      this._expanded ? "dashboard.logs_collapse" : "dashboard.logs_expand"
     );
 
     return html`
@@ -498,129 +280,171 @@ export class ESPHomeLogsDialog extends LitElement {
         @request-close=${this._onDialogRequestClose}
         @after-hide=${this._onDialogHide}
       >
-        <div class="logs-content">
-          <esphome-ansi-log
-            .lines=${this._lines}
-            placeholder=${this._localize("dashboard.logs_placeholder")}
-            ?light=${!this._darkMode}
-          ></esphome-ansi-log>
-          <div class="terminal-toolbar">
-            ${this._backToInstall
-              ? html`
-                  <button
-                    class="term-btn term-btn--ghost"
-                    @click=${this._onBackToInstall}
-                    title=${this._localize("dashboard.logs_back_to_install_tooltip")}
-                  >
-                    <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                    ${this._localize("dashboard.logs_back_to_install")}
-                  </button>
-                `
-              : ""}
-            ${this._streaming ? html`<span class="streaming-dot"></span>` : ""}
-            <span class="spacer"></span>
-            ${this._passive
-              ? ""
-              : html`
-                  <button
-                    class="term-btn term-btn--ghost ${this._showStates
-                      ? "is-active"
-                      : ""}"
-                    @click=${this._toggleShowStates}
-                    title=${toggleLabel}
-                    aria-pressed=${this._showStates ? "true" : "false"}
-                  >
-                    <wa-icon library="mdi" name="pulse"></wa-icon>
-                    ${this._localize("dashboard.logs_states")}
-                  </button>
-                `}
+        <span slot="header-suffix" class="source-chip" title=${source}>${source}</span>
+        <esphome-process-terminal
+          .lines=${this._lines}
+          placeholder=${this._localize("dashboard.logs_placeholder")}
+          ?light=${!this._darkMode}
+          ?streaming=${streaming}
+        >
+          ${this._backToInstall
+            ? html`<button
+                slot="toolbar-left"
+                class="term-btn term-btn--ghost"
+                @click=${this._onBackToInstall}
+                title=${this._localize("dashboard.logs_back_to_install_tooltip")}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                ${this._localize("dashboard.logs_back_to_install")}
+              </button>`
+            : ""}
+          <div class="toolbar-slot" slot="toolbar-right">
+            ${passive
+              ? // Web Serial only; disabled until a port is attached.
+                renderTermButton({
+                  icon: "restart",
+                  label: this._localize("dashboard.logs_reset_device"),
+                  disabled: !hasSerialPort(s),
+                  onClick: this._onResetDevice,
+                })
+              : renderTermToggle({
+                  active: this._showStates,
+                  onClick: this._toggleShowStates,
+                  icon: "pulse",
+                  label: this._localize("dashboard.logs_states"),
+                  title: toggleLabel,
+                })}
+            <!-- Kept inline: the expand-btn class drives the mobile hide rule. -->
             <button
+              type="button"
               class="term-btn term-btn--ghost expand-btn"
               @click=${this._toggleExpanded}
+              title=${expandLabel}
+              aria-label=${expandLabel}
             >
               <wa-icon
                 library="mdi"
                 name=${this._expanded ? "arrow-collapse" : "arrow-expand"}
               ></wa-icon>
             </button>
-            <button class="term-btn term-btn--ghost" @click=${this._downloadLogs}>
-              <wa-icon library="mdi" name="download"></wa-icon>
-            </button>
-            <button
-              class="term-btn term-btn--ghost"
-              @click=${this._clearLogs}
-              title=${this._localize("dashboard.logs_clear")}
-            >
-              <wa-icon library="mdi" name="delete-sweep"></wa-icon>
-              ${this._localize("dashboard.logs_clear")}
-            </button>
-            ${this._streaming
-              ? html`
-                  <button class="term-btn term-btn--stop" @click=${this._stopStreaming}>
-                    <wa-icon library="mdi" name="stop"></wa-icon>
-                    ${this._localize("dashboard.logs_stop")}
-                  </button>
-                `
-              : html`
-                  <button class="term-btn term-btn--start" @click=${this._startStreaming}>
-                    <wa-icon library="mdi" name="play"></wa-icon>
-                    ${this._localize("dashboard.logs_start")}
-                  </button>
-                `}
+            ${renderTermButton({
+              icon: "download",
+              title: this._localize("dashboard.logs_download"),
+              onClick: this._downloadLogs,
+            })}
+            ${renderTermButton({
+              icon: "delete-sweep",
+              label: this._localize("dashboard.logs_clear"),
+              onClick: this._clearLogs,
+            })}
+            ${streaming
+              ? renderTermButton({
+                  icon: "stop",
+                  label: this._localize("dashboard.logs_stop"),
+                  variant: "stop",
+                  onClick: this._onStop,
+                })
+              : renderTermButton({
+                  icon: "play",
+                  label: this._localize("dashboard.logs_start"),
+                  variant: "start",
+                  onClick: this._onStart,
+                })}
           </div>
-        </div>
+        </esphome-process-terminal>
       </esphome-base-dialog>
     `;
   }
 
-  private _startStreaming() {
-    // Don't respawn onto a closed dialog: _toggleShowStates awaits stopStream
-    // before restarting, and a close during that await would otherwise spawn an
-    // orphaned stream with no Stop button. open() sets _open first.
-    if (!this._open) return;
-    if (this._streaming) return;
-    this._streaming = true;
+  // Start button (only shown while not streaming; the leading guard also
+  // absorbs a double-click in the same microtask). Per state:
+  //  - ota (stopped): respawn the backend stream.
+  //  - serial / reconnecting: just un-pause display — no port reopen (no
+  //    DTR/RTS pulse / reset) and no second reconnect while one's in flight.
+  //  - dead: run the reconnect hook (#636).
+  private _onStart() {
+    const s = this._session;
+    if (isStreaming(s)) return;
+    switch (s.kind) {
+      case "ota":
+        this._startOtaStream();
+        break;
+      case "serial":
+      case "reconnecting":
+        this._session = { ...s, paused: false };
+        break;
+      case "dead":
+        this._reconnectSerial();
+        break;
+    }
+  }
 
-    this._streamId = this._api.logs(
+  // Stop button. OTA kills the subprocess (Start respawns it); a Web Serial
+  // session only pauses display — the port + reader stay open so Start resumes
+  // without a close/reopen that reboots the device (#526).
+  private _onStop() {
+    const s = this._session;
+    switch (s.kind) {
+      case "ota":
+        if (s.streamId !== null) {
+          this._session = { kind: "ota", port: s.port, streamId: null };
+          void this._stopBackendStream(s.streamId);
+        }
+        break;
+      case "serial":
+      case "reconnecting":
+        this._session = { ...s, paused: true };
+        break;
+    }
+  }
+
+  private _startOtaStream() {
+    const s = this._session;
+    // Don't respawn onto a closed dialog (a close during the states-toggle
+    // cancel await would otherwise orphan a stream); only spawn from a stopped
+    // OTA session.
+    if (!this._open || s.kind !== "ota" || s.streamId !== null) return;
+    // Tag the stop callbacks with this stream's id so a late onResult/onError
+    // from a torn-down stream can't stop the one that replaced it. (The API
+    // also drops a stopped stream's handler synchronously, so this is belt +
+    // braces — it keeps correctness local instead of relying on that.)
+    let streamId = "";
+    streamId = this._api.logs(
       this.configuration,
-      this._port,
+      s.port,
       {
         onOutput: (line: string) => {
           this._lines = [...this._lines, line];
         },
-        onResult: () => {
-          this._streaming = false;
-          this._streamId = "";
-        },
-        onError: () => {
-          this._streaming = false;
-          this._streamId = "";
-        },
+        onResult: () => this._markOtaStopped(streamId),
+        onError: () => this._markOtaStopped(streamId),
       },
       { noStates: !this._showStates }
     );
+    this._session = { kind: "ota", port: s.port, streamId };
   }
 
-  private _stopStreaming(): Promise<void> {
-    // Stop both flavours of stream the dialog can carry: a backend
-    // ``logs`` WS subscription and a local Web Serial read loop.
-    // Closing one but not the other left passive sessions with a
-    // live reader still pushing bytes into ``_lines`` after the
-    // user hit Stop / Close.
-    this._stopSerial();
-    const streamId = this._streamId;
-    this._streaming = false;
-    this._streamId = "";
-    if (!streamId) return Promise.resolve();
-    // Tell the backend to kill the subprocess. If the WS isn't open
-    // anymore there's nothing to cancel server-side anyway, so swallow
-    // any error from the call. Returns a promise so callers that need
-    // to wait for the cancel to land (e.g. the states toggle, which
-    // immediately spawns a fresh stream) can await it.
-    return this._api
-      .stopStream(streamId)
-      .catch(() => undefined)
-      .then(() => undefined);
+  private _markOtaStopped(streamId: string) {
+    const s = this._session;
+    if (s.kind === "ota" && s.streamId === streamId) {
+      this._session = { kind: "ota", port: s.port, streamId: null };
+    }
+  }
+
+  private _reconnectSerial() {
+    if (!this._reconnect) return;
+    this._session = { kind: "reconnecting", paused: false };
+    this._reconnect().catch(() => {
+      // The reopen-retry failure path handles itself (setSerialOpenFailed ->
+      // `dead`, with its own toast). Only surface genuinely-unhandled
+      // rejections — still `reconnecting` means attach didn't handle it — so we
+      // don't double-toast.
+      if (this._session.kind !== "reconnecting") return;
+      this._session = { kind: "dead" };
+      toast.error(this._localize("dashboard.logs_web_serial_open_failed"), {
+        richColors: true,
+      });
+    });
   }
 
   private _downloadLogs() {
@@ -634,36 +458,48 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private async _toggleShowStates() {
     this._showStates = !this._showStates;
-    /* The --no-states flag is set on the esphome subprocess at spawn
-       time, so flipping the toggle has to tear down the current
-       stream and start a fresh one. Await the cancel so the backend
-       has actually killed the old subprocess before we spawn the new
-       one — otherwise a fast double-toggle could leave two log
-       readers attached to the device API at once. Only restart if we
-       were actively streaming — if the user already hit Stop, leave
-       the buffer alone and let them hit Start themselves. */
-    if (!this._streamId) return;
-    await this._stopStreaming();
-    this._startStreaming();
+    /* The --no-states flag is baked into the esphome subprocess at spawn time,
+       so flipping the toggle tears the stream down and respawns it. Await the
+       cancel so the backend has killed the old subprocess before the new one
+       spawns (a fast double-toggle would otherwise leave two readers on the
+       device API). Only while actively streaming — if the user already hit
+       Stop, leave the buffer and let them Start themselves. */
+    const s = this._session;
+    if (s.kind !== "ota" || s.streamId === null) return;
+    this._session = { kind: "ota", port: s.port, streamId: null };
+    await this._stopBackendStream(s.streamId);
+    this._startOtaStream();
   }
 
   private _clearLogs() {
     this._lines = [];
   }
 
+  // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the
+  // standard auto-reset circuit) to reboot the device, like the old dashboard's
+  // console; the reader stays attached so the boot log follows. Resumes display
+  // first so a Stopped log shows the boot output instead of dropping it.
+  private _onResetDevice = async () => {
+    const s = this._session;
+    if (s.kind !== "serial") return;
+    this._session = { ...s, paused: false };
+    try {
+      await s.port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await s.port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch {
+      // setSignals fails if the cable was pulled; tell the user the reset didn't
+      // land rather than letting them assume the device rebooted.
+      toast.error(this._localize("dashboard.logs_reset_failed"), { richColors: true });
+    }
+  };
+
   /**
-   * Flip our local ``_open`` flag the moment the user
-   * initiates a close (X / Esc / outside-click), before
-   * wa-dialog finishes its hide animation. Log streaming
-   * pushes new lines into ``_lines`` on a continuous WS
-   * subscription, and each push triggers a re-render with
-   * ``?open=${this._open}`` — if ``_open`` were still
-   * ``true`` during the hide animation, the re-asserted
-   * ``open=true`` could cancel wa-dialog's in-progress
-   * hide. Doesn't ``preventDefault`` — no host-side veto
-   * reason — so the close still proceeds and the
-   * ``after-hide`` handler tears down the stream as
-   * before.
+   * Flip ``_open`` false the moment the user initiates a close (X / Esc /
+   * outside-click), before wa-dialog finishes its hide animation. Streamed
+   * lines push into ``_lines`` and each push re-renders with
+   * ``?open=${this._open}``; were ``_open`` still true mid-animation the
+   * re-asserted ``open=true`` could cancel wa-dialog's hide. No
+   * ``preventDefault`` — the close proceeds and ``after-hide`` tears down.
    */
   private _onDialogRequestClose = (): void => {
     this._open = false;
@@ -671,23 +507,18 @@ export class ESPHomeLogsDialog extends LitElement {
 
   private _onDialogHide() {
     this._open = false;
-    this._stopStreaming();
+    void this._teardownSession();
   }
 
   /**
    * "Back to install" handler — only visible when an ``onBackToInstall``
-   * callback was supplied to ``open`` / ``openPassive`` (post-install
-   * hand-off). Stops the live stream, closes this dialog, and invokes
-   * the supplied callback to re-show the source install dialog with
-   * its preserved state.
-   *
-   * Awaits ``_stopStreaming`` so the backend log subprocess has
-   * actually torn down before the install dialog re-takes the
-   * screen. Without the await, a fast ``Back → Logs → Back → Logs``
-   * toggle by the user could leave two backend log subscriptions
-   * running briefly, both pumping lines into the same buffer. */
+   * callback was supplied (post-install hand-off). Awaits teardown so the
+   * backend subprocess / serial reader is gone before the install dialog
+   * re-takes the screen (a fast Back -> Logs -> Back could otherwise leave two
+   * subscriptions briefly running), then re-shows the source install dialog.
+   */
   private _onBackToInstall = async () => {
-    await this._stopStreaming();
+    await this._teardownSession();
     const handler = this._backToInstallHandler;
     this._backToInstall = false;
     this._backToInstallHandler = null;

@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../../styles/breakpoints.js";
+
 export const componentCatalogStyles = css`
   :host {
     display: flex;
@@ -48,12 +50,12 @@ export const componentCatalogStyles = css`
   }
 
   .category-btn:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
   }
 
   .category-btn--active {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
   }
 
@@ -124,9 +126,9 @@ export const componentCatalogStyles = css`
     align-content: start;
   }
 
-  /* Below ~600px (modal viewport on phones) collapse sidebar into a
+  /* Below the shared phone breakpoint (modal viewport on phones) collapse sidebar into a
      horizontal chip row above the grid. */
-  @media (max-width: 600px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     :host {
       flex-direction: column;
       height: auto;
@@ -180,7 +182,7 @@ export const componentCatalogStyles = css`
 
   .component-card:hover {
     border-color: var(--esphome-primary);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
+    background: var(--esphome-tint-faint);
   }
 
   .component-card:focus-within {
@@ -364,7 +366,7 @@ export const componentCatalogStyles = css`
   /* Featured cards get a subtle primary border so they read as the
      curated set, distinct from the regular catalog. */
   .component-card--featured {
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    border-color: var(--esphome-tint-border);
   }
 
   .bundle-badge {
@@ -374,7 +376,7 @@ export const componentCatalogStyles = css`
     font-size: var(--wa-font-size-2xs);
     font-weight: var(--wa-font-weight-bold);
     color: var(--esphome-primary);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     border-radius: var(--wa-border-radius-s);
     padding: 1px 6px;
   }

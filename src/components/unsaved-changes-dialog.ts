@@ -146,7 +146,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
       }
 
       .btn--save:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        background: var(--esphome-primary-hover);
       }
 
       .btn wa-icon {

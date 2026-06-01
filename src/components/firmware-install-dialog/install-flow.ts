@@ -34,10 +34,18 @@ export async function startWebSerialInstall(
   const device = host._device;
   if (!device) return;
 
+  // Surface esptool-js chip-detect / flash-session output in the shared log,
+  // the same buffer the compile phase streams to. Without this the WebSerial
+  // install showed no esptool logs at all, unlike the OTA / server-serial
+  // paths which stream the backend job output (#346).
+  const onLog = (line: string) => {
+    host._logLines = [...host._logLines, line];
+  };
+
   // 1. Connect and detect chip
   let detected: DetectedChip;
   try {
-    detected = await detectChip();
+    detected = await detectChip(onLog);
   } catch {
     host._close(); // User cancelled port selection
     return;
@@ -127,7 +135,7 @@ export async function startWebSerialInstall(
   host._flashPercent = 0;
   let flashDetected: DetectedChip;
   try {
-    flashDetected = await connectToPort(detected.port);
+    flashDetected = await connectToPort(detected.port, onLog);
   } catch (err) {
     console.error("[Web Serial] Reconnect failed:", err);
     host._fail(host._localize("firmware.flash_failed"));

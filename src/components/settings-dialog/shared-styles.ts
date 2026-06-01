@@ -1,5 +1,12 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
+
+/** Width at/below which the settings sidebar stacks above the content.
+ *  Wider than the full-screen breakpoint so tablets get the stacked nav
+ *  while the dialog is still a centered (not full-screen) box. */
+const SETTINGS_STACK_BREAKPOINT = 700;
+
 export const settingsSharedStyles = css`
   esphome-base-dialog {
     --width: min(800px, 95vw);
@@ -104,17 +111,6 @@ export const settingsSharedStyles = css`
     flex-shrink: 0;
   }
 
-  .nav-group-header {
-    font-size: var(--wa-font-size-2xs);
-    font-weight: var(--wa-font-weight-bold);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--wa-color-text-quiet);
-    padding: var(--wa-space-s) var(--wa-space-s) var(--wa-space-2xs);
-    margin-top: var(--wa-space-s);
-    border-top: 1px solid var(--wa-color-surface-border);
-  }
-
   .content {
     flex: 1;
     display: flex;
@@ -130,7 +126,8 @@ export const settingsSharedStyles = css`
     overflow-y: auto;
   }
 
-  @media (max-width: 700px) {
+  /* Tablet and phone: stack the nav above the content. */
+  @media (max-width: ${SETTINGS_STACK_BREAKPOINT}px) {
     .layout {
       flex-direction: column;
       height: auto;
@@ -143,6 +140,14 @@ export const settingsSharedStyles = css`
     .nav {
       flex-direction: row;
       flex-wrap: wrap;
+    }
+  }
+
+  /* At the full-screen breakpoint (fullscreenMobileDialog) the dialog fills
+     the viewport, so the layout fills it and the content body scrolls. */
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    .layout {
+      height: 100%;
     }
   }
 `;

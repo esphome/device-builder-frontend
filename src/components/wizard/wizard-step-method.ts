@@ -85,7 +85,7 @@ export class ESPHomeWizardStepMethod extends LitElement {
 
       .option-card:hover {
         border-color: var(--esphome-primary);
-        background: color-mix(in srgb, var(--esphome-primary), transparent 95%);
+        background: var(--esphome-tint-faint);
       }
 
       .option-card-text h3 {

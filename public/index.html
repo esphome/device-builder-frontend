@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#038fc7" />
+    <!-- Tracks --esphome-primary's fallback below (HTML attr can't read a CSS var). -->
+    <meta name="theme-color" content="#009ac7" />
     <!--
       Content-Security-Policy - defense in depth against any future
       XSS that slips past Lit's auto-escaping. Catches injected
@@ -112,11 +113,31 @@
          document-relative URL would resolve against the route). -->
     <link rel="icon" type="image/svg+xml" />
     <style>
+      :root {
+        /* App palette — the single place to adjust colors. Each is HA's theme
+           var when embedded, else the fallback; everything reads these tokens,
+           so editing a value here overrides HA everywhere. */
+        --esphome-primary: var(--primary-color, #009ac7);
+        --esphome-on-primary: var(--text-primary-color, #ffffff);
+        --esphome-success: var(--success-color, #2ecc71);
+        --esphome-warning: var(--warning-color, #f39c12);
+        --esphome-error: var(--error-color, #e74c3c);
+        --esphome-offline: var(--disabled-text-color, #95a5a6);
+      }
       :root,
       .wa-light,
       .wa-dark .wa-invert {
-        --wa-color-brand-fill-loud: var(--primary-color, #009fee);
-        --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
+        --wa-color-brand-fill-loud: var(--esphome-primary);
+        --wa-color-brand-on-loud: var(--esphome-on-primary);
+        /* A tint of the brand, intentionally tracking --esphome-primary
+           rather than HA's --state-active-color (which is amber), so the
+           quiet brand fill stays on-brand and follows the single knob. */
+        --wa-color-brand-fill-quiet: color-mix(
+          in srgb,
+          var(--esphome-primary),
+          transparent 88%
+        );
+        --wa-color-brand-on-quiet: var(--esphome-primary);
       }
 
       body {

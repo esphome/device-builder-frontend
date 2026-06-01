@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
+
 export const dashboardStyles = css`
   :host {
     display: flex;
@@ -25,6 +27,24 @@ export const dashboardStyles = css`
        enforce the bar's own height and to reserve clearance inside
        the device table so its pagination row doesn't sit beneath it. */
     --select-bar-height: 64px;
+    /* Outer padding for the search toolbar, shared between the card
+       view's .toolbar and the table view's .controls. .controls lives
+       in esphome-device-table's shadow but inherits these from the
+       dashboard host, so both toolbars resolve identical values and
+       can't drift on mobile. Mobile override is in the @media block. */
+    --toolbar-pad-top: var(--wa-space-l);
+    /* Horizontal content gutter shared by every full-width region in
+       both views: the toolbar (.toolbar / .controls), the card grid,
+       the YAML hit list, the table outline (.table-wrap), and the
+       table count row. Full on desktop, tightened on mobile in the
+       @media block below. Defined on the host so the device-table
+       shadow inherits it, keeping card and table views aligned. #41 */
+    --content-gutter: var(--wa-space-l);
+    /* Inter-row gap inside the toolbar. Card view's .toolbar and the
+       table view's .toolbar-stack both use it, and the table count
+       row mirrors it as padding-top, so the rows line up identically
+       when toggling between views. */
+    --toolbar-row-gap: 2px;
   }
 
   /* YAML mode renders over any underlying view, so it shares this
@@ -47,9 +67,17 @@ export const dashboardStyles = css`
   /* Mobile compacts the pill further (see .discovered-section-header
      @media block below), so the gutter tightens one more step to
      match the smaller pill. #41 */
-  @media (max-width: 600px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     :host([has-discovered]) {
       padding-top: var(--wa-space-l);
+    }
+
+    /* Tighten the shared gutters on mobile. Every full-width region
+       in both views inherits these, so the card and table layouts
+       stay in lockstep at narrow widths. #41 */
+    :host {
+      --toolbar-pad-top: var(--wa-space-s);
+      --content-gutter: var(--wa-space-s);
     }
   }
 
@@ -184,7 +212,7 @@ export const dashboardStyles = css`
      (icon + count + Show), just denser padding and smaller text /
      icon. The expandable grid below keeps its existing sizing —
      this only compacts the collapsed-state header. #41 */
-  @media (max-width: 600px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     .discovered-section-header {
       padding: var(--wa-space-2xs) var(--wa-space-s);
       gap: var(--wa-space-xs);
@@ -204,8 +232,8 @@ export const dashboardStyles = css`
   .devices-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: var(--wa-space-l);
-    padding: var(--wa-space-l);
+    gap: var(--content-gutter);
+    padding: var(--wa-space-l) var(--content-gutter);
   }
 
   /* When the grid follows the toolbar's count row (whether directly
@@ -241,8 +269,8 @@ export const dashboardStyles = css`
   .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: var(--wa-space-l) var(--wa-space-l) 0;
+    gap: var(--toolbar-row-gap);
+    padding: var(--toolbar-pad-top) var(--content-gutter) 0;
     flex-shrink: 0;
   }
 
@@ -251,11 +279,12 @@ export const dashboardStyles = css`
      .controls handles the outer padding). Without this rule the
      inner rows stacked at 0px gap while card view stacked at 2px,
      so flipping the view-toggle made the X-devices row jump 2px
-     vertically. */
+     vertically. Both gaps draw from --toolbar-row-gap so they
+     can't drift apart. */
   .toolbar-stack {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--toolbar-row-gap);
   }
 
   .toolbar-row {
@@ -264,17 +293,6 @@ export const dashboardStyles = css`
     gap: var(--wa-space-s);
     flex-wrap: wrap;
     row-gap: var(--wa-space-xs);
-  }
-
-  /* Pushes the select-toggle to the right edge of the toolbar.
-     The facet pills sit in the middle of the row (between the
-     view-toggle and the spacer) so they read as part of the
-     "view / filter" cluster; on narrow viewports the row wraps
-     so the facets flow onto a second line without crowding the
-     search input. */
-  .toolbar-spacer {
-    flex: 1 1 auto;
-    min-width: var(--wa-space-s);
   }
 
   /* Facet pills cluster inline with the view-toggle. flex-wrap
@@ -288,6 +306,43 @@ export const dashboardStyles = css`
     row-gap: var(--wa-space-2xs);
     flex-shrink: 1;
     min-width: 0;
+  }
+
+  /* Trailing "Clear filters" action on the desktop facet row. Shares the
+     toolbar control height so the strip stays aligned, but stays quiet
+     (borderless, muted) so it doesn't read as another facet pill. */
+  .filter-clear {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: var(--esphome-control-height);
+    padding: 0 10px;
+    border: none;
+    border-radius: var(--wa-border-radius-m);
+    background: transparent;
+    color: var(--wa-color-text-quiet);
+    font-family: inherit;
+    font-size: var(--wa-font-size-s);
+    font-weight: var(--wa-font-weight-semibold, 600);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition:
+      background-color 0.12s,
+      color 0.12s;
+  }
+
+  .filter-clear wa-icon {
+    font-size: 16px;
+  }
+
+  .filter-clear:hover {
+    color: var(--esphome-primary);
+    background: var(--esphome-tint);
+  }
+
+  .filter-clear:focus-visible {
+    outline: none;
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   /* The <form role="search"> wrapper is what suppresses Chrome's
@@ -309,6 +364,20 @@ export const dashboardStyles = css`
     flex: 1 1 220px;
     min-width: 140px;
   }
+
+  /* Table view (.toolbar-stack) and YAML view (:host([yaml])) no
+     longer carry a Filters control in the search row, so the search
+     input seeds from a 0 flex-basis and fills the row the same way in
+     both, matching the device-search width. Flex line-breaking uses
+     the basis, not min-width, so the 220px basis above would push the
+     view-toggle onto a second line at ~360px; a 0 basis keeps search +
+     view-toggle on one row (search still grows to fill, floored by the
+     140px min-width). The card toolbar keeps the 220px basis since its
+     Filters control still shares this row. */
+  .toolbar-stack .search-wrap,
+  :host([yaml]) .search-wrap {
+    flex-basis: 0;
+  }
   /* Native <input class="search-input"> picks up the shared
      border / radius / focus-ring shape from inputStyles
      (src/styles/inputs.ts) — matches the .combobox-input shape
@@ -322,6 +391,10 @@ export const dashboardStyles = css`
      the placeholder. */
   .search-wrap .search-input {
     padding-left: 36px;
+    /* Share the toolbar control height so the search box matches the
+       view-toggle / facet pills beside it (the input's default is the
+       taller --wa-form-control-height). */
+    min-height: var(--esphome-control-height);
   }
 
   /* Decorative leading icon — magnifier in device mode, code-braces
@@ -384,7 +457,7 @@ export const dashboardStyles = css`
   .yaml-hits {
     display: flex;
     flex-direction: column;
-    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    padding: var(--wa-space-m) var(--content-gutter) var(--wa-space-l);
     gap: var(--wa-space-l);
   }
   /* Title-only list (no search query): pack rows tightly so the
@@ -416,7 +489,7 @@ export const dashboardStyles = css`
       border-color 0.12s;
   }
   .yaml-hits:not(:has(.yaml-snippet)) .yaml-hit-group:hover {
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    border-color: var(--esphome-tint-border-strong);
     background: var(--wa-color-surface-lowered);
   }
   .yaml-hit-group-header {
@@ -479,7 +552,7 @@ export const dashboardStyles = css`
     padding: 1px 0;
   }
   .yaml-snippet-line--match {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
   }
   .yaml-snippet-gutter {
     flex: 0 0 auto;
@@ -506,7 +579,6 @@ export const dashboardStyles = css`
   .device-count {
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
-    padding-left: 2px;
   }
   .device-count strong {
     color: var(--wa-color-text-normal);
@@ -530,18 +602,13 @@ export const dashboardStyles = css`
      device in the row above. Horizontal padding matches .controls
      and .table-wrap above/below so the count and toggle line up
      with the column headers on the right. 2px top padding mirrors
-     card view's .toolbar gap:2px so the inter-row spacing reads
-     identically between views. */
+     card view's .toolbar gap so the inter-row spacing reads
+     identically between views. Horizontal padding and top gap draw
+     from the shared --content-gutter / --toolbar-row-gap tokens, so
+     the count row trims on mobile and lines up with the toolbar
+     above it without a separate @media rule. */
   .table-device-count-row {
-    padding: 2px var(--wa-space-l) var(--wa-space-xs);
-  }
-
-  /* Mobile: tighten the table-view count-row gutter to match the
-     .controls / .table-wrap trim in PR-H (see table-styles.ts). */
-  @media (max-width: 600px) {
-    .table-device-count-row {
-      padding: 2px var(--wa-space-s) var(--wa-space-xs);
-    }
+    padding: var(--toolbar-row-gap) var(--content-gutter) var(--wa-space-xs);
   }
 
   /* ─── View Toggle ─── */
@@ -558,8 +625,8 @@ export const dashboardStyles = css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--esphome-control-height);
+    height: var(--esphome-control-height);
     border: none;
     background: var(--wa-color-surface-raised);
     color: var(--wa-color-text-quiet);
@@ -585,7 +652,7 @@ export const dashboardStyles = css`
   }
 
   .view-toggle-btn.active:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .view-toggle-btn wa-icon {
@@ -626,17 +693,17 @@ export const dashboardStyles = css`
   .select-toggle-btn:focus-visible {
     outline: none;
     color: var(--wa-color-text-normal);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .select-toggle-btn.active {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 88%);
+    background: var(--esphome-tint);
     color: var(--esphome-primary);
-    border-color: color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    border-color: var(--esphome-tint-border);
   }
 
   .select-toggle-btn.active:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    background: var(--esphome-tint-strong);
   }
 
   .select-toggle-btn wa-icon {
@@ -689,7 +756,7 @@ export const dashboardStyles = css`
     transition: background 0.12s;
   }
   .empty-search-clear:hover {
-    background: color-mix(in srgb, var(--esphome-primary), transparent 90%);
+    background: var(--esphome-tint);
   }
 
   /* ─── Skeleton ─── */
@@ -802,7 +869,7 @@ export const dashboardStyles = css`
     align-items: center;
     justify-content: center;
     gap: var(--wa-space-m);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 96%);
+    background: var(--esphome-tint-faint);
     min-height: 200px;
     cursor: pointer;
     transition:
@@ -812,7 +879,7 @@ export const dashboardStyles = css`
   }
   .add-device-card:hover {
     border-color: var(--esphome-primary);
-    background: color-mix(in srgb, var(--esphome-primary), transparent 92%);
+    background: var(--esphome-tint);
     transform: translateY(-2px);
   }
   .add-device-icon-wrap {
@@ -880,14 +947,37 @@ export const dashboardStyles = css`
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     transition: background 0.12s;
+    /* Keeps its natural width; on mobile's single-row toolbar
+       (table-styles.ts) it may only shrink, never grow. min-width:0 +
+       the label ellipsis below let it ellipsize instead of wrapping
+       the row in a long locale. */
+    min-width: 0;
   }
 
   .table-create-btn:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .table-create-btn wa-icon {
     font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .table-create-btn .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    /* Flex item must allow shrinking below its intrinsic width or the
+       ellipsis never triggers when the mobile row gets tight. */
+    min-width: 0;
+  }
+
+  /* Tighter horizontal padding on the mobile toolbar row so the three
+     controls sit more compactly (matches the Columns toggle). */
+  @media (max-width: 700px) {
+    .table-create-btn {
+      padding: 0 10px;
+    }
   }
 
   /* ─── FAB ─── */
@@ -921,7 +1011,7 @@ export const dashboardStyles = css`
     letter-spacing: 0.01em;
   }
   .fab-btn:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
     transform: translateY(-2px);
     box-shadow:
       0 8px 24px color-mix(in srgb, var(--esphome-primary), transparent 30%),
@@ -932,39 +1022,5 @@ export const dashboardStyles = css`
   }
   .fab-btn wa-icon {
     font-size: 18px;
-  }
-
-  /* Mobile content-padding trim. The card grid, toolbar, and YAML
-     hit list all sit at --wa-space-l (24px) horizontal padding;
-     on a 375px phone viewport that's ~13% of the width per side
-     gone to chrome. Tighten to --wa-space-s (8px) so device cards
-     and the toolbar row claim the available width. Placed last in
-     the stylesheet so source-order wins against the base
-     declarations above. #41 */
-  @media (max-width: 600px) {
-    .devices-grid {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
-      gap: var(--wa-space-s);
-    }
-
-    .toolbar {
-      padding: var(--wa-space-s) var(--wa-space-s) 0;
-    }
-
-    /* When the discovered banner is present, the host already
-       provides padding-top equal to the banner height; the
-       toolbar's own padding-top stacks on top of that and reads
-       as dead space between the banner bottom and the search
-       input. Shrink to one step so the two rows breathe without
-       the doubled gutter. #41 */
-    :host([has-discovered]) .toolbar {
-      padding-top: var(--wa-space-s);
-    }
-
-    .yaml-hits {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
-    }
   }
 `;

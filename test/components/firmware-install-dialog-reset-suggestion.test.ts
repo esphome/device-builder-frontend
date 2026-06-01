@@ -3,14 +3,14 @@
  *
  * Same shape as the command-dialog test: REMOTE-sourced compile failures
  * must replace the local "reset build environment" link with a plain-text
- * "ask the operator of <receiver>" instruction. The renderer is wrapped
- * inside ``renderStatus`` (the only exported surface in renderers.ts), so
- * tests drive it through that.
+ * "ask the operator of <receiver>" instruction. Driven through
+ * ``renderResetSuggestion``, which gates the failure phase and delegates the
+ * markup to the shared reset-suggestion module.
  */
 import { describe, it } from "vitest";
 import { JobSource } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { renderStatus } from "../../src/components/firmware-install-dialog/renderers.js";
+import { renderResetSuggestion } from "../../src/components/firmware-install-dialog/renderers.js";
 import {
   expectFallbackToLocal,
   expectLocalSuggestion,
@@ -52,9 +52,9 @@ function baseHost(overrides: Partial<Host> = {}): Host {
 }
 
 const render = (host: Host) =>
-  renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
+  renderResetSuggestion(host as unknown as ESPHomeFirmwareInstallDialog);
 
-describe("firmware-install-dialog renderStatus failure suggestion", () => {
+describe("firmware-install-dialog renderResetSuggestion failure suggestion", () => {
   it("emits both clean and reset links on a LOCAL build failure", () => {
     const host = baseHost();
     expectLocalSuggestion(render(host), host);
