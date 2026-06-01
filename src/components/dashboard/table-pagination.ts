@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { localizeContext } from "../../context/index.js";
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 
@@ -134,6 +135,49 @@ export class ESPHomeTablePagination extends LitElement {
       .page-btn wa-icon {
         font-size: 16px;
       }
+
+      /* ─── Mobile: compact footer ───
+         At phone widths the full footer (row-count line + "Rows per page"
+         label + selector + page-of + nav) wraps badly and eats vertical
+         space. Reclaim the row-count line and drop the text label (the
+         selector keeps its aria-label, so it stays accessible) and let the
+         remaining selector / page-of / nav cluster center and wrap onto at
+         most two short rows. #521 */
+      @media (max-width: ${MOBILE_BREAKPOINT}px) {
+        .pagination {
+          justify-content: center;
+          padding: var(--wa-space-s) var(--wa-space-m);
+          gap: var(--wa-space-xs) var(--wa-space-s);
+        }
+        /* Visually hide the row-count rather than display:none so the
+           filtered total stays in the a11y tree (screen readers still
+           announce it); absolute positioning takes it out of the flow so
+           its vertical space is still reclaimed. */
+        .info {
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
+        }
+        .controls {
+          flex-wrap: wrap;
+          justify-content: center;
+          gap: var(--wa-space-xs) var(--wa-space-s);
+        }
+        /* Selector alone — the "Rows per page" text is dropped here. */
+        .page-size span {
+          display: none;
+        }
+        /* Drop the 100px reservation so page-of hugs its text. */
+        .page-info {
+          min-width: 0;
+        }
+      }
     `,
   ];
 
@@ -148,7 +192,10 @@ export class ESPHomeTablePagination extends LitElement {
         <div class="controls">
           <div class="page-size">
             <span>${this._localize("dashboard.pagination_rows_per_page")}</span>
-            <select @change=${this._onPageSizeChange}>
+            <select
+              aria-label=${this._localize("dashboard.pagination_rows_per_page")}
+              @change=${this._onPageSizeChange}
+            >
               ${[10, 20, 25, 50, 100, ALL_PAGE_SIZE].map(
                 (size) =>
                   html`<option value=${size} ?selected=${this.pageSize === size}>

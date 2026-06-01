@@ -65,3 +65,19 @@ describe("table-pagination All option", () => {
     expect(el.shadowRoot!.querySelector(".page-info")).not.toBeNull();
   });
 });
+
+describe("table-pagination accessibility", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  // The visible "Rows per page" <span> is hidden on mobile (and was never
+  // programmatically tied to the <select>), so the selector carries its own
+  // aria-label to keep an accessible name on every viewport. Guard against a
+  // future change dropping it once the label is no longer visible.
+  it("gives the page-size selector an accessible name via aria-label", async () => {
+    const el = await mount({ pageSize: 25 });
+    const select = el.shadowRoot!.querySelector("select")!;
+    expect(select.getAttribute("aria-label")).toBe("dashboard.pagination_rows_per_page");
+  });
+});
