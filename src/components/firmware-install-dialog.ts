@@ -16,6 +16,7 @@ import type { ConfiguredDevice } from "../api/types/devices.js";
 import { type FirmwareBinary, JobSource } from "../api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import type { DetectedChip } from "../util/web-serial.js";
@@ -124,7 +125,14 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
   _compileReject: ((err: Error) => void) | null = null;
   _detected: DetectedChip | null = null;
 
-  static styles = [espHomeStyles, firmwareInstallDialogStyles, remoteBuildHintStyles];
+  static styles = [
+    espHomeStyles,
+    firmwareInstallDialogStyles,
+    remoteBuildHintStyles,
+    // Content-heavy (build status + expandable log): full-screen on mobile
+    // so it doesn't overflow a centered box. #41
+    fullscreenMobileDialog("esphome-base-dialog"),
+  ];
 
   installWebSerial(device: ConfiguredDevice) {
     this._init(device);
