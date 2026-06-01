@@ -17,7 +17,6 @@ import { YAML_ONLY_SECTIONS } from "../../src/components/device/yaml-only-sectio
 import { makeConfigEntry } from "../../src/util/config-entry-defaults.js";
 import { validateEntries } from "../../src/util/config-validation.js";
 import {
-  LIST_SECTION_VALUE_KEY,
   LIST_SECTIONS,
   MAP_SECTIONS,
   resolveSectionEntries,
@@ -57,7 +56,7 @@ describe("resolveSectionEntries (LIST section shape)", () => {
     ];
     const entries = resolveSectionEntries("globals", catalog);
     expect(entries).toHaveLength(1);
-    expect(entries[0].key).toBe(LIST_SECTION_VALUE_KEY);
+    expect(entries[0].key).toBe("globals");
     expect(entries[0].type).toBe(ConfigEntryType.NESTED);
     expect(entries[0].multi_value).toBe(true);
     expect(entries[0].config_entries).toBe(catalog);
@@ -80,7 +79,7 @@ describe("resolveSectionEntries (LIST section shape)", () => {
       expect(entries).toHaveLength(1);
       expect(entries[0].type).toBe(ConfigEntryType.NESTED);
       expect(entries[0].multi_value).toBe(true);
-      expect(entries[0].key).toBe(LIST_SECTION_VALUE_KEY);
+      expect(entries[0].key).toBe("future_list_section");
       expect(entries[0].label).toBe("Item");
     } finally {
       mutable.delete("future_list_section");
