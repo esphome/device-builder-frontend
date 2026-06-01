@@ -189,6 +189,12 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
           ${renderSearchInput(host)} ${renderViewToggle(host)}
         </div>
       </div>
+      <!-- Facets live in the controls-right cluster (with Columns +
+           Create) at every width, not just mobile. At <=1100px this is
+           the single collapsed Filters button; above 1100px it expands
+           to the full facet pills, which then sit in the right cluster
+           and let the search box absorb the horizontal squeeze. That
+           wide-screen expansion is intentional, not a regression. -->
       <div slot="before-columns" class="table-facets">${renderFacets(host)}</div>
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}

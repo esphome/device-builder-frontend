@@ -80,6 +80,9 @@ export class ESPHomeTableColumnToggle extends LitElement {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        /* Flex item must allow shrinking below its intrinsic width or
+           the ellipsis never triggers on a tight toolbar row. */
+        min-width: 0;
       }
 
       /* Tighter horizontal padding on the mobile toolbar row so the
@@ -204,7 +207,10 @@ export class ESPHomeTableColumnToggle extends LitElement {
     return html`
       <button
         class="toggle-btn"
+        type="button"
         aria-label=${this._localize("dashboard.table_columns")}
+        aria-haspopup="true"
+        aria-expanded=${this._open}
         @click=${this._toggle}
       >
         <wa-icon library="mdi" name="cog-outline"></wa-icon>
