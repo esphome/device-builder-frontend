@@ -121,4 +121,21 @@ describe("streamSerialToDialog", () => {
     expect(dialog._lines).toHaveLength(1);
     expect(dialog._lines[0]).toMatch(/^\[\d{2}:\d{2}:\d{2}\]\[I\]\[app:100\]: partial$/);
   });
+
+  it("closes the port on cancel, after releasing the reader lock", async () => {
+    // Regression: closing a still-locked port fails and leaves it open, so a
+    // later open() throws "already open" and the logs dialog never reopens.
+    // The lock must be released before close().
+    const port = createMockPort([encode("[I][a:1]: hi\n")]);
+    const dialog: MockDialog = { _lines: [] };
+    const cancel = streamSerialToDialog(port, dialog);
+    await flush();
+    cancel();
+    await flush();
+    expect(port._reader.releaseLock).toHaveBeenCalled();
+    expect(port.close).toHaveBeenCalledTimes(1);
+    expect(port._reader.releaseLock.mock.invocationCallOrder[0]).toBeLessThan(
+      port.close.mock.invocationCallOrder[0]
+    );
+  });
 });

@@ -8,10 +8,12 @@ import {
   mdiDownload,
   mdiPlay,
   mdiPulse,
+  mdiRestart,
   mdiStop,
 } from "@mdi/js";
 import { LitElement, html } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
+import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
@@ -42,6 +44,7 @@ registerMdiIcons({
   stop: mdiStop,
   "delete-sweep": mdiDeleteSweep,
   pulse: mdiPulse,
+  restart: mdiRestart,
 });
 
 @customElement("esphome-logs-dialog")
@@ -110,6 +113,25 @@ export class ESPHomeLogsDialog extends LitElement {
    */
   private _serialCancel: (() => void) | null = null;
 
+  // The Web Serial port backing a passive session. Held for teardown and the
+  // Reset Device pulse. The reader stays attached across Stop/Start (see
+  // `_serialPaused`) so resuming never reopens the port — a close/reopen
+  // pulses DTR/RTS and would reboot the device (#526).
+  private _serialPort: SerialPort | null = null;
+
+  // `true` pauses the on-screen log while the reader keeps draining the open
+  // port, so Start resumes without a reset. Read by `streamSerialToDialog`.
+  _serialPaused = false;
+
+  // Reconnect hook for a passive session whose reader is gone (post-install
+  // reopen failed); the "click Start to reconnect" recovery (#636). Normal
+  // Stop/Start only pauses/resumes the attached reader and never runs this.
+  private _serialReconnect: (() => Promise<void>) | null = null;
+
+  // Reactive mirror of `_serialPort != null` so Reset Device can disable
+  // itself while no port is attached instead of being a silent no-op.
+  @state() private _hasSerialPort = false;
+
   @query("esphome-process-terminal")
   private _terminal?: ESPHomeProcessTerminal;
 
@@ -145,6 +167,10 @@ export class ESPHomeLogsDialog extends LitElement {
        explicitly flips the toggle this session. */
     this._showStates = true;
     this._passive = false;
+    // Switching to an OTA / server-serial session: tear down any Web Serial
+    // port a previous passive session left open, and drop its reconnect hook.
+    this._closeSerial();
+    this._serialReconnect = null;
     this._backToInstallHandler = options.onBackToInstall ?? null;
     this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
@@ -164,16 +190,14 @@ export class ESPHomeLogsDialog extends LitElement {
     this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
-  /** Open dialog without auto-starting streaming (for Web Serial feed). */
-  /**
-   * Register a cancel for the active Web Serial reader so the dialog
-   * can tear it down on close or when ``openPassive`` starts a new
-   * session. Caller (``streamSerialToDialog``) returns one cancel
-   * fn per loop; the dialog only ever holds one at a time and
-   * disposes the prior one when a new one is registered.
-   */
-  public setSerialCancel(cancel: () => void) {
-    this._stopSerial();
+  /** Register the active Web Serial reader (its loop-cancel) and its port,
+   *  tearing down any previous one first. Called by `attachSerialLogStream`.
+   *  Leaves `_serialPaused` untouched so a Stop pressed during an in-flight
+   *  reconnect is honored rather than overridden by the re-attach. */
+  public setSerialStream(port: SerialPort, cancel: () => void) {
+    this._closeSerial();
+    this._serialPort = port;
+    this._hasSerialPort = true;
     this._serialCancel = cancel;
   }
 
@@ -187,12 +211,19 @@ export class ESPHomeLogsDialog extends LitElement {
    * surfacing.
    */
   public setSerialOpenFailed(message: string) {
-    this._stopSerial();
+    this._closeSerial();
     this._lines = [...this._lines, message];
     this._streaming = false;
   }
 
-  private _stopSerial() {
+  /** Full teardown: stop the read loop, which also closes the port (the
+   *  cancel from `streamSerialToDialog` releases the lock before closing, so
+   *  the next open() isn't blocked by a still-open port). For dialog close /
+   *  new session / reopen failure. A Stop pause does NOT call this — it only
+   *  flips `_serialPaused`, keeping the reader + port alive (#526). */
+  private _closeSerial() {
+    this._serialPort = null;
+    this._hasSerialPort = false;
     if (this._serialCancel) {
       const cancel = this._serialCancel;
       this._serialCancel = null;
@@ -200,19 +231,23 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  public openPassive(options: { onBackToInstall?: () => void } = {}) {
-    // Tear down any previous Web Serial read loop before kicking off
-    // the new session — without this the prior reader keeps shoving
-    // bytes into ``_lines`` and the new device's output is mixed
-    // with the old one's. Same shape as ``_detachStream`` in
-    // command-dialog.ts; different stream type, identical bug.
-    this._stopSerial();
-    // _port is only consulted if the user hits Stop and then Start
-    // after the serial reader is gone — default to OTA so the
-    // restart targets the freshly flashed device, not "" (#636).
+  public openPassive(
+    options: {
+      onBackToInstall?: () => void;
+      onReconnect?: () => Promise<void>;
+    } = {}
+  ) {
+    // Tear down any previous Web Serial session (stop the reader and close
+    // its port) before kicking off the new one — without this the prior
+    // reader keeps shoving bytes into ``_lines`` and the new device's
+    // output is mixed with the old one's.
+    this._closeSerial();
+    // Passive never streams via _port, but keep it a sane default (the header
+    // source chip keys off _passive, not this).
     this._port = "OTA";
     this._lines = [];
     this._streaming = true;
+    this._serialPaused = false;
     this._expanded = false;
     this._showStates = true;
     /* Web Serial drives output directly into ``_lines`` via
@@ -220,6 +255,7 @@ export class ESPHomeLogsDialog extends LitElement {
        subprocess to pass ``--no-states`` to, so the toggle is hidden
        in passive mode to avoid implying state filtering is available. */
     this._passive = true;
+    this._serialReconnect = options.onReconnect ?? null;
     this._backToInstallHandler = options.onBackToInstall ?? null;
     this._backToInstall = this._backToInstallHandler !== null;
     this._streamId = "";
@@ -272,7 +308,13 @@ export class ESPHomeLogsDialog extends LitElement {
             : ""}
           <div class="toolbar-slot" slot="toolbar-right">
             ${this._passive
-              ? ""
+              ? // Web Serial only; disabled until a port is attached.
+                renderTermButton({
+                  icon: "restart",
+                  label: this._localize("dashboard.logs_reset_device"),
+                  disabled: !this._hasSerialPort,
+                  onClick: this._onResetDevice,
+                })
               : renderTermToggle({
                   active: this._showStates,
                   onClick: this._toggleShowStates,
@@ -308,13 +350,13 @@ export class ESPHomeLogsDialog extends LitElement {
                   icon: "stop",
                   label: this._localize("dashboard.logs_stop"),
                   variant: "stop",
-                  onClick: this._stopStreaming,
+                  onClick: this._onStop,
                 })
               : renderTermButton({
                   icon: "play",
                   label: this._localize("dashboard.logs_start"),
                   variant: "start",
-                  onClick: this._startStreaming,
+                  onClick: this._onStart,
                 })}
           </div>
         </esphome-process-terminal>
@@ -322,11 +364,51 @@ export class ESPHomeLogsDialog extends LitElement {
     `;
   }
 
+  // Start button. The guard absorbs a double-click in the same microtask
+  // (the button only renders while not streaming). A passive session with a
+  // live reader just un-pauses — no port reopen (DTR/RTS pulse / reset) and
+  // no OTA fall-through (#526); if the reader is gone (reopen failed) it runs
+  // the reconnect hook instead (#636).
+  private _onStart() {
+    if (this._streaming) return;
+    if (this._passive) {
+      if (this._serialCancel) {
+        this._serialPaused = false;
+        this._streaming = true;
+        return;
+      }
+      if (this._serialReconnect) {
+        this._streaming = true;
+        // attach surfaces its own failure; reset so Start returns for a retry.
+        this._serialReconnect().catch(() => {
+          this._streaming = false;
+        });
+      }
+      return;
+    }
+    this._startStreaming();
+  }
+
+  // Stop button. A passive session pauses display only; the port + reader
+  // stay open so Start resumes without a close/reopen that reboots the device
+  // (#526). Full close happens on dialog close / new session.
+  private _onStop() {
+    if (this._passive) {
+      this._serialPaused = true;
+      this._streaming = false;
+      return;
+    }
+    void this._stopStreaming();
+  }
+
   private _startStreaming() {
     // Don't respawn onto a closed dialog: _toggleShowStates awaits stopStream
     // before restarting, and a close during that await would otherwise spawn an
     // orphaned stream with no Stop button. open() sets _open first.
     if (!this._open) return;
+    // Passive Stop/Start go through _onStop / _onStart; guard against an OTA
+    // stream ever spawning onto a serial session (#526).
+    if (this._passive) return;
     if (this._streaming) return;
     this._streaming = true;
 
@@ -351,12 +433,10 @@ export class ESPHomeLogsDialog extends LitElement {
   }
 
   private _stopStreaming(): Promise<void> {
-    // Stop both flavours of stream the dialog can carry: a backend
-    // ``logs`` WS subscription and a local Web Serial read loop.
-    // Closing one but not the other left passive sessions with a
-    // live reader still pushing bytes into ``_lines`` after the
-    // user hit Stop / Close.
-    this._stopSerial();
+    // Full teardown of either stream the dialog carries: the backend WS
+    // subscription and a Web Serial session (reader + port). For dialog
+    // close / back-to-install — the passive Stop pause goes through _onStop.
+    this._closeSerial();
     const streamId = this._streamId;
     this._streaming = false;
     this._streamId = "";
@@ -399,6 +479,22 @@ export class ESPHomeLogsDialog extends LitElement {
   private _clearLogs() {
     this._lines = [];
   }
+
+  // Reset Device button (Web Serial only). Pulses RTS (wired to EN on the
+  // standard auto-reset circuit) to reboot the device, like the old
+  // dashboard's console; the reader stays attached so the boot log follows.
+  private _onResetDevice = async () => {
+    const port = this._serialPort;
+    if (!port) return;
+    try {
+      await port.setSignals({ dataTerminalReady: false, requestToSend: true });
+      await port.setSignals({ dataTerminalReady: false, requestToSend: false });
+    } catch {
+      // setSignals fails if the cable was pulled; tell the user the reset
+      // didn't land rather than letting them assume the device rebooted.
+      toast.error(this._localize("dashboard.logs_reset_failed"), { richColors: true });
+    }
+  };
 
   /**
    * Flip our local ``_open`` flag the moment the user
