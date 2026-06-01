@@ -29,8 +29,7 @@ export const espHomeStyles = css`
       var(--primary-color, var(--esphome-brand-default)),
       black 8%
     );
-    /* Status colors hook HA's semantic vars, falling back to our own values
-       (the fallback is what renders under ingress / esphome-desktop). */
+    /* Hook HA's semantic vars; the hex is the esphome-desktop fallback. */
     --esphome-success: var(--success-color, #2ecc71);
     --esphome-warning: var(--warning-color, #f39c12);
     --esphome-error: var(--error-color, #e74c3c);

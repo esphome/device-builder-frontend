@@ -114,10 +114,8 @@
     <link rel="icon" type="image/svg+xml" />
     <style>
       :root {
-        /* Single source for the brand color when HA's --primary-color isn't
-           present (HA-ingress runs in an iframe and esphome-desktop has no HA,
-           so this fallback is what actually renders). Value matches HA's
-           default primary; re-tuning the brand is a one-line edit here. */
+        /* Single-source brand fallback for where HA isn't present
+           (esphome-desktop / standalone). Re-tune the brand here. */
         --esphome-brand-default: #009ac7;
       }
       :root,

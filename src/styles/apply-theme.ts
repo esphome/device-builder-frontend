@@ -27,30 +27,13 @@ function applyWaTheme(): void {
 }
 
 /**
- * Inject ESPHome-specific theme bridges that need to live at the
- * document level so CSS custom properties cascade into every
- * shadow root.
- *
- * `--esphome-svg-filter` adapts monochrome SVG icons (the ESPHome
- * component-catalog illustrations) to dark mode: in light mode it
- * stays `none`, in dark mode it inverts colours (with a
- * complementary hue rotation so any colour-tinted strokes survive
- * the round trip). Components apply it via
- * `filter: var(--esphome-svg-filter)` on `img[src$=".svg"]`.
- *
- * The ``--wa-color-brand-*`` overrides remap WebAwesome's default
- * cyan brand palette onto ``--primary-color`` (HA's primary), with
- * ``--esphome-brand-default`` (= HA's default primary ``#009ac7``,
- * defined once in index.html) as the fallback. When embedded in HA,
- * the ``var(…)`` hooks resolve: HA injects its full theme — including
- * ``--primary-color`` and its own ``--wa-color-*`` map — onto the
- * panel's root, even under ingress, so the panel adopts the user's
- * HA theme (e.g. a theme that remaps ``--primary-color`` recolours
- * the header to match). The fallback only renders where there's no
- * HA: esphome-desktop and the standalone dev server. Without this
- * remap the panel headers, primary buttons, FAB, and active
- * view-toggle pip burst in WebAwesome's own cyan. (HA's legacy
- * ``--primary-color`` ``#03a9f4`` was retired upstream for ``#009ac7``.)
+ * Document-level theme bridges so the custom properties cascade into
+ * every shadow root. `--esphome-svg-filter` inverts monochrome SVG
+ * icons in dark mode (hue-rotate keeps tinted strokes). The
+ * `--wa-color-brand-*` overrides point WebAwesome's brand palette at
+ * HA's `--primary-color`, which HA injects (even under ingress) so the
+ * panel adopts the user's theme; `--esphome-brand-default` is the
+ * fallback where there's no HA (esphome-desktop / standalone).
  */
 function applyEspHomeTokens(): void {
   const style = document.createElement("style");
