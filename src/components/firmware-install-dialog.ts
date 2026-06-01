@@ -307,9 +307,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
     this.dispatchEvent(new CustomEvent("close", { bubbles: true, composed: true }));
   };
 
-  // wa-dialog's close button (header X) and Escape both fire wa-after-hide.
-  // Same stream teardown as _close — otherwise a header-X-then-reopen leaves
-  // the prior followJob attached and lines duplicate into the new session.
+  // Flip _open the moment a close is requested (X / Escape / outside-click) so
+  // streamed log lines re-rendering with ?open can't re-assert open=true and
+  // cancel the in-flight hide (the race logs / command dialogs also guard).
+  // Teardown stays in _onClose (after-hide).
+  _onRequestClose = () => {
+    this._open = false;
+  };
+
+  // base-dialog's after-hide fires once the dialog has fully hidden (header X,
+  // Escape, or a programmatic close). Same stream teardown as _close —
+  // otherwise a header-X-then-reopen leaves the prior followJob attached and
+  // lines duplicate into the new session.
   _onClose = () => {
     this._open = false;
     this._detachStream();
@@ -320,6 +329,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
       <esphome-base-dialog
         ?open=${this._open}
         .label=${this._title}
+        @request-close=${this._onRequestClose}
         @after-hide=${this._onClose}
       >
         <esphome-process-terminal
