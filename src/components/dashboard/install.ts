@@ -68,7 +68,9 @@ export async function openLogs(
   // Offer the OTA-vs-serial choice whenever a serial path exists — browser
   // WebSerial, or serial ports on the server (mirrors the old dashboard's
   // logs-target behavior; see #525). With no serial option at all, skip the
-  // picker and open OTA logs directly.
+  // picker and open OTA logs directly. The device's online/offline state is
+  // intentionally not consulted: the picker (or OTA fallback) is purely
+  // serial-path driven, and the picker already gates its own OTA row on state.
   const hasWebSerial = "serial" in navigator;
   let hasServerPorts = false;
   if (!hasWebSerial) {
@@ -76,7 +78,11 @@ export async function openLogs(
     // serial path.
     try {
       hasServerPorts = (await host._api.getSerialPorts()).length > 0;
-    } catch {
+    } catch (err) {
+      // Lockstep deployment means this command exists, so a rejection is a
+      // real WS/backend fault, not version drift; log it but still fall
+      // through to OTA logs so the user isn't left without any path.
+      console.warn("getSerialPorts failed; falling back to OTA logs", err);
       hasServerPorts = false;
     }
   }
