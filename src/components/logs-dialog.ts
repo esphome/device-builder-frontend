@@ -24,7 +24,9 @@ import { registerMdiIcons } from "../util/register-icons.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
 import {
   type LogsSession,
+  OTA_PORT,
   hasSerialPort,
+  isOtaNetwork,
   isPassive,
   isStreaming,
 } from "./logs-session.js";
@@ -136,7 +138,7 @@ export class ESPHomeLogsDialog extends LitElement {
     }
   }
 
-  public open(port = "OTA", options: { onBackToInstall?: () => void } = {}) {
+  public open(port = OTA_PORT, options: { onBackToInstall?: () => void } = {}) {
     this._beginSession(options.onBackToInstall);
     this._reconnect = null;
     this._session = { kind: "ota", port, streamId: null };
@@ -307,13 +309,17 @@ export class ESPHomeLogsDialog extends LitElement {
                   disabled: !hasSerialPort(s),
                   onClick: this._onResetDevice,
                 })
-              : renderTermToggle({
-                  active: this._showStates,
-                  onClick: this._toggleShowStates,
-                  icon: "pulse",
-                  label: this._localize("dashboard.logs_states"),
-                  title: toggleLabel,
-                })}
+              : isOtaNetwork(s)
+                ? // States arrive only over the network/API connection, so the
+                  // toggle is hidden for a server serial source (#539).
+                  renderTermToggle({
+                    active: this._showStates,
+                    onClick: this._toggleShowStates,
+                    icon: "pulse",
+                    label: this._localize("dashboard.logs_states"),
+                    title: toggleLabel,
+                  })
+                : ""}
             <!-- Kept inline: the expand-btn class drives the mobile hide rule. -->
             <button
               type="button"

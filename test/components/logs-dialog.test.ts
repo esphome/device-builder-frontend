@@ -158,6 +158,44 @@ describe("logs-dialog header source chip", () => {
   });
 });
 
+describe("logs-dialog States toggle gate (#539)", () => {
+  function mount(): ESPHomeLogsDialog {
+    const el = new ESPHomeLogsDialog();
+    (el as any)._api = { logs: () => "s1", stopStream: () => Promise.resolve() };
+    document.body.appendChild(el);
+    return el;
+  }
+
+  // The States toggle is the only toolbar control with aria-pressed.
+  const hasStatesToggle = (el: ESPHomeLogsDialog): boolean =>
+    el.shadowRoot!.querySelector("[aria-pressed]") !== null;
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("shows the States toggle for an OTA (network) session", async () => {
+    const el = mount();
+    el.open("OTA");
+    await el.updateComplete;
+    expect(hasStatesToggle(el)).toBe(true);
+  });
+
+  it("hides the States toggle for a server-serial session", async () => {
+    const el = mount();
+    el.open("/dev/cu.usbserial-110");
+    await el.updateComplete;
+    expect(hasStatesToggle(el)).toBe(false);
+  });
+
+  it("hides the States toggle for a passive (Web Serial) session", async () => {
+    const el = mount();
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    await el.updateComplete;
+    expect(hasStatesToggle(el)).toBe(false);
+  });
+});
+
 describe("logs-dialog passive Web Serial session (#526)", () => {
   let el: ESPHomeLogsDialog;
   let logs: ReturnType<typeof vi.fn>;
