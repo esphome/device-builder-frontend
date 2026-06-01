@@ -155,7 +155,7 @@ export const deviceSectionConfigStyles = css`
     align-items: center;
     gap: 2px;
     background: var(--wa-color-brand-fill-loud, var(--esphome-primary));
-    color: var(--wa-color-brand-on-loud, #ffffff);
+    color: var(--wa-color-brand-on-loud, var(--esphome-on-primary));
     border: var(--wa-border-width-s) solid
       var(--wa-color-brand-fill-loud, var(--esphome-primary));
     padding: 2px var(--wa-space-s);

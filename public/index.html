@@ -129,6 +129,9 @@
       .wa-dark .wa-invert {
         --wa-color-brand-fill-loud: var(--esphome-primary);
         --wa-color-brand-on-loud: var(--esphome-on-primary);
+        /* A tint of the brand, intentionally tracking --esphome-primary
+           rather than HA's --state-active-color (which is amber), so the
+           quiet brand fill stays on-brand and follows the single knob. */
         --wa-color-brand-fill-quiet: color-mix(
           in srgb,
           var(--esphome-primary),
