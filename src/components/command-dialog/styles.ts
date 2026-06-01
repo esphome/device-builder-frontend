@@ -62,12 +62,8 @@ export const commandDialogStyles = css`
     overflow: hidden;
   }
 
-  /* On the mobile full-screen sheet (fullscreenMobileDialog) the dialog
-     fills the viewport, so the log fills it too instead of staying at a
-     fixed 60vh with dead space below. The 600px here must track
-     fullscreenMobileDialog's default breakpoint in dialog-mobile.ts; if
-     the command-dialog call site ever passes a custom breakpoint, change
-     both. #41 */
+  /* Fill the mobile full-screen sheet (fullscreenMobileDialog); keep this
+     600px in sync with that fragment's breakpoint. #41 */
   @media (max-width: 600px) {
     .content {
       height: 100%;

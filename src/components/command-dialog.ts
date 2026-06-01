@@ -198,8 +198,7 @@ export class ESPHomeCommandDialog extends LitElement {
     dialogCloseButtonStyles,
     commandDialogStyles,
     remoteBuildHintStyles,
-    // Build/clean log output is content-heavy: go full-screen on mobile
-    // instead of a centered box that overflows the viewport. #41
+    // Log output is content-heavy: full-screen on mobile. #41
     fullscreenMobileDialog("wa-dialog"),
   ];
 

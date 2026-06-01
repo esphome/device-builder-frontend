@@ -103,9 +103,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         --width: 750px;
       }
 
-      /* Mobile full-screen comes from fullscreenMobileDialog() in the
-         static styles array; the wizard's board picker and per-step
-         bodies need the full width instead of a 520px column. #41 */
+      /* Mobile full-screen comes from fullscreenMobileDialog in the static
+         styles so the board picker isn't boxed into a 520px column. #41 */
 
       wa-dialog::part(header) {
         background: var(--esphome-primary);

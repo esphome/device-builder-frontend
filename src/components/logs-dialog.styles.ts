@@ -232,9 +232,8 @@ export const logsDialogStyles = css`
   }
 
   @media (max-width: 700px) {
-    /* The full-screen ::part(dialog) rule comes from
-       fullscreenMobileDialog("esphome-base-dialog", 700) in the
-       component's static styles; these are the logs-specific companions. */
+    /* Full-screen ::part(dialog) comes from fullscreenMobileDialog in the
+       static styles; these are the logs-specific companions. */
     .logs-content {
       height: 100%;
       max-height: none;
