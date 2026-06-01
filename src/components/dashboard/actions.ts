@@ -5,6 +5,7 @@ import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ArchivedDevice, BulkActionResult } from "../../api/types/system.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { withBase } from "../../util/base-path.js";
+import { ESPHomeLogParser } from "../../util/esphome-log-parser.js";
 import {
   connectToPort,
   detectChip,
@@ -424,6 +425,11 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
   const decoder = new TextDecoder();
   let buffer = "";
   let cancelled = false;
+  // Raw UART logs skip the backend's per-line formatting, so a multi-line
+  // ESPHome record (color opened once, continuation lines indented) loses
+  // its color/header when split on \n. Re-apply them per line, exactly like
+  // the backend's esphome-logs CLI does via aioesphomeapi's LogParser.
+  const parser = new ESPHomeLogParser();
   const readLoop = async () => {
     try {
       while (true) {
@@ -448,7 +454,7 @@ export function streamSerialToDialog(port: any, dialog: any): () => void {
                unconditionally (the line break is preserved before
                stamping), so we match that behaviour here for parity
                between the two web serial paths. */
-            const stamped = `${formatSerialTimestamp(new Date())}${cleaned}`;
+            const stamped = `${formatSerialTimestamp(new Date())}${parser.parseLine(cleaned)}`;
             dialog._lines = [...dialog._lines, stamped];
           }
         }
