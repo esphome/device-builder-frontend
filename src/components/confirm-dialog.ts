@@ -1,17 +1,16 @@
 import { consume } from "@lit/context";
 import { mdiAlertOutline } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { modalDialogStyles } from "../styles/modal-dialog.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 
 registerMdiIcons({ "alert-outline": mdiAlertOutline });
 
@@ -55,15 +54,14 @@ export class ESPHomeConfirmDialog extends LitElement {
   @property()
   icon = "alert-outline";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   static styles = [
     espHomeStyles,
     modalDialogStyles,
-    dialogCloseButtonStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 420px;
       }
 
@@ -119,17 +117,22 @@ export class ESPHomeConfirmDialog extends LitElement {
 
   open() {
     this._decided = false;
-    this._dialog.open = true;
+    this._open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
 
   protected render() {
     return html`
-      <wa-dialog label=${this.heading} light-dismiss @wa-after-hide=${this._onAfterHide}>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this.heading}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
+      >
         <div class="body">
           ${this.destructive
             ? html`<div class="icon-wrap destructive">
@@ -158,7 +161,7 @@ export class ESPHomeConfirmDialog extends LitElement {
             ${this.confirmLabel || this.heading}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -181,7 +184,15 @@ export class ESPHomeConfirmDialog extends LitElement {
     this.dispatchEvent(new CustomEvent("secondary", { bubbles: true }));
   }
 
+  // Flip _open the moment a close is requested (X / Esc / outside-click),
+  // before wa-dialog finishes hiding, so a re-render can't re-assert ?open
+  // and cancel the in-progress hide. Teardown stays in after-hide.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
+
   private _onAfterHide() {
+    this._open = false;
     this._enter.set(false);
     if (!this._decided) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true }));
