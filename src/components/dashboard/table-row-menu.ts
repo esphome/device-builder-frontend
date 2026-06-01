@@ -110,6 +110,14 @@ export class ESPHomeTableRowMenu extends LitElement {
         box-shadow: var(--wa-shadow-l);
         padding: var(--wa-space-xs) 0;
         animation: menu-in 0.12s ease-out;
+        /* This menu has many items; on short / mobile viewports it would
+           otherwise run off the bottom of the screen. Cap it to the
+           viewport (8px gutter each side, matching the reposition pad)
+           and scroll internally so it always fits. vh fallback first,
+           then dvh for browsers that track the dynamic viewport. */
+        max-height: calc(100vh - 16px);
+        max-height: calc(100dvh - 16px);
+        overflow-y: auto;
       }
 
       @keyframes menu-in {
