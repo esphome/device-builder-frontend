@@ -1003,6 +1003,9 @@ export function updateSectionInYaml(
     // No array → leave the YAML untouched rather than collapse the
     // block to a bare header, which would wipe every item.
     if (!Array.isArray(raw)) return yaml;
+    // Emptied list (every item deleted) → drop the whole block instead
+    // of leaving an invalid bare `sectionKey:`. serializeYamlValues
+    // skips empty arrays, so the splice removes header + body.
     const childIndent = _detectSectionChildIndent(lines, start, false);
     const block = serializeYamlValues(
       { [sectionKey]: raw },

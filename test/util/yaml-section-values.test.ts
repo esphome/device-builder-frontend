@@ -1820,6 +1820,19 @@ describe("globals list section (LIST_SECTIONS)", () => {
     expect(Array.isArray(parsed.globals)).toBe(false);
     expect(parsed.foo).toBe("bar");
   });
+
+  it("removes the whole block when every item is deleted, keeping siblings", () => {
+    const out = updateSectionInYaml(TWO_ENTRY + "wifi:\n  ssid: home\n", "globals", {
+      globals: [],
+    });
+    expect(out).not.toContain("globals:");
+    expect(out).toContain("wifi:");
+    expect(out).toContain("ssid: home");
+  });
+
+  it("emptying the only section yields an empty document", () => {
+    expect(updateSectionInYaml(TWO_ENTRY, "globals", { globals: [] })).toBe("");
+  });
 });
 
 describe("LIST_SECTIONS is membership-driven, not hardcoded to globals", () => {
