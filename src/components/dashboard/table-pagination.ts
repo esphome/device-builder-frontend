@@ -139,7 +139,7 @@ export class ESPHomeTablePagination extends LitElement {
       /* ─── Mobile: compact footer ───
          At phone widths the full footer (row-count line + "Rows per page"
          label + selector + page-of + nav) wraps badly and eats vertical
-         space. Drop the redundant row-count line and the text label (the
+         space. Reclaim the row-count line and drop the text label (the
          selector keeps its aria-label, so it stays accessible) and let the
          remaining selector / page-of / nav cluster center and wrap onto at
          most two short rows. #521 */
@@ -149,8 +149,20 @@ export class ESPHomeTablePagination extends LitElement {
           padding: var(--wa-space-s) var(--wa-space-m);
           gap: var(--wa-space-xs) var(--wa-space-s);
         }
+        /* Visually hide the row-count rather than display:none so the
+           filtered total stays in the a11y tree (screen readers still
+           announce it); absolute positioning takes it out of the flow so
+           its vertical space is still reclaimed. */
         .info {
-          display: none;
+          position: absolute;
+          width: 1px;
+          height: 1px;
+          padding: 0;
+          margin: -1px;
+          overflow: hidden;
+          clip: rect(0, 0, 0, 0);
+          white-space: nowrap;
+          border: 0;
         }
         .controls {
           flex-wrap: wrap;
