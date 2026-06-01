@@ -196,7 +196,15 @@ export async function openLogsWithMethod(
     const reconnect = () =>
       attachSerialLogStream(serialPort, host._logsDialog, host._localize);
     host._logsDialog.openPassive({ onReconnect: reconnect });
-    await reconnect();
+    // attach toasts the reopen-retry failure itself; cover any other rejection
+    // so it can't escape this fire-and-forget call as an unhandled rejection.
+    try {
+      await reconnect();
+    } catch {
+      toast.error(host._localize("dashboard.logs_web_serial_open_failed"), {
+        richColors: true,
+      });
+    }
   }
 }
 

@@ -250,6 +250,19 @@ describe("logs-dialog passive Stop/Start pauses serial without rebooting (#526)"
     expect(logs).not.toHaveBeenCalled(); // reconnect, never an OTA stream
   });
 
+  it("Reset Device resumes a paused log so the boot output shows", async () => {
+    startPassive();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._onStop(); // user had Stopped (paused) the log
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (el as any)._onResetDevice();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._serialPaused).toBe(false);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._streaming).toBe(true);
+    expect(port.setSignals).toHaveBeenCalled();
+  });
+
   it("Reset Device toasts when the reset pulse fails (cable pulled)", async () => {
     port.setSignals = vi.fn(() => Promise.reject(new Error("device gone")));
     startPassive();

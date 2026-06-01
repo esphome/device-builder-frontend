@@ -369,19 +369,28 @@ export class ESPHomeLogsDialog extends LitElement {
   // live reader just un-pauses — no port reopen (DTR/RTS pulse / reset) and
   // no OTA fall-through (#526); if the reader is gone (reopen failed) it runs
   // the reconnect hook instead (#636).
+  /** Un-pause a passive session's on-screen log (reader is already draining). */
+  private _resumeSerialDisplay() {
+    this._serialPaused = false;
+    this._streaming = true;
+  }
+
   private _onStart() {
     if (this._streaming) return;
     if (this._passive) {
       if (this._serialCancel) {
-        this._serialPaused = false;
-        this._streaming = true;
+        this._resumeSerialDisplay();
         return;
       }
       if (this._serialReconnect) {
         this._streaming = true;
-        // attach surfaces its own failure; reset so Start returns for a retry.
         this._serialReconnect().catch(() => {
+          // attach toasts on the reopen-retry path; cover any other rejection
+          // here so the click can't fail silently, and reset so Start returns.
           this._streaming = false;
+          toast.error(this._localize("dashboard.logs_web_serial_open_failed"), {
+            richColors: true,
+          });
         });
       }
       return;
@@ -486,6 +495,9 @@ export class ESPHomeLogsDialog extends LitElement {
   private _onResetDevice = async () => {
     const port = this._serialPort;
     if (!port) return;
+    // Resume the log first (if Stopped) so the boot output the reset produces
+    // is shown rather than dropped into a paused view.
+    this._resumeSerialDisplay();
     try {
       await port.setSignals({ dataTerminalReady: false, requestToSend: true });
       await port.setSignals({ dataTerminalReady: false, requestToSend: false });
