@@ -1,4 +1,4 @@
-import { type ConfiguredDevice, DeviceState } from "../../api/types/devices.js";
+import type { ConfiguredDevice } from "../../api/types/devices.js";
 import type { ESPHomePageDashboard } from "../../pages/dashboard.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import type { CommandType } from "../command-dialog.js";
@@ -61,14 +61,32 @@ export function showJobProgress(
   );
 }
 
-export function openLogs(host: ESPHomePageDashboard, device: ConfiguredDevice): void {
-  if (device.state === DeviceState.ONLINE) {
-    host._logsDialog.configuration = device.configuration;
-    host._logsDialog.name = device.friendly_name || device.name;
-    host._logsDialog.open();
-  } else {
+export async function openLogs(
+  host: ESPHomePageDashboard,
+  device: ConfiguredDevice
+): Promise<void> {
+  // Offer the OTA-vs-serial choice whenever a serial path exists — browser
+  // WebSerial, or serial ports on the server (mirrors the old dashboard's
+  // logs-target behavior; see #525). With no serial option at all, skip the
+  // picker and open OTA logs directly.
+  const hasWebSerial = "serial" in navigator;
+  let hasServerPorts = false;
+  if (!hasWebSerial) {
+    // Only pay the backend round-trip when WebSerial can't already provide a
+    // serial path.
+    try {
+      hasServerPorts = (await host._api.getSerialPorts()).length > 0;
+    } catch {
+      hasServerPorts = false;
+    }
+  }
+  if (hasWebSerial || hasServerPorts) {
     host._installMethodDevice = device;
     host._installMethodMode = "logs";
     host._installMethodOpen = true;
+    return;
   }
+  host._logsDialog.configuration = device.configuration;
+  host._logsDialog.name = device.friendly_name || device.name;
+  host._logsDialog.open();
 }
