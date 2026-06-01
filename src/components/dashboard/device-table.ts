@@ -573,19 +573,26 @@ export class ESPHomeDeviceTable extends LitElement {
                         </span>
                       </td>`
                     : nothing}
-                  ${row.getVisibleCells().map(
-                    (cell: any) =>
-                      // data-label feeds the stacked mobile layout
-                      // (table-styles.ts): each cell shows its column
-                      // header as the field label via ::before.
-                      html`<td
-                        role="gridcell"
-                        class="col-${cell.column.id}"
-                        data-label=${cell.column.columnDef.header}
-                      >
-                        ${flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>`
-                  )}
+                  ${row.getVisibleCells().map((cell: any) => {
+                    // The stacked mobile layout (table-styles.ts) shows each
+                    // cell's column header as a field label. It's a real
+                    // span (not a CSS ::before) so screen readers announce
+                    // it on mobile, where the <thead> is hidden; the span is
+                    // display:none on desktop, so it stays out of the a11y
+                    // tree there (the column header already provides context).
+                    // Name is the card title and actions is a button row, so
+                    // neither gets a label.
+                    const id = cell.column.id;
+                    const labeled = id !== "name" && id !== "actions";
+                    return html`<td role="gridcell" class="col-${id}">
+                      ${labeled
+                        ? html`<span class="cell-stack-label"
+                            >${cell.column.columnDef.header}</span
+                          >`
+                        : nothing}
+                      ${flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>`;
+                  })}
                   <td role="gridcell" class="actions-col">
                     <button
                       class="actions-btn"

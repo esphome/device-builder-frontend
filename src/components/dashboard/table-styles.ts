@@ -10,6 +10,9 @@ export const tableLayoutStyles = css`
     flex-direction: column;
     flex: 1;
     min-height: 0;
+    /* Row-end kebab button footprint; the stacked-card name padding
+       derives its kebab clearance from this so the two can't drift. */
+    --table-kebab-size: 30px;
   }
 
   /* Slotted content uses content-driven height — flex-shrink:0
@@ -312,8 +315,8 @@ export const tableLayoutStyles = css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: var(--table-kebab-size);
+    height: var(--table-kebab-size);
     border: none;
     border-radius: var(--wa-border-radius-m);
     background: transparent;
@@ -341,13 +344,23 @@ export const tableLayoutStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
+  /* Per-cell field label for the stacked mobile layout. Hidden on
+     desktop (so it stays out of the a11y tree where the column header
+     already labels the cell); shown on mobile by the media block. It's
+     a real element rather than a ::before so screen readers announce it
+     when the <thead> is hidden. */
+  .cell-stack-label {
+    display: none;
+  }
+
   /* ─── Mobile: stacked-card layout ───
      On phones the desktop table doesn't fit (7+ columns, horizontal
      scroll only), so each row reflows into a card with one
-     "label: value" line per cell (data-label comes from the column
-     header in device-table.ts). The header row is hidden, so column
-     sorting isn't available on mobile; the default sort applies, and a
-     row tap still opens the drawer with full detail. #41 */
+     "label: value" line per cell (the label is .cell-stack-label,
+     rendered from the column header in device-table.ts). The header
+     row is hidden, so column sorting isn't available on mobile; the
+     default sort applies, and a row tap still opens the drawer with
+     full detail. #41 */
   @media (max-width: ${TABLE_STACK_BREAKPOINT}px) {
     .table-wrap {
       margin-bottom: var(--wa-space-s);
@@ -396,8 +409,8 @@ export const tableLayoutStyles = css`
       overflow: visible;
       text-overflow: clip;
     }
-    td:not(.no-results)::before {
-      content: attr(data-label);
+    .cell-stack-label {
+      display: inline;
       flex-shrink: 0;
       font-size: var(--wa-font-size-2xs);
       font-weight: var(--wa-font-weight-bold);
@@ -406,14 +419,14 @@ export const tableLayoutStyles = css`
       color: var(--wa-color-text-quiet);
     }
 
-    /* Name is the card title (first, larger, no label). */
+    /* Name is the card title (first, larger, no label). The right pad
+       reserves room for the absolutely-positioned kebab so a long name
+       can't slide under it; derived from the kebab footprint so the two
+       stay in sync. */
     td.col-name {
       order: -1;
-      padding-right: 28px;
+      padding-right: calc(var(--table-kebab-size) + var(--wa-space-xs));
       padding-bottom: var(--wa-space-2xs);
-    }
-    td.col-name::before {
-      display: none;
     }
     td.col-name .cell-name {
       font-size: var(--wa-font-size-m);
@@ -427,9 +440,6 @@ export const tableLayoutStyles = css`
       margin-top: var(--wa-space-xs);
       padding-top: var(--wa-space-s);
       border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-    }
-    td.col-actions::before {
-      display: none;
     }
 
     /* Row-end kebab pins to the card's top-right corner. */
