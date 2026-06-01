@@ -581,14 +581,18 @@ export class ESPHomeDeviceTable extends LitElement {
                     // display:none on desktop, so it stays out of the a11y
                     // tree there (the column header already provides context).
                     // Name is the card title and actions is a button row, so
-                    // neither gets a label.
+                    // neither gets a label. Only string headers can be used as
+                    // a label; a future flexRender (template/function) header
+                    // would stringify to "[object Object]", so skip it.
                     const id = cell.column.id;
-                    const labeled = id !== "name" && id !== "actions";
+                    const header = cell.column.columnDef.header;
+                    const label =
+                      id !== "name" && id !== "actions" && typeof header === "string"
+                        ? header
+                        : null;
                     return html`<td role="gridcell" class="col-${id}">
-                      ${labeled
-                        ? html`<span class="cell-stack-label"
-                            >${cell.column.columnDef.header}</span
-                          >`
+                      ${label !== null
+                        ? html`<span class="cell-stack-label">${label}</span>`
                         : nothing}
                       ${flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>`;
