@@ -60,7 +60,7 @@ export class ESPHomeSelectBar extends LitElement {
         align-items: center;
         justify-content: space-between;
         padding: var(--wa-space-m) var(--wa-space-xl);
-        height: var(--select-bar-height, 64px);
+        height: var(--select-bar-height);
         box-sizing: border-box;
         /* Locked at exactly --select-bar-height so the table host's
            padding-bottom reservation can never be undershot by a

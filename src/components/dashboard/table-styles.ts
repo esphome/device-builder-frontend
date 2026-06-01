@@ -24,7 +24,7 @@ export const tableLayoutStyles = css`
      --select-bar-height (with nowrap labels) so this reservation
      can't drift out of sync. */
   :host([select-mode]) {
-    padding-bottom: var(--select-bar-height, 64px);
+    padding-bottom: var(--select-bar-height);
     box-sizing: border-box;
   }
 
