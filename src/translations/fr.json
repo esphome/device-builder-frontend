@@ -982,7 +982,6 @@
     "build_server": "Serveur de compilation",
     "pairing_requests": "Demandes d'appairage",
     "build_offload": "Envoyer les compilations",
-    "experimental_tag": "Expérimental",
     "nav_item_attention_aria": "{label}, attention requise",
     "remote_build_enable": "Activer la compilation à distance",
     "remote_build_enable_desc": "Permet à d'autres tableaux de bord de votre réseau de compiler leur YAML ici. Un pair appairé peut exécuter n'importe quel code sur cette machine ; n'appairez qu'avec des tableaux de bord à qui vous donneriez un accès ssh.",

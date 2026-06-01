@@ -936,7 +936,6 @@
     "build_server": "构建服务器",
     "pairing_requests": "配对请求",
     "build_offload": "发送构建任务",
-    "experimental_tag": "实验性",
     "nav_item_attention_aria": "{label}，需要注意",
     "remote_build_enable": "启用远程构建",
     "remote_build_enable_desc": "允许同一网络中的其他仪表板在此处编译其 YAML。已配对的对端可以在这台机器上运行任意代码；仅与愿意授予 ssh 访问权限的仪表板配对。",
