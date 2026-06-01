@@ -8,7 +8,14 @@ export const dashboardStyles = css`
     flex-direction: column;
     position: relative;
     box-sizing: border-box;
+    /* vh fallback then dvh: on mobile 100vh is the large viewport, which
+       makes this fixed-height (internal-scroll) container taller than the
+       visible area — the pagination row and the fixed footer drop below
+       the fold and the page over-scrolls. dvh tracks the visible viewport
+       so the table fills exactly header→footer and the inner .table-scroll
+       still scrolls. Matches the vh/dvh pairing in device-styles.ts. */
     height: calc(100vh - var(--esphome-header-height) - var(--esphome-footer-height));
+    height: calc(100dvh - var(--esphome-header-height) - var(--esphome-footer-height));
     overflow: hidden;
     /* Single source of truth for the floating Create-device button's
        footprint. --fab-bottom is the gap between the FAB and the
