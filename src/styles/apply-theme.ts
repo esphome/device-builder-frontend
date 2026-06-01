@@ -41,15 +41,16 @@ function applyWaTheme(): void {
  * The ``--wa-color-brand-*`` overrides remap WebAwesome's default
  * cyan brand palette onto ``--primary-color`` (HA's primary), with
  * ``--esphome-brand-default`` (= HA's default primary ``#009ac7``,
- * defined once in index.html) as the fallback. In practice the
- * fallback is what renders: the HA panel runs as an **ingress
- * iframe**, so HA's ``--primary-color`` does not cross into this
- * document, and esphome-desktop has no HA at all. The ``var(…)``
- * hook still adapts automatically if a deployment ever runs
- * same-document where HA's vars cascade. Without this remap the
- * panel headers, primary buttons, FAB, and active view-toggle pip
- * burst in WebAwesome's own cyan. (HA's legacy ``--primary-color``
- * ``#03a9f4`` was retired upstream in favour of ``#009ac7``.)
+ * defined once in index.html) as the fallback. When embedded in HA,
+ * the ``var(…)`` hooks resolve: HA injects its full theme — including
+ * ``--primary-color`` and its own ``--wa-color-*`` map — onto the
+ * panel's root, even under ingress, so the panel adopts the user's
+ * HA theme (e.g. a theme that remaps ``--primary-color`` recolours
+ * the header to match). The fallback only renders where there's no
+ * HA: esphome-desktop and the standalone dev server. Without this
+ * remap the panel headers, primary buttons, FAB, and active
+ * view-toggle pip burst in WebAwesome's own cyan. (HA's legacy
+ * ``--primary-color`` ``#03a9f4`` was retired upstream for ``#009ac7``.)
  */
 function applyEspHomeTokens(): void {
   const style = document.createElement("style");
