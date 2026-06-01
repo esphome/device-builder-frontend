@@ -195,6 +195,15 @@ export class ESPHomeLogsDialog extends LitElement {
    *  Leaves `_serialPaused` untouched so a Stop pressed during an in-flight
    *  reconnect is honored rather than overridden by the re-attach. */
   public setSerialStream(port: SerialPort, cancel: () => void) {
+    // The attach is async (the reopen path retries for up to 5s). If the dialog
+    // was closed or switched to a non-passive session while it was in flight,
+    // don't register the stream — tear it down (cancel stops the reader and
+    // closes the port) so the handle isn't leaked, leaving the next open() to
+    // fail with "already open".
+    if (!this._open || !this._passive) {
+      cancel();
+      return;
+    }
     this._closeSerial();
     this._serialPort = port;
     this._hasSerialPort = true;

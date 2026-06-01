@@ -283,6 +283,31 @@ describe("logs-dialog passive Stop/Start pauses serial without rebooting (#526)"
     expect((el as any)._serialPaused).toBe(true);
   });
 
+  it("tears down a late attach after the dialog closed (no port leak)", () => {
+    el.openPassive({ onReconnect: () => Promise.resolve() });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._onDialogHide(); // dialog closed while an attach was in flight
+    const lateCancel = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    el.setSerialStream(port as any, lateCancel as unknown as () => void);
+    expect(lateCancel).toHaveBeenCalledTimes(1); // torn down, not registered
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._serialPort).toBe(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._serialCancel).toBe(null);
+  });
+
+  it("tears down a late passive attach after switching to an OTA session", () => {
+    el.openPassive();
+    el.open("OTA"); // switched to non-passive before the attach landed
+    const lateCancel = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    el.setSerialStream(port as any, lateCancel as unknown as () => void);
+    expect(lateCancel).toHaveBeenCalledTimes(1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._serialPort).toBe(null);
+  });
+
   it("tracks port presence so Reset Device can disable itself", () => {
     el.openPassive();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
