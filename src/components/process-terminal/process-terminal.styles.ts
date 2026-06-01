@@ -209,6 +209,19 @@ export const processTerminalStyles = css`
   .card {
     display: flex;
     flex-direction: column;
+    /* Resolves to auto when the host height is indefinite (compact card);
+       fills when a driver gives the host a definite height (firmware install,
+       expanded log on the full-screen mobile sheet — #516). */
+    height: 100%;
+  }
+  /* Driver's slotted block (collapsible log + any instructions) becomes the
+     growing, internally-scrolling region when the card is given a definite
+     height; no-op while the card is auto-height. The footer (toolbar-right)
+     then pins to the bottom as the last flex item. Scoped to the card-only
+     slot, so the stream variant's slots are untouched. */
+  slot[name="status-extra"]::slotted(*) {
+    flex: 1 1 auto;
+    min-height: 0;
   }
   .status {
     display: flex;

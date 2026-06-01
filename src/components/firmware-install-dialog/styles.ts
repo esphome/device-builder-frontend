@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+
 export const firmwareInstallDialogStyles = css`
   :host {
     --term-bg: #1e1e1e;
@@ -219,5 +221,27 @@ export const firmwareInstallDialogStyles = css`
   }
   .btn--ghost wa-icon {
     font-size: 14px;
+  }
+
+  /* #516 — expanded log on the full-screen mobile sheet: fill the dialog body
+     so the log scrolls internally and the footer stays on-screen, instead of
+     the whole card growing past the viewport and pushing the buttons below the
+     fold. Desktop keeps the 50vh log (this block doesn't apply there). */
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    :host([expanded]) esphome-process-terminal {
+      height: 100%;
+    }
+    :host([expanded]) [slot="status-extra"] {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    :host([expanded]) .logs-container {
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+    :host([expanded]) esphome-ansi-log {
+      --log-height: 100%;
+    }
   }
 `;
