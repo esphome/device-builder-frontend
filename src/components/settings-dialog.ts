@@ -106,8 +106,6 @@ export class ESPHomeSettingsDialog extends LitElement {
   }
 
   private _renderNav() {
-    const flat = SECTIONS.filter((s) => !s.group);
-    const experimental = SECTIONS.filter((s) => s.group === "experimental");
     // Pre-compute whether to render the alert dot on the
     // 'Send builds' (build_offload) entry. The dot's meaning is
     // 'something in this section needs your attention' -- driven
@@ -159,17 +157,7 @@ export class ESPHomeSettingsDialog extends LitElement {
         </button>
       `;
     };
-    return html`
-      ${flat.map(renderItem)}
-      ${experimental.length
-        ? html`
-            <div class="nav-group-header">
-              ${this._localize("settings.experimental_tag")}
-            </div>
-            ${experimental.map(renderItem)}
-          `
-        : nothing}
-    `;
+    return html`${SECTIONS.map(renderItem)}`;
   }
 
   private _renderSection() {

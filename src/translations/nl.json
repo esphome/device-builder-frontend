@@ -982,7 +982,6 @@
     "build_server": "Build-server",
     "pairing_requests": "Koppelingsverzoeken",
     "build_offload": "Builds verzenden",
-    "experimental_tag": "Experimenteel",
     "nav_item_attention_aria": "{label}, vereist aandacht",
     "remote_build_enable": "Bouwen op afstand inschakelen",
     "remote_build_enable_desc": "Laat andere dashboards in je netwerk hun YAML hier compileren. Een gekoppelde peer kan willekeurige code op deze machine uitvoeren; koppel alleen met dashboards waaraan je ssh-toegang zou geven.",

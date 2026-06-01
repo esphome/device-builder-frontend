@@ -936,7 +936,6 @@
     "build_server": "Összeállítási szerver",
     "pairing_requests": "Párosítási kérelmek",
     "build_offload": "Összeállítások küldése",
-    "experimental_tag": "Kísérleti",
     "nav_item_attention_aria": "{label}, figyelmet igényel",
     "remote_build_enable": "Távoli összeállítás engedélyezése",
     "remote_build_enable_desc": "Lehetővé teszi a hálózaton lévő más irányítópultoknak, hogy itt fordítsák le a YAML-jeiket. A párosított társ tetszőleges kódot futtathat ezen a gépen; csak olyan irányítópultokkal párosítson, amelyeknek akár ssh-hozzáférést adna.",
