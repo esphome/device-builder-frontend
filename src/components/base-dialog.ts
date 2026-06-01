@@ -4,6 +4,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
+import { centeredMobileDialog } from "../styles/dialog-mobile.js";
 
 /**
  * Thin shared wrapper around ``<wa-dialog>``.
@@ -177,6 +178,9 @@ export class ESPHomeBaseDialog extends LitElement {
 
   static styles = [
     dialogCloseButtonStyles,
+    // Mobile default: centered, dvh-capped. Heavy dialogs override with
+    // fullscreenMobileDialog (their outer-tree ::part rule wins).
+    centeredMobileDialog("wa-dialog"),
     css`
       :host {
         display: contents;

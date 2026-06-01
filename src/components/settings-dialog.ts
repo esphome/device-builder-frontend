@@ -18,6 +18,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
@@ -71,7 +72,13 @@ export class ESPHomeSettingsDialog extends LitElement {
   @state()
   private _open = false;
 
-  static styles = [espHomeStyles, settingsSharedStyles, settingsRowStyles];
+  static styles = [
+    espHomeStyles,
+    settingsSharedStyles,
+    settingsRowStyles,
+    // Full-screen on mobile; the layout fills the sheet (see shared-styles).
+    fullscreenMobileDialog("esphome-base-dialog"),
+  ];
 
   open() {
     this._section = "appearance";

@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../styles/dialog-mobile.js";
+
 /**
  * Styles for <esphome-logs-dialog>. The terminal surface itself (log output,
  * toolbar layout, term buttons, streaming dot) is rendered by the shared
@@ -75,19 +77,9 @@ export const logsDialogStyles = css`
     border-radius: 0;
   }
 
-  @media (max-width: 700px) {
-    :host esphome-base-dialog::part(dialog) {
-      position: fixed;
-      inset: 0;
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      max-width: none;
-      max-height: none;
-      margin: 0;
-      border-radius: 0;
-    }
-
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    /* Full-screen ::part(dialog) comes from fullscreenMobileDialog in the
+       static styles; this fills the component into that sheet. */
     esphome-process-terminal {
       height: 100%;
       --process-terminal-height: 100%;
