@@ -33,6 +33,15 @@ export const espHomeStyles = css`
     /* Text color for use on primary / dark / colored backgrounds — white in both light and dark modes */
     --esphome-on-primary: var(--text-primary-color, #ffffff);
 
+    /* Keyboard focus ring, defined once so every :focus-visible glow
+       stays consistent. Two sizes: the default 3px ring for inputs /
+       fields, and a 2px "tight" ring for compact controls (chips,
+       pills, icon buttons). Used as the full box-shadow value. */
+    --esphome-focus-ring: 0 0 0 3px
+      color-mix(in srgb, var(--esphome-primary), transparent 80%);
+    --esphome-focus-ring-tight: 0 0 0 2px
+      color-mix(in srgb, var(--esphome-primary), transparent 70%);
+
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
     --esphome-footer-height: 20px;

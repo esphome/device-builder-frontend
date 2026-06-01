@@ -351,7 +351,7 @@ export const dashboardStyles = css`
 
   .filter-clear:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   /* The <form role="search"> wrapper is what suppresses Chrome's
@@ -685,7 +685,7 @@ export const dashboardStyles = css`
   .select-toggle-btn:focus-visible {
     outline: none;
     color: var(--wa-color-text-normal);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .select-toggle-btn.active {

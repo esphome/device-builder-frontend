@@ -105,7 +105,7 @@ export const labelsFilterStyles = css`
   .row-action:focus-visible {
     outline: none;
     color: var(--wa-color-text-normal);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 70%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .row-action--danger:hover {
@@ -207,7 +207,7 @@ export const labelsFilterStyles = css`
 
   .create-trigger:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--esphome-primary), transparent 60%);
+    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   .create-trigger wa-icon {
