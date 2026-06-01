@@ -61,3 +61,50 @@ describe("confirm-dialog ENTER", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 });
+
+// The migration onto esphome-base-dialog introduced the reactive ?open binding,
+// the request-close handler, and the after-hide -> cancel path. Pin them so the
+// dismiss-cancels contract can't silently regress.
+describe("confirm-dialog dismiss / request-close", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const baseDialog = (el: ESPHomeConfirmDialog): HTMLElement =>
+    el.shadowRoot!.querySelector("esphome-base-dialog")!;
+
+  it("fires a single cancel when dismissed without a decision", async () => {
+    const el = await mount();
+    el.open();
+    await el.updateComplete;
+    const onCancel = vi.fn();
+    el.addEventListener("cancel", onCancel);
+    baseDialog(el).dispatchEvent(new CustomEvent("after-hide"));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fire cancel when the dialog was confirmed", async () => {
+    const el = await mount();
+    el.open();
+    await el.updateComplete;
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    el.addEventListener("confirm", onConfirm);
+    el.addEventListener("cancel", onCancel);
+    pressEnter(); // confirms (non-destructive) -> _decided = true
+    baseDialog(el).dispatchEvent(new CustomEvent("after-hide"));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onCancel).not.toHaveBeenCalled();
+  });
+
+  it("flips the reactive open flag to false on request-close", async () => {
+    const el = await mount();
+    el.open();
+    await el.updateComplete;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._open).toBe(true);
+    baseDialog(el).dispatchEvent(new CustomEvent("request-close"));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((el as any)._open).toBe(false);
+  });
+});
