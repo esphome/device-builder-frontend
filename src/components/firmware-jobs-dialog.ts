@@ -1,4 +1,3 @@
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import { consume } from "@lit/context";
@@ -29,13 +28,13 @@ import {
   firmwareJobsContext,
   localizeContext,
 } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import "./base-dialog.js";
 import "./command-dialog.js";
 import type { ESPHomeCommandDialog } from "./command-dialog.js";
 import "./confirm-dialog.js";
@@ -78,7 +77,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
   @state()
   _devices: ConfiguredDevice[] = [];
 
-  @query("wa-dialog") private _dialog!: HTMLElement & { open: boolean };
+  @state() private _open = false;
   @query("esphome-command-dialog") private _commandDialog!: ESPHomeCommandDialog;
   // Logs dialog for the post-install hand-off when reattaching from this
   // surface. Without one, request-show-logs-after-install would no-op. (#139)
@@ -96,18 +95,18 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
 
   open() {
     this._now = Date.now();
-    this._dialog.open = true;
+    this._open = true;
     this._startTicker();
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
     this._stopTicker();
   }
 
   // Open the Reset Build Environment confirm flow without needing this
-  // dialog open. The confirm + command dialogs are siblings of the wa-dialog
-  // in this host's shadow DOM, so they work even when the wa-dialog is closed
+  // dialog open. The confirm + command dialogs are siblings of the jobs
+  // dialog in this host's shadow DOM, so they work even when it's closed
   // — surfaces like the header kebab can entry-point the same flow.
   openResetBuildEnv() {
     this._confirmDialog.open();
@@ -127,12 +126,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._stopTicker();
   }
 
-  static styles = [
-    espHomeStyles,
-    primaryDialogHeaderStyles,
-    dialogCloseButtonStyles,
-    firmwareJobsDialogStyles,
-  ];
+  static styles = [espHomeStyles, primaryDialogHeaderStyles, firmwareJobsDialogStyles];
 
   /** Bucket the live jobs Map into sorted / active / terminal lists.
    *  Memoised on the upstream Map reference; the context provider
@@ -153,10 +147,11 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     const hasJobs = sorted.length > 0;
 
     return html`
-      <wa-dialog
-        light-dismiss
-        label=${this._localize("firmware_jobs.title")}
-        @wa-after-hide=${this._stopTicker}
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._localize("firmware_jobs.title")}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
       >
         <div class="toolbar">
           <button
@@ -182,7 +177,7 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
             : nothing}
         </div>
         ${hasJobs ? renderGroups(this, active, terminal) : renderEmpty(this._localize)}
-      </wa-dialog>
+      </esphome-base-dialog>
       <esphome-command-dialog
         @open-reset-build-env=${this._onLocalResetEvent}
         @request-show-logs-after-install=${this._onPostInstallShowLogs}
@@ -209,6 +204,17 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
       clearInterval(this._tickHandle);
       this._tickHandle = null;
     }
+  };
+
+  // Flip _open on the initiating close so a ticker-driven re-render can't
+  // re-assert ?open mid-hide; the ticker is torn down once hidden.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
+
+  private _onAfterHide = (): void => {
+    this._open = false;
+    this._stopTicker();
   };
 
   _jobDisplayName(job: FirmwareJob): string {

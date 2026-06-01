@@ -1,18 +1,18 @@
 import { css } from "lit";
 
 export const firmwareJobsDialogStyles = css`
-  wa-dialog {
+  esphome-base-dialog {
     --width: min(620px, 95vw);
   }
 
   /* Primary header bar + flush 40x40 close button come from the shared
-     primaryDialogHeaderStyles / dialogCloseButtonStyles fragments. */
+     primaryDialogHeaderStyles fragment + esphome-base-dialog. */
 
-  wa-dialog::part(footer) {
+  esphome-base-dialog::part(footer) {
     display: none;
   }
 
-  wa-dialog::part(body) {
+  esphome-base-dialog::part(body) {
     padding: 0;
   }
 
