@@ -293,17 +293,6 @@ export const dashboardStyles = css`
     row-gap: var(--wa-space-xs);
   }
 
-  /* Pushes the select-toggle to the right edge of the toolbar.
-     The facet pills sit in the middle of the row (between the
-     view-toggle and the spacer) so they read as part of the
-     "view / filter" cluster; on narrow viewports the row wraps
-     so the facets flow onto a second line without crowding the
-     search input. */
-  .toolbar-spacer {
-    flex: 1 1 auto;
-    min-width: var(--wa-space-s);
-  }
-
   /* Facet pills cluster inline with the view-toggle. flex-wrap
      lets pills flow onto a second row of their own if too many
      accumulate (large fleets with several areas / platforms). */
@@ -374,15 +363,17 @@ export const dashboardStyles = css`
     min-width: 140px;
   }
 
-  /* Table view only: the facets/Filters control no longer shares the
-     search row (it moved into the controls-right cluster), so the
-     search input can seed from a 0 flex-basis. Flex line-breaking uses
+  /* Table view (.toolbar-stack) and YAML view (:host([yaml])) no
+     longer carry a Filters control in the search row, so the search
+     input seeds from a 0 flex-basis and fills the row the same way in
+     both, matching the device-search width. Flex line-breaking uses
      the basis, not min-width, so the 220px basis above would push the
      view-toggle onto a second line at ~360px; a 0 basis keeps search +
      view-toggle on one row (search still grows to fill, floored by the
-     140px min-width). Card / YAML toolbars keep the 220px basis since
-     their Filters control still shares this row. */
-  .toolbar-stack .search-wrap {
+     140px min-width). The card toolbar keeps the 220px basis since its
+     Filters control still shares this row. */
+  .toolbar-stack .search-wrap,
+  :host([yaml]) .search-wrap {
     flex-basis: 0;
   }
   /* Native <input class="search-input"> picks up the shared

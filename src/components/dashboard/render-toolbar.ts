@@ -162,10 +162,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
       : host._localize("yaml_search.match_count_plural");
   return html`
     <div class="toolbar">
-      <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)}
-        <span class="toolbar-spacer"></span>
-      </div>
+      <div class="toolbar-row">${renderSearchInput(host)} ${renderViewToggle(host)}</div>
       ${matchCount !== null
         ? html`<span class="device-count"><strong>${matchCount}</strong> ${unit}</span>`
         : ""}
