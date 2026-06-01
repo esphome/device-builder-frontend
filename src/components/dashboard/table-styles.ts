@@ -36,7 +36,10 @@ export const tableLayoutStyles = css`
        y as Columns / Create. */
     align-items: flex-start;
     gap: var(--wa-space-s);
-    padding: var(--wa-space-l) var(--wa-space-l) 0;
+    /* Shared with the card view's .toolbar via tokens inherited from
+       the dashboard host, so the two views keep identical gutters at
+       every breakpoint (incl. the mobile trim). */
+    padding: var(--toolbar-pad-top) var(--toolbar-pad-x) 0;
     /* No bottom margin: the below-controls slot now carries the
        device-count + Select-multiple row, and its own bottom
        padding handles spacing to the .table-wrap. Keeping the
@@ -72,27 +75,15 @@ export const tableLayoutStyles = css`
     }
   }
 
-  /* Mobile content-padding trim. The controls strip and the
-     table-wrap claim --wa-space-l (24px) of horizontal padding /
-     margin on each side; on a 375px phone viewport that's ~13% of
-     the width per side gone to chrome. Match the dashboard's
-     .toolbar / .devices-grid trim so all three views share the
-     same tight gutters at narrow widths. #41 */
+  /* Mobile content-padding trim. The table-wrap claims --wa-space-l
+     (24px) of horizontal margin on each side; on a 375px phone
+     viewport that's ~13% of the width per side gone to chrome. Match
+     the dashboard's .devices-grid trim so all three views share the
+     same tight gutters at narrow widths. The .controls strip trims
+     via the shared --toolbar-pad-* tokens (defined on the dashboard
+     host and inherited here), so it stays in lockstep with the card
+     view's .toolbar without a duplicate rule. #41 */
   @media (max-width: 600px) {
-    .controls {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
-    }
-
-    /* Mirrors the dashboard's :host([has-discovered]) .toolbar
-       trim: when the banner is present the dashboard already
-       provides padding-top equal to the banner's height, so the
-       controls' own padding-top stacks as dead space. Drop one
-       step so the table view matches the card / YAML views. #41 */
-    :host([has-discovered]) .controls {
-      padding-top: var(--wa-space-s);
-    }
-
     .table-wrap {
       margin-left: var(--wa-space-s);
       margin-right: var(--wa-space-s);

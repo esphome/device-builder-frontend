@@ -25,6 +25,13 @@ export const dashboardStyles = css`
        enforce the bar's own height and to reserve clearance inside
        the device table so its pagination row doesn't sit beneath it. */
     --select-bar-height: 64px;
+    /* Outer padding for the search toolbar, shared between the card
+       view's .toolbar and the table view's .controls. .controls lives
+       in esphome-device-table's shadow but inherits these from the
+       dashboard host, so both toolbars resolve identical values and
+       can't drift on mobile. Mobile override is in the @media block. */
+    --toolbar-pad-top: var(--wa-space-l);
+    --toolbar-pad-x: var(--wa-space-l);
   }
 
   /* YAML mode renders over any underlying view, so it shares this
@@ -50,6 +57,14 @@ export const dashboardStyles = css`
   @media (max-width: 600px) {
     :host([has-discovered]) {
       padding-top: var(--wa-space-l);
+    }
+
+    /* Tighten the shared toolbar gutters on mobile. Both .toolbar
+       (card) and .controls (table) inherit these, so the two views
+       stay in lockstep at narrow widths. #41 */
+    :host {
+      --toolbar-pad-top: var(--wa-space-s);
+      --toolbar-pad-x: var(--wa-space-s);
     }
   }
 
@@ -242,7 +257,7 @@ export const dashboardStyles = css`
     display: flex;
     flex-direction: column;
     gap: 2px;
-    padding: var(--wa-space-l) var(--wa-space-l) 0;
+    padding: var(--toolbar-pad-top) var(--toolbar-pad-x) 0;
     flex-shrink: 0;
   }
 
@@ -971,32 +986,19 @@ export const dashboardStyles = css`
     font-size: 18px;
   }
 
-  /* Mobile content-padding trim. The card grid, toolbar, and YAML
-     hit list all sit at --wa-space-l (24px) horizontal padding;
-     on a 375px phone viewport that's ~13% of the width per side
-     gone to chrome. Tighten to --wa-space-s (8px) so device cards
-     and the toolbar row claim the available width. Placed last in
-     the stylesheet so source-order wins against the base
-     declarations above. #41 */
+  /* Mobile content-padding trim. The card grid and YAML hit list
+     sit at --wa-space-l (24px) horizontal padding; on a 375px phone
+     viewport that's ~13% of the width per side gone to chrome.
+     Tighten to --wa-space-s (8px) so device cards claim the available
+     width. The toolbar's own gutters trim via the shared
+     --toolbar-pad-* tokens (see the :host @media block above), which
+     the table view inherits too. Placed last in the stylesheet so
+     source-order wins against the base declarations above. #41 */
   @media (max-width: 600px) {
     .devices-grid {
       padding-left: var(--wa-space-s);
       padding-right: var(--wa-space-s);
       gap: var(--wa-space-s);
-    }
-
-    .toolbar {
-      padding: var(--wa-space-s) var(--wa-space-s) 0;
-    }
-
-    /* When the discovered banner is present, the host already
-       provides padding-top equal to the banner height; the
-       toolbar's own padding-top stacks on top of that and reads
-       as dead space between the banner bottom and the search
-       input. Shrink to one step so the two rows breathe without
-       the doubled gutter. #41 */
-    :host([has-discovered]) .toolbar {
-      padding-top: var(--wa-space-s);
     }
 
     .yaml-hits {
