@@ -1,4 +1,4 @@
-import { type CSSResult, css, unsafeCSS } from "lit";
+import { type CSSResult, css } from "lit";
 
 /**
  * Shared mobile-layout fragments for app dialogs (issue #41).
@@ -29,6 +29,13 @@ import { type CSSResult, css, unsafeCSS } from "lit";
  */
 type DialogHost = "wa-dialog" | "esphome-base-dialog";
 
+/** Pre-built selector fragments so the host can be interpolated into the
+ *  `css` template as a CSSResult, no `unsafeCSS` needed. */
+const HOST_SELECTOR: Record<DialogHost, CSSResult> = {
+  "wa-dialog": css`wa-dialog`,
+  "esphome-base-dialog": css`esphome-base-dialog`,
+};
+
 /** Default mobile breakpoint in px. */
 const MOBILE_DIALOG_BREAKPOINT = 600;
 
@@ -38,7 +45,7 @@ export function fullscreenMobileDialog(
   host: DialogHost,
   breakpoint: number = MOBILE_DIALOG_BREAKPOINT
 ): CSSResult {
-  const sel = unsafeCSS(host);
+  const sel = HOST_SELECTOR[host];
   return css`
     @media (max-width: ${breakpoint}px) {
       ${sel}::part(dialog) {
@@ -71,7 +78,7 @@ export function centeredMobileDialog(
   host: DialogHost,
   breakpoint: number = MOBILE_DIALOG_BREAKPOINT
 ): CSSResult {
-  const sel = unsafeCSS(host);
+  const sel = HOST_SELECTOR[host];
   return css`
     @media (max-width: ${breakpoint}px) {
       ${sel}::part(dialog) {
