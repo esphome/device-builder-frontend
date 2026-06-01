@@ -279,6 +279,7 @@ export class ESPHomeLogsDialog extends LitElement {
             </button>
             ${renderTermButton({
               icon: "download",
+              title: this._localize("dashboard.logs_download"),
               onClick: this._downloadLogs,
             })}
             ${renderTermButton({

@@ -433,9 +433,8 @@ export class ESPHomeCommandDialog extends LitElement {
           .state=${this._state}
           .statusMessage=${this._statusMessage}
         >
-          <div slot="sub-line">${renderRemoteBuilderSubLine(this)}</div>
-          <div slot="overlay">${renderQueuedOverlay(this)}</div>
-          <div slot="suggestion">${renderResetSuggestion(this)}</div>
+          ${renderRemoteBuilderSubLine(this)} ${renderQueuedOverlay(this)}
+          ${renderResetSuggestion(this)}
           <div slot="toolbar-right">${renderToolbar(this)}</div>
         </esphome-process-terminal>
       </esphome-base-dialog>

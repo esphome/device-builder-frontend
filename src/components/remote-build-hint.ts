@@ -48,7 +48,7 @@ export function renderRemoteBuildFailureSuggestion(
   const template = host._localize("command.try_reset_suggestion_remote");
   const [before, middle, after] = splitTemplate(template, "{clean_action}", "{receiver}");
   return html`
-    <div class="reset-suggestion" role="status">
+    <div class="reset-suggestion" role="status" slot="suggestion">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
         ${host._localize("command.try_clean_button")}</button
       >${middle}<code class="receiver-label">${receiver}</code>${after}

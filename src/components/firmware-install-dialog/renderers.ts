@@ -83,8 +83,17 @@ export function cardState(host: ESPHomeFirmwareInstallDialog): ProcessTerminalSt
       return "success";
     case "error":
       return "error";
-    default:
+    case "connecting":
+    case "queued":
+    case "installing":
+    case "compiling":
+    case "flashing":
+    case "downloading":
       return "running";
+    default:
+      // Exhaustive: adding an InstallStep without mapping it here is a
+      // compile error (host._step is no longer narrowed to never).
+      return host._step satisfies never;
   }
 }
 
@@ -182,12 +191,19 @@ function renderDownloadReadyExtra(
   `;
 }
 
-export function renderStatusExtra(host: ESPHomeFirmwareInstallDialog): TemplateResult {
-  return html`<div slot="status-extra">
-    ${host._step === "choose-binary" ? renderBinaryList(host) : nothing}
-    ${host._step === "download-ready" ? renderDownloadReadyExtra(host) : nothing}
-    ${renderLogs(host)}
-  </div>`;
+export function renderStatusExtra(
+  host: ESPHomeFirmwareInstallDialog
+): TemplateResult | typeof nothing {
+  const binaryList = host._step === "choose-binary" ? renderBinaryList(host) : nothing;
+  const downloadExtra =
+    host._step === "download-ready" ? renderDownloadReadyExtra(host) : nothing;
+  const logs = renderLogs(host);
+  // Skip the slotted wrapper entirely when there's nothing to show, so the
+  // card doesn't carry an empty element.
+  if (binaryList === nothing && downloadExtra === nothing && logs === nothing) {
+    return nothing;
+  }
+  return html`<div slot="status-extra">${binaryList} ${downloadExtra} ${logs}</div>`;
 }
 
 export function renderLogs(

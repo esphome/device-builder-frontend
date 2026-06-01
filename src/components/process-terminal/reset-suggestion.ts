@@ -31,7 +31,7 @@ export function renderValidationFailureSuggestion(host: SuggestionHost): Templat
   const text = host._localize("command.validation_failed_suggestion");
   const [before, after] = splitTemplate(text, "{editor_action}");
   return html`
-    <div class="reset-suggestion" role="status">
+    <div class="reset-suggestion" role="status" slot="suggestion">
       ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
         ${host._localize("command.try_open_editor_button")}</button
       >${after}
@@ -55,7 +55,7 @@ export function renderBuildFailureSuggestion(
   const text = host._localize("command.try_reset_suggestion");
   const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");
   return html`
-    <div class="reset-suggestion" role="status">
+    <div class="reset-suggestion" role="status" slot="suggestion">
       ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
         ${host._localize("command.try_clean_button")}</button
       >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>

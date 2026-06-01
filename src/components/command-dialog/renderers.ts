@@ -37,7 +37,7 @@ export function renderRemoteBuilderSubLine(
   // mid-compile is a power-user shape without a UI today.
   const canOverride = host._commandType === "install";
   return html`
-    <div class="remote-builder-sub-line" role="status">
+    <div class="remote-builder-sub-line" role="status" slot="sub-line">
       <wa-icon library="mdi" name="server-network"></wa-icon>
       <span
         >${host._localize("command.remote_builder_sub_line", {
@@ -85,7 +85,7 @@ export function renderQueuedOverlay(
       ? host._localize("command.queued_waiting_for_build_server")
       : host._localize("command.queued_message");
   return html`
-    <div class="queued-overlay" role="status" aria-live="polite">
+    <div class="queued-overlay" role="status" aria-live="polite" slot="overlay">
       <wa-icon library="mdi" name="timer-sand"></wa-icon>
       <div class="queued-title">${host._localize("command.queued_title")}</div>
       <div class="queued-message">${message}</div>

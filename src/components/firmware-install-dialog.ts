@@ -340,8 +340,7 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
           .statusDetail=${cardStatusDetail(this)}
           .progress=${this._step === "flashing" ? this._flashPercent : null}
         >
-          <div slot="suggestion">${renderResetSuggestion(this)}</div>
-          ${renderStatusExtra(this)}
+          ${renderResetSuggestion(this)} ${renderStatusExtra(this)}
           <div slot="toolbar-right">${renderFooter(this)}</div>
         </esphome-process-terminal>
       </esphome-base-dialog>

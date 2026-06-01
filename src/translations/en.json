@@ -67,6 +67,7 @@
     "logs_clear": "Clear",
     "logs_expand": "Expand",
     "logs_collapse": "Collapse",
+    "logs_download": "Download",
     "logs_states": "States",
     "logs_hide_states": "Hide states",
     "logs_show_states": "Show states",
