@@ -18,16 +18,15 @@ const HOST_SELECTOR: Record<DialogHost, CSSResult> = {
   "esphome-base-dialog": css`esphome-base-dialog`,
 };
 
-const MOBILE_DIALOG_BREAKPOINT = 600;
+/** Single source of truth for the dialog mobile breakpoint (px). Import
+ *  this anywhere a companion rule must reflow at the same width. */
+export const MOBILE_DIALOG_BREAKPOINT = 600;
 
 /** Full-screen sheet on mobile. */
-export function fullscreenMobileDialog(
-  host: DialogHost,
-  breakpoint: number = MOBILE_DIALOG_BREAKPOINT
-): CSSResult {
+export function fullscreenMobileDialog(host: DialogHost): CSSResult {
   const sel = HOST_SELECTOR[host];
   return css`
-    @media (max-width: ${breakpoint}px) {
+    @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
       ${sel}::part(dialog) {
         position: fixed;
         inset: 0;
@@ -45,13 +44,10 @@ export function fullscreenMobileDialog(
 
 /** Centered (native `margin: auto`) but capped to the viewport so tall
  *  content scrolls inside instead of overflowing. */
-export function centeredMobileDialog(
-  host: DialogHost,
-  breakpoint: number = MOBILE_DIALOG_BREAKPOINT
-): CSSResult {
+export function centeredMobileDialog(host: DialogHost): CSSResult {
   const sel = HOST_SELECTOR[host];
   return css`
-    @media (max-width: ${breakpoint}px) {
+    @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
       ${sel}::part(dialog) {
         max-width: calc(100vw - var(--wa-space-l));
         /* vh fallback, then dvh */

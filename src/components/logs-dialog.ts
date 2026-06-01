@@ -110,8 +110,8 @@ export class ESPHomeLogsDialog extends LitElement {
   static styles = [
     espHomeStyles,
     logsDialogStyles,
-    // Full-screen on mobile; 700px matches its other mobile rules.
-    fullscreenMobileDialog("esphome-base-dialog", 700),
+    // Full-screen on mobile.
+    fullscreenMobileDialog("esphome-base-dialog"),
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {

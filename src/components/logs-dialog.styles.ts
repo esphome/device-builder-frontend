@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../styles/dialog-mobile.js";
+
 /**
  * Styles for <esphome-logs-dialog>. Extracted from the component
  * file to keep it under the repo's file-size cap (see README →
@@ -231,7 +233,7 @@ export const logsDialogStyles = css`
     border-radius: 0;
   }
 
-  @media (max-width: 700px) {
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
     /* Full-screen ::part(dialog) comes from fullscreenMobileDialog in the
        static styles; these are the logs-specific companions. */
     .logs-content {
