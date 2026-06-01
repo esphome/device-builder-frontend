@@ -31,9 +31,9 @@ export const facetStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    /* Matches the 36px view-toggle / select-toggle squares so the
+    /* Shared with the search input / view-toggle / clear-filters so the
        toolbar row reads as one consistent control strip. */
-    height: 36px;
+    height: var(--esphome-control-height);
     padding: 0 10px 0 12px;
     border-radius: var(--wa-border-radius-m);
     /* 2px dashes — the default 1px-thick dashed border renders as

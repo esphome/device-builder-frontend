@@ -60,6 +60,10 @@ export const espHomeStyles = css`
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
     --esphome-footer-height: 20px;
+    /* Height shared by the toolbar's interactive controls (search input,
+       view-toggle, facet pills, clear-filters) so the search row stays
+       pixel-aligned from one source. */
+    --esphome-control-height: 36px;
 
     font-family: var(--wa-font-family-body);
   }

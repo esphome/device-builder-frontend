@@ -308,14 +308,14 @@ export const dashboardStyles = css`
     min-width: 0;
   }
 
-  /* Trailing "Clear filters" action on the desktop facet row. Matches
-     the 36px pill height so the strip stays aligned, but stays quiet
+  /* Trailing "Clear filters" action on the desktop facet row. Shares the
+     toolbar control height so the strip stays aligned, but stays quiet
      (borderless, muted) so it doesn't read as another facet pill. */
   .filter-clear {
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    height: 36px;
+    height: var(--esphome-control-height);
     padding: 0 10px;
     border: none;
     border-radius: var(--wa-border-radius-m);
@@ -391,6 +391,10 @@ export const dashboardStyles = css`
      the placeholder. */
   .search-wrap .search-input {
     padding-left: 36px;
+    /* Share the toolbar control height so the search box matches the
+       view-toggle / facet pills beside it (the input's default is the
+       taller --wa-form-control-height). */
+    min-height: var(--esphome-control-height);
   }
 
   /* Decorative leading icon — magnifier in device mode, code-braces
@@ -575,7 +579,6 @@ export const dashboardStyles = css`
   .device-count {
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
-    padding-left: 2px;
   }
   .device-count strong {
     color: var(--wa-color-text-normal);
@@ -622,8 +625,8 @@ export const dashboardStyles = css`
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
-    height: 36px;
+    width: var(--esphome-control-height);
+    height: var(--esphome-control-height);
     border: none;
     background: var(--wa-color-surface-raised);
     color: var(--wa-color-text-quiet);
