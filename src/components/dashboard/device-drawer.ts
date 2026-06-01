@@ -266,7 +266,7 @@ export class ESPHomeDeviceDrawer extends LitElement {
         color: var(--esphome-on-primary);
       }
       .action--primary:hover {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        background: var(--esphome-primary-hover);
       }
 
       .action--accent {

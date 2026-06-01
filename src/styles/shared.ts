@@ -13,6 +13,12 @@ export const espHomeStyles = css`
   :host {
     /* ─── Brand colors ─── */
     --esphome-primary: var(--primary-color, #009fee);
+    /* Hover / active background for hand-rolled primary <button>s
+       (the FAB, dialog confirm buttons, etc. that don't use
+       wa-button[variant="primary"]). Defined once so the brand
+       hover can't drift across the ~two dozen buttons that share
+       it. wa-button has its own hover in the variant rules below. */
+    --esphome-primary-hover: color-mix(in srgb, var(--esphome-primary), black 10%);
     --esphome-primary-light: color-mix(
       in srgb,
       var(--primary-color, #009fee) 12%,

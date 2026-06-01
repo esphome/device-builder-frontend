@@ -644,7 +644,7 @@ export const dashboardStyles = css`
   }
 
   .view-toggle-btn.active:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .view-toggle-btn wa-icon {
@@ -942,7 +942,7 @@ export const dashboardStyles = css`
   }
 
   .table-create-btn:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .table-create-btn wa-icon {
@@ -980,7 +980,7 @@ export const dashboardStyles = css`
     letter-spacing: 0.01em;
   }
   .fab-btn:hover {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
     transform: translateY(-2px);
     box-shadow:
       0 8px 24px color-mix(in srgb, var(--esphome-primary), transparent 30%),

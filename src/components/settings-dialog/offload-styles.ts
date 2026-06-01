@@ -74,7 +74,7 @@ export const pairingRowStyles = css`
   }
 
   .btn-pair-build-server:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
   }
 
   .btn-pair-build-server:active:not(:disabled) {

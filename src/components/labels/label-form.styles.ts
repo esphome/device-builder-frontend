@@ -247,8 +247,8 @@ export const labelFormStyles = css`
   }
 
   .btn--primary:hover {
-    background: color-mix(in srgb, var(--esphome-primary), #000 10%);
-    border-color: color-mix(in srgb, var(--esphome-primary), #000 10%);
+    background: var(--esphome-primary-hover);
+    border-color: var(--esphome-primary-hover);
   }
 
   .btn:disabled,

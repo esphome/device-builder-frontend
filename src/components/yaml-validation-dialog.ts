@@ -87,7 +87,7 @@ export class ESPHomeYamlValidationDialog extends LitElement {
       }
 
       .btn--goto:hover:not(:disabled) {
-        background: color-mix(in srgb, var(--esphome-primary), black 10%);
+        background: var(--esphome-primary-hover);
       }
 
       .btn--save-anyway {

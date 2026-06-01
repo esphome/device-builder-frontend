@@ -66,7 +66,7 @@ export const addAutomationDialogStyles = css`
     box-shadow: 0 2px 8px color-mix(in srgb, var(--esphome-primary), transparent 50%);
   }
   .actions .primary:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--esphome-primary), black 10%);
+    background: var(--esphome-primary-hover);
     box-shadow: 0 4px 14px color-mix(in srgb, var(--esphome-primary), transparent 35%);
     transform: translateY(-1px);
   }
