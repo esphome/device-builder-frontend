@@ -7,6 +7,7 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { withBase } from "../../util/base-path.js";
 import { markJustCreated } from "../../util/just-created.js";
@@ -92,6 +93,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    fullscreenMobileDialog("wa-dialog"),
     css`
       wa-dialog {
         --width: 520px;
@@ -101,30 +103,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         --width: 750px;
       }
 
-      /* Mobile: drop both width variants to fullscreen so the
-         wizard's board picker and per-step bodies have room to
-         breathe instead of getting boxed into a 520px column
-         flanked by black gutters. Mirrors the same shape the
-         logs-dialog uses — the --width custom property alone
-         doesn't work because wa-dialog's internal dialog part
-         carries a max-width calc(100% - …) and a UA max-height
-         that keep the dialog at its desktop size unless we
-         override them on the part directly. The dvh fallback
-         after vh lets modern browsers shrink the dialog as iOS
-         Safari's URL bar collapses. #41 */
-      @media (max-width: 600px) {
-        wa-dialog::part(dialog) {
-          position: fixed;
-          inset: 0;
-          width: 100vw;
-          height: 100vh;
-          height: 100dvh;
-          max-width: none;
-          max-height: none;
-          margin: 0;
-          border-radius: 0;
-        }
-      }
+      /* Mobile full-screen comes from fullscreenMobileDialog in the static
+         styles so the board picker isn't boxed into a 520px column. #41 */
 
       wa-dialog::part(header) {
         background: var(--esphome-primary);

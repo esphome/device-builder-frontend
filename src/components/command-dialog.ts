@@ -33,6 +33,7 @@ import {
   versionContext,
 } from "../context/index.js";
 import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
@@ -197,6 +198,8 @@ export class ESPHomeCommandDialog extends LitElement {
     dialogCloseButtonStyles,
     commandDialogStyles,
     remoteBuildHintStyles,
+    // Log output is content-heavy: full-screen on mobile. #41
+    fullscreenMobileDialog("wa-dialog"),
   ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {

@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../styles/dialog-mobile.js";
+
 /**
  * Styles for <esphome-logs-dialog>. Extracted from the component
  * file to keep it under the repo's file-size cap (see README →
@@ -231,26 +233,9 @@ export const logsDialogStyles = css`
     border-radius: 0;
   }
 
-  @media (max-width: 700px) {
-    :host esphome-base-dialog::part(dialog) {
-      position: fixed;
-      inset: 0;
-      /* width/height are explicit because wa-dialog's
-         width: var(--width) and the UA's
-         max-height: calc(100% - ...) would otherwise keep the
-         dialog at its desktop size. The vh declaration is the
-         fallback for pre-2022 Safari / Chrome / Firefox that
-         don't recognise dvh; modern browsers pick the dvh line
-         which adjusts as iOS Safari's URL bar collapses. */
-      width: 100vw;
-      height: 100vh;
-      height: 100dvh;
-      max-width: none;
-      max-height: none;
-      margin: 0;
-      border-radius: 0;
-    }
-
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    /* Full-screen ::part(dialog) comes from fullscreenMobileDialog in the
+       static styles; these are the logs-specific companions. */
     .logs-content {
       height: 100%;
       max-height: none;

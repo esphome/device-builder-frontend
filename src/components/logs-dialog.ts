@@ -15,6 +15,7 @@ import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -106,7 +107,12 @@ export class ESPHomeLogsDialog extends LitElement {
   @query("esphome-ansi-log")
   private _ansiLog?: ESPHomeAnsiLog;
 
-  static styles = [espHomeStyles, logsDialogStyles];
+  static styles = [
+    espHomeStyles,
+    logsDialogStyles,
+    // Full-screen on mobile.
+    fullscreenMobileDialog("esphome-base-dialog"),
+  ];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_darkMode")) {

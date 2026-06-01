@@ -1,5 +1,7 @@
 import { css } from "lit";
 
+import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+
 export const commandDialogStyles = css`
   :host {
     --term-bg: #1e1e1e;
@@ -60,6 +62,15 @@ export const commandDialogStyles = css`
     min-height: 300px;
     max-height: 70vh;
     overflow: hidden;
+  }
+
+  /* Fill the mobile full-screen sheet (fullscreenMobileDialog). #41 */
+  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    .content {
+      height: 100%;
+      min-height: 0;
+      max-height: none;
+    }
   }
   /* Anchor the queued overlay's positioning context on .log-area (not
      .content) so the overlay covers only the log — toolbar/banner stay
