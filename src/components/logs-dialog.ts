@@ -18,12 +18,16 @@ import { apiContext, darkModeContext, localizeContext } from "../context/index.j
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import { logsDialogStyles } from "./logs-dialog.styles.js";
+import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
+import {
+  termButtonStyles,
+  termTokens,
+} from "./process-terminal/process-terminal.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./ansi-log.js";
 import "./base-dialog.js";
+import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
   "arrow-collapse": mdiArrowCollapse,
@@ -103,10 +107,10 @@ export class ESPHomeLogsDialog extends LitElement {
    */
   private _serialCancel: (() => void) | null = null;
 
-  @query("esphome-ansi-log")
-  private _ansiLog?: ESPHomeAnsiLog;
+  @query("esphome-process-terminal")
+  private _terminal?: ESPHomeProcessTerminal;
 
-  static styles = [espHomeStyles, logsDialogStyles];
+  static styles = [espHomeStyles, termTokens, termButtonStyles, logsDialogStyles];
 
   protected willUpdate(changedProperties: Map<string, unknown>) {
     if (changedProperties.has("_darkMode")) {
@@ -146,7 +150,7 @@ export class ESPHomeLogsDialog extends LitElement {
        back to the bottom themselves. ``scrollToBottom()`` clears the
        flag and forces a scroll. updateComplete makes sure the @query
        has resolved on first open. */
-    this.updateComplete.then(() => this._ansiLog?.scrollToBottom());
+    this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
   /** Open dialog without auto-starting streaming (for Web Serial feed). */
@@ -230,27 +234,24 @@ export class ESPHomeLogsDialog extends LitElement {
         @request-close=${this._onDialogRequestClose}
         @after-hide=${this._onDialogHide}
       >
-        <div class="logs-content">
-          <esphome-ansi-log
-            .lines=${this._lines}
-            placeholder=${this._localize("dashboard.logs_placeholder")}
-            ?light=${!this._darkMode}
-          ></esphome-ansi-log>
-          <div class="terminal-toolbar">
-            ${this._backToInstall
-              ? html`
-                  <button
-                    class="term-btn term-btn--ghost"
-                    @click=${this._onBackToInstall}
-                    title=${this._localize("dashboard.logs_back_to_install_tooltip")}
-                  >
-                    <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                    ${this._localize("dashboard.logs_back_to_install")}
-                  </button>
-                `
-              : ""}
-            ${this._streaming ? html`<span class="streaming-dot"></span>` : ""}
-            <span class="spacer"></span>
+        <esphome-process-terminal
+          .lines=${this._lines}
+          placeholder=${this._localize("dashboard.logs_placeholder")}
+          ?light=${!this._darkMode}
+          ?streaming=${this._streaming}
+        >
+          ${this._backToInstall
+            ? html`<button
+                slot="toolbar-left"
+                class="term-btn term-btn--ghost"
+                @click=${this._onBackToInstall}
+                title=${this._localize("dashboard.logs_back_to_install_tooltip")}
+              >
+                <wa-icon library="mdi" name="arrow-left"></wa-icon>
+                ${this._localize("dashboard.logs_back_to_install")}
+              </button>`
+            : ""}
+          <div slot="toolbar-right">
             ${this._passive
               ? ""
               : html`
@@ -300,7 +301,7 @@ export class ESPHomeLogsDialog extends LitElement {
                   </button>
                 `}
           </div>
-        </div>
+        </esphome-process-terminal>
       </esphome-base-dialog>
     `;
   }

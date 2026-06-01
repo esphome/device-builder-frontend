@@ -107,12 +107,14 @@ export const processTerminalStyles = css`
   }
 
   /* ── stream variant ─────────────────────────────────────────── */
+  /* Height is variable-driven so a consumer can fill the dialog when
+     expanded / on mobile (logs-dialog overrides these to 100% / none). */
   .content {
     display: flex;
     flex-direction: column;
-    height: 60vh;
-    min-height: 300px;
-    max-height: 70vh;
+    height: var(--process-terminal-height, 60vh);
+    min-height: var(--process-terminal-min-height, 300px);
+    max-height: var(--process-terminal-max-height, 70vh);
     overflow: hidden;
   }
   /* Anchor the overlay slot's positioning context on .log-area so a queued
@@ -159,6 +161,9 @@ export const processTerminalStyles = css`
     flex-shrink: 0;
     display: flex;
     align-items: center;
+    /* Wrap when cramped (narrow / mobile) so labelled buttons stay on-screen
+       instead of running off the right edge. */
+    flex-wrap: wrap;
     gap: var(--wa-space-xs);
     padding: 6px var(--wa-space-m);
     background: var(--term-bg-alt);
