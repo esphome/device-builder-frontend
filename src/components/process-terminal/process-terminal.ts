@@ -156,7 +156,7 @@ export class ESPHomeProcessTerminal extends LitElement {
           : nothing}
         <slot name="suggestion"></slot>
         <slot name="status-extra"></slot>
-        <div class="card-footer"><slot name="toolbar-right"></slot></div>
+        <slot name="toolbar-right"></slot>
       </div>
     `;
   }

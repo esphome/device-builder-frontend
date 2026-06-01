@@ -10,7 +10,7 @@
 import { describe, it } from "vitest";
 import { JobSource } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { renderStatus } from "../../src/components/firmware-install-dialog/renderers.js";
+import { renderResetSuggestion } from "../../src/components/firmware-install-dialog/renderers.js";
 import {
   expectFallbackToLocal,
   expectLocalSuggestion,
@@ -52,9 +52,9 @@ function baseHost(overrides: Partial<Host> = {}): Host {
 }
 
 const render = (host: Host) =>
-  renderStatus(host as unknown as ESPHomeFirmwareInstallDialog);
+  renderResetSuggestion(host as unknown as ESPHomeFirmwareInstallDialog);
 
-describe("firmware-install-dialog renderStatus failure suggestion", () => {
+describe("firmware-install-dialog renderResetSuggestion failure suggestion", () => {
   it("emits both clean and reset links on a LOCAL build failure", () => {
     const host = baseHost();
     expectLocalSuggestion(render(host), host);

@@ -11,17 +11,18 @@ import { describe, expect, it } from "vitest";
 import type { FirmwareBinary } from "../../src/api/types/firmware-jobs.js";
 import { defaultLocalize } from "../../src/common/localize.js";
 import type { ESPHomeFirmwareInstallDialog } from "../../src/components/firmware-install-dialog.js";
-import { renderStatus } from "../../src/components/firmware-install-dialog/renderers.js";
+import { renderStatusExtra } from "../../src/components/firmware-install-dialog/renderers.js";
 
 function rowsText(binaries: FirmwareBinary[]): string {
   const host = {
     _step: "choose-binary",
     _binaries: binaries,
+    _logLines: [],
     _localize: defaultLocalize,
     _onChooseBinary: () => {},
   };
   const container = document.createElement("div");
-  render(renderStatus(host as unknown as ESPHomeFirmwareInstallDialog), container);
+  render(renderStatusExtra(host as unknown as ESPHomeFirmwareInstallDialog), container);
   return container.textContent ?? "";
 }
 

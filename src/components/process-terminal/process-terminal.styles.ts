@@ -243,13 +243,4 @@ export const processTerminalStyles = css`
     background: var(--esphome-primary);
     transition: width 0.2s;
   }
-
-  .card-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: var(--wa-space-s);
-    margin-top: var(--wa-space-l);
-    padding-top: var(--wa-space-m);
-    border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
-  }
 `;

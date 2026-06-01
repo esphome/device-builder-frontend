@@ -47,43 +47,9 @@ export const firmwareInstallDialogStyles = css`
     display: none;
   }
 
-  .status {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    text-align: center;
-    gap: var(--wa-space-m);
-    padding: var(--wa-space-l) 0;
-  }
-
-  .status wa-spinner {
-    font-size: 36px;
-    --indicator-color: var(--esphome-primary);
-    --track-color: color-mix(in srgb, var(--esphome-primary), transparent 80%);
-  }
-
-  .status-icon {
-    font-size: 42px;
-  }
-  .status-icon--success {
-    color: var(--esphome-success);
-  }
-  .status-icon--error {
-    color: var(--esphome-error);
-  }
-
-  .status-text {
-    font-size: var(--wa-font-size-m);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
-
-  .status-detail {
-    font-size: var(--wa-font-size-xs);
-    color: var(--wa-color-text-quiet);
-    max-width: 380px;
-    line-height: 1.5;
-  }
+  /* The status block (spinner / success / error icon + message + detail) and
+     the progress bar are rendered by <esphome-process-terminal variant="card">
+     now; only the install-specific bodies below remain here. */
 
   /* Reset-build-env suggestion — secondary hint, quieter than the red error. */
   .reset-suggestion {
@@ -170,22 +136,6 @@ export const firmwareInstallDialogStyles = css`
   .binary-option .desc {
     font-size: var(--wa-font-size-xs);
     color: var(--wa-color-text-quiet);
-  }
-
-  .progress-bar {
-    width: 100%;
-    height: 6px;
-    border-radius: 3px;
-    background: var(--wa-color-surface-lowered);
-    overflow: hidden;
-    margin-top: var(--wa-space-xs);
-  }
-
-  .progress-bar-fill {
-    height: 100%;
-    border-radius: 3px;
-    background: var(--esphome-primary);
-    transition: width 0.2s;
   }
 
   .logs-toggle {

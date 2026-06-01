@@ -27,18 +27,20 @@ import {
   startWebSerialInstall,
 } from "./firmware-install-dialog/install-flow.js";
 import {
+  cardState,
+  cardStatusDetail,
+  cardStatusMessage,
   renderFooter,
-  renderLogs,
-  renderProgress,
-  renderStatus,
+  renderResetSuggestion,
+  renderStatusExtra,
 } from "./firmware-install-dialog/renderers.js";
 import { firmwareInstallDialogStyles } from "./firmware-install-dialog/styles.js";
 import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
 import "./ansi-log.js";
 import "./base-dialog.js";
+import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
   "alert-circle": mdiAlertCircle,
@@ -324,8 +326,18 @@ export class ESPHomeFirmwareInstallDialog extends LitElement {
         .label=${this._title}
         @after-hide=${this._onClose}
       >
-        ${renderStatus(this)} ${renderProgress(this)} ${renderLogs(this)}
-        ${renderFooter(this)}
+        <esphome-process-terminal
+          variant="card"
+          ?light=${!this._darkMode}
+          .state=${cardState(this)}
+          .statusMessage=${cardStatusMessage(this)}
+          .statusDetail=${cardStatusDetail(this)}
+          .progress=${this._step === "flashing" ? this._flashPercent : null}
+        >
+          <div slot="suggestion">${renderResetSuggestion(this)}</div>
+          ${renderStatusExtra(this)}
+          <div slot="toolbar-right">${renderFooter(this)}</div>
+        </esphome-process-terminal>
       </esphome-base-dialog>
     `;
   }
