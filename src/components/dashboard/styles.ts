@@ -33,13 +33,10 @@ export const dashboardStyles = css`
        dashboard host, so both toolbars resolve identical values and
        can't drift on mobile. Mobile override is in the @media block. */
     --toolbar-pad-top: var(--wa-space-l);
-    /* Horizontal content gutter shared by every full-width region in
-       both views: the toolbar (.toolbar / .controls), the card grid,
-       the YAML hit list, the table outline (.table-wrap), and the
-       table count row. Full on desktop, tightened on mobile in the
-       @media block below. Defined on the host so the device-table
-       shadow inherits it, keeping card and table views aligned. #41 */
-    --content-gutter: var(--wa-space-l);
+    /* --content-gutter (the horizontal inset shared by the toolbar, card
+       grid, YAML hit list, table outline, and count row) is defined once on
+       esphome-layout's :host and inherited here, so the header and the body
+       share one gutter. The device-table shadow inherits it too. #41 */
     /* Inter-row gap inside the toolbar. Card view's .toolbar and the
        table view's .toolbar-stack both use it, and the table count
        row mirrors it as padding-top, so the rows line up identically
@@ -72,12 +69,10 @@ export const dashboardStyles = css`
       padding-top: var(--wa-space-l);
     }
 
-    /* Tighten the shared gutters on mobile. Every full-width region
-       in both views inherits these, so the card and table layouts
-       stay in lockstep at narrow widths. #41 */
+    /* Tighten the toolbar's top padding on mobile (the --content-gutter
+       mobile trim lives on esphome-layout now, inherited here). #41 */
     :host {
       --toolbar-pad-top: var(--wa-space-s);
-      --content-gutter: var(--wa-space-s);
     }
   }
 
