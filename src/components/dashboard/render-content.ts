@@ -186,9 +186,10 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
     >
       <div slot="toolbar" class="toolbar-stack">
         <div class="toolbar-row">
-          ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
+          ${renderSearchInput(host)} ${renderViewToggle(host)}
         </div>
       </div>
+      <div slot="before-columns" class="table-facets">${renderFacets(host)}</div>
       <div slot="below-controls" class="table-device-count-row">
         ${renderDeviceCountRow(host, filteredDevices.length, host._devices.length)}
       </div>
@@ -198,7 +199,7 @@ export function renderTable(host: ESPHomePageDashboard): TemplateResult {
         @click=${() => host._createDialog.open()}
       >
         <wa-icon library="mdi" name="plus"></wa-icon>
-        ${host._localize("dashboard.create_device")}
+        <span class="label">${host._localize("dashboard.create_device")}</span>
       </button>
       <div slot="no-results-extra" class="yaml-preview-banner">
         ${renderNoResultsExtras(host)}

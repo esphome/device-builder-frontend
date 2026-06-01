@@ -35,6 +35,9 @@ export class ESPHomeTableColumnToggle extends LitElement {
       :host {
         display: block;
         position: relative;
+        /* Allow the toggle to shrink (and its label to ellipsize) when
+           it shares the mobile toolbar row with Filters + Create. */
+        min-width: 0;
       }
 
       .toggle-btn {
@@ -43,6 +46,8 @@ export class ESPHomeTableColumnToggle extends LitElement {
         gap: 6px;
         padding: 0 14px;
         height: 36px;
+        max-width: 100%;
+        min-width: 0;
         box-sizing: border-box;
         border-radius: var(--wa-border-radius-m);
         font-size: var(--wa-font-size-xs);
@@ -64,6 +69,25 @@ export class ESPHomeTableColumnToggle extends LitElement {
 
       .toggle-btn wa-icon {
         font-size: 15px;
+        flex-shrink: 0;
+      }
+
+      /* On mobile the Columns toggle shares one row with Filters and
+         Create device (see table-styles.ts). The label ellipsizes
+         rather than wrapping the row when space is tight (e.g. a long
+         translated "Columns" string); the icon stays put. */
+      .toggle-btn .label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Tighter horizontal padding on the mobile toolbar row so the
+         three controls sit more compactly (matches Create device). */
+      @media (max-width: 700px) {
+        .toggle-btn {
+          padding: 0 10px;
+        }
       }
 
       .backdrop {
@@ -84,6 +108,20 @@ export class ESPHomeTableColumnToggle extends LitElement {
         box-shadow: var(--wa-shadow-l);
         padding: var(--wa-space-xs) 0;
         animation: menu-in 0.15s ease-out;
+      }
+
+      /* At desktop widths the toggle sits at the right edge of the
+         controls row, so the menu (right:0) opens leftward and fits.
+         On mobile the toggle moves into the middle of the second
+         toolbar row (see table-styles.ts), where right:0 would push
+         the menu off the left edge of the viewport. Anchor it to the
+         toggle's left edge so it opens rightward into open space.
+         700px matches the breakpoint where the controls reflow. */
+      @media (max-width: 700px) {
+        .menu {
+          left: 0;
+          right: auto;
+        }
       }
 
       @keyframes menu-in {
@@ -164,9 +202,13 @@ export class ESPHomeTableColumnToggle extends LitElement {
 
   protected render() {
     return html`
-      <button class="toggle-btn" @click=${this._toggle}>
+      <button
+        class="toggle-btn"
+        aria-label=${this._localize("dashboard.table_columns")}
+        @click=${this._toggle}
+      >
         <wa-icon library="mdi" name="cog-outline"></wa-icon>
-        ${this._localize("dashboard.table_columns")}
+        <span class="label">${this._localize("dashboard.table_columns")}</span>
       </button>
       ${this._open
         ? html`

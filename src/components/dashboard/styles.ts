@@ -373,6 +373,18 @@ export const dashboardStyles = css`
     flex: 1 1 220px;
     min-width: 140px;
   }
+
+  /* Table view only: the facets/Filters control no longer shares the
+     search row (it moved into the controls-right cluster), so the
+     search input can seed from a 0 flex-basis. Flex line-breaking uses
+     the basis, not min-width, so the 220px basis above would push the
+     view-toggle onto a second line at ~360px; a 0 basis keeps search +
+     view-toggle on one row (search still grows to fill, floored by the
+     140px min-width). Card / YAML toolbars keep the 220px basis since
+     their Filters control still shares this row. */
+  .toolbar-stack .search-wrap {
+    flex-basis: 0;
+  }
   /* Native <input class="search-input"> picks up the shared
      border / radius / focus-ring shape from inputStyles
      (src/styles/inputs.ts) — matches the .combobox-input shape
@@ -939,6 +951,11 @@ export const dashboardStyles = css`
     background: var(--esphome-primary);
     color: var(--esphome-on-primary);
     transition: background 0.12s;
+    /* Keeps its natural width; on mobile's single-row toolbar
+       (table-styles.ts) it may only shrink, never grow. min-width:0 +
+       the label ellipsis below let it ellipsize instead of wrapping
+       the row in a long locale. */
+    min-width: 0;
   }
 
   .table-create-btn:hover {
@@ -947,6 +964,21 @@ export const dashboardStyles = css`
 
   .table-create-btn wa-icon {
     font-size: 15px;
+    flex-shrink: 0;
+  }
+
+  .table-create-btn .label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Tighter horizontal padding on the mobile toolbar row so the three
+     controls sit more compactly (matches the Columns toggle). */
+  @media (max-width: 700px) {
+    .table-create-btn {
+      padding: 0 10px;
+    }
   }
 
   /* ─── FAB ─── */

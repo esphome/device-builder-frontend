@@ -35,7 +35,12 @@ export const tableLayoutStyles = css`
        facets). The slotted toolbar's right edge sits at the same
        y as Columns / Create. */
     align-items: flex-start;
-    gap: var(--wa-space-s);
+    /* row-gap matches the card / YAML toolbars' .toolbar-row
+       (row-gap: --wa-space-xs) so the vertical distance between the
+       search row and the wrapped Filters/Columns/Create row is
+       identical across all three views; column-gap stays --wa-space-s
+       for the desktop single-row spacing. */
+    gap: var(--wa-space-xs) var(--wa-space-s);
     /* Shared with the card view's .toolbar via tokens inherited from
        the dashboard host, so the two views keep identical gutters at
        every breakpoint (incl. the mobile trim). */
@@ -66,12 +71,35 @@ export const tableLayoutStyles = css`
       flex-wrap: wrap;
     }
 
+    /* Row 1: search + view-toggle claim the full width. */
     .controls ::slotted([slot="toolbar"]) {
       flex: 1 1 100%;
     }
 
+    /* Row 2: Filters + Columns + Create device share one line, packed
+       at the left (margin-left was previously auto, which pinned the
+       cluster to the right and left the dead space on the left). The
+       buttons keep their natural width and the row never wraps; when
+       space is tight (a long locale) Columns and Create shrink and
+       ellipsize their labels rather than breaking to a second line.
+       Filters keeps its short label (does not shrink). */
     .controls-right {
-      margin-left: auto;
+      flex: 1 1 100%;
+      flex-wrap: nowrap;
+      margin-left: 0;
+      align-items: center;
+      /* Tighter inter-button gap on the mobile row than the desktop
+         cluster's --wa-space-s. */
+      gap: var(--wa-space-xs);
+    }
+
+    .controls-right ::slotted([slot="before-columns"]) {
+      flex: 0 0 auto;
+    }
+
+    .controls-right ::slotted([slot="actions"]) {
+      flex: 0 1 auto;
+      min-width: 0;
     }
   }
 
