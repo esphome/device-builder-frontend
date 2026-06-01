@@ -1,82 +1,41 @@
 import { css } from "lit";
 
+/**
+ * Styles for <esphome-command-dialog>. The terminal surface (log output,
+ * success/error banner, toolbar layout, term buttons, streaming dot) is
+ * rendered by the shared <esphome-process-terminal>; what remains here is the
+ * dialog chrome and the styling for the controls this dialog slots into the
+ * component — the queued overlay, the remote-builder sub-line, and the
+ * reset-build-env suggestion. The --term-* tokens and .term-btn rules come
+ * from the shared termTokens / termButtonStyles in the dialog's static styles.
+ */
 export const commandDialogStyles = css`
-  :host {
-    --term-bg: #1e1e1e;
-    --term-bg-alt: #252526;
-    --term-fg: #d4d4d4;
-    --term-fg-muted: #808080;
-    --term-border: #3c3c3c;
-    --term-hover: #2a2d2e;
-    --term-accent: #4ec9b0;
-    --term-error: #f44747;
-    --term-success: #6a9955;
-  }
-
-  :host([light]) {
-    --term-bg: #f5f5f5;
-    --term-bg-alt: #e8e8e8;
-    --term-fg: #1e1e1e;
-    --term-fg-muted: #6e6e6e;
-    --term-border: #d0d0d0;
-    --term-hover: #dcdcdc;
-    --term-accent: #0d8a6f;
-    --term-error: #c02020;
-    --term-success: #3d7a28;
-  }
-
   /* Match logs-dialog width — same body (ANSI terminal output), same wrap
      budget. 900 wrapped routinely on retina laptops where the
      timestamp + [C][module:NNN] prefix ate horizontal real estate. */
-  wa-dialog {
+  esphome-base-dialog {
     --width: min(1300px, 94vw);
   }
-  wa-dialog::part(header) {
+  esphome-base-dialog::part(header) {
     background: var(--esphome-primary);
     /* Right padding 0 so close sits flush — explicitly sized below. */
     padding: 0 0 0 var(--wa-space-m);
     height: 40px;
     box-sizing: border-box;
   }
-  wa-dialog::part(title) {
+  esphome-base-dialog::part(title) {
     color: var(--esphome-on-primary);
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
     font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
   }
-  wa-dialog::part(body) {
+  esphome-base-dialog::part(body) {
     padding: 0;
     background: var(--term-bg);
     overflow: hidden;
   }
-  wa-dialog::part(footer) {
+  esphome-base-dialog::part(footer) {
     display: none;
-  }
-
-  .content {
-    display: flex;
-    flex-direction: column;
-    height: 60vh;
-    min-height: 300px;
-    max-height: 70vh;
-    overflow: hidden;
-  }
-  /* Anchor the queued overlay's positioning context on .log-area (not
-     .content) so the overlay covers only the log — toolbar/banner stay
-     interactive regardless of viewport height. */
-  .log-area {
-    position: relative;
-    flex: 1;
-    min-height: 0;
-    display: flex;
-  }
-  esphome-ansi-log {
-    flex: 1;
-    min-height: 0;
-    --log-height: 100%;
-  }
-  esphome-ansi-log::part(container) {
-    border-radius: 0;
   }
 
   .queued-overlay {
@@ -124,31 +83,8 @@ export const commandDialogStyles = css`
     line-height: 1.5;
   }
 
-  .status-banner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 20px;
-    border-top: 1px solid var(--term-border);
-    font-family: "SF Mono", "Fira Code", "Fira Mono", "Cascadia Code", monospace;
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .status-banner wa-icon {
-    font-size: 28px;
-    flex-shrink: 0;
-  }
-  .status-banner--success {
-    background: color-mix(in srgb, var(--term-success), transparent 85%);
-    color: var(--term-success);
-  }
-  .status-banner--error {
-    background: color-mix(in srgb, var(--term-error), transparent 85%);
-    color: var(--term-error);
-  }
-
   /* "Building on <receiver_label>" sub-line, visible while a REMOTE-source
-     job is in flight. Surfaced above the log area. */
+     job is in flight. Surfaced above the log area via the sub-line slot. */
   .remote-builder-sub-line {
     display: flex;
     align-items: center;
@@ -191,7 +127,8 @@ export const commandDialogStyles = css`
   }
 
   /* Reset-build-env suggestion — install/compile failures only. Muted
-     palette: a hint, not a second error. */
+     palette: a hint, not a second error. Slotted into the component's
+     suggestion slot. */
   .reset-suggestion {
     padding: 10px 20px;
     border-top: 1px solid var(--term-border);
@@ -216,84 +153,5 @@ export const commandDialogStyles = css`
     color: var(--term-accent);
     text-decoration-thickness: 2px;
     outline: none;
-  }
-  .terminal-toolbar {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-xs);
-    padding: 6px var(--wa-space-m);
-    background: var(--term-bg-alt);
-    border-top: 1px solid var(--term-border);
-  }
-  .terminal-toolbar .spacer {
-    flex: 1;
-  }
-
-  .streaming-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--term-accent);
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0%,
-    100% {
-      opacity: 1;
-    }
-    50% {
-      opacity: 0.3;
-    }
-  }
-
-  .term-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    padding: 4px 12px;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    font-family: "SF Mono", "Fira Code", monospace;
-    cursor: pointer;
-    border: 1px solid var(--term-border);
-    transition:
-      background 0.1s,
-      border-color 0.1s;
-  }
-  .term-btn wa-icon {
-    font-size: 14px;
-  }
-  .term-btn--ghost {
-    background: transparent;
-    color: var(--term-fg-muted);
-  }
-  .term-btn--ghost:hover {
-    background: var(--term-hover);
-    color: var(--term-fg);
-    border-color: var(--term-fg-muted);
-  }
-  .term-btn--ghost.is-active {
-    background: color-mix(in srgb, var(--term-accent), transparent 85%);
-    color: var(--term-accent);
-    border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
-  }
-  .term-btn--stop {
-    background: color-mix(in srgb, var(--term-error), transparent 85%);
-    color: var(--term-error);
-    border-color: color-mix(in srgb, var(--term-error), transparent 60%);
-  }
-  .term-btn--stop:hover {
-    background: color-mix(in srgb, var(--term-error), transparent 75%);
-  }
-  .term-btn--start {
-    background: color-mix(in srgb, var(--term-accent), transparent 85%);
-    color: var(--term-accent);
-    border-color: color-mix(in srgb, var(--term-accent), transparent 60%);
-  }
-  .term-btn--start:hover {
-    background: color-mix(in srgb, var(--term-accent), transparent 75%);
   }
 `;

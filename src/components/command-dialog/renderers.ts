@@ -2,9 +2,11 @@ import { html, nothing, type TemplateResult } from "lit";
 import { type FirmwareJob, JobSource, JobStatus } from "../../api/types/firmware-jobs.js";
 import { firmwareJobDisplayName } from "../../util/firmware-job-display.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
-import { splitTemplate } from "../../util/template-split.js";
 import type { ESPHomeCommandDialog } from "../command-dialog.js";
-import { renderRemoteBuildFailureSuggestion } from "../remote-build-hint.js";
+import {
+  renderBuildFailureSuggestion,
+  renderValidationFailureSuggestion,
+} from "../process-terminal/reset-suggestion.js";
 
 // "Building on <receiver>" sub-line for in-flight REMOTE jobs. Falls back to
 // the locally-primed snapshot for the gap between followJob and the first
@@ -91,23 +93,10 @@ export function renderQueuedOverlay(
   `;
 }
 
-export function renderBanner(
-  host: ESPHomeCommandDialog
-): TemplateResult | typeof nothing {
-  if (host._state !== "success" && host._state !== "error") return nothing;
-  const isSuccess = host._state === "success";
-  const icon = isSuccess ? "check-circle" : "alert-circle";
-  const modifier = isSuccess ? "success" : "error";
-  return html`
-    <div class="status-banner status-banner--${modifier}">
-      <wa-icon library="mdi" name=${icon}></wa-icon>
-      <span>${host._statusMessage}</span>
-    </div>
-  `;
-}
-
 // YAML validation failure → "open in editor". Build failure → clean → reset
 // staircase. _userStopped is shared — a user-cancel isn't a build problem.
+// The success / error status banner itself is rendered by
+// <esphome-process-terminal> from the dialog's state + status message.
 export function renderResetSuggestion(
   host: ESPHomeCommandDialog
 ): TemplateResult | typeof nothing {
@@ -119,47 +108,17 @@ export function renderResetSuggestion(
   if (host._commandType !== "install" && host._commandType !== "compile") {
     return nothing;
   }
-  return renderBuildFailureSuggestion(host);
-}
-
-function renderValidationFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
-  const text = host._localize("command.validation_failed_suggestion");
-  const [before, after] = splitTemplate(text, "{editor_action}");
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryOpenInEditor}>
-        ${host._localize("command.try_open_editor_button")}</button
-      >${after}
-    </div>
-  `;
+  return renderBuildFailureSuggestion(host, remotePeerLabel(host));
 }
 
 // Resolve the receiver label for a REMOTE-sourced job. Returns null for
 // LOCAL builds (or when the live + primed snapshots both lack a label) so
-// the caller falls back to the local reset-build-env link.
+// the shared renderer falls back to the local reset-build-env link.
 function remotePeerLabel(host: ESPHomeCommandDialog): string | null {
   const live = host._jobId ? host._jobs.get(host._jobId) : undefined;
   const primed = host._primedSource;
   if ((live?.source ?? primed?.source) !== JobSource.REMOTE) return null;
   return live?.source_label || primed?.source_label || null;
-}
-
-function renderBuildFailureSuggestion(host: ESPHomeCommandDialog): TemplateResult {
-  const remoteLabel = remotePeerLabel(host);
-  if (remoteLabel !== null) {
-    return renderRemoteBuildFailureSuggestion(host, remoteLabel);
-  }
-  const text = host._localize("command.try_reset_suggestion");
-  const [before, middle, after] = splitTemplate(text, "{clean_action}", "{reset_action}");
-  return html`
-    <div class="reset-suggestion" role="status">
-      ${before}<button class="reset-suggestion-link" @click=${host._tryCleanBuild}>
-        ${host._localize("command.try_clean_button")}</button
-      >${middle}<button class="reset-suggestion-link" @click=${host._tryResetBuildEnv}>
-        ${host._localize("command.try_reset_button")}</button
-      >${after}
-    </div>
-  `;
 }
 
 interface ToolbarToggleOpts {
@@ -229,24 +188,23 @@ function renderShowLogsAfterInstallToggle(
   });
 }
 
+// Right-aligned toolbar controls slotted into <esphome-process-terminal>'s
+// toolbar; the component renders the toolbar container, the streaming dot, and
+// the spacer.
 export function renderToolbar(host: ESPHomeCommandDialog): TemplateResult {
   return html`
-    <div class="terminal-toolbar">
-      ${host._state === "running" ? html`<span class="streaming-dot"></span>` : nothing}
-      <span class="spacer"></span>
-      ${renderShowSecretsToggle(host)} ${renderShowLogsAfterInstallToggle(host)}
-      ${host._lines.length > 0
-        ? html`<button
-            class="term-btn term-btn--ghost"
-            @click=${host._downloadOutput}
-            title=${host._localize("command.download")}
-            aria-label=${host._localize("command.download")}
-          >
-            <wa-icon library="mdi" name="download"></wa-icon>
-          </button>`
-        : nothing}
-      ${renderActions(host)}
-    </div>
+    ${renderShowSecretsToggle(host)} ${renderShowLogsAfterInstallToggle(host)}
+    ${host._lines.length > 0
+      ? html`<button
+          class="term-btn term-btn--ghost"
+          @click=${host._downloadOutput}
+          title=${host._localize("command.download")}
+          aria-label=${host._localize("command.download")}
+        >
+          <wa-icon library="mdi" name="download"></wa-icon>
+        </button>`
+      : nothing}
+    ${renderActions(host)}
   `;
 }
 

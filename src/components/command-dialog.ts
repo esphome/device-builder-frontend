@@ -32,12 +32,10 @@ import {
   localizeContext,
   versionContext,
 } from "../context/index.js";
-import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
 import { dispatchShowLogsAfterInstall } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import type { ESPHomeAnsiLog } from "./ansi-log.js";
 import {
   detachStream,
   followJob,
@@ -47,18 +45,22 @@ import {
   toggleShowSecrets,
 } from "./command-dialog/commands.js";
 import {
-  renderBanner,
   renderQueuedOverlay,
   renderRemoteBuilderSubLine,
   renderResetSuggestion,
   renderToolbar,
 } from "./command-dialog/renderers.js";
 import { commandDialogStyles } from "./command-dialog/styles.js";
+import type { ESPHomeProcessTerminal } from "./process-terminal/process-terminal.js";
+import {
+  termButtonStyles,
+  termTokens,
+} from "./process-terminal/process-terminal.styles.js";
 import { remoteBuildHintStyles } from "./remote-build-hint.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
-import "./ansi-log.js";
+import "./base-dialog.js";
+import "./process-terminal/process-terminal.js";
 
 registerMdiIcons({
   close: mdiClose,
@@ -136,6 +138,7 @@ export class ESPHomeCommandDialog extends LitElement {
   @property() configuration = "";
   @property() name = "";
 
+  @state() _open = false;
   @state() _commandType: CommandType = "validate";
   @state() _state: CommandState | null = null;
   @state() _lines: string[] = [];
@@ -189,12 +192,12 @@ export class ESPHomeCommandDialog extends LitElement {
   // Active job id (cancel target). Empty for validate.
   _jobId = "";
 
-  @query("wa-dialog") _dialog!: HTMLElement & { open: boolean };
-  @query("esphome-ansi-log") _ansiLog?: ESPHomeAnsiLog;
+  @query("esphome-process-terminal") _terminal?: ESPHomeProcessTerminal;
 
   static styles = [
     espHomeStyles,
-    dialogCloseButtonStyles,
+    termTokens,
+    termButtonStyles,
     commandDialogStyles,
     remoteBuildHintStyles,
   ];
@@ -231,7 +234,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._showSecrets = false;
     this._showLogsAfterInstall = true;
     void detachStream(this);
-    this._dialog.open = true;
+    this._open = true;
     this._resetAnsiLogScroll();
     void this._start();
   }
@@ -239,7 +242,7 @@ export class ESPHomeCommandDialog extends LitElement {
   _resetAnsiLogScroll() {
     // The ansi-log instance is reused across opens; scrollToBottom clears
     // its _isUserScrolled latch so streaming-to-bottom re-engages.
-    this.updateComplete.then(() => this._ansiLog?.scrollToBottom());
+    this.updateComplete.then(() => this._terminal?.scrollToBottom());
   }
 
   // Attach to a firmware job's stream. Handles any state — terminal jobs
@@ -269,20 +272,20 @@ export class ESPHomeCommandDialog extends LitElement {
     // every reopen layered fresh streams while previous ones still pumped
     // onOutput into _lines (lines duplicated per leaked subscription).
     void detachStream(this);
-    this._dialog.open = true;
+    this._open = true;
     this._resetAnsiLogScroll();
     followJob(this, job.job_id);
   }
 
   public close = () => {
     void detachStream(this);
-    this._dialog.open = false;
+    this._open = false;
   };
 
   // Reopen without clearing line buffer / status. Used by logs-dialog's
   // "Back to install" after the post-install hand-off.
   public reopen() {
-    this._dialog.open = true;
+    this._open = true;
     this._resetAnsiLogScroll();
   }
 
@@ -296,7 +299,7 @@ export class ESPHomeCommandDialog extends LitElement {
       port: this._port,
       reopenInstall: () => this.reopen(),
     });
-    if (handled) this._dialog.open = false;
+    if (handled) this._open = false;
   };
 
   private get _title(): string {
@@ -406,25 +409,40 @@ export class ESPHomeCommandDialog extends LitElement {
   _start = () => startCommand(this);
   _stop = () => stopCommand(this);
 
+  // Flip _open the moment the user initiates a close (X / Esc / outside-click)
+  // so streamed lines re-rendering with ?open can't re-assert open=true and
+  // cancel wa-dialog's in-flight hide (same race logs-dialog guards). No
+  // host-side veto, so the close still proceeds to after-hide.
+  private _onDialogRequestClose = () => {
+    this._open = false;
+  };
+
   private _onDialogHide = () => {
+    this._open = false;
     void detachStream(this);
   };
 
   protected render() {
     return html`
-      <wa-dialog label=${this._title} light-dismiss @wa-after-hide=${this._onDialogHide}>
-        <div class="content">
-          ${renderRemoteBuilderSubLine(this)}
-          <div class="log-area">
-            <esphome-ansi-log
-              .lines=${this._lines}
-              ?light=${!this._darkMode}
-            ></esphome-ansi-log>
-            ${renderQueuedOverlay(this)}
-          </div>
-          ${renderBanner(this)} ${renderResetSuggestion(this)} ${renderToolbar(this)}
-        </div>
-      </wa-dialog>
+      <esphome-base-dialog
+        ?open=${this._open}
+        .label=${this._title}
+        @request-close=${this._onDialogRequestClose}
+        @after-hide=${this._onDialogHide}
+      >
+        <esphome-process-terminal
+          .lines=${this._lines}
+          ?light=${!this._darkMode}
+          ?streaming=${this._state === "running"}
+          .state=${this._state}
+          .statusMessage=${this._statusMessage}
+        >
+          <div slot="sub-line">${renderRemoteBuilderSubLine(this)}</div>
+          <div slot="overlay">${renderQueuedOverlay(this)}</div>
+          <div slot="suggestion">${renderResetSuggestion(this)}</div>
+          <div slot="toolbar-right">${renderToolbar(this)}</div>
+        </esphome-process-terminal>
+      </esphome-base-dialog>
     `;
   }
 }
