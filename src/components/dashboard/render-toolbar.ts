@@ -163,7 +163,7 @@ export function renderYamlToolbar(host: ESPHomePageDashboard): TemplateResult {
   return html`
     <div class="toolbar">
       <div class="toolbar-row">
-        ${renderSearchInput(host)} ${renderViewToggle(host)} ${renderFacets(host)}
+        ${renderSearchInput(host)} ${renderViewToggle(host)}
         <span class="toolbar-spacer"></span>
       </div>
       ${matchCount !== null
