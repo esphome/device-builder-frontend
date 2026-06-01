@@ -57,6 +57,7 @@ describe("renderTermToggle", () => {
     iconInactive: "key-outline",
     labelActive: "Hide",
     labelInactive: "Show",
+    title: "Toggle secrets",
   };
 
   it("reflects the active state via is-active + aria-pressed and the active icon/label", () => {

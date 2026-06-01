@@ -277,6 +277,7 @@ export class ESPHomeLogsDialog extends LitElement {
                 })}
             <!-- Kept inline: the expand-btn class drives the mobile hide rule. -->
             <button
+              type="button"
               class="term-btn term-btn--ghost expand-btn"
               @click=${this._toggleExpanded}
               title=${expandLabel}

@@ -109,7 +109,9 @@ export class ESPHomeProcessTerminal extends LitElement {
         ${this._renderBanner()}
         <slot name="suggestion"></slot>
         <div class="terminal-toolbar">
-          ${this.streaming ? html`<span class="streaming-dot"></span>` : nothing}
+          ${this.streaming
+            ? html`<span class="streaming-dot" aria-hidden="true"></span>`
+            : nothing}
           <slot name="toolbar-left"></slot>
           <span class="spacer"></span>
           <slot name="toolbar-right"></slot>

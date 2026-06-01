@@ -10,13 +10,9 @@ import { html, nothing, type TemplateResult } from "lit";
  * already-localized strings; localization stays in the driver.
  */
 
-export interface TermButtonOpts {
+interface TermButtonBase {
   /** mdi icon name (registered by the driver). Omit for a text-only button. */
   icon?: string;
-  /** Already-localized label. Omit for an icon-only button. */
-  label?: string;
-  /** Tooltip + accessible name; falls back to ``label``. */
-  title?: string;
   variant?: "ghost" | "start" | "stop";
   /** Adds ``is-active`` (ghost toggles) and reflects ``aria-pressed``. */
   active?: boolean;
@@ -24,10 +20,17 @@ export interface TermButtonOpts {
   onClick: () => void;
 }
 
+// At least one of ``label`` / ``title`` must be present so an icon-only button
+// always has an accessible name (label = visible text; title = tooltip +
+// aria-label fallback). The union makes "icon with neither" a compile error.
+export type TermButtonOpts = TermButtonBase &
+  ({ label: string; title?: string } | { title: string; label?: string });
+
 export function renderTermButton(opts: TermButtonOpts): TemplateResult {
   const variant = opts.variant ?? "ghost";
   const title = opts.title ?? opts.label;
   return html`<button
+    type="button"
     class="term-btn term-btn--${variant} ${opts.active ? "is-active" : ""}"
     ?disabled=${opts.disabled ?? false}
     title=${title ?? nothing}
@@ -51,8 +54,9 @@ export interface TermToggleOpts {
   label?: string;
   labelActive?: string;
   labelInactive?: string;
-  /** Already-resolved tooltip for the current state. */
-  title?: string;
+  /** Already-resolved tooltip for the current state; also the accessible name
+   *  so a toggle is never nameless even when rendered icon-only. */
+  title: string;
 }
 
 /** A ghost toggle: ``is-active`` + ``aria-pressed`` track ``active``. */
