@@ -236,6 +236,8 @@
     "logs_start": "Démarrer",
     "logs_close": "Fermer",
     "logs_clear": "Effacer",
+    "logs_expand": "Agrandir",
+    "logs_collapse": "Réduire",
     "logs_states": "États",
     "logs_hide_states": "Masquer les états",
     "logs_show_states": "Afficher les états",
