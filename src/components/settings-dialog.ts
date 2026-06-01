@@ -22,6 +22,7 @@ import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 import {
+  SETTINGS_DIALOG_BREAKPOINT,
   settingsRowStyles,
   settingsSharedStyles,
 } from "./settings-dialog/shared-styles.js";
@@ -76,8 +77,10 @@ export class ESPHomeSettingsDialog extends LitElement {
     espHomeStyles,
     settingsSharedStyles,
     settingsRowStyles,
-    // Full-screen on mobile; the layout fills the sheet (see shared-styles).
-    fullscreenMobileDialog("esphome-base-dialog"),
+    // Full-screen as soon as the nav stacks (700px, not the 600px phone
+    // cutoff) so the 600-700 band doesn't float as a half-collapsed centered
+    // box; the layout fills the sheet (see shared-styles).
+    fullscreenMobileDialog("esphome-base-dialog", SETTINGS_DIALOG_BREAKPOINT),
   ];
 
   open() {

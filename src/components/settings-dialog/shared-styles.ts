@@ -1,11 +1,13 @@
 import { css } from "lit";
 
-import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
-
-/** Width at/below which the settings sidebar stacks above the content.
- *  Wider than the full-screen breakpoint so tablets get the stacked nav
- *  while the dialog is still a centered (not full-screen) box. */
-const SETTINGS_STACK_BREAKPOINT = 700;
+/** Width at/below which the settings dialog switches to its compact layout:
+ *  the sidebar stacks above the content as a wrapped nav, and the dialog goes
+ *  full-screen. This is wider than the shared phone cutoff (MOBILE_BREAKPOINT,
+ *  600px) on purpose -- between 600 and 700 a centered box with the nav already
+ *  stacked on top floated as an awkward half-collapsed panel, so the dialog
+ *  commits to the full-screen sheet as soon as the nav stacks. settings-dialog.ts
+ *  passes this value to fullscreenMobileDialog() so the two stay in lockstep. */
+export const SETTINGS_DIALOG_BREAKPOINT = 700;
 
 export const settingsSharedStyles = css`
   esphome-base-dialog {
@@ -126,11 +128,14 @@ export const settingsSharedStyles = css`
     overflow-y: auto;
   }
 
-  /* Tablet and phone: stack the nav above the content. */
-  @media (max-width: ${SETTINGS_STACK_BREAKPOINT}px) {
+  /* Compact layout: the dialog goes full-screen (see fullscreenMobileDialog in
+     settings-dialog.ts, driven by the same SETTINGS_DIALOG_BREAKPOINT) and the
+     nav stacks above the content. height: 100% fills the full-screen sheet so
+     the content body scrolls instead of the dialog collapsing to content. */
+  @media (max-width: ${SETTINGS_DIALOG_BREAKPOINT}px) {
     .layout {
       flex-direction: column;
-      height: auto;
+      height: 100%;
     }
     .sidebar {
       width: auto;
@@ -140,14 +145,6 @@ export const settingsSharedStyles = css`
     .nav {
       flex-direction: row;
       flex-wrap: wrap;
-    }
-  }
-
-  /* At the full-screen breakpoint (fullscreenMobileDialog) the dialog fills
-     the viewport, so the layout fills it and the content body scrolls. */
-  @media (max-width: ${MOBILE_BREAKPOINT}px) {
-    .layout {
-      height: 100%;
     }
   }
 `;

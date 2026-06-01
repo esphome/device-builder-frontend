@@ -20,11 +20,17 @@ const HOST_SELECTOR: Record<DialogHost, CSSResult> = {
   "esphome-base-dialog": css`esphome-base-dialog`,
 };
 
-/** Full-screen sheet on mobile. */
-export function fullscreenMobileDialog(host: DialogHost): CSSResult {
+/** Full-screen sheet on mobile. Pass a custom `breakpoint` for dialogs whose
+ *  layout needs to go full-screen earlier than the shared phone cutoff (e.g.
+ *  the settings dialog, whose stacked-nav band would otherwise float as an
+ *  awkward centered box between the phone cutoff and its own stack point). */
+export function fullscreenMobileDialog(
+  host: DialogHost,
+  breakpoint: number = MOBILE_BREAKPOINT
+): CSSResult {
   const sel = HOST_SELECTOR[host];
   return css`
-    @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    @media (max-width: ${breakpoint}px) {
       ${sel}::part(dialog) {
         position: fixed;
         inset: 0;
