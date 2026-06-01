@@ -3,7 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#038fc7" />
+    <!-- Tracks --esphome-brand-default below (HTML attr can't read a CSS var). -->
+    <meta name="theme-color" content="#009ac7" />
     <!--
       Content-Security-Policy - defense in depth against any future
       XSS that slips past Lit's auto-escaping. Catches injected
@@ -112,10 +113,17 @@
          document-relative URL would resolve against the route). -->
     <link rel="icon" type="image/svg+xml" />
     <style>
+      :root {
+        /* Single source for the brand color when HA's --primary-color isn't
+           present (HA-ingress runs in an iframe and esphome-desktop has no HA,
+           so this fallback is what actually renders). Value matches HA's
+           default primary; re-tuning the brand is a one-line edit here. */
+        --esphome-brand-default: #009ac7;
+      }
       :root,
       .wa-light,
       .wa-dark .wa-invert {
-        --wa-color-brand-fill-loud: var(--primary-color, #009fee);
+        --wa-color-brand-fill-loud: var(--primary-color, var(--esphome-brand-default));
         --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
       }
 

@@ -12,7 +12,7 @@ import { css } from "lit";
 export const espHomeStyles = css`
   :host {
     /* ─── Brand colors ─── */
-    --esphome-primary: var(--primary-color, #009fee);
+    --esphome-primary: var(--primary-color, var(--esphome-brand-default));
     /* Hover / active background for hand-rolled primary <button>s
        (the FAB, dialog confirm buttons, etc. that don't use
        wa-button[variant="primary"]). Defined once so the brand
@@ -21,14 +21,20 @@ export const espHomeStyles = css`
     --esphome-primary-hover: color-mix(in srgb, var(--esphome-primary), black 10%);
     --esphome-primary-light: color-mix(
       in srgb,
-      var(--primary-color, #009fee) 12%,
+      var(--primary-color, var(--esphome-brand-default)) 12%,
       transparent
     );
-    --esphome-secondary: color-mix(in srgb, var(--primary-color, #009fee), black 8%);
-    --esphome-success: #2ecc71;
-    --esphome-warning: #f39c12;
-    --esphome-error: #e74c3c;
-    --esphome-offline: #95a5a6;
+    --esphome-secondary: color-mix(
+      in srgb,
+      var(--primary-color, var(--esphome-brand-default)),
+      black 8%
+    );
+    /* Status colors hook HA's semantic vars, falling back to our own values
+       (the fallback is what renders under ingress / esphome-desktop). */
+    --esphome-success: var(--success-color, #2ecc71);
+    --esphome-warning: var(--warning-color, #f39c12);
+    --esphome-error: var(--error-color, #e74c3c);
+    --esphome-offline: var(--disabled-text-color, #95a5a6);
 
     /* Text color for use on primary / dark / colored backgrounds — white in both light and dark modes */
     --esphome-on-primary: var(--text-primary-color, #ffffff);

@@ -154,9 +154,10 @@ export const deviceSectionConfigStyles = css`
     display: inline-flex;
     align-items: center;
     gap: 2px;
-    background: var(--wa-color-brand-fill-loud, #009fee);
+    background: var(--wa-color-brand-fill-loud, var(--esphome-brand-default));
     color: var(--wa-color-brand-on-loud, #ffffff);
-    border: var(--wa-border-width-s) solid var(--wa-color-brand-fill-loud, #009fee);
+    border: var(--wa-border-width-s) solid
+      var(--wa-color-brand-fill-loud, var(--esphome-brand-default));
     padding: 2px var(--wa-space-s);
     border-radius: var(--wa-border-radius-m);
     cursor: pointer;
@@ -169,8 +170,16 @@ export const deviceSectionConfigStyles = css`
   }
 
   .api-actions-add:hover {
-    background: color-mix(in srgb, var(--wa-color-brand-fill-loud, #009fee), black 10%);
-    border-color: color-mix(in srgb, var(--wa-color-brand-fill-loud, #009fee), black 10%);
+    background: color-mix(
+      in srgb,
+      var(--wa-color-brand-fill-loud, var(--esphome-brand-default)),
+      black 10%
+    );
+    border-color: color-mix(
+      in srgb,
+      var(--wa-color-brand-fill-loud, var(--esphome-brand-default)),
+      black 10%
+    );
   }
 
   .api-actions-add wa-icon {

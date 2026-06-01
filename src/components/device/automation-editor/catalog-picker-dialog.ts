@@ -275,7 +275,7 @@ export class ESPHomeCatalogPickerDialog extends LitElement {
 
       .picker-row:hover .picker-row-add,
       .picker-row:focus-visible .picker-row-add {
-        background: var(--wa-color-brand-fill-loud, #009fee);
+        background: var(--wa-color-brand-fill-loud, var(--esphome-brand-default));
         color: var(--wa-color-brand-on-loud, #ffffff);
       }
 

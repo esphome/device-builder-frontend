@@ -39,18 +39,17 @@ function applyWaTheme(): void {
  * `filter: var(--esphome-svg-filter)` on `img[src$=".svg"]`.
  *
  * The ``--wa-color-brand-*`` overrides remap WebAwesome's default
- * cyan brand palette to Home Assistant's primary palette when
- * embedded as an HA panel. ``--primary-color`` and friends are set
- * by HA's theme on the root; when the panel runs standalone those
- * variables are undefined and the fallback values (HA's current
- * ``--ha-color-primary-40`` = #009ac7, plus matching translucent
- * and white companions) keep the panel looking consistent with
- * HA's default theme anyway. (Note: HA used to resolve
- * ``--primary-color`` to the legacy Material Light Blue 500 value
- * ``#03a9f4`` — that's been retired upstream in favour of
- * ``#009ac7``.) Without this, the panel headers, primary buttons,
- * FAB, and active view-toggle pip burst in WebAwesome cyan, which
- * clashes hard against HA's blue sidebar and chrome.
+ * cyan brand palette onto ``--primary-color`` (HA's primary), with
+ * ``--esphome-brand-default`` (= HA's default primary ``#009ac7``,
+ * defined once in index.html) as the fallback. In practice the
+ * fallback is what renders: the HA panel runs as an **ingress
+ * iframe**, so HA's ``--primary-color`` does not cross into this
+ * document, and esphome-desktop has no HA at all. The ``var(…)``
+ * hook still adapts automatically if a deployment ever runs
+ * same-document where HA's vars cascade. Without this remap the
+ * panel headers, primary buttons, FAB, and active view-toggle pip
+ * burst in WebAwesome's own cyan. (HA's legacy ``--primary-color``
+ * ``#03a9f4`` was retired upstream in favour of ``#009ac7``.)
  */
 function applyEspHomeTokens(): void {
   const style = document.createElement("style");
@@ -58,10 +57,13 @@ function applyEspHomeTokens(): void {
   style.textContent = `
     :root {
       --esphome-svg-filter: none;
-      --wa-color-brand-fill-loud: var(--primary-color, #009fee);
+      --wa-color-brand-fill-loud: var(--primary-color, var(--esphome-brand-default));
       --wa-color-brand-on-loud: var(--text-primary-color, #ffffff);
-      --wa-color-brand-fill-quiet: var(--state-active-color, rgba(0, 159, 238, 0.12));
-      --wa-color-brand-on-quiet: var(--primary-color, #009fee);
+      --wa-color-brand-fill-quiet: var(
+        --state-active-color,
+        color-mix(in srgb, var(--esphome-brand-default), transparent 88%)
+      );
+      --wa-color-brand-on-quiet: var(--primary-color, var(--esphome-brand-default));
     }
 
     /* Surfaces and text — remap WebAwesome's surface/text tokens to
@@ -99,13 +101,13 @@ function applyEspHomeTokens(): void {
 function applySonnerOverrides(): void {
   const css = `
     [data-sonner-toast] [data-button] {
-      background: #009fee !important;
-      color: #ffffff !important;
+      background: var(--wa-color-brand-fill-loud) !important;
+      color: var(--wa-color-brand-on-loud) !important;
       border: none !important;
       font-weight: 600 !important;
     }
     [data-sonner-toast] [data-button]:hover {
-      background: color-mix(in srgb, #009fee, black 10%) !important;
+      background: color-mix(in srgb, var(--wa-color-brand-fill-loud), black 10%) !important;
     }
   `;
 
