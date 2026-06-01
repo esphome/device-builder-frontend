@@ -73,6 +73,15 @@ export const dashboardStyles = css`
        mobile trim lives on esphome-layout now, inherited here). #41 */
     :host {
       --toolbar-pad-top: var(--wa-space-s);
+      /* On phones the table reflows into stacked cards (table-styles.ts),
+         so the desktop fixed-height / internal-scroll layout no longer
+         applies. Flow the whole dashboard in the app's scroll container
+         like the card / YAML views do: removes the dead space the flex:1
+         table-scroll stretched open above the pagination row, and reserves
+         space for the fixed footer so it stops clipping the bottom card. */
+      height: auto;
+      overflow: visible;
+      padding-bottom: var(--esphome-footer-height);
     }
   }
 

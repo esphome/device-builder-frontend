@@ -365,9 +365,13 @@ export const tableLayoutStyles = css`
       margin-bottom: var(--wa-space-s);
     }
 
-    /* Vertical scroll only; the horizontal-overflow shadows are moot. */
+    /* Vertical scroll only; the horizontal-overflow shadows are moot.
+       The dashboard host now flows on mobile (styles.ts), so the table
+       sizes to its content — drop the internal scroll region so there's
+       no phantom nested scrollbar. */
     .table-scroll {
       background: none;
+      overflow: visible;
     }
 
     thead {
