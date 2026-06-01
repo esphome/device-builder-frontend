@@ -179,10 +179,10 @@ export class ESPHomeBaseDialog extends LitElement {
   static styles = [
     dialogCloseButtonStyles,
     // Default mobile behavior for every base-dialog: stay centered with a
-    // capped, safe-area-aware height. Content-heavy consumers (logs, build
-    // output, install, ...) override this with fullscreenMobileDialog via
-    // their own esphome-base-dialog::part(dialog) rule, which wins the
-    // parts cascade as the outer tree.
+    // dvh-capped height. Content-heavy consumers (logs, build output,
+    // install, ...) override this with fullscreenMobileDialog via their own
+    // esphome-base-dialog::part(dialog) rule, which wins the parts cascade
+    // as the outer tree.
     centeredMobileDialog("wa-dialog"),
     css`
       :host {

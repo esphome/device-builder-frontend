@@ -8,11 +8,15 @@ import { type CSSResult, css } from "lit";
  * On phones two patterns are wanted:
  *
  * - {@link centeredMobileDialog}: short / form dialogs stay centered but
- *   get a dvh- and safe-area-aware height cap so tall content scrolls
- *   inside the box instead of overflowing the screen.
+ *   get a dvh-aware height cap so tall content scrolls inside the box
+ *   instead of overflowing the screen.
  * - {@link fullscreenMobileDialog}: content-heavy dialogs (build / log
  *   output, the create-config wizard, validate, install) fill the screen
  *   edge-to-edge.
+ *
+ * Sizing uses `dvh` (with a `vh` fallback) rather than `env(safe-area-*)`,
+ * so it works without opting the whole app into `viewport-fit=cover` (which
+ * would push the app's other fixed elements under the notch / home bar).
  *
  * `::part()` only pierces a single shadow level, so the rule must live in
  * the stylesheet of whichever component hosts the `<wa-dialog>`. Pass the
@@ -59,21 +63,14 @@ export function fullscreenMobileDialog(
         margin: 0;
         border-radius: 0;
       }
-
-      /* Keep the last action / log line clear of the home indicator on
-         notched phones (no-op where the inset is 0). */
-      ${sel}::part(body),
-      ${sel}::part(footer) {
-        padding-bottom: max(var(--wa-space-l), env(safe-area-inset-bottom));
-      }
     }
   `;
 }
 
 /** Stay vertically centered (wa-dialog's native `margin: auto`) but cap
- *  the box to the dynamic viewport minus safe areas so tall content
- *  scrolls internally instead of running off-screen. Does not touch
- *  `inset` / `margin`, so the native centering is preserved. */
+ *  the box to the dynamic viewport so tall content scrolls internally
+ *  instead of running off-screen. Does not touch `inset` / `margin`, so
+ *  the native centering is preserved. */
 export function centeredMobileDialog(
   host: DialogHost,
   breakpoint: number = MOBILE_DIALOG_BREAKPOINT
@@ -82,23 +79,11 @@ export function centeredMobileDialog(
   return css`
     @media (max-width: ${breakpoint}px) {
       ${sel}::part(dialog) {
-        max-width: calc(
-          100vw - var(--wa-space-l) - env(safe-area-inset-left) - env(
-              safe-area-inset-right
-            )
-        );
+        max-width: calc(100vw - var(--wa-space-l));
         /* vh first as the fallback; browsers without dvh keep a working
            cap, modern ones use the dvh line (tracks the URL bar). */
-        max-height: calc(
-          100vh - var(--wa-space-l) - env(safe-area-inset-top) - env(
-              safe-area-inset-bottom
-            )
-        );
-        max-height: calc(
-          100dvh - var(--wa-space-l) - env(safe-area-inset-top) - env(
-              safe-area-inset-bottom
-            )
-        );
+        max-height: calc(100vh - var(--wa-space-l));
+        max-height: calc(100dvh - var(--wa-space-l));
       }
     }
   `;
