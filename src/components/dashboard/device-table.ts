@@ -573,14 +573,19 @@ export class ESPHomeDeviceTable extends LitElement {
                         </span>
                       </td>`
                     : nothing}
-                  ${row
-                    .getVisibleCells()
-                    .map(
-                      (cell: any) =>
-                        html`<td role="gridcell" class="col-${cell.column.id}">
-                          ${flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </td>`
-                    )}
+                  ${row.getVisibleCells().map(
+                    (cell: any) =>
+                      // data-label feeds the stacked mobile layout
+                      // (table-styles.ts): each cell shows its column
+                      // header as the field label via ::before.
+                      html`<td
+                        role="gridcell"
+                        class="col-${cell.column.id}"
+                        data-label=${cell.column.columnDef.header}
+                      >
+                        ${flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>`
+                  )}
                   <td role="gridcell" class="actions-col">
                     <button
                       class="actions-btn"

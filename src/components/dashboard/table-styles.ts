@@ -1,5 +1,8 @@
 import { css } from "lit";
 
+/** Width at/below which the table reflows into stacked cards on phones. */
+const TABLE_STACK_BREAKPOINT = 600;
+
 /** Layout, header, body, scroll, select, and actions styles for the device table. */
 export const tableLayoutStyles = css`
   :host {
@@ -338,12 +341,115 @@ export const tableLayoutStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
-  /* Mobile bottom-margin trim for the table outline. The horizontal
-     margins already tighten via --content-gutter; only the bottom
-     gap (a separate vertical step) needs trimming here. #41 */
-  @media (max-width: 600px) {
+  /* ─── Mobile: stacked-card layout ───
+     On phones the desktop table doesn't fit (7+ columns, horizontal
+     scroll only), so each row reflows into a card with one
+     "label: value" line per cell (data-label comes from the column
+     header in device-table.ts). The header row is hidden, so column
+     sorting isn't available on mobile; the default sort applies, and a
+     row tap still opens the drawer with full detail. #41 */
+  @media (max-width: ${TABLE_STACK_BREAKPOINT}px) {
     .table-wrap {
       margin-bottom: var(--wa-space-s);
+    }
+
+    /* Vertical scroll only; the horizontal-overflow shadows are moot. */
+    .table-scroll {
+      background: none;
+    }
+
+    thead {
+      display: none;
+    }
+
+    table,
+    tbody {
+      display: block;
+    }
+
+    tbody tr {
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      gap: 2px;
+      margin: var(--wa-space-s);
+      padding: var(--wa-space-s) var(--wa-space-m);
+      border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+      border-radius: var(--wa-border-radius-m);
+      background: var(--wa-color-surface-default);
+    }
+    /* Desktop drops the last row's bottom border; restore it per card. */
+    tbody tr:last-child {
+      border-bottom: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    }
+
+    /* Data cells become label/value rows. */
+    td:not(.no-results) {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: var(--wa-space-m);
+      max-width: none;
+      padding: 3px 0;
+      border: none;
+      white-space: normal;
+      overflow: visible;
+      text-overflow: clip;
+    }
+    td:not(.no-results)::before {
+      content: attr(data-label);
+      flex-shrink: 0;
+      font-size: var(--wa-font-size-2xs);
+      font-weight: var(--wa-font-weight-bold);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--wa-color-text-quiet);
+    }
+
+    /* Name is the card title (first, larger, no label). */
+    td.col-name {
+      order: -1;
+      padding-right: 28px;
+      padding-bottom: var(--wa-space-2xs);
+    }
+    td.col-name::before {
+      display: none;
+    }
+    td.col-name .cell-name {
+      font-size: var(--wa-font-size-m);
+      font-weight: var(--wa-font-weight-bold);
+    }
+
+    /* Inline actions become a button row at the bottom, divided off. */
+    td.col-actions {
+      order: 1;
+      justify-content: flex-start;
+      margin-top: var(--wa-space-xs);
+      padding-top: var(--wa-space-s);
+      border-top: var(--wa-border-width-s) solid var(--wa-color-surface-border);
+    }
+    td.col-actions::before {
+      display: none;
+    }
+
+    /* Row-end kebab pins to the card's top-right corner. */
+    td.actions-col {
+      position: absolute;
+      top: var(--wa-space-xs);
+      right: var(--wa-space-xs);
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      padding: 0;
+    }
+
+    /* Select checkbox sits at the top of the card. */
+    td.select-col {
+      order: -2;
+      width: auto;
+      min-width: 0;
+      max-width: none;
+      justify-content: flex-start;
     }
   }
 `;
