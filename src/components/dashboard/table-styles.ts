@@ -409,6 +409,20 @@ export const tableLayoutStyles = css`
       overflow: visible;
       text-overflow: clip;
     }
+
+    /* The empty-state cell is excluded from the reset above so it stays
+       centered, but the base td's nowrap / max-width / clip would otherwise
+       crop the slotted YAML-pivot banner against the card edge on mobile
+       (the cell leaves the table formatting context here, so max-width
+       finally bites). Let it wrap and fill the card. #518 */
+    td.no-results {
+      max-width: none;
+      white-space: normal;
+      overflow: visible;
+      /* The desktop var(--wa-space-4xl) vertical pad is oversized inside a
+         phone card; trim to a card-appropriate step. */
+      padding: var(--wa-space-xl) var(--wa-space-m);
+    }
     .cell-stack-label {
       display: inline;
       flex-shrink: 0;
