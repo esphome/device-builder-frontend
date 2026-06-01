@@ -411,7 +411,7 @@ export const tableLayoutStyles = css`
     }
 
     /* The empty-state cell is excluded from the reset above so it stays
-       centered, but the base td's nowrap / max-width / clip would otherwise
+       centered, but the base td's nowrap / max-width / ellipsis would otherwise
        crop the slotted YAML-pivot banner against the card edge on mobile
        (the cell leaves the table formatting context here, so max-width
        finally bites). Let it wrap and fill the card. #518 */
