@@ -292,7 +292,7 @@ export class ESPHomeAnsiLog extends LitElement {
           Consolas, monospace;
         font-variant-ligatures: none;
         font-size: 12px;
-        padding: 8px 12px;
+        padding: 8px;
         border-radius: 8px;
         height: 100%;
         overflow-y: auto;
