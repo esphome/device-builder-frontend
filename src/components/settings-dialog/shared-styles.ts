@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 
 /** Width at/below which the settings sidebar stacks above the content.
  *  Wider than the full-screen breakpoint so tablets get the stacked nav
@@ -145,7 +145,7 @@ export const settingsSharedStyles = css`
 
   /* At the full-screen breakpoint (fullscreenMobileDialog) the dialog fills
      the viewport, so the layout fills it and the content body scrolls. */
-  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     .layout {
       height: 100%;
     }

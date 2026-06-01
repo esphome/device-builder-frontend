@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 
 /**
  * Terminal color tokens. Shared by ``<esphome-process-terminal>`` and its
@@ -285,7 +285,7 @@ export const fillTerminal = css`
  * breakpoint. Add to a stream dialog's ``static styles``.
  */
 export const fillTerminalOnMobile = css`
-  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     ${fillTerminal}
   }
 `;

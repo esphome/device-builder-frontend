@@ -1,7 +1,6 @@
 import { css } from "lit";
 
-/** Width at/below which the table reflows into stacked cards on phones. */
-const TABLE_STACK_BREAKPOINT = 600;
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 
 /** Layout, header, body, scroll, select, and actions styles for the device table. */
 export const tableLayoutStyles = css`
@@ -361,7 +360,7 @@ export const tableLayoutStyles = css`
      row is hidden, so column sorting isn't available on mobile; the
      default sort applies, and a row tap still opens the drawer with
      full detail. #41 */
-  @media (max-width: ${TABLE_STACK_BREAKPOINT}px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     .table-wrap {
       margin-bottom: var(--wa-space-s);
     }

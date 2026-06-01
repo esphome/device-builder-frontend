@@ -1,5 +1,7 @@
 import { type CSSResult, css } from "lit";
 
+import { MOBILE_BREAKPOINT } from "./breakpoints.js";
+
 /**
  * Mobile-layout fragments for app dialogs (issue #41). Both size with `dvh`
  * (vh fallback) so they need no `viewport-fit=cover`.
@@ -18,15 +20,11 @@ const HOST_SELECTOR: Record<DialogHost, CSSResult> = {
   "esphome-base-dialog": css`esphome-base-dialog`,
 };
 
-/** Single source of truth for the dialog mobile breakpoint (px). Import
- *  this anywhere a companion rule must reflow at the same width. */
-export const MOBILE_DIALOG_BREAKPOINT = 600;
-
 /** Full-screen sheet on mobile. */
 export function fullscreenMobileDialog(host: DialogHost): CSSResult {
   const sel = HOST_SELECTOR[host];
   return css`
-    @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    @media (max-width: ${MOBILE_BREAKPOINT}px) {
       ${sel}::part(dialog) {
         position: fixed;
         inset: 0;
@@ -47,7 +45,7 @@ export function fullscreenMobileDialog(host: DialogHost): CSSResult {
 export function centeredMobileDialog(host: DialogHost): CSSResult {
   const sel = HOST_SELECTOR[host];
   return css`
-    @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+    @media (max-width: ${MOBILE_BREAKPOINT}px) {
       ${sel}::part(dialog) {
         max-width: calc(100vw - var(--wa-space-l));
         /* vh fallback, then dvh */
