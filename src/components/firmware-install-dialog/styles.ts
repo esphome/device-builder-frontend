@@ -1,6 +1,6 @@
 import { css } from "lit";
 
-import { MOBILE_DIALOG_BREAKPOINT } from "../../styles/dialog-mobile.js";
+import { MOBILE_BREAKPOINT } from "../../styles/breakpoints.js";
 
 export const firmwareInstallDialogStyles = css`
   :host {
@@ -227,7 +227,7 @@ export const firmwareInstallDialogStyles = css`
      so the log scrolls internally and the footer stays on-screen, instead of
      the whole card growing past the viewport and pushing the buttons below the
      fold. Desktop keeps the 50vh log (this block doesn't apply there). */
-  @media (max-width: ${MOBILE_DIALOG_BREAKPOINT}px) {
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
     :host([expanded]) esphome-process-terminal {
       height: 100%;
     }
