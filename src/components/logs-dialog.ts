@@ -255,7 +255,7 @@ export class ESPHomeLogsDialog extends LitElement {
                 ${this._localize("dashboard.logs_back_to_install")}
               </button>`
             : ""}
-          <div slot="toolbar-right">
+          <div class="toolbar-slot" slot="toolbar-right">
             ${this._passive
               ? ""
               : renderTermToggle({

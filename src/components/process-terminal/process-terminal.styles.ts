@@ -92,6 +92,14 @@ export const termButtonStyles = css`
   .term-btn--start:hover {
     background: color-mix(in srgb, var(--term-accent), transparent 75%);
   }
+
+  /* A driver slots its toolbar controls inside one wrapper element; display:
+     contents removes that wrapper's box so the individual buttons promote to
+     flex items of the component's .terminal-toolbar and pick up its gap +
+     wrapping, instead of being squashed into one item. */
+  .toolbar-slot {
+    display: contents;
+  }
 `;
 
 /**
