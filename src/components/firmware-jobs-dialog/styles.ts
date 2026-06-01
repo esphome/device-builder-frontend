@@ -5,29 +5,8 @@ export const firmwareJobsDialogStyles = css`
     --width: min(620px, 95vw);
   }
 
-  wa-dialog::part(header) {
-    background: var(--esphome-primary);
-    padding: 0 var(--wa-space-m);
-    height: 40px;
-    box-sizing: border-box;
-  }
-
-  wa-dialog::part(title) {
-    color: var(--esphome-on-primary);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-  }
-
-  wa-dialog::part(close-button__base) {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    padding: 0;
-    min-width: unset;
-    min-height: unset;
-    color: var(--esphome-on-primary);
-    cursor: pointer;
-  }
+  /* Primary header bar + flush 40x40 close button come from the shared
+     primaryDialogHeaderStyles / dialogCloseButtonStyles fragments. */
 
   wa-dialog::part(footer) {
     display: none;

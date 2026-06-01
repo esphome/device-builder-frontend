@@ -18,6 +18,7 @@ import { customElement, state } from "lit/decorators.js";
 import type { OffloaderAlertSnapshotEntry } from "../api/types/remote-build-events.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { buildOffloadAlertsContext, localizeContext } from "../context/index.js";
+import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -75,6 +76,7 @@ export class ESPHomeSettingsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    primaryDialogHeaderStyles,
     settingsSharedStyles,
     settingsRowStyles,
     // Full-screen as soon as the nav stacks (700px, not the 600px phone

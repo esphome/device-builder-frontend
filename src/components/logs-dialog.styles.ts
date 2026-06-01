@@ -29,19 +29,9 @@ export const logsDialogStyles = css`
     --width: min(1300px, 94vw);
   }
 
-  /* Match the device-editor's title bar so the dialog reads as part of the
-     dashboard chrome; the body stays terminal-themed. */
-  esphome-base-dialog::part(header) {
-    background: var(--esphome-primary);
-    /* Right padding 0 so the close button sits flush with the corner. */
-    padding: 0 0 0 var(--wa-space-m);
-    height: 40px;
-    box-sizing: border-box;
-  }
+  /* The primary header bar + title colour/size come from the shared
+     primaryDialogHeaderStyles; the log title is the only monospace one. */
   esphome-base-dialog::part(title) {
-    color: var(--esphome-on-primary);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
     font-family: var(--logs-mono-font);
   }
   /* Truncate the name before the chip so a long /dev/cu… path can't overflow

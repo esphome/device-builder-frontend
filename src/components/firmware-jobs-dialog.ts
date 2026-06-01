@@ -29,6 +29,8 @@ import {
   firmwareJobsContext,
   localizeContext,
 } from "../context/index.js";
+import { dialogCloseButtonStyles } from "../styles/dialog-close-button.js";
+import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { firmwareJobDisplayName } from "../util/firmware-job-display.js";
 import { isTerminalJob as isTerminal } from "../util/firmware-job-status.js";
@@ -125,7 +127,12 @@ export class ESPHomeFirmwareJobsDialog extends LitElement {
     this._stopTicker();
   }
 
-  static styles = [espHomeStyles, firmwareJobsDialogStyles];
+  static styles = [
+    espHomeStyles,
+    primaryDialogHeaderStyles,
+    dialogCloseButtonStyles,
+    firmwareJobsDialogStyles,
+  ];
 
   /** Bucket the live jobs Map into sorted / active / terminal lists.
    *  Memoised on the upstream Map reference; the context provider

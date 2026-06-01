@@ -14,20 +14,7 @@ export const settingsSharedStyles = css`
     --width: min(800px, 95vw);
   }
 
-  esphome-base-dialog::part(header) {
-    background: var(--esphome-primary);
-    /* Right padding is 0 so the 40x40 close button sits flush
-       with the dialog's corner. */
-    padding: 0 0 0 var(--wa-space-m);
-    height: 40px;
-    box-sizing: border-box;
-  }
-
-  esphome-base-dialog::part(title) {
-    color: var(--esphome-on-primary);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
-  }
+  /* Primary header bar + title come from primaryDialogHeaderStyles (shared). */
 
   esphome-base-dialog::part(footer) {
     display: none;

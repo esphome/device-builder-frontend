@@ -18,6 +18,7 @@ import { DeviceState } from "../api/types/devices.js";
 import type { SerialPort } from "../api/types/system.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
@@ -134,7 +135,12 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     }
   }
 
-  static styles = [espHomeStyles, inputStyles, installMethodDialogStyles];
+  static styles = [
+    espHomeStyles,
+    primaryDialogHeaderStyles,
+    inputStyles,
+    installMethodDialogStyles,
+  ];
 
   protected render() {
     const methodTitleKey =

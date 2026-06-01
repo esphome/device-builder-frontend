@@ -17,6 +17,7 @@ import toast from "sonner-js";
 import type { ESPHomeAPI } from "../api/index.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
+import { primaryDialogHeaderStyles } from "../styles/dialog-header.js";
 import { fullscreenMobileDialog } from "../styles/dialog-mobile.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { downloadAnsiText } from "../util/download-text.js";
@@ -119,6 +120,7 @@ export class ESPHomeLogsDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    primaryDialogHeaderStyles,
     termTokens,
     termButtonStyles,
     logsDialogStyles,
