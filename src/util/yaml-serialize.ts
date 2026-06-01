@@ -281,6 +281,19 @@ function serializeListItem(
 }
 
 /**
+ * Serialize a bare list (no parent key header) at indent, one item per
+ * serializeListItem. For top-level list-bodied sections (globals)
+ * whose dash items sit directly under the header.
+ */
+export function serializeListSection(
+  items: readonly unknown[],
+  indent: string,
+  options: SerializeYamlOptions = {}
+): string[] {
+  return items.flatMap((item) => serializeListItem(item, indent, options));
+}
+
+/**
  * True when *value* would emit at least one line through
  * ``serializeYamlValues`` under its *default* options.
  *

@@ -38,6 +38,17 @@ import { makeConfigEntry } from "./config-entry-defaults.js";
  *  the YAML pane. */
 export const MAP_SECTIONS: ReadonlySet<string> = new Set(["substitutions"]);
 
+/** Values-record key the list body is stashed under for a LIST_SECTIONS
+ *  section. Synthetic, not a real YAML key; parse and serialize strip
+ *  it so it never lands in YAML. */
+export const LIST_SECTION_VALUE_KEY = "__items__";
+
+/** Top-level sections whose body is a list of mappings (globals: one
+ *  variable per dash item). Single source of truth — a member is both
+ *  collapsed to one navigator entry (``_expandListItems``) and edited
+ *  as a whole-block ``multi_value`` list. Add a key to enable both. */
+export const LIST_SECTIONS: ReadonlySet<string> = new Set(["globals"]);
+
 /** Sections that must persist explicit ``""`` values in YAML — i.e.
  *  the user typed a key + cleared the value, treat that as
  *  intentional data instead of "user cleared the field, drop it".
@@ -94,5 +105,22 @@ export function resolveSectionEntries(
   catalogEntries: ConfigEntry[]
 ): ConfigEntry[] {
   if (MAP_SECTIONS.has(sectionKey)) return MAP_SECTION_ENTRIES;
+  if (LIST_SECTIONS.has(sectionKey)) {
+    return [
+      makeConfigEntry({
+        key: LIST_SECTION_VALUE_KEY,
+        type: ConfigEntryType.NESTED,
+        multi_value: true,
+        label: LIST_SECTION_ITEM_LABELS[sectionKey] ?? "Item",
+        config_entries: catalogEntries,
+      }),
+    ];
+  }
   return catalogEntries;
 }
+
+/** Singular noun for each item card's header; the nested-list renderer
+ *  shows '<label> <n>' (Global variable 1). */
+const LIST_SECTION_ITEM_LABELS: Readonly<Record<string, string>> = {
+  globals: "Global variable",
+};

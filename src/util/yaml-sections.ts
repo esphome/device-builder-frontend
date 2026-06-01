@@ -1,3 +1,5 @@
+import { LIST_SECTIONS } from "./section-entry-overrides.js";
+
 export interface YamlSection {
   key: string;
   fromLine: number; // 1-indexed (CodeMirror convention)
@@ -99,12 +101,6 @@ export const CORE_KEYS = new Set([
 // `script` and `interval` are the standalone automation-adjacent
 // top-level keys.
 const AUTOMATION_KEYS = new Set(["script", "interval"]);
-
-// Sections that contain list items but should still be navigated to
-// as a single unit — clicking them takes you to the whole block, not
-// to individual entries inside. Keeps the navigator from listing one
-// nav item per global variable.
-const NON_EXPANDABLE_KEYS = new Set(["globals"]);
 
 export function categorizeSections(sections: YamlSection[]): CategorizedSections {
   const core: YamlSection[] = [];
@@ -253,10 +249,10 @@ function _expandListItems(
   lines: string[],
   section: { key: string; fromLine: number; toLine: number }
 ): YamlSection[] {
-  // Sections marked non-expandable keep their list items hidden from
-  // the navigator — the user navigates to the whole block, not the
-  // individual entries (e.g. globals).
-  if (NON_EXPANDABLE_KEYS.has(section.key)) {
+  // LIST_SECTIONS members keep their list items hidden from the
+  // navigator — the user navigates to the whole block (edited as a
+  // repeatable list), not the individual entries (e.g. globals).
+  if (LIST_SECTIONS.has(section.key)) {
     return [
       {
         key: section.key,

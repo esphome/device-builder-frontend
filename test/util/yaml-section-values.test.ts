@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  LIST_SECTION_VALUE_KEY,
+  LIST_SECTIONS,
+} from "../../src/util/section-entry-overrides.js";
+import {
   findSectionStart,
   LIST_ITEM_START_RE,
   parseYamlSectionValues,
@@ -1706,5 +1710,160 @@ describe("parseYamlSectionValues — ESPHome YAML boolean spellings", () => {
     expect(values.state).toBe("yes");
     expect(values.fallback).toBe("True");
     expect(values.hint).toBe("enable");
+  });
+});
+
+describe("globals list section (LIST_SECTIONS)", () => {
+  const TWO_ENTRY =
+    "globals:\n" +
+    "  - id: my_int\n" +
+    "    type: int\n" +
+    "    initial_value: '0'\n" +
+    "  - id: my_bool\n" +
+    "    type: bool\n" +
+    "    restore_value: true\n";
+
+  it("parses a 2-entry globals block into the synthetic list key", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed[LIST_SECTION_VALUE_KEY] as Record<string, unknown>[];
+    expect(Array.isArray(items)).toBe(true);
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    expect(items[0].type).toBe("int");
+    expect(items[0].initial_value).toBe("0");
+    expect(items[1].id).toBe("my_bool");
+    expect(items[1].type).toBe("bool");
+    expect(items[1].restore_value).toBe(true);
+  });
+
+  it("round-trips editing one item's initial_value, keeping every entry", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed[LIST_SECTION_VALUE_KEY] as Record<string, unknown>[];
+    items[0].initial_value = "42";
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", {
+      [LIST_SECTION_VALUE_KEY]: items,
+    });
+    expect(out).not.toContain(LIST_SECTION_VALUE_KEY);
+    expect(out.startsWith("globals:")).toBe(true);
+    const reparsed = parseYamlSectionValues(out + "\n", "globals");
+    const ritems = reparsed[LIST_SECTION_VALUE_KEY] as Record<string, unknown>[];
+    expect(ritems).toHaveLength(2);
+    expect(ritems[0].id).toBe("my_int");
+    expect(ritems[0].initial_value).toBe("42");
+    expect(ritems[1].id).toBe("my_bool");
+  });
+
+  it("round-trips adding a third item", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed[LIST_SECTION_VALUE_KEY] as Record<string, unknown>[];
+    items.push({ id: "my_str", type: "std::string" });
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", {
+      [LIST_SECTION_VALUE_KEY]: items,
+    });
+    expect(out).not.toContain(LIST_SECTION_VALUE_KEY);
+    const ritems = parseYamlSectionValues(out + "\n", "globals")[
+      LIST_SECTION_VALUE_KEY
+    ] as Record<string, unknown>[];
+    expect(ritems.map((i) => i.id)).toEqual(["my_int", "my_bool", "my_str"]);
+  });
+
+  it("round-trips removing the first item", () => {
+    const parsed = parseYamlSectionValues(TWO_ENTRY, "globals");
+    const items = parsed[LIST_SECTION_VALUE_KEY] as Record<string, unknown>[];
+    items.splice(0, 1);
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", {
+      [LIST_SECTION_VALUE_KEY]: items,
+    });
+    expect(out).not.toContain(LIST_SECTION_VALUE_KEY);
+    const ritems = parseYamlSectionValues(out + "\n", "globals")[
+      LIST_SECTION_VALUE_KEY
+    ] as Record<string, unknown>[];
+    expect(ritems).toHaveLength(1);
+    expect(ritems[0].id).toBe("my_bool");
+  });
+
+  it("round-trips a 4-space-indented globals fixture", () => {
+    const FOUR_SPACE =
+      "globals:\n" +
+      "    - id: my_int\n" +
+      "      type: int\n" +
+      "    - id: my_bool\n" +
+      "      type: bool\n";
+    const parsed = parseYamlSectionValues(FOUR_SPACE, "globals");
+    const items = parsed[LIST_SECTION_VALUE_KEY] as Record<string, unknown>[];
+    expect(items).toHaveLength(2);
+    expect(items[0].id).toBe("my_int");
+    items[0].type = "int64_t";
+    const out = updateSectionInYaml(FOUR_SPACE, "globals", {
+      [LIST_SECTION_VALUE_KEY]: items,
+    });
+    expect(out).not.toContain(LIST_SECTION_VALUE_KEY);
+    const ritems = parseYamlSectionValues(out + "\n", "globals")[
+      LIST_SECTION_VALUE_KEY
+    ] as Record<string, unknown>[];
+    expect(ritems).toHaveLength(2);
+    expect(ritems[0].type).toBe("int64_t");
+    expect(ritems[1].id).toBe("my_bool");
+  });
+
+  it("preserves sibling sections after globals on round-trip", () => {
+    const WITH_SIBLING = TWO_ENTRY + "wifi:\n  ssid: home\n";
+    const items = parseYamlSectionValues(WITH_SIBLING, "globals")[
+      LIST_SECTION_VALUE_KEY
+    ] as Record<string, unknown>[];
+    items[0].initial_value = "7";
+    const out = updateSectionInYaml(WITH_SIBLING, "globals", {
+      [LIST_SECTION_VALUE_KEY]: items,
+    });
+    expect(out).toContain("wifi:");
+    expect(out).toContain("ssid: home");
+  });
+
+  it("leaves the YAML untouched when the list value is not an array (no wipe)", () => {
+    // The form never produces this, but a missing/garbled synthetic
+    // key must not collapse the block to an empty mapping.
+    const out = updateSectionInYaml(TWO_ENTRY, "globals", {
+      [LIST_SECTION_VALUE_KEY]: undefined,
+    });
+    expect(out).toBe(TWO_ENTRY);
+  });
+});
+
+describe("LIST_SECTIONS is membership-driven, not hardcoded to globals", () => {
+  // Pins genericity: parse/serialize key off membership, so a future
+  // top-level list section is one allowlist edit.
+  const KEY = "future_list_section";
+  const FIXTURE = `${KEY}:\n  - id: a\n    type: int\n  - id: b\n    type: bool\n`;
+
+  it("parses and round-trips an arbitrary LIST_SECTIONS member", () => {
+    const mutable = LIST_SECTIONS as Set<string>;
+    mutable.add(KEY);
+    try {
+      const items = parseYamlSectionValues(FIXTURE, KEY)[
+        LIST_SECTION_VALUE_KEY
+      ] as Record<string, unknown>[];
+      expect(items).toHaveLength(2);
+      expect(items[0].id).toBe("a");
+
+      items.push({ id: "c", type: "float" });
+      const out = updateSectionInYaml(FIXTURE, KEY, {
+        [LIST_SECTION_VALUE_KEY]: items,
+      });
+      expect(out).not.toContain(LIST_SECTION_VALUE_KEY);
+      expect(out.startsWith(`${KEY}:`)).toBe(true);
+      const ritems = parseYamlSectionValues(out + "\n", KEY)[
+        LIST_SECTION_VALUE_KEY
+      ] as Record<string, unknown>[];
+      expect(ritems.map((i) => i.id)).toEqual(["a", "b", "c"]);
+    } finally {
+      mutable.delete(KEY);
+    }
+  });
+
+  it("parses the same fixture as a flat mapping when NOT a member", () => {
+    // Without membership the header body isn't list-stashed; the
+    // synthetic key is absent.
+    const parsed = parseYamlSectionValues(FIXTURE, KEY);
+    expect(parsed[LIST_SECTION_VALUE_KEY]).toBeUndefined();
   });
 });

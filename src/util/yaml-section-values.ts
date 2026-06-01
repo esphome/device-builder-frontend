@@ -8,11 +8,13 @@
  */
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import { LIST_SECTION_VALUE_KEY, LIST_SECTIONS } from "./section-entry-overrides.js";
 import {
-  YamlRawValue,
   formatYamlScalar,
   parseYamlBoolean,
+  serializeListSection,
   serializeYamlValues,
+  YamlRawValue,
   type SerializeYamlOptions,
 } from "./yaml-serialize.js";
 
@@ -749,6 +751,20 @@ export function parseYamlSectionValues(
   const childIndent = _detectSectionChildIndent(lines, startIdx, isListItem);
   const childRegex = childRegexFor(childIndent);
 
+  // Top-level list-bodied section (globals): stash the list under the
+  // synthetic key the form renders as a multi_value NESTED entry.
+  if (!isListItem && LIST_SECTIONS.has(sectionKey)) {
+    const peek = _skipBlankAndCommentLines(lines, startIdx + 1);
+    if (peek < lines.length && isChildListItemLine(lines[peek], childIndent)) {
+      values[LIST_SECTION_VALUE_KEY] = parseListBlock(
+        lines,
+        startIdx + 1,
+        childIndent
+      ).value;
+      return values;
+    }
+  }
+
   // List-item form: the first child key may sit on the same line as
   // the leading dash (e.g. `  - platform: gpio\n    pin: 4`).
   if (isListItem) {
@@ -983,6 +999,28 @@ export function updateSectionInYaml(
   const lines = yaml.split("\n");
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
+
+  // Top-level list-bodied section (globals): re-emit the stashed list
+  // as bare dash items under the preserved header; the synthetic key
+  // never reaches YAML.
+  if (LIST_SECTIONS.has(sectionKey)) {
+    const raw = values[LIST_SECTION_VALUE_KEY];
+    // No array → leave the YAML untouched rather than collapse the
+    // block to a bare header, which would wipe every item.
+    if (!Array.isArray(raw)) return yaml;
+    const list = raw;
+    const headerIndent = _leadingIndent(lines[start]);
+    const childIndent = _detectSectionChildIndent(lines, start, false);
+    const step = childIndent.startsWith(headerIndent)
+      ? childIndent.slice(headerIndent.length) || ESPHOME_YAML_INDENT
+      : ESPHOME_YAML_INDENT;
+    const body = serializeListSection(list, headerIndent, {
+      ...options,
+      indentStep: options.indentStep ?? step,
+    });
+    lines.splice(start, end - start, lines[start], ...body);
+    return lines.join("\n");
+  }
 
   const isListItem = LIST_ITEM_START_RE.test(lines[start]);
   // Match the user's existing indent step on save so 4-space (or
