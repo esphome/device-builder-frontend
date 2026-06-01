@@ -22,6 +22,11 @@ import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { detectEnvironment, type DeploymentEnvironment } from "../util/environment.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import {
+  secureLoopbackUrl,
+  webSerialAvailability,
+  type WebSerialAvailability,
+} from "../util/web-serial.js";
 import { installMethodDialogStyles } from "./install-method-dialog.styles.js";
 
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -95,8 +100,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
   @state() private _otaAddressCardExpanded = false;
   @state() private _otaAddressValue = "";
 
-  private get _supportsWebSerial(): boolean {
-    return "serial" in navigator;
+  private get _webSerialAvailability(): WebSerialAvailability {
+    return webSerialAvailability();
   }
 
   private get _environment(): DeploymentEnvironment {
@@ -154,7 +159,8 @@ export class ESPHomeInstallMethodDialog extends LitElement {
 
   private _renderMethodList() {
     const isOnline = this.deviceState === DeviceState.ONLINE;
-    const hasWebSerial = this._supportsWebSerial;
+    const availability = this._webSerialAvailability;
+    const hasWebSerial = availability === "available";
     const env = this._environment;
     // Replaces the disabled WebSerial row with web-download when
     // not online (offline or unknown) and no Web Serial. OTA is
@@ -166,17 +172,19 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     //
     // - With WebSerial: drop the server-serial row (WebSerial is the
     //   better path, no backend round-trip).
-    // - Without WebSerial: drop the *disabled* WebSerial row — the
-    //   active server-serial row directly below carries the same
-    //   "Plug into this computer" label, so the disabled row only
-    //   added a duplicate title and a "you need Chrome" hint that
-    //   doesn't apply (the user has a working path right here).
+    // - Browser genuinely can't do WebSerial (Safari / Firefox): drop the
+    //   *disabled* WebSerial row — the active server-serial row directly
+    //   below carries the same "Plug into this computer" label, so the
+    //   disabled row only added a duplicate title and a hint with no
+    //   actionable fix (the user has a working path right here).
     //
-    // On HA / remote the two rows point at different machines, so
-    // both stay and the disabled-WebSerial hint is still useful.
+    // When WebSerial is merely blocked by an insecure origin (e.g. 0.0.0.0),
+    // KEEP the disabled row — it carries an actionable "open at 127.0.0.1 /
+    // https" fix, so it isn't dead weight. On HA / remote both rows point at
+    // different machines, so both always stay.
     const showServerSerialRow = !(env === "localhost" && hasWebSerial);
     const dropDisabledWebSerial =
-      env === "localhost" && !hasWebSerial && !swapInWebDownload;
+      env === "localhost" && availability === "unsupported" && !swapInWebDownload;
     const serverSerialKeys = this._serverSerialCopyKeys(env);
 
     return html`
@@ -186,7 +194,7 @@ export class ESPHomeInstallMethodDialog extends LitElement {
           ? this._renderWebDownloadOption()
           : dropDisabledWebSerial
             ? nothing
-            : this._renderWebSerialOption(hasWebSerial)}
+            : this._renderWebSerialOption(availability)}
         ${showServerSerialRow
           ? html`<div class="option" @click=${this._onServerSerial}>
               <wa-icon library="mdi" name="serial-port"></wa-icon>
@@ -232,25 +240,63 @@ export class ESPHomeInstallMethodDialog extends LitElement {
     }
   }
 
-  private _renderWebSerialOption(hasWebSerial: boolean) {
+  private _renderWebSerialOption(availability: WebSerialAvailability) {
+    const enabled = availability === "available";
     return html`
       <div
-        class="option ${!hasWebSerial ? "option--disabled" : ""}"
-        @click=${hasWebSerial ? () => this._selectMethod("web-serial") : undefined}
+        class="option ${!enabled ? "option--disabled" : ""}"
+        @click=${enabled ? () => this._selectMethod("web-serial") : undefined}
       >
         <wa-icon library="mdi" name="usb"></wa-icon>
         <div class="info">
           <span class="title"
             >${this._localize("dashboard.install_method_usb_local")}</span
           >
-          <span class="desc"
-            >${hasWebSerial
-              ? this._localize("dashboard.install_method_usb_local_desc")
-              : this._localize("dashboard.install_method_usb_local_unsupported")}</span
-          >
+          <span class="desc">${this._renderWebSerialDesc(availability)}</span>
         </div>
       </div>
     `;
+  }
+
+  /**
+   * Disabled-row hint that names the real blocker. ``insecure-context`` is the
+   * common Chrome-on-``0.0.0.0`` case: the browser is capable, the origin
+   * isn't a secure context. When the loopback equivalent is known to work
+   * (``0.0.0.0`` only) render it as an inline link the user can click to switch
+   * origins; otherwise point them at localhost / https generically. Only a
+   * genuinely unsupported browser gets the use-a-supported-browser copy. The
+   * ``{link}`` split mirrors ``_renderWebDownloadOption`` so locales can place
+   * the URL anywhere (falling back to the plain key if a translation omits the
+   * marker).
+   *
+   * Known limitation: on an insecure origin ``navigator.serial`` is absent for
+   * EVERY browser, so we can't tell a capable-but-blocked browser from one with
+   * no Web Serial support at all. A browser that lacks it (older Firefox, etc.)
+   * is therefore shown the loopback link and, on the secure origin, still has no
+   * Web Serial. We accept that: the link helps the majority (Chrome, Edge,
+   * Firefox 151+) and the copy is phrased as a prerequisite, not a guarantee.
+   */
+  private _renderWebSerialDesc(availability: WebSerialAvailability) {
+    if (availability === "available") {
+      return this._localize("dashboard.install_method_usb_local_desc");
+    }
+    if (availability === "unsupported") {
+      return this._localize("dashboard.install_method_usb_local_unsupported");
+    }
+    const loopback = secureLoopbackUrl();
+    if (!loopback) {
+      return this._localize("dashboard.install_method_usb_local_insecure");
+    }
+    const linkText = new URL(loopback).host; // e.g. 127.0.0.1:6052
+    const template = this._localize("dashboard.install_method_usb_local_insecure_link");
+    if (!template.includes("{link}")) return template;
+    const [before, after = ""] = template.split("{link}");
+    return html`${before}<a
+        class="inline-link"
+        href=${loopback}
+        @click=${(e: MouseEvent) => e.stopPropagation()}
+        >${linkText}</a
+      >${after}`;
   }
 
   /**

@@ -31,7 +31,15 @@ export function detectEnvironment(api: ESPHomeAPI): DeploymentEnvironment {
   if (api.serverInfo?.ha_addon) return "ha-addon";
   if (typeof window !== "undefined") {
     const host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1" || host === "::1") {
+    // 0.0.0.0 is reachable only from the same machine (it resolves to
+    // loopback), so it's the local backend just like the literal loopback
+    // hosts — even though it isn't a secure context.
+    if (
+      host === "localhost" ||
+      host === "127.0.0.1" ||
+      host === "::1" ||
+      host === "0.0.0.0"
+    ) {
       return "localhost";
     }
   }
