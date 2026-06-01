@@ -31,7 +31,18 @@ export const dashboardStyles = css`
        dashboard host, so both toolbars resolve identical values and
        can't drift on mobile. Mobile override is in the @media block. */
     --toolbar-pad-top: var(--wa-space-l);
-    --toolbar-pad-x: var(--wa-space-l);
+    /* Horizontal content gutter shared by every full-width region in
+       both views: the toolbar (.toolbar / .controls), the card grid,
+       the YAML hit list, the table outline (.table-wrap), and the
+       table count row. Full on desktop, tightened on mobile in the
+       @media block below. Defined on the host so the device-table
+       shadow inherits it, keeping card and table views aligned. #41 */
+    --content-gutter: var(--wa-space-l);
+    /* Inter-row gap inside the toolbar. Card view's .toolbar and the
+       table view's .toolbar-stack both use it, and the table count
+       row mirrors it as padding-top, so the rows line up identically
+       when toggling between views. */
+    --toolbar-row-gap: 2px;
   }
 
   /* YAML mode renders over any underlying view, so it shares this
@@ -59,12 +70,12 @@ export const dashboardStyles = css`
       padding-top: var(--wa-space-l);
     }
 
-    /* Tighten the shared toolbar gutters on mobile. Both .toolbar
-       (card) and .controls (table) inherit these, so the two views
+    /* Tighten the shared gutters on mobile. Every full-width region
+       in both views inherits these, so the card and table layouts
        stay in lockstep at narrow widths. #41 */
     :host {
       --toolbar-pad-top: var(--wa-space-s);
-      --toolbar-pad-x: var(--wa-space-s);
+      --content-gutter: var(--wa-space-s);
     }
   }
 
@@ -219,8 +230,8 @@ export const dashboardStyles = css`
   .devices-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: var(--wa-space-l);
-    padding: var(--wa-space-l);
+    gap: var(--content-gutter);
+    padding: var(--wa-space-l) var(--content-gutter);
   }
 
   /* When the grid follows the toolbar's count row (whether directly
@@ -256,8 +267,8 @@ export const dashboardStyles = css`
   .toolbar {
     display: flex;
     flex-direction: column;
-    gap: 2px;
-    padding: var(--toolbar-pad-top) var(--toolbar-pad-x) 0;
+    gap: var(--toolbar-row-gap);
+    padding: var(--toolbar-pad-top) var(--content-gutter) 0;
     flex-shrink: 0;
   }
 
@@ -266,11 +277,12 @@ export const dashboardStyles = css`
      .controls handles the outer padding). Without this rule the
      inner rows stacked at 0px gap while card view stacked at 2px,
      so flipping the view-toggle made the X-devices row jump 2px
-     vertically. */
+     vertically. Both gaps draw from --toolbar-row-gap so they
+     can't drift apart. */
   .toolbar-stack {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: var(--toolbar-row-gap);
   }
 
   .toolbar-row {
@@ -436,7 +448,7 @@ export const dashboardStyles = css`
   .yaml-hits {
     display: flex;
     flex-direction: column;
-    padding: var(--wa-space-m) var(--wa-space-l) var(--wa-space-l);
+    padding: var(--wa-space-m) var(--content-gutter) var(--wa-space-l);
     gap: var(--wa-space-l);
   }
   /* Title-only list (no search query): pack rows tightly so the
@@ -582,18 +594,13 @@ export const dashboardStyles = css`
      device in the row above. Horizontal padding matches .controls
      and .table-wrap above/below so the count and toggle line up
      with the column headers on the right. 2px top padding mirrors
-     card view's .toolbar gap:2px so the inter-row spacing reads
-     identically between views. */
+     card view's .toolbar gap so the inter-row spacing reads
+     identically between views. Horizontal padding and top gap draw
+     from the shared --content-gutter / --toolbar-row-gap tokens, so
+     the count row trims on mobile and lines up with the toolbar
+     above it without a separate @media rule. */
   .table-device-count-row {
-    padding: 2px var(--wa-space-l) var(--wa-space-xs);
-  }
-
-  /* Mobile: tighten the table-view count-row gutter to match the
-     .controls / .table-wrap trim in PR-H (see table-styles.ts). */
-  @media (max-width: 600px) {
-    .table-device-count-row {
-      padding: 2px var(--wa-space-s) var(--wa-space-xs);
-    }
+    padding: var(--toolbar-row-gap) var(--content-gutter) var(--wa-space-xs);
   }
 
   /* ─── View Toggle ─── */
@@ -984,26 +991,5 @@ export const dashboardStyles = css`
   }
   .fab-btn wa-icon {
     font-size: 18px;
-  }
-
-  /* Mobile content-padding trim. The card grid and YAML hit list
-     sit at --wa-space-l (24px) horizontal padding; on a 375px phone
-     viewport that's ~13% of the width per side gone to chrome.
-     Tighten to --wa-space-s (8px) so device cards claim the available
-     width. The toolbar's own gutters trim via the shared
-     --toolbar-pad-* tokens (see the :host @media block above), which
-     the table view inherits too. Placed last in the stylesheet so
-     source-order wins against the base declarations above. #41 */
-  @media (max-width: 600px) {
-    .devices-grid {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
-      gap: var(--wa-space-s);
-    }
-
-    .yaml-hits {
-      padding-left: var(--wa-space-s);
-      padding-right: var(--wa-space-s);
-    }
   }
 `;

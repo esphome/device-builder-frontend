@@ -39,7 +39,7 @@ export const tableLayoutStyles = css`
     /* Shared with the card view's .toolbar via tokens inherited from
        the dashboard host, so the two views keep identical gutters at
        every breakpoint (incl. the mobile trim). */
-    padding: var(--toolbar-pad-top) var(--toolbar-pad-x) 0;
+    padding: var(--toolbar-pad-top) var(--content-gutter) 0;
     /* No bottom margin: the below-controls slot now carries the
        device-count + Select-multiple row, and its own bottom
        padding handles spacing to the .table-wrap. Keeping the
@@ -75,25 +75,15 @@ export const tableLayoutStyles = css`
     }
   }
 
-  /* Mobile content-padding trim. The table-wrap claims --wa-space-l
-     (24px) of horizontal margin on each side; on a 375px phone
-     viewport that's ~13% of the width per side gone to chrome. Match
-     the dashboard's .devices-grid trim so all three views share the
-     same tight gutters at narrow widths. The .controls strip trims
-     via the shared --toolbar-pad-* tokens (defined on the dashboard
-     host and inherited here), so it stays in lockstep with the card
-     view's .toolbar without a duplicate rule. #41 */
-  @media (max-width: 600px) {
-    .table-wrap {
-      margin-left: var(--wa-space-s);
-      margin-right: var(--wa-space-s);
-    }
-  }
-
   /* ─── Table ─── */
 
   .table-wrap {
-    margin: 0 var(--wa-space-l) var(--wa-space-l);
+    /* Horizontal margin draws from the shared --content-gutter token
+       (defined on the dashboard host, inherited here), so the table
+       outline trims on mobile in lockstep with the .controls strip
+       and the card view's grid. The bottom margin is a separate
+       vertical step, trimmed in the @media block below. #41 */
+    margin: 0 var(--content-gutter) var(--wa-space-l);
     border: var(--wa-border-width-s) solid var(--wa-color-surface-border);
     border-radius: var(--wa-border-radius-l);
     overflow: hidden;
@@ -320,14 +310,12 @@ export const tableLayoutStyles = css`
     font-size: var(--wa-font-size-s);
   }
 
-  /* Mobile margin trim for the table outline. Placed at the end
-     of the stylesheet so source-order beats the default
-     .table-wrap shorthand above (which would otherwise reset
-     margin-left / margin-right when the @media block fires).
-     Matches the card grid's mobile side padding. #41 */
+  /* Mobile bottom-margin trim for the table outline. The horizontal
+     margins already tighten via --content-gutter; only the bottom
+     gap (a separate vertical step) needs trimming here. #41 */
   @media (max-width: 600px) {
     .table-wrap {
-      margin: 0 var(--wa-space-s) var(--wa-space-s);
+      margin-bottom: var(--wa-space-s);
     }
   }
 `;
