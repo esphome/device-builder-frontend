@@ -42,6 +42,16 @@ export const espHomeStyles = css`
     --esphome-focus-ring-tight: 0 0 0 2px
       color-mix(in srgb, var(--esphome-primary), transparent 70%);
 
+    /* Elevation glow for raised primary action buttons (save, add,
+       etc.); rest + hover pair so the lift on hover stays consistent.
+       Bigger floating surfaces (the FAB, the round add-device badge)
+       keep their own larger, multi-layer shadows. Used as the full
+       box-shadow value. */
+    --esphome-primary-shadow: 0 2px 8px
+      color-mix(in srgb, var(--esphome-primary), transparent 50%);
+    --esphome-primary-shadow-hover: 0 4px 14px
+      color-mix(in srgb, var(--esphome-primary), transparent 35%);
+
     /* ─── Layout ─── */
     --esphome-header-height: 56px;
     --esphome-footer-height: 20px;
