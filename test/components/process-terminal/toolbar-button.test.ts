@@ -32,6 +32,17 @@ describe("renderTermButton", () => {
     expect(onClick).toHaveBeenCalledOnce();
   });
 
+  it("wraps the label in a .term-btn__label span so mobile can collapse it to icon-only", () => {
+    const btn = mount(
+      renderTermButton({ icon: "restart", label: "Reset device", onClick: () => {} })
+    );
+    const label = btn.querySelector(".term-btn__label");
+    expect(label?.textContent).toBe("Reset device");
+    // Icon stays a sibling of the (collapsible) label, not inside it.
+    expect(label?.querySelector("wa-icon")).toBeNull();
+    expect(btn.querySelector("wa-icon")?.getAttribute("name")).toBe("restart");
+  });
+
   it("uses title as the accessible name for an icon-only button", () => {
     const btn = mount(
       renderTermButton({ icon: "download", title: "Download", onClick: () => {} })

@@ -102,6 +102,26 @@ export const termButtonStyles = css`
   .toolbar-slot {
     display: contents;
   }
+
+  /* On narrow viewports collapse labelled icon buttons to icon-only so the
+     toolbar stays on one row instead of wrapping (#542 follow-up). The label
+     is visually hidden, not removed, so it still names the button for screen
+     readers; the title attribute keeps the tooltip. Icon-less buttons (e.g.
+     the command dialog's text-only Close) have no wa-icon, so they keep their
+     label and are never left empty. */
+  @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    .term-btn:has(wa-icon) .term-btn__label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+  }
 `;
 
 /**

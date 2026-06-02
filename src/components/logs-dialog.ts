@@ -299,7 +299,9 @@ export class ESPHomeLogsDialog extends LitElement {
                 title=${this._localize("dashboard.logs_back_to_install_tooltip")}
               >
                 <wa-icon library="mdi" name="arrow-left"></wa-icon>
-                ${this._localize("dashboard.logs_back_to_install")}
+                <span class="term-btn__label"
+                  >${this._localize("dashboard.logs_back_to_install")}</span
+                >
               </button>`
             : ""}
           <div class="toolbar-slot" slot="toolbar-right">
