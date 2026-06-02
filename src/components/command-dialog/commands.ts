@@ -179,14 +179,19 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
         );
         if (upload) {
-          host._jobId = upload.job_id;
-          host._jobStatus = upload.status;
-          followJob(host, upload.job_id);
+          // primeAndFollow re-primes the source snapshot from the upload (the
+          // local flash) so the remote-builder sub-line doesn't linger on the
+          // compile's receiver while the upload runs.
+          primeAndFollow(host, upload);
           return;
         }
-        // The backend creates the upload at install time, so a miss is a real
-        // gap — surface it rather than report a flash that didn't happen.
+        // Compile succeeded but there's no upload step — the device was never
+        // flashed, so don't report success (a real backend/transport gap).
         console.warn("install compile succeeded but no dependent upload for job", jobId);
+        host._state = "error";
+        host._statusMessage = host._localize("command.install_failed");
+        host._jobId = "";
+        return;
       }
 
       host._state = success ? "success" : "error";

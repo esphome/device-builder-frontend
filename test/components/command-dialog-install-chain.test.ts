@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   type FirmwareJob,
+  JobSource,
   JobStatus,
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
@@ -101,7 +102,7 @@ describe("command-dialog install chain follow", () => {
     warn.mockRestore();
   });
 
-  it("warns (and falls through to success) when a compile has no dependent upload", () => {
+  it("warns and fails (not success) when a compile has no dependent upload", () => {
     const compile = makeJob({ job_id: "c1", job_type: JobType.COMPILE });
     // No upload in context — a genuine backend/transport gap, not the happy path.
     const { host, follows, flipped } = makeHost(new Map([["c1", compile]]));
@@ -112,9 +113,47 @@ describe("command-dialog install chain follow", () => {
     follows.c1.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
 
     expect(warn).toHaveBeenCalledOnce();
-    expect(host._state).toBe("success");
-    expect(flipped()).toBe(true);
+    // The device was never flashed — must not report a successful install.
+    expect(host._state).toBe("error");
+    expect(host._statusMessage).toBe("command.install_failed");
+    expect(flipped()).toBe(false);
     warn.mockRestore();
+  });
+
+  it("re-primes the build source from the upload on hand-off", () => {
+    // The compile ran on a remote builder; the upload is local. After hand-off
+    // the primed source must track the upload so the remote-builder sub-line
+    // doesn't linger on the compile's receiver.
+    const compile = makeJob({
+      job_id: "c1",
+      job_type: JobType.COMPILE,
+      source: JobSource.REMOTE,
+      source_label: "builder",
+    });
+    const upload = makeJob({
+      job_id: "u1",
+      job_type: JobType.UPLOAD,
+      status: JobStatus.QUEUED,
+      depends_on: "c1",
+    });
+    const { host, follows } = makeHost(
+      new Map([
+        ["c1", compile],
+        ["u1", upload],
+      ])
+    );
+    host._primedSource = {
+      source: JobSource.REMOTE,
+      source_label: "builder",
+      source_esphome_version: "",
+    };
+
+    host._jobId = "c1";
+    followJob(host, "c1");
+    follows.c1.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
+
+    expect(host._primedSource?.source).toBe(JobSource.LOCAL);
+    expect(host._primedSource?.source_label).toBe("");
   });
 
   it("does not follow the upload when the compile fails", () => {
