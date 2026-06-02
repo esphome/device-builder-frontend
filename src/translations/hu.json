@@ -320,6 +320,7 @@
     "filter_area": "Terület",
     "filter_platform": "Platform",
     "filter_status": "Állapot",
+    "filter_update_status": "Frissítések",
     "filter_multi_selected": "{count} kijelölve",
     "drawer_loaded_integrations": "Betöltött integrációk",
     "drawer_auto_loaded_integrations": "{count} automatikusan betöltött függőség megjelenítése",

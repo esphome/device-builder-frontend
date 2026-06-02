@@ -320,6 +320,7 @@
     "filter_area": "区域",
     "filter_platform": "平台",
     "filter_status": "状态",
+    "filter_update_status": "更新",
     "filter_multi_selected": "已选择 {count} 项",
     "drawer_loaded_integrations": "已加载集成",
     "drawer_auto_loaded_integrations": "显示 {count} 个自动加载的依赖项",

@@ -27,6 +27,7 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
     _selectedAreas: [],
     _selectedPlatforms: [],
     _selectedStates: [],
+    _selectedUpdateStatus: [],
     _collapseFilters: false,
     _activeFacetCount: 0,
     _hasActiveFilters: false,
@@ -88,5 +89,30 @@ describe("renderFacets responsive layout", () => {
 
     clearBtn!.click();
     expect(host._clearAllFilters).toHaveBeenCalledTimes(1);
+  });
+
+  // _localize echoes its key, so the Updates pill is identifiable by its
+  // name attribute. Empty _devices means the fleet is current.
+  const updatesPill = (root: HTMLElement) =>
+    [...root.querySelectorAll("esphome-facet-filter")].find(
+      (el) => el.getAttribute("name") === "dashboard.filter_update_status"
+    );
+
+  it("renders the Updates pill when a device needs an update", () => {
+    const host = makeHost({ _devices: [{ update_available: true }] });
+    expect(updatesPill(renderInto(host))).not.toBeUndefined();
+  });
+
+  it("suppresses the Updates pill when the fleet is current", () => {
+    const host = makeHost({ _devices: [] });
+    expect(updatesPill(renderInto(host))).toBeUndefined();
+  });
+
+  it("suppresses the Updates pill in YAML-search mode", () => {
+    const host = makeHost({
+      _devices: [{ has_pending_changes: true }],
+      _yamlMode: true,
+    });
+    expect(updatesPill(renderInto(host))).toBeUndefined();
   });
 });

@@ -212,6 +212,7 @@
     "filter_area": "Gebied",
     "filter_platform": "Platform",
     "filter_status": "Status",
+    "filter_update_status": "Updates",
     "filter_multi_selected": "{count} geselecteerd",
     "drawer_loaded_integrations": "Geladen integraties",
     "context_select": "Selecteren",

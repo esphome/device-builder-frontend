@@ -108,3 +108,30 @@ export function computeStateFacet(
     localize(labelKeyByState[raw as DeviceState] ?? "dashboard.unknown")
   );
 }
+
+/** Update-status facet — two orthogonal buckets a device can carry
+ *  at once: ``update_available`` (firmware behind latest) and
+ *  ``modified`` (local YAML not yet deployed). Empty buckets are
+ *  dropped so the dashboard hides the pill (and any single bucket
+ *  that no device matches) when the fleet is current. */
+export function computeUpdateFacet(
+  devices: ConfiguredDevice[],
+  localize: LocalizeFunc
+): FacetOption[] {
+  let updateAvailable = 0;
+  let modified = 0;
+  for (const d of devices) {
+    if (d.update_available) updateAvailable += 1;
+    if (d.has_pending_changes) modified += 1;
+  }
+  const counts = new Map<string, number>();
+  if (updateAvailable > 0) counts.set("update_available", updateAvailable);
+  if (modified > 0) counts.set("modified", modified);
+  const labelKeyById: Record<string, string> = {
+    update_available: "dashboard.status_update_available",
+    modified: "dashboard.status_modified",
+  };
+  return tallyToFacet(counts, (raw) =>
+    localize(labelKeyById[raw] ?? "dashboard.status_modified")
+  );
+}

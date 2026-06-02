@@ -207,6 +207,11 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _selectedPlatforms: string[] = [];
   /** ``DeviceState`` values selected in the Status facet. */
   @state() _selectedStates: string[] = [];
+  /** Update-status buckets (``update_available`` / ``modified``)
+   *  selected in the Updates facet. AND semantics — a device must
+   *  satisfy every selected bucket — so selecting both narrows to
+   *  devices that are both update-available and modified. */
+  @state() _selectedUpdateStatus: string[] = [];
   @state() _yamlMode = false;
   @state() _yamlPreviewCount = 0;
   _yamlSearch = new YamlSearchController(this, () => this._api);
@@ -359,6 +364,7 @@ export class ESPHomePageDashboard extends LitElement {
     if (urlState.areas !== undefined) this._selectedAreas = urlState.areas;
     if (urlState.platforms !== undefined) this._selectedPlatforms = urlState.platforms;
     if (urlState.states !== undefined) this._selectedStates = urlState.states;
+    if (urlState.updates !== undefined) this._selectedUpdateStatus = urlState.updates;
     if (urlState.view !== undefined) this._view = urlState.view;
     if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;
 
@@ -393,6 +399,7 @@ export class ESPHomePageDashboard extends LitElement {
     "_selectedAreas",
     "_selectedPlatforms",
     "_selectedStates",
+    "_selectedUpdateStatus",
     "_view",
     "_yamlMode",
   ] as const;
@@ -414,6 +421,7 @@ export class ESPHomePageDashboard extends LitElement {
       areas: this._selectedAreas,
       platforms: this._selectedPlatforms,
       states: this._selectedStates,
+      updates: this._selectedUpdateStatus,
       view: this._view,
       yaml: this._yamlMode,
     });
@@ -560,7 +568,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels.length > 0 ||
       this._selectedAreas.length > 0 ||
       this._selectedPlatforms.length > 0 ||
-      this._selectedStates.length > 0
+      this._selectedStates.length > 0 ||
+      this._selectedUpdateStatus.length > 0
     );
   }
 
@@ -571,7 +580,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels.length +
       this._selectedAreas.length +
       this._selectedPlatforms.length +
-      this._selectedStates.length
+      this._selectedStates.length +
+      this._selectedUpdateStatus.length
     );
   }
 
@@ -585,6 +595,7 @@ export class ESPHomePageDashboard extends LitElement {
     this._selectedAreas = [];
     this._selectedPlatforms = [];
     this._selectedStates = [];
+    this._selectedUpdateStatus = [];
     this._syncYamlSearch();
   };
 
@@ -608,7 +619,8 @@ export class ESPHomePageDashboard extends LitElement {
       selectedLabels: string[],
       selectedAreas: string[],
       selectedPlatforms: string[],
-      selectedStates: string[]
+      selectedStates: string[],
+      selectedUpdateStatus: string[]
     ): ConfiguredDevice[] => {
       let out = devices;
       if (selectedLabels.length > 0) {
@@ -631,6 +643,16 @@ export class ESPHomePageDashboard extends LitElement {
         const set = new Set(selectedStates);
         out = out.filter((d) => set.has(d.state));
       }
+      if (selectedUpdateStatus.length > 0) {
+        // AND / narrowing: a device must satisfy every selected
+        // bucket (mirrors the labels facet, not the OR facets above).
+        const set = new Set(selectedUpdateStatus);
+        out = out.filter(
+          (d) =>
+            (!set.has("update_available") || d.update_available) &&
+            (!set.has("modified") || d.has_pending_changes)
+        );
+      }
       return out;
     }
   );
@@ -641,7 +663,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels,
       this._selectedAreas,
       this._selectedPlatforms,
-      this._selectedStates
+      this._selectedStates,
+      this._selectedUpdateStatus
     );
   }
 

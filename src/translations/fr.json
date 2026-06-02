@@ -212,6 +212,7 @@
     "filter_area": "Zone",
     "filter_platform": "Plateforme",
     "filter_status": "Statut",
+    "filter_update_status": "Mises à jour",
     "filter_multi_selected": "{count} sélectionnés",
     "drawer_loaded_integrations": "Intégrations chargées",
     "context_select": "Sélectionner",
