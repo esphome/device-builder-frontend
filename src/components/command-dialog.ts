@@ -165,6 +165,10 @@ export class ESPHomeCommandDialog extends LitElement {
   // to "open in editor" (YAML help). Reset per open().
   @state() _failedDuringValidate = false;
 
+  // Flips true when an install COMPILE succeeded but its dependent UPLOAD is
+  // missing — the build itself was fine, so the clean/reset hint is suppressed.
+  @state() _installMissingUpload = false;
+
   // Locally-primed status / source so the queued overlay + remote-builder
   // sub-line paint on the first frame instead of waiting for the next jobs
   // context update.
@@ -258,6 +262,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this._resetPendingLines();
     this._statusMessage = "";
     this._userStopped = false;
+    this._installMissingUpload = false;
     // Fresh attach is a fresh session — reset toggle defaults so a prior
     // opt-out doesn't silently inherit.
     this._showSecrets = false;

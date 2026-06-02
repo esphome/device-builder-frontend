@@ -42,6 +42,7 @@ interface Host {
   _userStopped: boolean;
   _commandType: string;
   _failedDuringValidate: boolean;
+  _installMissingUpload: boolean;
   _jobId: string;
   _jobs: Map<string, FirmwareJob>;
   _primedSource: {
@@ -61,6 +62,7 @@ function baseHost(overrides: Partial<Host> = {}): Host {
     _userStopped: false,
     _commandType: "install",
     _failedDuringValidate: false,
+    _installMissingUpload: false,
     _jobId: "job-1",
     _jobs: new Map(),
     _primedSource: null,
@@ -88,6 +90,12 @@ describe("renderResetSuggestion — local build", () => {
     // primed snapshot — the renderer must not assume REMOTE.
     const host = baseHost({ _jobs: new Map(), _primedSource: null });
     expectFallbackToLocal(render(host), host);
+  });
+
+  it("renders nothing when the install compile succeeded but had no upload", () => {
+    // The compile was fine; clean/reset wouldn't help a missing upload step.
+    const host = baseHost({ _installMissingUpload: true });
+    expectNoSuggestion(render(host));
   });
 });
 

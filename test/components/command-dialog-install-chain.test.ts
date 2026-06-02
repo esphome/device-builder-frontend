@@ -49,6 +49,7 @@ function makeHost(
     _lines: [] as string[],
     _showLogsAfterInstall: true,
     _failedDuringValidate: false,
+    _installMissingUpload: false,
     _localize: (key: string) => key,
     _flipToLogs: () => {
       flipped = true;
@@ -116,6 +117,8 @@ describe("command-dialog install chain follow", () => {
     // The device was never flashed — must not report a successful install.
     expect(host._state).toBe("error");
     expect(host._statusMessage).toBe("command.install_failed");
+    // Flagged so the clean/reset build-failure hint is suppressed (compile was fine).
+    expect(host._installMissingUpload).toBe(true);
     expect(flipped()).toBe(false);
     warn.mockRestore();
   });

@@ -45,6 +45,7 @@ export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   host._statusMessage = "";
   host._userStopped = false;
   host._failedDuringValidate = false;
+  host._installMissingUpload = false;
   // Clear primed snapshots so a Retry that picks a different source can't
   // leak the prior job's REMOTE label into renderBuildFailureSuggestion
   // before the new _jobs context update lands. open() already clears these
@@ -190,6 +191,9 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
         console.warn("install compile succeeded but no dependent upload for job", jobId);
         host._state = "error";
         host._statusMessage = host._localize("command.install_failed");
+        // The compile succeeded, so the clean/reset build-failure hint is
+        // misleading here — suppress it.
+        host._installMissingUpload = true;
         host._jobId = "";
         return;
       }
@@ -288,10 +292,14 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     const job = await host._api.firmwareInstall(configuration, port, true);
     // Keep _commandType "install": the public followJob would derive "compile"
     // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
-    // attempt, then re-attach via primeAndFollow.
+    // attempt and reset the run state (the public followJob did this), then
+    // re-attach via primeAndFollow.
     await detachStream(host);
     host._lines = [];
     host._resetPendingLines();
+    host._state = "running";
+    host._statusMessage = "";
+    host._installMissingUpload = false;
     primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";
