@@ -39,6 +39,7 @@ import {
   detachStream,
   followJob,
   onForceLocalClick,
+  resetRunState,
   startCommand,
   stopCommand,
   toggleShowSecrets,
@@ -257,12 +258,7 @@ export class ESPHomeCommandDialog extends LitElement {
     this.name = displayName;
     this._commandType = JOB_TYPE_TO_COMMAND[job.job_type] ?? "install";
     this._port = job.port || "OTA";
-    this._state = "running";
-    this._lines = [];
-    this._resetPendingLines();
-    this._statusMessage = "";
-    this._userStopped = false;
-    this._installMissingUpload = false;
+    resetRunState(this);
     // Fresh attach is a fresh session — reset toggle defaults so a prior
     // opt-out doesn't silently inherit.
     this._showSecrets = false;

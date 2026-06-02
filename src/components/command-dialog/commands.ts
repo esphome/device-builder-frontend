@@ -36,9 +36,10 @@ export async function detachStream(host: ESPHomeCommandDialog): Promise<void> {
   }
 }
 
-export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
-  await detachStream(host);
-  host._jobId = "";
+// Reset the per-run state a fresh attach starts from: the output buffer,
+// status banner, and the failure flags that gate the reset/validation hints.
+// Shared by every entry point that reuses the singleton dialog for a new run.
+export function resetRunState(host: ESPHomeCommandDialog): void {
   host._state = "running";
   host._lines = [];
   host._resetPendingLines();
@@ -46,6 +47,12 @@ export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
   host._userStopped = false;
   host._failedDuringValidate = false;
   host._installMissingUpload = false;
+}
+
+export async function startCommand(host: ESPHomeCommandDialog): Promise<void> {
+  await detachStream(host);
+  host._jobId = "";
+  resetRunState(host);
   // Clear primed snapshots so a Retry that picks a different source can't
   // leak the prior job's REMOTE label into renderBuildFailureSuggestion
   // before the new _jobs context update lands. open() already clears these
@@ -298,11 +305,7 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
     // attempt and reset the run state (the public followJob did this), then
     // re-attach via primeAndFollow.
     await detachStream(host);
-    host._lines = [];
-    host._resetPendingLines();
-    host._state = "running";
-    host._statusMessage = "";
-    host._installMissingUpload = false;
+    resetRunState(host);
     primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";

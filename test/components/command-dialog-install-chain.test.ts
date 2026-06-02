@@ -48,6 +48,7 @@ function makeHost(
     _port: "OTA",
     _lines: [] as string[],
     _showLogsAfterInstall: true,
+    _userStopped: false,
     _failedDuringValidate: false,
     _installMissingUpload: false,
     _localize: (key: string) => key,
@@ -202,12 +203,20 @@ describe("command-dialog install chain follow", () => {
       },
     });
     host._jobId = "c1"; // the remote compile being cancelled
+    // Stale per-session flags from the cancelled remote attempt.
+    host._userStopped = true;
+    host._failedDuringValidate = true;
+    host._installMissingUpload = true;
 
     await onForceLocalClick(host);
 
     expect(host._commandType).toBe("install");
     expect(host._jobId).toBe("c2");
     expect(follows.c2).toBeDefined();
+    // The new local run starts clean — stale flags can't mis-route its hint.
+    expect(host._userStopped).toBe(false);
+    expect(host._failedDuringValidate).toBe(false);
+    expect(host._installMissingUpload).toBe(false);
 
     follows.c2.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
     expect(host._jobId).toBe("u2");
