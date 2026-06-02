@@ -180,6 +180,10 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           followJob(host, upload.job_id);
           return;
         }
+        // The backend creates the held upload at install time, so a miss is a
+        // transport/backend gap, not version skew; surface it rather than
+        // silently reporting the device flashed after only compiling.
+        console.warn("install compile succeeded but no dependent upload for job", jobId);
       }
 
       host._state = success ? "success" : "error";

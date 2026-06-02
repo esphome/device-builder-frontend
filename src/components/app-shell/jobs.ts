@@ -2,8 +2,9 @@ import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-j
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import type { ESPHomeApp } from "../app-shell.js";
 
-// Mirrors the backend's _PRIMARY_JOB_TYPES retention pool — job types
-// deduplicated to one terminal entry per device.
+// Mirrors the backend's _PRIMARY_JOB_TYPES retention pool — deduplicated to
+// one terminal entry per (device, job type), so an install's COMPILE and its
+// dependent UPLOAD both survive rather than the upload evicting the compile.
 const PRIMARY_JOB_TYPES: ReadonlySet<JobType> = new Set([
   JobType.COMPILE,
   JobType.UPLOAD,
@@ -89,9 +90,10 @@ function upsertJob(host: ESPHomeApp, job: FirmwareJob): void {
   host._activeJobs = active;
 }
 
-// Terminal: keep in _firmwareJobs history; drop older terminal for same device
-// (re-compile replaces rather than stacks); clear per-device active slot.
-// Cancellations with a live successor are a backend supersede — drop silently.
+// Terminal: keep in _firmwareJobs history; drop older terminal of the same
+// type for the same device (a re-compile replaces the prior compile, not its
+// upload); clear per-device active slot. Cancellations with a live successor
+// are a backend supersede — drop silently.
 function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
   if (job.status === JobStatus.CANCELLED && job.configuration) {
     const supersededByActive = [...host._firmwareJobs.values()].some(
@@ -113,7 +115,7 @@ function terminateJob(host: ESPHomeApp, job: FirmwareJob): void {
     for (const [id, existing] of next) {
       if (id === job.job_id) continue;
       if (
-        PRIMARY_JOB_TYPES.has(existing.job_type) &&
+        existing.job_type === job.job_type &&
         existing.configuration === job.configuration &&
         isTerminalJobStatus(existing.status)
       ) {
