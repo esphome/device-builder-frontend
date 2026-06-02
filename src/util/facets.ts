@@ -109,29 +109,53 @@ export function computeStateFacet(
   );
 }
 
+/** The two update-status buckets, in display order. Exported so URL
+ *  hydration can reject unknown ids before they inflate the active-
+ *  filter count as no-op selections. */
+export const UPDATE_FACET_BUCKETS = ["update_available", "modified"] as const;
+
+type UpdateBucket = (typeof UPDATE_FACET_BUCKETS)[number];
+
+/** Each bucket's membership test — the single source of truth shared
+ *  by the facet's counts here and the dashboard's row filter, so the
+ *  bucket → device-field mapping isn't written twice. */
+export const UPDATE_FACET_PREDICATES: Record<
+  UpdateBucket,
+  (device: ConfiguredDevice) => boolean
+> = {
+  update_available: (d) => d.update_available,
+  modified: (d) => d.has_pending_changes,
+};
+
+const UPDATE_BUCKET_LABEL_KEY: Record<UpdateBucket, string> = {
+  update_available: "dashboard.status_update_available",
+  modified: "dashboard.status_modified",
+};
+
 /** Update-status facet — two orthogonal buckets a device can carry
  *  at once: ``update_available`` (firmware behind latest) and
- *  ``modified`` (local YAML not yet deployed). Empty buckets are
- *  dropped so the dashboard hides the pill (and any single bucket
- *  that no device matches) when the fleet is current. */
+ *  ``modified`` (local YAML not yet deployed). A bucket surfaces when
+ *  any device matches it *or* it's currently selected — so a filter
+ *  hydrated from the URL stays visible (and clearable) even after a
+ *  bulk update leaves the fleet current and its count at zero. When
+ *  nothing matches and nothing is selected the pill self-hides. */
 export function computeUpdateFacet(
   devices: ConfiguredDevice[],
-  localize: LocalizeFunc
+  localize: LocalizeFunc,
+  selected: readonly string[] = []
 ): FacetOption[] {
-  let updateAvailable = 0;
-  let modified = 0;
+  const counts: Record<UpdateBucket, number> = { update_available: 0, modified: 0 };
   for (const d of devices) {
-    if (d.update_available) updateAvailable += 1;
-    if (d.has_pending_changes) modified += 1;
+    for (const id of UPDATE_FACET_BUCKETS) {
+      if (UPDATE_FACET_PREDICATES[id](d)) counts[id] += 1;
+    }
   }
-  const counts = new Map<string, number>();
-  if (updateAvailable > 0) counts.set("update_available", updateAvailable);
-  if (modified > 0) counts.set("modified", modified);
-  const labelKeyById: Record<string, string> = {
-    update_available: "dashboard.status_update_available",
-    modified: "dashboard.status_modified",
-  };
-  return tallyToFacet(counts, (raw) =>
-    localize(labelKeyById[raw] ?? "dashboard.unknown")
+  const selectedSet = new Set(selected);
+  const surfaced = new Map<string, number>();
+  for (const id of UPDATE_FACET_BUCKETS) {
+    if (counts[id] > 0 || selectedSet.has(id)) surfaced.set(id, counts[id]);
+  }
+  return tallyToFacet(surfaced, (raw) =>
+    localize(UPDATE_BUCKET_LABEL_KEY[raw as UpdateBucket] ?? "dashboard.unknown")
   );
 }

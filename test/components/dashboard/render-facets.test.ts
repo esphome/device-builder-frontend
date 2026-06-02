@@ -90,6 +90,11 @@ describe("renderFacets", () => {
     expect(updatesPill(renderInto(host))).toBeUndefined();
   });
 
+  it("keeps the Updates pill when a filter is selected but the fleet is current", () => {
+    const host = makeHost({ _devices: [], _selectedUpdateStatus: ["update_available"] });
+    expect(updatesPill(renderInto(host))).not.toBeUndefined();
+  });
+
   it("suppresses the Updates pill in YAML-search mode", () => {
     const host = makeHost({
       _devices: [{ has_pending_changes: true }],

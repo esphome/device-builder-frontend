@@ -41,4 +41,11 @@ describe("computeUpdateFacet", () => {
     );
     expect(ids).toEqual(["update_available"]);
   });
+
+  it("surfaces a selected bucket at count 0 so a URL filter stays clearable", () => {
+    const opts = computeUpdateFacet([device({})], localize, ["update_available"]);
+    expect(opts).toEqual([
+      { id: "update_available", name: expect.any(String), count: 0 },
+    ]);
+  });
 });

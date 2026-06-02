@@ -4,7 +4,6 @@ import {
   mdiCheckboxMultipleMarkedOutline,
   mdiClipboardTextSearchOutline,
   mdiCodeBraces,
-  mdiFilterRemoveOutline,
   mdiMagnify,
   mdiPlus,
   mdiTable,
@@ -95,6 +94,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import { matchesDeviceName, matchesMacAddress } from "../util/device-search.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
+import { UPDATE_FACET_BUCKETS, UPDATE_FACET_PREDICATES } from "../util/facets.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -141,7 +141,6 @@ registerMdiIcons({
   "checkbox-multiple-marked-outline": mdiCheckboxMultipleMarkedOutline,
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
   "code-braces": mdiCodeBraces,
-  "filter-remove-outline": mdiFilterRemoveOutline,
   magnify: mdiMagnify,
   plus: mdiPlus,
   "view-grid": mdiViewGrid,
@@ -352,7 +351,12 @@ export class ESPHomePageDashboard extends LitElement {
     if (urlState.areas !== undefined) this._selectedAreas = urlState.areas;
     if (urlState.platforms !== undefined) this._selectedPlatforms = urlState.platforms;
     if (urlState.states !== undefined) this._selectedStates = urlState.states;
-    if (urlState.updates !== undefined) this._selectedUpdateStatus = urlState.updates;
+    if (urlState.updates !== undefined) {
+      // Reject unknown bucket ids from the user-editable URL so they
+      // don't count as active filters while narrowing nothing.
+      const valid = new Set<string>(UPDATE_FACET_BUCKETS);
+      this._selectedUpdateStatus = urlState.updates.filter((b) => valid.has(b));
+    }
     if (urlState.view !== undefined) this._view = urlState.view;
     if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;
 
@@ -634,10 +638,10 @@ export class ESPHomePageDashboard extends LitElement {
         // AND / narrowing: a device must satisfy every selected
         // bucket (mirrors the labels facet, not the OR facets above).
         const set = new Set(selectedUpdateStatus);
-        out = out.filter(
-          (d) =>
-            (!set.has("update_available") || d.update_available) &&
-            (!set.has("modified") || d.has_pending_changes)
+        out = out.filter((d) =>
+          UPDATE_FACET_BUCKETS.every(
+            (id) => !set.has(id) || UPDATE_FACET_PREDICATES[id](d)
+          )
         );
       }
       return out;

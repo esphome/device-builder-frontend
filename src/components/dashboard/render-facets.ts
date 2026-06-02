@@ -52,7 +52,11 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
   const areaOptions = computeAreaFacet(host._devices);
   const platformOptions = computePlatformFacet(host._devices);
   const stateOptions = computeStateFacet(host._devices, host._localize);
-  const updateOptions = computeUpdateFacet(host._devices, host._localize);
+  const updateOptions = computeUpdateFacet(
+    host._devices,
+    host._localize,
+    host._selectedUpdateStatus
+  );
   const multiSelectedLabel = host._localize("dashboard.filter_multi_selected", {
     count: "{count}",
   });
