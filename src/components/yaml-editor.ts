@@ -417,18 +417,18 @@ export class ESPHomeYamlEditor extends LitElement {
 
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
-      // Initial population: the editor mounted empty (default `value`
-      // is "") before the device YAML loaded async, so the first
-      // non-empty value arrives here. Dispatching it would record an
-      // undoable empty→content step, letting Ctrl+Z unwind to a blank
-      // editor (#1150). Remount instead so the loaded YAML is the
-      // document baseline with fresh history — same reset the
-      // configuration-change branch above uses.
+      // First non-empty population of a pristine, never-edited editor:
+      // the editor mounts empty (default `value` is "") and is filled by
+      // an async source — the device YAML load, or an external
+      // `yaml-draft` (e.g. a wizard) before any typing. Dispatching that
+      // would record an undoable empty→content step, letting Ctrl+Z
+      // unwind to a blank editor (#1150). Remount instead so the
+      // populated YAML is the document baseline with fresh history — the
+      // same reset the configuration-change branch above uses.
       //
-      // Gate on empty history (`undoDepth === 0`) so this only fires for
-      // the pristine initial load — not when the user has cleared the
-      // doc themselves and an external action (e.g. a dialog's
-      // `yaml-draft`) repopulates it, which must stay undoable.
+      // The `undoDepth === 0` gate scopes this to the never-edited
+      // window: once the user has edited or cleared the doc, history is
+      // non-empty, so a later external repopulate stays undoable.
       if (current === "" && this.value !== "" && undoDepth(this._view.state) === 0) {
         this._remountEditor();
         return;
