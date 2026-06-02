@@ -233,16 +233,6 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _tableSorting: SortingState | null = null;
   @state() _tableColumnVisibility: VisibilityState | null = null;
 
-  /** At/below 1100px the facet pills no longer fit inline (they widen
-   *  further once they carry selection badges), so they collapse into
-   *  the "Filters" menu. matchMedia, not CSS, so we render one set of
-   *  facets rather than a hidden duplicate. */
-  @state() _collapseFilters = false;
-  private _mql = window.matchMedia("(max-width: 1100px)");
-  private _onMqlChange = (e: MediaQueryListEvent) => {
-    this._collapseFilters = e.matches;
-  };
-
   private _adoptHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   _pendingAdoptScroll: string | null = null;
   _actionDevice: ConfiguredDevice | null = null;
@@ -332,8 +322,6 @@ export class ESPHomePageDashboard extends LitElement {
     this._hydrateFromUrl();
     this.setAttribute("view", this._view);
     this.toggleAttribute("yaml", this._yamlMode);
-    this._collapseFilters = this._mql.matches;
-    this._mql.addEventListener("change", this._onMqlChange);
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
@@ -429,7 +417,6 @@ export class ESPHomePageDashboard extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this._mql.removeEventListener("change", this._onMqlChange);
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
     window.removeEventListener(
       "esphome-show-ignored-changed",

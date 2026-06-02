@@ -32,9 +32,11 @@ export const facetStyles = css`
     align-items: center;
     gap: 8px;
     /* Shared with the search input / view-toggle / clear-filters so the
-       toolbar row reads as one consistent control strip. */
-    height: var(--esphome-control-height);
-    padding: 0 10px 0 12px;
+       toolbar row reads as one consistent control strip. min-height
+       (not height) so a pill whose selection badges wrap to a second
+       line inside the Filters-menu popover grows instead of clipping. */
+    min-height: var(--esphome-control-height);
+    padding: 4px 10px 4px 12px;
     border-radius: var(--wa-border-radius-m);
     /* 2px dashes — the default 1px-thick dashed border renders as
        almost-solid hairline on hidpi displays, especially against
@@ -47,10 +49,21 @@ export const facetStyles = css`
     font-weight: var(--wa-font-weight-semibold, 600);
     cursor: pointer;
     flex-shrink: 0;
+    /* Cap to the container so a pill carrying wide selection badges
+       stays inside the Filters-menu popover instead of spilling past
+       its right edge; the badges shrink + clip rather than overflow. */
+    max-width: 100%;
+    box-sizing: border-box;
     transition:
       background-color 0.12s,
       border-color 0.12s,
       color 0.12s;
+  }
+
+  /* Facet name sits between the + icon and the badges; never let it
+     shrink — the badges absorb the squeeze when space is tight. */
+  .facet-trigger-name {
+    flex-shrink: 0;
   }
 
   /* Hover stays neutral on purpose — the trigger is one of several
@@ -90,14 +103,15 @@ export const facetStyles = css`
   }
 
   /* Right-side container for the active-state badges. Wraps to a
-     second row only when the badges would otherwise overflow —
-     normally everything stays on one line. */
+     second row when two named badges can't share one line inside the
+     Filters-menu popover, so a wide value (e.g. "Update available")
+     stays fully readable instead of clipping at the popover edge. */
   .facet-trigger-badges {
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
-    max-width: 280px;
-    overflow: hidden;
+    min-width: 0;
   }
 
   /* One badge per selected value (≤ 2) or a single count badge
