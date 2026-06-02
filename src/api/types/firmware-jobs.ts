@@ -61,6 +61,14 @@ export interface FirmwareJob {
    *  dataclass defaults to ``""`` for every other job type so the
    *  field is always present on the wire — required here matches. */
   new_name: string;
+  /** Job id of the prerequisite this job is chained behind, or ``""``
+   *  when it has none. An install's UPLOAD carries its COMPILE's
+   *  ``job_id`` here: it stays QUEUED off the upload lane until the
+   *  compile succeeds, then runs. The backend defaults the field to
+   *  ``""`` for every unchained job so it's always present on the wire.
+   *  The install dialog reads it to follow the compile → upload chain
+   *  to completion instead of reporting success when the compile ends. */
+  depends_on: string;
   /** 0–100 progress, monotonically non-decreasing while the job runs.
    *  `null` until the underlying tooling (PlatformIO/esptool) emits a
    *  percentage we can latch onto. */

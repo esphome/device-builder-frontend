@@ -162,6 +162,23 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       host._flushPendingLines();
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
+
+      // An install runs as a COMPILE then a dependent UPLOAD on a separate
+      // lane (backend #1131); a finished compile is only half the install.
+      // Hand off to the upload and let its terminal result decide success,
+      // so we don't report the device flashed the moment it compiled. The
+      // upload carries depends_on === this compile's job_id; followJob
+      // handles it whether it's still queued, running, or already terminal.
+      if (success && host._commandType === "install") {
+        const upload = [...host._jobs.values()].find((j) => j.depends_on === jobId);
+        if (upload) {
+          host._jobId = upload.job_id;
+          host._jobStatus = upload.status;
+          followJob(host, upload.job_id);
+          return;
+        }
+      }
+
       host._state = success ? "success" : "error";
       host._statusMessage = host._localize(
         success

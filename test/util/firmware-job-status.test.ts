@@ -27,6 +27,7 @@ function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
     error: null,
     port: "",
     new_name: "",
+    depends_on: "",
     progress: null,
     source: JobSource.LOCAL,
     source_pin_sha256: "",
