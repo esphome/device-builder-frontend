@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { defaultLocalize, matchLocale } from "../../src/common/localize.js";
 

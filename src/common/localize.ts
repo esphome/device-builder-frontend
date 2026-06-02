@@ -64,28 +64,33 @@ const asMessages = (mod: unknown): Record<string, unknown> => {
 // `import.meta.webpackContext` is a build-time helper: rspack replaces
 // the call with a real (synchronous) context factory so each locale's
 // name, flag, and strings are available up front for the picker. Under
-// vitest the helper doesn't exist and the call throws — we swallow it
-// and run English-only, which is also the state in dev before
-// translations are downloaded.
+// vitest the helper doesn't exist and the call throws — that single call
+// is guarded so we fall back to English-only, which is also the state in
+// dev before translations are downloaded. The guard is scoped to just the
+// feature-probing call: iterating the context and reading each module run
+// outside it, so a genuine failure there (resolver error, malformed locale
+// JSON) surfaces instead of silently degrading a release to English-only.
 function discoverTranslations(): Map<string, Record<string, unknown>> {
   const translations = new Map<string, Record<string, unknown>>([
     [BASE_LOCALE, enMessages as Record<string, unknown>],
   ]);
+  let ctx: ReturnType<ImportMeta["webpackContext"]>;
   try {
-    const ctx = import.meta.webpackContext("../translations", {
+    ctx = import.meta.webpackContext("../translations", {
       recursive: false,
       regExp: /\.json$/,
       mode: "sync",
     });
-    for (const key of ctx.keys()) {
-      const stem = key.replace(/^\.\//, "").replace(/\.json$/, "");
-      if (stem === BASE_LOCALE) continue; // base is the static import
-      // Canonicalize so a Lokalise `zh_CN.json` is keyed as the BCP 47
-      // `zh-CN` everywhere downstream (picker, storage, Intl formatters).
-      translations.set(toBcp47(stem), asMessages(ctx(key)));
-    }
   } catch {
     // No bundler context (vitest, or pre-download dev) — base only.
+    return translations;
+  }
+  for (const key of ctx.keys()) {
+    const stem = key.replace(/^\.\//, "").replace(/\.json$/, "");
+    if (stem === BASE_LOCALE) continue; // base is the static import
+    // Canonicalize so a Lokalise `zh_CN.json` is keyed as the BCP 47
+    // `zh-CN` everywhere downstream (picker, storage, Intl formatters).
+    translations.set(toBcp47(stem), asMessages(ctx(key)));
   }
   return translations;
 }
