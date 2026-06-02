@@ -53,11 +53,8 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     const fromLine = i + 1; // 1-indexed CM line
     const toLine = _findBlockEnd(lines, i, indent);
 
-    // Resolve the host from the shared section parse — one source of
-    // truth for parentKey / id / name / index. An id-less list instance
-    // gets the backend's positional ``<domain>_<idx>`` so it surfaces
-    // and round-trips like an id'd one; a flat block (``esphome:``)
-    // hosts device-level triggers instead.
+    // The enclosing section: a list-item instance, a flat singleton, or
+    // the ``esphome:`` block (device-level, handled next).
     const host = smallestContainingSection(sections, fromLine);
 
     if (host && host.parentKey === undefined && host.key === "esphome") {
@@ -76,21 +73,10 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
       continue;
     }
 
-    // One source of truth: the helper returns the declared / positional id
-    // for a list-item host and null for a flat block (``sun:`` with an id is
-    // still null — the backend can't address it), so this matches what
-    // ``_shortcutTarget`` resolves for the same section. Only a *direct*
-    // ``on_*`` child of the list item scopes to it: the backend parses an
-    // instance's own ``on_*`` keys, not ones nested under a sub-mapping
-    // (``sensor[i].temperature.on_value``), so a deeper handler falls
-    // through to ``unscoped`` rather than claiming a handle that
-    // ``automations/parse`` won't confirm.
+    // Only a direct ``on_*`` child scopes to the host; a deeper handler
+    // (``sensor[i].temperature.on_value``) isn't addressable → ``unscoped``.
     let componentId: string | null = null;
-    if (
-      host &&
-      host.parentKey !== undefined &&
-      indent === listItemChildIndent(lines[host.fromLine - 1] ?? "")
-    ) {
+    if (host && indent === listItemChildIndent(lines[host.fromLine - 1] ?? "")) {
       componentId = instanceComponentId(sections, host);
     }
     if (host && componentId) {
@@ -98,7 +84,9 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
       const base = {
         id: componentId,
         name: host.name ?? undefined,
-        parentKey: host.parentKey,
+        // Domain (``key`` for a flat singleton) — the catalog is keyed
+        // ``<domain>.<event>``, so this resolves the trigger name.
+        parentKey: host.parentKey ?? host.key,
         eventKey: eventName,
       };
       // List-shaped trigger (``time.on_time``): one row per cron entry,

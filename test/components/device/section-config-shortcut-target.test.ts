@@ -83,11 +83,9 @@ describe("_shortcutTarget", () => {
     });
   });
 
-  it("returns null for a flat block even with an explicit id (no broken shortcut)", () => {
-    // The exact regression: `sun:` is a flat single-instance block that
-    // can carry an id and host on_sunrise, but the backend can't address
-    // it, so the gate must offer no shortcut (matching the parser's
-    // `unscoped`).
+  it("scopes a flat singleton block to its id (sun → its declared id)", () => {
+    // With backend flat-component support (#1139), `sun:` is addressable
+    // by its `id:`, so the section hosts automations like a list item.
     const yaml = `sun:
   id: my_sun
   latitude: 0°
@@ -95,7 +93,24 @@ describe("_shortcutTarget", () => {
     - then:
         - logger.log: "x"
 `;
-    expect(shortcutTarget(yaml, "sun")).toBeNull();
+    expect(shortcutTarget(yaml, "sun")).toEqual({
+      kind: "component_on",
+      componentId: "my_sun",
+    });
+  });
+
+  it("scopes an id-less flat singleton block to its domain", () => {
+    const yaml = `mqtt:
+  broker: test
+  on_message:
+    - topic: x/y
+      then:
+        - logger.log: "m"
+`;
+    expect(shortcutTarget(yaml, "mqtt")).toEqual({
+      kind: "component_on",
+      componentId: "mqtt",
+    });
   });
 
   it("routes multi-instance sections by _resolvedFromLine", () => {
