@@ -18,6 +18,7 @@ import {
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
 import { renderResetSuggestion } from "../../src/components/command-dialog/renderers.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 import {
   expectFallbackToLocal,
   expectLocalSuggestion,
@@ -28,31 +29,12 @@ import {
 } from "./_reset-suggestion-helpers.js";
 
 function fakeJob(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
-  return {
-    job_id: "job-1",
-    configuration: "kitchen.yaml",
+  return makeFirmwareJob({
     job_type: JobType.INSTALL,
     status: JobStatus.FAILED,
-    created_at: "2026-01-01T00:00:00Z",
-    started_at: null,
-    completed_at: null,
-    exit_code: null,
-    output: [],
     error: "",
-    port: "OTA",
-    new_name: "",
-    depends_on: "",
-    progress: null,
-    source: JobSource.LOCAL,
-    source_pin_sha256: "",
-    source_label: "",
-    source_esphome_version: "",
-    remote_peer: "",
-    remote_peer_label: "",
-    device_name: "",
-    device_friendly_name: "",
     ...overrides,
-  };
+  });
 }
 
 interface Host {
