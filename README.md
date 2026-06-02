@@ -86,6 +86,44 @@ python3 -m build --wheel
 | `npm run test:watch` | Run tests in watch mode                |
 | `npm run format`     | Format `src/` with Prettier            |
 
+## Translations
+
+`src/translations/en.json` is the English source of truth and the **only translation file committed to the repo**. Every other locale lives in [Lokalise](https://lokalise.com/); those files are gitignored and pulled on demand with a small TypeScript tool at `build-scripts/translations.ts` (run directly by Node — no build step).
+
+```bash
+# Push new/changed English keys up to Lokalise as the base language.
+npm run translations:upload
+
+# Pull the latest translations into src/translations/ (for local dev).
+npm run translations:download
+```
+
+Both commands read `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` from the environment. `upload` only adds keys — it never overwrites translator edits; pass `npm run translations:upload -- --cleanup` to also delete Lokalise keys that no longer exist in `en.json`. `download` pulls every language the project has, writes each one except English verbatim, and omits untranslated keys so the runtime English fallback in `localize.ts` stays in effect.
+
+The frontend loader (`src/common/localize.ts`) discovers whatever locale files are present at build time via `import.meta.webpackContext` — there's no hardcoded locale list. A checkout with no download (or a build before the secrets are set) simply ships English-only; the missing files are not an error. Locale codes are matched separator- and case-insensitively, so Lokalise's `fr` / `zh_CN` filenames resolve against the browser's BCP 47 `fr-FR` / `zh-CN` tags without any per-locale mapping.
+
+In CI this is automated by:
+
+- `translations-upload.yml` — pushes to Lokalise whenever `en.json` lands on `main`.
+- `release.yml` — downloads translations before bundling so the released wheel ships every locale.
+
+There's no scheduled download workflow: because the locale files are gitignored, there's nothing to commit back to `main`. The translations only need to exist at build time, and `release.yml` pulls them fresh for the wheel; locally, run `npm run translations:download` whenever you want to work against the latest copy.
+
+The workflows need the `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` repository secrets. **Adding a new locale is just a Lokalise change** — translate it there and the next download picks it up automatically. The language picker is fully data-driven: each translation file carries its own display name and flag in the top-level `language` (autonym, e.g. `Français`) and `flag` (emoji, e.g. `🇫🇷`) keys, so a new locale shows up named and flagged with no code change. If those keys are missing for a locale, the picker falls back to the raw code and a placeholder flag.
+
+### Thanks to Lokalise
+
+Translations are managed with [Lokalise](https://lokalise.com/), who generously provide their localization platform to the project free of charge. Thank you for supporting open source and helping bring the dashboard to more people in their own language.
+
+<p>
+  <a href="https://lokalise.com/">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="docs/lokalise-logo-dark.svg">
+      <img alt="Lokalise" src="docs/lokalise-logo-light.svg" width="280">
+    </picture>
+  </a>
+</p>
+
 ## Project structure
 
 ```
@@ -99,7 +137,7 @@ src/
 ├── common/         # i18n / localization
 ├── util/           # Helpers (debounce, YAML parsing, icons, ...)
 ├── styles/         # Theme and shared styles
-├── translations/   # Language files (en, fr, nl)
+├── translations/   # Language files (only en.json committed; rest from Lokalise)
 └── entrypoint.ts   # App bootstrap
 
 public/
@@ -148,7 +186,7 @@ These rules apply to all new code in `src/`. Existing files that pre-date them a
 ### Localization
 
 - All user-facing strings go through `_localize(key)` from `src/common/localize.ts`.
-- New keys added to `en.json` must land in `fr.json` and `nl.json` in the same PR — the i18n machinery falls back to English silently, which mixes languages in non-English UIs.
+- Add new keys to `en.json` only — it's the source of truth and the sole committed locale. Translations are managed in Lokalise (see [Translations](#translations)), not hand-edited in the PR: `translations:upload` pushes the new keys, translators fill them in, and `translations:download` brings them back. Until then the i18n machinery falls back to English for the missing keys.
 
 ### Comments
 
