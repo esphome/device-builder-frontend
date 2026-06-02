@@ -176,6 +176,10 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
         host._commandType === "install" &&
         finished?.job_type === JobType.COMPILE
       ) {
+        // The held UPLOAD is created at install time (#1131); its job_queued is
+        // ordered ahead of this compile's job_completed on the shared WS, so it
+        // is normally already in _jobs. A miss is therefore a real backend gap,
+        // not a still-arriving event for a legitimately-running install.
         const upload = [...host._jobs.values()].find(
           (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
         );
@@ -186,8 +190,7 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           primeAndFollow(host, upload);
           return;
         }
-        // Compile succeeded but there's no upload step — the device was never
-        // flashed, so don't report success (a real backend/transport gap).
+        // No upload step — the device was never flashed, so don't report success.
         console.warn("install compile succeeded but no dependent upload for job", jobId);
         host._state = "error";
         host._statusMessage = host._localize("command.install_failed");
