@@ -417,6 +417,17 @@ export class ESPHomeYamlEditor extends LitElement {
 
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
+      // Initial population: the editor mounted empty (default `value`
+      // is "") before the device YAML loaded async, so the first
+      // non-empty value arrives here. Dispatching it would record an
+      // undoable empty→content step, letting Ctrl+Z unwind to a blank
+      // editor (#1150). Remount instead so the loaded YAML is the
+      // document baseline with fresh history — same reset the
+      // configuration-change branch above uses.
+      if (current === "" && this.value !== "") {
+        this._remountEditor();
+        return;
+      }
       if (current !== this.value) {
         // Same-document patch (section-editor save, …).
         //
