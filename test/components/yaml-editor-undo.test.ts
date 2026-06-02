@@ -7,7 +7,7 @@
  */
 import { undo, undoDepth } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ESPHomeYamlEditor } from "../../src/components/yaml-editor.js";
 
@@ -60,5 +60,24 @@ describe("yaml-editor undo baseline (#1150)", () => {
     // And undo still works (no wiped stack).
     undo(view);
     expect(view.state.doc.toString()).not.toBe("logger:\n");
+  });
+
+  it("still scrolls to the highlight when value + highlightRange load in one cycle", async () => {
+    const el = await mount(); // empty
+    const spy = vi.spyOn(
+      el as unknown as { _scrollToHighlight: () => void },
+      "_scrollToHighlight"
+    );
+
+    // Deep-link load: page sets YAML, highlightRange and scrollToHighlight
+    // together. The initial-load remount early-returns before the
+    // highlightRange branch, so the scroll must run via _mountEditor.
+    el.value = "a\nb\nc\nd\ne\n";
+    el.highlightRange = { fromLine: 4, toLine: 4 };
+    el.scrollToHighlight = true;
+    await el.updateComplete;
+
+    expect(viewOf(el).state.doc.toString()).toBe("a\nb\nc\nd\ne\n");
+    expect(spy).toHaveBeenCalled();
   });
 });

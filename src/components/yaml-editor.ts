@@ -348,10 +348,27 @@ export class ESPHomeYamlEditor extends LitElement {
       parent: this._container,
     });
 
-    // Apply any pending highlight after mount
+    // Apply any pending highlight after mount. The remount paths in
+    // `updated()` (config change, initial-load baseline) early-return
+    // before the `highlightRange` branch, so a same-cycle deep-link
+    // (`?line=N` sets value + highlightRange together) relies on this
+    // to mark *and* scroll to the requested line.
     if (this.highlightRange) {
       this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
+      this._scrollToHighlight();
     }
+  }
+
+  /** Scroll the current highlight into view when `scrollToHighlight`. */
+  private _scrollToHighlight() {
+    if (!this._view || !this.highlightRange || !this.scrollToHighlight) return;
+    const line = Math.max(1, this.highlightRange.fromLine);
+    const pos = this._view.state.doc.line(
+      Math.min(line, this._view.state.doc.lines)
+    ).from;
+    this._view.dispatch({
+      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+    });
   }
 
   /**
@@ -499,15 +516,7 @@ export class ESPHomeYamlEditor extends LitElement {
 
     if (changed.has("highlightRange") && this._view) {
       this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
-      if (this.highlightRange && this.scrollToHighlight) {
-        const line = Math.max(1, this.highlightRange.fromLine);
-        const pos = this._view.state.doc.line(
-          Math.min(line, this._view.state.doc.lines)
-        ).from;
-        this._view.dispatch({
-          effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
-        });
-      }
+      this._scrollToHighlight();
     }
 
     if (changed.has("revealSensitive") && this._view) {
