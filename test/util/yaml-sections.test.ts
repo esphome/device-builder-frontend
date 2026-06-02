@@ -707,14 +707,19 @@ describe("parseYamlAutomations", () => {
     expect(ids).toEqual(["sensor_0", "sensor_1"]);
   });
 
-  it("leaves a flat single-instance block's on_* unscoped", () => {
+  it("scopes an id-less flat singleton's on_* to its domain", () => {
+    // Flat singleton (no list items) → addressed by the domain name,
+    // mirroring the backend's singleton_component_id (#1139).
     const yaml = `wifi:
   on_connect:
     - logger.log: "up"
 `;
     const [entry] = parseYamlAutomations(yaml);
-    expect(entry.key).toBe("automation:unscoped:on_connect:2");
-    expect(entry.id).toBeUndefined();
+    expect(entry.key).toBe("automation:component_on:wifi:on_connect");
+    expect(entry.id).toBe("wifi");
+    // parentKey carries the domain so the trigger catalog (keyed
+    // ``<domain>.<event>``) resolves the pretty name.
+    expect(entry.parentKey).toBe("wifi");
   });
 
   it("scopes a direct on_value on a single-value sensor", () => {
@@ -778,12 +783,9 @@ describe("parseYamlAutomations", () => {
     expect(entry?.id).toBeUndefined();
   });
 
-  it("leaves a flat block with an explicit id unscoped (backend addresses lists only)", () => {
-    // ``sun:`` is a flat single-instance component that can carry an ``id:``
-    // and host ``on_sunrise:`` — but the backend only resolves inline
-    // handlers under list domains, so the shortcut gate and the parser must
-    // both treat it as unscoped rather than emitting a component_on the
-    // backend can't address.
+  it("scopes a flat block's on_* to its declared id", () => {
+    // ``sun:`` is a flat singleton hosting ``on_sunrise:``; with backend
+    // flat-component support (#1139) it's addressable by its ``id:``.
     const yaml = `sun:
   id: my_sun
   latitude: 0°
@@ -792,8 +794,9 @@ describe("parseYamlAutomations", () => {
     - logger.log: "up"
 `;
     const [entry] = parseYamlAutomations(yaml);
-    expect(entry.key).toBe("automation:unscoped:on_sunrise:5");
-    expect(entry.id).toBeUndefined();
+    expect(entry.key).toBe("automation:component_on:my_sun:on_sunrise");
+    expect(entry.id).toBe("my_sun");
+    expect(entry.parentKey).toBe("sun");
   });
 });
 
@@ -834,19 +837,19 @@ describe("instanceComponentId", () => {
     expect(componentIdAt(yaml, 5)).toBe("switch_2");
   });
 
-  it("returns null for a flat single-instance block", () => {
+  it("resolves an id-less flat singleton block to its domain", () => {
     const yaml = `wifi:
   ssid: home
 `;
-    expect(componentIdAt(yaml, 1)).toBeNull();
+    expect(componentIdAt(yaml, 1)).toBe("wifi");
   });
 
-  it("returns null for a flat block even when it declares an explicit id", () => {
+  it("resolves a flat block with an explicit id to that id", () => {
     const yaml = `sun:
   id: my_sun
   latitude: 0°
 `;
-    expect(componentIdAt(yaml, 1)).toBeNull();
+    expect(componentIdAt(yaml, 1)).toBe("my_sun");
   });
 
   it("indexes by fromLine order, not object identity (reconstructed match still resolves)", () => {
