@@ -53,7 +53,7 @@ describe("clone-device-dialog ENTER", () => {
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps Enter reachable after close() until wa-after-hide", async () => {
+  it("keeps Enter reachable after close() until after-hide", async () => {
     // The empty/same/invalid checks are not idempotency guards (they pass
     // identically on the repeat); the listener detaches in _onAfterHide, not
     // close(), so the _resolved latch is the only thing stopping a second
@@ -67,11 +67,10 @@ describe("clone-device-dialog ENTER", () => {
     input.value = "kitchen";
     input.dispatchEvent(new Event("input"));
     await el.updateComplete;
-    pressEnter(); // confirms and runs close(), but wa-after-hide hasn't fired
-    const dialog = el.shadowRoot!.querySelector<HTMLElement & { open: boolean }>(
-      "wa-dialog"
-    )!;
-    expect(dialog.open).toBe(false);
+    pressEnter(); // confirms and runs close(), but after-hide hasn't fired
+    // close() flips the reactive _open flag; the base-dialog is still hiding
+    // (after-hide not yet fired) so the EnterController listener stays bound.
+    expect((el as unknown as { _open: boolean })._open).toBe(false);
     pressEnter(); // listener still bound; stopped only by the latch
     expect(onConfirm).toHaveBeenCalledTimes(1);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,5 +87,39 @@ describe("clone-device-dialog ENTER", () => {
     el.addEventListener("clone-confirm", onConfirm as EventListener);
     pressEnter();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Regression coverage for the esphome-base-dialog migration (#549).
+ *
+ * The migration swapped the imperative ``dialog.open`` for a reactive
+ * ``_open`` flag, so the open/close contract is the part most likely to
+ * silently regress. esphome-base-dialog never mutates its own ``open`` on
+ * a user close, so the host must flip ``_open`` itself in ``_onRequestClose``
+ * (Escape / X / backdrop) — otherwise a re-render would re-assert ``?open``
+ * and the dialog could never dismiss.
+ */
+describe("clone-device-dialog base-dialog open contract", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("open() / close() drive the reactive _open flag", async () => {
+    const el = await mount();
+    const view = el as unknown as { _open: boolean };
+    el.open("source");
+    expect(view._open).toBe(true);
+    el.close();
+    expect(view._open).toBe(false);
+  });
+
+  it("_onRequestClose flips the reactive open flag", async () => {
+    const el = await mount();
+    const view = el as unknown as { _open: boolean; _onRequestClose: () => void };
+    el.open("source");
+    expect(view._open).toBe(true);
+    view._onRequestClose();
+    expect(view._open).toBe(false);
   });
 });
