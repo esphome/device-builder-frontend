@@ -31,11 +31,13 @@ const FLAG_FALLBACK = "🏳️";
 // so this is defensive: hyphenate then run through Intl for canonical casing,
 // falling back to the raw hyphenated form for anything Intl rejects.
 //
-// Intentionally duplicated from build-scripts/translations-lib.ts and
-// src/common/localize.ts (the bodies are byte-identical). It is NOT shared
-// because this is a CommonJS build-time script that can't `require` the `.ts`
-// ESM lib without a loader, and the frontend bundle can't import from
-// build-scripts/. Keep the three copies in sync if you ever change one.
+// Intentionally duplicated from build-scripts/translations-lib.ts (the
+// bodies are byte-identical). It is NOT shared because this is a CommonJS
+// build-time script that can't `require` that `.ts` ESM module without a
+// loader. Keep the two copies in sync if you ever change one. (The runtime
+// localizer no longer needs its own copy: it derives AVAILABLE_LOCALES from
+// this manifest, which is already canonical, and the download tool
+// canonicalizes filenames at the write boundary.)
 const toBcp47 = (stem) => {
   const hyphenated = stem.replace(/_/g, "-");
   try {
