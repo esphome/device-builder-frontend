@@ -9,6 +9,7 @@ import {
   computeAreaFacet,
   computePlatformFacet,
   computeStateFacet,
+  computeUpdateFacet,
 } from "../../util/facets.js";
 import "../facets/facet-filter.js";
 import "./filters-menu.js";
@@ -30,28 +31,32 @@ export function renderLabelsFilter(host: ESPHomePageDashboard): TemplateResult {
   ></esphome-labels-filter>`;
 }
 
-/** Facets row — sits next to the view toggle in the toolbar and
- *  carries one pill per active facet dimension. The labels pill
- *  always renders (its popover is the create path even when the
- *  catalog is empty); area / platform / status only render when
- *  the configured-device list has at least one usable value to
+/** Facets row — every facet pill collapses into a single "Filters"
+ *  button + popover so the toolbar stays one line regardless of how
+ *  many facets or selections are active (an inline pill row overflows
+ *  once selection badges widen the pills). The labels pill always
+ *  renders inside the popover (its popover is the create path even
+ *  when the catalog is empty); area / platform / status only render
+ *  when the configured-device list has at least one usable value to
  *  filter by, so a fresh dashboard with a single-platform fleet
- *  doesn't sprout an empty / single-bucket pill that adds no
- *  signal.
+ *  doesn't sprout an empty / single-bucket pill that adds no signal.
  *
- *  In YAML-search mode the *labels* and *status* facets are
- *  suppressed — labels are device metadata (not in the YAML) and
- *  online/offline is runtime state (also not in the YAML), so
- *  filtering YAML matches by either is misleading. Area and
- *  platform stay because both come from the YAML itself.
- *
- *  On a narrow toolbar (``host._collapseFilters``, at/below 1100px)
- *  the pills collapse into a single "Filters" button + popover so the
- *  row stays one line instead of wrapping on tablets/pads. */
+ *  In YAML-search mode the *labels*, *status*, and *updates*
+ *  facets are suppressed — labels are device metadata (not in the
+ *  YAML), and online/offline plus update/modified state are runtime
+ *  (also not in the YAML), so filtering YAML matches by any of them
+ *  is misleading. Area and platform stay because both come from the
+ *  YAML itself. The updates facet additionally renders only when the
+ *  fleet has something to update (no 0/0 noise pill). */
 export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
   const areaOptions = computeAreaFacet(host._devices);
   const platformOptions = computePlatformFacet(host._devices);
   const stateOptions = computeStateFacet(host._devices, host._localize);
+  const updateOptions = computeUpdateFacet(
+    host._devices,
+    host._localize,
+    host._selectedUpdateStatus
+  );
   const multiSelectedLabel = host._localize("dashboard.filter_multi_selected", {
     count: "{count}",
   });
@@ -101,46 +106,39 @@ export function renderFacets(host: ESPHomePageDashboard): TemplateResult {
             host._selectedStates = e.detail;
           }}
         ></esphome-facet-filter>`}
+    ${!yamlMode && updateOptions.length > 0
+      ? html`<esphome-facet-filter
+          name=${host._localize("dashboard.filter_update_status")}
+          clear-label=${clearLabel}
+          multi-selected-label=${multiSelectedLabel}
+          .options=${updateOptions}
+          .selected=${host._selectedUpdateStatus}
+          @facet-change=${(e: CustomEvent<string[]>) => {
+            host._selectedUpdateStatus = e.detail;
+          }}
+        ></esphome-facet-filter>`
+      : nothing}
   `;
 
-  if (host._collapseFilters) {
-    // Badge / "Clear all" track facet selections only; a lone active
-    // search term is cleared from the search box's own clear control,
-    // not surfaced here.
-    return html`
-      <div class="filter-group">
-        <esphome-filters-menu
-          .activeCount=${host._activeFacetCount}
-          button-label=${host._localize("dashboard.filter_menu_button")}
-          clear-label=${clearLabel}
-          count-label=${host._localize(
-            host._activeFacetCount === 1
-              ? "dashboard.filter_menu_active_singular"
-              : "dashboard.filter_menu_active_plural",
-            { count: String(host._activeFacetCount) }
-          )}
-          @clear-filters=${host._clearAllFilters}
-        >
-          ${facetPills}
-        </esphome-filters-menu>
-      </div>
-    `;
-  }
-
+  // Badge / "Clear all" track facet selections only; a lone active
+  // search term is cleared from the search box's own clear control,
+  // not surfaced here.
   return html`
     <div class="filter-group">
-      ${facetPills}
-      ${host._hasActiveFilters
-        ? html`<button
-            class="filter-clear"
-            type="button"
-            title=${clearLabel}
-            @click=${host._clearAllFilters}
-          >
-            <wa-icon library="mdi" name="filter-remove-outline"></wa-icon>
-            ${clearLabel}
-          </button>`
-        : nothing}
+      <esphome-filters-menu
+        .activeCount=${host._activeFacetCount}
+        button-label=${host._localize("dashboard.filter_menu_button")}
+        clear-label=${clearLabel}
+        count-label=${host._localize(
+          host._activeFacetCount === 1
+            ? "dashboard.filter_menu_active_singular"
+            : "dashboard.filter_menu_active_plural",
+          { count: String(host._activeFacetCount) }
+        )}
+        @clear-filters=${host._clearAllFilters}
+      >
+        ${facetPills}
+      </esphome-filters-menu>
     </div>
   `;
 }

@@ -4,7 +4,6 @@ import {
   mdiCheckboxMultipleMarkedOutline,
   mdiClipboardTextSearchOutline,
   mdiCodeBraces,
-  mdiFilterRemoveOutline,
   mdiMagnify,
   mdiPlus,
   mdiTable,
@@ -95,6 +94,7 @@ import { espHomeStyles } from "../styles/shared.js";
 import { readDashboardUrl, writeDashboardUrl } from "../util/dashboard-url.js";
 import { matchesDeviceName, matchesMacAddress } from "../util/device-search.js";
 import { DEVICE_SORT_COLLATOR, deviceSortKey } from "../util/device-sort.js";
+import { UPDATE_FACET_BUCKETS, UPDATE_FACET_PREDICATES } from "../util/facets.js";
 import { computeLabelUsage } from "../util/label-usage.js";
 import { navigate } from "../util/navigation.js";
 import { consumePendingHighlight } from "../util/pending-highlight.js";
@@ -141,7 +141,6 @@ registerMdiIcons({
   "checkbox-multiple-marked-outline": mdiCheckboxMultipleMarkedOutline,
   "clipboard-text-search-outline": mdiClipboardTextSearchOutline,
   "code-braces": mdiCodeBraces,
-  "filter-remove-outline": mdiFilterRemoveOutline,
   magnify: mdiMagnify,
   plus: mdiPlus,
   "view-grid": mdiViewGrid,
@@ -207,6 +206,11 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _selectedPlatforms: string[] = [];
   /** ``DeviceState`` values selected in the Status facet. */
   @state() _selectedStates: string[] = [];
+  /** Update-status buckets (``update_available`` / ``modified``)
+   *  selected in the Updates facet. AND semantics — a device must
+   *  satisfy every selected bucket — so selecting both narrows to
+   *  devices that are both update-available and modified. */
+  @state() _selectedUpdateStatus: string[] = [];
   @state() _yamlMode = false;
   @state() _yamlPreviewCount = 0;
   _yamlSearch = new YamlSearchController(this, () => this._api);
@@ -227,16 +231,6 @@ export class ESPHomePageDashboard extends LitElement {
   @state() _tablePageSize = 25;
   @state() _tableSorting: SortingState | null = null;
   @state() _tableColumnVisibility: VisibilityState | null = null;
-
-  /** At/below 1100px the facet pills no longer fit inline (they widen
-   *  further once they carry selection badges), so they collapse into
-   *  the "Filters" menu. matchMedia, not CSS, so we render one set of
-   *  facets rather than a hidden duplicate. */
-  @state() _collapseFilters = false;
-  private _mql = window.matchMedia("(max-width: 1100px)");
-  private _onMqlChange = (e: MediaQueryListEvent) => {
-    this._collapseFilters = e.matches;
-  };
 
   private _adoptHighlightTimer: ReturnType<typeof setTimeout> | null = null;
   _pendingAdoptScroll: string | null = null;
@@ -327,8 +321,6 @@ export class ESPHomePageDashboard extends LitElement {
     this._hydrateFromUrl();
     this.setAttribute("view", this._view);
     this.toggleAttribute("yaml", this._yamlMode);
-    this._collapseFilters = this._mql.matches;
-    this._mql.addEventListener("change", this._onMqlChange);
     this._showIgnored = localStorage.getItem("esphome-show-ignored") === "true";
     window.addEventListener("esphome-serial-setup", this._onSerialSetup);
     window.addEventListener("esphome-show-ignored-changed", this._onShowIgnoredChanged);
@@ -359,6 +351,13 @@ export class ESPHomePageDashboard extends LitElement {
     if (urlState.areas !== undefined) this._selectedAreas = urlState.areas;
     if (urlState.platforms !== undefined) this._selectedPlatforms = urlState.platforms;
     if (urlState.states !== undefined) this._selectedStates = urlState.states;
+    if (urlState.updates !== undefined) {
+      // Normalize the user-editable URL to known buckets in canonical
+      // order, deduped — so unknown or duplicate ids can't inflate the
+      // active-filter count or render duplicate badges.
+      const requested = new Set(urlState.updates);
+      this._selectedUpdateStatus = UPDATE_FACET_BUCKETS.filter((b) => requested.has(b));
+    }
     if (urlState.view !== undefined) this._view = urlState.view;
     if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;
 
@@ -393,6 +392,7 @@ export class ESPHomePageDashboard extends LitElement {
     "_selectedAreas",
     "_selectedPlatforms",
     "_selectedStates",
+    "_selectedUpdateStatus",
     "_view",
     "_yamlMode",
   ] as const;
@@ -414,6 +414,7 @@ export class ESPHomePageDashboard extends LitElement {
       areas: this._selectedAreas,
       platforms: this._selectedPlatforms,
       states: this._selectedStates,
+      updates: this._selectedUpdateStatus,
       view: this._view,
       yaml: this._yamlMode,
     });
@@ -421,7 +422,6 @@ export class ESPHomePageDashboard extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback();
-    this._mql.removeEventListener("change", this._onMqlChange);
     window.removeEventListener("esphome-serial-setup", this._onSerialSetup);
     window.removeEventListener(
       "esphome-show-ignored-changed",
@@ -560,7 +560,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels.length > 0 ||
       this._selectedAreas.length > 0 ||
       this._selectedPlatforms.length > 0 ||
-      this._selectedStates.length > 0
+      this._selectedStates.length > 0 ||
+      this._selectedUpdateStatus.length > 0
     );
   }
 
@@ -571,7 +572,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels.length +
       this._selectedAreas.length +
       this._selectedPlatforms.length +
-      this._selectedStates.length
+      this._selectedStates.length +
+      this._selectedUpdateStatus.length
     );
   }
 
@@ -585,18 +587,19 @@ export class ESPHomePageDashboard extends LitElement {
     this._selectedAreas = [];
     this._selectedPlatforms = [];
     this._selectedStates = [];
+    this._selectedUpdateStatus = [];
     this._syncYamlSearch();
   };
 
-  /** Apply every active facet filter to the device list. Labels
-   *  use AND semantics (a device must carry every selected label,
-   *  the original "drill down by tag stack" behaviour we shipped
-   *  with the labels filter); area, platform, and status use OR
-   *  within the facet and AND across facets, the conventional
-   *  faceted-search shape.
+  /** Apply every active facet filter to the device list. Labels and
+   *  update-status use AND semantics (labels: a device must carry
+   *  every selected label, the original "drill down by tag stack";
+   *  updates: a device must satisfy every selected bucket); area,
+   *  platform, and status use OR within the facet and AND across
+   *  facets, the conventional faceted-search shape.
    *
-   *  Memoised on the five upstream references (``devices`` plus
-   *  the four selection arrays) so the two callers inside one
+   *  Memoised on the six upstream references (``devices`` plus
+   *  the five selection arrays) so the two callers inside one
    *  render cycle (``render()`` and ``_currentlyVisibleConfigurations``)
    *  share a single filter pass. Lit's reactive @state pattern
    *  hands out new array references on every selection change,
@@ -608,7 +611,8 @@ export class ESPHomePageDashboard extends LitElement {
       selectedLabels: string[],
       selectedAreas: string[],
       selectedPlatforms: string[],
-      selectedStates: string[]
+      selectedStates: string[],
+      selectedUpdateStatus: string[]
     ): ConfiguredDevice[] => {
       let out = devices;
       if (selectedLabels.length > 0) {
@@ -631,6 +635,16 @@ export class ESPHomePageDashboard extends LitElement {
         const set = new Set(selectedStates);
         out = out.filter((d) => set.has(d.state));
       }
+      if (selectedUpdateStatus.length > 0) {
+        // AND / narrowing: a device must satisfy every selected
+        // bucket (mirrors the labels facet, not the OR facets above).
+        const set = new Set(selectedUpdateStatus);
+        out = out.filter((d) =>
+          UPDATE_FACET_BUCKETS.every(
+            (id) => !set.has(id) || UPDATE_FACET_PREDICATES[id](d)
+          )
+        );
+      }
       return out;
     }
   );
@@ -641,7 +655,8 @@ export class ESPHomePageDashboard extends LitElement {
       this._selectedLabels,
       this._selectedAreas,
       this._selectedPlatforms,
-      this._selectedStates
+      this._selectedStates,
+      this._selectedUpdateStatus
     );
   }
 

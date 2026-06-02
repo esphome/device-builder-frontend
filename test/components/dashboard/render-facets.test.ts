@@ -1,10 +1,10 @@
 /**
  * @vitest-environment happy-dom
  *
- * Pins the responsive switch in renderFacets: mobile collapses the
- * facet pills into a single <esphome-filters-menu>; desktop renders
- * the inline pill row plus a trailing "Clear filters" button that
- * appears only when something is filtered and calls _clearAllFilters.
+ * Pins renderFacets: every facet pill collapses into a single
+ * <esphome-filters-menu> (no inline pill row), the menu's count-label
+ * picks the singular/plural key off the active count, and the Updates
+ * pill only renders when the fleet has something to update.
  */
 import { render } from "lit";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,9 +15,9 @@ import { renderFacets } from "../../../src/components/dashboard/render-facets.js
 import type { ESPHomePageDashboard } from "../../../src/pages/dashboard.js";
 
 // Minimal host-shaped fake. Empty _devices means the Area/Platform/
-// Status facets compute no options and self-suppress, so the inline
-// row reduces to the always-present labels pill — enough to assert the
-// wrapper choice and the clear button without standing up the page.
+// Status facets compute no options and self-suppress, so the menu
+// reduces to the always-present labels pill — enough to assert the
+// wrapper choice without standing up the page.
 function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     _devices: [],
@@ -27,7 +27,7 @@ function makeHost(overrides: Partial<Record<string, unknown>> = {}) {
     _selectedAreas: [],
     _selectedPlatforms: [],
     _selectedStates: [],
-    _collapseFilters: false,
+    _selectedUpdateStatus: [],
     _activeFacetCount: 0,
     _hasActiveFilters: false,
     _clearAllFilters: vi.fn(),
@@ -43,50 +43,63 @@ function renderInto(host: ESPHomePageDashboard): HTMLElement {
   return container;
 }
 
-describe("renderFacets responsive layout", () => {
+describe("renderFacets", () => {
   afterEach(() => {
     document.body.innerHTML = "";
   });
 
-  it("collapses to the Filters menu on a narrow toolbar", () => {
-    const host = makeHost({ _collapseFilters: true, _activeFacetCount: 2 });
-    const container = renderInto(host);
+  it("collapses every facet into a single Filters menu", () => {
+    const container = renderInto(makeHost({ _activeFacetCount: 2 }));
     expect(container.querySelector("esphome-filters-menu")).not.toBeNull();
-    // The inline desktop clear button is not used in the collapsed layout.
+    // No inline pill row / clear button — the menu owns clearing.
     expect(container.querySelector(".filter-clear")).toBeNull();
   });
 
   // _localize is stubbed to echo its key, so the count-label attribute
   // reveals which singular/plural key was chosen.
   it("uses the singular count label for exactly one active facet", () => {
-    const host = makeHost({ _collapseFilters: true, _activeFacetCount: 1 });
-    const menu = renderInto(host).querySelector("esphome-filters-menu");
+    const menu = renderInto(makeHost({ _activeFacetCount: 1 })).querySelector(
+      "esphome-filters-menu"
+    );
     expect(menu?.getAttribute("count-label")).toBe(
       "dashboard.filter_menu_active_singular"
     );
   });
 
   it("uses the plural count label for multiple active facets", () => {
-    const host = makeHost({ _collapseFilters: true, _activeFacetCount: 3 });
-    const menu = renderInto(host).querySelector("esphome-filters-menu");
+    const menu = renderInto(makeHost({ _activeFacetCount: 3 })).querySelector(
+      "esphome-filters-menu"
+    );
     expect(menu?.getAttribute("count-label")).toBe("dashboard.filter_menu_active_plural");
   });
 
-  it("renders inline pills with no clear button when nothing is filtered", () => {
-    const host = makeHost({ _collapseFilters: false, _hasActiveFilters: false });
-    const container = renderInto(host);
-    expect(container.querySelector("esphome-filters-menu")).toBeNull();
-    expect(container.querySelector(".filter-group")).not.toBeNull();
-    expect(container.querySelector(".filter-clear")).toBeNull();
+  // _localize echoes its key, so the Updates pill is identifiable by its
+  // name attribute. Empty _devices means the fleet is current.
+  const updatesPill = (root: HTMLElement) =>
+    [...root.querySelectorAll("esphome-facet-filter")].find(
+      (el) => el.getAttribute("name") === "dashboard.filter_update_status"
+    );
+
+  it("renders the Updates pill when a device needs an update", () => {
+    const host = makeHost({ _devices: [{ update_available: true }] });
+    expect(updatesPill(renderInto(host))).not.toBeUndefined();
   });
 
-  it("shows the clear button on desktop when filters are active", () => {
-    const host = makeHost({ _collapseFilters: false, _hasActiveFilters: true });
-    const container = renderInto(host);
-    const clearBtn = container.querySelector<HTMLButtonElement>(".filter-clear");
-    expect(clearBtn).not.toBeNull();
+  it("suppresses the Updates pill when the fleet is current", () => {
+    const host = makeHost({ _devices: [] });
+    expect(updatesPill(renderInto(host))).toBeUndefined();
+  });
 
-    clearBtn!.click();
-    expect(host._clearAllFilters).toHaveBeenCalledTimes(1);
+  it("keeps the Updates pill when a filter is selected but the fleet is current", () => {
+    const host = makeHost({ _devices: [], _selectedUpdateStatus: ["update_available"] });
+    expect(updatesPill(renderInto(host))).not.toBeUndefined();
+  });
+
+  it("suppresses the Updates pill in YAML-search mode", () => {
+    const host = makeHost({
+      _devices: [{ has_pending_changes: true }],
+      _yamlMode: true,
+    });
+    expect(updatesPill(renderInto(host))).toBeUndefined();
   });
 });

@@ -297,9 +297,7 @@ export const dashboardStyles = css`
     row-gap: var(--wa-space-xs);
   }
 
-  /* Facet pills cluster inline with the view-toggle. flex-wrap
-     lets pills flow onto a second row of their own if too many
-     accumulate (large fleets with several areas / platforms). */
+  /* Wraps the Filters-menu button in the toolbar control strip. */
   .filter-group {
     display: inline-flex;
     align-items: center;
@@ -308,43 +306,6 @@ export const dashboardStyles = css`
     row-gap: var(--wa-space-2xs);
     flex-shrink: 1;
     min-width: 0;
-  }
-
-  /* Trailing "Clear filters" action on the desktop facet row. Shares the
-     toolbar control height so the strip stays aligned, but stays quiet
-     (borderless, muted) so it doesn't read as another facet pill. */
-  .filter-clear {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    height: var(--esphome-control-height);
-    padding: 0 10px;
-    border: none;
-    border-radius: var(--wa-border-radius-m);
-    background: transparent;
-    color: var(--wa-color-text-quiet);
-    font-family: inherit;
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-semibold, 600);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition:
-      background-color 0.12s,
-      color 0.12s;
-  }
-
-  .filter-clear wa-icon {
-    font-size: 16px;
-  }
-
-  .filter-clear:hover {
-    color: var(--esphome-primary);
-    background: var(--esphome-tint);
-  }
-
-  .filter-clear:focus-visible {
-    outline: none;
-    box-shadow: var(--esphome-focus-ring-tight);
   }
 
   /* The <form role="search"> wrapper is what suppresses Chrome's

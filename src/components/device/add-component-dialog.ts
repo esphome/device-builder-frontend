@@ -385,18 +385,29 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // not retarget the form to a dep after the user submitted.
     this._depNavSeq++;
     try {
-      const { yaml } = await this._api.addComponent(this.configuration, {
-        component_id: this._selected.id,
-        fields: e.detail.fields,
-      });
+      // Merge into the editor's current draft so unsaved edits survive;
+      // the backend returns the merged YAML without persisting (it saves
+      // via the normal Save flow). Only send the draft when it's actually
+      // loaded — `yaml` defaults to "" before the config arrives, and
+      // merging into "" would drop the on-disk config, so an empty draft
+      // omits the arg and the backend falls back to the on-disk YAML.
+      const { yaml } = await this._api.addComponent(
+        this.configuration,
+        {
+          component_id: this._selected.id,
+          fields: e.detail.fields,
+        },
+        this.yaml || undefined
+      );
 
-      // Notify the host so the page re-fetches / re-renders with the
-      // new YAML. We dispatch this BEFORE deciding whether to close —
-      // when restoring `_returnTo` the dialog stays open, but we still
-      // need the device to know the YAML changed (so the dependency
-      // we just added shows up in the original component's dropdown).
+      // Surface the merged YAML as an unsaved draft. We dispatch this
+      // BEFORE deciding whether to close — when restoring `_returnTo`
+      // the dialog stays open, but the device still needs the new YAML
+      // (so the dependency we just added shows up in the original
+      // component's dropdown). `yaml-draft` advances only the working
+      // buffer, leaving the dirty flag on so the user saves explicitly.
       this.dispatchEvent(
-        new CustomEvent("yaml-updated", {
+        new CustomEvent("yaml-draft", {
           detail: { yaml },
           bubbles: true,
           composed: true,
@@ -439,7 +450,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
       } else if (this._bundleQueue.length > 0 && this._bundleProgress) {
         // Bundle in flight — pop the next featured id and refresh the
         // form for it. The just-updated `this.yaml` (carried in via
-        // the `yaml-updated` event) is still authoritative for the
+        // the `yaml-draft` event) is still authoritative for the
         // next step's ID-reference dropdown, since the host re-binds
         // it on re-render.
         const nextId = this._bundleQueue[0];
