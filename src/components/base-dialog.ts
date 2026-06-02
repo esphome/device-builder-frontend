@@ -75,13 +75,14 @@ import { centeredMobileDialog } from "../styles/dialog-mobile.js";
  *
  * **Slots**:
  *
- * - Default slot: dialog body. Consumers put their form
- *   fields, error banner, and actions row inline here.
- *   The wrapper doesn't impose a ``slot="footer"`` because
- *   most existing dialogs render the actions row as a
- *   plain ``<div class="actions">`` at the end of the
- *   body, and forcing them to migrate to a slotted footer
- *   would balloon the diff for no behaviour change.
+ * - Default slot: dialog body. Most dialogs render their form
+ *   fields, error banner, and actions row inline here (a plain
+ *   ``<div class="actions">`` at the end of the body), so the
+ *   default slot is all they need.
+ * - ``footer`` slot: forwarded to ``wa-dialog``'s footer for the
+ *   dialogs that do use a pinned footer row (e.g. the onboarding
+ *   wizard). Empty by default; dialogs that hide the footer via
+ *   ``::part(footer) { display: none }`` are unaffected.
  * - ``header-suffix`` slot: inline content after the title
  *   (e.g. a status chip). Empty by default, so other dialogs
  *   are unchanged. The row and title are exposed as the
@@ -180,6 +181,7 @@ export class ESPHomeBaseDialog extends LitElement {
           <span part="title-text">${this.label}</span><slot name="header-suffix"></slot>
         </header>
         <slot></slot>
+        <slot name="footer" slot="footer"></slot>
       </wa-dialog>
     `;
   }
