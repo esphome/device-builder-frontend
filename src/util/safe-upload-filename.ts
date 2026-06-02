@@ -82,9 +82,15 @@ export function safeUploadFilename(stem: string): string {
   // filename (``.txt``, ``.mqtt``, sub-extensions) is preserved.
   const firstDot = cleaned.indexOf(".");
   const beforeDot = firstDot === -1 ? cleaned : cleaned.slice(0, firstDot);
-  if (WINDOWS_RESERVED_NAMES.has(beforeDot.toUpperCase())) {
+  // Windows ignores trailing spaces and dots on the device-name
+  // segment, so ``CON .txt`` resolves to the console device exactly
+  // like ``CON.txt``. Match on the trimmed segment and emit the suffix
+  // on that trimmed base (``CON .txt`` → ``CON_.txt``) — keeping the
+  // trailing run would leave the still-unwritable ``CON .txt`` on disk.
+  const baseName = beforeDot.replace(/[\s.]+$/, "");
+  if (WINDOWS_RESERVED_NAMES.has(baseName.toUpperCase())) {
     const tail = firstDot === -1 ? "" : cleaned.slice(firstDot);
-    return `${beforeDot}_${tail}`;
+    return `${baseName}_${tail}`;
   }
   return cleaned;
 }

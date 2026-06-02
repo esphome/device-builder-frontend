@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
-import { JobSource, JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
+import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import type { LocalizeFunc } from "../../src/common/localize.js";
 import { firmwareJobDisplayName } from "../../src/util/firmware-job-display.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 /**
  * Build a structurally-accurate ``FirmwareJob`` for tests.
@@ -13,30 +14,13 @@ import { firmwareJobDisplayName } from "../../src/util/firmware-job-display.js";
  * silently drift behind a forced cast.
  */
 function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
-  return {
-    job_id: "job-1",
-    configuration: "kitchen.yaml",
+  return makeFirmwareJob({
     job_type: JobType.INSTALL,
     status: JobStatus.RUNNING,
-    created_at: "2026-05-11T00:00:00Z",
-    started_at: null,
-    completed_at: null,
-    exit_code: null,
-    output: [],
-    error: null,
     port: "",
-    new_name: "",
-    progress: null,
-    source: JobSource.LOCAL,
-    source_pin_sha256: "",
-    source_label: "",
-    source_esphome_version: "",
-    remote_peer: "",
-    remote_peer_label: "",
-    device_name: "",
-    device_friendly_name: "",
+    created_at: "2026-05-11T00:00:00Z",
     ...overrides,
-  };
+  });
 }
 
 /**

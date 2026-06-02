@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { FirmwareJob } from "../../src/api/types/firmware-jobs.js";
-import { JobSource, JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
+import { JobStatus, JobType } from "../../src/api/types/firmware-jobs.js";
 import {
   TERMINAL_JOB_STATUSES,
   isTerminalJob,
   isTerminalJobStatus,
 } from "../../src/util/firmware-job-status.js";
+import { makeFirmwareJob } from "../_make-firmware-job.js";
 
 /**
  * Build a structurally-accurate ``FirmwareJob`` for tests. Mirrors
@@ -14,30 +15,13 @@ import {
  * a forced cast.
  */
 function job(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
-  return {
-    job_id: "job-1",
+  return makeFirmwareJob({
     configuration: "test.yaml",
     job_type: JobType.INSTALL,
-    status: JobStatus.QUEUED,
-    created_at: "2026-05-04T12:00:00Z",
-    started_at: null,
-    completed_at: null,
-    exit_code: null,
-    output: [],
-    error: null,
     port: "",
-    new_name: "",
-    progress: null,
-    source: JobSource.LOCAL,
-    source_pin_sha256: "",
-    source_label: "",
-    source_esphome_version: "",
-    remote_peer: "",
-    remote_peer_label: "",
-    device_name: "",
-    device_friendly_name: "",
+    created_at: "2026-05-04T12:00:00Z",
     ...overrides,
-  };
+  });
 }
 
 describe("TERMINAL_JOB_STATUSES", () => {
