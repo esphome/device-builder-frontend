@@ -1,12 +1,17 @@
 // @vitest-environment happy-dom
 import { describe, expect, test, vi } from "vitest";
 
+// Stub the real wa-dialog: happy-dom can't run its form-associated
+// close button (reads ElementInternals.validity), and these tests only
+// need the wrapper's own event wiring, not wa-dialog's internals.
+vi.mock("@home-assistant/webawesome/dist/components/dialog/dialog.js", () => ({}));
+
 import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
 
 /**
  * Regression coverage for ``esphome-base-dialog``'s nested-wa-dialog
  * leak filter. Web Awesome's ``wa-dialog`` fires
- * ``wa-after-hide`` / ``wa-request-close`` with ``bubbles + composed``,
+ * ``wa-after-hide`` / ``wa-hide`` with ``bubbles + composed``,
  * so a wa-dialog opened *inside* the slotted body of a base-dialog
  * (e.g. the receiver-side accept flow opening an
  * ``esphome-confirm-dialog`` while the Settings dialog is open) would
@@ -26,7 +31,7 @@ import { ESPHomeBaseDialog } from "../../src/components/base-dialog.js";
  */
 
 interface BaseDialogPrivateView extends EventTarget {
-  _onWaRequestClose(e: Event): void;
+  _onWaHide(e: Event): void;
   _onWaAfterHide(e: Event): void;
 }
 
@@ -84,12 +89,12 @@ describe("esphome-base-dialog nested-wa-dialog filter", () => {
     expect(reemits).toHaveBeenCalledTimes(1);
   });
 
-  test("wa-request-close from a nested wa-dialog does not re-emit request-close", () => {
+  test("wa-hide from a nested wa-dialog does not re-emit request-close", () => {
     const base = makeBase();
     const reemits = vi.fn();
     base.addEventListener("request-close", reemits);
 
-    const event = new Event("wa-request-close", {
+    const event = new Event("wa-hide", {
       bubbles: true,
       cancelable: true,
     });
@@ -104,17 +109,17 @@ describe("esphome-base-dialog nested-wa-dialog filter", () => {
       writable: false,
     });
 
-    base._onWaRequestClose(event);
+    base._onWaHide(event);
 
     expect(reemits).not.toHaveBeenCalled();
   });
 
-  test("wa-request-close from base-dialog's own wa-dialog re-emits request-close", () => {
+  test("wa-hide from base-dialog's own wa-dialog re-emits request-close", () => {
     const base = makeBase();
     const reemits = vi.fn();
     base.addEventListener("request-close", reemits);
 
-    const event = new Event("wa-request-close", {
+    const event = new Event("wa-hide", {
       bubbles: true,
       cancelable: true,
     });
@@ -128,8 +133,32 @@ describe("esphome-base-dialog nested-wa-dialog filter", () => {
       writable: false,
     });
 
-    base._onWaRequestClose(event);
+    base._onWaHide(event);
 
     expect(reemits).toHaveBeenCalledTimes(1);
+  });
+
+  // Binding-level guard: the wrapper must listen for the event wa-dialog
+  // actually fires (``wa-hide``), not the nonexistent ``wa-request-close``.
+  // Dispatching the real event on the rendered wa-dialog must re-emit
+  // request-close; a stale ``wa-request-close`` must not. Without this the
+  // host never flips _open on a user close, so the dialog can't reopen.
+  test("rendered wrapper re-emits request-close on its wa-dialog's wa-hide", async () => {
+    const base = new ESPHomeBaseDialog();
+    base.open = true;
+    document.body.appendChild(base);
+    await base.updateComplete;
+
+    const wa = base.shadowRoot!.querySelector("wa-dialog")!;
+    const reemits = vi.fn();
+    base.addEventListener("request-close", reemits);
+
+    wa.dispatchEvent(new Event("wa-request-close", { bubbles: true, cancelable: true }));
+    expect(reemits).not.toHaveBeenCalled();
+
+    wa.dispatchEvent(new Event("wa-hide", { bubbles: true, cancelable: true }));
+    expect(reemits).toHaveBeenCalledTimes(1);
+
+    base.remove();
   });
 });

@@ -147,7 +147,7 @@ export class ESPHomePairBuildServerDialog extends LitElement {
 
   protected render() {
     // ?busy gates outside-click + Esc + close-button while a round-trip is
-    // in flight. Base-dialog vetoes wa-request-close when busy — without
+    // in flight. Base-dialog vetoes wa-hide when busy — without
     // this, a successful request_pair could fire pair-request-sent against
     // an already-closed dialog.
     return html`
