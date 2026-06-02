@@ -107,6 +107,22 @@ describe("safeUploadFilename", () => {
     expect(safeUploadFilename("console.txt")).toBe("console.txt");
   });
 
+  it("suffixes reserved names that carry trailing spaces before the dot", () => {
+    // Windows ignores trailing spaces (and dots) on the device-name
+    // segment, so ``CON .txt`` resolves to the console device exactly
+    // like ``CON.txt``. The segment before the first dot must be
+    // matched against its *trimmed* form, and the disambiguating ``_``
+    // emitted on the trimmed base so the on-disk name sidesteps the
+    // reservation (``CON .txt`` → ``CON_.txt``, not the unwritable
+    // ``CON .txt``).
+    expect(safeUploadFilename("CON .txt")).toBe("CON_.txt");
+    expect(safeUploadFilename("AUX .mqtt")).toBe("AUX_.mqtt");
+    expect(safeUploadFilename("lpt1 .v2")).toBe("lpt1_.v2");
+    // A trailing space without a dot is already handled by the
+    // surrounding-whitespace trim, but assert it stays correct.
+    expect(safeUploadFilename("CON ")).toBe("CON_");
+  });
+
   it("trims surrounding whitespace and dots", () => {
     // Windows silently strips trailing whitespace/dots at write time;
     // do it here so ``foo`` and ``foo `` and ``foo.`` can't collide.
