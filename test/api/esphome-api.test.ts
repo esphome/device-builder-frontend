@@ -618,6 +618,28 @@ describe("ESPHomeAPI — typed command wrappers", () => {
     await pending;
   });
 
+  it("addComponent forwards the draft yaml when given", async () => {
+    const api = new ESPHomeAPI();
+    const ws = await connect(api);
+    const pending = api.addComponent(
+      "foo.yaml",
+      { component_id: "i2c", fields: {} },
+      "esphome:\n  name: foo\n"
+    );
+    const sent = ws.sentAs<{
+      message_id: string;
+      args: Record<string, unknown>;
+    }>(0);
+    expect(sent.args).toEqual({
+      configuration: "foo.yaml",
+      component_id: "i2c",
+      fields: {},
+      yaml: "esphome:\n  name: foo\n",
+    });
+    ws.receive({ message_id: sent.message_id, result: { yaml: "..." } });
+    await pending;
+  });
+
   it("firmwareInstall defaults port to OTA and force_local to false", async () => {
     const api = new ESPHomeAPI();
     const ws = await connect(api);

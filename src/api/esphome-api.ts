@@ -941,11 +941,16 @@ export class ESPHomeAPI {
     args: {
       component_id: string;
       fields?: Record<string, unknown>;
-    }
+    },
+    // The editor's unsaved draft. When given, the backend merges into
+    // it and returns the result without writing disk, so unsaved edits
+    // survive; omit to merge into the on-disk YAML and persist.
+    yaml?: string
   ): Promise<AddComponentResponse> {
     return this.sendCommand<AddComponentResponse>("devices/add_component", {
       configuration,
       ...args,
+      ...(yaml !== undefined && { yaml }),
     });
   }
 
