@@ -10,6 +10,7 @@
  * importing these from `./yaml-sections.js` are unaffected.
  */
 
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 
 export interface YamlSection {
@@ -234,8 +235,7 @@ function _expandListItems(
     // indent. Deeper lines belong to nested sub-mappings (a sensor
     // platform's temperature:/humidity: blocks, the debug component's
     // per-metric sensors) whose name:/id: must not override the item's.
-    const dashIndent = lines[itemStart].match(/^ */)?.[0].length ?? 0;
-    const childIndent = dashIndent + 2;
+    const childIndent = listItemChildIndent(lines[itemStart]);
     for (let j = itemStart; j <= itemEnd; j++) {
       const line = lines[j];
       if (j !== itemStart) {
@@ -318,4 +318,19 @@ export function instanceComponentId(
     if (s.parentKey === domain && s.fromLine < match.fromLine) idx++;
   }
   return `${domain}_${idx}`;
+}
+
+/**
+ * Column where a list item's direct child keys sit — the first key after
+ * the ``- `` marker on *dashLine*. Derived from the line rather than
+ * assuming a fixed step: configs may put any number of spaces after the
+ * dash (``-   platform:`` → children align past ``dash + 2``), and a
+ * fixed ``+2`` would miss continuation ``id:`` / ``name:`` keys. Falls
+ * back to one indent past the dash when the dash carries no inline key.
+ */
+export function listItemChildIndent(dashLine: string): number {
+  const inline = dashLine.match(/^\s*-\s+(?=\S)/)?.[0].length;
+  if (inline !== undefined) return inline;
+  const dashIndent = dashLine.match(/^ */)?.[0].length ?? 0;
+  return dashIndent + ESPHOME_YAML_INDENT.length;
 }

@@ -52,6 +52,19 @@ wifi:
     expect(sections[1].name).toBe("bedroom");
   });
 
+  it("extracts continuation id/name when the dash has extra spaces", () => {
+    // ``-   platform`` pushes the child column past dash+2; id/name on
+    // continuation lines must still be picked up (a fixed +2 missed them).
+    const yaml = `switch:
+  -   platform: gpio
+      id: my_relay
+      name: My Relay
+`;
+    const sw = parseYamlTopLevelSections(yaml).find((s) => s.parentKey === "switch");
+    expect(sw?.id).toBe("my_relay");
+    expect(sw?.name).toBe("My Relay");
+  });
+
   it("keeps a LIST_SECTIONS member (globals) as one un-expanded section", () => {
     // A plain list section (sensor above) expands per item; a
     // LIST_SECTIONS member stays a single header entry so the nav
@@ -703,6 +716,22 @@ describe("parseYamlAutomations", () => {
       s.key.startsWith("automation:component_on:")
     );
     expect(entry.key).toBe("automation:component_on:switch_0:on_turn_on");
+  });
+
+  it("uses the declared id under an extra-space dash (not a positional fallback)", () => {
+    // Regression: a continuation ``id:`` under ``-   platform`` was missed,
+    // so the trigger scoped to ``switch_0`` instead of the real id — a
+    // handle the backend (which sees the id structurally) can't match.
+    const yaml = `switch:
+  -   platform: gpio
+      id: my_relay
+      on_turn_on:
+        - logger.log: "on"
+`;
+    const [entry] = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(entry.key).toBe("automation:component_on:my_relay:on_turn_on");
   });
 
   it("leaves a nested sub-component on_* unscoped (backend parses direct keys only)", () => {

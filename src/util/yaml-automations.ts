@@ -5,9 +5,9 @@
  * unaffected; import from there or from here directly.
  */
 
-import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import {
   instanceComponentId,
+  listItemChildIndent,
   parseYamlTopLevelSections,
   smallestContainingSection,
   type YamlSection,
@@ -89,7 +89,7 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     if (
       host &&
       host.parentKey !== undefined &&
-      indent === _itemChildIndent(lines, host.fromLine)
+      indent === listItemChildIndent(lines[host.fromLine - 1] ?? "")
     ) {
       componentId = instanceComponentId(sections, host);
     }
@@ -224,18 +224,6 @@ function _findBlockEnd(lines: string[], startIdx: number, indent: number): numbe
     if (lineIndent <= indent) return j;
   }
   return lines.length;
-}
-
-/** Column where a list item's direct child keys sit — the first key
- *  after the ``- `` marker on *dashFromLine* (1-indexed). Derived from the
- *  line rather than assuming a fixed step, since configs may put any
- *  number of spaces after the dash; falls back to one indent past the
- *  dash when the dash line carries no inline key. */
-function _itemChildIndent(lines: string[], dashFromLine: number): number {
-  const dashLine = lines[dashFromLine - 1] ?? "";
-  const inline = dashLine.match(/^\s*-\s+(?=\S)/)?.[0].length;
-  if (inline !== undefined) return inline;
-  return _dashIndent(dashLine) + ESPHOME_YAML_INDENT.length;
 }
 
 /** Top-level key block (``script:`` / ``interval:``) with its
