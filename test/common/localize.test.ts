@@ -66,6 +66,18 @@ describe("matchLocale (browser tag resolution)", () => {
     expect(matchLocale("zh-cn", CANDIDATES)).toBe("zh-CN");
   });
 
+  it("matches underscore-separated candidates against a hyphenated tag", () => {
+    // Lokalise filenames may use underscores (`zh_CN`); a browser reports
+    // BCP 47 hyphens (`zh-CN`). Matching is separator-agnostic and returns
+    // the candidate verbatim (the discovery layer canonicalizes stems, but
+    // matchLocale itself must stay underscore-tolerant).
+    expect(matchLocale("zh-CN", ["en", "zh_CN"])).toBe("zh_CN");
+  });
+
+  it("matches an underscore-separated browser tag against hyphenated candidates", () => {
+    expect(matchLocale("zh_CN", CANDIDATES)).toBe("zh-CN");
+  });
+
   it("falls back to language prefix for regional variants (fr-CA)", () => {
     expect(matchLocale("fr-CA", CANDIDATES)).toBe("fr");
   });

@@ -2,7 +2,8 @@ name: Upload translations
 
 # Push the English source strings to Lokalise whenever en.json lands on
 # main, so translators always see the latest keys. Only new keys are
-# added; existing translations are left untouched (see upload.ts).
+# added; existing translations are left untouched (see
+# build-scripts/translations.ts).
 
 on:
   push:

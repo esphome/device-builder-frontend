@@ -35,6 +35,22 @@ const BASE_LOCALE = "en";
 const normalizeLocale = (locale: string): string =>
   locale.toLowerCase().replace(/_/g, "-");
 
+// Canonicalize a translation-file stem to a BCP 47 tag. Lokalise exports
+// underscore-separated names (`zh_CN`, `pt_BR`); left as-is they become
+// selectable locale codes that get handed to `Intl.*` formatters (see
+// activeLocale() consumers), which throw `RangeError` on an invalid tag.
+// Hyphenate, then run through `Intl.getCanonicalLocales` for canonical
+// casing (`zh-CN`), falling back to the raw hyphenated form for anything
+// Intl rejects.
+const toBcp47 = (stem: string): string => {
+  const hyphenated = stem.replace(/_/g, "-");
+  try {
+    return Intl.getCanonicalLocales(hyphenated)[0] ?? hyphenated;
+  } catch {
+    return hyphenated;
+  }
+};
+
 const asMessages = (mod: unknown): Record<string, unknown> => {
   if (mod && typeof mod === "object" && "default" in mod) {
     return (mod as { default: Record<string, unknown> }).default;
@@ -62,9 +78,11 @@ function discoverTranslations(): Map<string, Record<string, unknown>> {
       mode: "sync",
     });
     for (const key of ctx.keys()) {
-      const locale = key.replace(/^\.\//, "").replace(/\.json$/, "");
-      if (locale === BASE_LOCALE) continue; // base is the static import
-      translations.set(locale, asMessages(ctx(key)));
+      const stem = key.replace(/^\.\//, "").replace(/\.json$/, "");
+      if (stem === BASE_LOCALE) continue; // base is the static import
+      // Canonicalize so a Lokalise `zh_CN.json` is keyed as the BCP 47
+      // `zh-CN` everywhere downstream (picker, storage, Intl formatters).
+      translations.set(toBcp47(stem), asMessages(ctx(key)));
     }
   } catch {
     // No bundler context (vitest, or pre-download dev) — base only.
