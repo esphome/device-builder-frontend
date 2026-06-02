@@ -23,6 +23,7 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { resolveSectionEntries } from "../../util/section-entry-overrides.js";
 import {
+  instanceComponentId,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   sectionKeyOf,
@@ -570,9 +571,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
    * automation" / triggers-list shortcut. Returns ``null`` when the
    * section can't host inline ``on_*:`` automations (api has its own
    * shortcut; script/interval have their own navigator CTAs; data-
-   * only blocks like substitutions never carry triggers; component
-   * list items without an ``id:`` can't be addressed by the
-   * structured editor).
+   * only blocks like substitutions never carry triggers; flat
+   * single-instance blocks have no positional id to address).
+   * id-less list-item instances resolve to the backend's positional
+   * ``<domain>_<idx>`` id, so they host automations like id'd ones.
    */
   private _shortcutTarget():
     | null
@@ -591,8 +593,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this._resolvedFromLine !== undefined
         ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
         : candidates[0];
-    if (!match.id) return null;
-    return { kind: "component_on", componentId: match.id };
+    const componentId = instanceComponentId(sections, match);
+    if (componentId === null) return null;
+    return { kind: "component_on", componentId };
   }
 
   /**

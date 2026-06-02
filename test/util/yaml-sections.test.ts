@@ -3,6 +3,7 @@ import { parseYamlSectionValues } from "../../src/util/yaml-section-values.js";
 import {
   _clearYamlSectionsMemo,
   categorizeSections,
+  instanceComponentId,
   parseYamlAutomations,
   parseYamlTopLevelSections,
   resolveCurrentFromLine,
@@ -584,6 +585,225 @@ describe("parseYamlAutomations", () => {
     expect(items.map((s) => s.key)).toEqual([
       "automation:component_on:my_button:on_press",
     ]);
+  });
+
+  it("scopes an id-less component's on_* to its positional <domain>_<idx>", () => {
+    const yaml = `switch:
+  - platform: template
+    name: "My Switch"
+    on_turn_on:
+      - logger.log: "on"
+`;
+    const result = parseYamlAutomations(yaml);
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe("automation:component_on:switch_0:on_turn_on");
+    expect(result[0].id).toBe("switch_0");
+    // Label still prefers the instance name when one is present.
+    expect(result[0].displayLabel).toBe("My Switch → on_turn_on");
+  });
+
+  it("labels a nameless id-less component by its positional id", () => {
+    const yaml = `switch:
+  - platform: template
+    on_turn_on:
+      - logger.log: "on"
+`;
+    const [entry] = parseYamlAutomations(yaml);
+    expect(entry.key).toBe("automation:component_on:switch_0:on_turn_on");
+    expect(entry.displayLabel).toBe("switch_0 → on_turn_on");
+  });
+
+  it("splits an id-less time.on_time list under its positional id", () => {
+    const yaml = `time:
+  - platform: sntp
+    on_time:
+      - seconds: 0
+        then:
+          - logger.log: "tick"
+      - cron: "0 0 12 * * *"
+        then:
+          - logger.log: "noon"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:time_0:")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:time_0:on_time:0",
+      "automation:component_on:time_0:on_time:1",
+    ]);
+  });
+
+  it("advances the positional index across id'd siblings in the same domain", () => {
+    const yaml = `switch:
+  - platform: template
+    on_turn_on:
+      - logger.log: "a"
+  - platform: gpio
+    id: my_relay
+    on_turn_on:
+      - logger.log: "b"
+  - platform: template
+    on_turn_on:
+      - logger.log: "c"
+`;
+    const ids = parseYamlAutomations(yaml)
+      .filter((s) => s.key.startsWith("automation:component_on:"))
+      .map((s) => s.id);
+    expect(ids).toEqual(["switch_0", "my_relay", "switch_2"]);
+  });
+
+  it("indexes id-less instances across mixed platforms in one domain", () => {
+    const yaml = `sensor:
+  - platform: dht
+    on_value:
+      - logger.log: "a"
+  - platform: adc
+    on_value:
+      - logger.log: "b"
+`;
+    const ids = parseYamlAutomations(yaml)
+      .filter((s) => s.key.startsWith("automation:component_on:"))
+      .map((s) => s.id);
+    expect(ids).toEqual(["sensor_0", "sensor_1"]);
+  });
+
+  it("leaves a flat single-instance block's on_* unscoped", () => {
+    const yaml = `wifi:
+  on_connect:
+    - logger.log: "up"
+`;
+    const [entry] = parseYamlAutomations(yaml);
+    expect(entry.key).toBe("automation:unscoped:on_connect:2");
+    expect(entry.id).toBeUndefined();
+  });
+
+  it("scopes a direct on_value on a single-value sensor", () => {
+    const yaml = `sensor:
+  - platform: adc
+    pin: GPIO1
+    on_value:
+      - logger.log: "v"
+`;
+    const [entry] = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(entry.key).toBe("automation:component_on:sensor_0:on_value");
+  });
+
+  it("scopes a direct on_* regardless of spaces after the dash (no fixed +2)", () => {
+    // Extra spaces after the dash push the item's child column past
+    // dash+2; the handler aligned there is still a direct trigger and
+    // must scope, not be mistaken for a nested one.
+    const yaml = `switch:
+  -   platform: template
+      on_turn_on:
+        - logger.log: "on"
+`;
+    const [entry] = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:")
+    );
+    expect(entry.key).toBe("automation:component_on:switch_0:on_turn_on");
+  });
+
+  it("leaves a nested sub-component on_* unscoped (backend parses direct keys only)", () => {
+    // ``on_value`` lives under the ``temperature:`` sub-mapping, not as a
+    // direct key on the dht list item, so the backend's instance.items()
+    // scan never sees it. The fallback parser must not claim a
+    // ``sensor_0`` handle ``automations/parse`` won't confirm.
+    const yaml = `sensor:
+  - platform: dht
+    temperature:
+      name: Temp
+      on_value:
+        - logger.log: "x"
+`;
+    const entry = parseYamlAutomations(yaml).find((s) => s.key.includes("on_value"));
+    expect(entry?.key).toBe("automation:unscoped:on_value:5");
+    expect(entry?.id).toBeUndefined();
+  });
+
+  it("leaves a flat block with an explicit id unscoped (backend addresses lists only)", () => {
+    // ``sun:`` is a flat single-instance component that can carry an ``id:``
+    // and host ``on_sunrise:`` — but the backend only resolves inline
+    // handlers under list domains, so the shortcut gate and the parser must
+    // both treat it as unscoped rather than emitting a component_on the
+    // backend can't address.
+    const yaml = `sun:
+  id: my_sun
+  latitude: 0°
+  longitude: 0°
+  on_sunrise:
+    - logger.log: "up"
+`;
+    const [entry] = parseYamlAutomations(yaml);
+    expect(entry.key).toBe("automation:unscoped:on_sunrise:5");
+    expect(entry.id).toBeUndefined();
+  });
+});
+
+describe("instanceComponentId", () => {
+  const componentIdAt = (yaml: string, fromLine: number): string | null => {
+    const sections = parseYamlTopLevelSections(yaml);
+    const match = sections.find((s) => s.fromLine === fromLine);
+    if (!match) throw new Error(`no section at line ${fromLine}`);
+    return instanceComponentId(sections, match);
+  };
+
+  it("returns the declared id when present", () => {
+    const yaml = `switch:
+  - platform: gpio
+    id: my_relay
+`;
+    expect(componentIdAt(yaml, 2)).toBe("my_relay");
+  });
+
+  it("synthesises <domain>_<idx> for an id-less list instance", () => {
+    const yaml = `switch:
+  - platform: template
+  - platform: gpio
+`;
+    expect(componentIdAt(yaml, 2)).toBe("switch_0");
+    expect(componentIdAt(yaml, 3)).toBe("switch_1");
+  });
+
+  it("advances the index across id'd siblings (backend enumerate parity)", () => {
+    const yaml = `switch:
+  - platform: template
+  - platform: gpio
+    id: my_relay
+  - platform: template
+`;
+    expect(componentIdAt(yaml, 2)).toBe("switch_0");
+    expect(componentIdAt(yaml, 3)).toBe("my_relay");
+    expect(componentIdAt(yaml, 5)).toBe("switch_2");
+  });
+
+  it("returns null for a flat single-instance block", () => {
+    const yaml = `wifi:
+  ssid: home
+`;
+    expect(componentIdAt(yaml, 1)).toBeNull();
+  });
+
+  it("returns null for a flat block even when it declares an explicit id", () => {
+    const yaml = `sun:
+  id: my_sun
+  latitude: 0°
+`;
+    expect(componentIdAt(yaml, 1)).toBeNull();
+  });
+
+  it("indexes by fromLine order, not object identity (reconstructed match still resolves)", () => {
+    const yaml = `switch:
+  - platform: template
+  - platform: gpio
+`;
+    const sections = parseYamlTopLevelSections(yaml);
+    const real = sections.find((s) => s.fromLine === 3);
+    if (!real) throw new Error("no section at line 3");
+    // A detached copy: different object identity, same fromLine/parentKey.
+    const detached = { ...real };
+    expect(instanceComponentId(sections, detached)).toBe("switch_1");
   });
 });
 

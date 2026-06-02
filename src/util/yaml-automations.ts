@@ -5,7 +5,13 @@
  * unaffected; import from there or from here directly.
  */
 
-import type { YamlSection } from "./yaml-sections.js";
+import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
+import {
+  instanceComponentId,
+  parseYamlTopLevelSections,
+  smallestContainingSection,
+  type YamlSection,
+} from "./yaml-sections-core.js";
 
 /**
  * Synchronous fallback parser for automation sections. The navigator
@@ -33,6 +39,9 @@ import type { YamlSection } from "./yaml-sections.js";
  */
 export function parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
+  // Memoised on `yaml`, so resolving an id-less host's positional id is
+  // free when the caller already parsed sections this render.
+  const sections = parseYamlTopLevelSections(yaml);
   const automations: YamlSection[] = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -44,11 +53,14 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     const fromLine = i + 1; // 1-indexed CM line
     const toLine = _findBlockEnd(lines, i, indent);
 
-    // Walk backwards to identify the enclosing block (esphome:
-    // device-level, or a configured-component instance with its id).
-    const ancestry = _walkAncestry(lines, i, indent);
+    // Resolve the host from the shared section parse — one source of
+    // truth for parentKey / id / name / index. An id-less list instance
+    // gets the backend's positional ``<domain>_<idx>`` so it surfaces
+    // and round-trips like an id'd one; a flat block (``esphome:``)
+    // hosts device-level triggers instead.
+    const host = smallestContainingSection(sections, fromLine);
 
-    if (ancestry.parentKey === "esphome") {
+    if (host && host.parentKey === undefined && host.key === "esphome") {
       automations.push({
         key: `automation:device_on:${eventName}`,
         // ``displayLabel`` is the legacy "Esphome → on_boot" label;
@@ -61,13 +73,32 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
         parentKey: "esphome",
         eventKey: eventName,
       });
-    } else if (ancestry.componentId) {
-      const componentId = ancestry.componentId;
-      const labelHead = ancestry.parentName || componentId;
+      continue;
+    }
+
+    // One source of truth: the helper returns the declared / positional id
+    // for a list-item host and null for a flat block (``sun:`` with an id is
+    // still null — the backend can't address it), so this matches what
+    // ``_shortcutTarget`` resolves for the same section. Only a *direct*
+    // ``on_*`` child of the list item scopes to it: the backend parses an
+    // instance's own ``on_*`` keys, not ones nested under a sub-mapping
+    // (``sensor[i].temperature.on_value``), so a deeper handler falls
+    // through to ``unscoped`` rather than claiming a handle that
+    // ``automations/parse`` won't confirm.
+    let componentId: string | null = null;
+    if (
+      host &&
+      host.parentKey !== undefined &&
+      indent === _itemChildIndent(lines, host.fromLine)
+    ) {
+      componentId = instanceComponentId(sections, host);
+    }
+    if (host && componentId) {
+      const labelHead = host.name || componentId;
       const base = {
         id: componentId,
-        name: ancestry.parentName ?? undefined,
-        parentKey: ancestry.parentKey ?? undefined,
+        name: host.name ?? undefined,
+        parentKey: host.parentKey,
         eventKey: eventName,
       };
       // List-shaped trigger (``time.on_time``): one row per cron entry,
@@ -93,18 +124,20 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
           toLine,
         });
       }
-    } else {
-      // No clear ancestry — keep the event as the bare display
-      // label and emit a non-namespaced key so it doesn't collide
-      // with a properly-resolved automation later.
-      automations.push({
-        key: `automation:unscoped:${eventName}:${fromLine}`,
-        displayLabel: eventName,
-        fromLine,
-        toLine,
-        eventKey: eventName,
-      });
+      continue;
     }
+
+    // No addressable host (a flat non-esphome block like ``wifi:``, or
+    // no resolvable enclosing block) — keep the event as the bare
+    // display label and emit a non-namespaced key so it doesn't
+    // collide with a properly-resolved automation later.
+    automations.push({
+      key: `automation:unscoped:${eventName}:${fromLine}`,
+      displayLabel: eventName,
+      fromLine,
+      toLine,
+      eventKey: eventName,
+    });
   }
 
   // Top-level ``script:`` / ``interval:`` list items. These don't
@@ -193,59 +226,16 @@ function _findBlockEnd(lines: string[], startIdx: number, indent: number): numbe
   return lines.length;
 }
 
-interface Ancestry {
-  parentKey: string | null;
-  parentName: string | null;
-  componentId: string | null;
-}
-
-/**
- * Walk backwards from an ``on_*:`` line to identify the enclosing
- * block. Returns:
- *
- * - ``parentKey`` — the nearest top-level key
- *   (``esphome``, ``binary_sensor``, …) discovered by scanning to
- *   a column-0 anchor.
- * - ``parentName`` — the configured component's ``name:`` if found,
- *   used as a display label.
- * - ``componentId`` — the configured component's ``id:`` if found,
- *   used as the stable identifier.
- */
-function _walkAncestry(lines: string[], startIdx: number, childIndent: number): Ancestry {
-  let parentKey: string | null = null;
-  let parentName: string | null = null;
-  let componentId: string | null = null;
-  // True once we've crossed our list item's leading ``-`` (at indent
-  // < childIndent). Beyond that boundary we keep scanning *only* to
-  // find the top-level key; we no longer harvest id / name (those
-  // would belong to a previous sibling, not us).
-  let crossedItemBoundary = false;
-  for (let j = startIdx - 1; j >= 0; j--) {
-    const line = lines[j];
-    if (line.trim() === "") continue;
-    const topLevel = line.match(/^([a-zA-Z_][\w]*)\s*:/);
-    if (topLevel) {
-      parentKey = topLevel[1];
-      break;
-    }
-    const lineIndent = (line.match(/^(\s*)/) ?? ["", ""])[1].length;
-    // A list-item dash at an indent shallower than our handler is
-    // our own item's leading row (we're somewhere inside it). Cross
-    // it but keep walking — the top-level key still sits above us.
-    if (lineIndent < childIndent && /^\s*-\s/.test(line)) {
-      crossedItemBoundary = true;
-      continue;
-    }
-    // Deeper lines (nested blocks under our handler's siblings)
-    // can't contribute id / name for our automation.
-    if (lineIndent > childIndent) continue;
-    if (crossedItemBoundary) continue;
-    const idMatch = line.match(/^\s+(?:-\s+)?id:\s*["']?([^"'\s]+)["']?\s*$/);
-    if (idMatch && !componentId) componentId = idMatch[1];
-    const nameMatch = line.match(/^\s+(?:-\s+)?name:\s*["']?(.+?)["']?\s*$/);
-    if (nameMatch && !parentName) parentName = nameMatch[1];
-  }
-  return { parentKey, parentName, componentId };
+/** Column where a list item's direct child keys sit — the first key
+ *  after the ``- `` marker on *dashFromLine* (1-indexed). Derived from the
+ *  line rather than assuming a fixed step, since configs may put any
+ *  number of spaces after the dash; falls back to one indent past the
+ *  dash when the dash line carries no inline key. */
+function _itemChildIndent(lines: string[], dashFromLine: number): number {
+  const dashLine = lines[dashFromLine - 1] ?? "";
+  const inline = dashLine.match(/^\s*-\s+(?=\S)/)?.[0].length;
+  if (inline !== undefined) return inline;
+  return _dashIndent(dashLine) + ESPHOME_YAML_INDENT.length;
 }
 
 /** Top-level key block (``script:`` / ``interval:``) with its
@@ -273,8 +263,7 @@ function _findChildBlock(
   childKey: string
 ): { fromLine: number; toLine: number } | null {
   // Locate the parent block's child indent by reading the first
-  // non-blank child line and capturing its leading whitespace —
-  // matches the convention used by ``_walkAncestry``.
+  // non-blank child line and capturing its leading whitespace.
   let childIndent: number | null = null;
   for (let i = parentFromLine; i < parentToLine && i < lines.length; i++) {
     const line = lines[i];
