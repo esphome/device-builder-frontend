@@ -190,6 +190,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
       : this._localize("device.add_script");
     return html`<esphome-base-dialog
       ?open=${this._open}
+      ?busy=${this._saving}
       .label=${title}
       @request-close=${this._onRequestClose}
     >
