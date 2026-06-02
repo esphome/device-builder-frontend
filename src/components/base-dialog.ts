@@ -11,7 +11,7 @@ import { centeredMobileDialog } from "../styles/dialog-mobile.js";
  *
  * Every dialog in the app spent ~20 lines on identical
  * scaffolding — the ``?open`` binding, the
- * ``?light-dismiss`` busy-gate, the ``@wa-request-close``
+ * ``?light-dismiss`` busy-gate, the ``@wa-hide``
  * / ``@wa-after-hide`` wiring, and ``dialogCloseButtonStyles``
  * to dress the built-in close button. This element bundles
  * all of that into one place so consumers carry just the
@@ -30,7 +30,7 @@ import { centeredMobileDialog } from "../styles/dialog-mobile.js";
  *   outside-click can't dismiss while a WS round-trip is
  *   in flight.
  * - The wrapper proactively ``preventDefault()``s
- *   ``wa-request-close`` so Escape / X-button click /
+ *   ``wa-hide`` so Escape / X-button click /
  *   programmatic close are all silently absorbed, even
  *   when the consumer doesn't wire their own
  *   ``@request-close`` veto handler. The busy gate is
@@ -44,7 +44,7 @@ import { centeredMobileDialog } from "../styles/dialog-mobile.js";
  * **Events re-emitted**:
  *
  * - ``@request-close`` mirrors ``wa-dialog``'s
- *   ``wa-request-close`` (cancellable; ``preventDefault()``
+ *   ``wa-hide`` (cancellable; ``preventDefault()``
  *   to veto for host-side reasons like unsaved changes).
  *   Not fired when the wrapper vetoes for ``busy`` — the
  *   host can't override the busy gate.
@@ -56,13 +56,13 @@ import { centeredMobileDialog } from "../styles/dialog-mobile.js";
  *
  * **Close paths**:
  *
- * All close paths flow through ``wa-request-close`` so
+ * All close paths flow through ``wa-hide`` so
  * busy gate + host veto are evaluated uniformly:
  *
  * - Escape key / outside-click / built-in X button →
- *   ``wa-dialog`` fires ``wa-request-close`` directly.
+ *   ``wa-dialog`` fires ``wa-hide`` directly.
  * - Reactive ``?open`` flip from the host → ``wa-dialog``
- *   fires ``wa-request-close`` as part of its hide
+ *   fires ``wa-hide`` as part of its hide
  *   sequence.
  *
  * The wrapper never mutates its own ``open`` property in
@@ -125,7 +125,7 @@ export class ESPHomeBaseDialog extends LitElement {
    *  Without ``reflect: true``, only the boolean-attribute
    *  form would update the attribute, so property /
    *  imperative writers would get the functional gate
-   *  (wa-request-close veto) but not the visual dim on the
+   *  (wa-hide veto) but not the visual dim on the
    *  close button. */
   @property({ type: Boolean, reflect: true }) busy = false;
 
@@ -143,7 +143,11 @@ export class ESPHomeBaseDialog extends LitElement {
     this._hasFooter = this.querySelector(':scope > [slot="footer"]') !== null;
   }
 
-  private _onWaRequestClose = (e: Event): void => {
+  private _onWaHide = (e: Event): void => {
+    // wa-dialog fires the cancelable ``wa-hide`` to request a
+    // close (Escape / X / outside-click / reactive ?open flip);
+    // preventDefault() on it vetoes the close.
+    //
     // ``wa-dialog``'s events bubble + compose, so the same
     // event type fired by a nested ``wa-dialog`` (e.g. an
     // ``esphome-confirm-dialog`` inside our slotted body)
@@ -188,7 +192,7 @@ export class ESPHomeBaseDialog extends LitElement {
         exportparts="dialog,header,title,body,footer,close-button,close-button__base"
         ?open=${this.open}
         ?light-dismiss=${!this.busy}
-        @wa-request-close=${this._onWaRequestClose}
+        @wa-hide=${this._onWaHide}
         @wa-after-hide=${this._onWaAfterHide}
       >
         <header slot="label" part="label-row">
@@ -237,7 +241,7 @@ export class ESPHomeBaseDialog extends LitElement {
       }
 
       /* Busy visual on wa-dialog's built-in close. The
-         functional gate is the wa-request-close veto
+         functional gate is the wa-hide veto
          above — clicking the X while busy silently
          absorbs the event and the dialog stays open. The
          CSS here is the user-facing cue (button looks
