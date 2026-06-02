@@ -586,15 +586,15 @@ export class ESPHomePageDashboard extends LitElement {
     this._syncYamlSearch();
   };
 
-  /** Apply every active facet filter to the device list. Labels
-   *  use AND semantics (a device must carry every selected label,
-   *  the original "drill down by tag stack" behaviour we shipped
-   *  with the labels filter); area, platform, and status use OR
-   *  within the facet and AND across facets, the conventional
-   *  faceted-search shape.
+  /** Apply every active facet filter to the device list. Labels and
+   *  update-status use AND semantics (labels: a device must carry
+   *  every selected label, the original "drill down by tag stack";
+   *  updates: a device must satisfy every selected bucket); area,
+   *  platform, and status use OR within the facet and AND across
+   *  facets, the conventional faceted-search shape.
    *
-   *  Memoised on the five upstream references (``devices`` plus
-   *  the four selection arrays) so the two callers inside one
+   *  Memoised on the six upstream references (``devices`` plus
+   *  the five selection arrays) so the two callers inside one
    *  render cycle (``render()`` and ``_currentlyVisibleConfigurations``)
    *  share a single filter pass. Lit's reactive @state pattern
    *  hands out new array references on every selection change,

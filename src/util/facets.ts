@@ -132,6 +132,6 @@ export function computeUpdateFacet(
     modified: "dashboard.status_modified",
   };
   return tallyToFacet(counts, (raw) =>
-    localize(labelKeyById[raw] ?? "dashboard.status_modified")
+    localize(labelKeyById[raw] ?? "dashboard.unknown")
   );
 }

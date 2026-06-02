@@ -1,6 +1,4 @@
 /**
- * @vitest-environment happy-dom
- *
  * Pins computeUpdateFacet: per-bucket counts, empty-fleet → [], and
  * only-non-zero buckets surface (so the dashboard hides the pill /
  * drops a bucket nothing matches).
@@ -8,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ConfiguredDevice } from "../../src/api/types/devices.js";
+import type { LocalizeFunc } from "../../src/common/localize.js";
 import { computeUpdateFacet } from "../../src/util/facets.js";
 
 // computeUpdateFacet only reads update_available / has_pending_changes.
@@ -16,7 +15,7 @@ function device(over: Partial<ConfiguredDevice>): ConfiguredDevice {
 }
 
 // Echo the key so assertions key off the i18n id, not display copy.
-const localize = ((key: string) => key) as never;
+const localize = ((key: string) => key) as unknown as LocalizeFunc;
 
 describe("computeUpdateFacet", () => {
   it("returns [] for an up-to-date fleet", () => {
