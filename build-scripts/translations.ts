@@ -29,7 +29,11 @@ import { fileURLToPath } from "node:url";
 
 import { unzipSync } from "fflate";
 
-import { BASE_LANGUAGE, flagValue, localeFromZipEntry } from "./translations-lib.ts";
+import {
+  BASE_LANGUAGE,
+  localeFromZipEntry,
+  resolveDownloadSource,
+} from "./translations-lib.ts";
 
 // --- Paths and locale config -------------------------------------------
 
@@ -392,14 +396,10 @@ async function main(): Promise<number> {
 
   try {
     if (command === "download") {
-      const source = flagValue(args, "--source") ?? "lokalise";
-      if (source === "release") {
+      if (resolveDownloadSource(args) === "release") {
         return await runDownloadFromRelease();
       }
-      if (source === "lokalise") {
-        return await runDownload(makeLokaliseClient());
-      }
-      throw new Error(`unknown --source '${source}' (expected 'lokalise' or 'release').`);
+      return await runDownload(makeLokaliseClient());
     }
     if (command === "upload") {
       return await runUpload(makeLokaliseClient(), args.includes("--cleanup"));

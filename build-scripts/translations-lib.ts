@@ -47,3 +47,23 @@ export function flagValue(args: string[], name: string): string | undefined {
   const idx = args.indexOf(name);
   return idx === -1 ? undefined : args[idx + 1];
 }
+
+export type DownloadSource = "lokalise" | "release";
+
+// Resolve the `download --source`. Absent flag defaults to "lokalise", but
+// a present-but-valueless or unknown `--source` is an error rather than a
+// silent fallback — so `download -- --source` (no value) or a typo fails
+// fast instead of quietly running against Lokalise.
+export function resolveDownloadSource(args: string[]): DownloadSource {
+  const present = args.some((a) => a === "--source" || a.startsWith("--source="));
+  if (!present) {
+    return "lokalise";
+  }
+  const value = flagValue(args, "--source");
+  if (value === "lokalise" || value === "release") {
+    return value;
+  }
+  throw new Error(
+    `--source must be 'lokalise' or 'release' (${value ? `got '${value}'` : "no value given"}).`
+  );
+}
