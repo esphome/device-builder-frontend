@@ -1,5 +1,5 @@
 import { autocompletion } from "@codemirror/autocomplete";
-import { indentWithTab } from "@codemirror/commands";
+import { indentWithTab, undoDepth } from "@codemirror/commands";
 import { indentUnit } from "@codemirror/language";
 import { EditorState, StateEffect, StateField } from "@codemirror/state";
 import { Decoration, keymap, type DecorationSet } from "@codemirror/view";
@@ -424,7 +424,12 @@ export class ESPHomeYamlEditor extends LitElement {
       // editor (#1150). Remount instead so the loaded YAML is the
       // document baseline with fresh history — same reset the
       // configuration-change branch above uses.
-      if (current === "" && this.value !== "") {
+      //
+      // Gate on empty history (`undoDepth === 0`) so this only fires for
+      // the pristine initial load — not when the user has cleared the
+      // doc themselves and an external action (e.g. a dialog's
+      // `yaml-draft`) repopulates it, which must stay undoable.
+      if (current === "" && this.value !== "" && undoDepth(this._view.state) === 0) {
         this._remountEditor();
         return;
       }

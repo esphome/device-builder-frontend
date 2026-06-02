@@ -5,7 +5,7 @@
  * and the device YAML loads async afterwards. That first content load
  * must not be an undoable step, or Ctrl+Z unwinds the editor to blank.
  */
-import { undoDepth } from "@codemirror/commands";
+import { undo, undoDepth } from "@codemirror/commands";
 import type { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -35,5 +35,30 @@ describe("yaml-editor undo baseline (#1150)", () => {
     expect(view.state.doc.toString()).toBe("wifi:\n  ssid: x\n");
     // Loaded content is the baseline — nothing to undo back to (no blank).
     expect(undoDepth(view.state)).toBe(0);
+  });
+
+  it("keeps an external repopulate undoable after the user clears the doc", async () => {
+    const el = await mount();
+    el.value = "wifi:\n  ssid: x\n"; // initial load (baselined)
+    await el.updateComplete;
+    const view = viewOf(el);
+
+    // User clears the editor themselves — recorded in history.
+    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: "" } });
+    expect(view.state.doc.toString()).toBe("");
+    expect(undoDepth(view.state)).toBeGreaterThan(0);
+
+    // An external action (e.g. a dialog's yaml-draft) repopulates it.
+    // History is non-empty, so this must NOT remount and wipe the undo
+    // stack — the same view stays mounted and the change is undoable.
+    el.value = "logger:\n";
+    await el.updateComplete;
+    expect(viewOf(el)).toBe(view); // not remounted
+    expect(view.state.doc.toString()).toBe("logger:\n");
+    expect(undoDepth(view.state)).toBeGreaterThan(0); // history preserved
+
+    // And undo still works (no wiped stack).
+    undo(view);
+    expect(view.state.doc.toString()).not.toBe("logger:\n");
   });
 });
