@@ -29,6 +29,8 @@ import { fileURLToPath } from "node:url";
 
 import { unzipSync } from "fflate";
 
+import { BASE_LANGUAGE, flagValue, localeFromZipEntry } from "./translations-lib.ts";
+
 // --- Paths and locale config -------------------------------------------
 
 // build-scripts/translations.ts -> repo root is one dir up.
@@ -36,14 +38,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(HERE, "..");
 const TRANSLATIONS_DIR = join(REPO_ROOT, "src", "translations");
 
-// Base language. Its file (en.json) is the in-repo source of truth and the
-// only translation file committed: `upload` pushes it to Lokalise as the
-// base, and `download` never overwrites it. Every other locale is whatever
-// Lokalise has — there is no hardcoded locale list and no per-locale code
-// mapping here. The frontend loader (src/common/localize.ts) discovers
-// downloaded files dynamically and normalizes separators, so Lokalise's
-// language codes (`fr`, `zh_CN`, ...) become the filenames verbatim.
-const BASE_LANGUAGE = "en";
+// en.json is the in-repo source of truth and the only committed translation
+// file: `upload` pushes it to Lokalise as the base, and `download` never
+// overwrites it. Every other locale is whatever Lokalise has — no hardcoded
+// locale list. Downloaded stems are canonicalized to BCP 47 at the write
+// boundary (see localeFromZipEntry) so a Lokalise `zh_CN` lands on disk as
+// the repo-conventional `zh-CN.json`.
 
 const translationPath = (locale: string): string =>
   join(TRANSLATIONS_DIR, `${locale}.json`);
@@ -286,33 +286,24 @@ async function runUpload(client: LokaliseClient, cleanup: boolean): Promise<numb
 }
 
 // Unpack a zip of `<locale>.json` files into src/translations/, writing
-// each locale verbatim except the base — en.json is the in-repo source of
-// truth and is never overwritten by a download. The frontend loader
+// each locale except the base — en.json is the in-repo source of truth and
+// is never overwritten by a download. Stems are canonicalized to BCP 47 so
+// a Lokalise `zh_CN.json` lands as `zh-CN.json`. The frontend loader
 // discovers whatever files land here, so there is no locale allow-list to
-// keep in sync. Shared by the Lokalise and GitHub-release download paths.
-function writeLocaleBundle(files: Record<string, Uint8Array>): number {
+// keep in sync. Returns the sorted locales written. Shared by the Lokalise
+// and GitHub-release download paths.
+function writeLocaleBundle(files: Record<string, Uint8Array>): string[] {
   const decoder = new TextDecoder();
   const written: string[] = [];
   for (const [name, bytes] of Object.entries(files)) {
-    if (!name.endsWith(".json")) {
-      continue;
-    }
-    const locale = name
-      .split("/")
-      .pop()!
-      .replace(/\.json$/, "");
-    if (locale === BASE_LANGUAGE) {
+    const locale = localeFromZipEntry(name);
+    if (locale === null || locale === BASE_LANGUAGE) {
       continue;
     }
     writeTranslation(locale, JSON.parse(decoder.decode(bytes)));
     written.push(locale);
   }
-
-  if (written.length === 0) {
-    console.log("Warning: bundle contained no non-base translation files.");
-  }
-  console.log(`Wrote ${written.length} file(s): ${[...written].sort().join(", ")}`);
-  return 0;
+  return written.sort();
 }
 
 async function runDownload(client: LokaliseClient): Promise<number> {
@@ -323,14 +314,35 @@ async function runDownload(client: LokaliseClient): Promise<number> {
   if (!resp.ok) {
     throw new Error(`Failed to download bundle: HTTP ${resp.status}`);
   }
-  return writeLocaleBundle(unzipSync(new Uint8Array(await resp.arrayBuffer())));
+  const written = writeLocaleBundle(unzipSync(new Uint8Array(await resp.arrayBuffer())));
+
+  if (written.length === 0) {
+    // A Lokalise download that yields no locales is a real failure (wrong
+    // project id, empty/corrupt bundle, API hiccup) — fail loudly so a
+    // release can't silently ship English-only. The legitimate English-only
+    // case is the unset-secrets guard in release.yml, which exits before
+    // ever calling download.
+    throw new Error("Lokalise returned no non-base translation files.");
+  }
+  console.log(`Wrote ${written.length} file(s): ${written.join(", ")}`);
+  return 0;
 }
 
 async function runDownloadFromRelease(): Promise<number> {
   const repo = process.env.GITHUB_REPOSITORY || DEFAULT_RELEASE_REPO;
   console.log(`Fetching ${RELEASE_ASSET_NAME} from the latest ${repo} release`);
   const zip = await fetchLatestReleaseAsset(repo, RELEASE_ASSET_NAME);
-  return writeLocaleBundle(unzipSync(zip));
+  const written = writeLocaleBundle(unzipSync(zip));
+
+  if (written.length === 0) {
+    // Unlike the Lokalise path, an empty release asset isn't a failure: a
+    // release built with Lokalise secrets unset legitimately ships
+    // English-only, and reproducing it here means writing nothing.
+    console.log("Warning: release asset contained no non-base translation files.");
+  } else {
+    console.log(`Wrote ${written.length} file(s): ${written.join(", ")}`);
+  }
+  return 0;
 }
 
 function writeTranslation(locale: string, data: unknown): void {
@@ -360,16 +372,6 @@ function usage(): void {
       "  GITHUB_REPOSITORY    owner/name for --source release (default esphome/device-builder-frontend)",
     ].join("\n")
   );
-}
-
-// Read a `--flag value` or `--flag=value` option out of argv.
-function flagValue(args: string[], name: string): string | undefined {
-  const inline = args.find((a) => a.startsWith(`${name}=`));
-  if (inline) {
-    return inline.slice(name.length + 1);
-  }
-  const idx = args.indexOf(name);
-  return idx === -1 ? undefined : args[idx + 1];
 }
 
 function makeLokaliseClient(): LokaliseClient {
@@ -413,4 +415,13 @@ async function main(): Promise<number> {
   }
 }
 
-main().then((code) => process.exit(code));
+// `main` resolves to an exit code for expected outcomes; the terminal
+// `.catch` keeps any unforeseen rejection (e.g. a throw outside main's
+// try/catch) on the same non-zero-exit contract instead of surfacing as an
+// unhandled rejection that may not fail CI.
+main()
+  .then((code) => process.exit(code))
+  .catch((err) => {
+    console.error(`error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });

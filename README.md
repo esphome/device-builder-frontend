@@ -88,7 +88,7 @@ python3 -m build --wheel
 
 ## Translations
 
-`src/translations/en.json` is the English source of truth and the **only translation file committed to the repo**. Every other locale lives in [Lokalise](https://lokalise.com/); those files are gitignored and pulled on demand with a small TypeScript tool at `build-scripts/translations.ts` (run directly by Node — no build step).
+`src/translations/en.json` is the English source of truth and the **only translation file committed to the repo**. Every other locale lives in [Lokalise](https://lokalise.com/); those files are gitignored and pulled on demand with a small TypeScript tool at `build-scripts/translations.ts` (run directly by Node — no build step). That direct `.ts` execution relies on Node's native type stripping, so it needs **Node 22.18+** (CI runs Node 24); on older Node it fails with `ERR_UNKNOWN_FILE_EXTENSION`.
 
 ```bash
 # Push new/changed English keys up to Lokalise as the base language.
@@ -96,9 +96,13 @@ npm run translations:upload
 
 # Pull the latest translations into src/translations/ (for local dev).
 npm run translations:download
+
+# Pull the locales from the latest GitHub release instead of Lokalise
+# (no Lokalise token needed — reads the release's translations.zip asset).
+npm run translations:download -- --source release
 ```
 
-Both commands read `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` from the environment. `upload` only adds keys — it never overwrites translator edits; pass `npm run translations:upload -- --cleanup` to also delete Lokalise keys that no longer exist in `en.json`. `download` pulls every language the project has, writes each one except English verbatim, and omits untranslated keys so the runtime English fallback in `localize.ts` stays in effect.
+Both Lokalise commands read `LOKALISE_API_TOKEN` and `LOKALISE_PROJECT_ID` from the environment. `upload` only adds keys — it never overwrites translator edits; pass `npm run translations:upload -- --cleanup` to also delete Lokalise keys that no longer exist in `en.json`. `download` pulls every language the project has, writes each one except English (canonicalizing Lokalise's underscore ISO codes to the repo's BCP 47 filenames, e.g. `zh_CN` → `zh-CN.json`), and omits untranslated keys so the runtime English fallback in `localize.ts` stays in effect. A Lokalise download that returns no locales is treated as an error rather than silently shipping English-only. The `--source release` variant needs no Lokalise token (optionally `GITHUB_TOKEN` / `GITHUB_REPOSITORY` to raise rate limits or point at a fork) and reproduces exactly the locales the latest release shipped.
 
 The frontend loader (`src/common/localize.ts`) discovers whatever locale files are present at build time via `import.meta.webpackContext` — there's no hardcoded locale list. A checkout with no download (or a build before the secrets are set) simply ships English-only; the missing files are not an error. Locale codes are matched separator- and case-insensitively, so Lokalise's `fr` / `zh_CN` filenames resolve against the browser's BCP 47 `fr-FR` / `zh-CN` tags without any per-locale mapping.
 

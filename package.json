@@ -4,6 +4,9 @@
   "description": "Frontend for ESPHome Dashboard",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "node build-scripts/dev-server.cjs",
     "build": "node build-scripts/build.cjs",
