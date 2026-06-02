@@ -13,5 +13,8 @@ export default function setup() {
   const script = fileURLToPath(
     new URL("../build-scripts/gen-language-manifest.cjs", import.meta.url)
   );
-  execFileSync(process.execPath, [script], { stdio: "ignore" });
+  // Inherit stderr so a generator failure (bad JSON, missing dir) surfaces
+  // its error instead of just a bare non-zero-exit throw; success output on
+  // stdout stays quiet to avoid noise before the suite runs.
+  execFileSync(process.execPath, [script], { stdio: ["ignore", "ignore", "inherit"] });
 }

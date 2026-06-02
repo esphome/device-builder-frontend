@@ -30,6 +30,12 @@ const FLAG_FALLBACK = "🏳️";
 // canonical hyphenated names (the download tool normalizes `zh_CN` → `zh-CN`),
 // so this is defensive: hyphenate then run through Intl for canonical casing,
 // falling back to the raw hyphenated form for anything Intl rejects.
+//
+// Intentionally duplicated from build-scripts/translations-lib.ts and
+// src/common/localize.ts (the bodies are byte-identical). It is NOT shared
+// because this is a CommonJS build-time script that can't `require` the `.ts`
+// ESM lib without a loader, and the frontend bundle can't import from
+// build-scripts/. Keep the three copies in sync if you ever change one.
 const toBcp47 = (stem) => {
   const hyphenated = stem.replace(/_/g, "-");
   try {
