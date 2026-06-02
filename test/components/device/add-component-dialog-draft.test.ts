@@ -55,4 +55,28 @@ describe("add-component-dialog preserves the editor draft (#1146)", () => {
     // Surfaced as an unsaved draft only.
     expect(seen).toEqual([{ type: "yaml-draft", yaml: "MERGED" }]);
   });
+
+  it("omits the draft when the editor yaml hasn't loaded, so it isn't merged into ''", async () => {
+    const dialog = new ESPHomeAddComponentDialog();
+    const addComponent = vi.fn().mockResolvedValue({ yaml: "MERGED" });
+    Object.assign(dialog as unknown as Record<string, unknown>, {
+      _api: { addComponent },
+      _selected: { id: "i2c" },
+      _returnTo: { id: "orig" },
+      _depDomain: null,
+    });
+    dialog.configuration = "foo.yaml";
+    dialog.yaml = ""; // still loading — must not become the merge base
+
+    await (
+      dialog as unknown as { _onFormSubmit: (e: CustomEvent) => Promise<void> }
+    )._onFormSubmit(new CustomEvent("form-submit", { detail: { fields: {} } }));
+
+    // Third arg is undefined → backend falls back to the on-disk YAML.
+    expect(addComponent).toHaveBeenCalledWith(
+      "foo.yaml",
+      { component_id: "i2c", fields: {} },
+      undefined
+    );
+  });
 });

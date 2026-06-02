@@ -385,16 +385,19 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // not retarget the form to a dep after the user submitted.
     this._depNavSeq++;
     try {
-      // Merge into the editor's current draft (`this.yaml`) so unsaved
-      // edits survive; the backend returns the merged YAML without
-      // persisting (it saves via the normal Save flow).
+      // Merge into the editor's current draft so unsaved edits survive;
+      // the backend returns the merged YAML without persisting (it saves
+      // via the normal Save flow). Only send the draft when it's actually
+      // loaded — `yaml` defaults to "" before the config arrives, and
+      // merging into "" would drop the on-disk config, so an empty draft
+      // omits the arg and the backend falls back to the on-disk YAML.
       const { yaml } = await this._api.addComponent(
         this.configuration,
         {
           component_id: this._selected.id,
           fields: e.detail.fields,
         },
-        this.yaml
+        this.yaml || undefined
       );
 
       // Surface the merged YAML as an unsaved draft. We dispatch this
