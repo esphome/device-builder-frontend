@@ -66,4 +66,14 @@ export class TriggerCatalogController implements ReactiveController {
     const catalogId = domain === "esphome" ? eventKey : `${domain}.${eventKey}`;
     return triggers.find((t) => t.id === catalogId)?.name || fallback;
   }
+
+  /** True when the catalog has a component trigger for `domain`. Fails
+   *  open until the catalog loads so a section's existing automations are
+   *  never briefly hidden mid-fetch. */
+  hasTriggersFor(domain: string): boolean {
+    const { platform, boardId } = this._context();
+    const triggers = getCachedAutomationTriggers(platform, boardId);
+    if (!triggers) return true;
+    return triggers.some((t) => t.applies_to.includes(domain));
+  }
 }

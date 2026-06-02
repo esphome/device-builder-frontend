@@ -8,13 +8,19 @@
  * shortcut the parser scoped as `unscoped`). These tests lock the gate's
  * classification and assert it agrees with the parser for the same YAML.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
+import type { ESPHomeAPI } from "../../../src/api/index.js";
+import type { AutomationTrigger } from "../../../src/api/types/automations.js";
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
+import {
+  _clearAutomationCatalogCache,
+  fetchAutomationTriggers,
+} from "../../../src/util/automation-catalog-cache.js";
 import {
   _clearYamlSectionsMemo,
   parseYamlAutomations,
@@ -41,8 +47,25 @@ const shortcutTarget = (
   return inner._shortcutTarget();
 };
 
+/** Seed the module trigger cache (keyed on undefined platform/board, as a
+ *  boardless test component resolves) so ``hasTriggersFor`` sees them. */
+const seedTriggers = (ids: string[]): Promise<unknown> => {
+  const triggers = ids.map((id) => ({
+    id,
+    applies_to: [id.split(".")[0]],
+  })) as unknown as AutomationTrigger[];
+  const api = { getAutomationTriggers: async () => triggers } as unknown as ESPHomeAPI;
+  return fetchAutomationTriggers(api, undefined, undefined);
+};
+
 beforeEach(() => {
   _clearYamlSectionsMemo();
+});
+
+afterEach(() => {
+  // Drop any seeded catalog so other tests keep their fail-open (no
+  // catalog → ``hasTriggersFor`` returns true) behavior.
+  _clearAutomationCatalogCache();
 });
 
 describe("_shortcutTarget", () => {
@@ -158,5 +181,16 @@ describe("_shortcutTarget", () => {
         (target as { kind: "component_on"; componentId: string }).componentId
       );
     }
+  });
+
+  it("hides the panel for a trigger-less domain once the catalog loads", async () => {
+    await seedTriggers(["sun.on_sunrise", "switch.on_turn_on"]);
+    // web_server has no catalog triggers → no automations panel.
+    expect(shortcutTarget("web_server:\n  port: 80\n", "web_server")).toBeNull();
+    // sun does → still offered.
+    expect(shortcutTarget("sun:\n  id: my_sun\n", "sun")).toEqual({
+      kind: "component_on",
+      componentId: "my_sun",
+    });
   });
 });

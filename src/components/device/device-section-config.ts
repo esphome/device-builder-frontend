@@ -568,9 +568,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
 
   /**
    * Target for the per-section "+ Add automation" / triggers-list
-   * shortcut: ``null`` for ``SHORTCUT_HIDE_KEYS`` (api / script / data-
-   * only blocks), ``device_on`` for ``esphome:``, else ``component_on``
-   * keyed by the instance's addressable id (list item or flat singleton).
+   * shortcut: ``null`` for ``SHORTCUT_HIDE_KEYS`` and domains with no
+   * catalog triggers (so trigger-less components like ``web_server:`` show
+   * no panel); ``device_on`` for ``esphome:``; else ``component_on`` keyed
+   * by the instance's addressable id (list item or flat singleton).
    */
   private _shortcutTarget():
     | null
@@ -587,6 +588,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this._resolvedFromLine !== undefined
         ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
         : candidates[0];
+    // Only host automations where the domain actually has triggers
+    // (mirrors the backend's ``_component_trigger_domains`` gate), so a
+    // trigger-less component like ``web_server:`` shows no panel.
+    const domain = match.parentKey ?? match.key;
+    if (!this._triggerCatalog.hasTriggersFor(domain)) return null;
     return { kind: "component_on", componentId: instanceComponentId(sections, match) };
   }
 
