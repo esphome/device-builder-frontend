@@ -588,11 +588,13 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this._resolvedFromLine !== undefined
         ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
         : candidates[0];
-    // Only host automations where the domain actually has triggers
+    // Only host automations where the section actually has triggers
     // (mirrors the backend's ``_component_trigger_domains`` gate), so a
-    // trigger-less component like ``web_server:`` shows no panel.
-    const domain = match.parentKey ?? match.key;
-    if (!this._triggerCatalog.hasTriggersFor(domain)) return null;
+    // trigger-less component like ``web_server:`` shows no panel. Check the
+    // bare domain and the qualified ``<domain>.<platform>``, since a
+    // trigger may be scoped to either (``switch`` vs ``output.slow_pwm``).
+    const scopes = [match.parentKey ?? match.key, this.sectionKey];
+    if (!this._triggerCatalog.hasTriggersFor(scopes)) return null;
     return { kind: "component_on", componentId: instanceComponentId(sections, match) };
   }
 

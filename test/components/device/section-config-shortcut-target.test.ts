@@ -48,12 +48,14 @@ const shortcutTarget = (
 };
 
 /** Seed the module trigger cache (keyed on undefined platform/board, as a
- *  boardless test component resolves) so ``hasTriggersFor`` sees them. */
-const seedTriggers = (ids: string[]): Promise<unknown> => {
-  const triggers = ids.map((id) => ({
-    id,
-    applies_to: [id.split(".")[0]],
-  })) as unknown as AutomationTrigger[];
+ *  boardless test component resolves) so ``hasTriggersFor`` sees them.
+ *  A bare id seeds ``applies_to: [<domain>]``; a ``[id, applies_to]`` pair
+ *  seeds an explicit (e.g. platform-qualified) scope. */
+const seedTriggers = (specs: Array<string | [string, string[]]>): Promise<unknown> => {
+  const triggers = specs.map((s) => {
+    const [id, applies_to] = typeof s === "string" ? [s, [s.split(".")[0]]] : s;
+    return { id, applies_to };
+  }) as unknown as AutomationTrigger[];
   const api = { getAutomationTriggers: async () => triggers } as unknown as ESPHomeAPI;
   return fetchAutomationTriggers(api, undefined, undefined);
 };
@@ -191,6 +193,17 @@ describe("_shortcutTarget", () => {
     expect(shortcutTarget("sun:\n  id: my_sun\n", "sun")).toEqual({
       kind: "component_on",
       componentId: "my_sun",
+    });
+  });
+
+  it("matches a trigger scoped to the qualified <domain>.<platform>", async () => {
+    // output's triggers list the platform-qualified scope (``output.slow_pwm``),
+    // not the bare domain — the gate must still offer the panel.
+    await seedTriggers([["slow_pwm.output.turn_on_action", ["output.slow_pwm"]]]);
+    const yaml = `output:\n  - platform: slow_pwm\n    id: my_out\n    pin: GPIO1\n`;
+    expect(shortcutTarget(yaml, "output.slow_pwm")).toEqual({
+      kind: "component_on",
+      componentId: "my_out",
     });
   });
 });

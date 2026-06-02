@@ -67,13 +67,15 @@ export class TriggerCatalogController implements ReactiveController {
     return triggers.find((t) => t.id === catalogId)?.name || fallback;
   }
 
-  /** True when the catalog has a component trigger for `domain`. Fails
-   *  open until the catalog loads so a section's existing automations are
-   *  never briefly hidden mid-fetch. */
-  hasTriggersFor(domain: string): boolean {
+  /** True when the catalog has a component trigger scoped to any of
+   *  `scopes` (a section's bare domain and its qualified
+   *  ``<domain>.<platform>`` — triggers list one or the other). Fails open
+   *  until the catalog loads so existing automations aren't briefly hidden
+   *  mid-fetch. */
+  hasTriggersFor(scopes: string[]): boolean {
     const { platform, boardId } = this._context();
     const triggers = getCachedAutomationTriggers(platform, boardId);
     if (!triggers) return true;
-    return triggers.some((t) => t.applies_to.includes(domain));
+    return triggers.some((t) => t.applies_to.some((a) => scopes.includes(a)));
   }
 }
