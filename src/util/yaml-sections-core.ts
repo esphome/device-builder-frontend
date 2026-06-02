@@ -285,34 +285,17 @@ export function smallestContainingSection(
 }
 
 /**
- * Addressable component id for the list-item instance `match` among
- * `sections`: its declared ``id:`` when present, else the backend's
- * positional ``<domain>_<idx>`` (``idx`` = the instance's 0-based
- * position in the ``<domain>:`` list, document order). Mirrors the
- * backend's inline-automation scheme (``parsing.py`` emits
- * ``f"{domain}_{idx}"``, ``inline.py`` resolves it back) so the handle
- * round-trips through ``automations/upsert`` / ``delete``.
- *
- * Returns ``null`` for a flat single-instance block (``sun:``,
- * ``mqtt:``, ``wifi:`` …) — **even when it declares an explicit
- * ``id:``**. The backend addresses inline ``on_*:`` handlers under list
- * domains only (``isinstance(section, list)``), so a flat host is not
- * addressable. The ``parentKey`` check therefore comes first: a flat
- * block with an id must still return ``null`` so the shortcut gate and
- * the parser agree (both treat it as unscoped) rather than offering a
- * shortcut that resolves to nothing.
+ * Addressable id for `match`, mirroring the backend so the handle
+ * round-trips through ``automations/upsert``: a list item → its ``id:`` or
+ * positional ``<domain>_<idx>``; a flat singleton (``sun:``, ``parentKey``
+ * unset) → its ``id:`` or the domain.
  */
-export function instanceComponentId(
-  sections: YamlSection[],
-  match: YamlSection
-): string | null {
+export function instanceComponentId(sections: YamlSection[], match: YamlSection): string {
   const domain = match.parentKey;
-  if (domain === undefined) return null;
+  if (domain === undefined) return match.id ?? match.key;
   if (match.id) return match.id;
-  // Position among same-domain instances in document order. Counting by
-  // ``fromLine`` (unique per list item) is a single allocation-free pass
-  // and, unlike ``indexOf``, doesn't depend on ``match`` being the same
-  // object reference held in ``sections``.
+  // Count by ``fromLine`` (not ``indexOf``): allocation-free and doesn't
+  // depend on ``match`` being the array's own object reference.
   let idx = 0;
   for (const s of sections) {
     if (s.parentKey === domain && s.fromLine < match.fromLine) idx++;

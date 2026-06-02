@@ -13,7 +13,7 @@
 import { consume } from "@lit/context";
 import { mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -29,8 +29,8 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { parseYamlAutomations } from "../../util/yaml-sections.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../base-dialog.js";
 
 registerMdiIcons({ close: mdiClose });
 
@@ -52,9 +52,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
-
+  @state() private _open = false;
   @state() private _name = "";
   @state() private _saving = false;
   @state() private _error = "";
@@ -63,10 +61,10 @@ export class ESPHomeAddApiActionDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 480px;
       }
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: var(--wa-space-l);
       }
       .intro {
@@ -156,8 +154,15 @@ export class ESPHomeAddApiActionDialog extends LitElement {
   public open() {
     this._name = "";
     this._error = "";
-    this._dialog.open = true;
+    this._open = true;
   }
+
+  // esphome-base-dialog never mutates its own open on a user-driven close
+  // (Escape / X / backdrop); the host owns flipping _open here, else a
+  // re-render re-asserts ?open and the dialog can't dismiss.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
 
   protected render() {
     const title = this.boardName
@@ -165,7 +170,12 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           name: this.boardName,
         })
       : this._localize("device.add_api_action");
-    return html`<wa-dialog light-dismiss label=${title}>
+    return html`<esphome-base-dialog
+      ?open=${this._open}
+      ?busy=${this._saving}
+      .label=${title}
+      @request-close=${this._onRequestClose}
+    >
       <p class="intro">
         ${renderMarkdown(this._localize("device.api_action_header_description"))}
       </p>
@@ -201,7 +211,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
             : this._localize("device.add_automation_continue")}
         </button>
       </div>
-    </wa-dialog>`;
+    </esphome-base-dialog>`;
   }
 
   private _canContinue(): boolean {
@@ -250,7 +260,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
           composed: true,
         })
       );
-      this._dialog.open = false;
+      this._open = false;
     } catch (err) {
       const msg =
         err instanceof Error

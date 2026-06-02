@@ -1,0 +1,62 @@
+/**
+ * @vitest-environment happy-dom
+ *
+ * Open/close contract for the add-api-action dialog after its
+ * migration onto ``esphome-base-dialog``. The wrapper never mutates
+ * its own ``open`` on a user-driven close (Escape / X / backdrop), so
+ * the host owns the reactive ``_open`` flag: ``open()`` must set it and
+ * the ``@request-close`` handler must clear it. Guards against a
+ * re-render re-asserting ``?open`` and trapping the dialog open.
+ */
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../src/components/base-dialog.js", () => ({}));
+vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
+vi.mock("sonner-js", () => ({ default: { error: vi.fn() } }));
+
+import { ESPHomeAddApiActionDialog } from "../../../src/components/device/add-api-action-dialog.js";
+
+async function mountDialog(): Promise<ESPHomeAddApiActionDialog> {
+  const dialog = new ESPHomeAddApiActionDialog();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (dialog as any)._localize = (key: string) => key; // no context provider in the test tree
+  document.body.appendChild(dialog);
+  await dialog.updateComplete;
+  return dialog;
+}
+
+const isOpen = (d: ESPHomeAddApiActionDialog): boolean =>
+  (d as unknown as { _open: boolean })._open;
+
+const requestClose = (d: ESPHomeAddApiActionDialog): void =>
+  (d as unknown as { _onRequestClose: () => void })._onRequestClose();
+
+describe("esphome-add-api-action-dialog base-dialog open contract", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("open() drives the reactive _open flag", async () => {
+    const dialog = await mountDialog();
+    expect(isOpen(dialog)).toBe(false);
+    dialog.open();
+    expect(isOpen(dialog)).toBe(true);
+  });
+
+  it("_onRequestClose flips _open back to false", async () => {
+    const dialog = await mountDialog();
+    dialog.open();
+    expect(isOpen(dialog)).toBe(true);
+    requestClose(dialog);
+    expect(isOpen(dialog)).toBe(false);
+  });
+
+  it("open() resets the name and error fields", async () => {
+    const dialog = await mountDialog();
+    (dialog as unknown as { _name: string })._name = "stale";
+    (dialog as unknown as { _error: string })._error = "boom";
+    dialog.open();
+    expect((dialog as unknown as { _name: string })._name).toBe("");
+    expect((dialog as unknown as { _error: string })._error).toBe("");
+  });
+});

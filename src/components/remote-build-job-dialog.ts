@@ -545,7 +545,7 @@ export class ESPHomeRemoteBuildJobDialog extends LitElement {
     }
     // ?busy gates outside-click + Esc + close-button while
     // the submit_job WS round-trip is in flight: base-dialog
-    // flips light-dismiss off and vetoes wa-request-close
+    // flips light-dismiss off and vetoes wa-hide
     // when busy, so the dialog can't dismiss between the
     // submit and the ack returning. Orphaning that response
     // would fire remote-build-job-submitted against an
