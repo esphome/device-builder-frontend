@@ -65,21 +65,39 @@ function makeHost(
   };
 }
 
-describe("command-dialog install chain follow", () => {
-  it("follows the compile into its upload and only succeeds after the upload", () => {
-    const compile = makeJob({ job_id: "c1", job_type: JobType.COMPILE });
-    const upload = makeJob({
-      job_id: "u1",
-      job_type: JobType.UPLOAD,
-      status: JobStatus.QUEUED,
-      depends_on: "c1",
-    });
-    const { host, follows, flipped } = makeHost(
+// A host pre-loaded with an install chain: a COMPILE "c1" and its held UPLOAD
+// "u1" (depends_on "c1"). Overrides tweak either job (e.g. a REMOTE compile).
+function installChainHost(
+  compileOverrides: Partial<FirmwareJob> = {},
+  uploadOverrides: Partial<FirmwareJob> = {}
+) {
+  const compile = makeJob({
+    job_id: "c1",
+    job_type: JobType.COMPILE,
+    ...compileOverrides,
+  });
+  const upload = makeJob({
+    job_id: "u1",
+    job_type: JobType.UPLOAD,
+    status: JobStatus.QUEUED,
+    depends_on: "c1",
+    ...uploadOverrides,
+  });
+  return {
+    ...makeHost(
       new Map([
         ["c1", compile],
         ["u1", upload],
       ])
-    );
+    ),
+    compile,
+    upload,
+  };
+}
+
+describe("command-dialog install chain follow", () => {
+  it("follows the compile into its upload and only succeeds after the upload", () => {
+    const { host, follows, flipped } = installChainHost();
 
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     host._jobId = "c1";
@@ -127,24 +145,10 @@ describe("command-dialog install chain follow", () => {
     // The compile ran on a remote builder; the upload is local. After hand-off
     // the primed source must track the upload so the remote-builder sub-line
     // doesn't linger on the compile's receiver.
-    const compile = makeJob({
-      job_id: "c1",
-      job_type: JobType.COMPILE,
+    const { host, follows } = installChainHost({
       source: JobSource.REMOTE,
       source_label: "builder",
     });
-    const upload = makeJob({
-      job_id: "u1",
-      job_type: JobType.UPLOAD,
-      status: JobStatus.QUEUED,
-      depends_on: "c1",
-    });
-    const { host, follows } = makeHost(
-      new Map([
-        ["c1", compile],
-        ["u1", upload],
-      ])
-    );
     host._primedSource = {
       source: JobSource.REMOTE,
       source_label: "builder",
@@ -160,19 +164,7 @@ describe("command-dialog install chain follow", () => {
   });
 
   it("does not follow the upload when the compile fails", () => {
-    const compile = makeJob({ job_id: "c1", job_type: JobType.COMPILE });
-    const upload = makeJob({
-      job_id: "u1",
-      job_type: JobType.UPLOAD,
-      status: JobStatus.QUEUED,
-      depends_on: "c1",
-    });
-    const { host, follows, flipped } = makeHost(
-      new Map([
-        ["c1", compile],
-        ["u1", upload],
-      ])
-    );
+    const { host, follows, flipped } = installChainHost();
 
     host._jobId = "c1";
     followJob(host, "c1");
