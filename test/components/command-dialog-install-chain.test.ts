@@ -7,7 +7,7 @@
  * report success once the upload finishes, instead of declaring the device
  * flashed the moment it compiled.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   type FirmwareJob,
   JobSource,
@@ -114,6 +114,7 @@ describe("command-dialog install chain follow", () => {
       ])
     );
 
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     host._jobId = "c1";
     followJob(host, "c1");
     follows.c1.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
@@ -130,6 +131,25 @@ describe("command-dialog install chain follow", () => {
     expect(host._statusMessage).toBe("command.install_success");
     expect(host._jobId).toBe("");
     expect(flipped()).toBe(true);
+    // The upload's completion must not re-trigger the missing-upload warning.
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it("warns (and falls through to success) when a compile has no dependent upload", () => {
+    const compile = makeJob({ job_id: "c1", job_type: JobType.COMPILE });
+    // No upload in context — a genuine backend/transport gap, not the happy path.
+    const { host, follows, flipped } = makeHost(new Map([["c1", compile]]));
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    host._jobId = "c1";
+    followJob(host, "c1");
+    follows.c1.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
+
+    expect(warn).toHaveBeenCalledOnce();
+    expect(host._state).toBe("success");
+    expect(flipped()).toBe(true);
+    warn.mockRestore();
   });
 
   it("does not follow the upload when the compile fails", () => {

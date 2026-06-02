@@ -167,10 +167,17 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
 
-      // An install is a COMPILE then a dependent UPLOAD (#1131); follow the
-      // upload (depends_on === this compile) so success reflects the flash,
-      // not just the compile.
-      if (success && host._commandType === "install") {
+      // An install is a COMPILE then a dependent UPLOAD (#1131); when the
+      // COMPILE succeeds, follow the upload (depends_on === this compile) so
+      // success reflects the flash, not just the compile. Gate on the finished
+      // job being the COMPILE so the upload's own completion (which re-enters
+      // this handler) falls straight through to success.
+      const finished = host._jobs.get(jobId);
+      if (
+        success &&
+        host._commandType === "install" &&
+        finished?.job_type === JobType.COMPILE
+      ) {
         const upload = [...host._jobs.values()].find(
           (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
         );
