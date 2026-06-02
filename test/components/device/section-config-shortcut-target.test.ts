@@ -8,13 +8,19 @@
  * shortcut the parser scoped as `unscoped`). These tests lock the gate's
  * classification and assert it agrees with the parser for the same YAML.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("sonner-js", () => ({
   default: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
 }));
 
+import type { ESPHomeAPI } from "../../../src/api/index.js";
+import type { AutomationTrigger } from "../../../src/api/types/automations.js";
 import { ESPHomeDeviceSectionConfig } from "../../../src/components/device/device-section-config.js";
+import {
+  _clearAutomationCatalogCache,
+  fetchAutomationTriggers,
+} from "../../../src/util/automation-catalog-cache.js";
 import {
   _clearYamlSectionsMemo,
   parseYamlAutomations,
@@ -41,8 +47,27 @@ const shortcutTarget = (
   return inner._shortcutTarget();
 };
 
+/** Seed the module trigger cache (keyed on undefined platform/board, as a
+ *  boardless test component resolves) so ``hasTriggersFor`` sees them.
+ *  A bare id seeds ``applies_to: [<domain>]``; a ``[id, applies_to]`` pair
+ *  seeds an explicit (e.g. platform-qualified) scope. */
+const seedTriggers = (specs: Array<string | [string, string[]]>): Promise<unknown> => {
+  const triggers = specs.map((s) => {
+    const [id, applies_to] = typeof s === "string" ? [s, [s.split(".")[0]]] : s;
+    return { id, applies_to };
+  }) as unknown as AutomationTrigger[];
+  const api = { getAutomationTriggers: async () => triggers } as unknown as ESPHomeAPI;
+  return fetchAutomationTriggers(api, undefined, undefined);
+};
+
 beforeEach(() => {
   _clearYamlSectionsMemo();
+});
+
+afterEach(() => {
+  // Drop any seeded catalog so other tests keep their fail-open (no
+  // catalog → ``hasTriggersFor`` returns true) behavior.
+  _clearAutomationCatalogCache();
 });
 
 describe("_shortcutTarget", () => {
@@ -83,11 +108,9 @@ describe("_shortcutTarget", () => {
     });
   });
 
-  it("returns null for a flat block even with an explicit id (no broken shortcut)", () => {
-    // The exact regression: `sun:` is a flat single-instance block that
-    // can carry an id and host on_sunrise, but the backend can't address
-    // it, so the gate must offer no shortcut (matching the parser's
-    // `unscoped`).
+  it("scopes a flat singleton block to its id (sun → its declared id)", () => {
+    // With backend flat-component support (#1139), `sun:` is addressable
+    // by its `id:`, so the section hosts automations like a list item.
     const yaml = `sun:
   id: my_sun
   latitude: 0°
@@ -95,7 +118,24 @@ describe("_shortcutTarget", () => {
     - then:
         - logger.log: "x"
 `;
-    expect(shortcutTarget(yaml, "sun")).toBeNull();
+    expect(shortcutTarget(yaml, "sun")).toEqual({
+      kind: "component_on",
+      componentId: "my_sun",
+    });
+  });
+
+  it("scopes an id-less flat singleton block to its domain", () => {
+    const yaml = `mqtt:
+  broker: test
+  on_message:
+    - topic: x/y
+      then:
+        - logger.log: "m"
+`;
+    expect(shortcutTarget(yaml, "mqtt")).toEqual({
+      kind: "component_on",
+      componentId: "mqtt",
+    });
   });
 
   it("routes multi-instance sections by _resolvedFromLine", () => {
@@ -143,5 +183,27 @@ describe("_shortcutTarget", () => {
         (target as { kind: "component_on"; componentId: string }).componentId
       );
     }
+  });
+
+  it("hides the panel for a trigger-less domain once the catalog loads", async () => {
+    await seedTriggers(["sun.on_sunrise", "switch.on_turn_on"]);
+    // web_server has no catalog triggers → no automations panel.
+    expect(shortcutTarget("web_server:\n  port: 80\n", "web_server")).toBeNull();
+    // sun does → still offered.
+    expect(shortcutTarget("sun:\n  id: my_sun\n", "sun")).toEqual({
+      kind: "component_on",
+      componentId: "my_sun",
+    });
+  });
+
+  it("matches a trigger scoped to the qualified <domain>.<platform>", async () => {
+    // output's triggers list the platform-qualified scope (``output.slow_pwm``),
+    // not the bare domain — the gate must still offer the panel.
+    await seedTriggers([["slow_pwm.output.turn_on_action", ["output.slow_pwm"]]]);
+    const yaml = `output:\n  - platform: slow_pwm\n    id: my_out\n    pin: GPIO1\n`;
+    expect(shortcutTarget(yaml, "output.slow_pwm")).toEqual({
+      kind: "component_on",
+      componentId: "my_out",
+    });
   });
 });

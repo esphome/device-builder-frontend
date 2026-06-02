@@ -567,14 +567,11 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   }
 
   /**
-   * Classify the current section for the per-section "+ Add
-   * automation" / triggers-list shortcut. Returns ``null`` when the
-   * section can't host inline ``on_*:`` automations (api has its own
-   * shortcut; script/interval have their own navigator CTAs; data-
-   * only blocks like substitutions never carry triggers; flat
-   * single-instance blocks have no positional id to address).
-   * id-less list-item instances resolve to the backend's positional
-   * ``<domain>_<idx>`` id, so they host automations like id'd ones.
+   * Target for the per-section "+ Add automation" / triggers-list
+   * shortcut: ``null`` for ``SHORTCUT_HIDE_KEYS`` and domains with no
+   * catalog triggers (so trigger-less components like ``web_server:`` show
+   * no panel); ``device_on`` for ``esphome:``; else ``component_on`` keyed
+   * by the instance's addressable id (list item or flat singleton).
    */
   private _shortcutTarget():
     | null
@@ -582,10 +579,8 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     | { kind: "component_on"; componentId: string } {
     if (SHORTCUT_HIDE_KEYS.has(this.sectionKey)) return null;
     if (this.sectionKey === "esphome") return { kind: "device_on" };
-    // Otherwise this should be a regular component instance — a list
-    // item under a top-level platform block. Look it up by matching
-    // section key, biased toward the section's currently-resolved
-    // fromLine so multi-instance components route to the right entry.
+    // A configured component (list item or flat singleton), matched by
+    // section key and biased to the resolved fromLine for multi-instance.
     const sections = parseYamlTopLevelSections(this.yaml);
     const candidates = sections.filter((s) => sectionKeyOf(s) === this.sectionKey);
     if (candidates.length === 0) return null;
@@ -593,9 +588,14 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
       this._resolvedFromLine !== undefined
         ? (candidates.find((s) => s.fromLine === this._resolvedFromLine) ?? candidates[0])
         : candidates[0];
-    const componentId = instanceComponentId(sections, match);
-    if (componentId === null) return null;
-    return { kind: "component_on", componentId };
+    // Only host automations where the section actually has triggers
+    // (mirrors the backend's ``_component_trigger_domains`` gate), so a
+    // trigger-less component like ``web_server:`` shows no panel. Check the
+    // bare domain and the qualified ``<domain>.<platform>``, since a
+    // trigger may be scoped to either (``switch`` vs ``output.slow_pwm``).
+    const scopes = [match.parentKey ?? match.key, this.sectionKey];
+    if (!this._triggerCatalog.hasTriggersFor(scopes)) return null;
+    return { kind: "component_on", componentId: instanceComponentId(sections, match) };
   }
 
   /**
