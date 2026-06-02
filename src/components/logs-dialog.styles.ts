@@ -30,22 +30,11 @@ export const logsDialogStyles = css`
   }
 
   /* The primary header bar + title colour/size come from the shared
-     primaryDialogHeaderStyles; the log title is the only monospace one. */
+     primaryDialogHeaderStyles; the log title is the only monospace one.
+     The title ellipsis + close-button-clearance now live in base-dialog,
+     so a long /dev/cu… path can't overflow the header here either. */
   esphome-base-dialog::part(title) {
     font-family: var(--logs-mono-font);
-  }
-  /* Truncate the name before the chip so a long /dev/cu… path can't overflow
-     the narrow header. */
-  esphome-base-dialog::part(label-row) {
-    display: flex;
-    align-items: center;
-    min-width: 0;
-  }
-  esphome-base-dialog::part(title-text) {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   esphome-base-dialog::part(body) {
     padding: 0;

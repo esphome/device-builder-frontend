@@ -248,6 +248,31 @@ export class ESPHomeBaseDialog extends LitElement {
         cursor: not-allowed;
         pointer-events: none;
       }
+
+      /* Keep the close (X) button reachable no matter how long the
+         title is. wa-dialog lays its header out as
+         [.title (flex: 1 1 auto)][.header-actions (the close button,
+         flex-shrink: 0)] but gives .title no min-width, so its default
+         min-width:auto (= min-content) lets a long unbroken title grow
+         the header past the dialog's right edge and shove the close
+         button off-screen (worst on a narrow / mobile viewport). Letting
+         the title column shrink to 0 and ellipsize fixes it for every
+         dialog built on this wrapper. The header-suffix (e.g. a status
+         chip) stays beside the truncated title via the label-row flex. */
+      wa-dialog::part(title) {
+        min-width: 0;
+      }
+      header[part="label-row"] {
+        display: flex;
+        align-items: center;
+        min-width: 0;
+      }
+      [part="title-text"] {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
     `,
   ];
 }
