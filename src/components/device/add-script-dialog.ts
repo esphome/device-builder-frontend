@@ -17,7 +17,7 @@
 import { consume } from "@lit/context";
 import { mdiClose } from "@mdi/js";
 import { css, html, LitElement, nothing } from "lit";
-import { customElement, property, query, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 
 import type { ESPHomeAPI } from "../../api/index.js";
@@ -36,8 +36,8 @@ import { renderMarkdown } from "../../util/markdown.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { applyYamlDiff, sectionKeyFromLocation } from "./automation-editor/serialise.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../base-dialog.js";
 
 registerMdiIcons({ close: mdiClose });
 
@@ -59,9 +59,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
   @property({ attribute: false })
   board: BoardCatalogEntry | null = null;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
-
+  @state() private _open = false;
   @state() private _id = "";
   @state() private _available: AvailableAutomations | null = null;
   @state() private _saving = false;
@@ -71,10 +69,10 @@ export class ESPHomeAddScriptDialog extends LitElement {
     espHomeStyles,
     inputStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 480px;
       }
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: var(--wa-space-l);
       }
       .intro {
@@ -164,9 +162,16 @@ export class ESPHomeAddScriptDialog extends LitElement {
   public open() {
     this._id = "";
     this._error = "";
-    this._dialog.open = true;
+    this._open = true;
     void this._loadAvailable();
   }
+
+  // esphome-base-dialog never mutates its own open in response to a user
+  // close (Escape / X / outside-click), so the host flips _open here to
+  // keep the next render's ?open binding in sync.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
 
   private async _loadAvailable() {
     if (!this._api || !this.configuration) return;
@@ -183,7 +188,12 @@ export class ESPHomeAddScriptDialog extends LitElement {
           name: this.boardName,
         })
       : this._localize("device.add_script");
-    return html`<wa-dialog light-dismiss label=${title}>
+    return html`<esphome-base-dialog
+      ?open=${this._open}
+      ?busy=${this._saving}
+      .label=${title}
+      @request-close=${this._onRequestClose}
+    >
       <p class="intro">
         ${renderMarkdown(this._localize("device.script_header_description"))}
       </p>
@@ -217,7 +227,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
             : this._localize("device.add_automation_continue")}
         </button>
       </div>
-    </wa-dialog>`;
+    </esphome-base-dialog>`;
   }
 
   private _canContinue(): boolean {
@@ -266,7 +276,7 @@ export class ESPHomeAddScriptDialog extends LitElement {
           composed: true,
         })
       );
-      this._dialog.open = false;
+      this._open = false;
     } catch (err) {
       const msg =
         err instanceof Error
