@@ -8,7 +8,7 @@
  * the ``@request-close`` handler must clear it. Guards against a
  * re-render re-asserting ``?open`` and trapping the dialog open.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../src/components/base-dialog.js", () => ({}));
 vi.mock("@home-assistant/webawesome/dist/components/icon/icon.js", () => ({}));
@@ -32,6 +32,10 @@ const requestClose = (d: ESPHomeAddApiActionDialog): void =>
   (d as unknown as { _onRequestClose: () => void })._onRequestClose();
 
 describe("esphome-add-api-action-dialog base-dialog open contract", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
   it("open() drives the reactive _open flag", async () => {
     const dialog = await mountDialog();
     expect(isOpen(dialog)).toBe(false);
