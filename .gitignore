@@ -15,6 +15,9 @@ build/
 # for development and during the release build, never checked in.
 /src/translations/*.json
 !/src/translations/en.json
+# Generated language picker manifest (autonym + flag per locale), built
+# from src/translations/*.json by build-scripts/gen-language-manifest.cjs.
+/src/generated/
 .DS_Store
 .claude/*
 !.claude/skills/

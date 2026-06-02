@@ -9,6 +9,7 @@
  * Translation files use nested objects; keys are accessed with dot-notation,
  * e.g. `localize("dashboard.title")`.
  */
+import languageManifest from "../generated/language-manifest.json";
 import enMessages from "../translations/en.json";
 
 export type LocalizeFunc = (
@@ -35,22 +36,6 @@ const BASE_LOCALE = "en";
 const normalizeLocale = (locale: string): string =>
   locale.toLowerCase().replace(/_/g, "-");
 
-// Canonicalize a translation-file stem to a BCP 47 tag. Lokalise exports
-// underscore-separated names (`zh_CN`, `pt_BR`); left as-is they become
-// selectable locale codes that get handed to `Intl.*` formatters (see
-// activeLocale() consumers), which throw `RangeError` on an invalid tag.
-// Hyphenate, then run through `Intl.getCanonicalLocales` for canonical
-// casing (`zh-CN`), falling back to the raw hyphenated form for anything
-// Intl rejects.
-const toBcp47 = (stem: string): string => {
-  const hyphenated = stem.replace(/_/g, "-");
-  try {
-    return Intl.getCanonicalLocales(hyphenated)[0] ?? hyphenated;
-  } catch {
-    return hyphenated;
-  }
-};
-
 const asMessages = (mod: unknown): Record<string, unknown> => {
   if (mod && typeof mod === "object" && "default" in mod) {
     return (mod as { default: Record<string, unknown> }).default;
@@ -58,48 +43,49 @@ const asMessages = (mod: unknown): Record<string, unknown> => {
   return mod as Record<string, unknown>;
 };
 
-// Every locale the bundle ships, mapped to its full message object. The
-// English base is always present (static import above); the rest come
-// from whatever JSON files exist in src/translations/ at build time.
-// `import.meta.webpackContext` is a build-time helper: rspack replaces
-// the call with a real (synchronous) context factory so each locale's
-// name, flag, and strings are available up front for the picker. Under
-// vitest the helper doesn't exist and the call throws — that single call
-// is guarded so we fall back to English-only, which is also the state in
-// dev before translations are downloaded. The guard is scoped to just the
-// feature-probing call: iterating the context and reading each module run
-// outside it, so a genuine failure there (resolver error, malformed locale
-// JSON) surfaces instead of silently degrading a release to English-only.
-function discoverTranslations(): Map<string, Record<string, unknown>> {
-  const translations = new Map<string, Record<string, unknown>>([
-    [BASE_LOCALE, enMessages as Record<string, unknown>],
-  ]);
-  let ctx: ReturnType<ImportMeta["webpackContext"]>;
-  try {
-    ctx = import.meta.webpackContext("../translations", {
-      recursive: false,
-      regExp: /\.json$/,
-      mode: "sync",
-    });
-  } catch {
-    // No bundler context (vitest, or pre-download dev) — base only.
-    return translations;
-  }
-  for (const key of ctx.keys()) {
-    const stem = key.replace(/^\.\//, "").replace(/\.json$/, "");
-    if (stem === BASE_LOCALE) continue; // base is the static import
-    // Canonicalize so a Lokalise `zh_CN.json` is keyed as the BCP 47
-    // `zh-CN` everywhere downstream (picker, storage, Intl formatters).
-    translations.set(toBcp47(stem), asMessages(ctx(key)));
-  }
-  return translations;
+interface LanguageMeta {
+  language: string;
+  flag: string;
 }
 
-const TRANSLATIONS = discoverTranslations();
+// Build-time manifest of every shipped locale's autonym + flag, generated
+// from src/translations/*.json by build-scripts/gen-language-manifest.cjs.
+// It carries only two keys per locale, so it's cheap to keep in the entry
+// bundle — which lets the language picker stay synchronous (see LANGUAGES /
+// AVAILABLE_LOCALES below) without pulling any locale's message body into the
+// initial download. The bodies load lazily instead (see getLocaleContext).
+const LANGUAGE_MANIFEST = languageManifest as Record<string, LanguageMeta>;
+
+// Locale message bodies load lazily — `mode: "lazy"` makes rspack emit one
+// async chunk per locale, fetched only when that locale is selected (see
+// loadLocalize). English-only users download none of them.
+// `import.meta.webpackContext` is a build-time helper rspack replaces with a
+// real context factory; under vitest it doesn't exist and the call throws.
+// The context is created lazily and memoized so module evaluation never
+// touches it (and the guard is scoped to just the feature-probing call, so a
+// genuine load failure later surfaces rather than being swallowed here).
+let localeContext: ReturnType<ImportMeta["webpackContext"]> | null | undefined;
+function getLocaleContext(): ReturnType<ImportMeta["webpackContext"]> | null {
+  if (localeContext !== undefined) return localeContext;
+  try {
+    localeContext = import.meta.webpackContext("../translations", {
+      recursive: false,
+      regExp: /\.json$/,
+      mode: "lazy",
+    });
+  } catch {
+    // No bundler context (vitest, or pre-download dev).
+    localeContext = null;
+  }
+  return localeContext;
+}
 
 /** Every locale the running bundle can serve: the always-present English
- *  base first, then whatever translation files were downloaded, by code. */
-export const AVAILABLE_LOCALES: SupportedLocale[] = [...TRANSLATIONS.keys()].sort(
+ *  base first, then whatever translation files were downloaded, by code.
+ *  Derived from the build-time language manifest (autonym + flag per locale)
+ *  so the picker is data-driven and synchronous without bundling any message
+ *  body — a downloaded locale lights up here with no code change. */
+export const AVAILABLE_LOCALES: SupportedLocale[] = Object.keys(LANGUAGE_MANIFEST).sort(
   (a, b) => {
     if (a === BASE_LOCALE) return -1;
     if (b === BASE_LOCALE) return 1;
@@ -132,11 +118,11 @@ export interface LanguageOption {
 export const LANGUAGES: LanguageOption[] = [
   { value: "system", labelKey: "settings.language_system", flag: "🌐" },
   ...AVAILABLE_LOCALES.map((locale): LanguageOption => {
-    const messages = TRANSLATIONS.get(locale) ?? {};
+    const meta = LANGUAGE_MANIFEST[locale];
     return {
       value: locale,
-      label: typeof messages.language === "string" ? messages.language : locale,
-      flag: typeof messages.flag === "string" ? messages.flag : "🏳️",
+      label: meta?.language ?? locale,
+      flag: meta?.flag ?? "🏳️",
     };
   }),
 ];
@@ -250,17 +236,30 @@ export const defaultLocalize: LocalizeFunc = buildLocalize(
 );
 
 /**
- * Loads the requested locale (with per-key English fallback). Async to
- * preserve the call-site contract; the messages are already in memory.
- * Replace the context value with the result once resolved.
+ * Loads the requested locale (with per-key English fallback). Fetches the
+ * locale's own lazily-split chunk on demand, so non-English bodies stay out
+ * of the entry bundle. Replace the context value with the result once
+ * resolved.
  *
  * If `force` is omitted, picks the stored locale (from a previous user
  * selection) or falls back to the browser locale.
  */
 export async function loadLocalize(force?: SupportedLocale): Promise<LocalizeFunc> {
   const locale = force ?? activeLocale();
-  const localeMessages = TRANSLATIONS.get(locale);
-  if (locale === BASE_LOCALE || !localeMessages) return defaultLocalize;
+  if (locale === BASE_LOCALE) return defaultLocalize;
 
-  return buildLocalize(deepMerge(enMessages as Record<string, unknown>, localeMessages));
+  const ctx = getLocaleContext();
+  if (!ctx) return defaultLocalize; // vitest, or pre-download dev — English only.
+
+  let mod: unknown;
+  try {
+    // Lazy context: this resolves (and fetches) the locale's own async chunk.
+    mod = await (ctx(`./${locale}.json`) as Promise<unknown>);
+  } catch {
+    // Locale file not in the bundle (e.g. a stored locale that's no longer
+    // shipped) or its chunk failed to load — fall back to English rather
+    // than render raw keys.
+    return defaultLocalize;
+  }
+  return buildLocalize(deepMerge(enMessages as Record<string, unknown>, asMessages(mod)));
 }
