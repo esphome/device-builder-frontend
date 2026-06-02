@@ -15,7 +15,10 @@ import {
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
 import type { ESPHomeCommandDialog } from "../../src/components/command-dialog.js";
-import { followJob } from "../../src/components/command-dialog/commands.js";
+import {
+  followJob,
+  onForceLocalClick,
+} from "../../src/components/command-dialog/commands.js";
 
 interface StreamCbs {
   onOutput: (line: string) => void;
@@ -51,7 +54,10 @@ function makeJob(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
   };
 }
 
-function makeHost(jobs: Map<string, FirmwareJob>) {
+function makeHost(
+  jobs: Map<string, FirmwareJob>,
+  apiExtra: Record<string, unknown> = {}
+) {
   const follows: Record<string, StreamCbs> = {};
   let flipped = false;
   let streamSeq = 0;
@@ -61,6 +67,7 @@ function makeHost(jobs: Map<string, FirmwareJob>) {
         follows[jobId] = cbs;
         return `stream-${++streamSeq}`;
       },
+      ...apiExtra,
     },
     _jobs: jobs,
     _commandType: "install",
@@ -69,6 +76,11 @@ function makeHost(jobs: Map<string, FirmwareJob>) {
     _state: "running",
     _statusMessage: "",
     _streamId: "",
+    _switchingToLocal: false,
+    configuration: "kitchen.yaml",
+    name: "kitchen",
+    _port: "OTA",
+    _lines: [] as string[],
     _showLogsAfterInstall: true,
     _failedDuringValidate: false,
     _localize: (key: string) => key,
@@ -76,6 +88,7 @@ function makeHost(jobs: Map<string, FirmwareJob>) {
       flipped = true;
     },
     _flushPendingLines: () => {},
+    _resetPendingLines: () => {},
     _enqueueLine: () => {},
   };
   return {
@@ -143,5 +156,46 @@ describe("command-dialog install chain follow", () => {
     expect(host._jobId).toBe("");
     expect(follows.u1).toBeUndefined();
     expect(flipped()).toBe(false);
+  });
+
+  it("build-locally stays in install mode and follows the new compile into its upload", async () => {
+    // firmwareInstall returns a COMPILE after #1131; the override must not let
+    // the dialog drop into compile mode (which would skip the upload chain).
+    const jobs = new Map<string, FirmwareJob>();
+    const newCompile = makeJob({
+      job_id: "c2",
+      job_type: JobType.COMPILE,
+      status: JobStatus.QUEUED,
+    });
+    const newUpload = makeJob({
+      job_id: "u2",
+      job_type: JobType.UPLOAD,
+      status: JobStatus.QUEUED,
+      depends_on: "c2",
+    });
+    const { host, follows } = makeHost(jobs, {
+      firmwareCancel: async () => {},
+      stopStream: async () => {},
+      firmwareInstall: async () => {
+        jobs.set("c2", newCompile);
+        jobs.set("u2", newUpload);
+        return newCompile;
+      },
+    });
+    host._jobId = "c1"; // the remote compile being cancelled
+
+    await onForceLocalClick(host);
+
+    expect(host._commandType).toBe("install");
+    expect(host._jobId).toBe("c2");
+    expect(follows.c2).toBeDefined();
+
+    follows.c2.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
+    expect(host._jobId).toBe("u2");
+    expect(host._state).toBe("running");
+
+    follows.u2.onResult({ status: JobStatus.COMPLETED, exit_code: 0 });
+    expect(host._state).toBe("success");
+    expect(host._statusMessage).toBe("command.install_success");
   });
 });

@@ -1,5 +1,5 @@
 import { APIError } from "../../api/api-error.js";
-import { type FirmwareJob, JobStatus } from "../../api/types/firmware-jobs.js";
+import { type FirmwareJob, JobStatus, JobType } from "../../api/types/firmware-jobs.js";
 import { ErrorCode } from "../../api/types/protocol.js";
 import { isTerminalJobStatus } from "../../util/firmware-job-status.js";
 import { classifyNoCompatiblePeerReason } from "../../util/version-mismatch.js";
@@ -134,10 +134,14 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
     return;
   }
 
+  primeAndFollow(host, job);
+}
+
+// Prime status + build source from the API response so the queued overlay and
+// remote-builder sub-line paint on the first frame, then attach the follow_job
+// stream. Leaves _commandType to the caller (the install chain relies on it).
+function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
-  // Prime from the API response so the queued overlay shows immediately;
-  // the matching job_queued event lands in firmwareJobsContext shortly after
-  // and the getter prefers that live value going forward.
   host._jobStatus = job.status;
   host._primedSource = {
     source: job.source,
@@ -163,14 +167,13 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
 
-      // An install runs as a COMPILE then a dependent UPLOAD on a separate
-      // lane (backend #1131); a finished compile is only half the install.
-      // Hand off to the upload and let its terminal result decide success,
-      // so we don't report the device flashed the moment it compiled. The
-      // upload carries depends_on === this compile's job_id; followJob
-      // handles it whether it's still queued, running, or already terminal.
+      // An install is a COMPILE then a dependent UPLOAD (#1131); follow the
+      // upload (depends_on === this compile) so success reflects the flash,
+      // not just the compile.
       if (success && host._commandType === "install") {
-        const upload = [...host._jobs.values()].find((j) => j.depends_on === jobId);
+        const upload = [...host._jobs.values()].find(
+          (j) => j.job_type === JobType.UPLOAD && j.depends_on === jobId
+        );
         if (upload) {
           host._jobId = upload.job_id;
           host._jobStatus = upload.status;
@@ -271,7 +274,13 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
       }
     }
     const job = await host._api.firmwareInstall(configuration, port, true);
-    host.followJob(job, host.name);
+    // Re-attach via primeAndFollow keeping _commandType "install"; the public
+    // followJob would derive "compile" from the returned COMPILE job (#1131)
+    // and skip the install → upload chain. Clear the cancelled attempt first.
+    await detachStream(host);
+    host._lines = [];
+    host._resetPendingLines();
+    primeAndFollow(host, job);
   } catch (err) {
     host._state = "error";
     host._statusMessage = host._localize("command.force_local_failed");
