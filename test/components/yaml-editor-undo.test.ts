@@ -65,8 +65,8 @@ describe("yaml-editor undo baseline (#1150)", () => {
   it("still scrolls to the highlight when value + highlightRange load in one cycle", async () => {
     const el = await mount(); // empty
     const spy = vi.spyOn(
-      el as unknown as { _scrollToHighlight: () => void },
-      "_scrollToHighlight"
+      el as unknown as { _applyHighlight: () => void },
+      "_applyHighlight"
     );
 
     // Deep-link load: page sets YAML, highlightRange and scrollToHighlight

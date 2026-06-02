@@ -348,20 +348,16 @@ export class ESPHomeYamlEditor extends LitElement {
       parent: this._container,
     });
 
-    // Apply any pending highlight after mount. The remount paths in
-    // `updated()` (config change, initial-load baseline) early-return
-    // before the `highlightRange` branch, so a same-cycle deep-link
-    // (`?line=N` sets value + highlightRange together) relies on this
-    // to mark *and* scroll to the requested line.
-    if (this.highlightRange) {
-      this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
-      this._scrollToHighlight();
-    }
+    // Remount paths in updated() return before the highlightRange
+    // branch, so re-apply a pending highlight (+ scroll) here.
+    if (this.highlightRange) this._applyHighlight();
   }
 
-  /** Scroll the current highlight into view when `scrollToHighlight`. */
-  private _scrollToHighlight() {
-    if (!this._view || !this.highlightRange || !this.scrollToHighlight) return;
+  /** Set (or clear) the highlight mark and scroll it into view. */
+  private _applyHighlight() {
+    if (!this._view) return;
+    this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
+    if (!this.highlightRange || !this.scrollToHighlight) return;
     const line = Math.max(1, this.highlightRange.fromLine);
     const pos = this._view.state.doc.line(
       Math.min(line, this._view.state.doc.lines)
@@ -434,18 +430,10 @@ export class ESPHomeYamlEditor extends LitElement {
 
     if (changed.has("value") && this._view) {
       const current = this._view.state.doc.toString();
-      // First non-empty population of a pristine, never-edited editor:
-      // the editor mounts empty (default `value` is "") and is filled by
-      // an async source — the device YAML load, or an external
-      // `yaml-draft` (e.g. a wizard) before any typing. Dispatching that
-      // would record an undoable empty→content step, letting Ctrl+Z
-      // unwind to a blank editor (#1150). Remount instead so the
-      // populated YAML is the document baseline with fresh history — the
-      // same reset the configuration-change branch above uses.
-      //
-      // The `undoDepth === 0` gate scopes this to the never-edited
-      // window: once the user has edited or cleared the doc, history is
-      // non-empty, so a later external repopulate stays undoable.
+      // First population of a never-edited editor: remount so the async
+      // value is the undo baseline, else Ctrl+Z unwinds to blank (#1150).
+      // The undoDepth gate keeps later external repopulates (after the
+      // user edits/clears) undoable.
       if (current === "" && this.value !== "" && undoDepth(this._view.state) === 0) {
         this._remountEditor();
         return;
@@ -515,8 +503,7 @@ export class ESPHomeYamlEditor extends LitElement {
     }
 
     if (changed.has("highlightRange") && this._view) {
-      this._view.dispatch({ effects: setHighlight.of(this.highlightRange) });
-      this._scrollToHighlight();
+      this._applyHighlight();
     }
 
     if (changed.has("revealSensitive") && this._view) {
