@@ -172,6 +172,7 @@ export class ESPHomeAddApiActionDialog extends LitElement {
       : this._localize("device.add_api_action");
     return html`<esphome-base-dialog
       ?open=${this._open}
+      ?busy=${this._saving}
       .label=${title}
       @request-close=${this._onRequestClose}
     >
