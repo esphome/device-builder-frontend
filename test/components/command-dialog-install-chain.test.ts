@@ -1,16 +1,8 @@
-/**
- * Install follows the COMPILE then its dependent UPLOAD (backend #1131).
- *
- * firmware/install returns the COMPILE job; the UPLOAD is held off its lane
- * (depends_on === compile job_id) until the compile succeeds, then flashes.
- * followJob must hand off to the upload on a successful compile and only
- * report success once the upload finishes, instead of declaring the device
- * flashed the moment it compiled.
- */
+// Install follows the COMPILE then its dependent UPLOAD (#1131): success is
+// reported only after the upload, not when the compile finishes.
 import { describe, expect, it, vi } from "vitest";
 import {
   type FirmwareJob,
-  JobSource,
   JobStatus,
   JobType,
 } from "../../src/api/types/firmware-jobs.js";
@@ -19,39 +11,12 @@ import {
   followJob,
   onForceLocalClick,
 } from "../../src/components/command-dialog/commands.js";
+import { makeFirmwareJob as makeJob } from "../_make-firmware-job.js";
 
 interface StreamCbs {
   onOutput: (line: string) => void;
   onResult: (data: unknown) => void;
   onError: (error: string) => void;
-}
-
-function makeJob(overrides: Partial<FirmwareJob> = {}): FirmwareJob {
-  return {
-    job_id: "job-1",
-    configuration: "kitchen.yaml",
-    job_type: JobType.COMPILE,
-    status: JobStatus.RUNNING,
-    created_at: "2026-01-01T00:00:00Z",
-    started_at: null,
-    completed_at: null,
-    exit_code: null,
-    output: [],
-    error: null,
-    port: "OTA",
-    new_name: "",
-    depends_on: "",
-    progress: null,
-    source: JobSource.LOCAL,
-    source_pin_sha256: "",
-    source_label: "",
-    source_esphome_version: "",
-    remote_peer: "",
-    remote_peer_label: "",
-    device_name: "",
-    device_friendly_name: "",
-    ...overrides,
-  };
 }
 
 function makeHost(

@@ -137,9 +137,8 @@ export async function startFirmwareJob(host: ESPHomeCommandDialog): Promise<void
   primeAndFollow(host, job);
 }
 
-// Prime status + build source from the API response so the queued overlay and
-// remote-builder sub-line paint on the first frame, then attach the follow_job
-// stream. Leaves _commandType to the caller (the install chain relies on it).
+// Prime status + source so the overlay paints on the first frame, then follow.
+// Leaves _commandType to the caller (the install chain relies on it).
 function primeAndFollow(host: ESPHomeCommandDialog, job: FirmwareJob): void {
   host._jobId = job.job_id;
   host._jobStatus = job.status;
@@ -167,11 +166,9 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
       const result = data as unknown as { status: string; exit_code: number | null };
       const success = result.status === JobStatus.COMPLETED;
 
-      // An install is a COMPILE then a dependent UPLOAD (#1131); when the
-      // COMPILE succeeds, follow the upload (depends_on === this compile) so
-      // success reflects the flash, not just the compile. Gate on the finished
-      // job being the COMPILE so the upload's own completion (which re-enters
-      // this handler) falls straight through to success.
+      // On a successful install COMPILE, follow its dependent UPLOAD so success
+      // reflects the flash (#1131). Gate on the finished job being the COMPILE
+      // so the upload's own completion falls straight through to success.
       const finished = host._jobs.get(jobId);
       if (
         success &&
@@ -187,9 +184,8 @@ export function followJob(host: ESPHomeCommandDialog, jobId: string): void {
           followJob(host, upload.job_id);
           return;
         }
-        // The backend creates the held upload at install time, so a miss is a
-        // transport/backend gap, not version skew; surface it rather than
-        // silently reporting the device flashed after only compiling.
+        // The backend creates the upload at install time, so a miss is a real
+        // gap — surface it rather than report a flash that didn't happen.
         console.warn("install compile succeeded but no dependent upload for job", jobId);
       }
 
@@ -285,9 +281,9 @@ export async function onForceLocalClick(host: ESPHomeCommandDialog): Promise<voi
       }
     }
     const job = await host._api.firmwareInstall(configuration, port, true);
-    // Re-attach via primeAndFollow keeping _commandType "install"; the public
-    // followJob would derive "compile" from the returned COMPILE job (#1131)
-    // and skip the install → upload chain. Clear the cancelled attempt first.
+    // Keep _commandType "install": the public followJob would derive "compile"
+    // from the returned COMPILE (#1131) and skip the chain. Clear the cancelled
+    // attempt, then re-attach via primeAndFollow.
     await detachStream(host);
     host._lines = [];
     host._resetPendingLines();
