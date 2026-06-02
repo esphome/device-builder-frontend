@@ -352,10 +352,11 @@ export class ESPHomePageDashboard extends LitElement {
     if (urlState.platforms !== undefined) this._selectedPlatforms = urlState.platforms;
     if (urlState.states !== undefined) this._selectedStates = urlState.states;
     if (urlState.updates !== undefined) {
-      // Reject unknown bucket ids from the user-editable URL so they
-      // don't count as active filters while narrowing nothing.
-      const valid = new Set<string>(UPDATE_FACET_BUCKETS);
-      this._selectedUpdateStatus = urlState.updates.filter((b) => valid.has(b));
+      // Normalize the user-editable URL to known buckets in canonical
+      // order, deduped — so unknown or duplicate ids can't inflate the
+      // active-filter count or render duplicate badges.
+      const requested = new Set(urlState.updates);
+      this._selectedUpdateStatus = UPDATE_FACET_BUCKETS.filter((b) => requested.has(b));
     }
     if (urlState.view !== undefined) this._view = urlState.view;
     if (urlState.yaml !== undefined) this._yamlMode = urlState.yaml;

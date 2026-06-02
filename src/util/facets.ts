@@ -109,9 +109,10 @@ export function computeStateFacet(
   );
 }
 
-/** The two update-status buckets, in display order. Exported so URL
- *  hydration can reject unknown ids before they inflate the active-
- *  filter count as no-op selections. */
+/** The two update-status buckets in canonical order — the order URL
+ *  hydration normalizes ``?updates=`` into (deduped, unknown ids
+ *  dropped). The *rendered* facet order is independent: ``tallyToFacet``
+ *  sorts the surfaced options by count then name. */
 export const UPDATE_FACET_BUCKETS = ["update_available", "modified"] as const;
 
 type UpdateBucket = (typeof UPDATE_FACET_BUCKETS)[number];

@@ -1,7 +1,8 @@
 /**
  * Pins computeUpdateFacet: per-bucket counts, empty-fleet → [], and
- * only-non-zero buckets surface (so the dashboard hides the pill /
- * drops a bucket nothing matches).
+ * matched buckets surface (so the pill hides / drops an unmatched
+ * bucket when the fleet is current) — except a currently-selected
+ * bucket stays at count 0 so a URL-hydrated filter remains clearable.
  */
 import { describe, expect, it } from "vitest";
 
