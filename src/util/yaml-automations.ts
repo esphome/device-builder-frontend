@@ -342,10 +342,11 @@ function _isTriggerEntry(
   const dashLine = lines[item.fromLine - 1] ?? "";
   // The first key can sit inline on the dash: ``- seconds: 0``.
   if (_DASH_TRIGGER_ENTRY_KEY_RE.test(dashLine)) return true;
-  // Otherwise a sibling key at the item's own content indent (``- `` is a
-  // dash plus one space, so two columns in). A deeper match — a ``then:``
+  // Otherwise a sibling key at the item's own content indent — the column
+  // of the first key after ``- ``, derived (not assumed ``+2``) so an
+  // extra-space dash doesn't throw it off. A deeper match — a ``then:``
   // nested under an ``if`` action — is not the entry's own key.
-  const contentIndent = _dashIndent(dashLine) + 2;
+  const contentIndent = listItemChildIndent(dashLine);
   for (let i = item.fromLine; i < item.toLine && i < lines.length; i++) {
     const m = lines[i].match(_TRIGGER_ENTRY_KEY_RE);
     if (m && m[1].length === contentIndent) return true;

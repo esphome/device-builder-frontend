@@ -584,6 +584,33 @@ describe("parseYamlAutomations", () => {
     expect(items.map((s) => s.key)).toEqual(["automation:component_on:my_time:on_time"]);
   });
 
+  it("splits a list-shaped on_time when entries use an extra-space dash and a non-trigger first key", () => {
+    // ``-   id:`` — the inline key isn't a trigger key, so the inline
+    // short-circuit doesn't fire; the sibling ``seconds:`` aligns past
+    // dash+2, so a fixed step would miss it and the block would collapse
+    // to one un-indexed row.
+    const yaml = `time:
+  - platform: sntp
+    id: my_time
+    on_time:
+      -   id: morning
+          seconds: 0
+          then:
+            - logger.log: "a"
+      -   id: noon
+          seconds: 30
+          then:
+            - logger.log: "b"
+`;
+    const items = parseYamlAutomations(yaml).filter((s) =>
+      s.key.startsWith("automation:component_on:my_time:on_time")
+    );
+    expect(items.map((s) => s.key)).toEqual([
+      "automation:component_on:my_time:on_time:0",
+      "automation:component_on:my_time:on_time:1",
+    ]);
+  });
+
   it("does not split a bare action list into per-action rows", () => {
     const yaml = `binary_sensor:
   - platform: gpio
