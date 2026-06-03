@@ -287,16 +287,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _scrollPendingFieldIntoView() {
     const path = this._pendingScrollPath;
     if (!path || !this.shadowRoot) return;
-    const target = this._findFieldElement(this.shadowRoot, path);
-    if (!target) return;
-    this._pendingScrollPath = undefined;
-    // ``center`` (not ``nearest``) so a tall field — long description plus
-    // input — lands fully in view instead of clipped at the fold.
-    target.scrollIntoView({ block: "center" });
-    // Restart the flash even when the same field is re-targeted.
-    target.classList.remove("field--highlight");
-    void target.offsetWidth;
-    target.classList.add("field--highlight");
+    // Try the exact field, then progressively shorter prefixes: a
+    // list-of-maps field (globals / filter items, whose form paths carry
+    // a synthetic index the YAML path lacks) at least scrolls its
+    // container into view.
+    for (let len = path.length; len >= 1; len--) {
+      const target = this._findFieldElement(this.shadowRoot, path.slice(0, len));
+      if (!target) continue;
+      this._pendingScrollPath = undefined;
+      // ``center`` (not ``nearest``) so a tall field — long description
+      // plus input — lands fully in view instead of clipped at the fold.
+      target.scrollIntoView({ block: "center" });
+      // Restart the flash even when the same field is re-targeted.
+      target.classList.remove("field--highlight");
+      void target.offsetWidth;
+      target.classList.add("field--highlight");
+      return;
+    }
   }
 
   /** Find the field with *path*, recursing into nested custom-element
