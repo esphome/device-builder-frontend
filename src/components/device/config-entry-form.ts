@@ -153,6 +153,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @state()
   private _nestedOpenSections: Set<string> = new Set();
 
+  /** Last field flashed + when, so the same field isn't re-pulsed within
+   *  10s as the cursor moves around inside it. */
+  private _lastFlashKey?: string;
+  private _lastFlashAt = 0;
+
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
    * picked before typing a numeric value. Keyed by dotted path.
@@ -316,10 +321,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
       // ``center`` (not ``nearest``) so a tall field — long description
       // plus input — lands fully in view instead of clipped at the fold.
       target.scrollIntoView({ block: "center" });
-      // Restart the flash even when the same field is re-targeted.
-      target.classList.remove("field--highlight");
-      void target.offsetWidth;
-      target.classList.add("field--highlight");
+      // Flash, but not for the same field twice within 10s — moving the
+      // cursor around inside one field shouldn't keep re-pulsing it.
+      const key = path.slice(0, len).join(" ");
+      const now = Date.now();
+      if (key !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
+        this._lastFlashKey = key;
+        this._lastFlashAt = now;
+        target.classList.remove("field--highlight");
+        void target.offsetWidth;
+        target.classList.add("field--highlight");
+      }
       return;
     }
   }

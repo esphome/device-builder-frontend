@@ -329,6 +329,9 @@ export function findFieldLine(
   section: YamlSection,
   relPath: string[]
 ): number | null {
+  // List/map sections (globals, substitutions) key their form fields
+  // under the section key; drop it so the path is section-relative.
+  if (relPath[0] === section.key) relPath = relPath.slice(1);
   if (relPath.length === 0) return null;
   const lines = yaml.split("\n");
   const start = section.fromLine - 1;

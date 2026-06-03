@@ -275,9 +275,16 @@ function renderPinAdvanced(
   // Reuse the form's ``nestedOpenSections`` machinery so the
   // open/closed state survives a re-render and follows the same
   // semantics as a regular ``nested`` group's expand toggle.
-  // Default closed — the long-form fields are an opt-in
-  // disclosure, never on the main form.
-  const isOpen = ctx.nestedOpenSections.has(advancedKey);
+  // Default closed for a short-form pin (opt-in disclosure) — but
+  // open when the pin already carries long-form advanced values
+  // (``mode`` / ``inverted`` / …): a field set in YAML shouldn't be
+  // hidden behind the toggle, and cursor-sync needs it rendered to
+  // scroll to.
+  const pinValues = ctx.scopeValues(path);
+  const hasAdvancedValue =
+    isLongForm &&
+    Object.keys(pinValues).some((k) => k !== "number" && pinValues[k] !== undefined);
+  const isOpen = ctx.nestedOpenSections.has(advancedKey) || hasAdvancedValue;
 
   const onAdvancedToggle = () => {
     // Locked / disabled fields (board-preset pins, parent-disabled

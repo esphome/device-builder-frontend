@@ -53,6 +53,15 @@ describe("findFieldLine", () => {
     expect(findFieldLine(yaml, section, ["ap", "ssid"])).toBe(4);
   });
 
+  it("strips a leading section key (list/map sections key fields under it)", () => {
+    const yaml = ["substitutions:", "  devicename: x", "  friendly_name: y", ""].join(
+      "\n"
+    );
+    const section = sectionAt(yaml, 1);
+    expect(findFieldLine(yaml, section, ["substitutions", "devicename"])).toBe(2);
+    expect(findFieldLine(yaml, section, ["substitutions", "friendly_name"])).toBe(3);
+  });
+
   it("targets the correct instance among duplicates", () => {
     const yaml = [
       "binary_sensor:",
