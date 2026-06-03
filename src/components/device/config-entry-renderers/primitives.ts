@@ -1,4 +1,4 @@
-import { html } from "lit";
+import { html, nothing } from "lit";
 import { ifDefined } from "lit/directives/if-defined.js";
 import type { ConfigEntry } from "../../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../../api/types/config-entries.js";
@@ -473,6 +473,9 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
       >
+        ${clearable
+          ? html`<wa-icon slot="clear-icon" library="mdi" name="close"></wa-icon>`
+          : nothing}
         ${visibleOptions.map(
           (opt) =>
             html`<wa-option
