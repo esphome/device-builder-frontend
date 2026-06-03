@@ -23,12 +23,18 @@ import {
 import { renderNestedField } from "./config-entry-renderers/nested.js";
 import { renderBooleanField } from "./config-entry-renderers/primitives.js";
 
+// Bare int / "GPIOn" form (esp / esp8266 / rp2040 / libretiny).
+const GPIO_PIN_RE = /^\s*(?:GPIO)?(\d+)\s*$/i;
+// nRF52 "P{port}.{pin}" form.
+const NRF52_PIN_RE = /^\s*P(\d+)\.(\d+)\s*$/i;
+
 /**
  * Parse a pin reference into a GPIO number. Used both for the field's
  * current value and for individual `suggestions` entries. Featured
  * manifests write pins as bare ints (`12`), string forms (`"GPIO12"`,
- * `"gpio12"`), or — for fields whose locked preset needs the long-form
- * ESPHome pin block — an object like
+ * `"gpio12"`), nRF52 port.pin notation (`"P0.27"`, `"P1.1"`), or — for
+ * fields whose locked preset needs the long-form ESPHome pin block — an
+ * object like
  * `{ number: 0, mode: { input: true, pullup: true }, inverted: true }`
  * (Sonoff Basic's front-panel button is the canonical example: the pin
  * is occupied + inverted + needs the internal pull-up, all baked into
@@ -38,13 +44,28 @@ import { renderBooleanField } from "./config-entry-renderers/primitives.js";
 export function parsePinGpio(s: unknown): number | null {
   if (typeof s === "number" && Number.isFinite(s)) return s;
   if (typeof s === "string") {
-    const m = s.match(/^\s*(?:GPIO)?(\d+)\s*$/i);
+    const m = s.match(GPIO_PIN_RE);
     if (m) return Number(m[1]);
+    // nRF52 port.pin notation, e.g. "P0.27" -> 27, "P1.1" -> 33. Each port has
+    // 32 pins, so reject pin >= 32 ("P0.33") rather than normalize it to a
+    // different valid-looking pin (which would silently rewrite the YAML).
+    const p = s.match(NRF52_PIN_RE);
+    if (p && Number(p[2]) < 32) return Number(p[1]) * 32 + Number(p[2]);
   }
   if (s !== null && typeof s === "object" && !Array.isArray(s)) {
     return parsePinGpio((s as Record<string, unknown>).number);
   }
   return null;
+}
+
+/**
+ * Format a GPIO number as the pin value ESPHome's platform validator
+ * accepts. ESP/LibreTiny take "GPIOn"; nRF52's validator rejects that
+ * and wants port.pin notation ("P0.27", "P1.1") — port*32 + pin.
+ */
+export function formatPinValue(gpio: number, platform: string | undefined): string {
+  if (platform === "nrf52") return `P${Math.floor(gpio / 32)}.${gpio % 32}`;
+  return `GPIO${gpio}`;
 }
 
 interface PinOptionView {
@@ -70,7 +91,7 @@ function buildPinOption(
   usedPins: Map<number, string>,
   ctx: RenderCtx
 ): PinOptionView {
-  const optValue = `GPIO${pin.gpio}`;
+  const optValue = formatPinValue(pin.gpio, ctx.board?.esphome.platform);
   const primary = pin.label || optValue;
   const occupiedBy = pin.occupied_by || "";
   const usedBy = usedPins.get(pin.gpio) || "";
@@ -193,12 +214,14 @@ export function renderPinField(
     return renderStringField(entry, "text", path, ctx);
   }
 
-  // Pin presets can land as bare ints (`12`), `GPIOn` strings, or the
-  // long-form pin block (`{ number: N, mode: {...}, inverted: ... }`).
-  // The wa-option values are always the `GPIOn` form, so normalise
-  // before comparing or the disabled select renders blank.
+  // Pin presets can land as bare ints (`12`), `GPIOn` / `P0.x` strings, or
+  // the long-form pin block (`{ number: N, mode: {...}, inverted: ... }`).
+  // The wa-option values are the platform's value form (`GPIOn`, or `P0.x`
+  // for nRF52), so normalise before comparing or the disabled select renders
+  // blank.
   const rawValue = ctx.getAt(path);
   const valueGpio = parsePinGpio(rawValue);
+  const platform = ctx.board.esphome.platform;
   // Fallback to ``String(rawValue)`` only when the value is a
   // primitive — js-yaml emits null-prototype maps for partial /
   // mid-edit pin blocks, and ``String(Object.create(null))`` throws
@@ -208,7 +231,7 @@ export function renderPinField(
   // the dropdown stays empty rather than blowing up.
   const value =
     valueGpio !== null
-      ? `GPIO${valueGpio}`
+      ? formatPinValue(valueGpio, platform)
       : isPrimitiveOrNullish(rawValue)
         ? String(rawValue ?? "")
         : "";

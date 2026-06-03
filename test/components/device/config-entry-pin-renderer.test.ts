@@ -4,6 +4,7 @@ import {
   ConfigEntryType,
 } from "../../../src/api/types/config-entries.js";
 import {
+  formatPinValue,
   parsePinGpio,
   renderPinField,
 } from "../../../src/components/device/config-entry-pin-renderer.js";
@@ -11,7 +12,13 @@ import {
   extractAttributeBindings,
   findTemplatesByAnchor,
 } from "../../_lit-template-walker.js";
-import { makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
+import {
+  findElementBindings,
+  makeBoardPin,
+  makeEntry,
+  makeRenderCtx,
+  makeTestBoard,
+} from "./_renderer-fixtures.js";
 
 describe("parsePinGpio", () => {
   it("accepts bare integers", () => {
@@ -28,6 +35,21 @@ describe("parsePinGpio", () => {
   it("accepts plain numeric strings", () => {
     expect(parsePinGpio("7")).toBe(7);
     expect(parsePinGpio("0")).toBe(0);
+  });
+
+  it("accepts nRF52 port.pin notation", () => {
+    // ESPHome's nRF52 validator writes pins as P{port}.{pin} = port*32 + pin.
+    expect(parsePinGpio("P0.27")).toBe(27);
+    expect(parsePinGpio("P1.1")).toBe(33);
+    expect(parsePinGpio("P0.0")).toBe(0);
+    expect(parsePinGpio("p1.16")).toBe(48);
+  });
+
+  it("rejects an out-of-range nRF52 pin part", () => {
+    // Each port has 32 pins (0-31); "P0.33" must not normalize to P1.1 (33) —
+    // that would silently rewrite the YAML to a different valid-looking pin.
+    expect(parsePinGpio("P0.33")).toBeNull();
+    expect(parsePinGpio("P0.32")).toBeNull();
   });
 
   it("extracts the GPIO from a long-form pin block", () => {
@@ -55,6 +77,59 @@ describe("parsePinGpio", () => {
     expect(parsePinGpio({ number: "nope" })).toBeNull();
     expect(parsePinGpio([])).toBeNull();
     expect(parsePinGpio(Number.NaN)).toBeNull();
+  });
+});
+
+describe("formatPinValue", () => {
+  it("uses GPIOn for ESP / LibreTiny", () => {
+    expect(formatPinValue(12, "esp32")).toBe("GPIO12");
+    expect(formatPinValue(5, "bk72xx")).toBe("GPIO5");
+    expect(formatPinValue(0, undefined)).toBe("GPIO0");
+  });
+
+  it("uses P{port}.{pin} for nRF52", () => {
+    expect(formatPinValue(27, "nrf52")).toBe("P0.27");
+    expect(formatPinValue(33, "nrf52")).toBe("P1.1");
+    expect(formatPinValue(48, "nrf52")).toBe("P1.16");
+  });
+});
+
+describe("renderPinField nRF52 pin values", () => {
+  // ESPHome's nRF52 pin validator rejects "GPIO27"; it wants P0.x / integer.
+  // The renderer must emit the P0.x value form for nRF52 boards so the
+  // editor writes valid YAML.
+  const nrf52Board = () =>
+    makeTestBoard({
+      pins: [makeBoardPin(27, { label: "P0.27", features: ["adc"] })],
+      overrides: { esphome: { platform: "nrf52", board: "xiao_ble" } as never },
+    });
+
+  it("writes the P{port}.{pin} value, not GPIOn", () => {
+    const ctx = makeRenderCtx({ pin: undefined }, { board: nrf52Board() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("P0.27");
+
+    const select = findTemplatesByAnchor(result, "<wa-select")[0];
+    const onChange = extractAttributeBindings(select)["@change"] as (e: Event) => void;
+    onChange({ target: { value: "P0.27" } } as never);
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin"], "P0.27");
+  });
+
+  it("matches the active option for a P0.x value", () => {
+    const ctx = makeRenderCtx({ pin: "P0.27" }, { board: nrf52Board() });
+    const result = renderPinField(
+      makeEntry(ConfigEntryType.PIN, { key: "pin", required: true, pin_features: [] }),
+      ["pin"],
+      ctx
+    );
+    const option = findElementBindings(result, "wa-option")[0];
+    expect(option.value).toBe("P0.27");
+    expect(option["?selected"]).toBe(true);
   });
 });
 
