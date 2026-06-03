@@ -252,6 +252,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (changed.has("entries") && changed.get("entries") !== undefined) {
       this._pendingUnits.clear();
       this._editingMagnitudes.clear();
+      // The form instance is reused across sections; reset the seed markers
+      // so a disclosure default-opens again for the new component (a key like
+      // "pin:pin-advanced" recurs across sections that each have a pin).
+      this._seededNestedOpen.clear();
     }
   }
 
