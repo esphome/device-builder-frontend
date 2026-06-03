@@ -5,6 +5,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { AdoptableDevice } from "../api/types/devices.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, localizeContext } from "../context/index.js";
+import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { validateDeviceName } from "../util/config-validation.js";
@@ -41,27 +42,15 @@ export class ESPHomeAdoptDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    // Neutral header + title + footer (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
       }
 
-      esphome-base-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      esphome-base-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
       }
 
       .description {

@@ -32,6 +32,10 @@ import type { ESPHomeAPI } from "../../api/index.js";
 import type { ConfiguredDevice, Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, labelsContext, localizeContext } from "../../context/index.js";
+import {
+  dialogChromeStyles,
+  quietCloseButtonStyles,
+} from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import {
   labelChipStyles,
@@ -114,6 +118,9 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
     espHomeStyles,
     labelChipStyles,
     labelsListStyles,
+    // Neutral header + title + quiet close button (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
+    quietCloseButtonStyles,
     css`
       :host {
         display: block;
@@ -205,22 +212,7 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
         --width: 480px;
       }
 
-      esphome-base-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      esphome-base-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      esphome-base-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
-      }
-
+      /* Neutral header + title + quiet close come from dialog-chrome.ts. */
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
       }

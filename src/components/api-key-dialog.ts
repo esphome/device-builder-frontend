@@ -5,6 +5,7 @@ import { customElement, property, state } from "lit/decorators.js";
 import toast from "sonner-js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { copyToClipboard } from "../util/copy-to-clipboard.js";
 import { registerMdiIcons } from "../util/register-icons.js";
@@ -35,27 +36,15 @@ export class ESPHomeApiKeyDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    // Neutral header + title + footer (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
     css`
       esphome-base-dialog {
         --width: 480px;
       }
 
-      esphome-base-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      esphome-base-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
       }
 
       .content {

@@ -32,6 +32,10 @@ import { customElement, property, state } from "lit/decorators.js";
 import type { Label } from "../../api/types/devices.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { labelsContext, localizeContext } from "../../context/index.js";
+import {
+  dialogChromeStyles,
+  quietCloseButtonStyles,
+} from "../../styles/dialog-chrome.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { EscapeController } from "../../util/escape-controller.js";
 import { labelChipStyles } from "../../util/label-chip-template.js";
@@ -107,7 +111,15 @@ export class ESPHomeLabelsFilter extends LitElement {
     this._close();
   });
 
-  static styles = [espHomeStyles, facetStyles, labelChipStyles, labelsFilterStyles];
+  static styles = [
+    espHomeStyles,
+    facetStyles,
+    labelChipStyles,
+    // Neutral header + title + quiet close button (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
+    quietCloseButtonStyles,
+    labelsFilterStyles,
+  ];
 
   protected willUpdate(changed: Map<string, unknown>) {
     if (changed.has("_open")) this._escape.set(this._open);

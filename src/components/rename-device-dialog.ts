@@ -3,6 +3,7 @@ import { LitElement, css, html, nothing } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogChromeStyles, quietCloseButtonStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { getDeviceNameWarning, validateDeviceName } from "../util/config-validation.js";
@@ -29,25 +30,12 @@ export class ESPHomeRenameDeviceDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    // Neutral header + title + quiet close button (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
+    quietCloseButtonStyles,
     css`
       esphome-base-dialog {
         --width: 420px;
-      }
-
-      esphome-base-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      esphome-base-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
-      esphome-base-dialog::part(close-button__base) {
-        background: transparent;
-        border: none;
-        box-shadow: none;
       }
 
       esphome-base-dialog::part(body) {

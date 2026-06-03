@@ -5,22 +5,10 @@ export const pairBuildServerDialogStyles = css`
     --width: 500px;
   }
 
-  esphome-base-dialog::part(header) {
-    padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-  }
-
-  esphome-base-dialog::part(title) {
-    font-size: var(--wa-font-size-m);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
-
+  /* Neutral header + title + footer come from dialogChromeStyles
+     (added in pair-build-server-dialog.ts's static styles). */
   esphome-base-dialog::part(body) {
     padding: 0 var(--wa-space-l);
-  }
-
-  esphome-base-dialog::part(footer) {
-    display: none;
   }
 
   .description {

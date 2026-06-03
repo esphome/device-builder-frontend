@@ -3,6 +3,7 @@ import { LitElement, css, html, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
+import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { inputStyles } from "../styles/inputs.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
@@ -55,27 +56,15 @@ export class ESPHomeFriendlyNameDialog extends LitElement {
   static styles = [
     espHomeStyles,
     inputStyles,
+    // Neutral header + title + footer (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
       }
 
-      esphome-base-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      esphome-base-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l);
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
       }
 
       .field {

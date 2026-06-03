@@ -11,6 +11,7 @@ import { LitElement, css, html } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext, serverVersionContext } from "../context/index.js";
+import { dialogChromeStyles } from "../styles/dialog-chrome.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
@@ -86,28 +87,16 @@ export class ESPHomeFeedbackDialog extends LitElement {
 
   static styles = [
     espHomeStyles,
+    // Neutral header + title + footer (shared) — dialog-chrome.ts.
+    dialogChromeStyles,
     css`
       esphome-base-dialog {
         --width: 460px;
       }
 
-      /* Close-button styling comes from esphome-base-dialog (dialogCloseButtonStyles). */
-      esphome-base-dialog::part(header) {
-        padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-      }
-
-      esphome-base-dialog::part(title) {
-        font-size: var(--wa-font-size-m);
-        font-weight: var(--wa-font-weight-bold);
-        color: var(--wa-color-text-normal);
-      }
-
+      /* Extra bottom padding here (the link list has no actions row). */
       esphome-base-dialog::part(body) {
         padding: 0 var(--wa-space-l) var(--wa-space-l);
-      }
-
-      esphome-base-dialog::part(footer) {
-        display: none;
       }
 
       .description {

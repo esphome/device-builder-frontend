@@ -220,27 +220,11 @@ export const labelsFilterStyles = css`
     --width: 460px;
   }
 
-  .create-dialog::part(header) {
-    padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-  }
-
-  .create-dialog::part(title) {
-    font-size: var(--wa-font-size-m);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
-
-  .create-dialog::part(close-button__base) {
-    background: transparent;
-    border: none;
-    box-shadow: none;
-  }
-
+  /* Neutral header + title + footer + quiet close come from dialogChromeStyles
+     and quietCloseButtonStyles (added in labels-filter.ts's static styles).
+     There's a single esphome-base-dialog in this component, so their unscoped
+     ::part selectors land on the create dialog. */
   .create-dialog::part(body) {
     padding: 0 var(--wa-space-l) var(--wa-space-l);
-  }
-
-  .create-dialog::part(footer) {
-    display: none;
   }
 `;

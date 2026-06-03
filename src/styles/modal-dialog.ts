@@ -46,30 +46,17 @@
  */
 import { css } from "lit";
 
-export const modalDialogStyles = css`
-  /* Dual selectors so this one shared fragment styles both the raw
-     <wa-dialog> modals and the ones migrated onto <esphome-base-dialog>
-     (its parts are re-exported under the same names). #39 */
-  wa-dialog::part(header),
-  esphome-base-dialog::part(header) {
-    padding: var(--wa-space-l) var(--wa-space-l) var(--wa-space-s);
-  }
+import { dialogChromeStyles } from "./dialog-chrome.js";
 
-  wa-dialog::part(title),
-  esphome-base-dialog::part(title) {
-    font-size: var(--wa-font-size-m);
-    font-weight: var(--wa-font-weight-bold);
-    color: var(--wa-color-text-normal);
-  }
+export const modalDialogStyles = css`
+  /* The neutral header / title / footer chrome is shared with the form and
+     picker dialogs via dialogChromeStyles; this fragment adds the
+     confirm-style body padding + icon/text/actions/button layout on top. */
+  ${dialogChromeStyles}
 
   wa-dialog::part(body),
   esphome-base-dialog::part(body) {
     padding: 0 var(--wa-space-l);
-  }
-
-  wa-dialog::part(footer),
-  esphome-base-dialog::part(footer) {
-    display: none;
   }
 
   .body {
