@@ -158,6 +158,7 @@ let versionPromise: Promise<string> | null = null;
 export function _resetSchemaCacheForTests() {
   cache.clear();
   configVarKeysCache.clear();
+  configVarDocsCache.clear();
   versionPromise = null;
 }
 
@@ -178,9 +179,13 @@ async function resolveVersion(api: ESPHomeAPI): Promise<string> {
   const promise = (async () => {
     const { esphome_version } = await api.getVersion();
     if (esphome_version.endsWith("dev")) return "dev";
-    const probe = await fetch(`${SCHEMA_HOST}/${esphome_version}/esphome.json`, {
-      method: "HEAD",
-    });
+    // Probe with GET, not HEAD: the schema CDN serves HEAD responses
+    // *without* the ``access-control-allow-origin`` header and caches
+    // that headerless entry under the URL, so a HEAD probe poisons the
+    // cache and the browser then blocks the real GET of the same bundle
+    // by CORS. A GET probe caches a CORS-clean entry the bundle fetch
+    // reuses. (GET also warms ``esphome.json``, which we need anyway.)
+    const probe = await fetch(`${SCHEMA_HOST}/${esphome_version}/esphome.json`);
     if (probe.ok) return esphome_version;
     // Only fall back to ``dev`` for a definitive
     // "this version isn't published" answer (404). Transient
@@ -539,6 +544,113 @@ async function loadSchemaCv(
   ];
   if (!cv || typeof cv !== "object") return null;
   return cv;
+}
+
+/** Memoise nested-path docs by ``<bundle>|<component>|<a.b.c>``. */
+const configVarDocsCache = new Map<string, Promise<string | null>>();
+
+/**
+ * Resolve the ``docs`` string for a config-var reached by descending
+ * *path* relative to the component's ``CONFIG_SCHEMA`` — e.g.
+ * ``["scan_parameters", "active"]`` under ``esp32_ble_tracker``.
+ * Walks ``extends`` chains and ``typed`` variants at each level.
+ * Returns ``null`` when the path doesn't resolve or carries no docs.
+ */
+export async function getConfigVarDocsAtPath(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  path: string[]
+): Promise<string | null> {
+  if (path.length === 0) return null;
+  const cacheKey = `${bundleName}|${componentKey}|${path.join(".")}`;
+  const cached = configVarDocsCache.get(cacheKey);
+  if (cached) return cached;
+  const promise = (async () => {
+    let cv = await loadSchemaCv(
+      api,
+      bundleName,
+      componentKey,
+      "CONFIG_SCHEMA",
+      new Set()
+    );
+    for (let i = 0; i < path.length; i++) {
+      if (!cv) return null;
+      const found = await findCvInCv(
+        api,
+        bundleName,
+        componentKey,
+        cv,
+        path[i],
+        new Set()
+      );
+      if (!found) return null;
+      if (i === path.length - 1) return found.docs ?? null;
+      cv = found;
+    }
+    return null;
+  })();
+  configVarDocsCache.set(cacheKey, promise);
+  return promise;
+}
+
+/** Find the config-var named *key* reachable from *cv* — descending a
+ *  ``typed`` union's variants or a ``schema``'s config_vars/extends. */
+async function findCvInCv(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  cv: SchemaConfigVar,
+  key: string,
+  visited: Set<string>
+): Promise<SchemaConfigVar | null> {
+  if (cv.type === "typed") {
+    for (const variant of Object.values(cv.types ?? {})) {
+      if (!variant) continue;
+      const found = await findCvInSchema(
+        api,
+        bundleName,
+        componentKey,
+        variant,
+        key,
+        visited
+      );
+      if (found) return found;
+    }
+    return null;
+  }
+  const schema = "schema" in cv ? cv.schema : undefined;
+  if (!schema) return null;
+  return findCvInSchema(api, bundleName, componentKey, schema, key, visited);
+}
+
+/** Look up *key* in a ``SchemaSchema``: its own ``config_vars`` first,
+ *  then each ``extends`` reference (recursively). */
+async function findCvInSchema(
+  api: ESPHomeAPI,
+  bundleName: string,
+  componentKey: string,
+  schema: SchemaSchema,
+  key: string,
+  visited: Set<string>
+): Promise<SchemaConfigVar | null> {
+  const direct = schema.config_vars?.[key];
+  if (direct) return direct;
+  for (const ext of schema.extends ?? []) {
+    const ref = parseExtendsRef(ext);
+    if (!ref) continue;
+    const cv = await loadSchemaCv(
+      api,
+      ref.bundle,
+      ref.componentKey,
+      ref.schemaName,
+      visited
+    );
+    if (!cv) continue;
+    const found = await findCvInCv(api, ref.bundle, ref.componentKey, cv, key, visited);
+    if (found) return found;
+  }
+  return null;
 }
 
 export interface SchemaEnumValue {

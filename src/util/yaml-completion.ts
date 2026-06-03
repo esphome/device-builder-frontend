@@ -144,7 +144,7 @@ const RE_ENUM_VALUE = /^[A-Za-z0-9_./-]*$/;
 // the moment the user types past the dot.
 const RE_KEY_OR_ACTION = /^[A-Za-z0-9_.]*$/;
 
-interface CatalogIndex {
+export interface CatalogIndex {
   /** Loaded list of components — used for top-level keys. */
   components: ComponentCatalogEntry[];
   /** id → component for direct lookups. */
@@ -160,7 +160,7 @@ let catalogPromise: Promise<CatalogIndex> | null = null;
  * (~1k entries) to keep entirely in memory; caching avoids re-fetching
  * on every keystroke.
  */
-function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
+export function loadCatalog(api: ESPHomeAPI): Promise<CatalogIndex> {
   if (catalogPromise) return catalogPromise;
   catalogPromise = (async () => {
     const res = await api.getComponents({ limit: 2000 });
@@ -535,7 +535,7 @@ function registryToCompletion(e: SchemaRegistryEntry, registryKey: string): Comp
  * the ``_BINARY_SENSOR_SCHEMA`` referenced by the platform's
  * ``extends`` chain — ``getTriggerKeys`` follows that chain.
  */
-function bundleFor(
+export function bundleFor(
   topLevelKey: string,
   platformValue: string | null
 ): { bundle: string; componentKey: string } {

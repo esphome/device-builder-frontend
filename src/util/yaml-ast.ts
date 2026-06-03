@@ -172,6 +172,26 @@ export function getTopLevelKey(state: EditorState, pos: number): string | null {
 }
 
 /**
+ * Collect the key chain from the top-level mapping down to the pair
+ * enclosing *pos* (``esp32_ble_tracker`` → ``scan_parameters`` →
+ * ``active``). Returns ``[]`` when *pos* isn't inside a mapping pair.
+ * List-item wrappers contribute no key — only ``Pair`` keys land in
+ * the chain — so a field under ``- platform: gpio`` yields
+ * ``[<domain>, <field>]``, matching how the schema nests platform
+ * fields directly under the component.
+ */
+export function getKeyPath(state: EditorState, pos: number): string[] {
+  const keys: string[] = [];
+  let cur = findEnclosingPair(syntaxTree(state).resolveInner(pos, -1));
+  while (cur) {
+    const k = getPairKey(state, cur);
+    if (k) keys.push(k);
+    cur = findEnclosingPair(cur.parent?.parent ?? null);
+  }
+  return keys.reverse();
+}
+
+/**
  * Read the ``platform:`` value of the enclosing list-item, if any
  * (``binary_sensor: - platform: gpio`` → ``"gpio"``). Returns
  * ``null`` when the cursor isn't inside a list-item that declares

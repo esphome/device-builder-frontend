@@ -1,0 +1,138 @@
+import { ensureSyntaxTree } from "@codemirror/language";
+import { EditorState } from "@codemirror/state";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ESPHomeAPI } from "../../src/api/esphome-api.js";
+import type { ComponentCatalogEntry } from "../../src/api/types/components.js";
+import type { ConfigEntry } from "../../src/api/types/config-entries.js";
+import * as schema from "../../src/util/esphome-schema.js";
+import { esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
+import type { CatalogIndex } from "../../src/util/yaml-completion.js";
+import { resolveHoverTarget } from "../../src/util/yaml-hover.js";
+
+// Stub the network-backed schema lookups; keep the rest of the module
+// (bundleFor consumers, parse helpers) real.
+vi.mock("../../src/util/esphome-schema.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/util/esphome-schema.js")>()),
+  getConfigVarValueOptions: vi.fn(),
+  getActions: vi.fn(),
+  getTriggerKeys: vi.fn(),
+  getRegistryEntries: vi.fn(),
+  lookupRegistryRef: vi.fn(),
+  getConfigVarDocsAtPath: vi.fn(),
+}));
+
+function comp(c: Partial<ComponentCatalogEntry>): ComponentCatalogEntry {
+  return { config_entries: [], ...c } as unknown as ComponentCatalogEntry;
+}
+function field(f: Partial<ConfigEntry>): ConfigEntry {
+  return f as unknown as ConfigEntry;
+}
+
+// Only `esphome` is in the catalog (with a visible `name` field) so the
+// suppression path has something to match; everything else is schema-only.
+const CATALOG: CatalogIndex = {
+  components: [],
+  byCategory: new Map(),
+  byId: new Map<string, ComponentCatalogEntry>([
+    [
+      "esphome",
+      comp({
+        id: "esphome",
+        name: "ESPHome Core",
+        description: "Core firmware configuration.",
+        docs_url: "https://esphome.io/components/esphome",
+        config_entries: [field({ key: "name" })],
+      }),
+    ],
+  ]),
+};
+
+const API = {} as unknown as ESPHomeAPI;
+
+function stateFor(doc: string): EditorState {
+  const state = EditorState.create({ doc, extensions: [esphomeYaml()] });
+  ensureSyntaxTree(state, state.doc.length);
+  return state;
+}
+function posOf(doc: string, token: string): number {
+  const idx = doc.indexOf(token);
+  if (idx < 0) throw new Error(`token not found: ${token}`);
+  return idx + 1;
+}
+function hover(doc: string, token: string) {
+  return resolveHoverTarget(stateFor(doc), posOf(doc, token), API, CATALOG);
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(schema.getConfigVarValueOptions).mockResolvedValue([]);
+  vi.mocked(schema.getActions).mockResolvedValue([]);
+  vi.mocked(schema.getTriggerKeys).mockResolvedValue([]);
+  vi.mocked(schema.getRegistryEntries).mockResolvedValue([]);
+  vi.mocked(schema.lookupRegistryRef).mockResolvedValue(null);
+  vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue(null);
+});
+
+describe("resolveHoverTarget", () => {
+  it("shows enum value docs when hovering a value", async () => {
+    vi.mocked(schema.getConfigVarValueOptions).mockResolvedValue([
+      { value: "garage_door", docs: "Garage door class." },
+    ]);
+    const doc = "binary_sensor:\n  - platform: template\n    device_class: garage_door\n";
+    const target = await hover(doc, "garage_door");
+    expect(target?.description).toBe("Garage door class.");
+  });
+
+  it("shows action docs inside an automation body", async () => {
+    vi.mocked(schema.getActions).mockResolvedValue([
+      { key: "logger.log", docs: "Log a message." },
+    ]);
+    const doc = 'esphome:\n  on_boot:\n    then:\n      - logger.log: "hi"\n';
+    const target = await hover(doc, "logger.log");
+    expect(target?.description).toBe("Log a message.");
+  });
+
+  it("shows trigger docs for an on_* key", async () => {
+    vi.mocked(schema.getTriggerKeys).mockResolvedValue([
+      { key: "on_press", docs: "Pressed." },
+    ]);
+    const doc =
+      "binary_sensor:\n  - platform: gpio\n    on_press:\n      - logger.log: x\n";
+    const target = await hover(doc, "on_press");
+    expect(target?.description).toBe("Pressed.");
+  });
+
+  it("walks the schema for a deeply-nested key", async () => {
+    vi.mocked(schema.getConfigVarDocsAtPath).mockResolvedValue("Scan actively.");
+    const doc = "esp32_ble_tracker:\n  scan_parameters:\n    active: false\n";
+    const target = await hover(doc, "active");
+    expect(target?.description).toBe("Scan actively.");
+    expect(vi.mocked(schema.getConfigVarDocsAtPath)).toHaveBeenCalledWith(
+      API,
+      "esp32_ble_tracker",
+      "esp32_ble_tracker",
+      ["scan_parameters", "active"]
+    );
+  });
+
+  it("suppresses a visible catalog config_entry (form documents it)", async () => {
+    expect(await hover('esphome:\n  name: "x"\n', "name")).toBeNull();
+    expect(vi.mocked(schema.getConfigVarDocsAtPath)).not.toHaveBeenCalled();
+  });
+
+  it("always shows a top-level component description", async () => {
+    const target = await hover('esphome:\n  name: "x"\n', "esphome");
+    expect(target?.description).toBe("Core firmware configuration.");
+    expect(target?.docsUrl).toBe("https://esphome.io/components/esphome");
+  });
+
+  it("returns null on a comment line", async () => {
+    expect(await hover("# just a comment\nesphome:\n", "comment")).toBeNull();
+  });
+
+  it("returns null when the schema has no docs for the key", async () => {
+    expect(
+      await hover("esp32_ble_tracker:\n  scan_parameters:\n    active: false\n", "active")
+    ).toBeNull();
+  });
+});
