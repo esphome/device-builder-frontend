@@ -1147,31 +1147,32 @@ export class ESPHomePageDevice extends LitElement {
     );
   }
 
-  /** Resolve *path* to its YAML line in the current section and highlight
-   *  just that line. Returns false (highlight untouched) when unresolved. */
-  private _highlightFieldLine(path: string[]): boolean {
+  /** Resolve *path* in the current section and highlight just its YAML line.
+   *  Returns the section used (so callers can fall back to its range) and
+   *  whether the exact line was found and highlighted. */
+  private _highlightFieldLine(path: string[]): {
+    section?: YamlSection;
+    found: boolean;
+  } {
     const section = this._focusedSection();
     const line = section ? findFieldLine(this._yaml, section, path) : null;
-    if (line === null) return false;
-    this._highlightRange = { fromLine: line, toLine: line };
-    this._scrollToHighlight = true;
-    return true;
+    if (line !== null) {
+      this._highlightRange = { fromLine: line, toLine: line };
+      this._scrollToHighlight = true;
+    }
+    return { section, found: line !== null };
   }
 
   /** Form field focused → highlight just that field's YAML line. */
   private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
     const path = (this._focusedFieldPath = e.detail.path);
     if (!path.length) return;
-    if (this._highlightFieldLine(path)) {
-      this._pendingFieldLine = false;
-      return;
-    }
+    const { section, found } = this._highlightFieldLine(path);
+    this._pendingFieldLine = !found;
     // No line yet: a value the user just set (icon, a new id) writes to YAML
-    // on a debounce, so the line appears on a later update. Highlight the
-    // whole section meanwhile and flag a retry to upgrade to the exact line.
-    this._pendingFieldLine = true;
-    const section = this._focusedSection();
-    if (section) {
+    // on a debounce, so the line appears on a later update; highlight the
+    // whole section meanwhile, and the retry upgrades to the exact line.
+    if (!found && section) {
       this._highlightRange = { fromLine: section.fromLine, toLine: section.toLine };
       this._scrollToHighlight = true;
     }
@@ -1181,7 +1182,9 @@ export class ESPHomePageDevice extends LitElement {
    *  upgrade the highlight from the whole section to that line. */
   private _retryPendingFieldLine() {
     if (!this._pendingFieldLine || !this._focusedFieldPath?.length) return;
-    if (this._highlightFieldLine(this._focusedFieldPath)) this._pendingFieldLine = false;
+    if (this._highlightFieldLine(this._focusedFieldPath).found) {
+      this._pendingFieldLine = false;
+    }
   }
 
   private _onYamlHighlight(

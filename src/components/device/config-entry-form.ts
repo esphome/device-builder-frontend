@@ -34,6 +34,7 @@ import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
+import { decideFieldFocus } from "./field-interaction.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -299,13 +300,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
           n instanceof HTMLElement && n.hasAttribute("data-field-key")
       );
     if (!el) return;
-    const path = parseFieldKey(el.getAttribute("data-field-key") ?? "");
+    const path = this._pathOf(el);
     if (!path.length) return;
-    const key = path.join(" ");
-    if (e.type === "change" && key !== this._focusedFieldKey) return;
-    const moved = key !== this._focusedFieldKey;
-    this._focusedFieldKey = key;
-    if (e.type === "input" && !moved) return; // same field, mid-typing: no re-emit
+    const { emit, focusedKey } = decideFieldFocus(
+      e.type,
+      fieldKeyAttr(path),
+      this._focusedFieldKey
+    );
+    this._focusedFieldKey = focusedKey;
+    if (!emit) return;
     this.dispatchEvent(
       new CustomEvent<{ path: string[] }>("field-focus", {
         detail: { path },
@@ -314,6 +317,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
       })
     );
   };
+
+  /** Decode a field element's ``data-field-key`` to its path. */
+  private _pathOf(el: Element): string[] {
+    return parseFieldKey(el.getAttribute("data-field-key") ?? "");
+  }
 
   protected updated(changed: PropertyValues) {
     super.updated(changed);
@@ -332,7 +340,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const fp = this.focusFieldPath;
     if (
       fp?.length &&
-      this._scrolledFocusKey !== fp.join(" ") &&
+      this._scrolledFocusKey !== fieldKeyAttr(fp) &&
       this._focusScrollTries < MAX_FOCUS_SCROLL_TRIES &&
       (changed.has("focusFieldPath") || changed.has("entries") || changed.has("values"))
     ) {
@@ -365,7 +373,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       target.scrollIntoView({ block: "center" });
       // Flash, but not for the same field twice within 10s — moving the
       // cursor around inside one field shouldn't keep re-pulsing it.
-      const key = path.slice(0, len).join(" ");
+      const key = fieldKeyAttr(path.slice(0, len));
       const now = Date.now();
       if (key !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
         this._lastFlashKey = key;
@@ -374,7 +382,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         void target.offsetWidth;
         target.classList.add("field--highlight");
       }
-      this._scrolledFocusKey = path.join(" ");
+      this._scrolledFocusKey = fieldKeyAttr(path);
       return;
     }
   }
@@ -384,7 +392,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  at shadow boundaries. */
   private _findFieldElement(root: ParentNode, path: string[]): HTMLElement | null {
     for (const el of root.querySelectorAll<HTMLElement>("[data-field-key]")) {
-      const p = parseFieldKey(el.getAttribute("data-field-key") ?? "");
+      const p = this._pathOf(el);
       if (p.length === path.length && p.every((k, i) => k === path[i])) return el;
     }
     for (const el of root.querySelectorAll<HTMLElement>("*")) {

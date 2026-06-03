@@ -79,6 +79,9 @@ describe("findFieldLine", () => {
     expect(findFieldLine(yaml, section, ["areas", "0", "id"])).toBe(5);
     expect(findFieldLine(yaml, section, ["areas", "1", "id"])).toBe(7);
     expect(findFieldLine(yaml, section, ["areas", "0"])).toBe(4);
+    // An optional child absent from the item: null drives the caller's
+    // whole-section fallback rather than a stale single-line highlight.
+    expect(findFieldLine(yaml, section, ["areas", "0", "name_add_mac"])).toBeNull();
   });
 
   it("targets the correct instance among duplicates", () => {
