@@ -62,6 +62,25 @@ describe("findFieldLine", () => {
     expect(findFieldLine(yaml, section, ["substitutions", "friendly_name"])).toBe(3);
   });
 
+  it("descends a list index into a list-of-maps item (areas)", () => {
+    const yaml = [
+      "esphome:",
+      "  name: x",
+      "  areas:",
+      "    - name: zombie",
+      "      id: ff",
+      "    - name: other",
+      "      id: gg",
+      "",
+    ].join("\n");
+    const section = sectionAt(yaml, 1);
+    expect(findFieldLine(yaml, section, ["name"])).toBe(2);
+    expect(findFieldLine(yaml, section, ["areas", "0", "name"])).toBe(4);
+    expect(findFieldLine(yaml, section, ["areas", "0", "id"])).toBe(5);
+    expect(findFieldLine(yaml, section, ["areas", "1", "id"])).toBe(7);
+    expect(findFieldLine(yaml, section, ["areas", "0"])).toBe(4);
+  });
+
   it("targets the correct instance among duplicates", () => {
     const yaml = [
       "binary_sensor:",

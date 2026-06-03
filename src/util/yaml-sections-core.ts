@@ -14,6 +14,11 @@ import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
 import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
 
+/** A YAML list-item line: leading indent, a dash, then a space or EOL. */
+const RE_LIST_ITEM = /^\s*-(\s|$)/;
+/** A field-path segment that addresses a list index (``["areas","0",…]``). */
+const RE_PATH_INDEX = /^\d+$/;
+
 export interface YamlSection {
   key: string;
   fromLine: number; // 1-indexed (CodeMirror convention)
@@ -321,8 +326,11 @@ export function listItemChildIndent(dashLine: string): number {
 
 /**
  * 1-indexed YAML line of the instance-relative field *relPath* within
- * *section* (``["pin","number"]`` → the nested ``number:`` line), or
- * ``null`` so callers fall back to the whole-section range.
+ * *section*, or ``null`` so callers fall back to the whole-section range.
+ * Descends both mapping keys (``["pin","number"]`` → the nested
+ * ``number:`` line) and list indices (``["areas","0","id"]`` → the ``id:``
+ * line of the first ``areas`` item) — the latter is how list-of-maps form
+ * fields (areas, globals) key their children.
  */
 export function findFieldLine(
   yaml: string,
@@ -337,29 +345,67 @@ export function findFieldLine(
   const start = section.fromLine - 1;
   const end = Math.min(section.toLine - 1, lines.length - 1);
   if (start < 0 || start >= lines.length) return null;
-  const header = lines[start];
-  const isList = /^\s*-\s/.test(header);
-  // A list item's inline key (``- platform: gpio``) is a direct child, so
-  // the header line is measured at the child indent, not its dash column.
-  const childIndent = isList
-    ? listItemChildIndent(header)
-    : indentOf(header) + ESPHOME_YAML_INDENT.length;
-  const stack: { indent: number; key: string }[] = [];
-  for (let i = start; i <= end; i++) {
-    const stripped = stripComment(lines[i]);
-    if (!stripped.trim()) continue;
-    const m = stripped.match(RE_PAIR_LINE);
-    if (!m) continue;
-    const indent = i === start && isList ? childIndent : indentOf(stripped);
-    if (indent < childIndent) continue;
-    while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
-    stack.push({ indent, key: m[1] });
-    if (
-      stack.length === relPath.length &&
-      stack.every((s, idx) => s.key === relPath[idx])
-    ) {
-      return i + 1;
+
+  // A dash item's inline key (``- name: x``) sits at the content column
+  // after ``- ``, not the dash column.
+  const keyIndentOf = (line: string): number =>
+    RE_LIST_ITEM.test(line) ? listItemChildIndent(line) : indentOf(line);
+  const firstChildIndent = (lo: number, hi: number): number | null => {
+    for (let i = lo; i <= hi; i++) {
+      const s = stripComment(lines[i]);
+      if (s.trim()) return indentOf(s);
     }
+    return null;
+  };
+
+  // Descend *path* within [lo, hi]; keys / dashes for this level sit at
+  // *baseIndent*.
+  const descend = (
+    lo: number,
+    hi: number,
+    baseIndent: number,
+    path: string[]
+  ): number | null => {
+    const seg = path[0];
+    const rest = path.slice(1);
+    if (RE_PATH_INDEX.test(seg)) {
+      const dashes: number[] = [];
+      for (let i = lo; i <= hi; i++) {
+        const s = stripComment(lines[i]);
+        if (s.trim() && indentOf(s) === baseIndent && RE_LIST_ITEM.test(s))
+          dashes.push(i);
+      }
+      const itemLo = dashes[Number(seg)];
+      if (itemLo === undefined) return null;
+      if (rest.length === 0) return itemLo + 1;
+      const itemHi = Number(seg) + 1 < dashes.length ? dashes[Number(seg) + 1] - 1 : hi;
+      return descend(itemLo, itemHi, listItemChildIndent(lines[itemLo]), rest);
+    }
+    for (let i = lo; i <= hi; i++) {
+      const s = stripComment(lines[i]);
+      if (!s.trim() || keyIndentOf(s) !== baseIndent) continue;
+      const m = s.match(RE_PAIR_LINE);
+      if (!m || m[1] !== seg) continue;
+      if (rest.length === 0) return i + 1;
+      let blockHi = hi;
+      for (let j = i + 1; j <= hi; j++) {
+        const cs = stripComment(lines[j]);
+        if (cs.trim() && indentOf(cs) <= baseIndent) {
+          blockHi = j - 1;
+          break;
+        }
+      }
+      const childIndent = firstChildIndent(i + 1, blockHi);
+      return childIndent === null ? null : descend(i + 1, blockHi, childIndent, rest);
+    }
+    return null;
+  };
+
+  if (RE_LIST_ITEM.test(lines[start])) {
+    // List-item section: keys live at the item's child indent, and the
+    // header line itself carries the inline key.
+    return descend(start, end, listItemChildIndent(lines[start]), relPath);
   }
-  return null;
+  const childIndent = firstChildIndent(start + 1, end);
+  return childIndent === null ? null : descend(start + 1, end, childIndent, relPath);
 }
