@@ -1127,10 +1127,15 @@ export class ESPHomePageDevice extends LitElement {
    *  optional/empty field) so a stale single-line highlight can't linger. */
   private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
     const path = e.detail.path;
-    if (!path?.length || this._selectedFromLine === undefined) return;
-    const section = parseYamlTopLevelSections(this._yaml).find(
-      (s) => s.fromLine === this._selectedFromLine
-    );
+    if (!path?.length || !this._selectedSection) return;
+    // Prefer the exact instance via fromLine; fall back to the section
+    // key (``_selectedFromLine`` is unset for sections reached through a
+    // section-select that carried no line, e.g. single-instance blocks).
+    const sections = parseYamlTopLevelSections(this._yaml);
+    const section =
+      (this._selectedFromLine !== undefined
+        ? sections.find((s) => s.fromLine === this._selectedFromLine)
+        : undefined) ?? sections.find((s) => sectionKeyOf(s) === this._selectedSection);
     if (!section) return;
     const line = findFieldLine(this._yaml, section, path);
     this._highlightRange =
