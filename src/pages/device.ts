@@ -34,7 +34,7 @@ import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
-import { LIST_SECTIONS, MAP_SECTIONS } from "../util/section-entry-overrides.js";
+import { LIST_SECTIONS } from "../util/section-entry-overrides.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
 import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
@@ -1108,13 +1108,12 @@ export class ESPHomePageDevice extends LitElement {
     this._pendingFieldLine = false;
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
-    // Drop the top-level key to get the form-relative path — except for
-    // list/map sections (globals, substitutions), whose form keys fields
-    // under that key.
+    // Drop the top-level key to get the form-relative path. LIST_SECTIONS
+    // (globals) are the exception: their form keys fields under the
+    // section key, so keep it. (MAP sections like substitutions render at
+    // an empty path, so their fields are section-relative — slice as usual.)
     const full = e.detail.path ?? [];
-    const keepsKey =
-      full.length > 0 && (LIST_SECTIONS.has(full[0]) || MAP_SECTIONS.has(full[0]));
-    const rel = keepsKey ? full : full.slice(1);
+    const rel = full.length > 0 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const sectionKey = sectionKeyOf(match);
     if (
       sectionKey === this._selectedSection &&
