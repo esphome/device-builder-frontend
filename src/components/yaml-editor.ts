@@ -54,6 +54,10 @@ const highlightField = StateField.define<DecorationSet>({
         const { fromLine, toLine } = effect.value;
         const doc = tr.state.doc;
         const lo = Math.max(1, fromLine);
+        // A doc-shrinking `value` update can land in the same render cycle as
+        // this highlight; if its start line no longer exists, drop it instead
+        // of letting `doc.line()` throw on the stale number.
+        if (lo > doc.lines) return Decoration.none;
         const hi = Math.min(doc.lines, toLine);
         // Single-line field highlight: a line decoration covers the whole line
         // regardless of content, so it doesn't lag behind text typed into the

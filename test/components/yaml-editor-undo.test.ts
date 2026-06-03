@@ -80,4 +80,20 @@ describe("yaml-editor undo baseline (#1150)", () => {
     expect(viewOf(el).state.doc.toString()).toBe("a\nb\nc\nd\ne\n");
     expect(spy).toHaveBeenCalled();
   });
+
+  it("drops a highlight whose start line outlives a doc-shrinking value update", async () => {
+    const el = await mount();
+    el.value = "a\nb\nc\nd\ne\nf\ng\n";
+    el.highlightRange = { fromLine: 7, toLine: 7 };
+    await el.updateComplete;
+    const view = viewOf(el);
+
+    // Doc shrinks below the highlighted line and a (now stale) highlight
+    // re-applies in the same cycle — must not throw "Invalid line number".
+    el.value = "a\nb\n";
+    el.highlightRange = { fromLine: 7, toLine: 7 };
+    await el.updateComplete;
+
+    expect(view.state.doc.toString()).toBe("a\nb\n");
+  });
 });
