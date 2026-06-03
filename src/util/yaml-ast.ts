@@ -172,9 +172,13 @@ export function getTopLevelKey(state: EditorState, pos: number): string | null {
 }
 
 /**
- * Key chain from the top-level mapping down to the pair enclosing
- * *pos*. List-item wrappers add no key, so ``slice(1)`` is the field
- * path relative to the component instance (the form's ``data-field-key``).
+ * Collect the key chain from the top-level mapping down to the pair
+ * enclosing *pos* (``esp32_ble_tracker`` → ``scan_parameters`` →
+ * ``active``). Returns ``[]`` when *pos* isn't inside a mapping pair.
+ * List-item wrappers contribute no key — only ``Pair`` keys land in
+ * the chain — so a field under ``- platform: gpio`` yields
+ * ``[<domain>, <field>]``, matching how the schema nests platform
+ * fields directly under the component.
  */
 export function getKeyPath(state: EditorState, pos: number): string[] {
   const keys: string[] = [];

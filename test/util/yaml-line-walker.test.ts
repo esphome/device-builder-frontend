@@ -1,3 +1,4 @@
+import { Text } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import {
   findParentKey,
@@ -6,6 +7,9 @@ import {
   readPlatformSibling,
   stripComment,
 } from "../../src/util/yaml-line-walker.js";
+
+/** Build a CodeMirror `Text` doc from an array of lines. */
+const t = (lines: string[]) => Text.of(lines);
 
 describe("indentOf", () => {
   it("counts leading spaces", () => {
@@ -54,7 +58,7 @@ describe("findParentKey", () => {
   it("finds the nearest ancestor key strictly less indented", () => {
     // From line 6 (indent 4) → walks up → ``- platform: gpio`` at
     // indent 2, regex captures ``platform``.
-    expect(findParentKey(lines, 6, 4)).toEqual({
+    expect(findParentKey(t(lines), 6, 4)).toEqual({
       key: "platform",
       indent: 2,
       lineIdx: 3,
@@ -62,12 +66,12 @@ describe("findParentKey", () => {
   });
 
   it("returns null when there's no shallower key", () => {
-    expect(findParentKey(lines, 0, 0)).toBeNull();
+    expect(findParentKey(t(lines), 0, 0)).toBeNull();
   });
 
   it("skips blank and comment-only lines", () => {
     const noisy = ["wifi:", "", "  # hi", "  ssid: x"];
-    expect(findParentKey(noisy, 3, 2)).toEqual({
+    expect(findParentKey(t(noisy), 3, 2)).toEqual({
       key: "wifi",
       indent: 0,
       lineIdx: 0,
@@ -84,12 +88,12 @@ describe("findTopLevelBlock", () => {
   ];
 
   it("returns the most recent column-0 key above the cursor", () => {
-    expect(findTopLevelBlock(lines, 3)).toBe("wifi");
-    expect(findTopLevelBlock(lines, 1)).toBe("esphome");
+    expect(findTopLevelBlock(t(lines), 3)).toBe("wifi");
+    expect(findTopLevelBlock(t(lines), 1)).toBe("esphome");
   });
 
   it("returns null when the cursor is the top of the doc", () => {
-    expect(findTopLevelBlock(lines, 0)).toBeNull();
+    expect(findTopLevelBlock(t(lines), 0)).toBeNull();
   });
 });
 
@@ -108,7 +112,7 @@ describe("readPlatformSibling (regex fallback)", () => {
     // ``platform:`` value directly instead of breaking on
     // ``ind < cursorIndent``.
     const lines = ["binary_sensor:", "  - platform: template", "    name: hi"];
-    expect(readPlatformSibling(lines, 2, 4)).toBe("template");
+    expect(readPlatformSibling(t(lines), 2, 4)).toBe("template");
   });
 
   it("reads platform sibling for a deeply-nested cursor (``device_class:`` user-reported case)", () => {
@@ -122,7 +126,7 @@ describe("readPlatformSibling (regex fallback)", () => {
       "    name: zwave",
       "    device_class: ",
     ];
-    expect(readPlatformSibling(lines, 3, 4)).toBe("uptime");
+    expect(readPlatformSibling(t(lines), 3, 4)).toBe("uptime");
   });
 
   it("walks past intermediate keys to find a platform several levels up", () => {
@@ -142,7 +146,7 @@ describe("readPlatformSibling (regex fallback)", () => {
       "    filters:",
       "      - ",
     ];
-    expect(readPlatformSibling(lines, 4, 6)).toBe("uptime");
+    expect(readPlatformSibling(t(lines), 4, 6)).toBe("uptime");
   });
 
   it("strips quotes from quoted platform values", () => {
@@ -151,13 +155,13 @@ describe("readPlatformSibling (regex fallback)", () => {
     // walker has to accept both forms and return the unquoted
     // string so the schema-bundle lookup succeeds.
     const dq = ["sensor:", '  - platform: "dht"', "    pin: 5"];
-    expect(readPlatformSibling(dq, 2, 4)).toBe("dht");
+    expect(readPlatformSibling(t(dq), 2, 4)).toBe("dht");
     const sq = ["sensor:", "  - platform: 'dht'", "    pin: 5"];
-    expect(readPlatformSibling(sq, 2, 4)).toBe("dht");
+    expect(readPlatformSibling(t(sq), 2, 4)).toBe("dht");
   });
 
   it("returns null when there's no platform sibling", () => {
     const lines = ["wifi:", "  ssid: x", "  password: y"];
-    expect(readPlatformSibling(lines, 2, 2)).toBeNull();
+    expect(readPlatformSibling(t(lines), 2, 2)).toBeNull();
   });
 });
