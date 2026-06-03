@@ -13,6 +13,41 @@ const FLASH_CLASS = "field--highlight";
  *  around inside one field shouldn't keep re-flashing it. */
 const FLASH_DEDUP_MS = 10_000;
 
+/** Mutable gating state for the scroll retry, split out so the decision is
+ *  unit-testable without a DOM. */
+export interface ScrollGate {
+  /** Key (``fieldKeyAttr``) of the target already scrolled to, or undefined. */
+  scrolledKey?: string;
+  /** Last target key seen; resets the budget on value change rather than on
+   *  the fresh array reference ``focusFieldPath`` gets every cursor move. */
+  lastFocusKey?: string;
+  /** Scroll attempts spent on the current target. */
+  tries: number;
+}
+
+/**
+ * Advance the scroll gate for the current target *key* and decide whether to
+ * (re)attempt the scroll. Resets the budget when the target changes by value;
+ * attempts while unscrolled, within *maxTries*, and a relevant prop changed.
+ * Pure — ``scrolledKey`` is only cleared here; a successful scroll sets it.
+ */
+export function advanceScrollGate(
+  gate: ScrollGate,
+  key: string | undefined,
+  relevantChange: boolean,
+  maxTries: number
+): { gate: ScrollGate; scroll: boolean } {
+  let { scrolledKey, lastFocusKey, tries } = gate;
+  if (key !== lastFocusKey) {
+    lastFocusKey = key;
+    scrolledKey = undefined;
+    tries = 0;
+  }
+  const scroll = !!key && scrolledKey !== key && tries < maxTries && relevantChange;
+  if (scroll) tries++;
+  return { gate: { scrolledKey, lastFocusKey, tries }, scroll };
+}
+
 /** The form surface this helper drives. */
 export interface FieldScrollHost {
   shadowRoot: ShadowRoot | null;
@@ -48,21 +83,22 @@ export class FieldScrollController {
   maybeScroll(changed: PropertyValues): void {
     const fp = this.host.focusFieldPath;
     const key = fp?.length ? fieldKeyAttr(fp) : undefined;
-    if (key !== this._lastFocusKey) {
-      this._lastFocusKey = key;
-      this._scrolledKey = undefined;
-      this._tries = 0;
-    }
-    if (
-      fp?.length &&
-      key &&
-      this._scrolledKey !== key &&
-      this._tries < MAX_TRIES &&
-      (changed.has("focusFieldPath") || changed.has("entries") || changed.has("values"))
-    ) {
-      this._tries++;
-      void this._scrollTo(fp, key);
-    }
+    const relevant =
+      changed.has("focusFieldPath") || changed.has("entries") || changed.has("values");
+    const { gate, scroll } = advanceScrollGate(
+      {
+        scrolledKey: this._scrolledKey,
+        lastFocusKey: this._lastFocusKey,
+        tries: this._tries,
+      },
+      key,
+      relevant,
+      MAX_TRIES
+    );
+    this._scrolledKey = gate.scrolledKey;
+    this._lastFocusKey = gate.lastFocusKey;
+    this._tries = gate.tries;
+    if (scroll && fp?.length && key) void this._scrollTo(fp, key);
   }
 
   private async _scrollTo(path: string[], key: string): Promise<void> {
