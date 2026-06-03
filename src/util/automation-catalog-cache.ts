@@ -14,6 +14,7 @@ import {
   tallyOutcome,
   type HydrationResult,
 } from "./automation-body-hydration.js";
+import { createSessionBlobCache, type SessionBlobCache } from "./session-blob-cache.js";
 
 /**
  * Session-scoped cache of the five slim automation catalogues
@@ -44,80 +45,49 @@ type CatalogValue = {
   filters: Filter[];
 };
 
-const _cache: {
-  [K in CatalogKind]: Map<string, CatalogValue[K]>;
-} = {
-  triggers: new Map(),
-  actions: new Map(),
-  conditions: new Map(),
-  light_effects: new Map(),
-  filters: new Map(),
-};
-
-const _inflight: {
-  [K in CatalogKind]: Map<string, Promise<CatalogValue[K]>>;
-} = {
-  triggers: new Map(),
-  actions: new Map(),
-  conditions: new Map(),
-  light_effects: new Map(),
-  filters: new Map(),
-};
-
-const _listeners = new Set<() => void>();
-
 function _key(platform?: string, boardId?: string): string {
   return `${platform ?? ""}|${boardId ?? ""}`;
 }
 
-function _notify(): void {
-  // Isolate each listener so a throwing subscriber doesn't reject
-  // the fetch promise (the cache is already populated at this
-  // point, so the rejection would be misleading) or skip later
-  // listeners. Same isolation as ``component-name-cache.ts``.
-  for (const listener of _listeners) {
-    try {
-      listener();
-    } catch (err) {
-      console.error("automation-catalog-cache listener threw", err);
-    }
-  }
-}
-
-function _fetch<K extends CatalogKind>(
-  kind: K,
-  fetcher: (platform?: string, boardId?: string) => Promise<CatalogValue[K]>,
-  platform: string | undefined,
-  boardId: string | undefined
-): Promise<CatalogValue[K]> {
-  const key = _key(platform, boardId);
-  const cached = _cache[kind].get(key);
-  if (cached !== undefined) return Promise.resolve(cached);
-
-  const existing = _inflight[kind].get(key);
-  if (existing) return existing;
-
-  const promise = fetcher(platform, boardId)
-    .then((entries) => {
-      _cache[kind].set(key, entries);
-      _inflight[kind].delete(key);
-      _notify();
-      return entries;
-    })
-    .catch((err) => {
-      _inflight[kind].delete(key);
-      throw err;
-    });
-
-  _inflight[kind].set(key, promise);
-  return promise;
-}
+// One session-blob cache per catalogue kind, all keyed by
+// ``platform|boardId``. No ``fallback`` — a failed list fetch rethrows
+// and isn't cached, so the next call retries; ``light_effects`` /
+// ``filters`` add a hydration pass below via each cache's ``update``.
+const _caches: {
+  [K in CatalogKind]: SessionBlobCache<CatalogValue[K], [string?, string?]>;
+} = {
+  triggers: createSessionBlobCache<AutomationTrigger[], [string?, string?]>({
+    name: "automation-catalog-cache:triggers",
+    key: _key,
+    fetch: (api, p, b) => api.getAutomationTriggers(p, b),
+  }),
+  actions: createSessionBlobCache<AutomationAction[], [string?, string?]>({
+    name: "automation-catalog-cache:actions",
+    key: _key,
+    fetch: (api, p, b) => api.getAutomationActions(p, b),
+  }),
+  conditions: createSessionBlobCache<AutomationCondition[], [string?, string?]>({
+    name: "automation-catalog-cache:conditions",
+    key: _key,
+    fetch: (api, p, b) => api.getAutomationConditions(p, b),
+  }),
+  light_effects: createSessionBlobCache<LightEffect[], [string?, string?]>({
+    name: "automation-catalog-cache:light_effects",
+    key: _key,
+    fetch: (api, p, b) => api.getLightEffects(p, b),
+  }),
+  filters: createSessionBlobCache<Filter[], [string?, string?]>({
+    name: "automation-catalog-cache:filters",
+    key: _key,
+    fetch: (api, p, b) => api.getFilters(p, b),
+  }),
+};
 
 export function getCachedAutomationTriggers(
   platform?: string,
   boardId?: string
 ): AutomationTrigger[] | undefined {
-  return _cache.triggers.get(_key(platform, boardId));
+  return _caches.triggers.getCached(platform, boardId);
 }
 
 export function fetchAutomationTriggers(
@@ -125,14 +95,14 @@ export function fetchAutomationTriggers(
   platform?: string,
   boardId?: string
 ): Promise<AutomationTrigger[]> {
-  return _fetch("triggers", (p, b) => api.getAutomationTriggers(p, b), platform, boardId);
+  return _caches.triggers.fetch(api, platform, boardId);
 }
 
 export function getCachedAutomationActions(
   platform?: string,
   boardId?: string
 ): AutomationAction[] | undefined {
-  return _cache.actions.get(_key(platform, boardId));
+  return _caches.actions.getCached(platform, boardId);
 }
 
 export function fetchAutomationActions(
@@ -140,14 +110,14 @@ export function fetchAutomationActions(
   platform?: string,
   boardId?: string
 ): Promise<AutomationAction[]> {
-  return _fetch("actions", (p, b) => api.getAutomationActions(p, b), platform, boardId);
+  return _caches.actions.fetch(api, platform, boardId);
 }
 
 export function getCachedAutomationConditions(
   platform?: string,
   boardId?: string
 ): AutomationCondition[] | undefined {
-  return _cache.conditions.get(_key(platform, boardId));
+  return _caches.conditions.getCached(platform, boardId);
 }
 
 export function fetchAutomationConditions(
@@ -155,19 +125,14 @@ export function fetchAutomationConditions(
   platform?: string,
   boardId?: string
 ): Promise<AutomationCondition[]> {
-  return _fetch(
-    "conditions",
-    (p, b) => api.getAutomationConditions(p, b),
-    platform,
-    boardId
-  );
+  return _caches.conditions.fetch(api, platform, boardId);
 }
 
 export function getCachedLightEffects(
   platform?: string,
   boardId?: string
 ): LightEffect[] | undefined {
-  return _cache.light_effects.get(_key(platform, boardId));
+  return _caches.light_effects.getCached(platform, boardId);
 }
 
 export async function fetchLightEffects(
@@ -175,13 +140,8 @@ export async function fetchLightEffects(
   platform?: string,
   boardId?: string
 ): Promise<LightEffect[]> {
-  const list = await _fetch(
-    "light_effects",
-    (p, b) => api.getLightEffects(p, b),
-    platform,
-    boardId
-  );
-  // Hydration runs OUTSIDE ``_fetch`` so cache hits also retry
+  const list = await _caches.light_effects.fetch(api, platform, boardId);
+  // Hydration runs OUTSIDE the cache fetch so cache hits also retry
   // any entries whose body fetch previously failed —
   // ``_hydratedEntries`` short-circuits already-done ones, so the
   // happy path pays a no-op filter.
@@ -194,7 +154,7 @@ export function getCachedFilters(
   platform?: string,
   boardId?: string
 ): Filter[] | undefined {
-  return _cache.filters.get(_key(platform, boardId));
+  return _caches.filters.getCached(platform, boardId);
 }
 
 export async function fetchFilters(
@@ -202,19 +162,19 @@ export async function fetchFilters(
   platform?: string,
   boardId?: string
 ): Promise<Filter[]> {
-  const list = await _fetch("filters", (p, b) => api.getFilters(p, b), platform, boardId);
+  const list = await _caches.filters.fetch(api, platform, boardId);
   return _postHydrate("filters", platform, boardId, list, (l) =>
     _hydrateRegistryConfigEntries(api, "filters", l)
   );
 }
 
-/** After ``_fetch`` notifies subscribers with the slim list, hydrate
- *  ``config_entries`` and — if any entry actually changed — replace
- *  the cached array with a fresh identity and notify again so
- *  identity-checking consumers (registry-list's
+/** After the cache fetch notifies subscribers with the slim list,
+ *  hydrate ``config_entries`` and — if any entry actually changed —
+ *  ``update`` the cache with a fresh array identity (which notifies
+ *  again) so identity-checking consumers (registry-list's
  *  ``subscribeAutomationCatalogCache`` reread of ``cache()``) repaint
  *  with the hydrated entries. Without the second notify + identity
- *  swap, the slim entries the first ``_notify`` painted would never
+ *  swap, the slim entries the first notify painted would never
  *  refresh: in-place mutation of ``config_entries`` doesn't bump the
  *  array reference Lit's ``hasChanged`` compares against. */
 async function _postHydrate<K extends "light_effects" | "filters">(
@@ -227,8 +187,7 @@ async function _postHydrate<K extends "light_effects" | "filters">(
   const result = await hydrate(list);
   if (result.succeeded === 0) return list;
   const fresh = [...list] as CatalogValue[K];
-  _cache[kind].set(_key(platform, boardId), fresh);
-  _notify();
+  _caches[kind].update(fresh, platform, boardId);
   return fresh;
 }
 
@@ -294,22 +253,17 @@ async function _hydrateRegistryConfigEntries(
 }
 
 /** Subscribe to cache updates. Returns an unsubscribe function.
- *  Listeners fire once per fresh entry (across any of the four
- *  catalogues); failed fetches do not fire. */
+ *  Listeners fire once per fresh entry (across any of the five
+ *  catalogues); failed fetches do not fire. Fanned across every
+ *  per-kind cache so one subscription covers them all. */
 export function subscribeAutomationCatalogCache(listener: () => void): () => void {
-  _listeners.add(listener);
+  const unsubs = Object.values(_caches).map((c) => c.subscribe(listener));
   return () => {
-    _listeners.delete(listener);
+    for (const unsub of unsubs) unsub();
   };
 }
 
-/** Test-only: drop all cached entries and pending promises. */
+/** Test-only: drop all cached entries, pending promises, and listeners. */
 export function _clearAutomationCatalogCache(): void {
-  // Derive the kinds from `_cache` so new registries (filters,
-  // ...) don't have to remember to update this list separately.
-  for (const kind of Object.keys(_cache) as CatalogKind[]) {
-    _cache[kind].clear();
-    _inflight[kind].clear();
-  }
-  _listeners.clear();
+  for (const cache of Object.values(_caches)) cache.reset();
 }
