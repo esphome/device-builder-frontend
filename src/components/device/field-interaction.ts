@@ -12,13 +12,10 @@ export interface FieldFocusDecision {
 }
 
 /**
- * Decide whether *type* on the field keyed *key* should highlight its YAML
- * line, given the currently focused field. ``focusin`` / ``input`` mark the
- * edited field (``input`` is authoritative: it only fires on the live field,
- * so it catches one whose ``focusin`` didn't surface, e.g. a just-added
- * required input). ``input`` re-emits only when focus moved, not mid-typing.
- * ``change`` fires on blur, so it is honored only while its field still holds
- * focus — else moving A→B re-points the highlight back at A.
+ * Decide whether *type* should highlight the field keyed *key*, and the next
+ * focused key. ``input`` is authoritative (catches a field whose ``focusin``
+ * didn't surface) and re-emits only when focus moved; ``change`` is honored
+ * only while its field still holds focus, so moving A to B doesn't re-point at A.
  */
 export function decideFieldFocus(
   type: string,

@@ -1,11 +1,7 @@
 import { css } from "lit";
 
-/**
- * One-shot glow for a field the YAML cursor navigated to (the structured side
- * of the field sync). Split into its own sheet so it lives with the feature
- * and doesn't grow the already-large ``config-entry-form.styles``; added to
- * ``fieldRendererStyles`` so it shares the form's shadow-root scope.
- */
+/** One-shot glow for a field the YAML cursor navigated to; in
+ *  ``fieldRendererStyles`` so it shares the form's shadow-root scope. */
 export const fieldHighlightStyles = css`
   /* Brief glow when navigated to from the YAML cursor — mirrors the
      dashboard's just-added card flash. */

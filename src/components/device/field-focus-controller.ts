@@ -2,22 +2,15 @@ import type { ReactiveController, ReactiveControllerHost } from "lit";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 import { decideFieldFocus } from "./field-interaction.js";
 
-/** Events that surface "the user is on this field" for YAML highlight sync.
- *  ``pointerdown`` is load-bearing: ``wa-input``'s nested ``delegatesFocus``
- *  shadow roots keep ``document.activeElement`` pinned to the outer host, so
- *  ``focusin`` only fires on first entry to the form, never when moving
- *  between fields. ``pointerdown`` fires on every click regardless. */
+// ``pointerdown`` is load-bearing: ``wa-input``'s nested ``delegatesFocus``
+// keeps ``document.activeElement`` on the outer host, so ``focusin`` fires
+// only on first entry, not when moving between fields.
 const FIELD_INTERACTION_EVENTS = ["focusin", "pointerdown", "input", "change"] as const;
 
 type FieldFocusHost = ReactiveControllerHost & HTMLElement;
 
-/**
- * Listens for field interactions on the form and emits a bubbling
- * ``field-focus`` ``CustomEvent<{ path }>`` for the YAML highlight sync, so
- * the page can highlight the matching line. Decides emit vs. skip via
- * ``decideFieldFocus`` (``input`` authoritative, ``change`` only while
- * focused, ``pointerdown`` for the delegatesFocus gap).
- */
+/** Emits a bubbling ``field-focus`` event as the user moves between fields
+ *  (emit/skip decided by ``decideFieldFocus``), for the YAML highlight sync. */
 export class FieldFocusController implements ReactiveController {
   /** Field currently being edited (last ``focusin`` / ``input`` / pointer). */
   private _focusedKey?: string;
