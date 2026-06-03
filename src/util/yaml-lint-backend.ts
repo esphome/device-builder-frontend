@@ -10,9 +10,16 @@
  * Wired via `linter()` (no `lintGutter()` — diagnostics show as red wavy
  * underlines only, never as a round pill in the gutter).
  */
-import { linter, type Diagnostic } from "@codemirror/lint";
-import type { Extension } from "@codemirror/state";
-import type { EditorView } from "@codemirror/view";
+import { forEachDiagnostic, linter, type Diagnostic } from "@codemirror/lint";
+import {
+  RangeSetBuilder,
+  StateField,
+  type EditorState,
+  type Extension,
+  type RangeSet,
+  type Text,
+} from "@codemirror/state";
+import { gutterLineClass, GutterMarker, type EditorView } from "@codemirror/view";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { EditorValidateResponse } from "../api/types/editor.js";
 
@@ -20,6 +27,14 @@ interface BackendLinterOptions {
   api: ESPHomeAPI;
   /** Live accessor — the configuration may change over the editor's lifetime. */
   getConfiguration: () => string;
+  /**
+   * Called after every lint pass with the resulting error messages and the
+   * configuration they were computed for, so the host can surface a
+   * document-level "configuration invalid" indicator that names the actual
+   * errors and ignore a late result from a since-switched device. Fires with
+   * `[]` for an empty/un-configured buffer or a failed round-trip.
+   */
+  onResult?: (errors: string[], configuration: string) => void;
 }
 
 /**
@@ -57,10 +72,101 @@ export function __setLastValidatedForTesting(
   _lastValidated.set(configuration, { content, result, at: performance.now() });
 }
 
-/** Match `line N, column M` (1-indexed) anywhere in a YAML parse error message. */
-const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/i;
+/** Match `line N, column M` (1-indexed) globally in a YAML parse error message. */
+const YAML_LINE_COL_RE = /line\s+(\d+)\s*,\s*column\s+(\d+)/gi;
 /** Fallback: bare `line N` if the column is missing from the message. */
-const YAML_LINE_RE = /line\s+(\d+)/i;
+const YAML_LINE_RE = /line\s+(\d+)/gi;
+
+/** A quoted path (POSIX `/` or Windows `\`) — keep the basename, drop the dir. */
+const QUOTED_PATH_RE = /"([^"]*[/\\])([^"/\\]+)"/g;
+
+/** ESPHome's root block — where structural "whole config" errors land. */
+const CORE_BLOCK_KEY = "esphome";
+
+/**
+ * Strip absolute directory paths out of a backend error message.
+ *
+ * ESPHome / PyYAML errors embed the config's absolute path
+ * (`"/Users/me/esphome/foo.yaml"` or `"C:\\Users\\me\\foo.yaml"`),
+ * leaking the host filesystem layout and username into the UI. Collapse
+ * any quoted path to its basename.
+ */
+export function sanitizeMessage(message: string): string {
+  return message.replace(QUOTED_PATH_RE, '"$2"');
+}
+
+/**
+ * Pull the real error location out of a PyYAML parse message.
+ *
+ * PyYAML reports the context mark (where the enclosing block started,
+ * often line 1) first and the problem mark (where the bad token was
+ * found) last, so the LAST `line N, column M` is the actual location.
+ * Falls back to a bare `line N`; `null` when the message carries no
+ * position at all.
+ */
+export function parseYamlErrorPosition(
+  message: string
+): { line: number; col: number | null } | null {
+  const colMatches = [...message.matchAll(YAML_LINE_COL_RE)];
+  if (colMatches.length) {
+    const last = colMatches[colMatches.length - 1];
+    return { line: Number.parseInt(last[1], 10), col: Number.parseInt(last[2], 10) };
+  }
+  const lineMatches = [...message.matchAll(YAML_LINE_RE)];
+  if (lineMatches.length) {
+    return {
+      line: Number.parseInt(lineMatches[lineMatches.length - 1][1], 10),
+      col: null,
+    };
+  }
+  return null;
+}
+
+/** Leading-whitespace width of a line. */
+function indentOf(text: string): number {
+  return text.length - text.trimStart().length;
+}
+
+/** Match a `key:` declaration, capturing its indent and the key token. */
+const KEY_LINE_RE = /^(\s*)([^\s:#][^:]*?)\s*:(?:\s|$)/;
+
+/** The key declared on the line containing *offset*, or `null`. */
+function keyAt(doc: Text, offset: number): string | null {
+  const hit = doc.lineAt(offset).text.match(KEY_LINE_RE);
+  return hit ? hit[2] : null;
+}
+
+/**
+ * Move a block-level validation error onto the key of its enclosing block.
+ *
+ * ESPHome marks "Component not found" / "Platform missing" on the block's
+ * value mapping, so a multi-line range spans the children. Walk it up to
+ * the first less-indented `key:` line (clamp to the first line if none).
+ * Single-line ranges are already precise and pass through untouched.
+ */
+export function retargetBlockDiagnostic(
+  doc: Text,
+  fallback: { from: number; to: number }
+): { from: number; to: number } {
+  const startLine = doc.lineAt(fallback.from);
+  if (doc.lineAt(fallback.to).number === startLine.number) return fallback;
+
+  const startIndent = indentOf(startLine.text);
+  for (let n = startLine.number - 1; n >= 1; n--) {
+    const line = doc.line(n);
+    const text = line.text;
+    if (!text.trim() || text.trimStart().startsWith("#")) continue; // skip blank/comment
+    if (indentOf(text) >= startIndent) continue; // still inside the block
+    const hit = text.match(KEY_LINE_RE); // first less-indented line = enclosing key
+    if (hit) {
+      const from = line.from + hit[1].length;
+      return { from, to: from + hit[2].length };
+    }
+    break; // less-indented but not a key — fall through to the clamp
+  }
+  // No enclosing key — at least keep the underline on the first line.
+  return { from: startLine.from + startIndent, to: startLine.to };
+}
 
 /**
  * Translate an upstream range (0-indexed start_line/start_col/end_line/end_col)
@@ -132,9 +238,15 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
   return linter(
     async (view) => {
       const configuration = opts.getConfiguration();
-      if (!configuration) return [];
+      if (!configuration) {
+        opts.onResult?.([], configuration);
+        return [];
+      }
       const content = view.state.doc.toString();
-      if (!content.trim()) return [];
+      if (!content.trim()) {
+        opts.onResult?.([], configuration);
+        return [];
+      }
 
       let res: EditorValidateResponse;
       try {
@@ -143,49 +255,48 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // Surface backend errors quietly in the console — we don't want a
         // network blip to flood the editor with spurious diagnostics.
         console.debug("[yaml-lint] validate_yaml failed:", err);
+        opts.onResult?.([], configuration);
         return [];
       }
       _lastValidated.set(configuration, { content, result: res, at: performance.now() });
 
       const diagnostics: Diagnostic[] = [];
+      // Whole-config errors (a structural error esphome pins on the root
+      // `esphome:` block, or an unplaceable parse error) go in the banner
+      // instead of a squiggle; localized errors keep their squiggle.
+      const bannerErrors: string[] = [];
 
       // YAML parse errors — usually one, no range, message contains
       // "line N, column M".
       for (const err of res.yaml_errors ?? []) {
         const msg = err.message ?? "";
-        let line: number | null = null;
-        let col: number | null = null;
-        const both = msg.match(YAML_LINE_COL_RE);
-        if (both) {
-          line = Number.parseInt(both[1], 10);
-          col = Number.parseInt(both[2], 10);
-        } else {
-          const lineOnly = msg.match(YAML_LINE_RE);
-          if (lineOnly) line = Number.parseInt(lineOnly[1], 10);
+        const message = sanitizeMessage(msg.trim()) || "Invalid YAML";
+        const pos = parseYamlErrorPosition(msg);
+        if (pos === null) {
+          bannerErrors.push(message); // no position to squiggle
+          continue;
         }
-        if (line === null || Number.isNaN(line)) continue;
-        const { from, to } = lineToOffsets(view, line, col);
-        diagnostics.push({
-          from,
-          to,
-          severity: "error",
-          source: "yaml",
-          message: msg.trim() || "Invalid YAML",
-        });
+        const { from, to } = lineToOffsets(view, pos.line, pos.col);
+        diagnostics.push({ from, to, severity: "error", source: "yaml", message });
       }
 
       // Schema/validation errors carry an explicit range.
       for (const err of res.validation_errors ?? []) {
-        const { from, to } = rangeToOffsets(view, err.range);
-        diagnostics.push({
-          from,
-          to,
-          severity: "error",
-          source: "esphome",
-          message: (err.message ?? "Invalid configuration").trim(),
-        });
+        const message =
+          sanitizeMessage((err.message ?? "").trim()) || "Invalid configuration";
+        const { from, to } = retargetBlockDiagnostic(
+          view.state.doc,
+          rangeToOffsets(view, err.range)
+        );
+        // Pinned on the `esphome:` core block → whole-config error → banner.
+        if (keyAt(view.state.doc, from) === CORE_BLOCK_KEY) {
+          bannerErrors.push(message);
+          continue;
+        }
+        diagnostics.push({ from, to, severity: "error", source: "esphome", message });
       }
 
+      opts.onResult?.(bannerErrors, configuration);
       return diagnostics;
     },
     {
@@ -196,3 +307,39 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
     }
   );
 }
+
+/** Tags a line so its line-number gutter cell renders the error icon. */
+const errorLineMarker = new (class extends GutterMarker {
+  elementClass = "cm-lint-error-line";
+})();
+
+/** One marker per line that carries a lint error, sorted by document offset. */
+function errorLineGutterMarkers(state: EditorState): RangeSet<GutterMarker> {
+  const lineStarts: number[] = [];
+  const seen = new Set<number>();
+  forEachDiagnostic(state, (diagnostic, from) => {
+    if (diagnostic.severity !== "error") return;
+    const start = state.doc.lineAt(from).from;
+    if (!seen.has(start)) {
+      seen.add(start);
+      lineStarts.push(start);
+    }
+  });
+  lineStarts.sort((a, b) => a - b);
+  const builder = new RangeSetBuilder<GutterMarker>();
+  for (const start of lineStarts) builder.add(start, start, errorLineMarker);
+  return builder.finish();
+}
+
+/**
+ * Replace the line number with an error icon on lines carrying a lint
+ * error, instead of reserving a separate lint-gutter column. The
+ * line-number gutter keeps a fixed width, so an error never reflows the
+ * editor and the icon stays aligned with the number column. Must be wired
+ * after the linter so the diagnostics state it reads is populated.
+ */
+export const lintErrorLineGutter: Extension = StateField.define<RangeSet<GutterMarker>>({
+  create: errorLineGutterMarkers,
+  update: (_value, tr) => errorLineGutterMarkers(tr.state),
+  provide: (field) => gutterLineClass.from(field),
+});

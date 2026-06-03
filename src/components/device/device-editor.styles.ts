@@ -309,6 +309,47 @@ export const deviceEditorStyles = css`
     font-weight: var(--wa-font-weight-bold);
   }
 
+  /* Document-level "configuration invalid" banner above the editor.
+     A flex child of .editor-pane (column + gap), so it sits above the
+     editor body and the body's flex:1 reclaims the rest. */
+  .invalid-banner {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    gap: var(--wa-space-s);
+    padding: var(--wa-space-s) var(--wa-space-m);
+    border-radius: var(--wa-border-radius-m);
+    background: var(--wa-color-danger-fill-quiet);
+    border: var(--wa-border-width-s) solid var(--wa-color-danger-60);
+    color: var(--wa-color-danger-text-normal);
+  }
+
+  .invalid-banner-icon {
+    flex: 0 0 auto;
+    font-size: 1.25rem;
+    margin-top: 0.05rem;
+    color: var(--wa-color-danger-60);
+  }
+
+  .invalid-banner-text {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    line-height: 1.4;
+    min-width: 0;
+  }
+
+  .invalid-banner-error {
+    font-size: var(--wa-font-size-xs);
+    font-weight: var(--wa-font-weight-semibold);
+    word-break: break-word;
+  }
+
+  .invalid-banner-more {
+    font-size: var(--wa-font-size-2xs);
+    opacity: 0.85;
+  }
+
   .editor-pane-body {
     flex: 1;
     overflow: hidden;
