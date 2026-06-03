@@ -254,6 +254,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
       <esphome-base-dialog
         class=${this._step === "board" ? "wide" : ""}
         ?open=${this._open}
+        ?busy=${this._submitting}
         .label=${this._title}
         @request-close=${this._onRequestClose}
         @after-hide=${this._onHide}
@@ -263,7 +264,13 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         @import-file=${this._onImportFile}
       >
         ${this._step !== "method"
-          ? html`<button slot="header-prefix" class="back-button" @click=${this._onBack}>
+          ? html`<button
+              slot="header-prefix"
+              class="back-button"
+              title=${this._localize("layout.back")}
+              aria-label=${this._localize("layout.back")}
+              @click=${this._onBack}
+            >
               <wa-icon library="mdi" name="arrow-left"></wa-icon>
             </button>`
           : nothing}

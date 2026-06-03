@@ -132,3 +132,42 @@ describe("create-config-dialog create de-dupe + retry", () => {
     );
   });
 });
+
+// The migration onto esphome-base-dialog swapped the imperative
+// `_dialog.open = …` for a reactive `_open` flag. _onRequestClose flipping
+// _open back to false is the load-bearing part — without it a user-driven
+// close (Escape / X / outside-click) wouldn't dismiss. Pin the contract.
+describe("create-config-dialog open/close contract", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const isOpen = (el: ESPHomeCreateConfigDialog): boolean =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._open;
+
+  it("open() and openAtBoardStep() set the reactive open flag", async () => {
+    const el = await mount({});
+    expect(isOpen(el)).toBe(true);
+    el.close();
+    await el.updateComplete;
+    expect(isOpen(el)).toBe(false);
+    el.openAtBoardStep();
+    expect(isOpen(el)).toBe(true);
+  });
+
+  it("flips _open to false on request-close from the wrapper", async () => {
+    const el = await mount({});
+    expect(isOpen(el)).toBe(true);
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("request-close")
+    );
+    expect(isOpen(el)).toBe(false);
+  });
+
+  it("close() sets _open to false", async () => {
+    const el = await mount({});
+    el.close();
+    expect(isOpen(el)).toBe(false);
+  });
+});
