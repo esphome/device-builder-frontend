@@ -81,9 +81,11 @@ const STICKY_MEASURE_KEY = Symbol("esphome-sticky-scroll");
  *  when the event didn't originate on a pinned row. Shared by the click
  *  and keyboard handlers. */
 function lineFromEvent(e: Event): number | null {
-  const target = (e.target as HTMLElement).closest<HTMLElement>(
-    ".cm-esphome-sticky-line"
-  );
+  // A click can land on a highlighted-token Text node, which has no
+  // ``closest``; start from its parent element in that case.
+  const node = e.target as Node;
+  const start = node instanceof Element ? node : node.parentElement;
+  const target = start?.closest<HTMLElement>(".cm-esphome-sticky-line");
   if (!target) return null;
   const lineNum = Number(target.dataset.line);
   return Number.isFinite(lineNum) && lineNum >= 1 ? lineNum : null;
@@ -357,7 +359,11 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         const rowHeight = this.view.defaultLineHeight;
         const predictedHeight = predictedCount * rowHeight;
 
-        const yMargin = Math.ceil(predictedHeight) - this._measuredHeight;
+        // Clamp to >= 0: jumping from a deeper (taller) scope to a
+        // shallower one makes the predicted overlay shorter than the
+        // current one, and a negative margin would push the target up
+        // behind the overlay.
+        const yMargin = Math.max(0, Math.ceil(predictedHeight) - this._measuredHeight);
 
         this.view.dispatch({
           selection: { anchor: line.from },

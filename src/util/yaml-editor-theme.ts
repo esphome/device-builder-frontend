@@ -23,7 +23,12 @@ import { tags as t } from "@lezer/highlight";
 export const EDITOR_FONT_FAMILY = '"JetBrains Mono", "Fira Code", monospace';
 export const EDITOR_FONT_SIZE = "13px";
 
-const DARK_BG = "#1e1e1e";
+/** Editor background per mode — shared so the sticky-scroll overlay
+ *  paints the same colour as the editor it floats over. */
+export const EDITOR_BG_DARK = "#1e1e1e";
+export const EDITOR_BG_LIGHT = "#ffffff";
+
+const DARK_BG = EDITOR_BG_DARK;
 const DARK_FG = "#d4d4d4";
 const DARK_GUTTER_FG = "#858585";
 const DARK_SELECTION = "#264f78";
@@ -33,7 +38,7 @@ const DARK_ACTIVE_LINE = "#2a2d2e";
 const DARK_ACTIVE_LINE_TINT = "#ffffff0a";
 const DARK_CURSOR = "#aeafad";
 
-const LIGHT_BG = "#ffffff";
+const LIGHT_BG = EDITOR_BG_LIGHT;
 const LIGHT_FG = "#1f2328";
 const LIGHT_GUTTER_FG = "#6e7781";
 const LIGHT_SELECTION = "#add6ff";

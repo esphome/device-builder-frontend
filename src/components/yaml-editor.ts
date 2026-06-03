@@ -14,6 +14,8 @@ import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import {
   darkHighlight,
+  EDITOR_BG_DARK,
+  EDITOR_BG_LIGHT,
   EDITOR_FONT_FAMILY,
   EDITOR_FONT_SIZE,
   lightHighlight,
@@ -145,7 +147,7 @@ export class ESPHomeYamlEditor extends LitElement {
       sensitiveValueMaskExtension(this.revealSensitive, this.maskAllValues),
       yamlStickyScroll({
         highlightStyle: this._darkMode ? darkHighlight : lightHighlight,
-        background: this._darkMode ? "#1e1e1e" : "#ffffff",
+        background: this._darkMode ? EDITOR_BG_DARK : EDITOR_BG_LIGHT,
         jumpToLineLabel: (line) =>
           this._localize("yaml_editor.sticky_jump_to_line", { line: String(line) }),
       }),

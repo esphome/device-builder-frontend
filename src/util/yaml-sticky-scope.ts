@@ -9,17 +9,29 @@ export interface StickyScopeLine {
   text: string;
 }
 
+/**
+ * ``stripComment(raw)`` when ``raw`` participates in scope structure,
+ * else ``null``. Blank lines and column-0 banner comments (``# ...``)
+ * decorate the next section rather than belonging to a scope, so every
+ * walk in this file skips them uniformly — matching the trim policy in
+ * ``parseYamlTopLevelSections``. Returns the stripped text (not a bare
+ * boolean) so callers can read its indent without re-stripping.
+ */
+function structuralStripped(raw: string): string | null {
+  if (raw.startsWith("#")) return null;
+  const stripped = stripComment(raw);
+  return stripped.trim() ? stripped : null;
+}
+
 export function findScopeExitLine(
   lines: string[],
   openerLine: number,
   openerIndent: number
 ): number {
   for (let i = openerLine; i < lines.length; i++) {
-    const stripped = stripComment(lines[i]);
-    if (!stripped.trim()) continue;
-    if (lines[i].startsWith("#")) continue;
-    const ind = indentOf(stripped);
-    if (ind <= openerIndent) return i + 1;
+    const stripped = structuralStripped(lines[i]);
+    if (!stripped) continue;
+    if (indentOf(stripped) <= openerIndent) return i + 1;
   }
   return lines.length + 1;
 }
@@ -46,16 +58,12 @@ export function findScopeExitLine(
  */
 export function isScopeOpener(lines: string[], lineNumber: number): boolean {
   if (lineNumber < 1 || lineNumber > lines.length) return false;
-  const raw = lines[lineNumber - 1];
-  const stripped = stripComment(raw);
-  if (!stripped.trim()) return false;
-  if (raw.startsWith("#")) return false;
+  const stripped = structuralStripped(lines[lineNumber - 1]);
+  if (!stripped) return false;
   const myIndent = indentOf(stripped);
   for (let i = lineNumber; i < lines.length; i++) {
-    const nextRaw = lines[i];
-    const nextStripped = stripComment(nextRaw);
-    if (!nextStripped.trim()) continue;
-    if (nextRaw.startsWith("#")) continue;
+    const nextStripped = structuralStripped(lines[i]);
+    if (!nextStripped) continue;
     return indentOf(nextStripped) > myIndent;
   }
   return false;
@@ -112,22 +120,16 @@ export function computeStickyScope(
   //     blank line and producing the visible trembling.
   let targetIndent: number;
   let walkFrom: number;
-  const topStripped = stripComment(lines[topVisibleLine - 1]);
-  if (topStripped.trim() && !lines[topVisibleLine - 1].startsWith("#")) {
+  const topStripped = structuralStripped(lines[topVisibleLine - 1]);
+  if (topStripped) {
     targetIndent = indentOf(topStripped);
     walkFrom = topVisibleLine - 2;
   } else {
-    // Blank / banner — find the most recent non-blank, non-banner
-    // line above and adopt its indent. The walk then proceeds
-    // from immediately above that line, so the line itself isn't
-    // re-pushed.
+    // Blank / banner — find the most recent meaningful line above and
+    // adopt its indent. The walk then proceeds from immediately above
+    // that line, so the line itself isn't re-pushed.
     let prev = topVisibleLine - 1;
-    while (prev > 0) {
-      const line = lines[prev - 1];
-      const stripped = stripComment(line);
-      if (stripped.trim() && !line.startsWith("#")) break;
-      prev--;
-    }
+    while (prev > 0 && !structuralStripped(lines[prev - 1])) prev--;
     if (prev === 0) return [];
     targetIndent = indentOf(stripComment(lines[prev - 1]));
     walkFrom = prev - 2;
@@ -135,12 +137,8 @@ export function computeStickyScope(
 
   const scope: StickyScopeLine[] = [];
   for (let i = walkFrom; i >= 0; i--) {
-    const stripped = stripComment(lines[i]);
-    if (!stripped.trim()) continue;
-    // Column-0 banner comments (``# section banner``) decorate
-    // the next section, not the surrounding scope — skip them
-    // the same way ``parseYamlTopLevelSections`` does.
-    if (lines[i].startsWith("#")) continue;
+    const stripped = structuralStripped(lines[i]);
+    if (!stripped) continue;
     const ind = indentOf(stripped);
     if (ind >= targetIndent) continue;
     scope.push({
