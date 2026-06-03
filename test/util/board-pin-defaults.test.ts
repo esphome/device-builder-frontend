@@ -166,9 +166,11 @@ describe("seedBoardPinDefaults", () => {
     expect(result).toEqual({});
   });
 
-  it("seeds uart rx/tx the same way as i2c scl/sda", () => {
-    // The mechanism is component-agnostic: any bus-like bare id
-    // composes ``<componentId>_<entryKey>`` and looks it up.
+  it("seeds uart tx_pin/rx_pin by stripping the _pin suffix (issue #601)", () => {
+    // Real uart entries are ``tx_pin`` / ``rx_pin``; board manifests
+    // tag pins ``uart_tx`` / ``uart_rx``. The role normalization (strip
+    // a trailing ``_pin`` / ``_gpio``) bridges the two, so the defaults
+    // seed instead of silently falling through.
     const board = makeBoard([
       makePin({ gpio: 20, features: ["uart_rx"] }),
       makePin({ gpio: 21, features: ["uart_tx"] }),
@@ -178,16 +180,30 @@ describe("seedBoardPinDefaults", () => {
       [
         makeEntry({ key: "rx_pin", default_value: "GPIO3" }),
         makeEntry({ key: "tx_pin", default_value: "GPIO1" }),
-        makeEntry({ key: "rx", default_value: "GPIO3" }),
-        makeEntry({ key: "tx", default_value: "GPIO1" }),
       ],
       board,
       {}
     );
-    // Only entries whose key matches the suffix after ``uart_`` get
-    // seeded — ``rx`` and ``tx``. Mismatched keys (``rx_pin``,
-    // ``tx_pin``) fall through.
-    expect(result).toEqual({ rx: 20, tx: 21 });
+    expect(result).toEqual({ rx_pin: 20, tx_pin: 21 });
+  });
+
+  it("matches a bare role key and a _gpio suffix too", () => {
+    // ``sda``/``scl`` (no suffix) and ``*_gpio`` both normalize to the
+    // same role-shaped tag the manifest uses.
+    const board = makeBoard([
+      makePin({ gpio: 20, features: ["uart_rx"] }),
+      makePin({ gpio: 21, features: ["uart_tx"] }),
+    ]);
+    const result = seedBoardPinDefaults(
+      "uart",
+      [
+        makeEntry({ key: "rx", default_value: "GPIO3" }), // bare role
+        makeEntry({ key: "tx_gpio", default_value: "GPIO1" }), // _gpio suffix
+      ],
+      board,
+      {}
+    );
+    expect(result).toEqual({ rx: 20, tx_gpio: 21 });
   });
 
   it("uses the FIRST matching pin when multiple are tagged", () => {
