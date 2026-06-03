@@ -343,10 +343,10 @@ export class ESPHomeYamlEditor extends LitElement {
         createBackendYamlLinter({
           api: this._api,
           getConfiguration: () => this.configuration,
-          onResult: (errors) =>
+          onResult: (errors, configuration) =>
             this.dispatchEvent(
               new CustomEvent("yaml-diagnostics", {
-                detail: { errors },
+                detail: { errors, configuration },
                 bubbles: true,
                 composed: true,
               })

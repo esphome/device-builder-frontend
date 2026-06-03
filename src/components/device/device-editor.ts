@@ -457,8 +457,22 @@ export class ESPHomeDeviceEditor extends LitElement {
     }
   }
 
-  private _onYamlDiagnostics(e: CustomEvent<{ errors: string[] }>) {
-    this._liveErrors = e.detail.errors;
+  private _onYamlDiagnostics(
+    e: CustomEvent<{ errors: string[]; configuration: string }>
+  ) {
+    // Ignore a late lint result for a since-switched device, so a stale
+    // "invalid" banner can't flash over the freshly-opened config.
+    if (e.detail.configuration !== this.configuration) return;
+    const next = e.detail.errors;
+    // The banner is an `aria-live` region — only reassign when the list
+    // actually changed so an unchanged lint pass doesn't re-announce it.
+    if (
+      next.length === this._liveErrors.length &&
+      next.every((msg, i) => msg === this._liveErrors[i])
+    ) {
+      return;
+    }
+    this._liveErrors = next;
   }
 
   private _setLayout(layout: DeviceLayoutMode) {

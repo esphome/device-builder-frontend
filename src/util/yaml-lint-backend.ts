@@ -28,12 +28,13 @@ interface BackendLinterOptions {
   /** Live accessor — the configuration may change over the editor's lifetime. */
   getConfiguration: () => string;
   /**
-   * Called after every lint pass with the resulting error messages, so the
-   * host can surface a document-level "configuration invalid" indicator that
-   * names the actual errors. Fires with `[]` for an empty/un-configured
-   * buffer or a failed round-trip.
+   * Called after every lint pass with the resulting error messages and the
+   * configuration they were computed for, so the host can surface a
+   * document-level "configuration invalid" indicator that names the actual
+   * errors and ignore a late result from a since-switched device. Fires with
+   * `[]` for an empty/un-configured buffer or a failed round-trip.
    */
-  onResult?: (errors: string[]) => void;
+  onResult?: (errors: string[], configuration: string) => void;
 }
 
 /**
@@ -128,6 +129,12 @@ function indentOf(text: string): number {
 
 /** Match a `key:` declaration, capturing its indent and the key token. */
 const KEY_LINE_RE = /^(\s*)([^\s:#][^:]*?)\s*:(?:\s|$)/;
+
+/** The key declared on the line containing *offset*, or `null`. */
+function keyAt(doc: Text, offset: number): string | null {
+  const hit = doc.lineAt(offset).text.match(KEY_LINE_RE);
+  return hit ? hit[2] : null;
+}
 
 /**
  * Move a block-level validation error onto the key of its enclosing block.
@@ -232,12 +239,12 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
     async (view) => {
       const configuration = opts.getConfiguration();
       if (!configuration) {
-        opts.onResult?.([]);
+        opts.onResult?.([], configuration);
         return [];
       }
       const content = view.state.doc.toString();
       if (!content.trim()) {
-        opts.onResult?.([]);
+        opts.onResult?.([], configuration);
         return [];
       }
 
@@ -248,7 +255,7 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
         // Surface backend errors quietly in the console — we don't want a
         // network blip to flood the editor with spurious diagnostics.
         console.debug("[yaml-lint] validate_yaml failed:", err);
-        opts.onResult?.([]);
+        opts.onResult?.([], configuration);
         return [];
       }
       _lastValidated.set(configuration, { content, result: res, at: performance.now() });
@@ -275,20 +282,21 @@ export function createBackendYamlLinter(opts: BackendLinterOptions): Extension {
 
       // Schema/validation errors carry an explicit range.
       for (const err of res.validation_errors ?? []) {
-        const message = sanitizeMessage((err.message ?? "Invalid configuration").trim());
+        const message =
+          sanitizeMessage((err.message ?? "").trim()) || "Invalid configuration";
         const { from, to } = retargetBlockDiagnostic(
           view.state.doc,
           rangeToOffsets(view, err.range)
         );
         // Pinned on the `esphome:` core block → whole-config error → banner.
-        if (view.state.doc.sliceString(from, to) === CORE_BLOCK_KEY) {
+        if (keyAt(view.state.doc, from) === CORE_BLOCK_KEY) {
           bannerErrors.push(message);
           continue;
         }
         diagnostics.push({ from, to, severity: "error", source: "esphome", message });
       }
 
-      opts.onResult?.(bannerErrors);
+      opts.onResult?.(bannerErrors, configuration);
       return diagnostics;
     },
     {
