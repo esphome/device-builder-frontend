@@ -23,6 +23,26 @@ import {
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
+// An empty-value "(none)" option marks an optional enum — surface a clear
+// (×) and drop the pseudo-option. Memoized per entry (stable catalog object).
+const _selectOptions = new WeakMap<
+  ConfigEntry,
+  { clearable: boolean; visibleOptions: NonNullable<ConfigEntry["options"]> }
+>();
+
+export function selectOptions(entry: ConfigEntry) {
+  let cached = _selectOptions.get(entry);
+  if (!cached) {
+    const options = entry.options ?? [];
+    cached = {
+      clearable: options.some((o) => o.value === ""),
+      visibleOptions: options.filter((o) => o.value !== ""),
+    };
+    _selectOptions.set(entry, cached);
+  }
+  return cached;
+}
+
 export function renderNumberField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
   // A featured-entry preset can pin the choice to a short list — defer to
   // the suggestion-aware string renderer which converts back to number on change.
@@ -441,17 +461,19 @@ export function renderSelectField(entry: ConfigEntry, path: string[], ctx: Rende
     (o) => o.value.toLowerCase() === defaultStr.toLowerCase()
   );
   const placeholder = defaultOption?.label ?? defaultStr;
+  const { clearable, visibleOptions } = selectOptions(entry);
   return html`
     <div class="field" data-field-key=${fieldKeyAttr(path)}>
       ${renderLabel(entry, ctx)}
       <wa-select
         class=${invalid ? "invalid" : ""}
         ?disabled=${disabled}
+        .withClear=${clearable}
         placeholder=${placeholder}
         @change=${(e: Event) =>
           ctx.emitChange(path, (e.target as HTMLSelectElement).value)}
       >
-        ${(entry.options ?? []).map(
+        ${visibleOptions.map(
           (opt) =>
             html`<wa-option
               value=${opt.value}
