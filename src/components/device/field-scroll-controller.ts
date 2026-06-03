@@ -113,18 +113,27 @@ export class FieldScrollController {
     // Try the exact field, then progressively shorter prefixes: a
     // list-of-maps field (globals / filter items, whose form paths carry
     // a synthetic index the YAML path lacks) at least scrolls its
-    // container into view.
+    // container into view. Only an exact match consumes the target; a
+    // prefix-only match still scrolls but leaves the budget to refine to the
+    // exact field once it renders (FLASH_DEDUP_MS guards against re-pulsing).
     for (let len = path.length; len >= 1; len--) {
       const target = this._find(host.shadowRoot, path.slice(0, len));
       if (!target) continue;
       // ``center`` (not ``nearest``) so a tall field — long description
       // plus input — lands fully in view instead of clipped at the fold.
       target.scrollIntoView({ block: "center" });
-      // Keyed on the matched prefix (the full key marks the target consumed
-      // below); debounced so a field isn't re-pulsed on every cursor nudge.
+      // Keyed on the matched prefix; debounced so it isn't re-pulsed on every
+      // cursor nudge. Skipped under reduced-motion: the animation is disabled
+      // there, so adding the class only strands it (animationend never fires).
       const matchedKey = fieldKeyAttr(path.slice(0, len));
       const now = Date.now();
-      if (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > FLASH_DEDUP_MS) {
+      const reduceMotion = window.matchMedia?.(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      if (
+        !reduceMotion &&
+        (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > FLASH_DEDUP_MS)
+      ) {
         this._lastFlashKey = matchedKey;
         this._lastFlashAt = now;
         target.classList.remove(FLASH_CLASS);
@@ -138,7 +147,7 @@ export class FieldScrollController {
           { once: true }
         );
       }
-      this._scrolledKey = key;
+      if (len === path.length) this._scrolledKey = key;
       return;
     }
   }
