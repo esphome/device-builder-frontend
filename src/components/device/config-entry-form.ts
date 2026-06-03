@@ -158,6 +158,11 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _lastFlashKey?: string;
   private _lastFlashAt = 0;
 
+  /** The ``focusFieldPath`` already scrolled to. Lets a switch into a
+   *  section retry across the entries/values renders until the field
+   *  exists, while a later value edit doesn't re-scroll a consumed one. */
+  private _scrolledFocusKey?: string;
+
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
    * picked before typing a numeric value. Keyed by dotted path.
@@ -285,24 +290,26 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
-    // Re-attempt on ``entries`` too: switching sections loads the new
-    // form's entries asynchronously, so the field isn't in the DOM yet
-    // on the ``focusFieldPath`` change alone. (``entries`` only changes
-    // on a section switch, not on value edits, so this won't scroll
-    // unbidden mid-editing.)
+    // A new cursor target hasn't been scrolled to yet.
+    if (changed.has("focusFieldPath")) this._scrolledFocusKey = undefined;
+    // Re-attempt while the target is unscrolled and any of these change:
+    // entries + values arrive in separate renders on a section switch, so
+    // the field may not be in the DOM until values lands. Consuming the
+    // target on success keeps a later value edit from re-scrolling.
+    const fp = this.focusFieldPath;
     if (
-      (changed.has("focusFieldPath") || changed.has("entries")) &&
-      this.focusFieldPath?.length
+      fp?.length &&
+      this._scrolledFocusKey !== fp.join(" ") &&
+      (changed.has("focusFieldPath") || changed.has("entries") || changed.has("values"))
     ) {
-      void this._scrollToFocusField(this.focusFieldPath);
+      void this._scrollToFocusField(fp);
     }
   }
 
   /**
    * Scroll the YAML-selected field into view, opening collapsed ancestor
-   * groups first. One-shot and tied to the current ``focusFieldPath``: a
-   * newer cursor move (or a field that never renders) can't leave it
-   * retrying on every later update.
+   * groups first. Tied to the current ``focusFieldPath`` (bails if a newer
+   * cursor move superseded it) and marks it consumed once found.
    */
   private async _scrollToFocusField(path: string[]) {
     if (!this.shadowRoot) return;
@@ -332,6 +339,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
         void target.offsetWidth;
         target.classList.add("field--highlight");
       }
+      this._scrolledFocusKey = path.join(" ");
       return;
     }
   }
