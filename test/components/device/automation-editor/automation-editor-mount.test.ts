@@ -143,6 +143,11 @@ describe("automation-editor mount-time load (behavioral)", () => {
     const editor = new ESPHomeAutomationEditor();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (editor as any)._api = api;
+    // Interpolating localize stub (no context provider in the test tree)
+    // so the ``{name} action`` header template resolves.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._localize = (key: string, values?: Record<string, string>) =>
+      key === "device.action_field_label" ? `${values?.name} action` : key;
     editor.configuration = "device.yaml";
     editor.location = {
       kind: "component_action",

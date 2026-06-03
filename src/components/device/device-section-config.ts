@@ -634,7 +634,10 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
     if (componentId === null) return nothing;
     const rows = parseYamlAutomations(this.yaml)
       .filter((s) => s.actionField !== undefined && s.id === componentId)
-      .map((s) => ({ key: s.key, label: actionFieldLabel(s.actionField ?? "") }));
+      .map((s) => ({
+        key: s.key,
+        label: actionFieldLabel(s.actionField ?? "", this._localize),
+      }));
     return html`<esphome-section-automation-list
       .heading=${this._localize("device.action_fields_list_title")}
       .rows=${rows}

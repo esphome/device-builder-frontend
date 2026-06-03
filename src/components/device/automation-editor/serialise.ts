@@ -198,9 +198,10 @@ export function locationFromSectionKey(key: string): AutomationLocation | null {
       return { kind: "component_on", component_id: parts[2], trigger: parts[3] };
     }
     case "component_action":
-      // `automation:component_action:<component_id>:<field>` — both are
-      // colon-free tokens (id is `[a-z0-9_]`, field is `*_action`).
-      return parts.length >= 4 && parts[2] && parts[3]
+      // `automation:component_action:<component_id>:<field>` — exactly 4
+      // colon-free tokens (id is `[a-z0-9_]`, field is `*_action`); no
+      // index part, so reject any trailing segments rather than ignore them.
+      return parts.length === 4 && parts[2] && parts[3]
         ? { kind: "component_action", component_id: parts[2], field: parts[3] }
         : null;
     case "script":

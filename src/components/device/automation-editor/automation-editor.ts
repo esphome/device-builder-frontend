@@ -754,7 +754,7 @@ export class ESPHomeAutomationEditor extends LitElement {
       return trigger.name;
     }
     if (loc?.kind === "component_action") {
-      return actionFieldLabel(loc.field);
+      return actionFieldLabel(loc.field, this._localize);
     }
     return this._localize("device.automation_header_title_static");
   }

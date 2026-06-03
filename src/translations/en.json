@@ -719,6 +719,7 @@
     "automations_list_edit": "Edit",
     "automations_list_delete": "Delete",
     "automations_list_empty": "No automations defined yet.",
+    "action_field_label": "{name} action",
     "action_fields_list_title": "Component actions",
     "action_fields_list_edit": "Edit",
     "action_fields_list_delete": "Delete",

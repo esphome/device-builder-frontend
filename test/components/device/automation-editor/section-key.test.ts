@@ -83,6 +83,11 @@ describe("locationFromSectionKey", () => {
     expect(locationFromSectionKey("automation:device_on:")).toBeNull();
     expect(locationFromSectionKey("automation:component_on:my_button")).toBeNull();
     expect(locationFromSectionKey("automation:component_action:my_gate")).toBeNull();
+    // component_action has no index — extra trailing segments are rejected,
+    // not silently ignored.
+    expect(
+      locationFromSectionKey("automation:component_action:my_gate:open_action:extra")
+    ).toBeNull();
     expect(locationFromSectionKey("automation:interval:notanumber")).toBeNull();
     expect(locationFromSectionKey("automation:api_action:")).toBeNull();
   });

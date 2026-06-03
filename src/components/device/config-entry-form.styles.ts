@@ -675,7 +675,12 @@ export const configEntryFormStyles = css`
     transition: background 0.12s;
   }
 
-  .edit-actions-button:hover {
+  .edit-actions-button:hover:not(:disabled) {
     background: var(--wa-color-surface-lowered);
+  }
+
+  .edit-actions-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 `;

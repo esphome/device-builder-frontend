@@ -517,6 +517,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
           <button
             type="button"
             class="edit-actions-button"
+            ?disabled=${ctx.disabled}
             @click=${() => this._emitEditActionField(entry.key)}
           >
             ${ctx.localize("device.automation_action_field_edit")}
