@@ -1371,10 +1371,12 @@ export class ESPHomeAPI {
    */
   async getPinRegistryModes(): Promise<Record<string, string[]>> {
     const raw = await this.sendCommand<unknown>("components/get_pin_registry_modes");
+    // Null-prototype so an untrusted ``__proto__`` / ``constructor`` key can't
+    // pollute the prototype when assigned below.
+    const result: Record<string, string[]> = Object.create(null);
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
-      return {};
+      return result;
     }
-    const result: Record<string, string[]> = {};
     for (const [key, value] of Object.entries(raw)) {
       if (typeof key !== "string" || !Array.isArray(value)) continue;
       const flags = value.filter((m): m is string => typeof m === "string");

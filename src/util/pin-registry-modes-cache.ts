@@ -32,9 +32,10 @@ export function fetchPinRegistryModes(
     _inflight = api
       .getPinRegistryModes()
       .catch((err) => {
-        // Cache {} so renders don't retry-storm; log so the lost scoping shows.
+        // Cache an empty map so renders don't retry-storm; log so the lost
+        // scoping shows. Null-prototype to match the populated map's shape.
         console.warn("pin-registry-modes fetch failed; Mode flags unscoped", err);
-        return {} as Record<string, string[]>;
+        return Object.create(null) as Record<string, string[]>;
       })
       .then((modes) => {
         _cache = modes;
