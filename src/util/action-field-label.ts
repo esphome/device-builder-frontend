@@ -14,7 +14,10 @@ import type { LocalizeFunc } from "../common/localize.js";
  */
 export function actionFieldLabel(field: string, localize: LocalizeFunc): string {
   const base = field.endsWith("_action") ? field.slice(0, -"_action".length) : field;
-  const words = base.replace(/_/g, " ").trim() || field;
-  const name = words ? words[0].toUpperCase() + words.slice(1) : words;
+  // ``|| "action"`` keeps ``words`` non-empty (a bare ``_action`` key the
+  // parser can't actually produce, or an empty field), so the
+  // sentence-case below is always safe — no dead empty-string branch.
+  const words = (base || field).replace(/_/g, " ").trim() || "action";
+  const name = words[0].toUpperCase() + words.slice(1);
   return localize("device.action_field_label", { name });
 }

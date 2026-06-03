@@ -1,15 +1,15 @@
 import { consume } from "@lit/context";
 import { mdiAlertOutline, mdiContentSave } from "@mdi/js";
 import { LitElement, css, html } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { localizeContext } from "../context/index.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { EnterController } from "../util/enter-controller.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "./base-dialog.js";
 
 registerMdiIcons({
   "alert-outline": mdiAlertOutline,
@@ -22,8 +22,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   @state()
   private _localize: LocalizeFunc = (key) => key;
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state() private _open = false;
 
   private _resolved = false;
 
@@ -32,27 +31,38 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
 
   open() {
     this._resolved = false;
-    this._dialog.open = true;
+    this._open = true;
     this._enter.set(true);
   }
 
   close() {
-    this._dialog.open = false;
+    this._open = false;
   }
+
+  // esphome-base-dialog never mutates its own open on a user-driven close
+  // (Escape / outside-click); the host owns flipping _open here, else a
+  // re-render re-asserts ?open and the dialog can't dismiss. Teardown +
+  // cancel-on-dismiss stay in _onAfterHide.
+  private _onRequestClose = (): void => {
+    this._open = false;
+  };
 
   static styles = [
     espHomeStyles,
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 460px;
       }
 
-      wa-dialog::part(header),
-      wa-dialog::part(footer) {
+      /* This prompt renders its own icon + heading in the body, so the
+         wrapper's title/close-button header isn't used — hide it (and the
+         unused footer). The shared close-button-clearance fix is moot here. */
+      esphome-base-dialog::part(header),
+      esphome-base-dialog::part(footer) {
         display: none;
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: 0;
       }
 
@@ -157,7 +167,11 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog light-dismiss @wa-after-hide=${this._onAfterHide}>
+      <esphome-base-dialog
+        ?open=${this._open}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onAfterHide}
+      >
         <div class="body">
           <div class="icon-wrap">
             <wa-icon library="mdi" name="alert-outline"></wa-icon>
@@ -179,7 +193,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
             ${this._localize("device.save_and_leave")}
           </button>
         </div>
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
@@ -197,6 +211,7 @@ export class ESPHomeUnsavedChangesDialog extends LitElement {
   }
 
   private _onAfterHide() {
+    this._open = false;
     this._enter.set(false);
     if (!this._resolved) {
       this.dispatchEvent(new CustomEvent("cancel", { bubbles: true, composed: true }));

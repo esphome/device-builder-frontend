@@ -83,6 +83,9 @@ import { centeredMobileDialog } from "../styles/dialog-mobile.js";
  *   dialogs that do use a pinned footer row (e.g. the onboarding
  *   wizard). Only forwarded when a consumer fills it, so footer-less
  *   dialogs render unchanged (see ``willUpdate``).
+ * - ``header-prefix`` slot: inline content before the title
+ *   (e.g. a wizard back button). Empty by default. Symmetric
+ *   with ``header-suffix``.
  * - ``header-suffix`` slot: inline content after the title
  *   (e.g. a status chip). Empty by default, so other dialogs
  *   are unchanged. The row and title are exposed as the
@@ -196,7 +199,8 @@ export class ESPHomeBaseDialog extends LitElement {
         @wa-after-hide=${this._onWaAfterHide}
       >
         <header slot="label" part="label-row">
-          <span part="title-text">${this.label}</span><slot name="header-suffix"></slot>
+          <slot name="header-prefix"></slot><span part="title-text">${this.label}</span
+          ><slot name="header-suffix"></slot>
         </header>
         <slot></slot>
         ${this._hasFooter ? html`<slot name="footer" slot="footer"></slot>` : nothing}

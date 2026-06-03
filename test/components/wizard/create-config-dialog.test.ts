@@ -39,10 +39,10 @@ async function mount(api: Partial<ESPHomeAPI>): Promise<ESPHomeCreateConfigDialo
   return el;
 }
 
-// The parent listens for create-empty-config on its wa-dialog; emit it the
-// way a wizard step would (bubbling, composed).
+// The parent listens for create-empty-config on its esphome-base-dialog; emit
+// it the way a wizard step would (bubbling, composed).
 function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
-  const wd = el.shadowRoot!.querySelector("wa-dialog")!;
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
   wd.dispatchEvent(
     new CustomEvent("create-empty-config", {
       detail: { name },
@@ -54,7 +54,7 @@ function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
 
 // Same shape for the basic-setup flow (board + WiFi + name).
 function emitFinish(el: ESPHomeCreateConfigDialog, name: string): void {
-  const wd = el.shadowRoot!.querySelector("wa-dialog")!;
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
   wd.dispatchEvent(
     new CustomEvent("finish-setup", {
       detail: { board: { id: "esp32dev" }, name, wifiSsid: "net", wifiPassword: "pw" },
@@ -130,5 +130,44 @@ describe("create-config-dialog create de-dupe + retry", () => {
         config_type: "basic",
       })
     );
+  });
+});
+
+// The migration onto esphome-base-dialog swapped the imperative
+// `_dialog.open = …` for a reactive `_open` flag. _onRequestClose flipping
+// _open back to false is the load-bearing part — without it a user-driven
+// close (Escape / X / outside-click) wouldn't dismiss. Pin the contract.
+describe("create-config-dialog open/close contract", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const isOpen = (el: ESPHomeCreateConfigDialog): boolean =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._open;
+
+  it("open() and openAtBoardStep() set the reactive open flag", async () => {
+    const el = await mount({});
+    expect(isOpen(el)).toBe(true);
+    el.close();
+    await el.updateComplete;
+    expect(isOpen(el)).toBe(false);
+    el.openAtBoardStep();
+    expect(isOpen(el)).toBe(true);
+  });
+
+  it("flips _open to false on request-close from the wrapper", async () => {
+    const el = await mount({});
+    expect(isOpen(el)).toBe(true);
+    el.shadowRoot!.querySelector("esphome-base-dialog")!.dispatchEvent(
+      new CustomEvent("request-close")
+    );
+    expect(isOpen(el)).toBe(false);
+  });
+
+  it("close() sets _open to false", async () => {
+    const el = await mount({});
+    el.close();
+    expect(isOpen(el)).toBe(false);
   });
 });

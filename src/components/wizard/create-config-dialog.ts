@@ -1,7 +1,7 @@
 import { consume } from "@lit/context";
 import { mdiArrowLeft, mdiClose } from "@mdi/js";
 import { LitElement, css, html, nothing } from "lit";
-import { customElement, query, state } from "lit/decorators.js";
+import { customElement, state } from "lit/decorators.js";
 import { APIError } from "../../api/api-error.js";
 import type { ESPHomeAPI } from "../../api/index.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
@@ -15,8 +15,8 @@ import { markPendingHighlight } from "../../util/pending-highlight.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { safeUploadFilename } from "../../util/safe-upload-filename.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
+import "../base-dialog.js";
 import "./wizard-step-board.js";
 import "./wizard-step-empty-config.js";
 import "./wizard-step-method.js";
@@ -88,25 +88,22 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   @state()
   private _createError = "";
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
-
   static styles = [
     espHomeStyles,
-    fullscreenMobileDialog("wa-dialog"),
+    fullscreenMobileDialog("esphome-base-dialog"),
     css`
-      wa-dialog {
+      esphome-base-dialog {
         --width: 520px;
       }
 
-      wa-dialog.wide {
+      esphome-base-dialog.wide {
         --width: 750px;
       }
 
       /* Mobile full-screen comes from fullscreenMobileDialog in the static
          styles so the board picker isn't boxed into a 520px column. #41 */
 
-      wa-dialog::part(header) {
+      esphome-base-dialog::part(header) {
         background: var(--esphome-primary);
         /* Right padding is 0 so the close button sits flush with the
            dialog's corner — the button is explicitly sized to a 40x40
@@ -117,16 +114,9 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         box-sizing: border-box;
       }
 
-      wa-dialog::part(title) {
-        color: var(--esphome-on-primary);
-        font-size: var(--wa-font-size-s);
-        font-weight: var(--wa-font-weight-bold);
-      }
-
-      .dialog-label {
-        display: flex;
-        align-items: center;
-        gap: var(--wa-space-xs);
+      /* Title text lives in base-dialog's title-text span; colour/weight
+         cascade in from the forwarded title part. */
+      esphome-base-dialog::part(title) {
         color: var(--esphome-on-primary);
         font-size: var(--wa-font-size-s);
         font-weight: var(--wa-font-weight-bold);
@@ -149,7 +139,7 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         opacity: 1;
       }
 
-      wa-dialog::part(close-button__base) {
+      esphome-base-dialog::part(close-button__base) {
         background: transparent;
         border: none;
         box-shadow: none;
@@ -165,12 +155,8 @@ export class ESPHomeCreateConfigDialog extends LitElement {
         cursor: pointer;
       }
 
-      wa-dialog::part(body) {
+      esphome-base-dialog::part(body) {
         padding: var(--wa-space-l) var(--wa-space-xl);
-      }
-
-      wa-dialog::part(footer) {
-        display: none;
       }
 
       .error {
@@ -219,7 +205,6 @@ export class ESPHomeCreateConfigDialog extends LitElement {
     this._importFile = null;
     this._submitting = false;
     this._resetCreateErrors();
-    this._dialog.open = true;
     this._open = true;
   }
 
@@ -235,13 +220,19 @@ export class ESPHomeCreateConfigDialog extends LitElement {
   }
 
   public close() {
-    this._dialog.open = false;
+    this._open = false;
   }
 
-  // wa-dialog only hides on light-dismiss / Escape / close; the step
-  // components stay mounted, so flip _open to drop their Enter listeners.
-  private _onHide = (e: Event) => {
-    if (e.target !== this._dialog) return; // ignore bubbled child wa-* hides
+  // esphome-base-dialog never flips its own open on a user-driven close
+  // (Escape / X / outside-click); the host owns _open, else a re-render
+  // re-asserts ?open and the dialog can't dismiss.
+  private _onRequestClose = () => {
+    this._open = false;
+  };
+
+  // The step components stay mounted while the dialog is merely hidden, so
+  // drop their Enter listeners once it has fully hidden.
+  private _onHide = () => {
     this._open = false;
   };
 
@@ -260,27 +251,33 @@ export class ESPHomeCreateConfigDialog extends LitElement {
 
   protected render() {
     return html`
-      <wa-dialog
+      <esphome-base-dialog
         class=${this._step === "board" ? "wide" : ""}
-        light-dismiss
-        @wa-after-hide=${this._onHide}
+        ?open=${this._open}
+        ?busy=${this._submitting}
+        .label=${this._title}
+        @request-close=${this._onRequestClose}
+        @after-hide=${this._onHide}
         @next-step=${this._onNextStep}
         @finish-setup=${this._onFinishSetup}
         @create-empty-config=${this._onCreateEmptyConfig}
         @import-file=${this._onImportFile}
       >
-        <span slot="label" class="dialog-label">
-          ${this._step !== "method"
-            ? html`<button class="back-button" @click=${this._onBack}>
-                <wa-icon library="mdi" name="arrow-left"></wa-icon>
-              </button>`
-            : nothing}
-          ${this._title}
-        </span>
+        ${this._step !== "method"
+          ? html`<button
+              slot="header-prefix"
+              class="back-button"
+              title=${this._localize("layout.back")}
+              aria-label=${this._localize("layout.back")}
+              @click=${this._onBack}
+            >
+              <wa-icon library="mdi" name="arrow-left"></wa-icon>
+            </button>`
+          : nothing}
         ${this._renderStep()}
         ${this._importError ? html`<p class="error">${this._importError}</p>` : nothing}
         ${this._createError ? html`<p class="error">${this._createError}</p>` : nothing}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
 
