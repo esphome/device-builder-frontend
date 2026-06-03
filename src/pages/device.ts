@@ -1095,31 +1095,36 @@ export class ESPHomePageDevice extends LitElement {
    * `updateListener`.
    */
   private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
-    // Drop the top-level key to get the form-relative path — except for
-    // list sections (globals), whose form keys fields under that key.
-    // Set before the section early-return below, or moving between fields
-    // in the same section wouldn't update the form's scroll target.
-    const full = e.detail.path ?? [];
-    this._focusFieldPath =
-      full.length > 0 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
+    // Drop the top-level key to get the form-relative path — except for
+    // list sections (globals), whose form keys fields under that key.
+    const full = e.detail.path ?? [];
+    const rel = full.length > 0 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const sectionKey = sectionKeyOf(match);
     if (
       sectionKey === this._selectedSection &&
       match.fromLine === this._selectedFromLine
     ) {
+      // Same section: update the field target directly for intra-section
+      // moves (the switch below would early-return and freeze it).
+      this._focusFieldPath = rel;
       return;
     }
+    // Cross-section: set the field path only when the switch actually
+    // applies, so a guard veto (unsaved edits) can't point the old
+    // section's form at a path meant for the new one.
     this._guardSectionSwitch(() => {
       this._selectedSection = sectionKey;
       this._selectedFromLine = match.fromLine;
+      this._focusFieldPath = rel;
       this._updateUrl();
     });
   }
 
-  /** Form field focused → highlight just that field's YAML line (leaves
-   *  the section highlight when the field can't be located). */
+  /** Form field focused → highlight just that field's YAML line, falling
+   *  back to the whole section when the field has no YAML line yet (an
+   *  optional/empty field) so a stale single-line highlight can't linger. */
   private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
     const path = e.detail.path;
     if (!path?.length || this._selectedFromLine === undefined) return;
@@ -1128,8 +1133,10 @@ export class ESPHomePageDevice extends LitElement {
     );
     if (!section) return;
     const line = findFieldLine(this._yaml, section, path);
-    if (line === null) return;
-    this._highlightRange = { fromLine: line, toLine: line };
+    this._highlightRange =
+      line !== null
+        ? { fromLine: line, toLine: line }
+        : { fromLine: section.fromLine, toLine: section.toLine };
     this._scrollToHighlight = true;
   }
 

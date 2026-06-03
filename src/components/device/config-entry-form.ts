@@ -153,10 +153,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @state()
   private _nestedOpenSections: Set<string> = new Set();
 
-  /** Pending scroll target; survives the re-render that opening a
-   *  collapsed ancestor group triggers. */
-  private _pendingScrollPath?: string[];
-
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
    * picked before typing a numeric value. Keyed by dotted path.
@@ -274,19 +270,23 @@ export class ESPHomeConfigEntryForm extends LitElement {
     super.updated(changed);
     void this._syncSelectValues();
     if (changed.has("focusFieldPath") && this.focusFieldPath?.length) {
-      this._pendingScrollPath = this.focusFieldPath;
-      // Open collapsed ancestor groups so the field is in the DOM to find.
-      for (let i = 1; i < this.focusFieldPath.length; i++) {
-        this.openNested(this.focusFieldPath.slice(0, i).join("."));
-      }
+      void this._scrollToFocusField(this.focusFieldPath);
     }
-    if (this._pendingScrollPath) this._scrollPendingFieldIntoView();
   }
 
-  /** Scroll the pending field into view once it's in the DOM; clears it. */
-  private _scrollPendingFieldIntoView() {
-    const path = this._pendingScrollPath;
-    if (!path || !this.shadowRoot) return;
+  /**
+   * Scroll the YAML-selected field into view, opening collapsed ancestor
+   * groups first. One-shot and tied to the current ``focusFieldPath``: a
+   * newer cursor move (or a field that never renders) can't leave it
+   * retrying on every later update.
+   */
+  private async _scrollToFocusField(path: string[]) {
+    if (!this.shadowRoot) return;
+    for (let i = 1; i < path.length; i++) {
+      this.openNested(path.slice(0, i).join("."));
+    }
+    await this.updateComplete; // let any opened group render
+    if (this.focusFieldPath !== path) return; // superseded by a newer move
     // Try the exact field, then progressively shorter prefixes: a
     // list-of-maps field (globals / filter items, whose form paths carry
     // a synthetic index the YAML path lacks) at least scrolls its
@@ -294,7 +294,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
     for (let len = path.length; len >= 1; len--) {
       const target = this._findFieldElement(this.shadowRoot, path.slice(0, len));
       if (!target) continue;
-      this._pendingScrollPath = undefined;
       // ``center`` (not ``nearest``) so a tall field — long description
       // plus input — lands fully in view instead of clipped at the fold.
       target.scrollIntoView({ block: "center" });
