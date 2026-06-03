@@ -287,18 +287,32 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _scrollPendingFieldIntoView() {
     const path = this._pendingScrollPath;
     if (!path || !this.shadowRoot) return;
-    const fields = this.shadowRoot.querySelectorAll<HTMLElement>("[data-field-key]");
-    const target = Array.from(fields).find((f) => {
-      const p = parseFieldKey(f.getAttribute("data-field-key") ?? "");
-      return p.length === path.length && p.every((k, i) => k === path[i]);
-    });
+    const target = this._findFieldElement(this.shadowRoot, path);
     if (!target) return;
     this._pendingScrollPath = undefined;
-    target.scrollIntoView({ block: "nearest" });
+    // ``center`` (not ``nearest``) so a tall field — long description plus
+    // input — lands fully in view instead of clipped at the fold.
+    target.scrollIntoView({ block: "center" });
     // Restart the flash even when the same field is re-targeted.
     target.classList.remove("field--highlight");
     void target.offsetWidth;
     target.classList.add("field--highlight");
+  }
+
+  /** Find the field with *path*, recursing into nested custom-element
+   *  shadow roots (registry lists, etc.) since ``querySelectorAll`` stops
+   *  at shadow boundaries. */
+  private _findFieldElement(root: ParentNode, path: string[]): HTMLElement | null {
+    for (const el of root.querySelectorAll<HTMLElement>("[data-field-key]")) {
+      const p = parseFieldKey(el.getAttribute("data-field-key") ?? "");
+      if (p.length === path.length && p.every((k, i) => k === path[i])) return el;
+    }
+    for (const el of root.querySelectorAll<HTMLElement>("*")) {
+      const sr = (el as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot;
+      const found = sr ? this._findFieldElement(sr, path) : null;
+      if (found) return found;
+    }
+    return null;
   }
 
   private async _syncSelectValues() {
