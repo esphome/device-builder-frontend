@@ -1,5 +1,6 @@
 import type { Extension } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
+import { EDITOR_FONT_FAMILY, EDITOR_FONT_SIZE } from "./yaml-editor-theme.js";
 
 export function buildStickyTheme(background: string): Extension {
   return EditorView.theme({
@@ -10,9 +11,13 @@ export function buildStickyTheme(background: string): Extension {
       right: "0",
       zIndex: "3",
       pointerEvents: "auto",
-      fontFamily: '"JetBrains Mono", "Fira Code", monospace',
-      fontSize: "13px",
-      lineHeight: "1.4",
+      // Typography mirrors the editor content (shared constants), and
+      // each row's height is pinned to the editor's measured
+      // ``defaultLineHeight`` via the ``--esphome-sticky-row-h`` var the
+      // plugin sets — so the overlay rows are exactly as tall as the
+      // lines they shadow and the slide math stays aligned.
+      fontFamily: EDITOR_FONT_FAMILY,
+      fontSize: EDITOR_FONT_SIZE,
       background,
       boxShadow: "0 1px 0 rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.08)",
       overflow: "hidden",
@@ -27,6 +32,8 @@ export function buildStickyTheme(background: string): Extension {
       whiteSpace: "pre",
       position: "relative",
       background: "inherit",
+      height: "var(--esphome-sticky-row-h)",
+      lineHeight: "var(--esphome-sticky-row-h)",
     },
     ".cm-esphome-sticky-line:hover": {
       background: "rgba(127, 127, 127, 0.12)",

@@ -930,6 +930,9 @@
     "no_match_yaml_preview": "Try YAML search — found {count} match across your configs",
     "no_match_yaml_preview_plural": "Try YAML search — found {count} matches across your configs"
   },
+  "yaml_editor": {
+    "sticky_jump_to_line": "Jump to line {line}"
+  },
   "settings": {
     "title": "Settings",
     "appearance": "Appearance",

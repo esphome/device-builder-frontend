@@ -15,6 +15,14 @@ import { tags as t } from "@lezer/highlight";
  * them red, which reads as an error to anyone used to VSCode).
  */
 
+/** Editor typography — shared so the sticky-scroll overlay
+ *  (``yaml-sticky-theme.ts``) renders with identical metrics to the
+ *  editor content. The overlay's slide math is driven by the editor's
+ *  measured ``defaultLineHeight``, so a font mismatch would misalign
+ *  the pinned rows; keeping one source of truth prevents that drift. */
+export const EDITOR_FONT_FAMILY = '"JetBrains Mono", "Fira Code", monospace';
+export const EDITOR_FONT_SIZE = "13px";
+
 const DARK_BG = "#1e1e1e";
 const DARK_FG = "#d4d4d4";
 const DARK_GUTTER_FG = "#858585";

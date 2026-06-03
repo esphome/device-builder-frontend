@@ -125,10 +125,7 @@ export function computeStickyScope(
     while (prev > 0) {
       const line = lines[prev - 1];
       const stripped = stripComment(line);
-      if (stripped.trim() && !line.startsWith("#")) {
-        targetIndent = indentOf(stripped);
-        break;
-      }
+      if (stripped.trim() && !line.startsWith("#")) break;
       prev--;
     }
     if (prev === 0) return [];

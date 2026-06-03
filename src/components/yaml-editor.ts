@@ -8,11 +8,14 @@ import { basicSetup, EditorView } from "codemirror";
 import { css, html, LitElement } from "lit";
 import { customElement, property, query, state } from "lit/decorators.js";
 import type { ESPHomeAPI } from "../api/esphome-api.js";
-import { apiContext, darkModeContext } from "../context/index.js";
+import type { LocalizeFunc } from "../common/localize.js";
+import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import {
   darkHighlight,
+  EDITOR_FONT_FAMILY,
+  EDITOR_FONT_SIZE,
   lightHighlight,
   vscodeDark,
   vscodeLight,
@@ -67,6 +70,10 @@ export class ESPHomeYamlEditor extends LitElement {
   @consume({ context: apiContext })
   @state()
   private _api?: ESPHomeAPI;
+
+  @consume({ context: localizeContext, subscribe: true })
+  @state()
+  private _localize: LocalizeFunc = (key) => key;
 
   @property() value = "";
 
@@ -138,14 +145,16 @@ export class ESPHomeYamlEditor extends LitElement {
       yamlStickyScroll({
         highlightStyle: this._darkMode ? darkHighlight : lightHighlight,
         background: this._darkMode ? "#1e1e1e" : "#ffffff",
+        jumpToLineLabel: (line) =>
+          this._localize("yaml_editor.sticky_jump_to_line", { line: String(line) }),
       }),
       EditorView.theme({
         "&": { height: "100%" },
         ".cm-scroller": {
           overflow: "auto",
-          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontFamily: EDITOR_FONT_FAMILY,
           fontVariantLigatures: "none",
-          fontSize: "13px",
+          fontSize: EDITOR_FONT_SIZE,
         },
         ".cm-esphome-highlight": {
           background: this._darkMode

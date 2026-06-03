@@ -27,12 +27,17 @@ export function patchStickyRow(
   gutterWidth: number,
   tree: Tree,
   state: EditorState,
-  highlightStyle: HighlightStyle
+  highlightStyle: HighlightStyle,
+  jumpToLineLabel: (lineNumber: number) => string
 ): void {
   const lineStr = String(sticky.lineNumber);
   if (row.dataset.line !== lineStr) {
     row.dataset.line = lineStr;
-    row.title = `Jump to line ${sticky.lineNumber}`;
+    // Localized action name — doubles as the tooltip and the
+    // accessible name (the row is role="button").
+    const label = jumpToLineLabel(sticky.lineNumber);
+    row.title = label;
+    row.setAttribute("aria-label", label);
   }
 
   const num = row.firstElementChild as HTMLSpanElement;

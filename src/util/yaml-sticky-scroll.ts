@@ -36,7 +36,7 @@
  */
 import type { HighlightStyle } from "@codemirror/language";
 import { syntaxTree } from "@codemirror/language";
-import type { Extension } from "@codemirror/state";
+import type { Extension, Text } from "@codemirror/state";
 import {
   EditorView,
   ViewPlugin,
@@ -56,6 +56,10 @@ import { buildStickyTheme } from "./yaml-sticky-theme.js";
 export interface StickyScrollOptions {
   highlightStyle: HighlightStyle;
   background: string;
+  /** Localized accessible name / tooltip for a pinned row, e.g.
+   *  "Jump to line 42". Passed in so the overlay doesn't hard-code
+   *  English copy. */
+  jumpToLineLabel: (lineNumber: number) => string;
 }
 
 interface StickyScrollState extends PluginValue {
@@ -73,20 +77,37 @@ interface MeasureResult {
 
 const STICKY_MEASURE_KEY = Symbol("esphome-sticky-scroll");
 
+/** Resolve the 1-indexed line number from a sticky-row event, or null
+ *  when the event didn't originate on a pinned row. Shared by the click
+ *  and keyboard handlers. */
+function lineFromEvent(e: Event): number | null {
+  const target = (e.target as HTMLElement).closest<HTMLElement>(
+    ".cm-esphome-sticky-line"
+  );
+  if (!target) return null;
+  const lineNum = Number(target.dataset.line);
+  return Number.isFinite(lineNum) && lineNum >= 1 ? lineNum : null;
+}
+
 export function yamlStickyScroll(options: StickyScrollOptions): Extension {
-  const { highlightStyle, background } = options;
+  const { highlightStyle, background, jumpToLineLabel } = options;
 
   const plugin = ViewPlugin.fromClass(
     class StickyScrollPluginImpl implements StickyScrollState {
       readonly overlay: HTMLDivElement;
       private _renderedKey = "";
-      private _renderedCount = 0;
       private _measuredHeight = 0;
+      // Cache the split document so scroll/geometry measures don't
+      // re-serialize the whole file on every event; rebuilt only when
+      // the doc instance changes (i.e. an edit landed).
+      private _lines: string[] = [];
+      private _linesDoc: Text | null = null;
 
       constructor(readonly view: EditorView) {
         this.overlay = document.createElement("div");
         this.overlay.className = "cm-esphome-sticky";
         this.overlay.addEventListener("click", this.onClick);
+        this.overlay.addEventListener("keydown", this.onKeydown);
         view.dom.appendChild(this.overlay);
         this.refresh();
       }
@@ -99,11 +120,23 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
 
       destroy(): void {
         this.overlay.removeEventListener("click", this.onClick);
+        this.overlay.removeEventListener("keydown", this.onKeydown);
         this.overlay.remove();
       }
 
       get height(): number {
         return this._measuredHeight;
+      }
+
+      /** Document lines for the current ``doc``, cached so repeated
+       *  scroll/measure passes reuse the array (#1). */
+      private lines(view: EditorView): string[] {
+        const doc = view.state.doc;
+        if (this._linesDoc !== doc) {
+          this._lines = doc.toString().split("\n");
+          this._linesDoc = doc;
+        }
+        return this._lines;
       }
 
       refresh(): void {
@@ -122,7 +155,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         const topLine = view.state.doc.lineAt(block.from);
         const gutterEl = view.dom.querySelector<HTMLElement>(".cm-gutters");
         const gutterWidth = gutterEl ? gutterEl.offsetWidth : 0;
-        const lines = view.state.doc.toString().split("\n");
+        const lines = this.lines(view);
         const scope = computeStickyScope(lines, topLine.number);
         if (isScopeOpener(lines, topLine.number)) {
           const stripped = stripComment(lines[topLine.number - 1]);
@@ -187,6 +220,9 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         scrollTop: number,
         rowHeight: number
       ): void {
+        // Pin each overlay row to the editor's measured line height so
+        // the rendered rows are exactly as tall as the math assumes (#4).
+        this.overlay.style.setProperty("--esphome-sticky-row-h", `${rowHeight}px`);
         let cumulativeShift = 0;
         let totalShift = 0;
         for (let i = 0; i < scope.length; i++) {
@@ -237,7 +273,6 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         this.overlay.replaceChildren();
         this.overlay.style.height = "";
         this._renderedKey = "";
-        this._renderedCount = 0;
         const previous = this._measuredHeight;
         this._measuredHeight = 0;
         if (previous !== 0) {
@@ -258,32 +293,53 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
             row = createStickyRow();
             this.overlay.appendChild(row);
           }
-          patchStickyRow(row, sticky, gutterWidth, tree, view.state, highlightStyle);
+          patchStickyRow(
+            row,
+            sticky,
+            gutterWidth,
+            tree,
+            view.state,
+            highlightStyle,
+            jumpToLineLabel
+          );
         }
         while (this.overlay.children.length > scope.length) {
           this.overlay.lastElementChild!.remove();
         }
-        this._renderedCount = scope.length;
       }
 
       onClick = (e: Event): void => {
-        const target = (e.target as HTMLElement).closest<HTMLElement>(
-          ".cm-esphome-sticky-line"
-        );
-        if (!target) return;
-        const lineNum = Number(target.dataset.line);
-        if (!Number.isFinite(lineNum) || lineNum < 1) return;
+        const lineNum = lineFromEvent(e);
+        if (lineNum !== null) this.jumpToLine(lineNum);
+      };
+
+      onKeydown = (e: KeyboardEvent): void => {
+        // Sticky rows are role="button"; mirror native button keys.
+        // Space is prevented so it doesn't scroll the page instead (#2).
+        if (e.key !== "Enter" && e.key !== " ") return;
+        const lineNum = lineFromEvent(e);
+        if (lineNum === null) return;
+        e.preventDefault();
+        this.jumpToLine(lineNum);
+      };
+
+      private jumpToLine(lineNum: number): void {
         const { state } = this.view;
         if (lineNum > state.doc.lines) return;
         const line = state.doc.line(lineNum);
 
-        const linesText = state.doc.toString().split("\n");
+        const linesText = this.lines(this.view);
         const predictedScope = computeStickyScope(linesText, lineNum);
-        const rowHeight =
-          this._renderedCount > 0
-            ? this._measuredHeight / this._renderedCount
-            : this.view.defaultLineHeight;
-        const predictedHeight = predictedScope.length * rowHeight;
+        // ``measure()`` also pins the clicked line itself when it's a
+        // scope opener, so count that extra row or the target lands
+        // partly behind the overlay (#7).
+        const predictedCount =
+          predictedScope.length + (isScopeOpener(linesText, lineNum) ? 1 : 0);
+        // Use the editor's stable measured line height. Dividing the
+        // post-shift overlay height by the row count underestimates it
+        // mid-transition and skews the margin (#3).
+        const rowHeight = this.view.defaultLineHeight;
+        const predictedHeight = predictedCount * rowHeight;
 
         const yMargin = Math.ceil(predictedHeight) - this._measuredHeight;
 
@@ -295,7 +351,7 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           }),
         });
         this.view.focus();
-      };
+      }
     },
     {
       eventObservers: {
