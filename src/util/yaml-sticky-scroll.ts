@@ -100,6 +100,12 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
         this.overlay.addEventListener("click", this.onClick);
         this.overlay.addEventListener("keydown", this.onKeydown);
         view.dom.appendChild(this.overlay);
+        // Listen on the scroller directly. A ViewPlugin ``scroll``
+        // eventObserver doesn't fire reliably, and ``update()`` only sees
+        // ``viewportChanged`` when CM re-renders new lines — so in a tall
+        // editor a small scroll within the rendered range would never
+        // refresh the overlay, leaving a stale section pinned.
+        view.scrollDOM.addEventListener("scroll", this.onScroll, { passive: true });
         this.refresh();
       }
 
@@ -112,8 +118,13 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       destroy(): void {
         this.overlay.removeEventListener("click", this.onClick);
         this.overlay.removeEventListener("keydown", this.onKeydown);
+        this.view.scrollDOM.removeEventListener("scroll", this.onScroll);
         this.overlay.remove();
       }
+
+      private onScroll = (): void => {
+        this.refresh();
+      };
 
       get height(): number {
         return this._measuredHeight;
@@ -262,11 +273,6 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       }
     },
     {
-      eventObservers: {
-        scroll() {
-          this.refresh();
-        },
-      },
       provide: (p) => [
         EditorView.scrollMargins.of((view) => {
           const instance = view.plugin(p);
