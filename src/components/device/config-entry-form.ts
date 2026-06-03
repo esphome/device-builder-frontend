@@ -438,9 +438,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
           // ignore
         }
       }
-      const key = field.getAttribute("data-field-key");
-      if (!key) continue;
-      const path = parseFieldKey(key);
+      const path = this._pathOf(field);
+      if (!path.length) continue;
       const value = getIn(this.values, path);
       // ``wa-select`` only carries primitive values; if the YAML
       // path resolves to an object (transient state from a partial
