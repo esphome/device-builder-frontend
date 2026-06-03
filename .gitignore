@@ -21,3 +21,9 @@ build/
 .DS_Store
 .claude/*
 !.claude/skills/
+# Stray notes / screenshots dropped at the repo root during development.
+# The only root-level docs we track are README.md and CLAUDE.md.
+/*.md
+!/README.md
+!/CLAUDE.md
+/*.png

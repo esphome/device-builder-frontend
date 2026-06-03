@@ -1,5 +1,6 @@
 import { consume } from "@lit/context";
 import {
+  mdiAlertCircleOutline,
   mdiCheckCircleOutline,
   mdiContentSave,
   mdiDockLeft,
@@ -27,6 +28,7 @@ import "../yaml-editor.js";
 import "./device-board-info.js";
 
 registerMdiIcons({
+  "alert-circle-outline": mdiAlertCircleOutline,
   "check-circle-outline": mdiCheckCircleOutline,
   "content-save": mdiContentSave,
   eye: mdiEye,
@@ -39,6 +41,9 @@ registerMdiIcons({
 });
 
 export type DeviceLayoutMode = "both" | "left" | "right";
+
+/** Cap the errors listed in the invalid banner; the rest collapse to "+N more". */
+const MAX_BANNER_ERRORS = 6;
 
 @customElement("esphome-device-editor")
 export class ESPHomeDeviceEditor extends LitElement {
@@ -158,6 +163,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   // secret *name* and are passed through as-is).
   @state()
   private _revealSensitive = false;
+
+  /** Live lint error messages from the editor's backend linter. Drives the
+   *  "configuration invalid" banner above the editor. */
+  @state()
+  private _liveErrors: string[] = [];
 
   static styles = [espHomeStyles, deviceEditorStyles];
 
@@ -342,6 +352,29 @@ export class ESPHomeDeviceEditor extends LitElement {
               ? html`<div class="pane-divider"></div>`
               : nothing}
             <div class="editor-pane editor-pane--right">
+              ${!this._showDiff && this._liveErrors.length > 0
+                ? html`<div class="invalid-banner" role="alert">
+                    <wa-icon
+                      library="mdi"
+                      name="alert-circle-outline"
+                      class="invalid-banner-icon"
+                    ></wa-icon>
+                    <div class="invalid-banner-text">
+                      ${this._liveErrors
+                        .slice(0, MAX_BANNER_ERRORS)
+                        .map(
+                          (msg) => html`<span class="invalid-banner-error">${msg}</span>`
+                        )}
+                      ${this._liveErrors.length > MAX_BANNER_ERRORS
+                        ? html`<span class="invalid-banner-more"
+                            >${this._localize("device.editor_invalid_more", {
+                              count: this._liveErrors.length - MAX_BANNER_ERRORS,
+                            })}</span
+                          >`
+                        : nothing}
+                    </div>
+                  </div>`
+                : nothing}
               <div class="editor-pane-body">
                 ${this._showDiff
                   ? html`<esphome-yaml-diff
@@ -355,6 +388,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                       .scrollToHighlight=${this.scrollToHighlight}
                       .revealSensitive=${this._revealSensitive}
                       @yaml-change=${this._onYamlChange}
+                      @yaml-diagnostics=${this._onYamlDiagnostics}
                     ></esphome-yaml-editor>`}
               </div>
             </div>
@@ -409,6 +443,11 @@ export class ESPHomeDeviceEditor extends LitElement {
   }
 
   updated(changed: Map<string, unknown>) {
+    // Switching device clears the banner until the new file re-lints, so a
+    // stale "invalid" never flashes over a freshly-opened valid config.
+    if (changed.has("configuration")) {
+      this._liveErrors = [];
+    }
     if (this._showDiff && changed.has("_showDiffButton") && !this._showDiffButton) {
       this._showDiff = false;
       return;
@@ -416,6 +455,24 @@ export class ESPHomeDeviceEditor extends LitElement {
     if (this._showDiff && changed.has("savedYaml") && this.yaml === this.savedYaml) {
       this._showDiff = false;
     }
+  }
+
+  private _onYamlDiagnostics(
+    e: CustomEvent<{ errors: string[]; configuration: string }>
+  ) {
+    // Ignore a late lint result for a since-switched device, so a stale
+    // "invalid" banner can't flash over the freshly-opened config.
+    if (e.detail.configuration !== this.configuration) return;
+    const next = e.detail.errors;
+    // The banner is an `aria-live` region — only reassign when the list
+    // actually changed so an unchanged lint pass doesn't re-announce it.
+    if (
+      next.length === this._liveErrors.length &&
+      next.every((msg, i) => msg === this._liveErrors[i])
+    ) {
+      return;
+    }
+    this._liveErrors = next;
   }
 
   private _setLayout(layout: DeviceLayoutMode) {

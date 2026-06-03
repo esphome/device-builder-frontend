@@ -589,6 +589,7 @@
     "section_components_desc": "You can add components after finishing your core configuration e.g. sensors.",
     "section_automations_desc": "You can set up automations once the core config and at least one component is added.",
     "editor_title_ready": "Editing {name}",
+    "editor_invalid_more": "…and {count} more",
     "layout_components_only": "Show components only",
     "layout_split": "Split view",
     "layout_yaml_only": "Show YAML editor only",
