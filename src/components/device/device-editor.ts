@@ -124,6 +124,10 @@ export class ESPHomeDeviceEditor extends LitElement {
   @property({ type: Number })
   selectedFromLine?: number;
 
+  /** Instance-relative field path to scroll into view, from the YAML cursor. */
+  @property({ attribute: false })
+  focusFieldPath?: string[];
+
   /** Yaml content at last save/load — compared against current yaml to detect changes. */
   @property({ attribute: false })
   savedYaml = "";
@@ -343,6 +347,7 @@ export class ESPHomeDeviceEditor extends LitElement {
                 .configuration=${this.configuration}
                 .selectedSection=${this.selectedSection}
                 .selectedFromLine=${this.selectedFromLine}
+                .focusFieldPath=${this.focusFieldPath}
                 .justCreated=${this.justCreated}
                 ?yamlPaneVisible=${effectiveLayout !== "left"}
                 @show-yaml-editor=${this._onShowYamlEditor}

@@ -12,6 +12,12 @@
 
 import { ESPHOME_YAML_INDENT } from "./esphome-yaml-lang.js";
 import { LIST_SECTIONS } from "./section-entry-overrides.js";
+import { indentOf, RE_PAIR_LINE, stripComment } from "./yaml-line-walker.js";
+
+/** A YAML list-item line: leading indent, a dash, then a space or EOL. */
+const RE_LIST_ITEM = /^\s*-(\s|$)/;
+/** A field-path segment that addresses a list index (``["areas","0",…]``). */
+const RE_PATH_INDEX = /^\d+$/;
 
 export interface YamlSection {
   key: string;
@@ -316,4 +322,95 @@ export function listItemChildIndent(dashLine: string): number {
   if (inline !== undefined) return inline;
   const dashIndent = dashLine.match(/^ */)?.[0].length ?? 0;
   return dashIndent + ESPHOME_YAML_INDENT.length;
+}
+
+/**
+ * 1-indexed YAML line of the instance-relative field *relPath* within
+ * *section*, or ``null`` so callers fall back to the whole-section range.
+ * Descends both mapping keys (``["pin","number"]`` → the nested
+ * ``number:`` line) and list indices (``["areas","0","id"]`` → the ``id:``
+ * line of the first ``areas`` item) — the latter is how list-of-maps form
+ * fields (areas, globals) key their children.
+ */
+export function findFieldLine(
+  yaml: string,
+  section: YamlSection,
+  relPath: string[]
+): number | null {
+  // Accept an optional leading section key (some callers pass it, e.g.
+  // ``["globals", …]``) and strip it so the path is section-relative.
+  if (relPath[0] === section.key) relPath = relPath.slice(1);
+  if (relPath.length === 0) return null;
+  const lines = yaml.split("\n");
+  const start = section.fromLine - 1;
+  const end = Math.min(section.toLine - 1, lines.length - 1);
+  if (start < 0 || start >= lines.length) return null;
+
+  // A dash item's inline key (``- name: x``) sits at the content column
+  // after ``- ``, not the dash column.
+  const keyIndentOf = (line: string): number =>
+    RE_LIST_ITEM.test(line) ? listItemChildIndent(line) : indentOf(line);
+  const firstChildIndent = (lo: number, hi: number): number | null => {
+    for (let i = lo; i <= hi; i++) {
+      const s = stripComment(lines[i]);
+      if (s.trim()) return indentOf(s);
+    }
+    return null;
+  };
+
+  // Descend *path* within [lo, hi]; keys / dashes for this level sit at
+  // *baseIndent*.
+  const descend = (
+    lo: number,
+    hi: number,
+    baseIndent: number,
+    path: string[]
+  ): number | null => {
+    const seg = path[0];
+    const rest = path.slice(1);
+    if (RE_PATH_INDEX.test(seg)) {
+      const dashes: number[] = [];
+      for (let i = lo; i <= hi; i++) {
+        const s = stripComment(lines[i]);
+        if (s.trim() && indentOf(s) === baseIndent && RE_LIST_ITEM.test(s))
+          dashes.push(i);
+      }
+      // A numeric segment is a list index only where this level actually has
+      // dash items; with none it's a literal numeric mapping key (a ``0:``
+      // substitution), so fall through to the key match below.
+      if (dashes.length) {
+        const itemLo = dashes[Number(seg)];
+        if (itemLo === undefined) return null;
+        if (rest.length === 0) return itemLo + 1;
+        const itemHi = Number(seg) + 1 < dashes.length ? dashes[Number(seg) + 1] - 1 : hi;
+        return descend(itemLo, itemHi, listItemChildIndent(lines[itemLo]), rest);
+      }
+    }
+    for (let i = lo; i <= hi; i++) {
+      const s = stripComment(lines[i]);
+      if (!s.trim() || keyIndentOf(s) !== baseIndent) continue;
+      const m = s.match(RE_PAIR_LINE);
+      if (!m || m[1] !== seg) continue;
+      if (rest.length === 0) return i + 1;
+      let blockHi = hi;
+      for (let j = i + 1; j <= hi; j++) {
+        const cs = stripComment(lines[j]);
+        if (cs.trim() && indentOf(cs) <= baseIndent) {
+          blockHi = j - 1;
+          break;
+        }
+      }
+      const childIndent = firstChildIndent(i + 1, blockHi);
+      return childIndent === null ? null : descend(i + 1, blockHi, childIndent, rest);
+    }
+    return null;
+  };
+
+  if (RE_LIST_ITEM.test(lines[start])) {
+    // List-item section: keys live at the item's child indent, and the
+    // header line itself carries the inline key.
+    return descend(start, end, listItemChildIndent(lines[start]), relPath);
+  }
+  const childIndent = firstChildIndent(start + 1, end);
+  return childIndent === null ? null : descend(start + 1, end, childIndent, relPath);
 }

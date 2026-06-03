@@ -83,6 +83,9 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
   // duplicates — a small shift maps the click back to the closest match.
   @property({ type: Number }) fromLine?: number;
 
+  // Instance-relative field path to scroll into view, from the YAML cursor.
+  @property({ attribute: false }) focusFieldPath?: string[];
+
   // Same string the YAML pane shows including unsaved edits. Save and delete
   // operate on this rather than re-fetching: the navigator emits fromLine
   // relative to live YAML, so an out-of-sync version would point the splice
@@ -380,6 +383,7 @@ export class ESPHomeDeviceSectionConfig extends LitElement {
               .yaml=${this.yaml}
               .fromLine=${this._resolvedFromLine}
               .sectionKey=${this.sectionKey}
+              .focusFieldPath=${this.focusFieldPath}
               .presentComponents=${this._presentComponents}
               ?show-advanced=${showAdvanced}
               @value-change=${this._onValueChange}

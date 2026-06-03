@@ -34,6 +34,8 @@ import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
+import { FieldFocusController } from "./field-focus-controller.js";
+import { FieldScrollController } from "./field-scroll-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -146,8 +148,24 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @property({ attribute: false })
   presentComponents: Set<string> = new Set();
 
+  /** Instance-relative field path to scroll into view, from the YAML cursor. */
+  @property({ attribute: false })
+  focusFieldPath?: string[];
+
   @state()
   private _nestedOpenSections: Set<string> = new Set();
+
+  /** Keys already default-opened by ``_seedNestedOpen`` so the seed fires
+   *  once and a later user collapse isn't re-overridden. */
+  private _seededNestedOpen: Set<string> = new Set();
+
+  /** Scrolls the YAML-cursor-selected field into view (the structured side
+   *  of the field sync); driven from ``updated``. */
+  private _fieldScroll = new FieldScrollController(this);
+
+  /** Emits ``field-focus`` as the user moves between fields (the other side
+   *  of the sync); owns its own listener lifecycle. */
+  private _fieldFocus = new FieldFocusController(this);
 
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
@@ -234,12 +252,21 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (changed.has("entries") && changed.get("entries") !== undefined) {
       this._pendingUnits.clear();
       this._editingMagnitudes.clear();
+      // Re-seed disclosures for the new component; a key like "pin:pin-advanced"
+      // recurs across sections, and the form instance is reused.
+      this._seededNestedOpen.clear();
     }
+  }
+
+  /** Decode a field element's ``data-field-key`` to its path. */
+  private _pathOf(el: Element): string[] {
+    return parseFieldKey(el.getAttribute("data-field-key") ?? "");
   }
 
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
+    this._fieldScroll.maybeScroll(changed);
   }
 
   private async _syncSelectValues() {
@@ -273,9 +300,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
           // ignore
         }
       }
-      const key = field.getAttribute("data-field-key");
-      if (!key) continue;
-      const path = parseFieldKey(key);
+      const path = this._pathOf(field);
+      if (!path.length) continue;
       const value = getIn(this.values, path);
       // ``wa-select`` only carries primitive values; if the YAML
       // path resolves to an object (transient state from a partial
@@ -518,6 +544,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       errorAt: (path) => this.errors.get(path.join(".")) ?? null,
       emitChange: (path, value) => this._emitChange(path, value),
       toggleNested: (key) => this._toggleNested(key),
+      seedNestedOpen: (key) => this._seedNestedOpen(key),
       requestAddComponent: (domain) => this._requestAddComponent(domain),
       scopeValues: (path) => this._scopeValues(path),
       filterRenderable: this._filterRenderable,
@@ -597,6 +624,17 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const next = new Set(this._nestedOpenSections);
     next.add(key);
     this._nestedOpenSections = next;
+  }
+
+  /**
+   * Open *key* once as a default (honoring a later user collapse). Mutates
+   * in place so seeding mid-render schedules no update; the seeded marker
+   * keeps it to one shot.
+   */
+  private _seedNestedOpen(key: string) {
+    if (this.requiredOnly || this._seededNestedOpen.has(key)) return;
+    this._seededNestedOpen.add(key);
+    this._nestedOpenSections.add(key);
   }
 
   /**

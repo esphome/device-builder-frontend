@@ -11,6 +11,7 @@ import type { ESPHomeAPI } from "../api/esphome-api.js";
 import type { LocalizeFunc } from "../common/localize.js";
 import { apiContext, darkModeContext, localizeContext } from "../context/index.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
+import { getKeyPath } from "../util/yaml-ast.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import {
   darkHighlight,
@@ -52,8 +53,19 @@ const highlightField = StateField.define<DecorationSet>({
         if (!effect.value) return Decoration.none;
         const { fromLine, toLine } = effect.value;
         const doc = tr.state.doc;
-        const from = doc.line(Math.max(1, fromLine)).from;
-        const to = doc.line(Math.min(doc.lines, toLine)).to;
+        const lo = Math.max(1, fromLine);
+        const hi = Math.min(doc.lines, toLine);
+        // Single-line field highlight: a line decoration covers the whole line
+        // regardless of content, so it doesn't lag behind text typed into the
+        // line from the form. Multi-line section highlight: one mark spanning
+        // the block, instead of a decoration per line for a large section.
+        if (lo === hi) {
+          return Decoration.set([
+            Decoration.line({ class: "cm-esphome-highlight" }).range(doc.line(lo).from),
+          ]);
+        }
+        const from = doc.line(lo).from;
+        const to = doc.line(hi).to;
         return Decoration.set([
           Decoration.mark({ class: "cm-esphome-highlight" }).range(from, to),
         ]);
@@ -378,9 +390,12 @@ export class ESPHomeYamlEditor extends LitElement {
           const line = update.state.doc.lineAt(head).number;
           if (line !== this._lastReportedCursorLine) {
             this._lastReportedCursorLine = line;
+            // Full key path; the page derives the form-relative path
+            // (it knows whether the section keys fields under its key).
+            const path = getKeyPath(update.state, head);
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
-                detail: { line },
+                detail: { line, path },
                 bubbles: true,
                 composed: true,
               })
@@ -451,8 +466,11 @@ export class ESPHomeYamlEditor extends LitElement {
     const pos = this._view.state.doc.line(
       Math.min(line, this._view.state.doc.lines)
     ).from;
+    // ``nearest`` scrolls only when the line is outside the viewport, so a
+    // structured-editor field highlight doesn't jolt the YAML pane when the
+    // line is already visible.
     this._view.dispatch({
-      effects: EditorView.scrollIntoView(pos, { y: "start", yMargin: 50 }),
+      effects: EditorView.scrollIntoView(pos, { y: "nearest", yMargin: 50 }),
     });
   }
 

@@ -181,7 +181,7 @@ export function renderMapField(entry: ConfigEntry, path: string[], ctx: RenderCt
     const valuePath = [...path, rowKey];
     const complex = !isPrimitiveOrNullish(map[rowKey]);
     return html`
-      <div class="map-row">
+      <div class="map-row" data-field-key=${fieldKeyAttr(valuePath)}>
         <input
           type="text"
           class="multi-input map-key-input"
