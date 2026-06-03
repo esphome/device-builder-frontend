@@ -31,7 +31,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { navigate, setLeaveGuard } from "../../src/util/navigation.js";
+import { navigate, runLeaveGuard, setLeaveGuard } from "../../src/util/navigation.js";
 
 /* The vitest config runs in the ``node`` environment, which has
  * no ``window``. ``navigation.ts`` reaches for ``window.history``
@@ -183,5 +183,64 @@ describe("navigate", () => {
     await navPromise;
 
     expect(pushStateSpy).toHaveBeenCalledWith({}, "", "/dashboard");
+  });
+});
+
+/**
+ * ``runLeaveGuard`` is the guard-only gate for back-navigations that bypass
+ * ``navigate()`` but must still honour the leave guard — the header back
+ * arrow's ``history.back()``, whose raw popstate the router commits before the
+ * device editor's own popstate guard can veto it. It must mirror the gating
+ * half of ``navigate()`` without touching history.
+ */
+describe("runLeaveGuard", () => {
+  afterEach(() => {
+    setLeaveGuard(null);
+  });
+
+  it("resolves true when no guard is registered", async () => {
+    await expect(runLeaveGuard()).resolves.toBe(true);
+  });
+
+  it("returns the guard's result (true → proceed)", async () => {
+    const guard = vi.fn(() => Promise.resolve(true));
+    setLeaveGuard(guard);
+    await expect(runLeaveGuard()).resolves.toBe(true);
+    expect(guard).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the guard's result (false → block) and calls it once", async () => {
+    const guard = vi.fn(() => Promise.resolve(false));
+    setLeaveGuard(guard);
+    await expect(runLeaveGuard()).resolves.toBe(false);
+    expect(guard).toHaveBeenCalledTimes(1);
+  });
+
+  it("awaits an asynchronous guard (dialog resolves after a microtask)", async () => {
+    let resolveGuard: ((v: boolean) => void) | undefined;
+    const guard = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveGuard = resolve;
+        })
+    );
+    setLeaveGuard(guard);
+
+    let settled: boolean | undefined;
+    const p = runLeaveGuard().then((v) => (settled = v));
+    await Promise.resolve();
+    expect(settled).toBeUndefined(); // still pending until the user chooses
+
+    resolveGuard?.(false);
+    await p;
+    expect(settled).toBe(false);
+  });
+
+  it("uses the latest registered guard and ignores a cleared one", async () => {
+    const stale = vi.fn(() => Promise.resolve(false));
+    setLeaveGuard(stale);
+    setLeaveGuard(null);
+    await expect(runLeaveGuard()).resolves.toBe(true);
+    expect(stale).not.toHaveBeenCalled();
   });
 });

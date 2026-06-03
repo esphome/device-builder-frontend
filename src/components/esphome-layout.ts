@@ -12,7 +12,7 @@ import {
 import { MOBILE_BREAKPOINT } from "../styles/breakpoints.js";
 import { espHomeStyles } from "../styles/shared.js";
 import { stripBase, withBase } from "../util/base-path.js";
-import { navigate } from "../util/navigation.js";
+import { navigate, runLeaveGuard } from "../util/navigation.js";
 import { registerMdiIcons } from "../util/register-icons.js";
 
 import "@home-assistant/webawesome/dist/components/button/button.js";
@@ -288,7 +288,7 @@ export class ESPHomeLayout extends LitElement {
     `,
   ];
 
-  private _goHome() {
+  private async _goHome() {
     // Prefer popping the history stack so the previous URL — and
     // therefore the dashboard's filter / search state encoded in
     // its query string — is restored verbatim. ``history.state`` is
@@ -298,6 +298,11 @@ export class ESPHomeLayout extends LitElement {
     // pop and we fall back to ``navigate("/")`` to stay inside the
     // SPA instead of exiting to the previous site.
     if (window.history.state !== null && typeof window.history.state === "object") {
+      // history.back() fires a raw popstate the router commits (unmounting the
+      // page) before the device editor's popstate guard can veto it, so honour
+      // the leave guard here — same gate navigate() applies. navigate("/") runs
+      // the guard itself, so the fallback isn't double-prompted.
+      if (!(await runLeaveGuard())) return;
       window.history.back();
       return;
     }
