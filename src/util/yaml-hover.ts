@@ -306,9 +306,10 @@ export function createYamlHoverTooltip(api: ESPHomeAPI, getSeeAlsoLabel: () => s
         const catalog = await loadCatalog(api);
         target = await resolveHoverTarget(view.state, pos, api, catalog);
       } catch (err) {
-        // Any catalog/schema fetch failure degrades to no tooltip; log it so
-        // a real outage (loadCatalog is shared with completion) is visible.
-        console.debug("[yaml-hover] failed to resolve hover docs:", err);
+        // The catalog/schema fetches degrade gracefully on their own, so
+        // reaching here is an unexpected error — warn (visible by default,
+        // unlike debug) since a persistent failure silently kills hovers.
+        console.warn("[yaml-hover] failed to resolve hover docs:", err);
         return null;
       }
       if (!target) return null;
