@@ -12,7 +12,10 @@ import { apiContext, darkModeContext } from "../context/index.js";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../util/esphome-yaml-lang.js";
 import { createYamlCompletionSource } from "../util/yaml-completion.js";
 import { vscodeDark, vscodeLight } from "../util/yaml-editor-theme.js";
-import { createBackendYamlLinter } from "../util/yaml-lint-backend.js";
+import {
+  createBackendYamlLinter,
+  lintErrorLineGutter,
+} from "../util/yaml-lint-backend.js";
 import type { YamlSection } from "../util/yaml-sections.js";
 import {
   sensitiveValueMaskExtension,
@@ -20,6 +23,11 @@ import {
 } from "../util/yaml-sensitive-mask.js";
 
 export type HighlightRange = Pick<YamlSection, "fromLine" | "toLine">;
+
+// `#` must be percent-encoded (`%23`) inside a data-URI background-image.
+const errorDot = (fill: string, stroke: string): string =>
+  `url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40">` +
+  `<circle cx="20" cy="20" r="14" fill="${fill}" stroke="${stroke}" stroke-width="6"/></svg>')`;
 
 // Module-level singletons so they survive editor rebuilds
 const setHighlight = StateEffect.define<HighlightRange | null>();
@@ -134,7 +142,7 @@ export class ESPHomeYamlEditor extends LitElement {
             ? "rgba(99, 179, 237, 0.2)"
             : "rgba(59, 130, 246, 0.1)",
         },
-        // ─── Diagnostics: red wavy underline only (no gutter pill) ──
+        // ─── Diagnostics: red wavy underline + gutter marker ────────
         ".cm-lintRange-error": {
           backgroundImage: this._darkMode
             ? 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 6 3"><path d="M0 3 L1.5 0 L3 3 L4.5 0 L6 3" fill="none" stroke="%23ff6b6b" stroke-width="0.9" stroke-linecap="round"/></svg>\')'
@@ -162,6 +170,7 @@ export class ESPHomeYamlEditor extends LitElement {
           color: this._darkMode ? "#f0f0f5" : "#1a1a1a",
           fontFamily: "inherit",
           fontSize: "12.5px",
+          fontWeight: "500",
           lineHeight: "1.5",
         },
         ".cm-diagnostic + .cm-diagnostic": {
@@ -175,6 +184,17 @@ export class ESPHomeYamlEditor extends LitElement {
         },
         ".cm-diagnostic-info": {
           borderLeftColor: this._darkMode ? "#4dabf7" : "#0b5cad",
+        },
+        // A red dot replaces the line number on error lines — no separate
+        // lint gutter, so an error never reflows the editor.
+        ".cm-lineNumbers .cm-gutterElement.cm-lint-error-line": {
+          color: "transparent",
+          backgroundImage: this._darkMode
+            ? errorDot("%23ff6b6b", "%23d92d20")
+            : errorDot("%23d92d20", "%23a51d12"),
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "right 3px center",
+          backgroundSize: "0.7em",
         },
         // ─── Autocompletion popup ───────────────────────────────────
         ".cm-tooltip.cm-tooltip-autocomplete": {
@@ -317,12 +337,22 @@ export class ESPHomeYamlEditor extends LitElement {
     ];
 
     if (this._api && this.configuration) {
-      // Backend lint — wavy underlines only, no gutter pill.
+      // `lintErrorLineGutter` reads the linter's diagnostics, so it must be
+      // wired after `createBackendYamlLinter`.
       extensions.push(
         createBackendYamlLinter({
           api: this._api,
           getConfiguration: () => this.configuration,
-        })
+          onResult: (errors) =>
+            this.dispatchEvent(
+              new CustomEvent("yaml-diagnostics", {
+                detail: { errors },
+                bubbles: true,
+                composed: true,
+              })
+            ),
+        }),
+        lintErrorLineGutter
       );
       // Schema-driven completion off the components catalog.
       extensions.push(
