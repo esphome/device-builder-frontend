@@ -3,6 +3,7 @@ import {
   _resetSchemaCacheForTests,
   fetchBundle,
   getActions,
+  getConfigVarDocsAtPath,
   getConfigVarKeys,
   getConfigVarValueOptions,
   getRegistryEntries,
@@ -989,6 +990,91 @@ describe("getRegistryEntryKeys", () => {
       "delay"
     );
     expect(keys.map((k) => k.key)).toEqual(["time"]);
+  });
+});
+
+describe("getConfigVarDocsAtPath", () => {
+  // ethernet-shaped: CONFIG_SCHEMA is a typed union whose ``type:``
+  // discriminator carries its own docs, and each variant pulls the
+  // common fields in via ``extends``.
+  const ETH_BUNDLE = {
+    ethernet: {
+      schemas: {
+        CONFIG_SCHEMA: {
+          type: "typed",
+          typed_key: "type",
+          docs: "The type of LAN chipset.",
+          types: {
+            LAN8720: { config_vars: {}, extends: ["ethernet.RMII_SCHEMA"] },
+          },
+        },
+        RMII_SCHEMA: {
+          type: "schema",
+          schema: {
+            config_vars: {
+              mdc_pin: { type: "pin", docs: "MDC pin." },
+              clk: {
+                type: "schema",
+                schema: {
+                  config_vars: { mode: { type: "string", docs: "Clock mode." } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+  function mockEth() {
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      return new Response(JSON.stringify(ETH_BUNDLE), { status: 200 });
+    });
+  }
+
+  it("returns the typed discriminator's docs with the variant list appended", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["type"]
+    );
+    expect(docs).toBe("The type of LAN chipset. `LAN8720`");
+  });
+
+  it("resolves a field carried into a variant via extends", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["mdc_pin"]
+    );
+    expect(docs).toBe("MDC pin.");
+  });
+
+  it("walks into a nested schema config-var", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["clk", "mode"]
+    );
+    expect(docs).toBe("Clock mode.");
+  });
+
+  it("returns null for an unknown key", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["nope"]
+    );
+    expect(docs).toBeNull();
   });
 });
 

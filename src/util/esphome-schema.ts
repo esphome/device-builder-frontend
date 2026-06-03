@@ -585,7 +585,20 @@ export async function getConfigVarDocsAtPath(
         new Set()
       );
       if (!found) return null;
-      if (i === path.length - 1) return found.docs ?? null;
+      if (i === path.length - 1) {
+        // A typed discriminator's own docs name the variants only as a
+        // ``Supported … are:`` lead-in; append the variant list so the
+        // hover isn't cut off mid-sentence.
+        if (found.type === "typed" && found.typed_key === path[i] && found.types) {
+          const list = Object.keys(found.types)
+            .map((n) => `\`${n}\``)
+            .join(", ");
+          return list
+            ? `${found.docs ? `${found.docs} ` : ""}${list}`
+            : (found.docs ?? null);
+        }
+        return found.docs ?? null;
+      }
       cv = found;
     }
     return null;
@@ -605,6 +618,9 @@ async function findCvInCv(
   visited: Set<string>
 ): Promise<SchemaConfigVar | null> {
   if (cv.type === "typed") {
+    // The discriminator key itself (``type:`` on a typed schema, e.g.
+    // ethernet) carries its docs on the typed cv, not in any variant.
+    if (cv.typed_key === key) return cv;
     for (const variant of Object.values(cv.types ?? {})) {
       if (!variant) continue;
       const found = await findCvInSchema(

@@ -159,10 +159,16 @@ export async function resolveHoverTarget(
   const colonIdx = line.text.indexOf(":");
   const overValue = colonIdx >= 0 && colInLine > colonIdx && rest.trim().length > 0;
 
-  // 1. Enum value → that option's meaning (the form's dropdown never
-  //    shows per-value docs, so this is always worth surfacing).
+  // 1. Value position.
   if (overValue) {
     if (!topLevelKey) return null;
+    // ``platform: <value>`` → the platform component's description.
+    if (key === "platform") {
+      const c = catalog.byId.get(`${topLevelKey}.${unquote(rest.trim())}`);
+      return c ? componentTarget(c) : null;
+    }
+    // Otherwise an enum value → that option's meaning (the form's
+    // dropdown never shows per-value docs).
     const { bundle, componentKey } = bundleFor(topLevelKey, platformValue);
     const options = await getConfigVarValueOptions(api, bundle, componentKey, key);
     return docsTarget(options.find((o) => o.value === unquote(rest.trim()))?.docs);
@@ -212,7 +218,11 @@ export async function resolveHoverTarget(
     path.slice(1)
   );
   if (schemaDocs) return docsTarget(schemaDocs);
-  const comp = catalog.byId.get(componentKey) ?? catalog.byId.get(topLevelKey);
+  // Catalog fallback. The catalog keys platforms as ``<domain>.<stem>``
+  // (``binary_sensor.gpio``), the reverse of the schema bundle's
+  // ``<stem>.<domain>`` componentKey — use the catalog form here.
+  const catalogId = platformValue ? `${topLevelKey}.${platformValue}` : topLevelKey;
+  const comp = catalog.byId.get(catalogId);
   const entry = comp ? findConfigEntry(comp.config_entries ?? [], key) : undefined;
   return entry ? fieldTarget(entry, comp) : null;
 }

@@ -50,6 +50,26 @@ const CATALOG: CatalogIndex = {
         ],
       }),
     ],
+    // Platform component — keyed `<domain>.<stem>` (the reverse of the
+    // schema bundle's componentKey) to pin the catalog-fallback lookup.
+    [
+      "binary_sensor.gpio",
+      comp({
+        id: "binary_sensor.gpio",
+        name: "GPIO Binary Sensor",
+        description: "A binary sensor on a GPIO pin.",
+        docs_url: "https://esphome.io/components/binary_sensor/gpio",
+        config_entries: [
+          field({
+            key: "pin",
+            description: "The pin to monitor.",
+            config_entries: [
+              field({ key: "inverted", description: "Invert the level." }),
+            ],
+          }),
+        ],
+      }),
+    ],
   ]),
 };
 
@@ -138,6 +158,21 @@ describe("resolveHoverTarget", () => {
     const target = await hover('esphome:\n  name: "x"\n', "esphome");
     expect(target?.description).toBe("Core firmware configuration.");
     expect(target?.docsUrl).toBe("https://esphome.io/components/esphome");
+  });
+
+  it("shows the platform component description for platform: <value>", async () => {
+    const doc = "binary_sensor:\n  - platform: gpio\n    name: x\n";
+    const target = await hover(doc, "gpio");
+    expect(target?.description).toBe("A binary sensor on a GPIO pin.");
+    expect(target?.docsUrl).toBe("https://esphome.io/components/binary_sensor/gpio");
+  });
+
+  it("falls back to the catalog for a nested platform field (correct <domain>.<stem> id)", async () => {
+    // Schema walk returns null (default mock) → catalog fallback, which
+    // must key the platform as binary_sensor.gpio, not gpio.binary_sensor.
+    const doc = "binary_sensor:\n  - platform: gpio\n    pin:\n      inverted: false\n";
+    const target = await hover(doc, "inverted");
+    expect(target?.description).toBe("Invert the level.");
   });
 
   it("returns null on a comment line", async () => {
