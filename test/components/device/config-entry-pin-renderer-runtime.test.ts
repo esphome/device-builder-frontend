@@ -67,10 +67,15 @@ const longFormPinEntry = () =>
     config_entries: [modeChild()],
   });
 
-const openModeCtx = (pin: unknown) =>
+const openModeCtx = (pin: unknown, pinRegistryModes?: Record<string, string[]>) =>
   makeRenderCtx(
     { pin },
-    { overrides: { nestedOpenSections: new Set(["pin:pin-advanced", "pin.mode"]) } }
+    {
+      overrides: {
+        nestedOpenSections: new Set(["pin:pin-advanced", "pin.mode"]),
+        ...(pinRegistryModes ? { pinRegistryModes } : {}),
+      },
+    }
   );
 
 const switchByLabel = (result: unknown, label: string) =>
@@ -184,5 +189,44 @@ describe("renderPinField — mode scalar shorthand expansion", () => {
     const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
     // No flag switches; the value falls through to the scalar notice.
     expect(findElementBindings(result, "wa-switch")).toHaveLength(0);
+  });
+});
+
+describe("renderPinField — mode flags scoped to the pin registry", () => {
+  const PCA9554_MODES = { pca9554: ["input", "output"] };
+
+  it("hides flags an external provider doesn't allow (pca9554 -> no pullup)", () => {
+    const ctx = openModeCtx({ pca9554: "hub", number: 0, mode: "OUTPUT" }, PCA9554_MODES);
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Output")?.["?checked"]).toBe(true);
+    expect(switchByLabel(result, "Input")).toBeDefined();
+    expect(switchByLabel(result, "Pullup")).toBeUndefined();
+  });
+
+  it("keeps every flag for a native pin (no provider key in the value)", () => {
+    const ctx = openModeCtx({ number: "GPIO33", mode: "OUTPUT" }, PCA9554_MODES);
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Pullup")).toBeDefined();
+    expect(switchByLabel(result, "Input")).toBeDefined();
+    expect(switchByLabel(result, "Output")).toBeDefined();
+  });
+
+  it("keeps every flag when the registry map is absent (graceful fallback)", () => {
+    const ctx = openModeCtx({ pca9554: "hub", number: 0, mode: "OUTPUT" });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Pullup")).toBeDefined();
+  });
+
+  it("keeps every flag for an unknown provider not in the map", () => {
+    const ctx = openModeCtx(
+      { some_future_expander: "hub", number: 0, mode: "OUTPUT" },
+      PCA9554_MODES
+    );
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Pullup")).toBeDefined();
   });
 });

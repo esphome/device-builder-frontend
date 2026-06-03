@@ -24,13 +24,19 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import {
+  fetchPinRegistryModes,
+  getCachedPinRegistryModes,
+  subscribePinRegistryModes,
+} from "../../util/pin-registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
@@ -87,6 +93,14 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** WS client — used only to fetch the session-cached pin-registry-modes
+   *  map; ``subscribe`` so a late-arriving context kicks the fetch. */
+  @consume({ context: apiContext, subscribe: true })
+  @state()
+  private _api?: ESPHomeAPI;
+
+  private _unsubPinRegistryModes?: () => void;
 
   /** Schema entries to render (recursive — NESTED entries contain
    *  their own `config_entries`). */
@@ -244,6 +258,19 @@ export class ESPHomeConfigEntryForm extends LitElement {
    * wa-select's own initial value resolution and the displayed label
    * stays blank.
    */
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Re-render when the shared pin-registry-modes map populates so the pin
+    // Mode checkboxes scope once it arrives.
+    this._unsubPinRegistryModes = subscribePinRegistryModes(() => this.requestUpdate());
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unsubPinRegistryModes?.();
+    this._unsubPinRegistryModes = undefined;
+  }
+
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
@@ -267,6 +294,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
     super.updated(changed);
     void this._syncSelectValues();
     this._fieldScroll.maybeScroll(changed);
+    // Idempotent (the cache dedupes in-flight + resolved); kicks once the
+    // api context lands.
+    if (this._api) void fetchPinRegistryModes(this._api);
   }
 
   private async _syncSelectValues() {
@@ -542,6 +572,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       fromLine: this.fromLine,
       sectionKey: this.sectionKey,
       board: this.board,
+      pinRegistryModes: getCachedPinRegistryModes(),
       requiredOnly: this.requiredOnly,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),

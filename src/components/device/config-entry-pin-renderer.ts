@@ -326,17 +326,55 @@ function renderPinAdvanced(
       </button>
       ${isOpen
         ? html`<div class="pin-advanced-fields">
-            ${longFormFields.map((child) =>
-              child.key === "mode" &&
-              child.type === ConfigEntryType.NESTED &&
-              typeof ctx.getAt([...path, child.key]) === "string"
-                ? renderPinModeField(child, [...path, child.key], ctx)
-                : ctx.renderEntry(child, [...path, child.key])
-            )}
+            ${longFormFields.map((child) => renderLongFormChild(child, path, ctx))}
           </div>`
         : nothing}
     </div>
   `;
+}
+
+/** Render one long-form pin field, scoping the ``mode`` flag group to the
+ *  flags the pin's external provider allows (an expander like ``pca9554``
+ *  drops pullup / pulldown / open_drain). A native pin or unknown provider
+ *  keeps every flag. */
+function renderLongFormChild(
+  child: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx
+): unknown {
+  if (child.key !== "mode" || child.type !== ConfigEntryType.NESTED) {
+    return ctx.renderEntry(child, [...path, child.key]);
+  }
+  const modePath = [...path, child.key];
+  const allowed = providerAllowedModes(ctx.getAt(path), ctx.pinRegistryModes);
+  const scoped = allowed ? scopeModeChildren(child, allowed) : child;
+  // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion wrapper;
+  // the object form goes through the normal nested dispatch.
+  return typeof ctx.getAt(modePath) === "string"
+    ? renderPinModeField(scoped, modePath, ctx)
+    : ctx.renderEntry(scoped, modePath);
+}
+
+/** The pin value's provider key that the registry-modes map knows about, or
+ *  ``null`` for a native pin (no provider key) / short form / unknown
+ *  provider — all of which keep the full flag set. */
+function providerAllowedModes(
+  pinValue: unknown,
+  modesMap: Record<string, string[]> | undefined
+): string[] | null {
+  if (!modesMap || !isPlainObject(pinValue)) return null;
+  for (const key of Object.keys(pinValue)) {
+    if (key in modesMap) return modesMap[key];
+  }
+  return null;
+}
+
+/** Return *modeEntry* with its flag children narrowed to *allowed*. */
+function scopeModeChildren(modeEntry: ConfigEntry, allowed: string[]): ConfigEntry {
+  const children = (modeEntry.config_entries ?? []).filter((c) =>
+    allowed.includes(c.key)
+  );
+  return { ...modeEntry, config_entries: children };
 }
 
 /**
