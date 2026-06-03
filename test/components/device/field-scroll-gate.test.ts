@@ -72,4 +72,12 @@ describe("gatingDisclosureKeys", () => {
   it("ignores a path that doesn't sit under the prefix", () => {
     expect(gatingDisclosureKeys(DECLS, ["other", "inverted"])).toEqual([]);
   });
+
+  it("ignores an empty-prefix decl instead of gating every path", () => {
+    // A malformed/empty ``data-reveal-for`` parses to []; an unguarded
+    // ``[].every`` would match every target and open the disclosure spuriously.
+    expect(
+      gatingDisclosureKeys([{ prefix: [], key: "bad" }], ["pin", "inverted"])
+    ).toEqual([]);
+  });
 });

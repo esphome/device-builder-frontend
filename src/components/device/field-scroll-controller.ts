@@ -49,14 +49,18 @@ export function advanceScrollGate(
 }
 
 /** Open keys for disclosures that gate *path* — a disclosure declares the
- *  path prefix it hides behind; a strict-ancestor prefix means it must open. */
+ *  path prefix it hides behind; a strict-ancestor prefix means it must open.
+ *  An empty prefix gates nothing (a malformed decl mustn't match every path). */
 export function gatingDisclosureKeys(
   decls: ReadonlyArray<{ prefix: string[]; key: string }>,
   path: string[]
 ): string[] {
   return decls
     .filter(
-      (d) => d.prefix.length < path.length && d.prefix.every((k, i) => k === path[i])
+      (d) =>
+        d.prefix.length > 0 &&
+        d.prefix.length < path.length &&
+        d.prefix.every((k, i) => k === path[i])
     )
     .map((d) => d.key);
 }
@@ -172,7 +176,10 @@ export class FieldScrollController {
   }
 
   /** Read the gating-disclosure declarations a renderer rendered into the DOM:
-   *  ``data-reveal-for`` is the gated path prefix, ``data-field-key`` the open key. */
+   *  ``data-reveal-for`` is the gated path prefix, ``data-field-key`` the open key.
+   *  Only the host shadow root is scanned (where pin Advanced renders); a future
+   *  disclosure nested inside a child element's shadow root would need the same
+   *  recursion ``_find`` uses. */
   private _gatingDecls(root: ParentNode): { prefix: string[]; key: string }[] {
     const decls: { prefix: string[]; key: string }[] = [];
     for (const el of root.querySelectorAll<HTMLElement>("[data-reveal-for]")) {
