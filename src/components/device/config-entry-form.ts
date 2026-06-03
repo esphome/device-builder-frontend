@@ -295,6 +295,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (!target) return;
     this._pendingScrollPath = undefined;
     target.scrollIntoView({ block: "nearest" });
+    // Restart the flash even when the same field is re-targeted.
+    target.classList.remove("field--highlight");
+    void target.offsetWidth;
+    target.classList.add("field--highlight");
   }
 
   private async _syncSelectValues() {
