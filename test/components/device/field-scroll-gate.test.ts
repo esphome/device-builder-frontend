@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   advanceScrollGate,
+  gatingDisclosureKeys,
   type ScrollGate,
 } from "../../../src/components/device/field-scroll-controller.js";
 
@@ -46,5 +47,29 @@ describe("advanceScrollGate", () => {
     const { gate, scroll } = advanceScrollGate(consumed, undefined, true, MAX);
     expect(scroll).toBe(false);
     expect(gate).toEqual({ scrolledKey: undefined, lastFocusKey: undefined, tries: 0 });
+  });
+});
+
+describe("gatingDisclosureKeys", () => {
+  const DECLS = [{ prefix: ["pin"], key: "pin:pin-advanced" }];
+
+  it("opens a disclosure gating a strict-descendant field", () => {
+    expect(gatingDisclosureKeys(DECLS, ["pin", "inverted"])).toEqual([
+      "pin:pin-advanced",
+    ]);
+  });
+
+  it("opens it for a deeply nested descendant", () => {
+    expect(gatingDisclosureKeys(DECLS, ["pin", "mode", "pullup"])).toEqual([
+      "pin:pin-advanced",
+    ]);
+  });
+
+  it("leaves the prefix path itself untouched", () => {
+    expect(gatingDisclosureKeys(DECLS, ["pin"])).toEqual([]);
+  });
+
+  it("ignores a path that doesn't sit under the prefix", () => {
+    expect(gatingDisclosureKeys(DECLS, ["other", "inverted"])).toEqual([]);
   });
 });

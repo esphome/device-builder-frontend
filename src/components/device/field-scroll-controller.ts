@@ -48,6 +48,19 @@ export function advanceScrollGate(
   return { gate: { scrolledKey, lastFocusKey, tries }, scroll };
 }
 
+/** Open keys for disclosures that gate *path* — a disclosure declares the
+ *  path prefix it hides behind; a strict-ancestor prefix means it must open. */
+export function gatingDisclosureKeys(
+  decls: ReadonlyArray<{ prefix: string[]; key: string }>,
+  path: string[]
+): string[] {
+  return decls
+    .filter(
+      (d) => d.prefix.length < path.length && d.prefix.every((k, i) => k === path[i])
+    )
+    .map((d) => d.key);
+}
+
 /** The form surface this helper drives. */
 export interface FieldScrollHost {
   shadowRoot: ShadowRoot | null;
@@ -107,6 +120,12 @@ export class FieldScrollController {
     for (let i = 1; i < path.length; i++) {
       host.openNested(path.slice(0, i).join("."));
     }
+    // Custom disclosures (e.g. pin Advanced) aren't dotted-path keyed; they
+    // declare the prefix they hide behind in the DOM, so the controller stays
+    // agnostic to any renderer's key convention.
+    for (const k of gatingDisclosureKeys(this._gatingDecls(host.shadowRoot), path)) {
+      host.openNested(k);
+    }
     await host.updateComplete; // let any opened group render
     const cur = host.focusFieldPath;
     if (!cur || fieldKeyAttr(cur) !== key) return; // superseded by a newer move
@@ -150,6 +169,22 @@ export class FieldScrollController {
       if (len === path.length) this._scrolledKey = key;
       return;
     }
+  }
+
+  /** Read the gating-disclosure declarations a renderer rendered into the DOM:
+   *  ``data-reveal-for`` is the gated path prefix, ``data-field-key`` the open key. */
+  private _gatingDecls(root: ParentNode): { prefix: string[]; key: string }[] {
+    const decls: { prefix: string[]; key: string }[] = [];
+    for (const el of root.querySelectorAll<HTMLElement>("[data-reveal-for]")) {
+      const key = el.getAttribute("data-field-key");
+      if (key) {
+        decls.push({
+          prefix: parseFieldKey(el.getAttribute("data-reveal-for") ?? ""),
+          key,
+        });
+      }
+    }
+    return decls;
   }
 
   /** Find the field with *path*, recursing into nested custom-element shadow
