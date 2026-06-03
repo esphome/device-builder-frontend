@@ -1363,6 +1363,30 @@ export class ESPHomeAPI {
     return result;
   }
 
+  /**
+   * Map of external pin provider → allowed long-form `mode` flags
+   * (`pca9554` → `["input", "output"]`), fetched once per session. Filtered to
+   * the `{string: string[]}` contract: non-object → `{}`, non-string flags
+   * dropped, empty providers omitted.
+   */
+  async getPinRegistryModes(): Promise<Record<string, string[]>> {
+    const raw = await this.sendCommand<unknown>("components/get_pin_registry_modes");
+    // Null-prototype so an untrusted ``__proto__`` / ``constructor`` key can't
+    // pollute the prototype when assigned below.
+    const result: Record<string, string[]> = Object.create(null);
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw)) {
+      return result;
+    }
+    for (const [key, value] of Object.entries(raw)) {
+      if (typeof key !== "string" || !Array.isArray(value)) continue;
+      const flags = value.filter((m): m is string => typeof m === "string");
+      // Omit empty-after-filter providers; an empty allow-list would scope the
+      // Mode group to zero checkboxes instead of falling back to show-all.
+      if (flags.length > 0) result[key] = flags;
+    }
+    return result;
+  }
+
   // ─── Automations ─────────────────────────────────────────
 
   /**

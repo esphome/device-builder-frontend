@@ -24,13 +24,19 @@ import {
 } from "@mdi/js";
 import { html, LitElement, nothing, type PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
+import type { ESPHomeAPI } from "../../api/esphome-api.js";
 import type { BoardCatalogEntry } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
 import { ConfigEntryType } from "../../api/types/config-entries.js";
 import type { LocalizeFunc } from "../../common/localize.js";
-import { localizeContext } from "../../context/index.js";
+import { apiContext, localizeContext } from "../../context/index.js";
 import { type ValidationError } from "../../util/config-validation.js";
 import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import {
+  fetchPinRegistryModes,
+  getCachedPinRegistryModes,
+  subscribePinRegistryModes,
+} from "../../util/pin-registry-modes-cache.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
@@ -87,6 +93,15 @@ export class ESPHomeConfigEntryForm extends LitElement {
   @consume({ context: localizeContext, subscribe: true })
   @state()
   private _localize: LocalizeFunc = (key) => key;
+
+  /** WS client — used only to fetch the session-cached pin-registry-modes
+   *  map; ``subscribe`` so a late-arriving context kicks the fetch. */
+  @consume({ context: apiContext, subscribe: true })
+  @state()
+  private _api?: ESPHomeAPI;
+
+  private _unsubPinRegistryModes?: () => void;
+  private _pinRegistryModesKicked = false;
 
   /** Schema entries to render (recursive — NESTED entries contain
    *  their own `config_entries`). */
@@ -226,24 +241,21 @@ export class ESPHomeConfigEntryForm extends LitElement {
     )}`;
   }
 
-  /**
-   * After every render, push the current value onto each <wa-select>
-   * imperatively. This is a workaround for a wa-select quirk where
-   * the value/selected wiring through Lit's template doesn't always
-   * land — especially on the first paint, when wa-select reads its
-   * value before the slotted options are connected. Each field div
-   * carries a `data-field-key` (the JSON-encoded path) so we can look
-   * up the right value for its select. Encoding the path as JSON
-   * rather than a dotted string keeps user-supplied map keys that
-   * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
-   *
-   * We wait for each select's `updateComplete` (and one frame after
-   * that) to make sure wa-select's own first-render bookkeeping —
-   * `handleDefaultSlotChange`, `setSelectedOptions`, etc. — has run
-   * before we set `.value`. Otherwise our imperative set fights with
-   * wa-select's own initial value resolution and the displayed label
-   * stays blank.
-   */
+  /** Subscribe to the shared pin-registry-modes cache so the form repaints
+   *  (scoping the pin Mode checkboxes) once the map arrives. */
+  connectedCallback(): void {
+    super.connectedCallback();
+    // Re-render when the shared pin-registry-modes map populates so the pin
+    // Mode checkboxes scope once it arrives.
+    this._unsubPinRegistryModes = subscribePinRegistryModes(() => this.requestUpdate());
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unsubPinRegistryModes?.();
+    this._unsubPinRegistryModes = undefined;
+  }
+
   protected willUpdate(changed: PropertyValues) {
     // A different entry list means the form was re-targeted to a
     // different component (e.g. the dep-flow detour swapping
@@ -267,8 +279,32 @@ export class ESPHomeConfigEntryForm extends LitElement {
     super.updated(changed);
     void this._syncSelectValues();
     this._fieldScroll.maybeScroll(changed);
+    // Kick the shared fetch once, when the api context first lands — not on
+    // every render. The cache + subscribe handle dedupe and the repaint.
+    if (this._api && !this._pinRegistryModesKicked) {
+      this._pinRegistryModesKicked = true;
+      void fetchPinRegistryModes(this._api);
+    }
   }
 
+  /**
+   * After every render, push the current value onto each <wa-select>
+   * imperatively. This is a workaround for a wa-select quirk where
+   * the value/selected wiring through Lit's template doesn't always
+   * land — especially on the first paint, when wa-select reads its
+   * value before the slotted options are connected. Each field div
+   * carries a `data-field-key` (the JSON-encoded path) so we can look
+   * up the right value for its select. Encoding the path as JSON
+   * rather than a dotted string keeps user-supplied map keys that
+   * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
+   *
+   * We wait for each select's `updateComplete` (and one frame after
+   * that) to make sure wa-select's own first-render bookkeeping —
+   * `handleDefaultSlotChange`, `setSelectedOptions`, etc. — has run
+   * before we set `.value`. Otherwise our imperative set fights with
+   * wa-select's own initial value resolution and the displayed label
+   * stays blank.
+   */
   private async _syncSelectValues() {
     if (!this.shadowRoot) return;
     const fields = this.shadowRoot.querySelectorAll<HTMLElement>("[data-field-key]");
@@ -542,6 +578,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
       fromLine: this.fromLine,
       sectionKey: this.sectionKey,
       board: this.board,
+      pinRegistryModes: getCachedPinRegistryModes(),
       requiredOnly: this.requiredOnly,
       nestedOpenSections: this._nestedOpenSections,
       getAt: (path) => getIn(this.values, path),

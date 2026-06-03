@@ -96,6 +96,9 @@ export interface RenderCtx {
    *  dropdown doesn't offer binary_sensor filters. */
   sectionKey: string;
   board: BoardCatalogEntry | null;
+  /** ``{provider_key: [allowed_mode_flags]}`` scoping the long-form pin Mode
+   *  checkboxes per external provider; absent provider / native pin → all flags. */
+  pinRegistryModes?: Record<string, string[]>;
   requiredOnly: boolean;
   nestedOpenSections: Set<string>;
   getAt: (path: string[]) => unknown;

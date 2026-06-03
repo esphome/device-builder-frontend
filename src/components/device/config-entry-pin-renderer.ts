@@ -330,17 +330,75 @@ function renderPinAdvanced(
       </button>
       ${isOpen
         ? html`<div class="pin-advanced-fields">
-            ${longFormFields.map((child) =>
-              child.key === "mode" &&
-              child.type === ConfigEntryType.NESTED &&
-              typeof ctx.getAt([...path, child.key]) === "string"
-                ? renderPinModeField(child, [...path, child.key], ctx)
-                : ctx.renderEntry(child, [...path, child.key])
-            )}
+            ${longFormFields.map((child) => renderLongFormChild(child, path, ctx))}
           </div>`
         : nothing}
     </div>
   `;
+}
+
+/** Render one long-form pin field; the ``mode`` group is scoped to the flags
+ *  the pin's external provider allows (a native / unknown provider keeps all). */
+function renderLongFormChild(
+  child: ConfigEntry,
+  path: string[],
+  ctx: RenderCtx
+): unknown {
+  if (child.key !== "mode" || child.type !== ConfigEntryType.NESTED) {
+    return ctx.renderEntry(child, [...path, child.key]);
+  }
+  const modePath = [...path, child.key];
+  const modeValue = ctx.getAt(modePath);
+  const allowed = providerAllowedModes(ctx.getAt(path), ctx.pinRegistryModes);
+  // Keep any flag the value already sets visible even if the provider now
+  // disallows it, so a legacy/invalid config can be repaired from the editor.
+  const scoped = allowed
+    ? scopeModeChildren(child, allowed, presentModeFlags(modeValue))
+    : child;
+  // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion wrapper;
+  // the object form goes through the normal nested dispatch.
+  return typeof modeValue === "string"
+    ? renderPinModeField(scoped, modePath, ctx)
+    : ctx.renderEntry(scoped, modePath);
+}
+
+/** Allowed mode flags for *pinValue*'s provider, or ``null`` (native pin,
+ *  short form, unknown provider, or empty list) to keep the full flag set. */
+function providerAllowedModes(
+  pinValue: unknown,
+  modesMap: Record<string, string[]> | undefined
+): string[] | null {
+  if (!modesMap || !isPlainObject(pinValue)) return null;
+  for (const key of Object.keys(pinValue)) {
+    // Own-property check, not ``in``, so a key like ``toString`` can't match
+    // an inherited member. An empty list means no scoping (show every flag).
+    if (Object.prototype.hasOwnProperty.call(modesMap, key)) {
+      const allowed = modesMap[key];
+      return allowed.length > 0 ? allowed : null;
+    }
+  }
+  return null;
+}
+
+/** Flag keys the current ``mode`` value sets (object keys, or a scalar
+ *  shorthand's expansion) — kept visible so a legacy flag stays editable. */
+function presentModeFlags(modeValue: unknown): string[] {
+  if (typeof modeValue === "string") {
+    return Object.keys(expandPinModeShorthand(modeValue) ?? {});
+  }
+  return isPlainObject(modeValue) ? Object.keys(modeValue) : [];
+}
+
+/** *modeEntry* with its flag children narrowed to *allowed* plus any flag
+ *  *present* already sets, so a disallowed-but-set flag stays editable. */
+function scopeModeChildren(
+  modeEntry: ConfigEntry,
+  allowed: string[],
+  present: string[]
+): ConfigEntry {
+  const keep = new Set([...allowed, ...present]);
+  const children = (modeEntry.config_entries ?? []).filter((c) => keep.has(c.key));
+  return { ...modeEntry, config_entries: children };
 }
 
 /**
