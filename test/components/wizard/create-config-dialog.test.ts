@@ -39,10 +39,10 @@ async function mount(api: Partial<ESPHomeAPI>): Promise<ESPHomeCreateConfigDialo
   return el;
 }
 
-// The parent listens for create-empty-config on its wa-dialog; emit it the
-// way a wizard step would (bubbling, composed).
+// The parent listens for create-empty-config on its esphome-base-dialog; emit
+// it the way a wizard step would (bubbling, composed).
 function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
-  const wd = el.shadowRoot!.querySelector("wa-dialog")!;
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
   wd.dispatchEvent(
     new CustomEvent("create-empty-config", {
       detail: { name },
@@ -54,7 +54,7 @@ function emitCreate(el: ESPHomeCreateConfigDialog, name: string): void {
 
 // Same shape for the basic-setup flow (board + WiFi + name).
 function emitFinish(el: ESPHomeCreateConfigDialog, name: string): void {
-  const wd = el.shadowRoot!.querySelector("wa-dialog")!;
+  const wd = el.shadowRoot!.querySelector("esphome-base-dialog")!;
   wd.dispatchEvent(
     new CustomEvent("finish-setup", {
       detail: { board: { id: "esp32dev" }, name, wifiSsid: "net", wifiPassword: "pw" },
