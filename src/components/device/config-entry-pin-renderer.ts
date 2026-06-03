@@ -8,9 +8,10 @@
 import { html, nothing, type TemplateResult } from "lit";
 import type { BoardPin } from "../../api/types/boards.js";
 import type { ConfigEntry } from "../../api/types/config-entries.js";
-import { PinFeature, PinMode } from "../../api/types/config-entries.js";
+import { ConfigEntryType, PinFeature, PinMode } from "../../api/types/config-entries.js";
 import { findUsedPins, sectionEndLine } from "../../util/config-entry-yaml-scan.js";
 import { isPlainObject, isPrimitiveOrNullish } from "../../util/nested-values.js";
+import { expandPinModeShorthand } from "../../util/pin-mode.js";
 import {
   effectiveDisabled,
   fieldKeyAttr,
@@ -19,6 +20,8 @@ import {
   renderStringField,
   type RenderCtx,
 } from "./config-entry-renderers-shared.js";
+import { renderNestedField } from "./config-entry-renderers/nested.js";
+import { renderBooleanField } from "./config-entry-renderers/primitives.js";
 
 /**
  * Parse a pin reference into a GPIO number. Used both for the field's
@@ -323,9 +326,77 @@ function renderPinAdvanced(
       </button>
       ${isOpen
         ? html`<div class="pin-advanced-fields">
-            ${longFormFields.map((child) => ctx.renderEntry(child, [...path, child.key]))}
+            ${longFormFields.map((child) =>
+              child.key === "mode" &&
+              child.type === ConfigEntryType.NESTED &&
+              typeof ctx.getAt([...path, child.key]) === "string"
+                ? renderPinModeField(child, [...path, child.key], ctx)
+                : ctx.renderEntry(child, [...path, child.key])
+            )}
           </div>`
         : nothing}
     </div>
   `;
+}
+
+/**
+ * Render the pin ``mode`` group. A scalar shorthand (``mode: OUTPUT``)
+ * is expanded to its flag dict for display so the existing checkboxes
+ * reflect it; the YAML scalar is kept until the user toggles a flag,
+ * which writes the flag-object form. Object form and unrecognised
+ * shorthands fall through to the normal nested renderer.
+ */
+function renderPinModeField(
+  entry: ConfigEntry,
+  modePath: string[],
+  ctx: RenderCtx
+): unknown {
+  const raw = ctx.getAt(modePath);
+  const expanded = typeof raw === "string" ? expandPinModeShorthand(raw) : null;
+  if (!expanded) return renderNestedField(entry, modePath, ctx);
+  return renderNestedField(entry, modePath, pinModeDisplayCtx(ctx, modePath, expanded));
+}
+
+/** Wrap *ctx* so reads under *modePath* see *expanded* (a flag dict from a
+ *  scalar shorthand) and a flag-child write promotes the mode to the
+ *  flag-object form, replacing the scalar only on edit. */
+function pinModeDisplayCtx(
+  ctx: RenderCtx,
+  modePath: string[],
+  expanded: Record<string, boolean>
+): RenderCtx {
+  const modeKey = modePath.join(".");
+  const flagOf = (path: string[]): string | null =>
+    path.length === modePath.length + 1 &&
+    path.slice(0, modePath.length).join(".") === modeKey
+      ? path[modePath.length]
+      : null;
+  const wrapped: RenderCtx = {
+    ...ctx,
+    getAt: (path) => {
+      if (path.join(".") === modeKey) return expanded;
+      const flag = flagOf(path);
+      return flag !== null ? expanded[flag] : ctx.getAt(path);
+    },
+    scopeValues: (path) =>
+      path.join(".") === modeKey ? { ...expanded } : ctx.scopeValues(path),
+    emitChange: (path, value) => {
+      const flag = flagOf(path);
+      if (flag === null) {
+        ctx.emitChange(path, value);
+        return;
+      }
+      const next = { ...expanded };
+      if (value) next[flag] = true;
+      else delete next[flag];
+      ctx.emitChange(modePath, next);
+    },
+  };
+  // The mode children are booleans; render them through the wrapper so the
+  // checkboxes read/write the expanded flags.
+  wrapped.renderEntry = (child, path) =>
+    child.type === ConfigEntryType.BOOLEAN
+      ? renderBooleanField(child, path, wrapped)
+      : ctx.renderEntry(child, path);
+  return wrapped;
 }

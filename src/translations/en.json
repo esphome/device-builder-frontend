@@ -659,6 +659,7 @@
     "multi_value_remove": "Remove",
     "multi_value_yaml_only": "This list contains YAML the visual editor can't model — edit it directly in the YAML pane on the right.",
     "value_yaml_only": "This value can't be modeled by the visual editor — edit it directly in the YAML pane on the right.",
+    "value_set_in_yaml": "Set to {value} in YAML; edit it in the YAML pane on the right.",
     "registry_list_loading": "Loading catalog…",
     "registry_list_select": "Select an option…",
     "registry_list_empty_catalog": "No options available for this registry.",

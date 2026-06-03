@@ -114,7 +114,9 @@ function hasMaterialValue(entry: ConfigEntry, values: Record<string, unknown>): 
       if (value instanceof YamlRawValue) return true;
       return Array.isArray(value) && value.length > 0;
     }
-    if (!isPlainObject(value)) return false;
+    // A scalar at a NESTED key is a shorthand the user set in YAML (e.g.
+    // a pin ``mode: OUTPUT``); it's material even though it can't recurse.
+    if (!isPlainObject(value)) return value !== undefined;
     return (entry.config_entries ?? []).some((child) => hasMaterialValue(child, value));
   }
   return value !== undefined;
@@ -145,7 +147,11 @@ export function filterRenderable(
           asRecord(values[entry.key]),
           opts
         );
-        if (renderableChildren.length === 0) continue;
+        // Keep a group whose own value is a scalar shorthand (no child
+        // renders for it, but the user set it) so it stays visible.
+        if (renderableChildren.length === 0 && !hasMaterialValue(entry, values)) {
+          continue;
+        }
       }
     } else if (
       opts.requiredOnly &&

@@ -693,3 +693,45 @@ describe("collectRenderablePaths", () => {
     expect([...paths]).toEqual(["devices"]);
   });
 });
+
+describe("filterRenderable — NESTED with a scalar value", () => {
+  const modeEntry = () =>
+    makeEntry({
+      key: "mode",
+      type: ConfigEntryType.NESTED,
+      advanced: true,
+      config_entries: [
+        makeEntry({ key: "output", type: ConfigEntryType.BOOLEAN, advanced: true }),
+      ],
+    });
+
+  it("keeps an advanced NESTED entry whose value is a scalar shorthand", () => {
+    // pin ``mode: OUTPUT`` — the value is a string, not an object, and
+    // no child renders for it, but the user set it, so it stays visible
+    // without the Show advanced toggle.
+    const out = filterRenderable(
+      [modeEntry()],
+      { mode: "OUTPUT" },
+      { requiredOnly: false, showAdvanced: false }
+    );
+    expect(out.map((e) => e.key)).toEqual(["mode"]);
+  });
+
+  it("still drops an advanced NESTED entry with no value and no children", () => {
+    const out = filterRenderable(
+      [modeEntry()],
+      {},
+      { requiredOnly: false, showAdvanced: false }
+    );
+    expect(out).toEqual([]);
+  });
+
+  it("keeps an object-form NESTED entry with a filled child (unchanged)", () => {
+    const out = filterRenderable(
+      [modeEntry()],
+      { mode: { output: true } },
+      { requiredOnly: false, showAdvanced: false }
+    );
+    expect(out.map((e) => e.key)).toEqual(["mode"]);
+  });
+});

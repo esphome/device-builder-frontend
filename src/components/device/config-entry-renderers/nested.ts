@@ -7,7 +7,9 @@ import {
   effectiveDisabled,
   fieldKeyAttr,
   labelFor,
+  renderFieldError,
   renderHelpLink,
+  renderLabel,
   type RenderCtx,
 } from "../config-entry-renderers-shared.js";
 
@@ -32,6 +34,23 @@ function _enableStash(ctx: RenderCtx): Map<string, Record<string, unknown>> {
 // set tracks groups the user explicitly *collapsed*. Otherwise groups default
 // closed and the set tracks groups they *opened*.
 export function renderNestedField(entry: ConfigEntry, path: string[], ctx: RenderCtx) {
+  // A scalar at a NESTED key (an unmodellable shorthand the user set in
+  // YAML) renders read-only with its value, not as an empty flag group.
+  const raw = ctx.getAt(path);
+  if (
+    !entry.multi_value &&
+    (typeof raw === "string" || typeof raw === "number" || typeof raw === "boolean")
+  ) {
+    return html`
+      <div class="field" data-field-key=${fieldKeyAttr(path)}>
+        ${renderLabel(entry, ctx)}
+        <p class="field-description">
+          ${ctx.localize("device.value_set_in_yaml", { value: String(raw) })}
+        </p>
+        ${renderFieldError(path, ctx)}
+      </div>
+    `;
+  }
   const key = path.join(".");
   const inSet = ctx.nestedOpenSections.has(key);
   const isOpen = ctx.requiredOnly ? !inSet : inSet;

@@ -40,6 +40,42 @@ const pinEntry = () =>
     pin_features: [],
   });
 
+const flag = (key: string, label: string) =>
+  makeEntry(ConfigEntryType.BOOLEAN, { key, label, advanced: true });
+
+const modeChild = () =>
+  makeEntry(ConfigEntryType.NESTED, {
+    key: "mode",
+    label: "Mode",
+    advanced: true,
+    config_entries: [
+      flag("input", "Input"),
+      flag("output", "Output"),
+      flag("pullup", "Pullup"),
+    ],
+  });
+
+/** Pin entry carrying the long-form ``mode`` flag group, with the
+ *  Advanced disclosure and the Mode group pre-opened so the flag
+ *  switches render. */
+const longFormPinEntry = () =>
+  makeEntry(ConfigEntryType.PIN, {
+    key: "pin",
+    label: "Pin",
+    required: true,
+    pin_features: [],
+    config_entries: [modeChild()],
+  });
+
+const openModeCtx = (pin: unknown) =>
+  makeRenderCtx(
+    { pin },
+    { overrides: { nestedOpenSections: new Set(["pin:pin-advanced", "pin.mode"]) } }
+  );
+
+const switchByLabel = (result: unknown, label: string) =>
+  findElementBindings(result, "wa-switch").find((b) => b["aria-label"] === label);
+
 describe("renderPinField — long-form pin block selection", () => {
   it("marks the GPIO33 option ?selected=true when the YAML uses { number: 'GPIO33', ... }", () => {
     const ctx = makeRenderCtx({
@@ -102,5 +138,42 @@ describe("renderPinField — long-form pin block selection", () => {
       (o) => o["?selected"] === true
     );
     expect(selected.length).toBe(0);
+  });
+});
+
+describe("renderPinField — mode scalar shorthand expansion", () => {
+  it("ticks the matching flag checkbox for a scalar shorthand (mode: OUTPUT)", () => {
+    const ctx = openModeCtx({ number: 0, mode: "OUTPUT" });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Output")?.["?checked"]).toBe(true);
+    expect(switchByLabel(result, "Input")?.["?checked"]).toBe(false);
+    expect(switchByLabel(result, "Pullup")?.["?checked"]).toBe(false);
+  });
+
+  it("promotes the scalar to the flag-object form when a flag is toggled", () => {
+    const ctx = openModeCtx({ number: 0, mode: "OUTPUT" });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    const onChange = switchByLabel(result, "Pullup")?.["@change"] as (e: unknown) => void;
+    onChange({ target: { checked: true } });
+
+    expect(ctx.emitChange).toHaveBeenCalledWith(["pin", "mode"], {
+      output: true,
+      pullup: true,
+    });
+  });
+
+  it("does not emit a change just from rendering (YAML scalar preserved)", () => {
+    const ctx = openModeCtx({ number: 0, mode: "OUTPUT" });
+    renderPinField(longFormPinEntry(), ["pin"], ctx);
+    expect(ctx.emitChange).not.toHaveBeenCalled();
+  });
+
+  it("renders a read-only notice for an unknown shorthand (mode: BOGUS)", () => {
+    const ctx = openModeCtx({ number: 0, mode: "BOGUS" });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+    // No flag switches; the value falls through to the scalar notice.
+    expect(findElementBindings(result, "wa-switch")).toHaveLength(0);
   });
 });
