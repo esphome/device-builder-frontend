@@ -637,7 +637,6 @@ export async function resolveAvailableEntries(
 function resolveCompletionContext(
   state: EditorState,
   pos: number,
-  allLines: string[],
   lineIdx: number,
   indent: number
 ): {
@@ -664,8 +663,8 @@ function resolveCompletionContext(
   }
   return {
     bundleCtx: null,
-    platformValue: readPlatformSibling(allLines, lineIdx, indent),
-    topLevelKey: findTopLevelBlock(allLines, lineIdx),
+    platformValue: readPlatformSibling(state.doc, lineIdx, indent),
+    topLevelKey: findTopLevelBlock(state.doc, lineIdx),
   };
 }
 
@@ -689,8 +688,6 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       const idx = commentStart.index + commentStart[0].length - 1;
       if (colInLine > idx) return null;
     }
-
-    const allLines = state.doc.toString().split("\n");
 
     // ── Value position: `key:` already on this line, cursor after the colon.
     // Value position: cursor is past ``  key: partial`` (plain) or
@@ -742,7 +739,7 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       // `platform:` value → suggest components whose category matches the
       // parent top-level block (e.g. sensor: → platforms in sensor category).
       if (key === "platform") {
-        const block = findTopLevelBlock(allLines, lineInfo.number - 1);
+        const block = findTopLevelBlock(state.doc, lineInfo.number - 1);
         if (block) {
           const candidates = catalog.byCategory.get(block) ?? [];
           if (candidates.length > 0) {
@@ -756,14 +753,13 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
       }
 
       // Resolve the entry being set so we can value-complete against it.
-      const parent = findParentKey(allLines, lineInfo.number - 1, indent);
+      const parent = findParentKey(state.doc, lineInfo.number - 1, indent);
       // We're in a top-level value (rare — most top-level values
       // are mappings). Bail.
       if (!parent) return null;
       const completionCtx = resolveCompletionContext(
         state,
         pos,
-        allLines,
         lineInfo.number - 1,
         indent
       );
@@ -861,13 +857,12 @@ export function createYamlCompletionSource(api: ESPHomeAPI) {
     }
 
     // Nested → config_entries of the parent block (or platform-merged).
-    const parent = findParentKey(allLines, lineInfo.number - 1, indent);
+    const parent = findParentKey(state.doc, lineInfo.number - 1, indent);
     if (!parent) return null;
 
     const completionCtx = resolveCompletionContext(
       state,
       pos,
-      allLines,
       lineInfo.number - 1,
       indent
     );

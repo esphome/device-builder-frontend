@@ -159,13 +159,12 @@ export async function resolveHoverTarget(
   const rest = m[2];
   const indent = indentOf(stripped);
   const lineIdx = line.number - 1;
-  const allLines = state.doc.toString().split("\n");
 
   const bundleCtx = resolveBundleContext(state, pos);
-  const topLevelKey = bundleCtx?.topLevelKey ?? findTopLevelBlock(allLines, lineIdx);
+  const topLevelKey = bundleCtx?.topLevelKey ?? findTopLevelBlock(state.doc, lineIdx);
   const platformValue = bundleCtx
     ? bundleCtx.platformValue
-    : readPlatformSibling(allLines, lineIdx, indent);
+    : readPlatformSibling(state.doc, lineIdx, indent);
 
   // Don't duplicate the structured editor: skip components it can form-edit.
   if (topLevelKey && !(await isYamlOnlyComponent(api, topLevelKey, platformValue))) {
@@ -220,7 +219,7 @@ export async function resolveHoverTarget(
     if (hit?.docs) return docsTarget(hit.docs);
   }
 
-  const parent = findParentKey(allLines, lineIdx, indent);
+  const parent = findParentKey(state.doc, lineIdx, indent);
 
   // 4. Registry / filter list entry (parent key is a registry config-var).
   if (isListItem && parent && topLevelKey) {
