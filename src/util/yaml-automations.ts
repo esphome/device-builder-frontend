@@ -14,6 +14,21 @@ import {
 } from "./yaml-sections-core.js";
 
 /**
+ * A component action-list config field (``open_action:`` …) at some
+ * indent. Group 1 is the indent, group 2 the field key.
+ *
+ * This is a naming heuristic: the ``*_action`` suffix on a direct child
+ * of a component instance. The backend (``ConfigEntryType.TRIGGER`` via
+ * ``automations/parse``) is the authority on which fields are real
+ * action lists; this keystroke-time fallback can't see the schema. In the
+ * lockstep deployment the two stay in sync, but a future component field
+ * named ``*_action`` that ISN'T a trigger would surface a spurious row
+ * here until the backend parse corrects it — so any divergence is easy
+ * to spot at this one site.
+ */
+const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
+
+/**
  * Synchronous fallback parser for automation sections. The navigator
  * needs to paint instantly on every keystroke, so we can't wait for
  * the backend's ``automations/parse`` round-trip; this regex-based
@@ -25,6 +40,8 @@ import {
  *   (``device_on`` automations).
  * - List items under top-level ``script:`` and ``interval:`` blocks
  *   (``script`` and ``interval`` automations).
+ * - ``*_action`` config fields on a component instance
+ *   (``component_action`` automations — cover ``open_action`` …).
  *
  * Emits stable machine-readable keys
  * (``automation:component_on:<id>:on_press`` etc.) plus a separate
@@ -37,10 +54,6 @@ import {
  * fallback only sees what the regex catches, but it's load-bearing
  * for keystroke-time UI responsiveness.
  */
-/** A component action-list config field (``open_action:`` …) at some
- *  indent. Group 1 is the indent, group 2 the field key. */
-const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
-
 export function parseYamlAutomations(yaml: string): YamlSection[] {
   const lines = yaml.split("\n");
   // Memoised on `yaml`, so resolving an id-less host's positional id is
@@ -144,6 +157,9 @@ export function parseYamlAutomations(yaml: string): YamlSection[] {
     if (!match) continue;
     const indent = match[1].length;
     const field = match[2];
+    // An ``on_*`` key is a trigger, already emitted by the loop above;
+    // skip it here so an ``on_…_action`` name can't be counted twice.
+    if (field.startsWith("on_")) continue;
     const fromLine = i + 1;
     const host = smallestContainingSection(sections, fromLine);
     if (!host || indent !== listItemChildIndent(lines[host.fromLine - 1] ?? "")) continue;
