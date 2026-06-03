@@ -440,6 +440,23 @@ export const configEntryFormStyles = css`
     font-style: normal;
   }
 
+  /* Section labels for the Recommended / Other pins groups in the GPIO
+     picker (issue #1012). Presentational only — wa-select skips
+     non-option children for selection / keyboard nav. */
+  .pin-group-label {
+    display: block;
+    padding: var(--wa-space-2xs) var(--wa-space-s) 0;
+    font-size: var(--wa-font-size-2xs);
+    font-weight: var(--wa-font-weight-semibold);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--wa-color-text-quiet);
+  }
+
+  .pin-group-divider {
+    margin: var(--wa-space-2xs) 0;
+  }
+
   /* ─── Pin "Advanced" disclosure (long-form fields) ──────── */
   /* Compact toggle that opens the long-form pin fields (mode
      flags, inverted) attached by the catalog's

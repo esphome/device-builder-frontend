@@ -25,9 +25,20 @@
  * attribute order in the renderer source isn't load-bearing.
  */
 import { describe, expect, it } from "vitest";
-import { ConfigEntryType } from "../../../src/api/types/config-entries.js";
+import {
+  ConfigEntryType,
+  PinFeature,
+  PinMode,
+} from "../../../src/api/types/config-entries.js";
 import { renderPinField } from "../../../src/components/device/config-entry-pin-renderer.js";
-import { findElementBindings, makeEntry, makeRenderCtx } from "./_renderer-fixtures.js";
+import { findTemplatesByAnchor } from "../../_lit-template-walker.js";
+import {
+  findElementBindings,
+  makeBoardPin,
+  makeEntry,
+  makeRenderCtx,
+  makeTestBoard,
+} from "./_renderer-fixtures.js";
 
 const pinEntry = () =>
   makeEntry(ConfigEntryType.PIN, {
@@ -252,5 +263,79 @@ describe("renderPinField — mode flags scoped to the pin registry", () => {
 
     expect(switchByLabel(result, "Pullup")).toBeDefined();
     expect(switchByLabel(result, "Output")).toBeDefined();
+  });
+});
+
+describe("renderPinField — feature/direction soft-filter (issue #1012)", () => {
+  // Board: GPIO32 has ADC, GPIO25 doesn't, GPIO34 is input-only, GPIO6 is
+  // board-unavailable.
+  const board = () =>
+    makeTestBoard({
+      pins: [
+        makeBoardPin(32, { features: ["input", "output", "adc"] }),
+        makeBoardPin(25, { features: ["input", "output"] }),
+        makeBoardPin(34, { features: ["input", "input_only"] }),
+        makeBoardPin(6, { features: ["input", "output"], available: false }),
+      ],
+    });
+  const optByValue = (result: unknown, gpio: number) =>
+    findElementBindings(result, "wa-option").find((o) => o.value === `GPIO${gpio}`);
+
+  it("shows a feature-mismatched pin (not hidden) as a selectable warning", () => {
+    const entry = makeEntry(ConfigEntryType.PIN, {
+      key: "pin",
+      required: true,
+      pin_features: [PinFeature.ADC],
+    });
+    const result = renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() }));
+
+    const adc = optByValue(result, 32);
+    const noAdc = optByValue(result, 25);
+    expect(adc, "ADC pin present").toBeDefined();
+    expect(noAdc, "non-ADC pin still present, not hidden").toBeDefined();
+    expect(String(adc!.class)).not.toContain("pin-option--warn");
+    expect(String(noAdc!.class)).toContain("pin-option--warn");
+    expect(noAdc!["?disabled"]).not.toBe(true);
+    // Recommended/Other split renders a divider.
+    expect(findTemplatesByAnchor(result, "wa-divider").length).toBeGreaterThan(0);
+  });
+
+  it("softens an input-only pin on an output field to a selectable warning", () => {
+    const entry = makeEntry(ConfigEntryType.PIN, {
+      key: "pin",
+      required: true,
+      pin_features: [],
+      pin_mode: PinMode.OUTPUT,
+    });
+    const result = renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() }));
+
+    const inputOnly = optByValue(result, 34);
+    expect(inputOnly).toBeDefined();
+    expect(String(inputOnly!.class)).toContain("pin-option--warn");
+    expect(inputOnly!["?disabled"]).not.toBe(true);
+  });
+
+  it("keeps a board-unavailable pin disabled", () => {
+    const entry = makeEntry(ConfigEntryType.PIN, {
+      key: "pin",
+      required: true,
+      pin_features: [],
+    });
+    const result = renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() }));
+
+    expect(optByValue(result, 6)!["?disabled"]).toBe(true);
+  });
+
+  it("renders one flat list (no divider) when the field has no required features", () => {
+    const entry = makeEntry(ConfigEntryType.PIN, {
+      key: "pin",
+      required: true,
+      pin_features: [],
+    });
+    const result = renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() }));
+
+    // GPIO34 (input-only) is recommended here since no output is required, and
+    // every other pin matches → no Recommended/Other split.
+    expect(findTemplatesByAnchor(result, "wa-divider").length).toBe(0);
   });
 });
