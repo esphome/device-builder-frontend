@@ -73,7 +73,7 @@ describe("device-labels-editor open/close contract", () => {
     expect(isOpen(el)).toBe(false);
   });
 
-  it("closes when the device prop swaps", async () => {
+  it("closes when the device prop swaps to a different device", async () => {
     const el = await mount();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (el as any)._open = true;
@@ -81,5 +81,20 @@ describe("device-labels-editor open/close contract", () => {
     el.device = { configuration: "bedroom", labels: [] } as unknown as ConfiguredDevice;
     await el.updateComplete;
     expect(isOpen(el)).toBe(false);
+  });
+
+  it("stays open on a same-device update (e.g. DEVICE_UPDATED after a toggle)", async () => {
+    const el = await mount();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (el as any)._open = true;
+    await el.updateComplete;
+    // Same configuration, new labels (and a new object ref, as the dashboard
+    // hands down after set_labels) — the dialog must NOT close.
+    el.device = {
+      configuration: "kitchen",
+      labels: ["a"],
+    } as unknown as ConfiguredDevice;
+    await el.updateComplete;
+    expect(isOpen(el)).toBe(true);
   });
 });

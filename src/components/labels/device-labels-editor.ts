@@ -242,20 +242,25 @@ export class ESPHomeDeviceLabelsEditor extends LitElement {
   ];
 
   protected willUpdate(changed: Map<string, unknown>) {
-    if (changed.has("device")) {
-      // Reset transient state when the drawer swaps to a different
-      // device; otherwise a half-typed "create" form would persist
-      // into the next device's editor and a still-pending save
-      // chained against the previous device would gate this one's
-      // ``_saving`` indicator until that promise settled.
+    if (!changed.has("device")) return;
+    const prev = changed.get("device") as ConfiguredDevice | undefined;
+    // A same-device prop update — the ``DEVICE_UPDATED`` push that lands
+    // after our own ``set_labels`` — now carries the saved labels, so drop
+    // the optimistic override and trust the prop. Crucially, DON'T close the
+    // dialog: the user is mid-edit and toggling more labels, and each toggle
+    // round-trips through this same push.
+    this._optimisticLabels = null;
+    // Only a real swap to a *different* device tears down the transient edit
+    // state and closes the dialog; otherwise a half-typed "create" form would
+    // persist into the next device's editor and a still-pending save chained
+    // against the previous device would gate this one's ``_saving`` indicator.
+    if (prev !== undefined && prev.configuration !== this.device.configuration) {
       this._open = false;
       this._createForm?.collapse();
-      this._optimisticLabels = null;
       this._saving = false;
       this._saveChain = Promise.resolve();
-      // Drop any in-flight create snapshot so a late
-      // ``label-created`` arriving after the swap is ignored rather
-      // than misapplied to the new device.
+      // Drop any in-flight create snapshot so a late ``label-created``
+      // arriving after the swap is ignored rather than misapplied.
       this._pendingCreateConfig = null;
     }
   }
