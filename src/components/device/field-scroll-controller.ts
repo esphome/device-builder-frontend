@@ -9,6 +9,10 @@ const MAX_TRIES = 3;
 /** Class that runs the one-shot glow; defined in ``config-entry-form.styles``. */
 const FLASH_CLASS = "field--highlight";
 
+/** Don't re-pulse the same field within this window — moving the cursor
+ *  around inside one field shouldn't keep re-flashing it. */
+const FLASH_DEDUP_MS = 10_000;
+
 /** The form surface this helper drives. */
 export interface FieldScrollHost {
   shadowRoot: ShadowRoot | null;
@@ -80,12 +84,11 @@ export class FieldScrollController {
       // ``center`` (not ``nearest``) so a tall field — long description
       // plus input — lands fully in view instead of clipped at the fold.
       target.scrollIntoView({ block: "center" });
-      // Flash, but not for the same field twice within 10s — moving the
-      // cursor around inside one field shouldn't keep re-pulsing it. Keyed on
-      // the matched prefix (the full key marks the target consumed below).
+      // Keyed on the matched prefix (the full key marks the target consumed
+      // below); debounced so a field isn't re-pulsed on every cursor nudge.
       const matchedKey = fieldKeyAttr(path.slice(0, len));
       const now = Date.now();
-      if (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
+      if (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > FLASH_DEDUP_MS) {
         this._lastFlashKey = matchedKey;
         this._lastFlashAt = now;
         target.classList.remove(FLASH_CLASS);
