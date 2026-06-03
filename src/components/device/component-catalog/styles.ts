@@ -129,10 +129,12 @@ export const componentCatalogStyles = css`
   /* Below the shared phone breakpoint (modal viewport on phones) collapse sidebar into a
      horizontal chip row above the grid. */
   @media (max-width: ${MOBILE_BREAKPOINT}px) {
+    /* The dialog hosting the catalog goes full-screen on phones, so fill the
+       available height (the body's flex track) rather than capping at 70vh,
+       which would leave the bottom of the screen empty. */
     :host {
       flex-direction: column;
-      height: auto;
-      max-height: 70vh;
+      height: 100%;
     }
 
     .sidebar {
@@ -160,6 +162,14 @@ export const componentCatalogStyles = css`
     .main {
       padding-left: 0;
       padding-right: 0;
+    }
+
+    /* Drop the desktop 340px column floor: in the full-screen mobile dialog
+       the body is narrower than 340px on small phones (e.g. 375px − padding),
+       and minmax(340px, …) would force a track wider than the viewport and
+       clip the cards. A single minmax(0, 1fr) column shrinks to fit. */
+    .components-grid {
+      grid-template-columns: minmax(0, 1fr);
     }
   }
 

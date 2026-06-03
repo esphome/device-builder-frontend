@@ -210,3 +210,41 @@ describe("add-automation-dialog list-shaped triggers (#1080)", () => {
     });
   });
 });
+
+// The migration onto esphome-base-dialog swapped the imperative
+// @query _dialog.open for a reactive _open flag. Pin the open / request-close
+// contract — request-close flipping _open is what makes a user-driven close
+// (Escape / X / outside-click) actually dismiss.
+describe("add-automation-dialog open/close contract", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  const baseDialog = (d: ESPHomeAddAutomationDialog): HTMLElement =>
+    d.shadowRoot!.querySelector("esphome-base-dialog")!;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isOpen = (d: ESPHomeAddAutomationDialog): boolean => (d as any)._open;
+
+  it("open() flips the reactive flag and binds ?open", async () => {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(slimAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    expect(isOpen(dialog)).toBe(false);
+    dialog.open();
+    await dialog.updateComplete;
+    expect(isOpen(dialog)).toBe(true);
+    expect(baseDialog(dialog).hasAttribute("open")).toBe(true);
+  });
+
+  it("flips _open to false on request-close", async () => {
+    const api = {
+      getAvailableAutomations: vi.fn(() => Promise.resolve(slimAvailable())),
+    } as unknown as ESPHomeAPI;
+    const dialog = await mountDialog(api);
+    dialog.open();
+    await dialog.updateComplete;
+    baseDialog(dialog).dispatchEvent(new CustomEvent("request-close"));
+    expect(isOpen(dialog)).toBe(false);
+  });
+});

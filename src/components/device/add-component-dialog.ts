@@ -7,6 +7,7 @@ import type { BoardCatalogEntry, FeaturedBundle } from "../../api/types/boards.j
 import type { ComponentCatalogEntry } from "../../api/types/components.js";
 import type { LocalizeFunc } from "../../common/localize.js";
 import { apiContext, localizeContext } from "../../context/index.js";
+import { fullscreenMobileDialog } from "../../styles/dialog-mobile.js";
 import { espHomeStyles } from "../../styles/shared.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { findAddedSection } from "../../util/yaml-sections.js";
@@ -22,9 +23,9 @@ import {
 } from "./add-component-dialog-selection.js";
 import { addComponentDialogStyles } from "./add-component-dialog.styles.js";
 
-import "@home-assistant/webawesome/dist/components/dialog/dialog.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
 import "@home-assistant/webawesome/dist/components/spinner/spinner.js";
+import "../base-dialog.js";
 import "./add-component-form.js";
 import "./component-catalog.js";
 import type { ESPHomeComponentCatalog } from "./component-catalog.js";
@@ -78,8 +79,8 @@ export class ESPHomeAddComponentDialog extends LitElement {
   @property({ attribute: false })
   lockedCategories: string[] = [];
 
-  @query("wa-dialog")
-  private _dialog!: HTMLElement & { open: boolean };
+  @state()
+  private _open = false;
 
   @query("esphome-component-catalog")
   private _catalog!: ESPHomeComponentCatalog;
@@ -143,14 +144,21 @@ export class ESPHomeAddComponentDialog extends LitElement {
    *  resolve time discards its result. */
   private _selectionSeq = 0;
 
-  static styles = [espHomeStyles, addComponentDialogStyles];
+  // Full-screen on mobile (overrides base-dialog's centered default): the
+  // catalog is a wide, content-heavy view that needs the whole viewport on a
+  // phone rather than being boxed into a centered column.
+  static styles = [
+    espHomeStyles,
+    fullscreenMobileDialog("esphome-base-dialog"),
+    addComponentDialogStyles,
+  ];
 
   public open() {
     this._resetDetourState();
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
-    this._dialog.open = true;
+    this._open = true;
     this.updateComplete.then(() => this._catalog?.load());
   }
 
@@ -166,7 +174,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
     this._selected = null;
     this._submitError = "";
     this._submitting = false;
-    this._dialog.open = true;
+    this._open = true;
     this.updateComplete.then(() => this._catalog?.filterByDomain(domain));
   }
 
@@ -203,10 +211,18 @@ export class ESPHomeAddComponentDialog extends LitElement {
     // position, expanded card) survives the round trip into the form view —
     // hide it with `hidden` rather than swapping it out of the DOM. The form
     // is fine to mount/unmount on demand since each selection starts fresh.
+    const title = isForm
+      ? this._selected!.name
+      : this.boardName
+        ? this._localize(headerKey, { name: this.boardName })
+        : this._localize(headerKey);
     return html`
-      <wa-dialog
+      <esphome-base-dialog
         class=${isForm ? "form-view" : ""}
-        light-dismiss
+        ?open=${this._open}
+        ?busy=${this._submitting}
+        .label=${title}
+        @request-close=${this._onRequestClose}
         @add-component=${this._onComponentSelected}
         @add-bundle=${this._onBundleSelected}
         @form-cancel=${this._onBack}
@@ -214,18 +230,17 @@ export class ESPHomeAddComponentDialog extends LitElement {
         @navigate-to-dep=${this._onNavigateToDep}
         @request-add-component=${this._onNavigateToDep}
       >
-        <span slot="label" class="dialog-label">
-          ${isForm
-            ? html`<button class="back-button" @click=${this._onBack}>
-                <wa-icon library="mdi" name="arrow-left"></wa-icon>
-              </button>`
-            : nothing}
-          ${isForm
-            ? this._selected!.name
-            : this.boardName
-              ? this._localize(headerKey, { name: this.boardName })
-              : this._localize(headerKey)}
-        </span>
+        ${isForm
+          ? html`<button
+              slot="header-prefix"
+              class="back-button"
+              title=${this._localize("layout.back")}
+              aria-label=${this._localize("layout.back")}
+              @click=${this._onBack}
+            >
+              <wa-icon library="mdi" name="arrow-left"></wa-icon>
+            </button>`
+          : nothing}
         ${this._returnTo
           ? html`<div class="return-banner">
               ${this._localize("device.return_to_after_dep_prefix")}
@@ -270,9 +285,16 @@ export class ESPHomeAddComponentDialog extends LitElement {
               .submitError=${this._submitError}
             ></esphome-add-component-form>`
           : nothing}
-      </wa-dialog>
+      </esphome-base-dialog>
     `;
   }
+
+  // esphome-base-dialog never flips its own open on a user-driven close
+  // (Escape / X / outside-click); the host owns _open here. The busy gate
+  // (?busy=_submitting) blocks dismissal while an add is in flight.
+  private _onRequestClose = () => {
+    this._open = false;
+  };
 
   private async _onComponentSelected(
     e: CustomEvent<{ component: ComponentCatalogEntry }>
@@ -513,7 +535,7 @@ export class ESPHomeAddComponentDialog extends LitElement {
             })
           );
         }
-        this._dialog.open = false;
+        this._open = false;
         this._selected = null;
         this._resetDetourState();
       }

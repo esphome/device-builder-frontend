@@ -8,10 +8,10 @@ import { css } from "lit";
  * ``inputStyles``.
  */
 export const addAutomationDialogStyles = css`
-  wa-dialog {
+  esphome-base-dialog {
     --width: 560px;
   }
-  wa-dialog::part(body) {
+  esphome-base-dialog::part(body) {
     padding: var(--wa-space-l);
   }
   .field {

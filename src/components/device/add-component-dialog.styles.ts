@@ -1,15 +1,15 @@
 import { css } from "lit";
 
 export const addComponentDialogStyles = css`
-  wa-dialog {
+  esphome-base-dialog {
     --width: 900px;
   }
 
-  wa-dialog.form-view {
+  esphome-base-dialog.form-view {
     --width: 480px;
   }
 
-  wa-dialog::part(header) {
+  esphome-base-dialog::part(header) {
     background: var(--esphome-primary);
     /* Right padding is 0 so the close button sits flush with the
        dialog's corner — the button is explicitly sized to a 40x40
@@ -20,13 +20,15 @@ export const addComponentDialogStyles = css`
     box-sizing: border-box;
   }
 
-  wa-dialog::part(title) {
+  /* Title text lives in base-dialog's title-text span; colour/weight
+     cascade in from the forwarded title part. */
+  esphome-base-dialog::part(title) {
     color: var(--esphome-on-primary);
     font-size: var(--wa-font-size-s);
     font-weight: var(--wa-font-weight-bold);
   }
 
-  wa-dialog::part(close-button__base) {
+  esphome-base-dialog::part(close-button__base) {
     background: transparent;
     border: none;
     box-shadow: none;
@@ -42,21 +44,8 @@ export const addComponentDialogStyles = css`
     cursor: pointer;
   }
 
-  wa-dialog::part(body) {
+  esphome-base-dialog::part(body) {
     padding: var(--wa-space-l);
-  }
-
-  wa-dialog::part(footer) {
-    display: none;
-  }
-
-  .dialog-label {
-    display: flex;
-    align-items: center;
-    gap: var(--wa-space-xs);
-    color: var(--esphome-on-primary);
-    font-size: var(--wa-font-size-s);
-    font-weight: var(--wa-font-weight-bold);
   }
 
   .back-button {
