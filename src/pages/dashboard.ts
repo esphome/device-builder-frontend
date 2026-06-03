@@ -69,6 +69,7 @@ import { renderYamlMode } from "../components/dashboard/render-yaml.js";
 import {
   maybeFireEmptyStatePreview,
   onSearchKeyDown,
+  refocusSearchInput,
   setSearchMode,
   syncYamlSearch,
 } from "../components/dashboard/search.js";
@@ -584,7 +585,7 @@ export class ESPHomePageDashboard extends LitElement {
   _clearSearch = () => {
     this._search = "";
     this._syncYamlSearch();
-    this._searchInputEl?.focus();
+    refocusSearchInput(this);
   };
 
   /** Wipe search + every facet selection in one shot. Wired to the

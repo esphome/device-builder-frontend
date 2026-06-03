@@ -31,4 +31,10 @@ describe("actionFieldLabel", () => {
   it("handles a key without the suffix", () => {
     expect(actionFieldLabel("sequence", localize)).toBe("Sequence action");
   });
+
+  it("falls back without throwing on an empty field", () => {
+    // Not reachable from the call sites (the parser only passes matched
+    // `*_action` keys), but the util must not crash if reused.
+    expect(actionFieldLabel("", localize)).toBe("Action action");
+  });
 });
