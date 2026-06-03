@@ -142,6 +142,19 @@ describe("fetchBundle", () => {
     );
     expect(sensorGets.length).toBe(1);
   });
+
+  it("resolves the 'core' alias to esphome.json, never core.json", async () => {
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const bundle = await fetchBundle(makeApi() as never, "core");
+    expect(bundle).not.toBeNull();
+    expect(fetchSpy.mock.calls.some((c) => String(c[0]).endsWith("/core.json"))).toBe(
+      false
+    );
+  });
 });
 
 describe("getTriggerKeys", () => {
@@ -372,12 +385,16 @@ describe("getActions", () => {
   });
 
   it("emits core actions without a domain prefix", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+    // Core actions live inside esphome.json under the `core` component
+    // (there is no core.json); the `core` bundle name aliases to it.
+    fetchSpy.mockImplementation(async (url: string) => {
       if (url.endsWith("/esphome.json"))
-        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
-      return new Response(JSON.stringify(CORE_BUNDLE), { status: 200 });
+        return new Response(JSON.stringify({ ...ESPHOME_BUNDLE, ...CORE_BUNDLE }), {
+          status: 200,
+        });
+      throw new Error(`unexpected fetch ${url}`);
     });
-    const actions = await getActions(makeApi() as never, ["core"], ["core"]);
+    const actions = await getActions(makeApi() as never, ["esphome"], ["core"]);
     expect(actions.map((a) => a.key).sort()).toEqual(["delay", "if"]);
   });
 
