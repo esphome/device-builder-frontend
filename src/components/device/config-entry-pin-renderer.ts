@@ -337,10 +337,8 @@ function renderPinAdvanced(
   `;
 }
 
-/** Render one long-form pin field, scoping the ``mode`` flag group to the
- *  flags the pin's external provider allows (an expander like ``pca9554``
- *  drops pullup / pulldown / open_drain). A native pin or unknown provider
- *  keeps every flag. */
+/** Render one long-form pin field; the ``mode`` group is scoped to the flags
+ *  the pin's external provider allows (a native / unknown provider keeps all). */
 function renderLongFormChild(
   child: ConfigEntry,
   path: string[],
@@ -359,9 +357,8 @@ function renderLongFormChild(
     : ctx.renderEntry(scoped, modePath);
 }
 
-/** The pin value's provider key that the registry-modes map knows about, or
- *  ``null`` for a native pin (no provider key) / short form / unknown
- *  provider — all of which keep the full flag set. */
+/** Allowed mode flags for *pinValue*'s provider, or ``null`` (native pin,
+ *  short form, unknown provider, or empty list) to keep the full flag set. */
 function providerAllowedModes(
   pinValue: unknown,
   modesMap: Record<string, string[]> | undefined

@@ -1,20 +1,16 @@
 import type { ESPHomeAPI } from "../api/esphome-api.js";
 
 /**
- * Session-scoped cache of the ``{provider_key: [allowed_mode_flags]}`` map
- * (`components/get_pin_registry_modes`). The map is immutable for the WS
- * session — it only changes with a backend release — so it's fetched once and
- * shared across every pin renderer rather than re-issued per form. A failed
- * fetch caches an empty map (the editor then shows every flag) so a transient
- * error doesn't retry-storm on each render.
+ * Session cache of the ``{provider_key: [allowed_mode_flags]}`` map
+ * (`components/get_pin_registry_modes`), fetched once and shared across pin
+ * renderers. A failed fetch caches ``{}`` so renders don't retry-storm.
  */
 
 let _cache: Record<string, string[]> | undefined;
 let _inflight: Promise<Record<string, string[]>> | undefined;
 const _listeners = new Set<() => void>();
 
-/** Synchronously read the cached map; ``undefined`` until the first fetch
- *  resolves (renderers treat that as "show every flag"). */
+/** Read the cached map; ``undefined`` until the first fetch resolves. */
 export function getCachedPinRegistryModes(): Record<string, string[]> | undefined {
   return _cache;
 }
@@ -36,16 +32,14 @@ export function fetchPinRegistryModes(
     _inflight = api
       .getPinRegistryModes()
       .catch((err) => {
-        // Cache the empty map so a repeated render doesn't retry-storm, but
-        // log so the silent loss of Mode scoping for the session is visible.
+        // Cache {} so renders don't retry-storm; log so the lost scoping shows.
         console.warn("pin-registry-modes fetch failed; Mode flags unscoped", err);
         return {} as Record<string, string[]>;
       })
       .then((modes) => {
         _cache = modes;
         _inflight = undefined;
-        // Isolate each listener so a throwing subscriber can't break the
-        // others or reject this (successfully resolved) shared promise.
+        // Isolate listeners so one throw can't break others or reject this promise.
         for (const cb of _listeners) {
           try {
             cb();
@@ -59,8 +53,7 @@ export function fetchPinRegistryModes(
   return _inflight;
 }
 
-/** Test-only: drop the cached map and in-flight fetch so a fresh test run
- *  doesn't inherit another's session cache. */
+/** Test-only: reset the cached map, in-flight fetch, and listeners. */
 export function _resetPinRegistryModesCache(): void {
   _cache = undefined;
   _inflight = undefined;

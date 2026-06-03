@@ -1364,15 +1364,10 @@ export class ESPHomeAPI {
   }
 
   /**
-   * Map of external pin provider → the long-form `mode` flags it allows
-   * (`pca9554` → `["input", "output"]`). The visual editor scopes the pin
-   * Mode checkboxes against this; a provider absent from the map (or a native
-   * pin, which carries no provider key) shows every flag. Fetched once per
-   * session — the dataset only refreshes with a backend release.
-   *
-   * The WS layer doesn't enforce a shape, so the payload is filtered to the
-   * `{string: string[]}` contract here: a non-object becomes `{}`, and any
-   * non-string flag inside a value array is dropped.
+   * Map of external pin provider → allowed long-form `mode` flags
+   * (`pca9554` → `["input", "output"]`), fetched once per session. Filtered to
+   * the `{string: string[]}` contract: non-object → `{}`, non-string flags
+   * dropped, empty providers omitted.
    */
   async getPinRegistryModes(): Promise<Record<string, string[]>> {
     const raw = await this.sendCommand<unknown>("components/get_pin_registry_modes");
