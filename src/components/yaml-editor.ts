@@ -20,6 +20,7 @@ import {
   vscodeDark,
   vscodeLight,
 } from "../util/yaml-editor-theme.js";
+import { createYamlHoverTooltip } from "../util/yaml-hover.js";
 import {
   createBackendYamlLinter,
   lintErrorLineGutter,
@@ -307,6 +308,39 @@ export class ESPHomeYamlEditor extends LitElement {
           color: this._darkMode ? "#9aa0a6" : "#5e6772",
           marginTop: "4px",
         },
+        // ─── Hover docs tooltip ─────────────────────────────────────
+        ".cm-tooltip.cm-tooltip-hover": {
+          background: this._darkMode ? "#1f1f23" : "#ffffff",
+          border: this._darkMode ? "1px solid #3a3a44" : "1px solid #e1e4e8",
+          borderRadius: "8px",
+          boxShadow: this._darkMode
+            ? "0 8px 24px rgba(0,0,0,0.5)"
+            : "0 8px 24px rgba(0,0,0,0.12)",
+          maxWidth: "460px",
+        },
+        ".cm-esphome-hover": {
+          padding: "10px 14px",
+          fontSize: "12.5px",
+          lineHeight: "1.5",
+          color: this._darkMode ? "#f0f0f5" : "#1a1a1a",
+        },
+        ".cm-esphome-hover p:last-child": {
+          marginBottom: "0",
+        },
+        ".cm-esphome-hover .cm-esphome-info-meta": {
+          fontStyle: "italic",
+        },
+        ".cm-esphome-info .md-code, .cm-esphome-hover .md-code": {
+          fontFamily: '"JetBrains Mono", "Fira Code", monospace',
+          fontSize: "0.92em",
+          padding: "1px 4px",
+          borderRadius: "4px",
+          background: this._darkMode ? "#2a2a32" : "#f0f1f3",
+        },
+        ".cm-esphome-info .md-link, .cm-esphome-hover .md-link": {
+          color: this._darkMode ? "#7fc4ff" : "#0b5cad",
+          textDecoration: "underline",
+        },
       }),
       EditorView.updateListener.of((update) => {
         // LOAD-BEARING ORDER: `yaml-change` MUST be dispatched
@@ -382,6 +416,10 @@ export class ESPHomeYamlEditor extends LitElement {
           closeOnBlur: true,
           maxRenderedOptions: 60,
         })
+      );
+      // Catalog-backed hover docs (description + "See also" link).
+      extensions.push(
+        createYamlHoverTooltip(this._api, () => this._localize("device.see_also"))
       );
     }
 

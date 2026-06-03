@@ -3,6 +3,8 @@ import {
   _resetSchemaCacheForTests,
   fetchBundle,
   getActions,
+  getComponentDocs,
+  getConfigVarDocsAtPath,
   getConfigVarKeys,
   getConfigVarValueOptions,
   getRegistryEntries,
@@ -80,8 +82,7 @@ afterEach(() => {
 
 describe("fetchBundle", () => {
   it("uses the version reported by the API when schema.esphome.io has it", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+    fetchSpy.mockImplementation(async (url: string) => {
       if (url.includes("/2026.5.0/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       throw new Error(`unexpected fetch ${url}`);
@@ -94,9 +95,9 @@ describe("fetchBundle", () => {
   });
 
   it("falls back to /dev/ when the version-specific bundle is missing", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      // HEAD probe says the version-specific bundle isn't published yet.
-      if (init?.method === "HEAD") return new Response(null, { status: 404 });
+    fetchSpy.mockImplementation(async (url: string) => {
+      // Version-specific probe 404s → resolveVersion falls back to dev.
+      if (url.includes("/2026.5.0/")) return new Response(null, { status: 404 });
       if (url.includes("/dev/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       throw new Error(`unexpected fetch ${url}`);
@@ -115,35 +116,52 @@ describe("fetchBundle", () => {
   });
 
   it("returns null on a non-2xx response", async () => {
-    fetchSpy.mockImplementation(async (_url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+    // Probe esphome.json succeeds; the requested bundle 500s → null.
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(null, { status: 500 });
     });
-    const bundle = await fetchBundle(makeApi() as never, "esphome");
+    const bundle = await fetchBundle(makeApi() as never, "sensor");
     expect(bundle).toBeNull();
   });
 
   it("deduplicates concurrent requests for the same bundle", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
-      if (url.includes("esphome.json"))
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      if (url.endsWith("/sensor.json"))
+        return new Response(JSON.stringify(SENSOR_BUNDLE), { status: 200 });
       throw new Error(`unexpected fetch ${url}`);
     });
     const api = makeApi() as never;
-    await Promise.all([fetchBundle(api, "esphome"), fetchBundle(api, "esphome")]);
-    // One HEAD probe + one GET, regardless of how many in-flight callers.
-    const gets = fetchSpy.mock.calls.filter(
-      (c) => (c[1] as RequestInit | undefined)?.method !== "HEAD"
+    await Promise.all([fetchBundle(api, "sensor"), fetchBundle(api, "sensor")]);
+    // Concurrent callers for the same bundle share one network GET.
+    const sensorGets = fetchSpy.mock.calls.filter((c) =>
+      String(c[0]).endsWith("/sensor.json")
     );
-    expect(gets.length).toBe(1);
+    expect(sensorGets.length).toBe(1);
+  });
+
+  it("resolves the 'core' alias to esphome.json, never core.json", async () => {
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      throw new Error(`unexpected fetch ${url}`);
+    });
+    const bundle = await fetchBundle(makeApi() as never, "core");
+    expect(bundle).not.toBeNull();
+    expect(fetchSpy.mock.calls.some((c) => String(c[0]).endsWith("/core.json"))).toBe(
+      false
+    );
   });
 });
 
 describe("getTriggerKeys", () => {
   it("returns trigger keys from a top-level component (esphome)", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
     });
     const triggers = await getTriggerKeys(makeApi() as never, "esphome", "esphome");
@@ -158,7 +176,8 @@ describe("getTriggerKeys", () => {
 
   it("returns trigger keys from a platform-style component (binary_sensor.gpio)", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(SENSOR_BUNDLE), { status: 200 });
     });
     const triggers = await getTriggerKeys(
@@ -179,7 +198,8 @@ describe("getTriggerKeys", () => {
 
   it("returns [] when the component key isn't in the bundle", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
     });
     const triggers = await getTriggerKeys(makeApi() as never, "esphome", "nope");
@@ -188,7 +208,8 @@ describe("getTriggerKeys", () => {
 
   it("returns [] when the component has no trigger config-vars", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(
         JSON.stringify({
           plain: {
@@ -243,7 +264,8 @@ describe("getTriggerKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("gpio.json"))
         return new Response(JSON.stringify(GPIO_BUNDLE), { status: 200 });
       if (url.includes("binary_sensor.json"))
@@ -288,8 +310,9 @@ describe("getTriggerKeys", () => {
         },
       },
     };
-    fetchSpy.mockImplementation(async (_url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const triggers = await getTriggerKeys(makeApi() as never, "child", "child");
@@ -338,7 +361,8 @@ const CORE_BUNDLE = {
 describe("getActions", () => {
   it("aggregates actions across the requested bundles", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("logger.json"))
         return new Response(JSON.stringify(LOGGER_BUNDLE), { status: 200 });
       if (url.includes("light.json"))
@@ -361,11 +385,16 @@ describe("getActions", () => {
   });
 
   it("emits core actions without a domain prefix", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
-      return new Response(JSON.stringify(CORE_BUNDLE), { status: 200 });
+    // Core actions live inside esphome.json under the `core` component
+    // (there is no core.json); the `core` bundle name aliases to it.
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify({ ...ESPHOME_BUNDLE, ...CORE_BUNDLE }), {
+          status: 200,
+        });
+      throw new Error(`unexpected fetch ${url}`);
     });
-    const actions = await getActions(makeApi() as never, ["core"], ["core"]);
+    const actions = await getActions(makeApi() as never, ["esphome"], ["core"]);
     expect(actions.map((a) => a.key).sort()).toEqual(["delay", "if"]);
   });
 
@@ -385,7 +414,8 @@ describe("getActions", () => {
     // Both bundles carry the same ``logger.log`` action — the
     // aggregator should not list it twice.
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(LOGGER_BUNDLE), { status: 200 });
     });
     const actions = await getActions(
@@ -403,7 +433,8 @@ describe("getActions", () => {
     // legacy editor used (only suggest actions from components
     // actually present in the YAML).
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(
         JSON.stringify({
           ...LOGGER_BUNDLE,
@@ -472,7 +503,8 @@ describe("getConfigVarKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("uptime.json"))
         return new Response(JSON.stringify(UPTIME_BUNDLE), { status: 200 });
       if (url.includes("sensor.json"))
@@ -517,7 +549,8 @@ describe("getConfigVarKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(CHILD_BUNDLE), { status: 200 });
     });
     const keys = await getConfigVarKeys(makeApi() as never, "child", "child");
@@ -541,7 +574,8 @@ describe("getConfigVarKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const keys = await getConfigVarKeys(makeApi() as never, "thing", "thing");
@@ -604,7 +638,8 @@ describe("getConfigVarValueOptions", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("uptime.json"))
         return new Response(JSON.stringify(UPTIME_BUNDLE), { status: 200 });
       if (url.includes("sensor.json"))
@@ -639,7 +674,8 @@ describe("getConfigVarValueOptions", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const values = await getConfigVarValueOptions(
@@ -712,7 +748,8 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       if (url.includes("uptime.json"))
         return new Response(JSON.stringify(UPTIME_BUNDLE), { status: 200 });
       if (url.includes("sensor.json"))
@@ -764,7 +801,8 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const keys = await getConfigVarKeys(makeApi() as never, "thing", "thing");
@@ -784,7 +822,8 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const ref = await lookupRegistryRef(makeApi() as never, "thing", "thing", "name");
@@ -793,7 +832,8 @@ describe("lookupRegistryRef + getRegistryEntries", () => {
 
   it("returns [] when the registry ref points at a missing slot", async () => {
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify({ thing: { schemas: {} } }), { status: 200 });
     });
     const entries = await getRegistryEntries(makeApi() as never, "thing.filter");
@@ -869,7 +909,8 @@ describe("getRegistryEntryKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(GLOBALS_BUNDLE), { status: 200 });
     });
     const keys = await getRegistryEntryKeys(
@@ -908,7 +949,8 @@ describe("getRegistryEntryKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const keys = await getRegistryEntryKeys(
@@ -927,7 +969,8 @@ describe("getRegistryEntryKeys", () => {
   it("returns [] for a missing registry entry", async () => {
     const BUNDLE = { thing: { action: {} } };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(BUNDLE), { status: 200 });
     });
     const keys = await getRegistryEntryKeys(
@@ -954,7 +997,8 @@ describe("getRegistryEntryKeys", () => {
       },
     };
     fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
     });
     const keys = await getRegistryEntryKeys(
@@ -967,6 +1011,112 @@ describe("getRegistryEntryKeys", () => {
   });
 });
 
+describe("getComponentDocs", () => {
+  it("reads docs from core.components and core.platforms", async () => {
+    const BUNDLE = {
+      core: {
+        components: { wifi: { docs: "Wi-Fi docs." } },
+        platforms: { binary_sensor: { docs: "Binary sensor docs." } },
+      },
+    };
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(BUNDLE), { status: 200 });
+      throw new Error(`unexpected ${url}`);
+    });
+    expect(await getComponentDocs(makeApi() as never, "wifi")).toBe("Wi-Fi docs.");
+    expect(await getComponentDocs(makeApi() as never, "binary_sensor")).toBe(
+      "Binary sensor docs."
+    );
+    expect(await getComponentDocs(makeApi() as never, "nope")).toBeNull();
+  });
+});
+
+describe("getConfigVarDocsAtPath", () => {
+  // ethernet-shaped: CONFIG_SCHEMA is a typed union whose ``type:``
+  // discriminator carries its own docs, and each variant pulls the
+  // common fields in via ``extends``.
+  const ETH_BUNDLE = {
+    ethernet: {
+      schemas: {
+        CONFIG_SCHEMA: {
+          type: "typed",
+          typed_key: "type",
+          docs: "The type of LAN chipset.",
+          types: {
+            LAN8720: { config_vars: {}, extends: ["ethernet.RMII_SCHEMA"] },
+          },
+        },
+        RMII_SCHEMA: {
+          type: "schema",
+          schema: {
+            config_vars: {
+              mdc_pin: { type: "pin", docs: "MDC pin." },
+              clk: {
+                type: "schema",
+                schema: {
+                  config_vars: { mode: { type: "string", docs: "Clock mode." } },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  };
+  function mockEth() {
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      return new Response(JSON.stringify(ETH_BUNDLE), { status: 200 });
+    });
+  }
+
+  it("returns the typed discriminator's docs with the variant list appended", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["type"]
+    );
+    expect(docs).toBe("The type of LAN chipset. `LAN8720`");
+  });
+
+  it("resolves a field carried into a variant via extends", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["mdc_pin"]
+    );
+    expect(docs).toBe("MDC pin.");
+  });
+
+  it("walks into a nested schema config-var", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["clk", "mode"]
+    );
+    expect(docs).toBe("Clock mode.");
+  });
+
+  it("returns null for an unknown key", async () => {
+    mockEth();
+    const docs = await getConfigVarDocsAtPath(
+      makeApi() as never,
+      "ethernet",
+      "ethernet",
+      ["nope"]
+    );
+    expect(docs).toBeNull();
+  });
+});
+
 describe("resolveVersion (probe failure handling)", () => {
   it("evicts the cached version when the probe returns a transient 5xx", async () => {
     // Copilot-flagged: ``probe.ok ? esphome_version : "dev"`` made
@@ -975,58 +1125,62 @@ describe("resolveVersion (probe failure handling)", () => {
     // cached version so a later caller can retry once conditions
     // recover.
     let probeAttempts = 0;
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") {
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json")) {
         probeAttempts += 1;
         if (probeAttempts === 1) return new Response(null, { status: 503 });
-        return new Response(null, { status: 200 });
-      }
-      if (url.includes("/2026.5.0/esphome.json"))
         return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      }
+      if (url.endsWith("/sensor.json"))
+        return new Response(JSON.stringify(SENSOR_BUNDLE), { status: 200 });
       throw new Error(`unexpected ${url}`);
     });
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const first = await fetchBundle(makeApi() as never, "esphome");
+    const first = await fetchBundle(makeApi() as never, "sensor");
     expect(first).toBeNull();
-    const second = await fetchBundle(makeApi() as never, "esphome");
+    const second = await fetchBundle(makeApi() as never, "sensor");
     expect(second).not.toBeNull();
     expect(probeAttempts).toBe(2);
     debugSpy.mockRestore();
   });
 
   it("treats a 404 probe as a stable 'dev' signal (no retries)", async () => {
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 404 });
-      if (url.includes("/dev/esphome.json"))
-        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.includes("/2026.5.0/esphome.json"))
+        return new Response(null, { status: 404 });
+      if (url.includes("/dev/sensor.json"))
+        return new Response(JSON.stringify(SENSOR_BUNDLE), { status: 200 });
       throw new Error(`unexpected ${url}`);
     });
-    const bundle = await fetchBundle(makeApi() as never, "esphome");
+    const bundle = await fetchBundle(makeApi() as never, "sensor");
     expect(bundle).not.toBeNull();
-    await fetchBundle(makeApi() as never, "esphome");
-    const heads = fetchSpy.mock.calls.filter(
-      (c) => (c[1] as RequestInit | undefined)?.method === "HEAD"
+    await fetchBundle(makeApi() as never, "sensor");
+    // The version probe (2026.5.0/esphome.json) fires once; the dev
+    // fallback is cached for the session.
+    const probes = fetchSpy.mock.calls.filter((c) =>
+      String(c[0]).includes("/2026.5.0/esphome.json")
     );
-    expect(heads.length).toBe(1);
+    expect(probes.length).toBe(1);
   });
 });
 
 describe("fetchBundle (negative cache eviction)", () => {
   it("evicts a failed lookup so the next caller retries", async () => {
     let attempt = 0;
-    fetchSpy.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (init?.method === "HEAD") return new Response(null, { status: 200 });
+    fetchSpy.mockImplementation(async (url: string) => {
+      if (url.endsWith("/esphome.json"))
+        return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
       attempt += 1;
       if (attempt === 1) throw new TypeError("Failed to fetch");
-      return new Response(JSON.stringify(ESPHOME_BUNDLE), { status: 200 });
+      return new Response(JSON.stringify(SENSOR_BUNDLE), { status: 200 });
     });
     const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
-    const first = await fetchBundle(makeApi() as never, "esphome");
+    const first = await fetchBundle(makeApi() as never, "sensor");
     expect(first).toBeNull();
     // The second call should NOT see the cached null — it should
     // fire a fresh fetch (the cache evicted the failed entry) and
     // get the now-successful response.
-    const second = await fetchBundle(makeApi() as never, "esphome");
+    const second = await fetchBundle(makeApi() as never, "sensor");
     expect(second).not.toBeNull();
     debugSpy.mockRestore();
   });
