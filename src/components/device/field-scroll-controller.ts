@@ -81,11 +81,12 @@ export class FieldScrollController {
       // plus input — lands fully in view instead of clipped at the fold.
       target.scrollIntoView({ block: "center" });
       // Flash, but not for the same field twice within 10s — moving the
-      // cursor around inside one field shouldn't keep re-pulsing it.
-      const key = fieldKeyAttr(path.slice(0, len));
+      // cursor around inside one field shouldn't keep re-pulsing it. Keyed on
+      // the matched prefix (the full key marks the target consumed below).
+      const matchedKey = fieldKeyAttr(path.slice(0, len));
       const now = Date.now();
-      if (key !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
-        this._lastFlashKey = key;
+      if (matchedKey !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
+        this._lastFlashKey = matchedKey;
         this._lastFlashAt = now;
         target.classList.remove(FLASH_CLASS);
         void target.offsetWidth;
