@@ -195,14 +195,11 @@ describe("computeStickyScope", () => {
     expect(scope.map((s) => s.lineNumber)).toEqual([5]);
   });
 
-  it("starts the walk from indent of a blank top-visible line", () => {
-    // If the topmost visible line happens to be blank, the walker
-    // adopts the indent of the previous non-blank line as its
-    // bound — so the chain stays stable as scrollTop crosses a
-    // blank line inside an existing scope. An earlier draft used
-    // ``Infinity`` here, which let the walk pick up every leaf
-    // along the way and made the chain explode by 1–2 rows on
-    // every blank line (visible as trembling while scrolling).
+  it("anchors a blank top-visible line to the next meaningful line below", () => {
+    // When the topmost visible line is blank, the walker adopts the
+    // indent of the NEXT meaningful line (the content being scrolled
+    // into), not the previous one — so a deeper scope is dropped as
+    // soon as the boundary blank reaches the top, rather than lingering.
     const lines = fromYaml(
       [
         "sensor:", //                  1
@@ -213,12 +210,32 @@ describe("computeStickyScope", () => {
       ].join("\n")
     );
     const scope = computeStickyScope(lines, 4);
-    // Previous non-blank is line 3 (indent 4) — that's the bound.
-    // Walk back from line 3's slot: line 2 (indent 2) is the
-    // strictly-less ancestor, then line 1 (indent 0). Line 3
-    // itself is a leaf and isn't pinned. Result matches what the
-    // chain looks like at line 3 — stable across the blank.
-    expect(scope.map((s) => s.lineNumber)).toEqual([1, 2]);
+    // Next meaningful line is 5 (``- platform: bme280``, indent 2) — a
+    // sibling of the dht item. Its only ancestor is ``sensor:`` (1);
+    // the dht ``- platform`` (2) is a sibling, not an ancestor, so it
+    // is NOT pinned across the gap between the two list items.
+    expect(scope.map((s) => s.lineNumber)).toEqual([1]);
+  });
+
+  it("drops a nested scope at a column-0 comment before a shallower sibling", () => {
+    // Regression: a ``#``-at-column-0 comment (read as a banner) sitting
+    // between a nested block and a shallower sibling must not keep the
+    // nested key pinned once the sibling is what's on screen.
+    const lines = fromYaml(
+      [
+        "switch:", //                  1   indent 0
+        "  - platform: gpio", //       2   indent 2  (list item)
+        "    pin:", //                 3   indent 4  (nested key)
+        "      number: 0", //          4   indent 6
+        "#      inverted: true", //    5   column-0 comment
+        "    name: Open", //           6   indent 4  (sibling of pin:)
+      ].join("\n")
+    );
+    // On the comment line, anchor forward to ``name:`` (6, indent 4):
+    // its ancestors are switch (1) and the list item (2) — not pin (3).
+    expect(computeStickyScope(lines, 5).map((s) => s.lineNumber)).toEqual([1, 2]);
+    // And on ``name:`` itself, same result (pin already dropped).
+    expect(computeStickyScope(lines, 6).map((s) => s.lineNumber)).toEqual([1, 2]);
   });
 
   it("returns empty for out-of-range top visible lines", () => {

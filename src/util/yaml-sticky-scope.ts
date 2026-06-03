@@ -127,16 +127,15 @@ export function computeStickyScope(
   // pinning it as well produces the visible duplication
   // ("blinking") the user sees as they scroll past it.
   //
-  // The bound is the indent of the topmost *meaningful* line:
+  // The bound is the indent of the relevant *meaningful* line:
   //   - non-blank, non-banner-comment topVisibleLine → its own
   //     indent.
-  //   - blank / banner topVisibleLine → walk back to the most
-  //     recent meaningful line and use ITS indent. This keeps
-  //     the chain stable as scrollTop crosses a blank line in
-  //     the middle of a scope: without it, ``targetIndent =
-  //     Infinity`` would let the walk pick up every leaf along
-  //     the way, making the chain explode by 1–2 rows on every
-  //     blank line and producing the visible trembling.
+  //   - blank / banner topVisibleLine → the NEXT meaningful line
+  //     below it (the content being scrolled into), so the chain
+  //     drops a scope as soon as a boundary blank/comment reaches
+  //     the top rather than holding the deeper scope one line too
+  //     long. Bounding to that line's indent (not ``Infinity``)
+  //     still keeps the walk from picking up every leaf.
   let targetIndent: number;
   let walkFrom: number;
   const topStripped = structuralStripped(lines[topVisibleLine - 1]);
@@ -144,14 +143,18 @@ export function computeStickyScope(
     targetIndent = indentOf(topStripped);
     walkFrom = topVisibleLine - 2;
   } else {
-    // Blank / banner — find the most recent meaningful line above and
-    // adopt its indent. The walk then proceeds from immediately above
-    // that line, so the line itself isn't re-pushed.
-    let prev = topVisibleLine - 1;
-    while (prev > 0 && !structuralStripped(lines[prev - 1])) prev--;
-    if (prev === 0) return [];
-    targetIndent = indentOf(stripComment(lines[prev - 1]));
-    walkFrom = prev - 2;
+    // Blank / banner — anchor to the NEXT meaningful line below (the
+    // content being scrolled into), excluding it, so the chain reflects
+    // the upcoming scope rather than the one being left. Anchoring
+    // backward instead kept a deeper scope pinned one line too long
+    // across a boundary — e.g. a column-0 ``#`` comment between a
+    // nested block and a shallower sibling left the nested key pinned
+    // when the sibling was already on screen.
+    let next = topVisibleLine + 1;
+    while (next <= lines.length && !structuralStripped(lines[next - 1])) next++;
+    if (next > lines.length) return [];
+    targetIndent = indentOf(stripComment(lines[next - 1]));
+    walkFrom = next - 2;
   }
 
   const scope: StickyScopeLine[] = [];
