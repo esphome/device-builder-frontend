@@ -101,6 +101,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   private _api?: ESPHomeAPI;
 
   private _unsubPinRegistryModes?: () => void;
+  private _pinRegistryModesKicked = false;
 
   /** Schema entries to render (recursive — NESTED entries contain
    *  their own `config_entries`). */
@@ -278,9 +279,12 @@ export class ESPHomeConfigEntryForm extends LitElement {
     super.updated(changed);
     void this._syncSelectValues();
     this._fieldScroll.maybeScroll(changed);
-    // Idempotent (the cache dedupes in-flight + resolved); kicks once the
-    // api context lands.
-    if (this._api) void fetchPinRegistryModes(this._api);
+    // Kick the shared fetch once, when the api context first lands — not on
+    // every render. The cache + subscribe handle dedupe and the repaint.
+    if (this._api && !this._pinRegistryModesKicked) {
+      this._pinRegistryModesKicked = true;
+      void fetchPinRegistryModes(this._api);
+    }
   }
 
   /**

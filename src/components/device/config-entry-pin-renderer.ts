@@ -348,11 +348,16 @@ function renderLongFormChild(
     return ctx.renderEntry(child, [...path, child.key]);
   }
   const modePath = [...path, child.key];
+  const modeValue = ctx.getAt(modePath);
   const allowed = providerAllowedModes(ctx.getAt(path), ctx.pinRegistryModes);
-  const scoped = allowed ? scopeModeChildren(child, allowed) : child;
+  // Keep any flag the value already sets visible even if the provider now
+  // disallows it, so a legacy/invalid config can be repaired from the editor.
+  const scoped = allowed
+    ? scopeModeChildren(child, allowed, presentModeFlags(modeValue))
+    : child;
   // A scalar shorthand (``mode: OUTPUT``) needs the display-expansion wrapper;
   // the object form goes through the normal nested dispatch.
-  return typeof ctx.getAt(modePath) === "string"
+  return typeof modeValue === "string"
     ? renderPinModeField(scoped, modePath, ctx)
     : ctx.renderEntry(scoped, modePath);
 }
@@ -375,11 +380,24 @@ function providerAllowedModes(
   return null;
 }
 
-/** Return *modeEntry* with its flag children narrowed to *allowed*. */
-function scopeModeChildren(modeEntry: ConfigEntry, allowed: string[]): ConfigEntry {
-  const children = (modeEntry.config_entries ?? []).filter((c) =>
-    allowed.includes(c.key)
-  );
+/** Flag keys the current ``mode`` value sets (object keys, or a scalar
+ *  shorthand's expansion) — kept visible so a legacy flag stays editable. */
+function presentModeFlags(modeValue: unknown): string[] {
+  if (typeof modeValue === "string") {
+    return Object.keys(expandPinModeShorthand(modeValue) ?? {});
+  }
+  return isPlainObject(modeValue) ? Object.keys(modeValue) : [];
+}
+
+/** *modeEntry* with its flag children narrowed to *allowed* plus any flag
+ *  *present* already sets, so a disallowed-but-set flag stays editable. */
+function scopeModeChildren(
+  modeEntry: ConfigEntry,
+  allowed: string[],
+  present: string[]
+): ConfigEntry {
+  const keep = new Set([...allowed, ...present]);
+  const children = (modeEntry.config_entries ?? []).filter((c) => keep.has(c.key));
   return { ...modeEntry, config_entries: children };
 }
 

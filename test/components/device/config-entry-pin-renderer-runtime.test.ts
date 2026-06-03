@@ -230,6 +230,20 @@ describe("renderPinField — mode flags scoped to the pin registry", () => {
     expect(switchByLabel(result, "Pullup")).toBeDefined();
   });
 
+  it("keeps a disallowed flag visible when the value already sets it (legacy repair)", () => {
+    // pca9554 disallows pullup, but a legacy config set INPUT_PULLUP; the
+    // Pullup checkbox must stay so the user can untick it to repair the config.
+    const ctx = openModeCtx(
+      { pca9554: "hub", number: 0, mode: "INPUT_PULLUP" },
+      PCA9554_MODES
+    );
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Pullup")?.["?checked"]).toBe(true);
+    expect(switchByLabel(result, "Input")?.["?checked"]).toBe(true);
+    expect(switchByLabel(result, "Output")).toBeDefined();
+  });
+
   it("keeps every flag when the provider's allowed list is empty", () => {
     // Defensive: an empty allow-list must fall back to show-all rather than
     // scope the Mode group to zero checkboxes.
