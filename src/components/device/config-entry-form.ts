@@ -74,6 +74,9 @@ registerMdiIcons({
   plus: mdiPlus,
 });
 
+/** Events that surface "the user is on this field" for YAML highlight sync. */
+const FIELD_INTERACTION_EVENTS = ["focusin", "input", "change"] as const;
+
 /** Detail emitted with `value-change` events. */
 export interface ConfigEntryValueChange {
   path: string[];
@@ -163,8 +166,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  exists, while a later value edit doesn't re-scroll a consumed one. */
   private _scrolledFocusKey?: string;
 
-  /** Field with focus (last ``focusin``). A ``change`` fires on blur, so it
-   *  must match this to highlight — else leaving A for B re-points at A. */
+  /** Field currently being edited (last ``focusin`` / ``input``). A ``change``
+   *  fires on blur, so it must match this to highlight; else leaving A for B
+   *  re-points the highlight back at A. */
   private _focusedFieldKey?: string;
 
   /**
@@ -257,22 +261,25 @@ export class ESPHomeConfigEntryForm extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.addEventListener("focusin", this._onFieldInteraction);
-    this.addEventListener("change", this._onFieldInteraction);
+    for (const t of FIELD_INTERACTION_EVENTS) {
+      this.addEventListener(t, this._onFieldInteraction);
+    }
   }
 
   disconnectedCallback() {
-    this.removeEventListener("focusin", this._onFieldInteraction);
-    this.removeEventListener("change", this._onFieldInteraction);
+    for (const t of FIELD_INTERACTION_EVENTS) {
+      this.removeEventListener(t, this._onFieldInteraction);
+    }
     super.disconnectedCallback();
   }
 
-  /** Field focused or changed → tell the page which field, to highlight its
-   *  YAML line. ``change`` covers selects / switches whose click doesn't
-   *  reliably surface a focusin, but a ``change`` fires on *blur* — so when
-   *  moving from field A to B it can land after B's ``focusin`` and re-point
-   *  the highlight at A. Gate ``change`` to the field that holds focus (the
-   *  last ``focusin``). Walks ``composedPath`` (not ``closest``) so a field
+  /** A field was focused, typed in, or committed → tell the page which field,
+   *  to highlight its YAML line. ``focusin`` / ``input`` mark the field being
+   *  edited (``input`` is authoritative: it only fires on the live field, so
+   *  it catches one whose ``focusin`` didn't surface, e.g. a just-added
+   *  required input). ``change`` fires on *blur*, so it would re-point the
+   *  highlight at the field just left; honor it only while that field still
+   *  holds focus. Walks ``composedPath`` (not ``closest``) so a field
    *  whose ``data-field-key`` lives inside a nested renderer's shadow root —
    *  the pin / registry-list editors — is still found. */
   private _onFieldInteraction = (e: Event) => {
@@ -286,8 +293,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
     const path = parseFieldKey(el.getAttribute("data-field-key") ?? "");
     if (!path.length) return;
     const key = path.join(" ");
-    if (e.type === "focusin") this._focusedFieldKey = key;
-    else if (key !== this._focusedFieldKey) return;
+    if (e.type === "change" && key !== this._focusedFieldKey) return;
+    const moved = key !== this._focusedFieldKey;
+    this._focusedFieldKey = key;
+    if (e.type === "input" && !moved) return; // same field, mid-typing: no re-emit
     this.dispatchEvent(
       new CustomEvent<{ path: string[] }>("field-focus", {
         detail: { path },

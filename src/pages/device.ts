@@ -1147,36 +1147,41 @@ export class ESPHomePageDevice extends LitElement {
     );
   }
 
+  /** Resolve *path* to its YAML line in the current section and highlight
+   *  just that line. Returns false (highlight untouched) when unresolved. */
+  private _highlightFieldLine(path: string[]): boolean {
+    const section = this._focusedSection();
+    const line = section ? findFieldLine(this._yaml, section, path) : null;
+    if (line === null) return false;
+    this._highlightRange = { fromLine: line, toLine: line };
+    this._scrollToHighlight = true;
+    return true;
+  }
+
   /** Form field focused → highlight just that field's YAML line. */
   private _onFieldFocus(e: CustomEvent<{ path: string[] }>) {
-    this._focusedFieldPath = e.detail.path;
-    const path = this._focusedFieldPath;
-    const section = path?.length ? this._focusedSection() : undefined;
-    if (!section || !path) return;
-    const line = findFieldLine(this._yaml, section, path);
-    // No line yet → highlight the section and flag a retry: a value the
-    // user just set (icon, a new id) writes to YAML on a debounce, so the
-    // line appears on a later update — _retryPendingFieldLine upgrades to
-    // the exact line then.
-    this._pendingFieldLine = line === null;
-    this._highlightRange =
-      line !== null
-        ? { fromLine: line, toLine: line }
-        : { fromLine: section.fromLine, toLine: section.toLine };
-    this._scrollToHighlight = true;
+    const path = (this._focusedFieldPath = e.detail.path);
+    if (!path.length) return;
+    if (this._highlightFieldLine(path)) {
+      this._pendingFieldLine = false;
+      return;
+    }
+    // No line yet: a value the user just set (icon, a new id) writes to YAML
+    // on a debounce, so the line appears on a later update. Highlight the
+    // whole section meanwhile and flag a retry to upgrade to the exact line.
+    this._pendingFieldLine = true;
+    const section = this._focusedSection();
+    if (section) {
+      this._highlightRange = { fromLine: section.fromLine, toLine: section.toLine };
+      this._scrollToHighlight = true;
+    }
   }
 
   /** Once the pending field's YAML line exists (debounced write landed),
    *  upgrade the highlight from the whole section to that line. */
   private _retryPendingFieldLine() {
-    const path = this._focusedFieldPath;
-    if (!this._pendingFieldLine || !path?.length) return;
-    const section = this._focusedSection();
-    const line = section ? findFieldLine(this._yaml, section, path) : null;
-    if (line === null) return; // still not written; wait for the next update
-    this._pendingFieldLine = false;
-    this._highlightRange = { fromLine: line, toLine: line };
-    this._scrollToHighlight = true;
+    if (!this._pendingFieldLine || !this._focusedFieldPath?.length) return;
+    if (this._highlightFieldLine(this._focusedFieldPath)) this._pendingFieldLine = false;
   }
 
   private _onYamlHighlight(
