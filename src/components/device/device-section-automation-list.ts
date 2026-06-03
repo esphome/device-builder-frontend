@@ -1,8 +1,16 @@
+import { mdiDelete, mdiPencil, mdiPlus } from "@mdi/js";
 import { html, LitElement, nothing } from "lit";
 import { customElement, property } from "lit/decorators.js";
 
 import { espHomeStyles } from "../../styles/shared.js";
+import { registerMdiIcons } from "../../util/register-icons.js";
 import { deviceSectionAutomationListStyles } from "./device-section-automation-list.styles.js";
+
+import "@home-assistant/webawesome/dist/components/icon/icon.js";
+
+// Self-contained icon registration — the component renders these MDI
+// icons regardless of which host mounts it.
+registerMdiIcons({ plus: mdiPlus, pencil: mdiPencil, delete: mdiDelete });
 
 /** One row in the manage-list: ``key`` is the stable section key (used
  *  for both edit-routing and delete), ``label`` the display text. */
