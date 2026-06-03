@@ -52,15 +52,16 @@ interface PinOptionView {
   primary: string;
   secondary: string;
   titleText: string;
-  /** Show the warning icon + amber styling (in-use, input-only, or
-   *  feature-mismatch). */
+  /** Warning icon + amber styling — for a pin in use elsewhere or input-only
+   *  on an output field. A missing capability is NOT warned (a board manifest
+   *  that doesn't tag the feature isn't proof the pin lacks it). */
   warn: boolean;
-  /** Block selection — only for board-unavailable pins; capability /
-   *  direction mismatches stay selectable. */
-  disabled: boolean;
-  /** Matches the field's required features and direction; drives the
-   *  Recommended-vs-Other grouping. */
-  recommended: boolean;
+  /** Board-unavailable (occupied / tied to flash) — disabled + grouped under
+   *  "Reserved". */
+  reserved: boolean;
+  /** Positively carries the field's required features and has no direction
+   *  conflict — grouped under "Supports …". */
+  supported: boolean;
 }
 
 function buildPinOption(
@@ -76,10 +77,10 @@ function buildPinOption(
   const needsOutput =
     entry.pin_mode === PinMode.OUTPUT || entry.pin_mode === PinMode.INPUT_OUTPUT;
   const inputOnlyConflict = needsOutput && pin.features.includes(PinFeature.INPUT_ONLY);
-  const missingFeatures = (entry.pin_features ?? []).filter(
-    (f) => !pin.features.includes(f)
+  const hasAllFeatures = (entry.pin_features ?? []).every((f) =>
+    pin.features.includes(f)
   );
-  const unavailable = pin.available === false;
+  const reserved = pin.available === false;
   const inUse = !!(occupiedBy || usedBy);
 
   const inUseText = occupiedBy
@@ -87,41 +88,33 @@ function buildPinOption(
     : usedBy
       ? ctx.localize("device.pin_used_by", { name: usedBy })
       : "";
-  const warnParts: string[] = [];
-  if (missingFeatures.length > 0) {
-    warnParts.push(
-      ctx.localize("device.pin_missing_feature", {
-        features: missingFeatures.map((f) => f.toUpperCase()).join(", "),
-      })
-    );
-  }
-  if (inputOnlyConflict) warnParts.push(ctx.localize("device.pin_input_only"));
+  const conflictText = inputOnlyConflict ? ctx.localize("device.pin_input_only") : "";
   const baseSupporting =
-    pin.notes || (unavailable ? ctx.localize("device.pin_unavailable") : "");
+    pin.notes || (reserved ? ctx.localize("device.pin_unavailable") : "");
 
   const secondaryParts: string[] = [];
   if (pin.label && pin.label !== optValue) secondaryParts.push(optValue);
   if (inUseText) secondaryParts.push(inUseText);
-  secondaryParts.push(...warnParts);
+  if (conflictText) secondaryParts.push(conflictText);
   if (baseSupporting) secondaryParts.push(baseSupporting);
 
   return {
     optValue,
     primary,
     secondary: secondaryParts.join(" • "),
-    titleText: [inUseText, ...warnParts, baseSupporting].filter(Boolean).join(" — "),
-    warn: inUse || inputOnlyConflict || missingFeatures.length > 0,
-    // Only a board-unavailable pin is unselectable; capability / direction
-    // mismatches are soft warnings the user can override.
-    disabled: unavailable,
-    recommended: missingFeatures.length === 0 && !inputOnlyConflict,
+    titleText: [inUseText, conflictText, baseSupporting].filter(Boolean).join(" — "),
+    warn: inUse || inputOnlyConflict,
+    reserved,
+    supported: hasAllFeatures && !inputOnlyConflict,
   };
 }
 
-/** Render the pin options split into "Recommended" (match the field's
- *  features + direction) and "Other pins" groups, separated by a labelled
- *  divider. With no required features every pin is recommended, so the
- *  headers are omitted and it renders as one flat list. */
+/** Render the pin options in up to three sections: pins that positively carry
+ *  the field's required feature(s) under "Supports …" (only when those
+ *  features exist and some pin advertises them — never a quality claim on
+ *  untagged pins), the rest, and board-unavailable pins (disabled) under
+ *  "Reserved". A section header only appears when there's something to
+ *  contrast; with nothing to split it's one flat list. */
 function renderPinOptions(
   pins: BoardPin[],
   entry: ConfigEntry,
@@ -129,27 +122,32 @@ function renderPinOptions(
   value: string,
   ctx: RenderCtx
 ): TemplateResult {
-  const recommended: PinOptionView[] = [];
+  const supported: PinOptionView[] = [];
   const other: PinOptionView[] = [];
+  const reserved: PinOptionView[] = [];
   for (const pin of pins) {
     const view = buildPinOption(pin, entry, usedPins, ctx);
-    (view.recommended ? recommended : other).push(view);
+    (view.reserved ? reserved : view.supported ? supported : other).push(view);
   }
-  const split = recommended.length > 0 && other.length > 0;
+  // Only contrast supported-vs-other when both groups are non-empty; otherwise
+  // it's one flat list (no false "this is special" framing).
+  const splitByCapability = supported.length > 0 && other.length > 0;
+  const features = (entry.pin_features ?? []).map((f) => f.toUpperCase()).join(", ");
+  const header = (key: string, withDivider: boolean) =>
+    html`${withDivider
+        ? html`<wa-divider class="pin-group-divider"></wa-divider>`
+        : nothing} <small class="pin-group-label">${key}</small>`;
   return html`
-    ${split
-      ? html`<small class="pin-group-label">
-          ${ctx.localize("device.pin_group_recommended")}
-        </small>`
+    ${splitByCapability && features
+      ? header(ctx.localize("device.pin_group_supports", { features }), false)
       : nothing}
-    ${recommended.map((v) => renderPinOption(v, value))}
-    ${split
-      ? html`<wa-divider class="pin-group-divider"></wa-divider>
-          <small class="pin-group-label">
-            ${ctx.localize("device.pin_group_other")}
-          </small>`
-      : nothing}
+    ${supported.map((v) => renderPinOption(v, value))}
+    ${splitByCapability ? header(ctx.localize("device.pin_group_other"), true) : nothing}
     ${other.map((v) => renderPinOption(v, value))}
+    ${reserved.length > 0
+      ? header(ctx.localize("device.pin_group_reserved"), true)
+      : nothing}
+    ${reserved.map((v) => renderPinOption(v, value))}
   `;
 }
 
@@ -159,7 +157,7 @@ function renderPinOption(v: PinOptionView, value: string): TemplateResult {
     value=${v.optValue}
     .label=${v.primary}
     ?selected=${v.optValue === value}
-    ?disabled=${v.disabled}
+    ?disabled=${v.reserved}
     title=${v.titleText}
   >
     <span class="pin-option-stack">

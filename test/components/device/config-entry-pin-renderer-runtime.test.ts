@@ -281,7 +281,7 @@ describe("renderPinField — feature/direction soft-filter (issue #1012)", () =>
   const optByValue = (result: unknown, gpio: number) =>
     findElementBindings(result, "wa-option").find((o) => o.value === `GPIO${gpio}`);
 
-  it("shows a feature-mismatched pin (not hidden) as a selectable warning", () => {
+  it("shows a non-matching pin (not hidden) under Other, without a warning", () => {
     const entry = makeEntry(ConfigEntryType.PIN, {
       key: "pin",
       required: true,
@@ -293,10 +293,12 @@ describe("renderPinField — feature/direction soft-filter (issue #1012)", () =>
     const noAdc = optByValue(result, 25);
     expect(adc, "ADC pin present").toBeDefined();
     expect(noAdc, "non-ADC pin still present, not hidden").toBeDefined();
+    // A missing capability is NOT a warning (untagged != incapable); the
+    // grouping alone conveys it.
     expect(String(adc!.class)).not.toContain("pin-option--warn");
-    expect(String(noAdc!.class)).toContain("pin-option--warn");
+    expect(String(noAdc!.class)).not.toContain("pin-option--warn");
     expect(noAdc!["?disabled"]).not.toBe(true);
-    // Recommended/Other split renders a divider.
+    // Supports / Other / Reserved split renders dividers.
     expect(findTemplatesByAnchor(result, "wa-divider").length).toBeGreaterThan(0);
   });
 
@@ -315,7 +317,7 @@ describe("renderPinField — feature/direction soft-filter (issue #1012)", () =>
     expect(inputOnly!["?disabled"]).not.toBe(true);
   });
 
-  it("keeps a board-unavailable pin disabled", () => {
+  it("keeps a board-unavailable pin disabled (Reserved)", () => {
     const entry = makeEntry(ConfigEntryType.PIN, {
       key: "pin",
       required: true,
@@ -326,16 +328,23 @@ describe("renderPinField — feature/direction soft-filter (issue #1012)", () =>
     expect(optByValue(result, 6)!["?disabled"]).toBe(true);
   });
 
-  it("renders one flat list (no divider) when the field has no required features", () => {
+  it("renders one flat list (no divider) when nothing needs breaking out", () => {
+    // No required features, no output requirement, no unavailable pins → every
+    // pin is usable and selectable, so there's no Supports/Other/Reserved split.
+    const flatBoard = makeTestBoard({
+      pins: [makeBoardPin(16), makeBoardPin(17), makeBoardPin(18)],
+    });
     const entry = makeEntry(ConfigEntryType.PIN, {
       key: "pin",
       required: true,
       pin_features: [],
     });
-    const result = renderPinField(entry, ["pin"], makeRenderCtx({}, { board: board() }));
+    const result = renderPinField(
+      entry,
+      ["pin"],
+      makeRenderCtx({}, { board: flatBoard })
+    );
 
-    // GPIO34 (input-only) is recommended here since no output is required, and
-    // every other pin matches → no Recommended/Other split.
     expect(findTemplatesByAnchor(result, "wa-divider").length).toBe(0);
   });
 });
