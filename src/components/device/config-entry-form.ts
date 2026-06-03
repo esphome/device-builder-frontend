@@ -76,8 +76,12 @@ registerMdiIcons({
   plus: mdiPlus,
 });
 
-/** Events that surface "the user is on this field" for YAML highlight sync. */
-const FIELD_INTERACTION_EVENTS = ["focusin", "input", "change"] as const;
+/** Events that surface "the user is on this field" for YAML highlight sync.
+ *  ``pointerdown`` is load-bearing: ``wa-input``'s nested ``delegatesFocus``
+ *  shadow roots keep ``document.activeElement`` pinned to the outer host, so
+ *  ``focusin`` only fires on first entry to the form, never when moving
+ *  between fields. ``pointerdown`` fires on every click regardless. */
+const FIELD_INTERACTION_EVENTS = ["focusin", "pointerdown", "input", "change"] as const;
 
 /** Detail emitted with `value-change` events. */
 export interface ConfigEntryValueChange {

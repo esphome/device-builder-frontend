@@ -34,4 +34,15 @@ describe("decideFieldFocus", () => {
     // Moving A->B: A's blur-time change must not re-point the highlight at A.
     expect(decideFieldFocus("change", A, B)).toEqual({ emit: false, focusedKey: B });
   });
+
+  it("pointerdown on a different field emits and claims focus", () => {
+    // wa-input's nested delegatesFocus keeps document.activeElement pinned to
+    // the outer host, so focusin only fires on first entry; pointerdown is the
+    // reliable per-click signal for moving between fields.
+    expect(decideFieldFocus("pointerdown", B, A)).toEqual({ emit: true, focusedKey: B });
+  });
+
+  it("pointerdown on the already-focused field does not re-emit", () => {
+    expect(decideFieldFocus("pointerdown", A, A)).toEqual({ emit: false, focusedKey: A });
+  });
 });
