@@ -213,6 +213,27 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
           const cm6Line = view.state.doc.line(exitLine);
           return view.lineBlockAt(cm6Line.from).top;
         });
+        // The line at ``scrollTop`` sits behind the overlay, so its scope
+        // can include levels that have actually ended within the rows
+        // stacked above the first *visible* line. Drop any ancestor whose
+        // exit is at/above the bottom of its own row (``scrollTop +
+        // (i+1)*rowHeight``): deeper scopes end first, so this trims the
+        // pinned chain down to what encloses the visible content (e.g. a
+        // sibling ``pin:`` is dropped once ``name:`` is on screen). The
+        // threshold is fixed per row, so there's no count↔height feedback
+        // loop — the trim is stable.
+        let keep = scope.length;
+        for (let i = 0; i < scope.length; i++) {
+          if (exitYs[i] <= scrollTop + (i + 1) * rowHeight) {
+            keep = i;
+            break;
+          }
+        }
+        if (keep < scope.length) {
+          scope.length = keep;
+          exitYs.length = keep;
+        }
+
         const slideInYs: number[] = scope.map(() => Number.NEGATIVE_INFINITY);
         const lastIdx = scope.length - 1;
         if (
