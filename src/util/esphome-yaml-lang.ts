@@ -9,7 +9,13 @@
  * - Block:   `value: !lambda |-\n  return x;`
  */
 import { cppLanguage } from "@codemirror/lang-cpp";
-import { LRLanguage, LanguageSupport, indentService } from "@codemirror/language";
+import {
+  LRLanguage,
+  LanguageSupport,
+  foldInside,
+  foldNodeProp,
+  indentService,
+} from "@codemirror/language";
 import type { Input, SyntaxNodeRef } from "@lezer/common";
 import { parseMixed } from "@lezer/common";
 import { parser as yamlParser } from "@lezer/yaml";
@@ -80,6 +86,20 @@ export const esphomeYamlLanguage = LRLanguage.define({
   name: "esphome-yaml",
   parser: yamlParser.configure({
     wrap: parseMixed(nestLambdas),
+    // Restore the fold ranges the bare @lezer/yaml parser doesn't carry
+    // but @codemirror/lang-yaml's yamlLanguage adds — without these the
+    // editor's fold gutter has nothing to fold. Block mappings/sequences
+    // fold from the end of their opening line; flow collections fold
+    // inside their delimiters.
+    props: [
+      foldNodeProp.add({
+        "FlowMapping FlowSequence": foldInside,
+        "Item Pair BlockLiteral": (node, state) => ({
+          from: state.doc.lineAt(node.from).to,
+          to: node.to,
+        }),
+      }),
+    ],
   }),
   languageData: {
     commentTokens: { line: "#" },

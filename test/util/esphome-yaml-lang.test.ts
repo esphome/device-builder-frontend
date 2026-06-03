@@ -1,4 +1,9 @@
-import { getIndentation, indentUnit } from "@codemirror/language";
+import {
+  ensureSyntaxTree,
+  foldable,
+  getIndentation,
+  indentUnit,
+} from "@codemirror/language";
 import { EditorState } from "@codemirror/state";
 import { describe, expect, it } from "vitest";
 import { ESPHOME_YAML_INDENT, esphomeYaml } from "../../src/util/esphome-yaml-lang.js";
@@ -90,6 +95,45 @@ describe("esphome-yaml indent service", () => {
     expect(indentAt("on_boot:\n  - lambda: |-\n")).toBe(6);
     expect(indentAt("foo:\n  bar: >+\n")).toBe(4);
     expect(indentAt("foo:\n  bar: |\n")).toBe(4);
+  });
+});
+
+/**
+ * `foldable` is CodeMirror's official query for the fold range a given
+ * line opens — using it (rather than reading the parser props directly)
+ * keeps the test resilient to internal API changes. Returns `{from, to}`
+ * for the collapsible region, or `null` when the line opens nothing.
+ */
+function foldAt(yaml: string, lineNumber: number): { from: number; to: number } | null {
+  const state = EditorState.create({
+    doc: yaml,
+    extensions: [indentUnit.of(ESPHOME_YAML_INDENT), esphomeYaml()],
+  });
+  // Force a full parse so the fold service sees the whole tree.
+  ensureSyntaxTree(state, state.doc.length);
+  const line = state.doc.line(lineNumber);
+  return foldable(state, line.from, line.to);
+}
+
+describe("esphome-yaml folding", () => {
+  it("folds a top-level block from the end of its opening line", () => {
+    const yaml = "wifi:\n  ssid: x\n  password: y\n";
+    const range = foldAt(yaml, 1);
+    expect(range).not.toBeNull();
+    // Fold starts at the end of the `wifi:` line, not the start — the
+    // header stays visible when collapsed.
+    expect(range!.from).toBe(yaml.indexOf("\n"));
+    // ...and extends through the last child line.
+    expect(range!.to).toBe("wifi:\n  ssid: x\n  password: y".length);
+  });
+
+  it("does not fold a leaf key with no children", () => {
+    expect(foldAt("wifi:\n  ssid: x\n", 2)).toBeNull();
+  });
+
+  it("folds a list section", () => {
+    const yaml = "sensor:\n  - platform: dht\n    pin: D1\n";
+    expect(foldAt(yaml, 1)).not.toBeNull();
   });
 });
 
