@@ -364,7 +364,12 @@ function providerAllowedModes(
 ): string[] | null {
   if (!modesMap || !isPlainObject(pinValue)) return null;
   for (const key of Object.keys(pinValue)) {
-    if (key in modesMap) return modesMap[key];
+    // Own-property check, not ``in``, so a key like ``toString`` can't match
+    // an inherited member. An empty list means no scoping (show every flag).
+    if (Object.prototype.hasOwnProperty.call(modesMap, key)) {
+      const allowed = modesMap[key];
+      return allowed.length > 0 ? allowed : null;
+    }
   }
   return null;
 }

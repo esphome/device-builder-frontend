@@ -240,24 +240,8 @@ export class ESPHomeConfigEntryForm extends LitElement {
     )}`;
   }
 
-  /**
-   * After every render, push the current value onto each <wa-select>
-   * imperatively. This is a workaround for a wa-select quirk where
-   * the value/selected wiring through Lit's template doesn't always
-   * land — especially on the first paint, when wa-select reads its
-   * value before the slotted options are connected. Each field div
-   * carries a `data-field-key` (the JSON-encoded path) so we can look
-   * up the right value for its select. Encoding the path as JSON
-   * rather than a dotted string keeps user-supplied map keys that
-   * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
-   *
-   * We wait for each select's `updateComplete` (and one frame after
-   * that) to make sure wa-select's own first-render bookkeeping —
-   * `handleDefaultSlotChange`, `setSelectedOptions`, etc. — has run
-   * before we set `.value`. Otherwise our imperative set fights with
-   * wa-select's own initial value resolution and the displayed label
-   * stays blank.
-   */
+  /** Subscribe to the shared pin-registry-modes cache so the form repaints
+   *  (scoping the pin Mode checkboxes) once the map arrives. */
   connectedCallback(): void {
     super.connectedCallback();
     // Re-render when the shared pin-registry-modes map populates so the pin
@@ -299,6 +283,24 @@ export class ESPHomeConfigEntryForm extends LitElement {
     if (this._api) void fetchPinRegistryModes(this._api);
   }
 
+  /**
+   * After every render, push the current value onto each <wa-select>
+   * imperatively. This is a workaround for a wa-select quirk where
+   * the value/selected wiring through Lit's template doesn't always
+   * land — especially on the first paint, when wa-select reads its
+   * value before the slotted options are connected. Each field div
+   * carries a `data-field-key` (the JSON-encoded path) so we can look
+   * up the right value for its select. Encoding the path as JSON
+   * rather than a dotted string keeps user-supplied map keys that
+   * contain a dot (a `logger.logs` row keyed `i2c.idf`) intact.
+   *
+   * We wait for each select's `updateComplete` (and one frame after
+   * that) to make sure wa-select's own first-render bookkeeping —
+   * `handleDefaultSlotChange`, `setSelectedOptions`, etc. — has run
+   * before we set `.value`. Otherwise our imperative set fights with
+   * wa-select's own initial value resolution and the displayed label
+   * stays blank.
+   */
   private async _syncSelectValues() {
     if (!this.shadowRoot) return;
     const fields = this.shadowRoot.querySelectorAll<HTMLElement>("[data-field-key]");

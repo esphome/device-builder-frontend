@@ -35,11 +35,24 @@ export function fetchPinRegistryModes(
   if (!_inflight) {
     _inflight = api
       .getPinRegistryModes()
-      .catch(() => ({}) as Record<string, string[]>)
+      .catch((err) => {
+        // Cache the empty map so a repeated render doesn't retry-storm, but
+        // log so the silent loss of Mode scoping for the session is visible.
+        console.warn("pin-registry-modes fetch failed; Mode flags unscoped", err);
+        return {} as Record<string, string[]>;
+      })
       .then((modes) => {
         _cache = modes;
         _inflight = undefined;
-        for (const cb of _listeners) cb();
+        // Isolate each listener so a throwing subscriber can't break the
+        // others or reject this (successfully resolved) shared promise.
+        for (const cb of _listeners) {
+          try {
+            cb();
+          } catch (err) {
+            console.error("pin-registry-modes listener threw", err);
+          }
+        }
         return modes;
       });
   }
@@ -51,4 +64,5 @@ export function fetchPinRegistryModes(
 export function _resetPinRegistryModesCache(): void {
   _cache = undefined;
   _inflight = undefined;
+  _listeners.clear();
 }

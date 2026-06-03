@@ -229,4 +229,14 @@ describe("renderPinField — mode flags scoped to the pin registry", () => {
 
     expect(switchByLabel(result, "Pullup")).toBeDefined();
   });
+
+  it("keeps every flag when the provider's allowed list is empty", () => {
+    // Defensive: an empty allow-list must fall back to show-all rather than
+    // scope the Mode group to zero checkboxes.
+    const ctx = openModeCtx({ weird: "hub", number: 0, mode: "OUTPUT" }, { weird: [] });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Pullup")).toBeDefined();
+    expect(switchByLabel(result, "Output")).toBeDefined();
+  });
 });

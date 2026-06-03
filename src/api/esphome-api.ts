@@ -1381,9 +1381,11 @@ export class ESPHomeAPI {
     }
     const result: Record<string, string[]> = {};
     for (const [key, value] of Object.entries(raw)) {
-      if (typeof key === "string" && Array.isArray(value)) {
-        result[key] = value.filter((m): m is string => typeof m === "string");
-      }
+      if (typeof key !== "string" || !Array.isArray(value)) continue;
+      const flags = value.filter((m): m is string => typeof m === "string");
+      // Omit empty-after-filter providers; an empty allow-list would scope the
+      // Mode group to zero checkboxes instead of falling back to show-all.
+      if (flags.length > 0) result[key] = flags;
     }
     return result;
   }
