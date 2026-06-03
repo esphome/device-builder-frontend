@@ -160,10 +160,10 @@ const listItemRegexFor = (dashIndent: string) => new RegExp(`^${dashIndent}-\\s+
  * line-by-line serializer. Skipping them here just keeps comments
  * from corrupting the structural read.
  */
-const isBlankOrCommentLine = (line: string): boolean => {
-  const trimmed = line.trim();
-  return trimmed === "" || trimmed.startsWith("#");
-};
+const isCommentLine = (line: string): boolean => line.trim().startsWith("#");
+
+const isBlankOrCommentLine = (line: string): boolean =>
+  line.trim() === "" || isCommentLine(line);
 
 /**
  * Walk forward from *startIdx* skipping blank and comment-only
@@ -995,6 +995,34 @@ export function updateSectionInYaml(
   const { start, end } = findSectionRange(lines, sectionKey, fromLine);
   if (start < 0) return yaml;
 
+  // List-item vs map shape and the section's child indent drive both
+  // the trailing-comment trim below and the serializer's indent step.
+  const isListItem = LIST_ITEM_START_RE.test(lines[start]);
+  const childIndent = _detectSectionChildIndent(lines, start, isListItem);
+
+  // The range runs to the next top-level key, swallowing trailing
+  // comments the splice would then wipe. Walk the trailing run back
+  // from `end`; if it holds a section-level comment, stop the splice
+  // before the run so those lines survive. A `#` line indented deeper
+  // than the section's children is block-scalar body content, not a
+  // YAML comment — break there so it stays on the byte-identical path
+  // rather than being duplicated. Pure-blank runs (incl. the terminal
+  // newline) also stay on that path. (`> start + 1` keeps the header.)
+  let runStart = end;
+  let trailingHasComment = false;
+  while (runStart > start + 1) {
+    const prev = lines[runStart - 1];
+    if (prev.trim() === "") {
+      runStart--;
+    } else if (isCommentLine(prev) && _leadingIndent(prev).length <= childIndent.length) {
+      trailingHasComment = true;
+      runStart--;
+    } else {
+      break;
+    }
+  }
+  const spliceEnd = trailingHasComment ? runStart : end;
+
   // Top-level list-bodied section (globals): re-emit through the
   // mapping serializer's array branch — { sectionKey: array } yields
   // `sectionKey:` plus the dash items at the section's child indent.
@@ -1006,7 +1034,6 @@ export function updateSectionInYaml(
     // Emptied list (every item deleted) → drop the whole block instead
     // of leaving an invalid bare `sectionKey:`. serializeYamlValues
     // skips empty arrays, so the splice removes header + body.
-    const childIndent = _detectSectionChildIndent(lines, start, false);
     const block = serializeYamlValues(
       { [sectionKey]: raw },
       _leadingIndent(lines[start]),
@@ -1015,16 +1042,13 @@ export function updateSectionInYaml(
         indentStep: options.indentStep ?? (childIndent || ESPHOME_YAML_INDENT),
       }
     );
-    lines.splice(start, end - start, ...block);
+    lines.splice(start, spliceEnd - start, ...block);
     return lines.join("\n");
   }
 
-  const isListItem = LIST_ITEM_START_RE.test(lines[start]);
-  // Match the user's existing indent step on save so 4-space (or
-  // other consistent) YAML doesn't get re-emitted with a mixed
-  // 2-space slice. Falls back to the canonical 2-space step when
-  // the section is otherwise empty.
-  const childIndent = _detectSectionChildIndent(lines, start, isListItem);
+  // `childIndent` (detected above) also matches the user's existing
+  // indent step on save, so 4-space (or other consistent) YAML isn't
+  // re-emitted with a mixed 2-space slice.
   let toSerialize = values;
   let dashLine = lines[start];
   if (isListItem) {
@@ -1120,7 +1144,7 @@ export function updateSectionInYaml(
       indentStep: options.indentStep ?? detectedStep,
     }),
   ];
-  lines.splice(start, end - start, ...newLines);
+  lines.splice(start, spliceEnd - start, ...newLines);
   return lines.join("\n");
 }
 
