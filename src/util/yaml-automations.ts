@@ -14,17 +14,11 @@ import {
 } from "./yaml-sections-core.js";
 
 /**
- * A component action-list config field (``open_action:`` …) at some
- * indent. Group 1 is the indent, group 2 the field key.
- *
- * This is a naming heuristic: the ``*_action`` suffix on a direct child
- * of a component instance. The backend (``ConfigEntryType.TRIGGER`` via
- * ``automations/parse``) is the authority on which fields are real
- * action lists; this keystroke-time fallback can't see the schema. In the
- * lockstep deployment the two stay in sync, but a future component field
- * named ``*_action`` that ISN'T a trigger would surface a spurious row
- * here until the backend parse corrects it — so any divergence is easy
- * to spot at this one site.
+ * A component action-list field (``open_action:`` …): group 1 the
+ * indent, group 2 the key. A naming heuristic — the backend
+ * (``ConfigEntryType.TRIGGER``) is the authority; this keystroke-time
+ * fallback can't see the schema, so a non-trigger ``*_action`` field
+ * would surface a spurious row here until backend parse corrects it.
  */
 const _COMPONENT_ACTION_FIELD_RE = /^(\s+)([a-z0-9_]+_action):/;
 

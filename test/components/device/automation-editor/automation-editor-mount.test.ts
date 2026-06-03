@@ -134,4 +134,29 @@ describe("automation-editor mount-time load (behavioral)", () => {
 
     expect(getAvailableAutomations).toHaveBeenCalledTimes(1);
   });
+
+  it("renders a component_action location titled by the field label", async () => {
+    const getAvailableAutomations = vi.fn().mockResolvedValue(slimAvailable());
+    const getAutomationBodies = vi.fn().mockResolvedValue({});
+    const api = { getAvailableAutomations, getAutomationBodies } as unknown as ESPHomeAPI;
+
+    const editor = new ESPHomeAutomationEditor();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any)._api = api;
+    editor.configuration = "device.yaml";
+    editor.location = {
+      kind: "component_action",
+      component_id: "my_gate",
+      field: "open_action",
+    };
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (editor as any).value = { trigger_id: null, trigger_params: {}, actions: [] };
+    document.body.appendChild(editor);
+    await editor.updateComplete;
+    await flushPending();
+
+    // Header derives from the field (no trigger to name); edit-mode means
+    // the add-only trigger picker is never instantiated.
+    expect(editor.shadowRoot?.textContent ?? "").toContain("Open action");
+  });
 });
