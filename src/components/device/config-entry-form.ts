@@ -35,6 +35,7 @@ import { registerMdiIcons } from "../../util/register-icons.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
 import { decideFieldFocus } from "./field-interaction.js";
+import { FieldScrollController } from "./field-scroll-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
 import "@home-assistant/webawesome/dist/components/icon/icon.js";
@@ -77,11 +78,6 @@ registerMdiIcons({
 
 /** Events that surface "the user is on this field" for YAML highlight sync. */
 const FIELD_INTERACTION_EVENTS = ["focusin", "input", "change"] as const;
-
-/** Renders to spend looking for a cursor-targeted field before giving up.
- *  entries + values land in separate renders, so one retry isn't enough;
- *  the cap stops an unbounded shadow-DOM walk for a never-rendered path. */
-const MAX_FOCUS_SCROLL_TRIES = 3;
 
 /** Detail emitted with `value-change` events. */
 export interface ConfigEntryValueChange {
@@ -166,19 +162,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  once and a later user collapse isn't re-overridden. */
   private _seededNestedOpen: Set<string> = new Set();
 
-  /** Last field flashed + when, so the same field isn't re-pulsed within
-   *  10s as the cursor moves around inside it. */
-  private _lastFlashKey?: string;
-  private _lastFlashAt = 0;
-
-  /** The ``focusFieldPath`` already scrolled to. Lets a switch into a
-   *  section retry across the entries/values renders until the field
-   *  exists, while a later value edit doesn't re-scroll a consumed one. */
-  private _scrolledFocusKey?: string;
-
-  /** Render attempts spent locating the current ``focusFieldPath``, bounded
-   *  by ``MAX_FOCUS_SCROLL_TRIES`` so a never-rendered path stops retrying. */
-  private _focusScrollTries = 0;
+  /** Scrolls the YAML-cursor-selected field into view (the structured side
+   *  of the field sync); driven from ``updated``. */
+  private _fieldScroll = new FieldScrollController(this);
 
   /** Field currently being edited (last ``focusin`` / ``input``). A ``change``
    *  fires on blur, so it must match this to highlight; else leaving A for B
@@ -330,84 +316,7 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
-    // A new cursor target hasn't been scrolled to yet; reset the retry budget.
-    if (changed.has("focusFieldPath")) {
-      this._scrolledFocusKey = undefined;
-      this._focusScrollTries = 0;
-    }
-    // Re-attempt while the target is unscrolled and any of these change:
-    // entries + values arrive in separate renders on a section switch, so
-    // the field may not be in the DOM until values lands. The bounded retry
-    // budget stops an endless shadow-DOM walk (and a spontaneous later
-    // scroll) for a path this form never renders; consuming the target on
-    // success keeps a later value edit from re-scrolling.
-    const fp = this.focusFieldPath;
-    if (
-      fp?.length &&
-      this._scrolledFocusKey !== fieldKeyAttr(fp) &&
-      this._focusScrollTries < MAX_FOCUS_SCROLL_TRIES &&
-      (changed.has("focusFieldPath") || changed.has("entries") || changed.has("values"))
-    ) {
-      this._focusScrollTries++;
-      void this._scrollToFocusField(fp);
-    }
-  }
-
-  /**
-   * Scroll the YAML-selected field into view, opening collapsed ancestor
-   * groups first. Tied to the current ``focusFieldPath`` (bails if a newer
-   * cursor move superseded it) and marks it consumed once found.
-   */
-  private async _scrollToFocusField(path: string[]) {
-    if (!this.shadowRoot) return;
-    for (let i = 1; i < path.length; i++) {
-      this.openNested(path.slice(0, i).join("."));
-    }
-    await this.updateComplete; // let any opened group render
-    if (this.focusFieldPath !== path) return; // superseded by a newer move
-    // Try the exact field, then progressively shorter prefixes: a
-    // list-of-maps field (globals / filter items, whose form paths carry
-    // a synthetic index the YAML path lacks) at least scrolls its
-    // container into view.
-    for (let len = path.length; len >= 1; len--) {
-      const target = this._findFieldElement(this.shadowRoot, path.slice(0, len));
-      if (!target) continue;
-      // ``center`` (not ``nearest``) so a tall field — long description
-      // plus input — lands fully in view instead of clipped at the fold.
-      target.scrollIntoView({ block: "center" });
-      // Flash, but not for the same field twice within 10s — moving the
-      // cursor around inside one field shouldn't keep re-pulsing it.
-      const key = fieldKeyAttr(path.slice(0, len));
-      const now = Date.now();
-      if (key !== this._lastFlashKey || now - this._lastFlashAt > 10_000) {
-        this._lastFlashKey = key;
-        this._lastFlashAt = now;
-        target.classList.remove("field--highlight");
-        void target.offsetWidth;
-        target.classList.add("field--highlight");
-      }
-      this._scrolledFocusKey = fieldKeyAttr(path);
-      return;
-    }
-  }
-
-  /** Find the field with *path*, recursing into nested custom-element
-   *  shadow roots (registry lists, etc.) since ``querySelectorAll`` stops
-   *  at shadow boundaries. */
-  private _findFieldElement(root: ParentNode, path: string[]): HTMLElement | null {
-    for (const el of root.querySelectorAll<HTMLElement>("[data-field-key]")) {
-      const p = this._pathOf(el);
-      if (p.length === path.length && p.every((k, i) => k === path[i])) return el;
-    }
-    // Only custom elements (hyphenated tag) carry a shadow root, so skip the
-    // plain-element subtree and recurse just into those.
-    for (const el of root.querySelectorAll<HTMLElement>("*")) {
-      if (!el.localName.includes("-")) continue;
-      const sr = (el as HTMLElement & { shadowRoot: ShadowRoot | null }).shadowRoot;
-      const found = sr ? this._findFieldElement(sr, path) : null;
-      if (found) return found;
-    }
-    return null;
+    this._fieldScroll.maybeScroll(changed);
   }
 
   private async _syncSelectValues() {
