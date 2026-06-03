@@ -324,9 +324,9 @@ export class ESPHomeYamlEditor extends LitElement {
           const line = update.state.doc.lineAt(head).number;
           if (line !== this._lastReportedCursorLine) {
             this._lastReportedCursorLine = line;
-            // Instance-relative field path (drop the top-level key) so the
-            // page can scroll the matching form field into view.
-            const path = getKeyPath(update.state, head).slice(1);
+            // Full key path; the page derives the form-relative path
+            // (it knows whether the section keys fields under its key).
+            const path = getKeyPath(update.state, head);
             this.dispatchEvent(
               new CustomEvent("yaml-cursor-line", {
                 detail: { line, path },

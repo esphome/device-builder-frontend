@@ -34,6 +34,7 @@ import { consumeJustCreated } from "../util/just-created.js";
 import { navigate, setLeaveGuard } from "../util/navigation.js";
 import { postInstallShowLogsHandler } from "../util/post-install-logs.js";
 import { registerMdiIcons } from "../util/register-icons.js";
+import { LIST_SECTIONS } from "../util/section-entry-overrides.js";
 import { UnsavedGuard } from "../util/unsaved-guard.js";
 import { resolveSectionForUrlLine } from "../util/url-line-resolver.js";
 import { getLastValidatedResult } from "../util/yaml-lint-backend.js";
@@ -1094,9 +1095,13 @@ export class ESPHomePageDevice extends LitElement {
    * `updateListener`.
    */
   private _onYamlCursorLine(e: CustomEvent<{ line: number; path?: string[] }>) {
+    // Drop the top-level key to get the form-relative path — except for
+    // list sections (globals), whose form keys fields under that key.
     // Set before the section early-return below, or moving between fields
     // in the same section wouldn't update the form's scroll target.
-    this._focusFieldPath = e.detail.path;
+    const full = e.detail.path ?? [];
+    this._focusFieldPath =
+      full.length > 0 && LIST_SECTIONS.has(full[0]) ? full : full.slice(1);
     const match = sectionAtLine(this._yaml, e.detail.line);
     if (!match) return;
     const sectionKey = sectionKeyOf(match);
