@@ -56,7 +56,8 @@ describe("renderFacets", () => {
   });
 
   // _localize is stubbed to echo its key, so the count-label attribute
-  // reveals which singular/plural key was chosen.
+  // reveals which singular/plural key was chosen. The badge tracks facet
+  // selections only — a lone search term isn't counted here (#1160).
   it("uses the singular count label for exactly one active facet", () => {
     const menu = renderInto(makeHost({ _activeFacetCount: 1 })).querySelector(
       "esphome-filters-menu"

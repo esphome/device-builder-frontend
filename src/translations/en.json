@@ -39,6 +39,7 @@
     "unknown": "Unknown",
     "delete": "Delete",
     "search_placeholder": "Search devices…",
+    "search_clear": "Clear search",
     "device_singular": "device",
     "device_plural": "devices",
     "search_of": "of {total}",

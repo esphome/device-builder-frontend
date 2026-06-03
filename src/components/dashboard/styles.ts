@@ -354,10 +354,39 @@ export const dashboardStyles = css`
      the placeholder. */
   .search-wrap .search-input {
     padding-left: 36px;
+    /* Room for the clear (×); mirrors the 36px leading-icon inset. */
+    padding-right: 36px;
     /* Share the toolbar control height so the search box matches the
        view-toggle / facet pills beside it (the input's default is the
        taller --wa-form-control-height). */
     min-height: var(--esphome-control-height);
+  }
+
+  /* Hide the native type="search" × so it doesn't double our own. */
+  .search-wrap .search-input::-webkit-search-cancel-button {
+    display: none;
+  }
+
+  /* Our clear control — shown only when a query is present. */
+  .search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--wa-color-text-quiet);
+    z-index: 1;
+  }
+
+  .search-clear:hover {
+    color: var(--wa-color-text-normal);
   }
 
   /* Decorative leading icon — magnifier in device mode, code-braces
