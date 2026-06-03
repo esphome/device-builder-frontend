@@ -21,11 +21,12 @@ describe("getKeyPath", () => {
     ]);
   });
 
-  it("drops the list-item wrapper — slice(1) is the form field path", () => {
+  it("omits list-item wrappers — slice(1) drops the section key for the form path", () => {
     const doc =
       "binary_sensor:\n  - platform: gpio\n    name: x\n    pin:\n      number: D1\n";
-    // The structured form keys fields relative to the instance, so the
-    // page uses getKeyPath(...).slice(1) to match `data-field-key`.
+    // getKeyPath only collects mapping-pair keys (the ``- `` list-item adds
+    // none), so the chain here is [binary_sensor, name]; the page slices off
+    // the leading section key to match the instance-relative data-field-key.
     expect(pathAt(doc, "name").slice(1)).toEqual(["name"]);
     expect(pathAt(doc, "number").slice(1)).toEqual(["pin", "number"]);
   });

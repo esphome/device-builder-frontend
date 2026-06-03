@@ -34,7 +34,7 @@ import { getIn, isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { _isStructuralType, filterRenderable } from "./config-entry-render-filter.js";
 import { fieldKeyAttr, parseFieldKey } from "./config-entry-renderers-shared.js";
-import { decideFieldFocus } from "./field-interaction.js";
+import { FieldFocusController } from "./field-focus-controller.js";
 import { FieldScrollController } from "./field-scroll-controller.js";
 
 import "@home-assistant/webawesome/dist/components/divider/divider.js";
@@ -75,13 +75,6 @@ registerMdiIcons({
   "open-in-new": mdiOpenInNew,
   plus: mdiPlus,
 });
-
-/** Events that surface "the user is on this field" for YAML highlight sync.
- *  ``pointerdown`` is load-bearing: ``wa-input``'s nested ``delegatesFocus``
- *  shadow roots keep ``document.activeElement`` pinned to the outer host, so
- *  ``focusin`` only fires on first entry to the form, never when moving
- *  between fields. ``pointerdown`` fires on every click regardless. */
-const FIELD_INTERACTION_EVENTS = ["focusin", "pointerdown", "input", "change"] as const;
 
 /** Detail emitted with `value-change` events. */
 export interface ConfigEntryValueChange {
@@ -170,10 +163,9 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  of the field sync); driven from ``updated``. */
   private _fieldScroll = new FieldScrollController(this);
 
-  /** Field currently being edited (last ``focusin`` / ``input``). A ``change``
-   *  fires on blur, so it must match this to highlight; else leaving A for B
-   *  re-points the highlight back at A. */
-  private _focusedFieldKey?: string;
+  /** Emits ``field-focus`` as the user moves between fields (the other side
+   *  of the sync); owns its own listener lifecycle. */
+  private _fieldFocus = new FieldFocusController(this);
 
   /**
    * Transient unit choice for FLOAT_WITH_UNIT entries the user
@@ -262,60 +254,6 @@ export class ESPHomeConfigEntryForm extends LitElement {
       this._editingMagnitudes.clear();
     }
   }
-
-  connectedCallback() {
-    super.connectedCallback();
-    for (const t of FIELD_INTERACTION_EVENTS) {
-      this.addEventListener(t, this._onFieldInteraction);
-    }
-  }
-
-  disconnectedCallback() {
-    for (const t of FIELD_INTERACTION_EVENTS) {
-      this.removeEventListener(t, this._onFieldInteraction);
-    }
-    super.disconnectedCallback();
-  }
-
-  /** A field was focused, typed in, or committed → tell the page which field,
-   *  to highlight its YAML line. ``focusin`` / ``input`` mark the field being
-   *  edited (``input`` is authoritative: it only fires on the live field, so
-   *  it catches one whose ``focusin`` didn't surface, e.g. a just-added
-   *  required input). ``change`` fires on *blur*, so it would re-point the
-   *  highlight at the field just left; honor it only while that field still
-   *  holds focus. Walks ``composedPath`` (not ``closest``) so a field
-   *  whose ``data-field-key`` lives inside a nested renderer's shadow root —
-   *  the pin / registry-list editors — is still found. */
-  private _onFieldInteraction = (e: Event) => {
-    const el = e
-      .composedPath()
-      .find(
-        (n): n is HTMLElement =>
-          n instanceof HTMLElement && n.hasAttribute("data-field-key")
-      );
-    if (!el) return;
-    // Only real field paths (JSON arrays from ``fieldKeyAttr``) map to a YAML
-    // line. Synthetic disclosure keys like ``pin:pin-advanced`` would strand
-    // the page in a doomed pending-field-line retry — skip them.
-    const attr = el.getAttribute("data-field-key") ?? "";
-    if (!attr.startsWith("[")) return;
-    const path = this._pathOf(el);
-    if (!path.length) return;
-    const { emit, focusedKey } = decideFieldFocus(
-      e.type,
-      fieldKeyAttr(path),
-      this._focusedFieldKey
-    );
-    this._focusedFieldKey = focusedKey;
-    if (!emit) return;
-    this.dispatchEvent(
-      new CustomEvent<{ path: string[] }>("field-focus", {
-        detail: { path },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  };
 
   /** Decode a field element's ``data-field-key`` to its path. */
   private _pathOf(el: Element): string[] {

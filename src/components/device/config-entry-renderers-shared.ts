@@ -19,13 +19,19 @@ import { isPrimitiveOrNullish } from "../../util/nested-values.js";
 import { registerMdiIcons } from "../../util/register-icons.js";
 import { renderInlineError } from "../../util/render-error.js";
 import { configEntryFormStyles } from "./config-entry-form.styles.js";
+import { fieldHighlightStyles } from "./field-highlight.styles.js";
 import type { PasswordInputValueChange } from "./password-input.js";
 
 /** Stylesheets every element that hosts ``ctx.renderEntry`` output
  *  needs in its shadow root: field shell, input styling, and the
  *  layout rules for compound widgets (``.time-period-inputs``,
  *  ``.nested-fields``, …) the per-field renderers emit. */
-export const fieldRendererStyles = [espHomeStyles, inputStyles, configEntryFormStyles];
+export const fieldRendererStyles = [
+  espHomeStyles,
+  inputStyles,
+  configEntryFormStyles,
+  fieldHighlightStyles,
+];
 
 registerMdiIcons({
   "key-variant": mdiKeyVariant,
