@@ -151,6 +151,15 @@ describe("renderPinField — mode scalar shorthand expansion", () => {
     expect(switchByLabel(result, "Pullup")?.["?checked"]).toBe(false);
   });
 
+  it("ticks both flags of a compound shorthand (mode: INPUT_PULLUP)", () => {
+    const ctx = openModeCtx({ number: "GPIO33", mode: "INPUT_PULLUP" });
+    const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
+
+    expect(switchByLabel(result, "Input")?.["?checked"]).toBe(true);
+    expect(switchByLabel(result, "Pullup")?.["?checked"]).toBe(true);
+    expect(switchByLabel(result, "Output")?.["?checked"]).toBe(false);
+  });
+
   it("promotes the scalar to the flag-object form when a flag is toggled", () => {
     const ctx = openModeCtx({ number: 0, mode: "OUTPUT" });
     const result = renderPinField(longFormPinEntry(), ["pin"], ctx);
