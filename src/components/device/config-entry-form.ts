@@ -77,6 +77,11 @@ registerMdiIcons({
 /** Events that surface "the user is on this field" for YAML highlight sync. */
 const FIELD_INTERACTION_EVENTS = ["focusin", "input", "change"] as const;
 
+/** Renders to spend looking for a cursor-targeted field before giving up.
+ *  entries + values land in separate renders, so one retry isn't enough;
+ *  the cap stops an unbounded shadow-DOM walk for a never-rendered path. */
+const MAX_FOCUS_SCROLL_TRIES = 3;
+
 /** Detail emitted with `value-change` events. */
 export interface ConfigEntryValueChange {
   path: string[];
@@ -165,6 +170,10 @@ export class ESPHomeConfigEntryForm extends LitElement {
    *  section retry across the entries/values renders until the field
    *  exists, while a later value edit doesn't re-scroll a consumed one. */
   private _scrolledFocusKey?: string;
+
+  /** Render attempts spent locating the current ``focusFieldPath``, bounded
+   *  by ``MAX_FOCUS_SCROLL_TRIES`` so a never-rendered path stops retrying. */
+  private _focusScrollTries = 0;
 
   /** Field currently being edited (last ``focusin`` / ``input``). A ``change``
    *  fires on blur, so it must match this to highlight; else leaving A for B
@@ -309,18 +318,25 @@ export class ESPHomeConfigEntryForm extends LitElement {
   protected updated(changed: PropertyValues) {
     super.updated(changed);
     void this._syncSelectValues();
-    // A new cursor target hasn't been scrolled to yet.
-    if (changed.has("focusFieldPath")) this._scrolledFocusKey = undefined;
+    // A new cursor target hasn't been scrolled to yet; reset the retry budget.
+    if (changed.has("focusFieldPath")) {
+      this._scrolledFocusKey = undefined;
+      this._focusScrollTries = 0;
+    }
     // Re-attempt while the target is unscrolled and any of these change:
     // entries + values arrive in separate renders on a section switch, so
-    // the field may not be in the DOM until values lands. Consuming the
-    // target on success keeps a later value edit from re-scrolling.
+    // the field may not be in the DOM until values lands. The bounded retry
+    // budget stops an endless shadow-DOM walk (and a spontaneous later
+    // scroll) for a path this form never renders; consuming the target on
+    // success keeps a later value edit from re-scrolling.
     const fp = this.focusFieldPath;
     if (
       fp?.length &&
       this._scrolledFocusKey !== fp.join(" ") &&
+      this._focusScrollTries < MAX_FOCUS_SCROLL_TRIES &&
       (changed.has("focusFieldPath") || changed.has("entries") || changed.has("values"))
     ) {
+      this._focusScrollTries++;
       void this._scrollToFocusField(fp);
     }
   }
