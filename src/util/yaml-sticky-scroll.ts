@@ -132,7 +132,12 @@ export function yamlStickyScroll(options: StickyScrollOptions): Extension {
       }
 
       private onScroll = (): void => {
-        this.refresh();
+        // Measure + apply synchronously off the live scroll position.
+        // Deferring via requestMeasure lagged a frame behind continuous
+        // scrolling, so the pinned scope trailed the viewport (a sibling
+        // you'd scrolled past stayed pinned). The reads here hit CM's
+        // height oracle / cached layout, not a forced reflow.
+        this.applyMeasured(this.measure(this.view), this.view);
       };
 
       get height(): number {
